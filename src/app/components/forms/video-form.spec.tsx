@@ -1009,16 +1009,53 @@ describe('VideoForm — submit poster URL after a file replace', () => {
     );
   });
 
-  it('keeps the existing poster when the fresh capture uploaded nothing', async () => {
+  it('clears the replaced row poster when the fresh capture uploaded nothing', async () => {
+    // Replacing the file forces a fresh choice: the row's poster is a frame of
+    // a video that is no longer there. The new candidate set still persists,
+    // so the strip offers frames to pick, and the server turns the empty value
+    // into a cleared column (`resolveUpdatedPosterUrl`).
     mocks.getPosterDraftFields.mockResolvedValue({ posterCandidates: freshCandidates });
 
     await replaceFileAndSave();
 
     await waitFor(() =>
       expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          values: expect.objectContaining({ posterUrl: editVideo.posterUrl }),
-        })
+        expect.objectContaining({ values: expect.objectContaining({ posterUrl: '' }) })
+      )
+    );
+  });
+
+  it('drops a poster uploaded this session when the file is replaced', async () => {
+    // `uploadedPosterUrl` out-ranks the form field in both the preview and the
+    // submit payload, so clearing the field alone would leave the admin's old
+    // image attached to the new file.
+    mocks.getPosterDraftFields.mockResolvedValue({});
+    mocks.uploadVideoMultipart.mockResolvedValue({
+      success: true,
+      s3Key: 'media/videos/v1/replacement.mp4',
+      fileSize: 9000,
+    });
+    asEditMode();
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    const image = new File(['png'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload a poster image'), image);
+    await waitFor(() =>
+      expect(screen.getByAltText('Video poster')).toHaveAttribute(
+        'src',
+        'https://cdn.example.com/poster.jpg'
+      )
+    );
+
+    await uploadVideoFile(user, 'replacement.mp4', 'Replace video file');
+    await screen.findByText('replacement.mp4');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(mocks.updateVideoAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ values: expect.objectContaining({ posterUrl: '' }) })
       )
     );
   });

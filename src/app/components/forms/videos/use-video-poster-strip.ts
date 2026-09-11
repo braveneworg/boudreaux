@@ -44,6 +44,13 @@ export interface UseVideoPosterStripArgs {
    * otherwise keep the preview on the manual image the pick just replaced.
    */
   onPosterPersisted?: () => void;
+  /**
+   * Called when a replacement file drops the outgoing one's poster. Clearing
+   * the form field is not enough on its own — a poster uploaded this session
+   * out-ranks it in both the preview and the submit payload — so `VideoForm`
+   * uses this to forget that upload too.
+   */
+  onPosterDropped?: () => void;
 }
 
 export interface UseVideoPosterStripResult {
@@ -164,6 +171,7 @@ export const useVideoPosterStrip = ({
   preGeneratedId,
   draftCandidateUrls,
   onPosterPersisted,
+  onPosterDropped,
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
   const [freshSelectedIndex, setFreshSelectedIndex] = useState(0);
@@ -193,22 +201,25 @@ export const useVideoPosterStrip = ({
   // (it skips the pointless presign for an empty set itself).
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
-      // A capture that yields nothing (an undecodable replacement) leaves the
-      // OUTGOING file's frame on the form — the draft wrote it, or the row
-      // hydrated it — and with no new frames to out-rank it, Save would hand
-      // file A's poster to file B (spec §9: zero candidates persists
-      // nothing). A manual poster is not a frame of the outgoing file and
-      // stays. `shouldDirty` so `VideoForm`'s `keepDirtyValues` reset cannot
-      // restore the row's value over the clear.
-      const posterUrl = form.getValues('posterUrl');
-      if (candidates.length === 0 && posterUrl && rowCandidateUrls.has(posterUrl)) {
-        form.setValue('posterUrl', '', { shouldDirty: true });
+      // Replacing the video file forces a fresh poster choice — the outgoing
+      // capture's frames, the row's stored frames, and an image the admin
+      // uploaded by hand all go. Cover art belonging to a file that is no
+      // longer there must never ride along (Save would otherwise hand file
+      // A's poster to file B), and nothing in the UI would flag it if it did.
+      // `s3Key` still holds the OUTGOING key here — the upload rewrites it
+      // only on success — so it tells a replacement from a new video's first
+      // file, where there is nothing to replace. `shouldDirty` so
+      // `VideoForm`'s `keepDirtyValues` reset cannot restore the row's value
+      // over the clear.
+      if (form.getValues('s3Key')) {
+        if (form.getValues('posterUrl')) form.setValue('posterUrl', '', { shouldDirty: true });
+        onPosterDropped?.();
       }
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
       startUploads(candidates);
     },
-    [startUploads, form, rowCandidateUrls]
+    [startUploads, form, onPosterDropped]
   );
 
   const handleSelectCandidate = useCallback(

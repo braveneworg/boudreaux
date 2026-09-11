@@ -96,8 +96,8 @@ const runVideoUpdate = async (
   const candidates = resolveUpdatedCandidates(data, videoId, s3KeyReplaced);
   const response = await VideoService.updateVideo(videoId, {
     ...buildVideoUpdateInput(data, userId),
-    // A file replace settles both poster halves — the outgoing file's frames
-    // (and the poster pointing into them) never carry over to the new file.
+    // A file replace settles both poster halves — no frame and no poster of
+    // the outgoing file carries over to the new one.
     posterUrl: resolveUpdatedPosterUrl(data, s3KeyReplaced),
     ...(candidates !== undefined ? { posterCandidates: candidates } : {}),
   });

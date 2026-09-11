@@ -352,9 +352,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   // candidate frame before submit and the footer can gate on the in-flight PUT.
   const poster = useVideoPosterUpload({ preGeneratedId, setValue });
   // Owns the candidate strip: fresh capture this session, else the row's stored
-  // candidates; a pick persists instantly once isPersisted. A persisted pick
-  // drops any poster uploaded this session, so the preview follows the pick
-  // instead of staying on the out-ranking manual image.
+  // candidates; a pick persists instantly once isPersisted. Both a persisted
+  // pick and a replacement file drop any poster uploaded this session, so the
+  // preview follows them instead of staying on the out-ranking manual image.
   const posterStrip = useVideoPosterStrip({
     form,
     video,
@@ -366,6 +366,9 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     // Save), and stale-free after a SECOND replace, whose frames are not in it.
     draftCandidateUrls,
     onPosterPersisted: poster.clearUploadedPoster,
+    // A replacement file drops the outgoing one's poster, this session's
+    // manual upload included — it out-ranks the cleared field everywhere.
+    onPosterDropped: poster.clearUploadedPoster,
   });
   useEffect(() => {
     getPosterDraftFieldsRef.current = posterStrip.getPosterDraftFields;

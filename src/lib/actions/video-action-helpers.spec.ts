@@ -13,7 +13,7 @@ import {
   buildVideoUpdateInput,
   confirmVideoUpload,
   deleteReplacedVideoAssets,
-  isPosterReplaced,
+  isPosterDropped,
   isVideoOwnedUrl,
   resolveUpdatedCandidates,
   resolveUpdatedPosterUrl,
@@ -203,25 +203,32 @@ describe('buildVideoUpdateInput', () => {
   });
 });
 
-describe('isPosterReplaced', () => {
+describe('isPosterDropped', () => {
   it('is false when the update omits the poster', () => {
-    expect(isPosterReplaced(currentVideo, { ...formData, posterUrl: undefined })).toBe(false);
+    expect(isPosterDropped(currentVideo, { ...formData, posterUrl: undefined }, false)).toBe(false);
   });
 
-  it('is false when the update clears the poster to an empty string', () => {
-    expect(isPosterReplaced(currentVideo, { ...formData, posterUrl: '' })).toBe(false);
+  it('is false when an empty poster arrives without a file replace', () => {
+    // The poster section is replace-only, so an empty field on a plain save
+    // just means the video never had one — the column stays untouched.
+    expect(isPosterDropped(currentVideo, { ...formData, posterUrl: '' }, false)).toBe(false);
   });
 
   it('is false when the poster is unchanged', () => {
-    expect(isPosterReplaced(currentVideo, { ...formData, posterUrl: currentPosterUrl })).toBe(
-      false
-    );
+    expect(isPosterDropped(currentVideo, { ...formData, posterUrl: currentPosterUrl }, false)) //
+      .toBe(false);
   });
 
   it('is true when a new differing poster is supplied', () => {
-    expect(isPosterReplaced(currentVideo, { ...formData, posterUrl: 'https://cdn/new.jpg' })).toBe(
-      true
-    );
+    expect(
+      isPosterDropped(currentVideo, { ...formData, posterUrl: 'https://cdn/new.jpg' }, false)
+    ).toBe(true);
+  });
+
+  it('is true when a file replace clears the poster', () => {
+    // The replacement forces a fresh choice, so the outgoing image is no
+    // longer anyone's poster and its object is orphaned.
+    expect(isPosterDropped(currentVideo, { ...formData, posterUrl: '' }, true)).toBe(true);
   });
 });
 
@@ -393,6 +400,25 @@ describe('deleteReplacedVideoAssets — candidate cleanup guards', () => {
 
     expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-1.jpg');
     expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/poster-candidate-2.jpg');
+  });
+
+  it('frees a manual poster the replacement cleared', () => {
+    // A replacement drops ANY poster, the admin's own upload included, so the
+    // old image is orphaned even though no new URL took its place.
+    const current = { ...currentWithCandidates, posterUrl: manualUrl('old-manual') } as Video;
+
+    deleteReplacedVideoAssets(current, { ...formData, posterUrl: '' }, true);
+
+    expect(deleteS3Object).toHaveBeenCalledWith('media/videos/vid1/old-manual.jpg');
+  });
+
+  it('leaves a manual poster alone when a plain save sends no poster', () => {
+    // Not a replace — an empty field there means the column is untouched.
+    const current = { ...currentWithCandidates, posterUrl: manualUrl('old-manual') } as Video;
+
+    deleteReplacedVideoAssets(current, { ...formData, posterUrl: '' }, false);
+
+    expect(deleteS3Object).not.toHaveBeenCalled();
   });
 });
 
