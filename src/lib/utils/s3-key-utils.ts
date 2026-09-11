@@ -71,8 +71,7 @@ export const buildMediaS3Key = ({
 };
 
 /** The endpoint label of a virtual-hosted S3 host: `s3`, or legacy `s3-{region}`. */
-const isS3EndpointLabel = (label: string | undefined): boolean =>
-  label === 's3' || (label?.startsWith('s3-') ?? false);
+const isS3EndpointLabel = (label: string): boolean => label === 's3' || label.startsWith('s3-');
 
 const S3_HOST_SUFFIX = '.amazonaws.com';
 
@@ -88,13 +87,12 @@ const s3HostBucket = (host: string): string | null => {
   if (!host.endsWith(S3_HOST_SUFFIX)) return null;
   const labels = host.slice(0, -S3_HOST_SUFFIX.length).split('.');
   // The endpoint label is last (`{bucket}.s3`) or second-to-last, with the
-  // region behind it (`{bucket}.s3.{region}`); anything before it is the
+  // region behind it (`{bucket}.s3.{region}`); everything before it is the
   // bucket, and there must be something — path-style `s3.amazonaws.com` names
-  // no bucket in the host.
-  const endpointIndex = [labels.length - 1, labels.length - 2].find(
-    (index) => index > 0 && isS3EndpointLabel(labels.at(index))
-  );
-  return endpointIndex === undefined ? null : labels.slice(0, endpointIndex).join('.');
+  // no bucket in the host at all.
+  const endpointIndex = labels.findLastIndex(isS3EndpointLabel);
+  if (endpointIndex < 1 || endpointIndex < labels.length - 2) return null;
+  return labels.slice(0, endpointIndex).join('.');
 };
 
 /**
