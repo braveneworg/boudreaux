@@ -99,8 +99,7 @@ describe('bundleDownloadQuerySchema', () => {
       expect(result.success).toBe(false);
       const issues = result.success ? [] : result.error.issues;
       const issue = issues.find((i) => i.code === 'custom' && i.path.includes('formats')) as
-        | { params?: { code?: string; invalid?: string[] } }
-        | undefined;
+        { params?: { code?: string; invalid?: string[] } } | undefined;
       expect(issue?.params?.code).toBe('INVALID_FORMATS');
       expect(issue?.params?.invalid).toEqual(['FLAC']);
     });
@@ -113,8 +112,7 @@ describe('bundleDownloadQuerySchema', () => {
       expect(result.success).toBe(false);
       const issues = result.success ? [] : result.error.issues;
       const issue = issues.find((i) => i.code === 'custom' && i.path.includes('formats')) as
-        | { params?: { invalid?: string[] } }
-        | undefined;
+        { params?: { invalid?: string[] } } | undefined;
       expect(issue?.params?.invalid).toEqual(['WAV']);
     });
 

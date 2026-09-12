@@ -8,13 +8,7 @@ import { useGravatarHash } from '@/hooks/use-gravatar-hash';
 import { cn } from '@/lib/utils';
 
 export type GravatarDefaultStyle =
-  | 'retro'
-  | 'identicon'
-  | 'monsterid'
-  | 'wavatar'
-  | 'robohash'
-  | 'mp'
-  | '404';
+  'retro' | 'identicon' | 'monsterid' | 'wavatar' | 'robohash' | 'mp' | '404';
 
 interface GravatarAvatarProps {
   /** Gravatar source. Either `email` (hashed client-side) or `hash` (precomputed server-side). */

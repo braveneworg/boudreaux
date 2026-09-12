@@ -13,8 +13,7 @@
  * Feature: 007-free-digital-downloads
  */
 export type DownloadSubject =
-  | { kind: 'user'; userId: string }
-  | { kind: 'guest'; visitorId: string };
+  { kind: 'user'; userId: string } | { kind: 'guest'; visitorId: string };
 
 /**
  * Type guard: subject is an authenticated user.

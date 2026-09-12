@@ -14,8 +14,7 @@ import type { SetLogLevelInput } from '@/lib/validation/log-level-schema';
 const DEFAULT_TTL_MINUTES = 60;
 
 export type SetLogLevelActionResult =
-  | { success: true; state: LogLevelState }
-  | { success: false; error: 'unauthorized' | 'invalid' };
+  { success: true; state: LogLevelState } | { success: false; error: 'unauthorized' | 'invalid' };
 
 /**
  * Admin-only: override the runtime log level (or clear the override with

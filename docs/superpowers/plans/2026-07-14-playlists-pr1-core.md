@@ -130,11 +130,7 @@ export interface PlaylistSearchItem {
   context?: string;
 }
 export type PlaylistSearchGroupKey =
-  | 'songs'
-  | 'videos'
-  | 'publicPlaylists'
-  | 'releases'
-  | 'artistMatch';
+  'songs' | 'videos' | 'publicPlaylists' | 'releases' | 'artistMatch';
 export interface PlaylistSearchResponse {
   groups: Array<{ key: PlaylistSearchGroupKey; label: string; items: PlaylistSearchItem[] }>;
 }

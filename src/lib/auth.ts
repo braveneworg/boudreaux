@@ -65,9 +65,11 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
  * Resolve better-auth's base URL as a dynamic, per-request config so auth works
  * same-origin whether the app is served from the apex or the `www` subdomain
  * (host-only session cookies — no `crossSubDomainCookies` — require auth to stay
- * first-party). better-auth resolves the base URL from the served host (via the
- * proxy's `x-forwarded-host`, trusted by default for dynamic configs) when it
- * matches `allowedHosts`, and trusts those origins for CSRF. The allowlist —
+ * first-party). better-auth resolves the base URL from the request's `Host`
+ * header — NGINX forwards the public host (`proxy_set_header Host $host`), and
+ * better-auth ≥1.7 ignores `x-forwarded-host` unless
+ * `advanced.trustedProxyHeaders` is set — when it matches `allowedHosts`, and
+ * trusts those origins for CSRF. The allowlist —
  * the apex and any subdomain of it, derived from `AUTH_URL` — is what keeps an
  * injected host header from impersonating another origin; any other host
  * (localhost in dev/E2E, an unlisted preview) falls back to `AUTH_URL`,

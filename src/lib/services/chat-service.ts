@@ -50,8 +50,7 @@ export type SendChatMessageResult =
   | { success: false; error: 'disabled' };
 
 export type ToggleReactionResult =
-  | { success: true; data: ChatMessageDto }
-  | { success: false; error: 'not_found' | 'disabled' };
+  { success: true; data: ChatMessageDto } | { success: false; error: 'not_found' | 'disabled' };
 
 export const MAX_PINNED_CHAT_MESSAGES = 3;
 

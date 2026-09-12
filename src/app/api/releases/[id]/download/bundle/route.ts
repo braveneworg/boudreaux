@@ -1463,8 +1463,7 @@ const resolveFreeVisitorIdentity = async (
 
 /** Access outcome: an early reject `Response`, or whether the caller is entitled by purchase. */
 type BundleAccessResult =
-  | { kind: 'response'; response: Response }
-  | { kind: 'ok'; hasEntitlement: boolean };
+  { kind: 'response'; response: Response } | { kind: 'ok'; hasEntitlement: boolean };
 
 /**
  * Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset).
@@ -1628,8 +1627,7 @@ const assembleGate = (args: {
 
 /** Cap/lock outcome: either an early Response or whether this request holds the lock. */
 type CapLockResult =
-  | { kind: 'response'; response: Response }
-  | { kind: 'ok'; lockAcquired: boolean };
+  { kind: 'response'; response: Response } | { kind: 'ok'; lockAcquired: boolean };
 
 /**
  * 007-free-digital-downloads US2/US3 — enforce the rolling 24h free-tier cap

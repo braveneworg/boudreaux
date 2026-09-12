@@ -169,11 +169,7 @@ export interface PlaylistSearchItem {
 
 /** Group key for the media-search grouped response. */
 export type PlaylistSearchGroupKey =
-  | 'songs'
-  | 'videos'
-  | 'publicPlaylists'
-  | 'releases'
-  | 'artistMatch';
+  'songs' | 'videos' | 'publicPlaylists' | 'releases' | 'artistMatch';
 
 /** Grouped media-search response from GET /api/playlists/media-search. */
 export interface PlaylistSearchResponse {

@@ -525,9 +525,7 @@ describe('Independent Tests', () => {
 // Skip expensive setup when not needed
 const setup = () => {
   // Only runs when called
-  return {
-    /* expensive setup */
-  };
+  return {/* expensive setup */};
 };
 
 // Use test.skip for temporarily disabled tests

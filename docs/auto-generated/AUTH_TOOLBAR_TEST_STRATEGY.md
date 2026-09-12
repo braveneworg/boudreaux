@@ -63,18 +63,10 @@ vi.mock('next-auth/react', () => ({
 }));
 
 // Child components
-vi.mock('./signin-link', () => ({
-  /* ... */
-}));
-vi.mock('./signup-link', () => ({
-  /* ... */
-}));
-vi.mock('./signout-button', () => ({
-  /* ... */
-}));
-vi.mock('../ui/vertical-separator', () => ({
-  /* ... */
-}));
+vi.mock('./signin-link', () => ({/* ... */}));
+vi.mock('./signup-link', () => ({/* ... */}));
+vi.mock('./signout-button', () => ({/* ... */}));
+vi.mock('../ui/vertical-separator', () => ({/* ... */}));
 
 // Utilities
 vi.mock('@/app/lib/utils/tailwind-utils', () => ({

@@ -295,8 +295,7 @@ if (isPrismaError(error)) {
 
 ```typescript
 type FormState =
-  | { success: true; data: UserData }
-  | { success: false; errors: Record<string, string[]> };
+  { success: true; data: UserData } | { success: false; errors: Record<string, string[]> };
 
 // ✅ TypeScript forces you to check success before accessing data
 if (formState.success) {
