@@ -459,13 +459,13 @@ const eslintConfig = [
   },
   // Security linting (full recommended rule set, applied everywhere).
   security.configs.recommended,
-  // ── Sole scoped rule exception ───────────────────────────────────────────────
+  // ── Scoped rule exceptions (the only two) ────────────────────────────────────
   // The project forbids inline eslint-disable comments. `detect-non-literal-fs-filename`
   // is purely syntactic (it flags any non-literal path argument with no "validated/safe"
   // escape), so code doing real file I/O on runtime-computed paths cannot satisfy it:
   // CLI/build scripts, the os-tmpdir upload temp file, and the ffmpeg sibling temp file.
   // These paths are all server-generated, never user input. Every other rule is satisfied
-  // in code repo-wide.
+  // in code repo-wide, except the nginx config guard below.
   {
     files: [
       'scripts/**/*.{ts,tsx}',
@@ -478,6 +478,16 @@ const eslintConfig = [
     ],
     rules: {
       'security/detect-non-literal-fs-filename': 'off',
+    },
+  },
+  // The nginx config guard resolves request paths the way nginx does, which means
+  // compiling the `location ~ …` patterns read from the repo's own nginx.conf.
+  // `detect-non-literal-regexp` is likewise purely syntactic; the patterns are
+  // committed config, never user input.
+  {
+    files: ['nginx/nginx.conf.spec.ts'],
+    rules: {
+      'security/detect-non-literal-regexp': 'off',
     },
   },
   // Server-only modules must log through the project logger (`@/lib/utils/logger`),
