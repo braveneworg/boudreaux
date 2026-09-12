@@ -17,7 +17,13 @@ several sign-ins per minute.
   only the general `/api/` zone plus the one-shot `state` cookie.
 - After an auth-library migration, grep nginx for the OLD library's paths — a
   location regex that matches nothing still looks like protection.
-- CI E2E never goes through nginx and `nginx -t` cannot run outside Docker
-  (`proxy_pass http://website:3000`, `/run/secrets/ssl_*`), so routing rules
-  are proven only by `nginx/nginx.conf.spec.ts` and a prod smoke. Keep that
-  spec's resolver in step with any new `location` modifier you introduce.
+- CI E2E never goes through nginx, so routing rules are proven only by
+  `nginx/nginx.conf.spec.ts` and a prod smoke. Keep that spec's resolver in
+  step with any new `location` modifier you introduce.
+- Syntax is a separate question: a bare `nginx -t` fails outside the compose
+  network (`proxy_pass http://website:3000`, `/run/secrets/ssl_*`), so CI's
+  `nginx-config` job runs `scripts/ci/nginx-config-test.sh` — it builds the
+  production image and runs `nginx -t` inside it with `website` aliased to
+  loopback and a throwaway self-signed pair mounted as the secrets. Run it
+  locally (`bash scripts/ci/nginx-config-test.sh .`, needs Docker) before
+  touching a directive you have not used before.
