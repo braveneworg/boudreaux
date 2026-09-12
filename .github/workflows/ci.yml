@@ -42,6 +42,25 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm exec tsc --noEmit
 
+  # ── nginx config syntax ───────────────────────────────────────────────────
+  # nginx/nginx.conf is baked into the nginx image by deploy.yml and is
+  # otherwise parsed only by the real nginx at deploy time — CI E2E never goes
+  # through nginx, and nginx.conf.spec.ts guards routing rules without asking
+  # nginx. Build the production image and run `nginx -t` inside it here so a
+  # syntax error fails the PR instead of a container that refuses to start.
+  # No toolchain needed: the runner's docker + openssl are enough.
+  nginx-config:
+    name: nginx config syntax
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run nginx -t inside the production nginx image
+        run: bash scripts/ci/nginx-config-test.sh .
+
   # ── Lambda quality (bio-generator + stripe-webhook) ───────────────────────
   # The lambdas are standalone pnpm projects excluded from the root tsconfig,
   # so the quality job above never typechecks them, and their vitest suites
