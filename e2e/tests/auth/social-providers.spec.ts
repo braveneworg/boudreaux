@@ -13,6 +13,38 @@ import { mockTurnstile } from '../../helpers/turnstile-mock';
 // completing an external authorize redirect.
 const SOCIAL_SIGN_IN_ENDPOINT = '**/api/auth/sign-in/social';
 
+// The server-side half of the Turnstile gate: a browser that skips the widget
+// and POSTs straight to better-auth is refused. The UI path (clicking a
+// provider button after the widget verifies) is covered below — it succeeds
+// only because the confirm action issued the gate cookie first.
+test.describe('Turnstile gate on the sign-in API', () => {
+  test('rejects a direct social sign-in POST that skipped the challenge', async ({
+    request,
+    baseURL,
+  }) => {
+    const response = await request.post('/api/auth/sign-in/social', {
+      data: { provider: 'google', callbackURL: '/' },
+      headers: { origin: baseURL ?? '' },
+    });
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'TURNSTILE_REQUIRED' });
+  });
+
+  test('rejects a direct magic-link POST that skipped the challenge', async ({
+    request,
+    baseURL,
+  }) => {
+    const response = await request.post('/api/auth/sign-in/magic-link', {
+      data: { email: 'gate-probe@example.com', callbackURL: '/' },
+      headers: { origin: baseURL ?? '' },
+    });
+
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'TURNSTILE_REQUIRED' });
+  });
+});
+
 test.describe('Social provider sign-in initiation', () => {
   test.beforeEach(async ({ page }) => {
     await mockTurnstile(page);
