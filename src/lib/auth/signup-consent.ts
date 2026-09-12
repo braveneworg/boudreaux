@@ -5,6 +5,8 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 
+import { useSecureAuthCookies } from '@/lib/auth/secure-cookies';
+
 /**
  * Short-lived cookie that carries the agreements a user accepted on the signup
  * card across a social OAuth redirect, so the same opt-ins are persisted whether
@@ -19,10 +21,6 @@ import { cookies } from 'next/headers';
 export const SIGNUP_CONSENT_COOKIE = 'signup_consent';
 
 const MAX_AGE_SECONDS = 60 * 10;
-
-// Mirror auth.ts: secure cookies in production, except under E2E where the
-// standalone server runs over plain HTTP (a secure cookie would not be sent).
-const useSecureCookie = process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true';
 
 /** The decoded consent, as the create hook applies it to a new user. */
 export interface SignupConsent {
@@ -56,7 +54,7 @@ export const setSignupConsentCookie = async (input: {
   cookieStore.set(SIGNUP_CONSENT_COOKIE, JSON.stringify(stored), {
     httpOnly: true,
     sameSite: 'lax',
-    secure: useSecureCookie,
+    secure: useSecureAuthCookies,
     path: '/',
     maxAge: MAX_AGE_SECONDS,
   });

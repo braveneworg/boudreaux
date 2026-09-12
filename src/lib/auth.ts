@@ -15,6 +15,7 @@ import {
   buildSocialProvidersConfig,
   resolveAppleClientSecret,
 } from '@/lib/auth/social-providers-config';
+import { turnstileGateBeforeHook } from '@/lib/auth/turnstile-gate-hook';
 import { userCreateBeforeHook } from '@/lib/auth/user-create-before-hook';
 import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
 import { prisma } from '@/lib/prisma';
@@ -170,6 +171,13 @@ export const auth = betterAuth({
     // and signed-in UI intermittently renders signed-out. Scope the limiter
     // to REAL production; E2E keeps it off. Defaults (window/max) unchanged.
     enabled: isProductionRuntime,
+  },
+  hooks: {
+    // Turnstile gate: browser POSTs to /sign-in/social and /sign-in/magic-link
+    // must carry the cookie issued when a server action verified the widget's
+    // token (see turnstile-gate.ts). Server-side auth.api calls pass through —
+    // the signin/signup actions verify the token themselves first.
+    before: turnstileGateBeforeHook,
   },
   advanced: {
     useSecureCookies: isProductionRuntime,

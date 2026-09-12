@@ -61,15 +61,16 @@ interface SignupSigninFormProps {
   /** Optional breadcrumb trail docked inside the flyer panel. */
   breadcrumbs?: BreadcrumbItemData[];
   /**
-   * Disables the social buttons. The signup page passes
-   * `!(termsAccepted && isVerified)` so social sign-in is gated on the same
-   * agreements + Turnstile check the magic-link path enforces.
+   * Disables the social buttons. Both auth pages gate social sign-in on the
+   * Turnstile check the magic-link path enforces (`!isVerified`); signup also
+   * requires the terms switch (`!(termsAccepted && isVerified)`).
    */
   socialDisabled?: boolean;
   /**
    * Async gate run before social sign-in (forwarded to SocialProviderButtons).
-   * The signup page stashes the opt-in consent + verifies Turnstile here so the
-   * choices persist across the OAuth redirect.
+   * Both pages consume the Turnstile token server-side here — that issues the
+   * gate cookie better-auth requires on /sign-in/social — and signup also
+   * stashes the opt-in consent so the choices persist across the OAuth redirect.
    */
   onBeforeSocialSignIn?: (provider: SocialProvider) => Promise<boolean>;
 }

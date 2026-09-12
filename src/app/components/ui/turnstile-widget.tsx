@@ -26,12 +26,22 @@ export const TurnstileWidget = ({
       ? (process.env.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY ?? '')
       : (process.env.NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY ?? '');
 
+  // The test key always passes. Auto-verify on mount so E2E and local runs
+  // don't depend on Cloudflare's challenge script loading — but never in real
+  // production, where only the widget's own `onVerify` may unlock the form
+  // (the server refuses sign-in without a verified token anyway).
+  // NEXT_PUBLIC_E2E_MODE is inlined at build time: set for the E2E build,
+  // absent from the production build.
+  const autoVerify =
+    process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_E2E_MODE === 'true';
+
   useEffect(() => {
-    // The test key always passes. Auto-verify synchronously so E2E and local
-    // test runs don't depend on Cloudflare's challenge script loading.
+    if (!autoVerify) {
+      return;
+    }
     setIsVerified(true);
     onToken?.('mock-turnstile-token');
-  }, [onToken, setIsVerified]);
+  }, [autoVerify, onToken, setIsVerified]);
 
   const handleReset = () => {
     turnstile.reset();

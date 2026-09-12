@@ -41,6 +41,11 @@ vi.mock('@/lib/services/signup-settings-service', () => ({
 vi.mock('@/lib/auth/signup-consent', () => ({
   readAndClearSignupConsent: vi.fn(async () => null),
 }));
+// A stable sentinel so identity survives `vi.resetModules()` between cases.
+const turnstileGateBeforeHookSentinel = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/auth/turnstile-gate-hook', () => ({
+  turnstileGateBeforeHook: turnstileGateBeforeHookSentinel,
+}));
 
 // A clearly-fake placeholder secret that is ≥32 chars (the validation
 // threshold). Built from a repeated filler so it carries no real entropy and
@@ -126,6 +131,23 @@ describe('src/lib/auth — socialProviders + accountLinking wiring', () => {
     const created = await config.databaseHooks.user.create.before({ email: 'new@example.com' });
 
     expect(created.data.username).toEqual(expect.any(String));
+  });
+
+  it('wires the Turnstile gate as the before hook on every auth request', async () => {
+    vi.resetModules();
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('NODE_ENV', 'development');
+
+    await import('./auth');
+
+    const { betterAuth: betterAuthSpy } = await import('better-auth');
+    const calls = (betterAuthSpy as ReturnType<typeof vi.fn>).mock.calls;
+    const config = calls[calls.length - 1][0];
+
+    // Browser POSTs to /sign-in/social and /sign-in/magic-link must carry the
+    // Turnstile gate cookie; the hook is the server-side half of that gate.
+    expect(config.hooks.before).toBe(turnstileGateBeforeHookSentinel);
   });
 
   it('passes disableSignUp: true to magicLink when AUTH_DISABLE_SIGNUP is "true"', async () => {
