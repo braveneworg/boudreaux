@@ -359,16 +359,63 @@ describe('createVideoDraftAction', () => {
     });
   });
 
-  it('drops a posterUrl that is not one of the candidates', async () => {
+  /**
+   * A poster need not be one of the frames: the admin can upload their own
+   * image while the video multipart is still running, and an abandoned draft
+   * must keep THAT rather than a captured frame. Own-namespace is the guard.
+   */
+  const MANUAL_POSTER = `https://cdn.example.com/media/videos/${ID}/poster-175-ab12cd.jpg`;
+
+  it('persists a manual poster that is not one of the candidates', async () => {
     const result = await createVideoDraftAction({
       ...validInput,
-      posterUrl: candidate(3).url,
+      posterUrl: MANUAL_POSTER,
+      posterCandidates: [candidate(1)],
+    });
+
+    expect(result.success).toBe(true);
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input?.posterUrl).toBe(MANUAL_POSTER);
+  });
+
+  it('still persists the candidates alongside a manual poster', async () => {
+    await createVideoDraftAction({
+      ...validInput,
+      posterUrl: MANUAL_POSTER,
+      posterCandidates: [candidate(1)],
+    });
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input?.posterCandidates).toEqual([candidate(1)]);
+  });
+
+  it('persists a manual poster captured before any frames existed', async () => {
+    await createVideoDraftAction({ ...validInput, posterUrl: MANUAL_POSTER });
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
+    expect(input?.posterUrl).toBe(MANUAL_POSTER);
+  });
+
+  it('drops a posterUrl outside the video namespace', async () => {
+    const result = await createVideoDraftAction({
+      ...validInput,
+      posterUrl: 'https://cdn.example.com/media/videos/other/poster.jpg',
       posterCandidates: [candidate(1)],
     });
 
     expect(result.success).toBe(true);
     const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
     expect(input?.posterUrl).toBeUndefined();
+  });
+
+  it('keeps the namespaced candidates when only the posterUrl is foreign', async () => {
+    await createVideoDraftAction({
+      ...validInput,
+      posterUrl: 'https://cdn.example.com/media/videos/other/poster.jpg',
+      posterCandidates: [candidate(1)],
+    });
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls.at(-1)?.[0];
     expect(input?.posterCandidates).toEqual([candidate(1)]);
   });
 

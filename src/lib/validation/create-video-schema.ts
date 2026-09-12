@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
+import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { videoArtistDetailSchema } from '@/lib/validation/video-artist-detail-schema';
 import { posterCandidatesSchema } from '@/lib/validation/video-poster-candidate-schema';
 import { videoProducerSchema } from '@/lib/validation/video-producer-schema';
@@ -56,7 +57,14 @@ export const videoFormSchema = z.object({
   mimeType: z.enum(VIDEO_ALLOWED_MIME_TYPES, {
     message: 'Only MP4 and WebM videos are supported',
   }),
-  posterUrl: z.string().url({ message: 'Poster must be a valid URL' }).optional().or(z.literal('')),
+  posterUrl: z
+    .string()
+    .max(2048, { message: 'Poster URL must be less than 2048 characters' })
+    // Never `z.string().url()` — it admits `javascript:`/`data:` schemes
+    // (docs/lessons/validation/zod-url-fields-use-is-http-url.md).
+    .refine(isHttpUrl, { message: 'Poster must be a valid URL' })
+    .optional()
+    .or(z.literal('')),
   posterCandidates: posterCandidatesSchema.optional(),
   publishedAt: z.string().optional().or(z.literal('')),
   artistDetails: z.array(videoArtistDetailSchema).max(20).optional(),

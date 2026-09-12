@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -29,13 +29,15 @@ export interface UseVideoPosterStripArgs {
   effectiveVideoId: string | undefined;
   preGeneratedId: string;
   /**
-   * Whether THIS session's captured frames already reached the row — true in a
-   * draft session (the draft create persisted them), false during an edit-mode
-   * file replace, where they only land at Save. `selectVideoPosterAction`
-   * accepts only the row's own candidates, so a fresh pick must stay local
-   * until then or the server refuses it and the pick snaps back.
+   * Candidate URLs a draft create wrote onto the row this session (empty in
+   * edit mode, where the row's own `posterCandidates` cover it).
+   * `selectVideoPosterAction` accepts only the row's own candidates, so a
+   * fresh pick must stay local until one of these URLs is what it points at —
+   * otherwise the server refuses it and the pick visibly snaps back. Tracked
+   * as URLs rather than a per-session flag because a SECOND file replace
+   * captures frames the row has never seen while the draft still exists.
    */
-  freshCandidatesPersisted: boolean;
+  draftCandidateUrls: string[];
   /**
    * Called only after a pick has actually persisted. `VideoForm` uses it to
    * forget a poster uploaded this session, whose display precedence would
@@ -90,6 +92,52 @@ const didPersistPoster = async (
   }
 };
 
+interface UsePersistPosterPickArgs {
+  form: UseFormReturn<VideoFormData>;
+  effectiveVideoId: string | undefined;
+  onPosterPersisted?: () => void;
+}
+
+/**
+ * One pick's optimistic write + instant persist, latest-pick-wins. A newer
+ * click always owns `posterUrl`, so an older attempt's outcome neither writes
+ * nor toasts: without that guard a first pick failing AFTER a second one
+ * succeeded reverts the preview to a value two picks old (until the video
+ * refetch lands) and reports an error for a poster that is in fact set. Same
+ * generation guard `usePosterCandidateUploads` uses for its upload fan-out.
+ */
+const usePersistPosterPick = ({
+  form,
+  effectiveVideoId,
+  onPosterPersisted,
+}: UsePersistPosterPickArgs): ((candidateUrl: string) => Promise<void>) => {
+  const { selectVideoPosterAsync } = useSelectVideoPosterMutation();
+  const pickGenerationRef = useRef(0);
+
+  return useCallback(
+    async (candidateUrl: string): Promise<void> => {
+      if (!effectiveVideoId) return;
+      const generation = (pickGenerationRef.current += 1);
+      const previousPosterUrl = form.getValues('posterUrl') ?? '';
+      form.setValue('posterUrl', candidateUrl, { shouldDirty: false });
+      const persisted = await didPersistPoster(
+        selectVideoPosterAsync,
+        effectiveVideoId,
+        candidateUrl
+      );
+      if (pickGenerationRef.current !== generation) return;
+      if (persisted) {
+        onPosterPersisted?.();
+        toast.success('Poster updated.');
+        return;
+      }
+      form.setValue('posterUrl', previousPosterUrl, { shouldDirty: false });
+      toast.error('Could not set the poster — try again.');
+    },
+    [effectiveVideoId, form, selectVideoPosterAsync, onPosterPersisted]
+  );
+};
+
 /**
  * Owns the poster candidate strip: what it shows, which thumb is highlighted,
  * and what a click does.
@@ -101,12 +149,11 @@ const didPersistPoster = async (
  * edit page still offers the frames (and highlights none when a manual poster
  * is live).
  *
- * A click is local-only until a row exists AND holds the clicked candidate;
- * then the pick is written into the form optimistically and persisted
- * instantly, reverting with an error toast if the server refuses it. A stored
- * pick qualifies as soon as a row exists; a fresh one needs
- * `freshCandidatesPersisted`. Otherwise the selection stays local and rides
- * along into the draft/save payload via
+ * A click is local-only until a row exists AND holds the clicked candidate —
+ * the row's stored set, plus whatever a draft create wrote this session; then
+ * the pick is written into the form optimistically and persisted instantly,
+ * reverting with an error toast if the server refuses it. Otherwise the
+ * selection stays local and rides along into the draft/save payload via
  * {@link UseVideoPosterStripResult.getPosterDraftFields}.
  */
 export const useVideoPosterStrip = ({
@@ -115,7 +162,7 @@ export const useVideoPosterStrip = ({
   isPersisted,
   effectiveVideoId,
   preGeneratedId,
-  freshCandidatesPersisted,
+  draftCandidateUrls,
   onPosterPersisted,
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
@@ -123,11 +170,16 @@ export const useVideoPosterStrip = ({
   const { startUploads, alignedNow, getSettledAligned } = usePosterCandidateUploads({
     preGeneratedId,
   });
-  const { selectVideoPosterAsync } = useSelectVideoPosterMutation();
+  const persistPick = usePersistPosterPick({ form, effectiveVideoId, onPosterPersisted });
   const watchedPosterUrl = useWatch({ control: form.control, name: 'posterUrl' });
 
   const isFreshMode = freshCandidates.length > 0;
   const stored = useMemo<VideoPosterCandidate[]>(() => video?.posterCandidates ?? [], [video]);
+  /** Every candidate URL the row is known to carry — the only persistable picks. */
+  const rowCandidateUrls = useMemo(
+    () => new Set([...stored.map(({ url }) => url), ...draftCandidateUrls]),
+    [stored, draftCandidateUrls]
+  );
   const stripCandidates: StripCandidate[] = isFreshMode ? freshCandidates : stored;
   const selectedIndex = isFreshMode
     ? freshSelectedIndex
@@ -141,40 +193,37 @@ export const useVideoPosterStrip = ({
   // (it skips the pointless presign for an empty set itself).
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
+      // A capture that yields nothing (an undecodable replacement) leaves the
+      // OUTGOING file's frame on the form — the draft wrote it, or the row
+      // hydrated it — and with no new frames to out-rank it, Save would hand
+      // file A's poster to file B (spec §9: zero candidates persists
+      // nothing). A manual poster is not a frame of the outgoing file and
+      // stays. `shouldDirty` so `VideoForm`'s `keepDirtyValues` reset cannot
+      // restore the row's value over the clear.
+      const posterUrl = form.getValues('posterUrl');
+      if (candidates.length === 0 && posterUrl && rowCandidateUrls.has(posterUrl)) {
+        form.setValue('posterUrl', '', { shouldDirty: true });
+      }
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
       startUploads(candidates);
     },
-    [startUploads]
-  );
-
-  const persistPick = useCallback(
-    async (candidateUrl: string): Promise<void> => {
-      if (!effectiveVideoId) return;
-      const previousPosterUrl = form.getValues('posterUrl') ?? '';
-      form.setValue('posterUrl', candidateUrl, { shouldDirty: false });
-      if (await didPersistPoster(selectVideoPosterAsync, effectiveVideoId, candidateUrl)) {
-        onPosterPersisted?.();
-        toast.success('Poster updated.');
-        return;
-      }
-      form.setValue('posterUrl', previousPosterUrl, { shouldDirty: false });
-      toast.error('Could not set the poster — try again.');
-    },
-    [effectiveVideoId, form, selectVideoPosterAsync, onPosterPersisted]
+    [startUploads, form, rowCandidateUrls]
   );
 
   const handleSelectCandidate = useCallback(
     (index: number): void => {
       if (isFreshMode) setFreshSelectedIndex(index);
-      // A fresh frame is only persistable once its own upload has landed AND
-      // the row already carries this session's candidates; until then the pick
-      // stays local and the draft/save payload carries it.
+      // Only a URL the row already carries is persistable — a fresh frame
+      // needs its own upload to have landed AND the draft create to have put
+      // it there. Until then the pick stays local and the draft/save payload
+      // carries it.
       const candidateUrl = isFreshMode ? alignedNow.at(index)?.url : stored.at(index)?.url;
-      const isPersistable = isPersisted && (isFreshMode ? freshCandidatesPersisted : true);
-      if (isPersistable && candidateUrl) void persistPick(candidateUrl);
+      if (isPersisted && candidateUrl && rowCandidateUrls.has(candidateUrl)) {
+        void persistPick(candidateUrl);
+      }
     },
-    [isFreshMode, alignedNow, stored, isPersisted, freshCandidatesPersisted, persistPick]
+    [isFreshMode, alignedNow, stored, isPersisted, rowCandidateUrls, persistPick]
   );
 
   const getPosterDraftFields = useCallback(async (): Promise<DraftPosterFields> => {
