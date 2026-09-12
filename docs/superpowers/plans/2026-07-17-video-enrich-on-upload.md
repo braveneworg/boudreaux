@@ -914,8 +914,7 @@ const logger = loggers.media;
 
 /** Result of the draft create — the caller degrades gracefully on failure. */
 export type CreateVideoDraftResult =
-  | { success: true; videoId: string }
-  | { success: false; error: string };
+  { success: true; videoId: string } | { success: false; error: string };
 
 /** Draft title: the form value, else the cleaned filename stem. */
 const draftTitle = (title: string | undefined, fileName: string): string => {

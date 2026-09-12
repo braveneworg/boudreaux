@@ -562,6 +562,9 @@ const eslintConfig = [
       'src/lib/prisma-adapter.spec.ts',
       'src/lib/utils/slow-query-extension.ts',
       'src/lib/utils/slow-query-extension.spec.ts',
+      // Reads the generated data model (schema metadata, no data access) to pin
+      // better-auth's fail-closed startup schema check to the real Prisma schema.
+      'src/lib/auth-schema-validation.spec.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',

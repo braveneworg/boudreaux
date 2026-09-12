@@ -33,7 +33,7 @@ import { Separator } from '@/ui/separator';
 import { Skeleton } from '@/ui/skeleton';
 import { ZinePanel } from '@/ui/zine-panel';
 
-import { useConnectedAccounts } from './_hooks/use-connected-accounts';
+import { useConnectedAccounts, type ConnectedAccount } from './_hooks/use-connected-accounts';
 
 type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 
@@ -52,6 +52,16 @@ const PROVIDERS: ProviderConfig[] = [
 ];
 
 /**
+ * The linked account row for a provider, if any. Taking the first match keeps
+ * better-auth 1.6's `providerId`-only unlink behavior when a provider is
+ * linked more than once.
+ */
+const findLinkedAccount = (
+  accounts: ConnectedAccount[] | null,
+  providerId: string
+): ConnectedAccount | undefined => accounts?.find((account) => account.providerId === providerId);
+
+/**
  * Profile panel showing all 4 social providers with their link/unlink status.
  * Calls `authClient.linkSocial` to initiate OAuth redirect, and
  * `authClient.unlinkAccount` (behind an AlertDialog confirm) to disconnect.
@@ -59,15 +69,15 @@ const PROVIDERS: ProviderConfig[] = [
 export const ConnectedAccountsSection = (): React.ReactElement => {
   const { accounts, isLoading, error, refetch } = useConnectedAccounts();
 
-  const linkedProviderIds = new Set((accounts ?? []).map((a) => a.providerId));
-
   const handleLink = (provider: SocialProvider): void => {
     void authClient.linkSocial({ provider, callbackURL: '/profile' });
   };
 
-  const handleUnlink = async (providerId: string, label: string): Promise<void> => {
+  const handleUnlink = async (accountId: string, label: string): Promise<void> => {
     try {
-      const { error: unlinkError } = await authClient.unlinkAccount({ providerId });
+      // better-auth ≥1.7 selects the account by its own row `id` — passing the
+      // provider-side `accountId` would 400 ACCOUNT_NOT_FOUND.
+      const { error: unlinkError } = await authClient.unlinkAccount({ accountId });
       if (unlinkError !== null && unlinkError !== undefined) {
         const err = unlinkError instanceof Error ? unlinkError : new Error(String(unlinkError));
         toast.error(`Failed to disconnect from ${label}`);
@@ -110,21 +120,21 @@ export const ConnectedAccountsSection = (): React.ReactElement => {
       {!isLoading && error === null && (
         <div>
           {PROVIDERS.map(({ provider, providerId, label, Icon }) => {
-            const isLinked = linkedProviderIds.has(providerId);
+            const linkedAccount = findLinkedAccount(accounts, providerId);
 
             return (
               <div key={provider} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
                   <Icon className="size-5 shrink-0" aria-hidden="true" />
                   <span className="font-medium">{label}</span>
-                  {isLinked ? (
+                  {linkedAccount ? (
                     <Badge variant="secondary">Connected</Badge>
                   ) : (
                     <span className="text-muted-foreground text-sm">Not connected</span>
                   )}
                 </div>
 
-                {isLinked ? (
+                {linkedAccount ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -140,7 +150,9 @@ export const ConnectedAccountsSection = (): React.ReactElement => {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void handleUnlink(providerId, label)}>
+                        <AlertDialogAction
+                          onClick={() => void handleUnlink(linkedAccount.id, label)}
+                        >
                           Disconnect
                         </AlertDialogAction>
                       </AlertDialogFooter>

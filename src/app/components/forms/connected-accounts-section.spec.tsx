@@ -184,7 +184,52 @@ describe('ConnectedAccountsSection', () => {
         accounts: [makeAccount('google')],
         refetch: refetchMock,
       });
-      unlinkAccountMock.mockResolvedValue({ data: {}, error: null });
+      unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
+
+      render(<ConnectedAccountsSection />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+      // better-auth ≥1.7 selects the account by its own row `id` — NOT the
+      // provider-side `accountId`, which would 400 ACCOUNT_NOT_FOUND.
+      await waitFor(() => {
+        expect(unlinkAccountMock).toHaveBeenCalledWith({ accountId: 'id-google' });
+        expect(toastMock.success).toHaveBeenCalledWith('Disconnected from Google');
+        expect(refetchMock).toHaveBeenCalled();
+      });
+    });
+
+    it('unlinks the row of the provider being disconnected when several are linked', async () => {
+      useConnectedAccountsMock.mockReturnValue({
+        ...defaultHookResult,
+        accounts: [makeAccount('google'), makeAccount('facebook')],
+        refetch: vi.fn().mockResolvedValue(undefined),
+      });
+      unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
+
+      render(<ConnectedAccountsSection />);
+
+      // Rows follow PROVIDERS order, so the linked rows are Google then Facebook.
+      const unlinkButtons = screen.getAllByRole('button', { name: 'Unlink' });
+      await userEvent.click(unlinkButtons[1]);
+      await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+
+      await waitFor(() => {
+        expect(unlinkAccountMock).toHaveBeenCalledWith({ accountId: 'id-facebook' });
+      });
+    });
+
+    it('unlinks the first linked row when a provider has more than one', async () => {
+      useConnectedAccountsMock.mockReturnValue({
+        ...defaultHookResult,
+        accounts: [
+          { ...makeAccount('google'), id: 'id-google-first' },
+          { ...makeAccount('google'), id: 'id-google-second' },
+        ],
+        refetch: vi.fn().mockResolvedValue(undefined),
+      });
+      unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
 
       render(<ConnectedAccountsSection />);
 
@@ -192,9 +237,7 @@ describe('ConnectedAccountsSection', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
       await waitFor(() => {
-        expect(unlinkAccountMock).toHaveBeenCalledWith({ providerId: 'google' });
-        expect(toastMock.success).toHaveBeenCalledWith('Disconnected from Google');
-        expect(refetchMock).toHaveBeenCalled();
+        expect(unlinkAccountMock).toHaveBeenCalledWith({ accountId: 'id-google-first' });
       });
     });
 

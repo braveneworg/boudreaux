@@ -16,8 +16,7 @@ export const MENTION_REGEX = /(^|[^\w@-])@([A-Za-z0-9_.-]{1,32})/g;
 
 /** Token kind emitted by {@link tokenizeMentions}. */
 export type MentionToken =
-  | { kind: 'text'; value: string }
-  | { kind: 'mention'; value: string; username: string };
+  { kind: 'text'; value: string } | { kind: 'mention'; value: string; username: string };
 
 /**
  * Extract the unique usernames mentioned in a message body, preserving

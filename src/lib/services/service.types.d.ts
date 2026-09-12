@@ -14,5 +14,4 @@ import type { DataErrorCode } from '@/lib/types/domain/errors';
  * is free to change and matching it silently couples behaviour to wording.
  */
 export type ServiceResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; code: DataErrorCode };
+  { success: true; data: T } | { success: false; error: string; code: DataErrorCode };

@@ -566,9 +566,7 @@ interface InfoTickerTapeMinimalProps {
 }
 
 type InfoTickerTapeProps =
-  | InfoTickerTapeArtistReleaseProps
-  | InfoTickerTapeFeaturedArtistProps
-  | InfoTickerTapeMinimalProps;
+  InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps | InfoTickerTapeMinimalProps;
 
 /** Resolved display values shown by {@link InfoTickerTape}, derived from any prop variant. */
 interface InfoTickerTapeDisplay {

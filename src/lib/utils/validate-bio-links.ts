@@ -98,8 +98,7 @@ const probeHop = async (url: URL): Promise<HopOutcome> => {
 };
 
 type ResponseOutcome =
-  | { kind: 'verdict'; verdict: LinkVerdict }
-  | { kind: 'redirect'; nextUrl: URL };
+  { kind: 'verdict'; verdict: LinkVerdict } | { kind: 'redirect'; nextUrl: URL };
 
 // Map one hop's response to a verdict, or surface the next redirect target.
 // Only definitive tombstones (404/410) drop; a 3xx without a usable http(s)

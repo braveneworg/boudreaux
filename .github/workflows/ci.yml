@@ -119,7 +119,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: vitest-blob-${{ matrix.shard }}
-          path: .vitest-reports/*
+          # Vitest 5 writes blob-<shard>-<total>.json under .vitest/blob/.
+          path: .vitest/blob/*
           include-hidden-files: true
           retention-days: 1
           if-no-files-found: warn
@@ -145,11 +146,11 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: vitest-blob-*
-          path: .vitest-reports
+          path: .vitest/blob
           merge-multiple: true
 
       - name: Verify blob reports
-        run: ls -la .vitest-reports/
+        run: ls -la .vitest/blob/
 
       - name: Merge reports and generate coverage
         run: pnpm run test:merge

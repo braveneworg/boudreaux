@@ -83,8 +83,7 @@ const runProbe = async (videoId: string, s3Key: string): Promise<void> => {
 };
 
 export type ProbePrefillResult =
-  | { ok: true; tags: ProbePrefillTags }
-  | { ok: false; error: string };
+  { ok: true; tags: ProbePrefillTags } | { ok: false; error: string };
 
 /**
  * ffprobe pipeline for uploaded videos. Kicked after create / file replacement

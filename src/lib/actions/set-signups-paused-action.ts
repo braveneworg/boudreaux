@@ -12,8 +12,7 @@ import { requireRole } from '@/lib/utils/auth/require-role';
 import { signupsPausedSchema } from '@/lib/validation/signups-paused-schema';
 
 export type SetSignupsPausedActionResult =
-  | { success: true }
-  | { success: false; error: 'unauthorized' | 'invalid' };
+  { success: true } | { success: false; error: 'unauthorized' | 'invalid' };
 
 export const setSignupsPausedAction = async (input: {
   paused: boolean;

@@ -20,8 +20,7 @@ const limiter = rateLimit({
 });
 
 type ActionResult =
-  | { success: true; clientSecret: string; sessionId: string }
-  | { success: false; error: string };
+  { success: true; clientSecret: string; sessionId: string } | { success: false; error: string };
 
 type SessionParams = {
   releaseId: string;

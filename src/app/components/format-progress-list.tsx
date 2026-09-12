@@ -6,12 +6,7 @@
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 export type FormatDownloadStatus =
-  | 'pending'
-  | 'zipping'
-  | 'done'
-  | 'uploading'
-  | 'complete'
-  | 'error';
+  'pending' | 'zipping' | 'done' | 'uploading' | 'complete' | 'error';
 
 export interface FormatProgress {
   formatType: string;

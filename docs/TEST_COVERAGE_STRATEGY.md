@@ -110,12 +110,8 @@ vi.mock('next-auth/react', () => ({
 }));
 
 // Avoid ✗ - Multiple conflicting mocks for same module
-vi.mock('next-auth/react', () => ({
-  /* mock 1 */
-}));
-vi.mock('next-auth/react', () => ({
-  /* mock 2 - overwrites mock 1 */
-}));
+vi.mock('next-auth/react', () => ({/* mock 1 */}));
+vi.mock('next-auth/react', () => ({/* mock 2 - overwrites mock 1 */}));
 ```
 
 ### 4. Assertion Best Practices

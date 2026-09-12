@@ -13,6 +13,8 @@
 # testing
 /coverage
 /.vitest-reports
+# Vitest 5 reports, blobs and attachments
+/.vitest
 test-results.xml
 # Temporary TypeScript config files generated during testing (e.g., tsconfig.abc123xyz.json)
 tsconfig.*.json

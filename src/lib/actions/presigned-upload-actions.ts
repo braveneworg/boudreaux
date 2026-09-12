@@ -123,12 +123,7 @@ const validateFile = (
 };
 
 type EntityType =
-  | 'artists'
-  | 'releases'
-  | 'tracks'
-  | 'notifications'
-  | 'featured-artists'
-  | 'videos';
+  'artists' | 'releases' | 'tracks' | 'notifications' | 'featured-artists' | 'videos';
 
 interface S3UploadContext {
   s3Client: ReturnType<typeof getS3Client>;
