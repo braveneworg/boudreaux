@@ -131,13 +131,6 @@ export const buildVideoUpdateInput = (data: VideoFormData, userId: string): Upda
 });
 
 /**
- * Whether the update supplies a new, non-empty poster that differs from the
- * current one (i.e. the poster is being replaced, so the old key can be freed).
- */
-export const isPosterReplaced = (current: Video, data: VideoFormData): boolean =>
-  data.posterUrl !== undefined && data.posterUrl !== '' && data.posterUrl !== current.posterUrl;
-
-/**
  * Whether `url` resolves to an S3 key inside this video's own namespace
  * (`media/videos/{videoId}/…`) — the write-path injection guard for every
  * admin-supplied poster URL, frame or manual upload alike.
@@ -189,15 +182,34 @@ export const resolveUpdatedCandidates = (
 
 /**
  * Poster URL an update writes: whatever the payload supplies, or `null` when a
- * file replace supplies none — the outgoing file's frame must not stay on as
- * the new file's poster. Only a replace can clear it: the poster section is
- * replace-only, so an empty field on a plain save just means the video never
- * had a poster, and `undefined` leaves the column untouched.
+ * file replace supplies none. Replacing the video file forces a fresh poster
+ * choice — a captured frame, or an image the admin uploads after the replace —
+ * so NO poster of the outgoing file survives, its manual upload included; the
+ * client empties the field for exactly that case. Only a replace can clear it:
+ * the poster section is replace-only, so an empty field on a plain save just
+ * means the video never had a poster, and `undefined` leaves the column
+ * untouched.
  */
 export const resolveUpdatedPosterUrl = (
   data: VideoFormData,
   s3KeyReplaced: boolean
 ): string | null | undefined => data.posterUrl || (s3KeyReplaced ? null : undefined);
+
+/**
+ * Whether the update leaves the row's current poster unreferenced: it supplies
+ * a different one, or a file replace cleared it — a replacement forces a fresh
+ * poster choice, so the outgoing image is no longer anyone's poster and its
+ * object can be freed. An empty poster on a save that did NOT replace the file
+ * resolves to `undefined` (column untouched), so nothing is orphaned.
+ */
+export const isPosterDropped = (
+  current: Video,
+  data: VideoFormData,
+  s3KeyReplaced: boolean
+): boolean => {
+  const next = resolveUpdatedPosterUrl(data, s3KeyReplaced);
+  return next !== undefined && next !== current.posterUrl;
+};
 
 /** Whether `url` is one of the video's stored candidate frames. */
 const isStoredCandidateUrl = (current: Video, url: string | null): boolean =>
@@ -236,7 +248,7 @@ const replacedCandidateKeys = (
 /**
  * Best-effort, fire-and-forget cleanup of S3 objects a successful update
  * orphaned: the old video key (file replaced), the old poster key (poster
- * replaced — unless it is a stored candidate, which must survive a
+ * dropped — unless it is a stored candidate, which must survive a
  * candidate-to-candidate switch), and the old candidate set (file replaced,
  * minus whichever frame an unchanged poster still points at). Failures are
  * swallowed by {@link deleteS3Object}.
@@ -253,7 +265,7 @@ export const deleteReplacedVideoAssets = (
   }
   keysToDelete.push(...replacedCandidateKeys(current, data, s3KeyReplaced));
   if (
-    isPosterReplaced(current, data) &&
+    isPosterDropped(current, data, s3KeyReplaced) &&
     current.posterUrl &&
     !isStoredCandidateUrl(current, current.posterUrl)
   ) {
