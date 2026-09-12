@@ -57,6 +57,11 @@ vi.mock('@/lib/actions/stash-signup-consent-action', () => ({
   stashSignupConsent: stashSignupConsentMock,
 }));
 
+const confirmTurnstileMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/actions/confirm-turnstile-action', () => ({
+  confirmTurnstile: confirmTurnstileMock,
+}));
+
 // Bypass schema validation so handleSubmit always fires with the test data.
 vi.mock('@hookform/resolvers/zod', () => ({
   zodResolver: () => () => ({ values: resolvedFormData, errors: {} }),
@@ -139,6 +144,8 @@ describe('SignupPage', () => {
     capturedOnBeforeSocialSignIn = undefined;
     stashSignupConsentMock.mockReset();
     stashSignupConsentMock.mockResolvedValue({ success: true });
+    confirmTurnstileMock.mockReset();
+    confirmTurnstileMock.mockResolvedValue({ success: true });
     // Reset the shared form data between tests that mutate it.
     delete (resolvedFormData as Record<string, unknown>).nullField;
   });
@@ -155,9 +162,23 @@ describe('SignupPage', () => {
       );
     });
 
-    it('does not gate social sign-in on the signin path', () => {
+    it('gates social sign-in on the signin path until Turnstile passes', () => {
       usePathnameMock.mockReturnValue('/signin');
       render(<SignupPage />);
+
+      expect(screen.getByTestId('signup-signin-form')).toHaveAttribute(
+        'data-social-disabled',
+        'true'
+      );
+    });
+
+    it('enables social sign-in on the signin path once Turnstile passes', async () => {
+      usePathnameMock.mockReturnValue('/signin');
+      render(<SignupPage />);
+
+      await act(async () => {
+        capturedSetIsVerified?.(true);
+      });
 
       expect(screen.getByTestId('signup-signin-form')).toHaveAttribute(
         'data-social-disabled',
@@ -196,11 +217,30 @@ describe('SignupPage', () => {
       expect(toastErrorMock).toHaveBeenCalledWith('bad captcha');
     });
 
-    it('does not pass a consent gate on the signin path', () => {
+    it('confirms the Turnstile challenge before social sign-in on signin', async () => {
       usePathnameMock.mockReturnValue('/signin');
       render(<SignupPage />);
 
-      expect(capturedOnBeforeSocialSignIn).toBeUndefined();
+      await act(async () => {
+        capturedOnToken?.('turnstile-token');
+      });
+
+      const proceed = await capturedOnBeforeSocialSignIn?.('apple');
+
+      expect(confirmTurnstileMock).toHaveBeenCalledWith({ turnstileToken: 'turnstile-token' });
+      expect(stashSignupConsentMock).not.toHaveBeenCalled();
+      expect(proceed).toBe(true);
+    });
+
+    it('aborts social sign-in on signin when the confirmation fails', async () => {
+      usePathnameMock.mockReturnValue('/signin');
+      confirmTurnstileMock.mockResolvedValue({ success: false, error: 'bad captcha' });
+      render(<SignupPage />);
+
+      const proceed = await capturedOnBeforeSocialSignIn?.('apple');
+
+      expect(proceed).toBe(false);
+      expect(toastErrorMock).toHaveBeenCalledWith('bad captcha');
     });
   });
 

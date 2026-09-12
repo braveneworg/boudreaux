@@ -18,6 +18,7 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { ImageHeading } from '@/app/components/ui/image-heading';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { useSession } from '@/hooks/use-session';
+import { confirmTurnstile } from '@/lib/actions/confirm-turnstile-action';
 import { signinAction } from '@/lib/actions/signin-action';
 import { signupAction } from '@/lib/actions/signup-action';
 import { stashSignupConsent } from '@/lib/actions/stash-signup-consent-action';
@@ -91,27 +92,32 @@ const SignupPage = () => {
     reportClientError(err, 'route');
   }, []);
 
-  // Gate social sign-in on the signup path: terms must be accepted and Turnstile
-  // verified, matching the magic-link gate. (Signin has no terms, so it is
-  // ungated as before.)
+  // Every sign-in method waits for the Turnstile challenge: social buttons stay
+  // disabled until the widget verifies (signup additionally needs the terms
+  // switch), matching the magic-link field, which only renders once verified.
   const termsAccepted = form.watch('termsAndConditions') === true;
-  const socialDisabled = isSignupPath ? !(termsAccepted && isVerified) : false;
+  const socialDisabled = isSignupPath ? !(termsAccepted && isVerified) : !isVerified;
 
-  // Before a social redirect on signup, verify Turnstile + stash the chosen
-  // opt-ins in a cookie so the user.create.before hook persists them onto the
-  // new OAuth user — the same agreements the magic-link path records.
+  // Before a social redirect, consume the Turnstile token server-side — the
+  // action issues the gate cookie better-auth's before hook requires on
+  // /sign-in/social, so a client that skips the widget is refused. Signup also
+  // stashes the chosen opt-ins in a cookie so the user.create.before hook
+  // persists them onto the new OAuth user — the same agreements the magic-link
+  // path records.
   const handleBeforeSocialSignIn = useCallback(async (): Promise<boolean> => {
-    const result = await stashSignupConsent({
-      turnstileToken,
-      allowSmsNotifications: form.getValues('allowSmsNotifications') ?? false,
-      allowEmailNotifications: form.getValues('allowEmailNotifications') ?? false,
-    });
+    const result = isSignupPath
+      ? await stashSignupConsent({
+          turnstileToken,
+          allowSmsNotifications: form.getValues('allowSmsNotifications') ?? false,
+          allowEmailNotifications: form.getValues('allowEmailNotifications') ?? false,
+        })
+      : await confirmTurnstile({ turnstileToken });
     if (!result.success) {
       toast.error(result.error ?? 'Verification failed. Please try again.');
       return false;
     }
     return true;
-  }, [turnstileToken, form]);
+  }, [isSignupPath, turnstileToken, form]);
 
   const handleSubmit = useCallback(
     async (data: CombinedFormSchema) => {
@@ -196,7 +202,7 @@ const SignupPage = () => {
                 callbackURL="/"
                 onSocialError={handleSocialError}
                 socialDisabled={socialDisabled}
-                onBeforeSocialSignIn={isSignupPath ? handleBeforeSocialSignIn : undefined}
+                onBeforeSocialSignIn={handleBeforeSocialSignIn}
                 breadcrumbs={[
                   { anchorText: isSignupPath ? 'Sign Up' : 'Sign In', url: '#', isActive: true },
                 ]}

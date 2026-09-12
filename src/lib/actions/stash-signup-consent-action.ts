@@ -7,9 +7,9 @@ import 'server-only';
 
 import { headers } from 'next/headers';
 
+import { passTurnstileChallenge } from '@/lib/auth/pass-turnstile-challenge';
 import { setSignupConsentCookie } from '@/lib/auth/signup-consent';
 import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
-import { verifyTurnstile } from '@/lib/utils/verify-turnstile';
 
 export interface StashSignupConsentInput {
   /** Cloudflare Turnstile token captured by the widget. */
@@ -24,12 +24,13 @@ export interface StashSignupConsentResult {
 }
 
 /**
- * Called from the signup card right before `authClient.signIn.social`. Verifies
- * the Turnstile token server-side (the same bot gate magic-link gets) and, on
- * success, stashes the chosen opt-ins in the consent cookie so better-auth's
+ * Called from the signup card right before `authClient.signIn.social`. Passes
+ * the Turnstile challenge server-side — consuming the token and issuing the
+ * gate cookie better-auth's before hook requires on `/sign-in/social` — and,
+ * on success, stashes the chosen opt-ins in the consent cookie so better-auth's
  * `user.create.before` hook can persist them onto the new OAuth user. The
- * caller only invokes this once terms are accepted, so the cookie always
- * implies terms acceptance.
+ * caller only invokes this once terms are accepted, so the consent cookie
+ * always implies terms acceptance.
  */
 export const stashSignupConsent = async (
   input: StashSignupConsentInput
@@ -37,12 +38,9 @@ export const stashSignupConsent = async (
   const headersList = await headers();
   const ip = extractClientIpFromHeaders(headersList);
 
-  const turnstileResult = await verifyTurnstile(input.turnstileToken, ip);
-  if (!turnstileResult.success) {
-    return {
-      success: false,
-      error: turnstileResult.error || 'CAPTCHA verification failed. Please try again.',
-    };
+  const challenge = await passTurnstileChallenge({ turnstileToken: input.turnstileToken, ip });
+  if (!challenge.success) {
+    return challenge;
   }
 
   await setSignupConsentCookie({

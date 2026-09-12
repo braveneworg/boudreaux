@@ -5,13 +5,15 @@ import { stashSignupConsent } from './stash-signup-consent-action';
 
 vi.mock('server-only', () => ({}));
 
-const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
+const mockPassTurnstileChallenge = vi.hoisted(() => vi.fn());
 const mockSetSignupConsentCookie = vi.hoisted(() => vi.fn());
 
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => ({ get: vi.fn(() => '127.0.0.1') })),
 }));
-vi.mock('@/lib/utils/verify-turnstile', () => ({ verifyTurnstile: mockVerifyTurnstile }));
+vi.mock('@/lib/auth/pass-turnstile-challenge', () => ({
+  passTurnstileChallenge: mockPassTurnstileChallenge,
+}));
 vi.mock('@/lib/utils/extract-client-ip', () => ({
   extractClientIpFromHeaders: vi.fn(() => '127.0.0.1'),
 }));
@@ -20,8 +22,13 @@ vi.mock('@/lib/auth/signup-consent', () => ({
 }));
 
 describe('stashSignupConsent', () => {
-  it('verifies Turnstile and stashes the opt-ins on success', async () => {
-    mockVerifyTurnstile.mockResolvedValue({ success: true });
+  beforeEach(() => {
+    mockPassTurnstileChallenge.mockReset();
+    mockSetSignupConsentCookie.mockReset();
+  });
+
+  it('passes the Turnstile challenge and stashes the opt-ins on success', async () => {
+    mockPassTurnstileChallenge.mockResolvedValueOnce({ success: true });
 
     const result = await stashSignupConsent({
       turnstileToken: 'token',
@@ -30,15 +37,18 @@ describe('stashSignupConsent', () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(mockVerifyTurnstile).toHaveBeenCalledWith('token', '127.0.0.1');
+    expect(mockPassTurnstileChallenge).toHaveBeenCalledWith({
+      turnstileToken: 'token',
+      ip: '127.0.0.1',
+    });
     expect(mockSetSignupConsentCookie).toHaveBeenCalledWith({
       allowSmsNotifications: true,
       allowEmailNotifications: false,
     });
   });
 
-  it('does not set the cookie when Turnstile fails', async () => {
-    mockVerifyTurnstile.mockResolvedValue({ success: false, error: 'bad token' });
+  it('does not stash consent when the challenge fails', async () => {
+    mockPassTurnstileChallenge.mockResolvedValueOnce({ success: false, error: 'bad token' });
 
     const result = await stashSignupConsent({
       turnstileToken: 'token',

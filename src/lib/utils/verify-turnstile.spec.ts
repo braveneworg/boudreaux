@@ -137,9 +137,35 @@ describe('verifyTurnstile', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it('bypasses in the E2E production standalone (E2E_MODE=true) with the test secret', async () => {
+      vi.stubEnv('CLOUDFLARE_SECRET', CONSTANTS.TURNSTILE.TEST_SECRET);
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('E2E_MODE', 'true');
+
+      const result = await verifyTurnstile('mock-turnstile-token', '127.0.0.1');
+
+      expect(result).toEqual({ success: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not bypass under E2E_MODE when the secret is not the test secret', async () => {
+      vi.stubEnv('CLOUDFLARE_SECRET', 'real-production-secret');
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('E2E_MODE', 'true');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await verifyTurnstile('valid-token', '127.0.0.1');
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
     it('should not bypass verification when test secret is used in production', async () => {
       vi.stubEnv('CLOUDFLARE_SECRET', CONSTANTS.TURNSTILE.TEST_SECRET);
       vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('E2E_MODE', '');
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),

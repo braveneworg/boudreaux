@@ -63,11 +63,57 @@ describe('TurnstileWidget', () => {
 
   beforeEach(() => {
     mockCallbacks = {};
+    mockSetIsVerified.mockClear();
     // Default to a non-bypass test key so the Turnstile widget renders.
     // Individual tests can override with vi.stubEnv() or clear via stubEnv('', '').
     // Stubs are restored by the global afterEach in setupTests.ts.
     vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'default-test-key');
     vi.stubEnv('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'default-prod-key');
+  });
+
+  describe('mount-time auto-verify', () => {
+    it('auto-verifies on mount outside production (the test key always passes)', () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+      const onToken = vi.fn();
+
+      render(<TurnstileWidget {...defaultProps} onToken={onToken} />);
+
+      expect(mockSetIsVerified).toHaveBeenCalledWith(true);
+      expect(onToken).toHaveBeenCalledWith('mock-turnstile-token');
+    });
+
+    it('does not auto-verify on mount in production — only the real challenge unlocks', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+      const onToken = vi.fn();
+
+      render(<TurnstileWidget {...defaultProps} onToken={onToken} />);
+
+      expect(mockSetIsVerified).not.toHaveBeenCalled();
+      expect(onToken).not.toHaveBeenCalled();
+    });
+
+    it('auto-verifies on mount in the E2E production standalone', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', 'true');
+
+      render(<TurnstileWidget {...defaultProps} />);
+
+      expect(mockSetIsVerified).toHaveBeenCalledWith(true);
+    });
+
+    it('still unlocks on a real verification in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+      const onToken = vi.fn();
+
+      render(<TurnstileWidget {...defaultProps} onToken={onToken} />);
+      fireEvent.click(screen.getByTestId('turnstile-widget'));
+
+      expect(mockSetIsVerified).toHaveBeenCalledWith(true);
+      expect(onToken).toHaveBeenCalledWith('mock-token');
+    });
   });
 
   describe('site key selection', () => {

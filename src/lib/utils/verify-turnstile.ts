@@ -19,13 +19,16 @@ interface TurnstileVerifyResponse {
 
 /**
  * Whether to skip the live siteverify call. Bypass only when BOTH conditions
- * are met: Cloudflare's well-known test secret key is in use AND we are not in
- * production. This prevents accidental bypass in production if the test secret
- * is misconfigured.
+ * are met: Cloudflare's well-known test secret key is in use AND this is not
+ * real production — dev/test, or the E2E standalone (a production build with
+ * E2E_MODE=true, which `auth.ts` refuses to boot in real production). This
+ * prevents accidental bypass in production if the test secret is misconfigured,
+ * and keeps E2E offline instead of round-tripping to Cloudflare.
  * @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
  */
 const shouldBypassVerification = (secret: string): boolean =>
-  secret === CONSTANTS.TURNSTILE.TEST_SECRET && process.env.NODE_ENV !== 'production';
+  secret === CONSTANTS.TURNSTILE.TEST_SECRET &&
+  (process.env.NODE_ENV !== 'production' || process.env.E2E_MODE === 'true');
 
 /**
  * Map a failed Turnstile verification result to a user-facing error message.

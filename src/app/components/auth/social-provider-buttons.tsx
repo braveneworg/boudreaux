@@ -46,13 +46,14 @@ interface SocialProviderButtonsProps {
   onError?: (provider: SocialProvider, error: unknown) => void;
   /**
    * Disables every button (in addition to the internal pending state). The
-   * signup page uses this to gate social sign-in on terms acceptance + Turnstile.
+   * auth pages use this to gate social sign-in on Turnstile (and, on signup,
+   * terms acceptance).
    */
   disabled?: boolean;
   /**
    * Optional async gate run before `signIn.social`. Resolve `true` to proceed,
-   * `false` to abort (e.g. the signup page stashes consent + verifies Turnstile
-   * here, and skips sign-in if that fails).
+   * `false` to abort (the auth pages consume the Turnstile token server-side
+   * here — signup also stashes consent — and skip sign-in if that fails).
    */
   beforeSignIn?: (provider: SocialProvider) => Promise<boolean>;
 }
