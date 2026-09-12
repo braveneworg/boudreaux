@@ -122,6 +122,16 @@ out). The SES client uses the standard AWS credential chain.
 (`NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY` is the always-pass dev/test key — not a
 production secret.)
 
+Every sign-in method waits for the challenge, and the server enforces it: a
+server action consumes the widget's single-use token and issues a short-lived,
+signed, `httpOnly` gate cookie (`src/lib/auth/turnstile-gate.ts`), and a
+better-auth before hook refuses browser `POST`s to `/sign-in/social` and
+`/sign-in/magic-link` that lack it (`403`, code `TURNSTILE_REQUIRED`). The
+cookie is signed with `AUTH_SECRET` — nothing extra to provision. Server-side
+`auth.api.*` calls (the signin/signup actions, which verify the token
+themselves) are exempt. Under E2E (`E2E_MODE=true` with the public test
+secret) verification is bypassed offline, so the suite never calls Cloudflare.
+
 ### Social OAuth providers (set per provider you enable)
 
 Quick reference — set both vars for each provider you want to offer; a provider
