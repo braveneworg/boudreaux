@@ -26,6 +26,12 @@ Rules:
   never server-rendered — mount-gated or interaction-only) and/or a `loading`
   component. Prefer a `loading` fallback that reserves the real footprint so
   the container (popover, dialog, row) doesn't re-measure and jump.
+- Adding the boundary changes focus: Radix FocusScope autofocuses the first
+  tabbable at popover MOUNT, which is now the loading fallback — when the
+  real panel lands nothing focuses it, and the E2E `toBeFocused()` net in
+  `playlist-add-from-player.spec.ts` fails in CI (shard 3, PR #736). A
+  lazy-loaded popover body must place focus itself on mount (ref + effect —
+  the `autoFocus` attribute is banned by jsx-a11y/no-autofocus).
 - Unit tests can only catch this with the app-dir implementation: Vitest
   resolves the bare `next/dynamic` specifier to the pages-router module, which
   always supplies a boundary. Mock it to `next/dist/shared/lib/app-dynamic` and

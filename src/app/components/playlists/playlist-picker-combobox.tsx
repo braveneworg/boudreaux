@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import { Plus } from 'lucide-react';
 
@@ -29,6 +29,15 @@ interface PlaylistPickerComboboxProps {
   onPick: (row: PlaylistListRow) => void;
   /** Playlist id to hide from the list (e.g. the playlist currently open). */
   excludePlaylistId?: string;
+  /**
+   * Focus the search input on mount. Needed when the picker lands inside an
+   * already-open Radix popover (lazy-loaded panel): FocusScope's mount-time
+   * autofocus ran against the loading fallback, so nothing else will place
+   * focus on the input once it exists. Done via a ref in an effect rather
+   * than the `autoFocus` attribute (jsx-a11y/no-autofocus) — the intent is the
+   * same as the popover's own open-autofocus, just deferred to the real input.
+   */
+  focusOnMount?: boolean;
 }
 
 /**
@@ -41,9 +50,15 @@ interface PlaylistPickerComboboxProps {
 export const PlaylistPickerCombobox = ({
   onPick,
   excludePlaylistId,
+  focusOnMount = false,
 }: PlaylistPickerComboboxProps): ReactElement => {
   const [search, setSearch] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const { isPending, rows } = usePlaylistsQuery();
+
+  useEffect(() => {
+    if (focusOnMount) inputRef.current?.focus();
+  }, [focusOnMount]);
 
   const q = search.toLowerCase();
   const visibleRows = (rows ?? [])
@@ -58,6 +73,7 @@ export const PlaylistPickerCombobox = ({
         onValueChange={setSearch}
         placeholder="Find a playlist…"
         aria-label="Find a playlist"
+        ref={inputRef}
       />
       <CommandList>
         <CommandEmpty>{isPending ? 'Loading…' : 'No playlists yet.'}</CommandEmpty>

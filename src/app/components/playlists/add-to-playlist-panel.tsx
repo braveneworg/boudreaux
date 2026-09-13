@@ -40,7 +40,10 @@ export const AddToPlaylistPanel = ({
   return (
     <div className="flex w-full flex-col gap-2">
       <p className="px-2 text-sm font-semibold">Add to a playlist</p>
-      <PlaylistPickerCombobox onPick={flow.pickPlaylist} />
+      {/* focusOnMount: this panel is lazy-loaded into an already-open popover,
+          so Radix FocusScope's mount-time autofocus already ran (against the
+          loading fallback) — the picker must take focus itself when it lands. */}
+      <PlaylistPickerCombobox onPick={flow.pickPlaylist} focusOnMount />
       <Button variant="outline" className="w-full" onClick={onCreatePlaylist}>
         <ListPlus aria-hidden="true" />
         Create playlist
