@@ -18,7 +18,8 @@ never preload everything.
   worktrees made by `claude --worktree` or subagent isolation; for any other
   worktree (e.g. `git worktree add`), copy them yourself —
   `cp -p <main-checkout>/.env <main-checkout>/.env.local <worktree>/`. Copying
-  is required; reading them stays forbidden (hard constraint 2).
+  is required; reading them stays forbidden (hard constraint 2), and the live
+  values they carry make hard constraint 1 mandatory.
 - TDD is non-negotiable: write the test first, watch it fail, then implement.
   Every feature and bug fix ships with tests.
 - Quality over speed. These guidelines are binding — when code can't comply,
@@ -31,22 +32,25 @@ never preload everything.
 
 ## Hard constraints
 
-1. **Database isolation** — the production `DATABASE_URL` lives outside this
-   repo and must never reach an agent: never put it in a repo file, a command,
-   or a prompt, and never try to obtain it. Every `.env*` file in the repo
-   that sets `DATABASE_URL` points it at the dockerized MongoDB
-   (`mongodb://localhost:27018/boudreaux-dev?replicaSet=rs0`, served by
-   `pnpm run e2e:docker:up`). Try out new functionality that could change data
-   (dev-server mutations, seed or maintenance scripts, `prisma db push`,
-   migrations) only against that database, never the production, testing, or
-   staging database. Seed, `prisma db`/`migrate`/`studio`, restore,
-   backfill/migration scripts, and `next dev`/`next start` run outside Docker
-   prompt for approval (`.claude/settings.json` ask rules): prefix the command
-   with the Docker `DATABASE_URL` (never `export` it) so the approver sees the
-   target, and approve only prompts whose command shows `DATABASE_URL=`
-   pointing at `localhost:27018`. Before touching E2E, the DB, builds, dev
-   servers, seed scripts, or anything that reads the environment, read
-   [`e2e/AGENTS.md`](e2e/AGENTS.md) in full. When in doubt, stop and ask.
+1. **Database isolation** — the copied `.env*` files point at live databases.
+   Try out new functionality that could change data (dev-server mutations,
+   seed or maintenance scripts, `prisma db push`, migrations) only against a
+   dockerized MongoDB — `pnpm run e2e:docker:up` serves one on
+   `localhost:27018` — never the production, testing, or staging database.
+   Point the process at it with a command-scoped variable, e.g.
+   `DATABASE_URL='mongodb://localhost:27018/boudreaux-dev?replicaSet=rs0' pnpm run dev`
+   (seed it the same way), never `export` it — values already in the
+   environment win over `.env*` — and check that URL before anything writes.
+   Seed, `prisma db`/`migrate`/`studio`, restore, backfill/migration scripts,
+   and `next dev`/`next start` run outside Docker prompt for approval
+   (`.claude/settings.json` ask rules), so keep the `DATABASE_URL` prefix on
+   the command where the approver sees it. Approve such a prompt only when
+   the command itself shows `DATABASE_URL=` pointing at `localhost:27018`;
+   without that prefix it uses the live database URL from the copied `.env`,
+   so deny it.
+   Before touching E2E, the DB, builds, dev servers, seed scripts, or anything
+   that reads the environment, read [`e2e/AGENTS.md`](e2e/AGENTS.md) in full.
+   When in doubt, stop and ask.
 2. **Secrets and `.env*`** — never read, print, decrypt, or pipe the contents
    of `.env*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`,
    `.npmrc`, `~/.config/gh/hosts.yml`, or any secret-bearing file — with any
