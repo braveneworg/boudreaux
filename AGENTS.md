@@ -1,6 +1,6 @@
 # boudreaux — Agent & Contributor Guidelines
 
-Last updated: 2026-07-21
+Last updated: 2026-09-13
 
 Single source of truth for how to work in this repository — for humans and for
 every AI coding agent. Tool-specific files (e.g. `CLAUDE.md`) defer to this
@@ -13,6 +13,13 @@ never preload everything.
 - Every edit happens in a worktree branched off freshly-fetched `origin/main`
   (`.claude/worktrees/<type>-<name>`, branch renamed to `<type>/<name>`) —
   never in the main checkout.
+- Every worktree gets copies of all of the main checkout's `.env*` files so it
+  can build, run, and pass its git hooks. `.worktreeinclude` copies them into
+  worktrees made by `claude --worktree` or subagent isolation; for any other
+  worktree (e.g. `git worktree add`), copy them yourself —
+  `cp -p <main-checkout>/.env <main-checkout>/.env.local <worktree>/`. Copying
+  is required; reading them stays forbidden (hard constraint 2), and the live
+  values they carry make hard constraint 1 mandatory.
 - TDD is non-negotiable: write the test first, watch it fail, then implement.
   Every feature and bug fix ships with tests.
 - Quality over speed. These guidelines are binding — when code can't comply,
@@ -25,18 +32,39 @@ never preload everything.
 
 ## Hard constraints
 
-1. **E2E / database isolation** — before touching E2E, the DB, builds, dev
-   servers, seed scripts, or anything that reads the environment, read
-   [`e2e/AGENTS.md`](e2e/AGENTS.md) in full. When in doubt there, stop and ask.
-2. **Secrets and `.env*`** — never read, print, copy, decrypt, or pipe the
-   contents of `.env*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`,
+1. **Database isolation** — the copied `.env*` files point at live databases.
+   Try out new functionality that could change data (dev-server mutations,
+   seed or maintenance scripts, `prisma db push`, migrations) only against a
+   dockerized MongoDB — `pnpm run e2e:docker:up` serves one on
+   `localhost:27018` — never the production, testing, or staging database.
+   Point the process at it with a command-scoped variable, e.g.
+   `DATABASE_URL='mongodb://localhost:27018/boudreaux-dev?replicaSet=rs0' pnpm run dev`
+   (seed it the same way), never `export` it — values already in the
+   environment win over `.env*` — and check that URL before anything writes.
+   Seed, `prisma db`/`migrate`/`studio`, restore, backfill/migration scripts,
+   and `next dev`/`next start` run outside Docker prompt for approval
+   (`.claude/settings.json` ask rules), so keep the `DATABASE_URL` prefix on
+   the command where the approver sees it. Approve such a prompt only when
+   the command itself shows `DATABASE_URL=` pointing at `localhost:27018`;
+   without that prefix it uses the live database URL from the copied `.env`,
+   so deny it. When you add a script or `package.json` script that writes to
+   the database, add matching ask rules —
+   `scripts/check-database-ask-rules.spec.ts` fails the gate until you do.
+   Before touching E2E, the DB, builds, dev servers, seed scripts, or anything
+   that reads the environment, read [`e2e/AGENTS.md`](e2e/AGENTS.md) in full.
+   When in doubt, stop and ask.
+2. **Secrets and `.env*`** — never read, print, decrypt, or pipe the contents
+   of `.env*`, `.envrc`, `*.pem`, `*.key`, `id_*`, `.aws/credentials`,
    `.npmrc`, `~/.config/gh/hosts.yml`, or any secret-bearing file — with any
    tool, even piped through `head`/`wc` or redirected; running the command
-   captures the value regardless. Never quote or log any value from them, even
-   partially; never run `git diff`/`show`/`log -p`/`grep` on paths that may
-   contain secrets without confirming the path is safe. Treat all `.env*` as
-   production secrets (gitignored / "dev only" does not make them safe);
-   refuse pasted `.env` content. Redact to `***` any env var matching
+   captures the value regardless. Copying `.env*` files into a worktree is
+   required and is not reading. `.claude/settings.json` deny rules block
+   reading `.env` and every `.env.*` (`.env.example` included). Never quote
+   or log any value from them,
+   even partially; never run `git diff`/`show`/`log -p`/`grep` on paths that
+   may contain secrets without confirming the path is safe. Treat every other
+   `.env*` as production secrets (gitignored / "dev only" does not make them
+   safe); refuse pasted `.env` content. Redact to `***` any env var matching
    `*_URL`, `*SECRET*`, `*TOKEN*`, `*KEY*`, `*PASSWORD*`, `*PASSWD*`,
    `*CREDENTIAL*`, `*DSN*`, `*CONNECTION*` before it could appear in output.
    If a task "needs" a secret value, ask for a placeholder. If a secret (even

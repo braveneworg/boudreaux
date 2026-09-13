@@ -1,0 +1,7 @@
+# Gitignored files copied into worktrees that `claude --worktree` and subagent
+# isolation create (gitignore syntax). Every worktree needs the main checkout's
+# env files to build, run, and pass its hooks — they are copied, never read
+# (AGENTS.md hard constraint 2). Tracked files such as .env.example are never
+# copied.
+.env
+.env.*

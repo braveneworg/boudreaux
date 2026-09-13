@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const;
 
+// Size used until ResponsiveContainer measures its box. Recharts defaults to
+// -1×-1, which logs "width(-1) and height(-1) of chart should be greater than
+// 0" on every first render and server-renders an empty box. Values match
+// upstream shadcn/ui's chart component.
+const INITIAL_CHART_DIMENSION = { width: 320, height: 200 } as const;
+
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode;
@@ -63,7 +69,9 @@ const ChartContainer = ({
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer>
+        <RechartsPrimitive.ResponsiveContainer initialDimension={INITIAL_CHART_DIMENSION}>
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
       </div>
     </ChartContext.Provider>
   );
