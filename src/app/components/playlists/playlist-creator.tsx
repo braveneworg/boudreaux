@@ -304,7 +304,12 @@ export const PlaylistCreator = ({
   };
 
   return (
-    <section aria-label="Playlist creator" className="flex flex-col gap-4">
+    // min-w-0: in the embedded variant this section is a grid item of
+    // DialogContent, and grid items default to `min-width: auto` — the
+    // intrinsic width of the widest search-result row (thumb + title + pill +
+    // duration + two action buttons) would then widen the dialog's track past
+    // its own box, clipping every row's right side instead of truncating.
+    <section aria-label="Playlist creator" className="flex min-w-0 flex-col gap-4">
       <CreatorHeading
         isDraft={isDraft}
         detail={detail}
