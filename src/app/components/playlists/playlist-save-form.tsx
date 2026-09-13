@@ -43,6 +43,11 @@ const playlistSaveFormSchema = z.object({
 interface PlaylistSaveFormProps {
   /** `dialog` renders the full DialogFooter; `inline` renders a bare Save row. */
   variant: 'dialog' | 'inline';
+  /**
+   * DOM id for the `<form>`, so a submit button rendered outside the form
+   * (e.g. a parent's heading action) can target it via the `form` attribute.
+   */
+  id?: string;
   mode: 'create' | 'edit';
   /** `null` in create mode until saved. */
   playlistId: string | null;
@@ -72,12 +77,15 @@ interface PlaylistSaveFormProps {
  *
  * Renders either inside a Dialog (`variant="dialog"`, full footer with Add
  * songs + Cancel + Save) or standalone (`variant="inline"`, Save-only footer).
- * `onSavingChange` mirrors the in-flight state so a parent dialog can keep
- * gating Escape/overlay close; the submit hook closes a dialog on success via
- * `onCancel`, which the dialog wires to its own `onOpenChange(false)`.
+ * `onSavingChange` mirrors the in-flight state so a parent can keep gating a
+ * dialog's Escape/overlay close or disable its own submit control; it reports
+ * `false` on unmount so a parent that outlives the form never sticks on
+ * "saving". The submit hook closes a dialog on success via `onCancel`, which
+ * the dialog wires to its own `onOpenChange(false)`.
  */
 export const PlaylistSaveForm = ({
   variant,
+  id,
   mode,
   playlistId,
   initialValues,
@@ -106,9 +114,13 @@ export const PlaylistSaveForm = ({
 
   const isEditMode = mode === 'edit';
 
-  // Mirror the in-flight state so a parent dialog can gate Escape/overlay close.
+  // Mirror the in-flight state so a parent can gate close / disable its own
+  // submit control. A successful save unmounts this form (the creator leaves
+  // the draft phase) before the submit hook's `finally` runs, so the cleanup
+  // is what tells the parent the save has settled.
   useEffect(() => {
     onSavingChange?.(isSaving);
+    return () => onSavingChange?.(false);
   }, [isSaving, onSavingChange]);
 
   const handleAddSongs = (): void => {
@@ -119,6 +131,7 @@ export const PlaylistSaveForm = ({
   return (
     <Form {...form}>
       <form
+        id={id}
         noValidate
         onSubmit={form.handleSubmit((values) => submitSave(values, pendingFiles))}
         className="flex flex-col gap-4"

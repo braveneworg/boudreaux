@@ -127,6 +127,20 @@ describe('PlaylistSaveForm', () => {
     });
   });
 
+  describe('id', () => {
+    it('applies the given id to the form element so outside buttons can target it', () => {
+      const { container } = renderForm({ variant: 'inline', id: 'inline-save-form' });
+
+      expect(container.querySelector('form')).toHaveAttribute('id', 'inline-save-form');
+    });
+
+    it('renders the form without an id attribute when none is given', () => {
+      const { container } = renderForm({ variant: 'inline' });
+
+      expect(container.querySelector('form')).not.toHaveAttribute('id');
+    });
+  });
+
   describe('onSavingChange', () => {
     it('reports the current saving state to the parent', () => {
       isSavingRef.current = true;
@@ -134,6 +148,16 @@ describe('PlaylistSaveForm', () => {
       renderForm({ variant: 'dialog', onSavingChange });
 
       expect(onSavingChange).toHaveBeenCalledWith(true);
+    });
+
+    it('reports false to the parent when it unmounts mid-save', () => {
+      isSavingRef.current = true;
+      const onSavingChange = vi.fn();
+      const { unmount } = renderForm({ variant: 'inline', onSavingChange });
+
+      unmount();
+
+      expect(onSavingChange).toHaveBeenLastCalledWith(false);
     });
   });
 
