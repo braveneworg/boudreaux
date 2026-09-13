@@ -14,6 +14,7 @@
       "Bash(pnpm run test:coverage:check)",
       "Bash(pnpm run test:coverage:check *)",
       "Bash(gh run watch *)"
-    ]
+    ],
+    "deny": ["Read(.env)", "Read(.env.*)"]
   }
 }
