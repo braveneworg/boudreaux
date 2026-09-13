@@ -79,10 +79,23 @@ describe('isStaleJob', () => {
     expect(isStaleJob(startedAt, STALE_JOB_MS)).toBe(true);
   });
 
-  it('treats a job exactly at the window boundary as live', () => {
-    const startedAt = new Date(Date.now() - STALE_JOB_MS);
+  describe('at the window boundary', () => {
+    // Freeze the clock: reading Date.now() twice a millisecond apart pushes the
+    // job past the window, which flaked this test under the full suite.
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    });
 
-    expect(isStaleJob(startedAt, STALE_JOB_MS)).toBe(false);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('treats a job exactly at the window boundary as live', () => {
+      const startedAt = new Date(Date.now() - STALE_JOB_MS);
+
+      expect(isStaleJob(startedAt, STALE_JOB_MS)).toBe(false);
+    });
   });
 
   /**
