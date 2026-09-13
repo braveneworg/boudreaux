@@ -600,7 +600,15 @@ describe('createVideoAction', () => {
 
   describe('Poster candidates', () => {
     // Real (unmocked) s3-key-utils in this spec file: an S3-style URL lets
-    // extractS3KeyFromUrl resolve a key without a CDN_DOMAIN env var.
+    // extractS3KeyFromUrl resolve a key without a CDN_DOMAIN env var. Pin the
+    // bucket these URLs name — worktrees carry real env files, and a real
+    // AWS_S3_BUCKET_NAME would reject the fixture URLs.
+    beforeEach(() => {
+      vi.stubEnv('AWS_S3_BUCKET_NAME', 'my-bucket');
+      vi.stubEnv('S3_BUCKET', '');
+      vi.stubEnv('CDN_DOMAIN', '');
+    });
+
     const s3CandidateUrl = (ownerId: string, n: number) =>
       `https://my-bucket.s3.us-east-1.amazonaws.com/media/videos/${ownerId}/poster-candidate-${n}.jpg`;
 
