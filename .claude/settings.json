@@ -51,7 +51,19 @@
       "Bash(pnpm exec tsx scripts/dedupe-*)",
       "Bash(pnpm exec tsx scripts/fix-*)",
       "Bash(pnpm exec tsx scripts/migrate-*)",
-      "Bash(pnpm exec tsx scripts/mongo-backup.ts restore *)"
+      "Bash(pnpm exec tsx scripts/mongo-backup.ts restore *)",
+      "Bash(pnpm run dev *)",
+      "Bash(pnpm dev *)",
+      "Bash(pnpm run start *)",
+      "Bash(pnpm start *)",
+      "Bash(next dev *)",
+      "Bash(next start *)",
+      "Bash(pnpm next dev *)",
+      "Bash(pnpm next start *)",
+      "Bash(pnpm exec next dev *)",
+      "Bash(pnpm exec next start *)",
+      "Bash(npx next dev *)",
+      "Bash(npx next start *)"
     ],
     "deny": ["Read(.env)", "Read(.env.*)"]
   }

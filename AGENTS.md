@@ -41,9 +41,10 @@ never preload everything.
    `DATABASE_URL='mongodb://localhost:27018/boudreaux-dev?replicaSet=rs0' pnpm run dev`
    (seed it the same way), never `export` it — values already in the
    environment win over `.env*` — and check that URL before anything writes.
-   Seed, `prisma db`/`migrate`/`studio`, restore, and backfill/migration
-   script commands prompt for approval (`.claude/settings.json` ask rules),
-   so keep the `DATABASE_URL` prefix on the command where the approver sees it.
+   Seed, `prisma db`/`migrate`/`studio`, restore, backfill/migration scripts,
+   and `next dev`/`next start` run outside Docker prompt for approval
+   (`.claude/settings.json` ask rules), so keep the `DATABASE_URL` prefix on
+   the command where the approver sees it.
    Before touching E2E, the DB, builds, dev servers, seed scripts, or anything
    that reads the environment, read [`e2e/AGENTS.md`](e2e/AGENTS.md) in full.
    When in doubt, stop and ask.
