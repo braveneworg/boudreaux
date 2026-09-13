@@ -47,7 +47,9 @@ never preload everything.
    the command where the approver sees it. Approve such a prompt only when
    the command itself shows `DATABASE_URL=` pointing at `localhost:27018`;
    without that prefix it uses the live database URL from the copied `.env`,
-   so deny it.
+   so deny it. When you add a script or `package.json` script that writes to
+   the database, add matching ask rules —
+   `scripts/check-database-ask-rules.spec.ts` fails the gate until you do.
    Before touching E2E, the DB, builds, dev servers, seed scripts, or anything
    that reads the environment, read [`e2e/AGENTS.md`](e2e/AGENTS.md) in full.
    When in doubt, stop and ask.
