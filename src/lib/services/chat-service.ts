@@ -228,9 +228,10 @@ export class ChatService {
     await triggerChatEvent(CHAT_EVENTS.newMessage, dto);
 
     // Fan out mention emails after persisting + broadcasting so a slow
-    // SES dispatch can't delay the message hitting the channel. Errors
-    // are swallowed inside notifyMentions — chat is the source of truth,
-    // the email is best-effort.
+    // SES dispatch can't delay the message hitting the channel.
+    // `notifyMentions` never rejects: Redis or SES failures are logged and
+    // that notification is dropped — chat is the source of truth, the
+    // email is best-effort.
     const recipients = await ChatMentionService.resolveMentions(params.body, params.userId);
     if (recipients.length > 0) {
       await ChatMentionService.notifyMentions({

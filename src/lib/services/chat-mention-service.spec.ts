@@ -25,14 +25,9 @@ const mockRedisDel = vi.hoisted(() => vi.fn());
 const mockRedisRpush = vi.hoisted(() => vi.fn());
 const mockRedisLrange = vi.hoisted(() => vi.fn());
 const mockRedisExpire = vi.hoisted(() => vi.fn());
+const mockGetRedisClient = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/upstash-redis', () => ({
-  getRedisClient: () => ({
-    set: mockRedisSet,
-    del: mockRedisDel,
-    rpush: mockRedisRpush,
-    lrange: mockRedisLrange,
-    expire: mockRedisExpire,
-  }),
+  getRedisClient: mockGetRedisClient,
 }));
 
 const mockChatUserFindByUserId = vi.hoisted(() => vi.fn());
@@ -41,13 +36,21 @@ vi.mock('@/lib/repositories/chat-user-repository', () => ({
 }));
 
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/logger', () => ({
-  loggers: { chat: { info: mockLoggerInfo, error: mockLoggerError } },
+  loggers: { chat: { info: mockLoggerInfo, warn: mockLoggerWarn, error: mockLoggerError } },
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetRedisClient.mockImplementation(() => ({
+    set: mockRedisSet,
+    del: mockRedisDel,
+    rpush: mockRedisRpush,
+    lrange: mockRedisLrange,
+    expire: mockRedisExpire,
+  }));
   mockRedisLrange.mockResolvedValue([]);
   mockChatUserFindByUserId.mockResolvedValue(null);
 });
@@ -376,5 +379,85 @@ describe('ChatMentionService.notifyMentions', () => {
         ],
       })
     );
+  });
+
+  describe('when Redis is unavailable', () => {
+    it('resolves without emailing when claiming the throttle rejects', async () => {
+      mockRedisSet.mockRejectedValueOnce(new Error('Unauthorized'));
+
+      await expect(ChatMentionService.notifyMentions(baseParams)).resolves.toBeUndefined();
+
+      expect(mockSendChatMentionEmail).not.toHaveBeenCalled();
+    });
+
+    it('warns with the recipient id when claiming the throttle rejects', async () => {
+      mockRedisSet.mockRejectedValueOnce(new Error('Unauthorized'));
+
+      await ChatMentionService.notifyMentions(baseParams);
+
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Chat mention email skipped — Redis unavailable',
+        expect.objectContaining({ userId: 'r1', error: 'Unauthorized' })
+      );
+    });
+
+    it('resolves when buffering rejects while the throttle is held', async () => {
+      mockRedisSet.mockResolvedValueOnce(null);
+      mockRedisRpush.mockRejectedValueOnce(new Error('down'));
+
+      await expect(ChatMentionService.notifyMentions(baseParams)).resolves.toBeUndefined();
+    });
+
+    it('resolves when the re-buffer after a failed email rejects', async () => {
+      mockRedisSet.mockResolvedValueOnce('OK');
+      // First del drains the buffer before the email; the second (throttle
+      // release inside the email catch) is the one that fails.
+      mockRedisDel.mockResolvedValueOnce(1).mockRejectedValueOnce(new Error('down'));
+      mockSendChatMentionEmail.mockRejectedValueOnce(new Error('SES down'));
+
+      await expect(ChatMentionService.notifyMentions(baseParams)).resolves.toBeUndefined();
+    });
+
+    it('resolves and sends nothing when the Redis client cannot be created', async () => {
+      mockGetRedisClient.mockImplementationOnce(() => {
+        throw new Error('Upstash Redis is not configured');
+      });
+
+      await expect(ChatMentionService.notifyMentions(baseParams)).resolves.toBeUndefined();
+
+      expect(mockSendChatMentionEmail).not.toHaveBeenCalled();
+    });
+
+    it('warns once, without a recipient, when the Redis client cannot be created', async () => {
+      mockGetRedisClient.mockImplementationOnce(() => {
+        throw new Error('Upstash Redis is not configured');
+      });
+
+      await ChatMentionService.notifyMentions(baseParams);
+
+      expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Chat mention emails skipped — Redis unavailable',
+        expect.objectContaining({ error: 'Upstash Redis is not configured' })
+      );
+    });
+
+    it("still emails the other recipient when one recipient's Redis call fails", async () => {
+      mockRedisSet.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce('OK');
+      mockSendChatMentionEmail.mockResolvedValueOnce(true);
+
+      await ChatMentionService.notifyMentions({
+        ...baseParams,
+        recipients: [
+          { id: 'r1', username: 'recip', email: 'recip@example.com' },
+          { id: 'r2', username: 'other', email: 'other@example.com' },
+        ],
+      });
+
+      expect(mockSendChatMentionEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendChatMentionEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ toEmail: 'other@example.com' })
+      );
+    });
   });
 });
