@@ -7,9 +7,7 @@ Before writing, running, or debugging specs, read every file in
 
 E2E tests, the seed script, and the Playwright web server **must** run only
 against the local Docker MongoDB container — never a URL from `.env*`, the
-shell, or any other source. Worktrees carry copies of the real `.env*` files
-(root `AGENTS.md`), so a process that falls back to them reaches live data —
-these rules are what keep E2E runs on the container.
+shell, or any other source.
 
 - The only acceptable URL is
   `mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0` (container
