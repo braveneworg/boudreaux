@@ -44,7 +44,10 @@ never preload everything.
    Seed, `prisma db`/`migrate`/`studio`, restore, backfill/migration scripts,
    and `next dev`/`next start` run outside Docker prompt for approval
    (`.claude/settings.json` ask rules), so keep the `DATABASE_URL` prefix on
-   the command where the approver sees it.
+   the command where the approver sees it. Approve such a prompt only when
+   the command itself shows `DATABASE_URL=` pointing at `localhost:27018`;
+   without that prefix it uses the live database URL from the copied `.env`,
+   so deny it.
    Before touching E2E, the DB, builds, dev servers, seed scripts, or anything
    that reads the environment, read [`e2e/AGENTS.md`](e2e/AGENTS.md) in full.
    When in doubt, stop and ask.
