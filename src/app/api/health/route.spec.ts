@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 
 import { checkDatabaseHealth } from '@/lib/utils/database-utils';
 import { loggers } from '@/lib/utils/logger';
+import { checkRedisHealth } from '@/lib/utils/redis-health';
 
 import { GET } from './route';
 
@@ -31,9 +32,75 @@ vi.mock('@/lib/utils/database-utils', () => ({
   checkDatabaseHealth: vi.fn(),
 }));
 
+// Redis is non-critical: default it to connected so the Mongo cases below
+// stay about Mongo.
+vi.mock('@/lib/utils/redis-health', () => ({
+  checkRedisHealth: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(checkRedisHealth).mockResolvedValue({ status: 'connected', latency: 3 });
+});
+
 describe('Health Check API', () => {
   const dummyRequest = new NextRequest('http://localhost/api/health');
   const dummyContext = { params: Promise.resolve({}) };
+
+  describe('redis status', () => {
+    it('reports redis connected with its latency on the healthy body', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({ healthy: true, latency: 25 });
+
+      const response = await GET(dummyRequest, dummyContext);
+      const data = await response.json();
+
+      expect(data.redis).toBe('connected');
+      expect(data.redisLatency).toBe(3);
+    });
+
+    it('stays 200 when redis is unavailable', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({ healthy: true, latency: 25 });
+      vi.mocked(checkRedisHealth).mockResolvedValue({ status: 'unavailable' });
+
+      const response = await GET(dummyRequest, dummyContext);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('healthy');
+      expect(data.redis).toBe('unavailable');
+    });
+
+    it('omits redisLatency when redis is unavailable', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({ healthy: true, latency: 25 });
+      vi.mocked(checkRedisHealth).mockResolvedValue({ status: 'unavailable' });
+
+      const response = await GET(dummyRequest, dummyContext);
+      const data = await response.json();
+
+      expect(data).not.toHaveProperty('redisLatency');
+    });
+
+    it('stays 200 when redis is not configured', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({ healthy: true, latency: 25 });
+      vi.mocked(checkRedisHealth).mockResolvedValue({ status: 'not configured' });
+
+      const response = await GET(dummyRequest, dummyContext);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.redis).toBe('not configured');
+    });
+
+    it('includes the redis status on the database-failed body', async () => {
+      vi.mocked(checkDatabaseHealth).mockResolvedValue({ healthy: false, error: 'down' });
+
+      const response = await GET(dummyRequest, dummyContext);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.redis).toBe('connected');
+    });
+  });
+
   describe('GET /api/health', () => {
     it('should return healthy status when database is connected', async () => {
       vi.mocked(checkDatabaseHealth).mockResolvedValue({
