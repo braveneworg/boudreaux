@@ -190,6 +190,48 @@ test.describe('Add to a playlist from a player', () => {
     await expect(editDialog.getByLabel('Title')).toHaveValue(title);
   });
 
+  test('keeps mixed song + video search results inside the create dialog', async ({ userPage }) => {
+    // Phone width: the dialog is `calc(100% - 2rem)` wide, so a single
+    // result row's intrinsic width (icon + thumb + title + "video" pill +
+    // duration + two action buttons) exceeds the dialog. The creator must
+    // shrink and truncate instead of widening the dialog's grid track.
+    await userPage.setViewportSize({ width: 390, height: 844 });
+    await userPage.goto(`/releases/${releaseId}`);
+
+    await addToPlaylistTrigger(userPage).click();
+    await expect(playlistPicker(userPage)).toBeVisible();
+    await userPage.getByRole('button', { name: 'Create playlist' }).click();
+
+    const createDialog = userPage.getByRole('dialog', { name: 'Create playlist' });
+    await expect(createDialog).toBeVisible();
+
+    // "E2E" matches both the seeded tracks and the seeded videos.
+    await createDialog.getByRole('combobox', { name: 'Search songs and videos' }).fill('E2E');
+    await expect(createDialog.getByRole('group', { name: 'Songs' })).toBeVisible();
+    await expect(createDialog.getByRole('group', { name: 'Videos' })).toBeVisible();
+
+    // A video row's title is still on screen (not pushed under the clip edge).
+    const videoRow = createDialog
+      .getByRole('group', { name: 'Videos' })
+      .getByRole('option')
+      .first();
+    await expect(videoRow.getByText('video', { exact: true })).toBeInViewport();
+
+    // Nothing inside the dialog may extend past its right edge, and the
+    // dialog itself must not have grown a horizontal scroll range.
+    const overflow = await createDialog.evaluate((el) => {
+      const { right } = el.getBoundingClientRect();
+      const descendants = Array.from(el.querySelectorAll('*'));
+      const pastRight = Math.max(
+        0,
+        ...descendants.map((d) => d.getBoundingClientRect().right - right)
+      );
+      return { pastRight, scrollGap: el.scrollWidth - el.clientWidth };
+    });
+    expect(overflow.pastRight).toBeLessThanOrEqual(0.5);
+    expect(overflow.scrollGap).toBeLessThanOrEqual(0);
+  });
+
   test('adds a video to a playlist from its card', async ({ userPage }, testInfo) => {
     const title = `Video Add ${testInfo.retry}-${Date.now()}`;
 

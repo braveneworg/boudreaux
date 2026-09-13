@@ -65,6 +65,22 @@ describe('buildCdnImageVariantUrl', () => {
     expect(buildCdnImageVariantUrl(thumbUrl, 1200)).toBe(thumbUrl);
   });
 
+  it('returns a video poster CDN URL byte-identical regardless of requested width', () => {
+    // Video posters live under media/videos/<id>/ and never get `_w{width}`
+    // variants (only cover-art and bio uploads run the variant generator), so
+    // rewriting them 403s on the CDN and renders a broken thumbnail.
+    const posterUrl =
+      'https://cdn.fakefourrecords.com/media/videos/6a562cf7da08ad30064e147c/poster-1784032924133-5gskc1.jpg';
+    expect(buildCdnImageVariantUrl(posterUrl, 40)).toBe(posterUrl);
+    expect(buildCdnImageVariantUrl(posterUrl, 1200)).toBe(posterUrl);
+  });
+
+  it('returns a relative video poster path unchanged apart from the CDN prefix', () => {
+    expect(buildCdnImageVariantUrl('/media/videos/abc123/poster-1.png', 640)).toBe(
+      'https://cdn.fakefourrecords.com/media/videos/abc123/poster-1.png'
+    );
+  });
+
   it('still appends a width suffix for normal media URLs', () => {
     expect(buildCdnImageVariantUrl('https://cdn.fakefourrecords.com/media/cover.jpg', 800)).toBe(
       'https://cdn.fakefourrecords.com/media/cover_w800.webp'

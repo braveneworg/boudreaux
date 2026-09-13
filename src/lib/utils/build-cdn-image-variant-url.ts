@@ -18,11 +18,17 @@ const CDN_DOMAIN =
 const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
 
 /**
- * Path marker for generation-time bio thumbnails, which are uploaded as a
- * single webp with no `_w{width}` variants — requesting a variant 403s on
- * the CDN, so these URLs must pass through unchanged.
+ * Path markers for assets stored as a single file with no `_w{width}`
+ * variants — requesting a variant 403s on the CDN, so these URLs must pass
+ * through unchanged:
+ * - `/bio/thumbs/`: generation-time bio thumbnails (one webp each).
+ * - `/media/videos/`: video poster frames (`poster-*.jpg|png`, captured at
+ *   upload); only cover-art and bio uploads run the variant generator.
  */
-const SINGLE_VARIANT_PATH_MARKER = '/bio/thumbs/';
+const SINGLE_VARIANT_PATH_MARKERS = ['/bio/thumbs/', '/media/videos/'] as const;
+
+const isSingleVariantPath = (pathname: string): boolean =>
+  SINGLE_VARIANT_PATH_MARKERS.some((marker) => pathname.includes(marker));
 
 /**
  * Matches an existing `_w{number}` suffix at the end of a filename's base
@@ -41,7 +47,7 @@ const EXISTING_WIDTH_SUFFIX_REGEX = /_w\d+$/;
 const WEBP_TRANSCODE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']);
 
 const appendWidthSuffix = (pathname: string, width: number): string => {
-  if (pathname.includes(SINGLE_VARIANT_PATH_MARKER)) {
+  if (isSingleVariantPath(pathname)) {
     return pathname;
   }
 
