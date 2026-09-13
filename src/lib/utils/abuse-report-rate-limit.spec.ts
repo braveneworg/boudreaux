@@ -5,14 +5,20 @@
 import {
   ABUSE_REPORT_GLOBAL_LIMIT,
   ABUSE_REPORT_PAIR_LIMIT,
+  ABUSE_REPORT_WINDOW_MS,
   checkAbuseReportRateLimit,
   resetAbuseReportRateLimitForTesting,
 } from './abuse-report-rate-limit';
+import { resetRedisFallbackForTesting } from './redis-fallback';
 
 vi.mock('server-only', () => ({}));
 
 vi.mock('@upstash/redis', () => ({
   Redis: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { redis: { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } },
 }));
 
 interface LimiterStub {
@@ -44,11 +50,16 @@ describe('abuse-report-rate-limit constants', () => {
   it('caps global tier at 10 per 24h', () => {
     expect(ABUSE_REPORT_GLOBAL_LIMIT).toBe(10);
   });
+
+  it('expresses the 24h window in milliseconds for the in-memory fallback', () => {
+    expect(ABUSE_REPORT_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
+  });
 });
 
 describe('checkAbuseReportRateLimit', () => {
   beforeEach(() => {
     resetAbuseReportRateLimitForTesting();
+    resetRedisFallbackForTesting();
     pairLimit.mockReset();
     globalLimit.mockReset();
     buildOrder.length = 0;
@@ -131,5 +142,52 @@ describe('checkAbuseReportRateLimit', () => {
     expect(result.success).toBe(true);
     expect(pairLimit).not.toHaveBeenCalled();
     expect(globalLimit).not.toHaveBeenCalled();
+  });
+
+  describe('when Upstash is unavailable', () => {
+    it('allows the report when the pair tier rejects', async () => {
+      pairLimit.mockRejectedValueOnce(new Error('Unauthorized'));
+      globalLimit.mockResolvedValueOnce({ success: true, reset: Date.now() + 1000 });
+
+      const result = await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+
+      expect(result).toEqual({ success: true, blockedBy: null, retryAfterSeconds: 0 });
+    });
+
+    it('allows the report when Redis is not configured at all', async () => {
+      vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+      vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+
+      const result = await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('still enforces the pair cap in fallback mode', async () => {
+      pairLimit.mockRejectedValue(new Error('down'));
+      globalLimit.mockRejectedValue(new Error('down'));
+
+      for (let i = 0; i < ABUSE_REPORT_PAIR_LIMIT; i += 1) {
+        await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+      }
+      const fourth = await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: 't1' });
+
+      expect(fourth.blockedBy).toBe('pair');
+    });
+
+    it('still enforces the global cap across distinct targets in fallback mode', async () => {
+      pairLimit.mockRejectedValue(new Error('down'));
+      globalLimit.mockRejectedValue(new Error('down'));
+
+      for (let i = 0; i < ABUSE_REPORT_GLOBAL_LIMIT; i += 1) {
+        await checkAbuseReportRateLimit({ reporterId: 'r1', reportedUserId: `t${i}` });
+      }
+      const eleventh = await checkAbuseReportRateLimit({
+        reporterId: 'r1',
+        reportedUserId: 't-last',
+      });
+
+      expect(eleventh.blockedBy).toBe('global');
+    });
   });
 });

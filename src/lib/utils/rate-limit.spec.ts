@@ -267,6 +267,64 @@ describe('rateLimit', () => {
     });
   });
 
+  describe('consume', () => {
+    it('reports remaining = limit - 1 on the first hit', () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+
+      const result = limiter.consume(3, 'consume-first');
+
+      expect(result).toMatchObject({ success: true, remaining: 2 });
+    });
+
+    it('reports success=false and remaining=0 once the limit is exceeded', () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+
+      limiter.consume(2, 'consume-over');
+      limiter.consume(2, 'consume-over');
+      const result = limiter.consume(2, 'consume-over');
+
+      expect(result).toMatchObject({ success: false, remaining: 0 });
+    });
+
+    it('never reports negative remaining after repeated over-limit hits', () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+
+      limiter.consume(1, 'consume-neg');
+      limiter.consume(1, 'consume-neg');
+      const result = limiter.consume(1, 'consume-neg');
+
+      expect(result.remaining).toBe(0);
+    });
+
+    it('tracks tokens independently', () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+
+      limiter.consume(1, 'consume-a');
+      const other = limiter.consume(1, 'consume-b');
+
+      expect(other.success).toBe(true);
+    });
+
+    it('reports a reset timestamp within the configured interval', () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+      const before = Date.now();
+
+      const { reset } = limiter.consume(3, 'consume-reset');
+
+      expect(reset).toBeGreaterThan(before);
+      expect(reset).toBeLessThanOrEqual(before + 60000 + 5);
+    });
+
+    it('shares its counter with check()', async () => {
+      const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 500 });
+
+      limiter.consume(2, 'consume-shared');
+      await limiter.check(2, 'consume-shared');
+
+      await expect(limiter.check(2, 'consume-shared')).rejects.toThrow('Rate limit exceeded');
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle empty token string', async () => {
       const limiter = rateLimit({

@@ -383,4 +383,5 @@ export const loggers = {
   payments: createLogger('PAYMENTS'),
   audit: createLogger('AUDIT'),
   http: createLogger('HTTP'),
+  redis: createLogger('REDIS'),
 };
