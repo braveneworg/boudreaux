@@ -633,6 +633,7 @@ describe('Logger', () => {
       expect(loggers.payments).toBeDefined();
       expect(loggers.audit).toBeDefined();
       expect(loggers.http).toBeDefined();
+      expect(loggers.redis).toBeDefined();
     });
 
     it('logs with the correct module name', async () => {

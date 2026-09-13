@@ -5,10 +5,14 @@ import 'server-only';
 
 import { Ratelimit } from '@upstash/ratelimit';
 
+import { limitWithFallback } from './redis-fallback';
 import { getRedisClient } from './upstash-redis';
 
 /** Hard ceiling on chat sends per device per rolling minute. */
 export const CHAT_RATE_LIMIT_PER_MINUTE = 10;
+
+/** The sliding window, in ms — shared by the Upstash and fallback limiters. */
+const CHAT_RATE_LIMIT_WINDOW_MS = 60_000;
 
 /**
  * Threshold at which a sender is auto-flagged for review. Set just below
@@ -54,6 +58,10 @@ export interface ChatRateLimitResult {
  * (ChatRateLimitLog) can attribute breaches to a device.
  *
  * Skipped entirely in E2E mode to keep test suites deterministic.
+ *
+ * Fails open: when Upstash is unreachable or not configured the same
+ * ceiling is enforced by a per-process in-memory window instead (see
+ * {@link limitWithFallback}), so a Redis outage never blocks chat.
  */
 export const checkChatRateLimit = async (
   userId: string,
@@ -70,7 +78,13 @@ export const checkChatRateLimit = async (
   }
 
   const key = `${userId}:${fingerprint}:${ip}`;
-  const { success, remaining, reset } = await getLimiter().limit(key);
+  const { success, remaining, reset } = await limitWithFallback({
+    name: 'chat',
+    getLimiter,
+    key,
+    limit: CHAT_RATE_LIMIT_PER_MINUTE,
+    windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
+  });
   const retryAfterSeconds = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
 
   return { success, remaining, reset, retryAfterSeconds };

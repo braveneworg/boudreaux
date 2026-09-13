@@ -1,6 +1,6 @@
 # Live Chat Architecture
 
-_Last updated: 2026-05-13_
+_Last updated: 2026-09-13_
 
 This document describes the Fake Four Inc. live-chat drawer feature
 (branch `develop/feature/create-live-chat`). It is the authoritative
@@ -11,8 +11,9 @@ runbook for chat issues.
 
 A globally-mounted, authenticated-only chat drawer with optimistic
 message sends, presence-channel realtime over Pusher, sliding-window
-rate limiting via Upstash Redis, device fingerprinting for abuse
-detection, and an admin moderation panel.
+rate limiting via Upstash Redis (failing open to an in-memory window
+when Redis is unreachable), device fingerprinting for abuse detection,
+and an admin moderation panel.
 
 ```
 Browser                                Next.js server                MongoDB           External
@@ -25,7 +26,7 @@ ChatLauncher (root layout)
       ├── useChatChannel ───────────► POST /api/chat/pusher-auth ───────────────────► Pusher (presence)
       ├── useFingerprint            (FingerprintJS, lazy)
       ├── ChatInput ────────────────► sendChatMessageAction        ─► ChatMessage
-      │                                   ├─ checkChatRateLimit ────────────────────► Upstash Redis
+      │                                   ├─ checkChatRateLimit ────────────────────► Upstash Redis (fail-open → in-memory)
       │                                   ├─ ChatUser.upsert       ─► ChatUser
       │                                   ├─ flag at ≥8/min        ─► ChatUser
       │                                   ├─ logBreach (on 429)    ─► ChatRateLimitLog
@@ -309,7 +310,12 @@ Server-side (required at runtime, validated in
 [`env-validation.ts`](../../src/lib/config/env-validation.ts)):
 
 - `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER`
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — required at
+  boot (a missing secret fails loudly), but a Redis that is present yet
+  _failing_ at runtime degrades instead of breaking: the chat and
+  abuse-report limiters fall back to a per-process in-memory window with
+  the same numbers (`limitWithFallback`), and @mention emails are skipped.
+  `/api/health` reports `redis: connected | unavailable | not configured`.
 
 Client-side (must be `NEXT_PUBLIC_*` to reach the browser):
 
@@ -325,7 +331,14 @@ Free-tier limits and the traffic they imply:
 | Upstash Redis | 10k commands/day                            | ~5k chat sends/day (2 commands per send for the limiter) |
 | MongoDB Atlas | (existing tier — chat collections are tiny) | n/a                                                      |
 
+Fixed Upstash overhead on top of chat traffic: the `Redis Keepalive`
+workflow (1 PING/day) and the memoized PING behind `/api/health`
+(≤288/day regardless of traffic — the result is cached for 5 minutes).
+
 Both Pusher and Upstash have one-click upgrade paths if usage grows.
+Note that Upstash deletes free databases after a period of inactivity
+(per its current policy); the keepalive exists so low chat traffic
+never triggers that again.
 
 ## Operational runbook
 
@@ -345,6 +358,32 @@ Both Pusher and Upstash have one-click upgrade paths if usage grows.
 1. Check Upstash daily command count.
 2. If it's near 10k, the sliding-window window may be saturating
    from log spam — inspect `ChatRateLimitLog` for hot fingerprints.
+
+**"Upstash database deleted / unavailable"**
+
+Symptoms: `curl -s https://fakefourrecords.com/api/health | jq .redis`
+returns `"unavailable"` (HTTP status stays 200 — Mongo is the only 500
+trigger); Loki shows a `REDIS`-module warning `Upstash unavailable —
+using in-memory rate limit`; the `Redis Keepalive` workflow run is red.
+
+What still works: chat sends and abuse reports — each limiter enforces
+the same ceiling from a per-process in-memory window (single container
+today; with replicas the limit would be per instance). What degrades:
+@mention emails are skipped (Redis is the only bound on emails per
+recipient, so sending unbounded is the wrong failure), and limits reset
+on container restart.
+
+Recovery:
+
+1. Create a new database at console.upstash.com (Regional, same AWS
+   region as the EC2, TLS on, eviction off).
+2. Set the repo secrets `UPSTASH_REDIS_REST_URL` and
+   `UPSTASH_REDIS_REST_TOKEN` from the database's REST API tab — the
+   deploy workflow regenerates the box's `.env` from them.
+3. Re-run the latest deploy (or merge to `main`). Confirm
+   `/api/health` reports `redis: "connected"` (allow up to 5 minutes for
+   the memo), then `gh workflow run redis-keepalive.yml` and watch it go
+   green. Check that Upstash's notice emails reach a monitored inbox.
 
 **"A user is being abusive"**
 

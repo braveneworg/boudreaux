@@ -5,6 +5,7 @@ import 'server-only';
 
 import { Ratelimit } from '@upstash/ratelimit';
 
+import { limitWithFallback } from './redis-fallback';
 import { getRedisClient } from './upstash-redis';
 
 /**
@@ -21,6 +22,9 @@ export const ABUSE_REPORT_PAIR_WINDOW = '24 h' as const;
  */
 export const ABUSE_REPORT_GLOBAL_LIMIT = 10;
 export const ABUSE_REPORT_GLOBAL_WINDOW = '24 h' as const;
+
+/** The 24h window in ms, for the in-memory fallback limiter. */
+export const ABUSE_REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 let cachedPairLimiter: Ratelimit | null = null;
 let cachedGlobalLimiter: Ratelimit | null = null;
@@ -66,6 +70,10 @@ export interface AbuseReportRateLimitResult {
  *
  * Skipped entirely in E2E mode (`E2E_MODE=true`) to keep deterministic
  * Playwright runs from tripping production-grade limits.
+ *
+ * Fails open: when Upstash is unreachable or not configured each tier is
+ * enforced by a per-process in-memory window instead (see
+ * {@link limitWithFallback}), so a Redis outage never blocks reporting.
  */
 export const checkAbuseReportRateLimit = async (params: {
   reporterId: string;
@@ -76,7 +84,13 @@ export const checkAbuseReportRateLimit = async (params: {
   }
 
   const pairKey = `${params.reporterId}:${params.reportedUserId}`;
-  const pair = await getPairLimiter().limit(pairKey);
+  const pair = await limitWithFallback({
+    name: 'abuse-report:pair',
+    getLimiter: getPairLimiter,
+    key: pairKey,
+    limit: ABUSE_REPORT_PAIR_LIMIT,
+    windowMs: ABUSE_REPORT_WINDOW_MS,
+  });
   if (!pair.success) {
     return {
       success: false,
@@ -85,7 +99,13 @@ export const checkAbuseReportRateLimit = async (params: {
     };
   }
 
-  const global = await getGlobalLimiter().limit(params.reporterId);
+  const global = await limitWithFallback({
+    name: 'abuse-report:global',
+    getLimiter: getGlobalLimiter,
+    key: params.reporterId,
+    limit: ABUSE_REPORT_GLOBAL_LIMIT,
+    windowMs: ABUSE_REPORT_WINDOW_MS,
+  });
   if (!global.success) {
     return {
       success: false,

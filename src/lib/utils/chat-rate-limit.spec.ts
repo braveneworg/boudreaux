@@ -10,11 +10,18 @@ import {
   checkChatRateLimit,
   resetChatRateLimitForTesting,
 } from './chat-rate-limit';
+import { resetRedisFallbackForTesting } from './redis-fallback';
 
 vi.mock('server-only', () => ({}));
 
 vi.mock('@upstash/redis', () => ({
   Redis: vi.fn(),
+}));
+
+const warnMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { redis: { warn: warnMock, info: vi.fn(), debug: vi.fn() } },
 }));
 
 const limitMock = vi.fn();
@@ -47,6 +54,7 @@ describe('chat-rate-limit constants', () => {
 describe('checkChatRateLimit', () => {
   beforeEach(() => {
     resetChatRateLimitForTesting();
+    resetRedisFallbackForTesting();
     RatelimitCtor.mockClear();
     limitMock.mockReset();
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
@@ -115,5 +123,51 @@ describe('checkChatRateLimit', () => {
     await checkChatRateLimit('user-1', 'fp-2', '2.2.2.2');
 
     expect(RatelimitCtor).toHaveBeenCalledTimes(1);
+  });
+
+  describe('when Upstash is unavailable', () => {
+    it('allows the send through the in-memory fallback when the limiter rejects', async () => {
+      limitMock.mockRejectedValueOnce(new Error('Unauthorized'));
+
+      const result = await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+
+      expect(result).toMatchObject({ success: true, remaining: CHAT_RATE_LIMIT_PER_MINUTE - 1 });
+    });
+
+    it('allows the send when Redis is not configured at all', async () => {
+      vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+      vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+
+      const result = await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+
+      expect(result.success).toBe(true);
+    });
+
+    it('still enforces the per-minute ceiling in fallback mode', async () => {
+      limitMock.mockRejectedValue(new Error('down'));
+
+      for (let i = 0; i < CHAT_RATE_LIMIT_PER_MINUTE; i += 1) {
+        await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+      }
+      const eleventh = await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+
+      expect(eleventh).toMatchObject({ success: false, remaining: 0 });
+    });
+
+    it('does not report remaining=0 on a limiter timeout (auto-flag guard)', async () => {
+      limitMock.mockResolvedValueOnce({ success: true, remaining: 0, reset: 0, reason: 'timeout' });
+
+      const result = await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+
+      expect(result.remaining).toBe(CHAT_RATE_LIMIT_PER_MINUTE - 1);
+    });
+
+    it('warns through the redis logger when falling back', async () => {
+      limitMock.mockRejectedValueOnce(new Error('down'));
+
+      await checkChatRateLimit('user-1', 'fp-abc', '203.0.113.5');
+
+      expect(warnMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

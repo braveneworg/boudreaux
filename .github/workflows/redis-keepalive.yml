@@ -1,0 +1,41 @@
+name: Redis Keepalive
+
+# One PING a day so the free-tier Upstash Redis never goes idle — it was
+# deleted for inactivity once (2026-09), which took chat sends and abuse
+# reports down with it until the limiters learned to fail open. The job goes
+# red when the reply is not PONG, so a re-deletion surfaces here first;
+# GitHub emails the workflow author on a failed scheduled run.
+#
+# Caveats: GitHub may delay scheduled runs by minutes and disables schedules
+# after 60 days without repo activity (release-bot commits count; use
+# `workflow_dispatch` to run it by hand). The memoized PING behind
+# /api/health, polled by the uptime check, is a second, incidental keepalive.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: redis-keepalive
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: PING production Upstash Redis
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout keepalive script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci/redis-keepalive.sh
+          sparse-checkout-cone-mode: false
+
+      - name: PING
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: bash scripts/ci/redis-keepalive.sh
