@@ -156,6 +156,22 @@ describe('PlaylistPickerCombobox', () => {
     });
   });
 
+  describe('focusOnMount', () => {
+    it('focuses the search input on mount when focusOnMount is set', () => {
+      mockRows([ROAD_TRIP]);
+      renderPicker({ focusOnMount: true });
+
+      expect(findPlaylistInput()).toHaveFocus();
+    });
+
+    it('leaves focus alone by default', () => {
+      mockRows([ROAD_TRIP]);
+      renderPicker();
+
+      expect(findPlaylistInput()).not.toHaveFocus();
+    });
+  });
+
   describe('exclusion', () => {
     it('omits the playlist matching excludePlaylistId', () => {
       mockRows([ROAD_TRIP, CHILL_MIX]);

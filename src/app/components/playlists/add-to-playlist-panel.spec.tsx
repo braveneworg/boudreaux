@@ -109,6 +109,17 @@ describe('AddToPlaylistPanel', () => {
     expect(flow.pickPlaylist).toHaveBeenCalledWith(CHILL_MIX);
   });
 
+  it('focuses the picker input on mount', () => {
+    // The panel is lazy-loaded inside an already-open popover, so Radix
+    // FocusScope's mount-time autofocus has already run against the loading
+    // fallback — the panel must place focus itself when it lands.
+    mockRows([ROAD_TRIP]);
+    mockFlow();
+    renderPanel();
+
+    expect(screen.getByPlaceholderText('Find a playlist…')).toHaveFocus();
+  });
+
   it('calls onCreatePlaylist when the "Create playlist" button is clicked', async () => {
     const user = userEvent.setup();
     mockRows([]);
