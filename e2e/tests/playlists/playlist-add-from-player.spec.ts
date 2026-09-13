@@ -190,6 +190,33 @@ test.describe('Add to a playlist from a player', () => {
     await expect(editDialog.getByLabel('Title')).toHaveValue(title);
   });
 
+  test('saves a new playlist from the heading "Save playlist" button', async ({
+    userPage,
+  }, testInfo) => {
+    const title = `Player Heading Save ${testInfo.retry}-${Date.now()}`;
+
+    await userPage.goto(`/releases/${releaseId}`);
+
+    await addToPlaylistTrigger(userPage).click();
+    await expect(playlistPicker(userPage)).toBeVisible();
+    await userPage.getByRole('button', { name: 'Create playlist' }).click();
+
+    const createDialog = userPage.getByRole('dialog', { name: 'Create playlist' });
+    await expect(createDialog).toBeVisible();
+
+    // The embedded creator's inline form is already on screen, so the heading
+    // button (upper-right, next to the "Unsaved" badge) must SUBMIT that form —
+    // it used to only re-open an already-open form and did nothing.
+    await createDialog.getByLabel('Title').fill(title);
+    await createDialog.getByRole('button', { name: 'Save playlist' }).click();
+
+    // Proof of the save: the "Unsaved" draft badge is gone, the saved title
+    // heads the creator, and the post-save deep-link button appears.
+    await expect(createDialog.getByRole('button', { name: 'Open in My Playlists' })).toBeVisible();
+    await expect(createDialog.getByText('Unsaved')).toHaveCount(0);
+    await expect(createDialog.getByRole('heading', { name: title })).toBeVisible();
+  });
+
   test('keeps mixed song + video search results inside the create dialog', async ({ userPage }) => {
     // Phone width: the dialog is `calc(100% - 2rem)` wide, so a single
     // result row's intrinsic width (icon + thumb + title + "video" pill +

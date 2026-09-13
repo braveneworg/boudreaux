@@ -57,6 +57,8 @@ interface SaveFormStubProps {
   pendingItemRefs: PlaylistItemSourceRef[];
   availableArtistImages: string[];
   onSaved: (playlist: PlaylistDetailResponse) => void;
+  onSavingChange?: (isSaving: boolean) => void;
+  id?: string;
 }
 
 const playlistQueryMock = vi.hoisted(() => vi.fn());
@@ -81,6 +83,7 @@ const reorderPlaylistItemsMock = vi.hoisted(() =>
 const capturedSearch = vi.hoisted(() => ({ current: null as SearchStubProps | null }));
 const capturedSaveDialog = vi.hoisted(() => ({ current: null as SaveDialogStubProps | null }));
 const capturedSaveForm = vi.hoisted(() => ({ current: null as SaveFormStubProps | null }));
+const inlineSaveFormSubmitMock = vi.hoisted(() => vi.fn());
 const capturedList = vi.hoisted(() => ({ current: null as ListStubProps | null }));
 
 vi.mock('./playlist-creator-search', () => ({
@@ -105,15 +108,22 @@ vi.mock('./playlist-save-dialog', () => ({
   },
 }));
 
+// A real <form> carrying the passed id, so a button elsewhere in the tree can
+// target it through the native `form` attribute exactly as the real form does.
 vi.mock('./playlist-save-form', () => ({
   PlaylistSaveForm: (props: SaveFormStubProps) => {
     capturedSaveForm.current = props;
     return (
-      <div
+      <form
+        id={props.id}
         data-testid="save-form"
         data-variant={props.variant}
         data-mode={props.mode}
         data-title={props.initialValues.title}
+        onSubmit={(event) => {
+          event.preventDefault();
+          inlineSaveFormSubmitMock();
+        }}
       />
     );
   },
@@ -275,6 +285,7 @@ beforeEach(() => {
   // The global `clearMocks` only clears calls — reset implementations too so
   // per-test `mockImplementation`s never leak across the shuffled test order.
   playlistQueryMock.mockReset();
+  inlineSaveFormSubmitMock.mockReset();
   addPlaylistItemAsyncMock.mockReset();
   removePlaylistItemMock.mockReset();
   reorderPlaylistItemsMock.mockReset();
@@ -363,6 +374,17 @@ describe('PlaylistCreator', () => {
       await user.click(screen.getByRole('button', { name: 'Save playlist' }));
 
       expect(saveDialog()).toBeInTheDocument();
+    });
+
+    it('keeps the "Save playlist" button a plain button in the page variant', () => {
+      renderCreator();
+
+      addSong();
+
+      expect(screen.getByRole('button', { name: 'Save playlist' })).toHaveAttribute(
+        'type',
+        'button'
+      );
     });
 
     it('maps the pending items to source refs for the save dialog', () => {
@@ -772,6 +794,43 @@ describe('PlaylistCreator', () => {
       renderCreator({ variant: 'embedded', seedItem: SONG });
 
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('submits the inline save form from the heading "Save playlist" button', async () => {
+      const user = userEvent.setup();
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      await user.click(screen.getByRole('button', { name: 'Save playlist' }));
+
+      expect(inlineSaveFormSubmitMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('targets the inline save form by id from the heading "Save playlist" button', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      const formId = saveForm()?.getAttribute('id');
+
+      expect(screen.getByRole('button', { name: 'Save playlist' })).toHaveAttribute(
+        'form',
+        formId ?? ''
+      );
+    });
+
+    it('disables the heading "Save playlist" button while the inline form is saving', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      act(() => capturedSaveForm.current?.onSavingChange?.(true));
+
+      expect(screen.getByRole('button', { name: 'Save playlist' })).toBeDisabled();
+    });
+
+    it('re-enables the heading "Save playlist" button once the inline form settles', () => {
+      renderCreator({ variant: 'embedded', seedItem: SONG });
+
+      act(() => capturedSaveForm.current?.onSavingChange?.(true));
+      act(() => capturedSaveForm.current?.onSavingChange?.(false));
+
+      expect(screen.getByRole('button', { name: 'Save playlist' })).toBeEnabled();
     });
 
     it('does not re-stage when a different seed item arrives after mount', () => {

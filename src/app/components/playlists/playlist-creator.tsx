@@ -4,7 +4,15 @@
 
 'use client';
 
-import { useEffect, useImperativeHandle, useRef, type ReactElement, type Ref } from 'react';
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactElement,
+  type Ref,
+} from 'react';
 
 import { Pencil } from 'lucide-react';
 
@@ -99,6 +107,13 @@ interface CreatorHeadingProps {
   isDraft: boolean;
   detail: PlaylistDetailResponse | undefined;
   hasPendingItems: boolean;
+  /**
+   * Embedded only: id of the inline save form. When set, "Save playlist" is a
+   * native submit button for that form instead of a dialog opener.
+   */
+  saveFormId?: string;
+  /** Embedded only: disables "Save playlist" while the inline form is saving. */
+  isSaving: boolean;
   onSave: () => void;
   onEdit: () => void;
 }
@@ -107,11 +122,18 @@ interface CreatorHeadingProps {
  * Draft: "New playlist" with an "Unsaved" badge and a "Save playlist" button
  * while items are staged. Saved/editing: the playlist title with an edit
  * pencil.
+ *
+ * In the page variant "Save playlist" (re)opens the save dialog. In the
+ * embedded variant the inline form is already on screen, so opening it is a
+ * no-op — there the button submits that form via the `form` attribute (the
+ * click still dispatches the open so the form is guaranteed mounted).
  */
 const CreatorHeading = ({
   isDraft,
   detail,
   hasPendingItems,
+  saveFormId,
+  isSaving,
   onSave,
   onEdit,
 }: CreatorHeadingProps): ReactElement =>
@@ -120,7 +142,15 @@ const CreatorHeading = ({
       <h2 className="text-lg font-semibold">New playlist</h2>
       {hasPendingItems && <Badge variant="secondary">Unsaved</Badge>}
       {hasPendingItems && (
-        <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={onSave}>
+        <Button
+          type={saveFormId ? 'submit' : 'button'}
+          form={saveFormId}
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          disabled={isSaving}
+          onClick={onSave}
+        >
           Save playlist
         </Button>
       )}
@@ -148,7 +178,11 @@ interface CreatorSaveSurfaceProps {
   initialValues: { title: string; isPublic: boolean; coverImages: string[] };
   pendingItemRefs: ReturnType<typeof toSourceRef>[];
   availableArtistImages: string[];
+  /** Embedded only: DOM id the inline form exposes for the heading's submit. */
+  inlineFormId: string;
   onSaved: (playlist: PlaylistDetailResponse) => void;
+  /** Embedded only: mirrors the inline form's in-flight state. */
+  onSavingChange: (isSaving: boolean) => void;
   onOpenChange: (open: boolean) => void;
   onAddSongs: () => void;
 }
@@ -164,19 +198,23 @@ const CreatorSaveSurface = ({
   initialValues,
   pendingItemRefs,
   availableArtistImages,
+  inlineFormId,
   onSaved,
+  onSavingChange,
   onOpenChange,
   onAddSongs,
 }: CreatorSaveSurfaceProps): ReactElement =>
   variant === 'embedded' ? (
     <PlaylistSaveForm
       variant="inline"
+      id={inlineFormId}
       mode={mode}
       playlistId={playlistId}
       initialValues={initialValues}
       pendingItemRefs={pendingItemRefs}
       availableArtistImages={availableArtistImages}
       onSaved={onSaved}
+      onSavingChange={onSavingChange}
     />
   ) : (
     <PlaylistSaveDialog
@@ -252,6 +290,10 @@ export const PlaylistCreator = ({
   } = usePlaylistCreator();
   const searchRef = useRef<PlaylistCreatorSearchHandle>(null);
   useImperativeHandle(ref, () => ({ focusSearch: () => searchRef.current?.focus() }), []);
+  // Embedded: the heading's "Save playlist" submits the inline form by id and
+  // is disabled while that form reports a save in flight.
+  const inlineFormId = useId();
+  const [isInlineSaving, setIsInlineSaving] = useState(false);
 
   // Embedded: stage the seed once on mount. Ref-guarded so a later `seedItem`
   // prop change never re-stages (and keeps the effect exhaustive-deps-safe).
@@ -314,6 +356,8 @@ export const PlaylistCreator = ({
         isDraft={isDraft}
         detail={detail}
         hasPendingItems={state.pendingItems.length > 0}
+        saveFormId={variant === 'embedded' ? inlineFormId : undefined}
+        isSaving={isInlineSaving}
         onSave={openSaveDialog}
         onEdit={handleEditCurrent}
       />
@@ -335,7 +379,9 @@ export const PlaylistCreator = ({
           initialValues={saveDialogInitialValues(state.phase, detail)}
           pendingItemRefs={state.pendingItems.map(toSourceRef)}
           availableArtistImages={dedupeCoverArts(listItems)}
+          inlineFormId={inlineFormId}
           onSaved={handleSaved}
+          onSavingChange={setIsInlineSaving}
           onOpenChange={handleSaveDialogOpenChange}
           onAddSongs={handleAddSongs}
         />
