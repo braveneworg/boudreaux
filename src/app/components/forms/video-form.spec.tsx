@@ -17,12 +17,13 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type * as videoDescriptionEditor from '@/app/components/forms/videos/enrichment/video-description-editor';
 import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
 import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import type { UseFormSetValue } from 'react-hook-form';
+import type { Control, UseFormSetValue } from 'react-hook-form';
 
 type PosterCandidate = videoMetadata.PosterCandidate;
 
@@ -242,15 +243,24 @@ vi.mock('@/app/components/forms/videos/video-producers-section', () => ({
   VideoProducersSection: () => <div data-testid="video-producers-section" />,
 }));
 
-vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
-  VideoEnrichmentPanel: ({
+// The panel mock renders the REAL bound description editor: the form's only
+// Description field lives inside the panel, so the load/apply specs that read
+// `getByLabelText('Description')` exercise the genuine RHF binding.
+vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', async () => {
+  const { VideoDescriptionEditor } = await vi.importActual<typeof videoDescriptionEditor>(
+    '@/app/components/forms/videos/enrichment/video-description-editor'
+  );
+  const VideoEnrichmentPanel = ({
     videoId,
+    control,
     onApplyVideoSuggestion,
   }: {
     videoId: string;
+    control: Control<VideoFormData>;
     onApplyVideoSuggestion: (field: string, value: string) => void;
   }) => (
     <div data-testid="video-enrichment-panel" data-video-id={videoId}>
+      <VideoDescriptionEditor control={control} />
       <button type="button" onClick={() => onApplyVideoSuggestion('releasedOn', '2024-08-08')}>
         Apply enriched date
       </button>
@@ -267,8 +277,9 @@ vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () =>
         Apply enriched featured artist
       </button>
     </div>
-  ),
-}));
+  );
+  return { VideoEnrichmentPanel };
+});
 
 // A minimal controllable DatePicker so date fields are plain inputs associated
 // with their FormLabel (accessible name comes from the label, not aria-label).

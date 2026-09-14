@@ -9,11 +9,12 @@ import { expect, test } from '../fixtures/auth.fixture';
  * Form-validation only: E2E has no S3, so no real upload is attempted. The specs
  * assert the form renders, that an empty submit surfaces the required-field
  * errors plus the missing-upload blocker, that the category radios select, that
- * the Music category is pre-checked on load (Task 2), that the artist comboboxes
- * and producer combobox behave correctly (Tasks 14/15/9), and that "Generate
- * description" fills the field when BIO_GENERATOR_FAKE=true. The release date
- * has no button any more — its automatic lookup only runs once an upload has
- * started, which `admin-video-draft-upload.spec.ts` covers end to end.
+ * the Music category is pre-checked on load (Task 2), and that the artist
+ * comboboxes and producer combobox behave correctly (Tasks 14/15/9). The
+ * release date has no button — its automatic lookup only runs once an upload
+ * has started — and the description has no field here at all: the enrichment
+ * panel hosts the only editor, and the panel mounts once a draft row exists.
+ * `admin-video-draft-upload.spec.ts` covers both end to end.
  */
 
 test.describe('Admin video form — create', () => {
@@ -37,7 +38,10 @@ test.describe('Admin video form — create', () => {
     await expect(adminPage.getByRole('radio', { name: 'Informational' })).toBeVisible();
     await expect(adminPage.getByText('Release date', { exact: true })).toBeVisible();
     await expect(adminPage.getByLabel('Duration (seconds)')).toBeVisible();
-    await expect(adminPage.getByLabel('Description')).toBeVisible();
+    // No Description field before the first upload: the enrichment panel
+    // hosts the only editor and needs a draft row (toHaveCount counts hidden
+    // elements, so 0 is the only safe "absent" assertion).
+    await expect(adminPage.getByLabel('Description')).toHaveCount(0);
 
     // Poster and publish sections plus the footer action.
     await expect(adminPage.getByRole('heading', { name: 'Poster' })).toBeVisible();
@@ -235,38 +239,5 @@ test.describe('Admin video form — create', () => {
     // The removed pill is gone; the seeded one remains.
     await expect(pillsList.getByText('Brand New Producer')).toHaveCount(0);
     await expect(pillsList.getByText('E2E Producer One')).toBeVisible();
-  });
-
-  test('Generate description fills the field when BIO_GENERATOR_FAKE is true', async ({
-    adminPage,
-  }) => {
-    await adminPage.goto('/admin/videos/new');
-
-    // Disabled until BOTH title and artist are present — the synthesized
-    // prose must name the artist, so a title alone is not enough.
-    const generateBtn = adminPage.getByRole('button', { name: 'Generate description' });
-    await expect(generateBtn).toBeDisabled();
-
-    await adminPage.getByLabel('Title').fill('Test Video Title');
-    await expect(generateBtn).toBeDisabled();
-
-    // Pick the seeded primary artist through the combobox (stable accessible
-    // name via the <label htmlFor> linkage — see the combobox test above).
-    await adminPage.getByRole('combobox', { name: 'Artist / Creator' }).click();
-    await adminPage.getByPlaceholder('Search artists…').first().fill('Test Artist');
-    const artistOption = adminPage.getByRole('option', { name: 'Test Artist One' });
-    await expect(artistOption).toBeVisible({ timeout: 5_000 });
-    await artistOption.click();
-    await expect(generateBtn).toBeEnabled();
-
-    const description = adminPage.getByLabel('Description', { exact: true });
-    await expect(description).toHaveValue('');
-
-    // With BIO_GENERATOR_FAKE=true the fake lookup interpolates the title and
-    // artist into deterministic ~500-char prose with attributed quotes.
-    await generateBtn.click();
-    await expect(description).toHaveValue(/Test Video Title/, { timeout: 10_000 });
-    await expect(description).toHaveValue(/Test Artist One/);
-    await expect(description).toHaveValue(/Indie Sleeves/);
   });
 });

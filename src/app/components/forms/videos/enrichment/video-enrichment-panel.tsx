@@ -43,10 +43,12 @@ import {
   STALE_JOB_TIMEOUT_MESSAGE,
 } from '@/utils/async-job-lifecycle';
 
-import { EditableDescriptionSuggestion } from './editable-description-suggestion';
 import { useAutoApplyReleaseDateSuggestion } from './use-autoapply-release-date';
 import { useAutofillAppliedDescription } from './use-autofill-applied-description';
 import { VideoArtistSuggestionCard } from './video-artist-suggestion-card';
+import { VideoDescriptionEditor } from './video-description-editor';
+import { VideoDescriptionSuggestion } from './video-description-suggestion';
+import { VideoEnrichmentErrorBoundary } from './video-enrichment-error-boundary';
 import { VideoEnrichmentProgressTimeline } from './video-enrichment-progress-timeline';
 import { VideoEnrichmentStatusChip } from './video-enrichment-status-chip';
 import { VideoFieldSuggestion } from './video-field-suggestion';
@@ -83,9 +85,9 @@ interface VideoLevelFieldConfig {
   testId: string;
 }
 
+// `description` has no entry: its row is the dedicated VideoDescriptionSuggestion.
 const VIDEO_LEVEL_FIELD_CONFIG = new Map<VideoLevelSuggestionField, VideoLevelFieldConfig>([
   ['releasedOn', { applyLabel: 'Use this date', testId: 'video-release-date-suggestion' }],
-  ['description', { applyLabel: 'Use this description', testId: 'video-description-suggestion' }],
   [
     'featuredArtist',
     { applyLabel: 'Add featured artist', testId: 'video-featured-artist-suggestion' },
@@ -158,7 +160,9 @@ interface VideoLevelSuggestionListProps {
  * row: release date, description, and each featured artist. Watches the three
  * targeted form fields once so every card's applied state derives from the
  * live form — value equality for releasedOn/description, name-membership for
- * featuredArtist. Apply is always client-only (the parent fills the form).
+ * featuredArtist. Apply is always client-only (the parent fills the form). The
+ * description row is the dedicated {@link VideoDescriptionSuggestion}: no
+ * Dismiss, and nothing rendered once it is no longer pending.
  */
 const VideoLevelSuggestionList = ({
   suggestions,
@@ -177,30 +181,26 @@ const VideoLevelSuggestionList = ({
     return isFeaturedApplied(artist ?? '', value);
   };
 
-  const currentValueFor = (field: VideoLevelSuggestionField): string | null => {
-    if (field === 'releasedOn') return releasedOn || null;
-    if (field === 'description') return description || null;
-    return artist || null;
-  };
+  const currentValueFor = (field: VideoLevelSuggestionField): string | null =>
+    field === 'releasedOn' ? releasedOn || null : artist || null;
 
   return (
     <>
       {suggestions.map((suggestion) => {
-        const field = toVideoLevelField(suggestion.field);
-        const config = field === null ? undefined : VIDEO_LEVEL_FIELD_CONFIG.get(field);
-        if (field === null || config === undefined) return null;
-        if (field === 'description') {
+        if (suggestion.field === 'description') {
           return (
-            <EditableDescriptionSuggestion
+            <VideoDescriptionSuggestion
               key={suggestion.id}
               suggestion={suggestion}
-              currentDescription={description ?? ''}
+              isApplied={isApplied('description', suggestion.value)}
               isBusy={isBusy}
-              onApply={(value) => onApplyVideoSuggestion('description', value)}
-              onDismiss={() => onDismissSuggestion(suggestion)}
+              onApply={() => onApplyVideoSuggestion('description', suggestion.value)}
             />
           );
         }
+        const field = toVideoLevelField(suggestion.field);
+        const config = field === null ? undefined : VIDEO_LEVEL_FIELD_CONFIG.get(field);
+        if (field === null || config === undefined) return null;
         const { applyLabel, testId } = config;
         return (
           <VideoFieldSuggestion
@@ -388,6 +388,11 @@ const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElemen
  * actions; video-level suggestions apply into the parent form only. Run and
  * Re-run are disabled with a hint while the live Artist / Creator field is
  * blank (the server action refuses blank-artist runs as a backstop).
+ *
+ * The panel also hosts THE description editor (ADR-0005): the form's only
+ * `description` field, rendered in every phase above the results body. The
+ * results sit inside their own error boundary so a crash there can never take
+ * the editor — and the admin's unsaved prose — down with it.
  */
 export const VideoEnrichmentPanel = ({
   videoId,
@@ -480,16 +485,20 @@ export const VideoEnrichmentPanel = ({
         {data !== undefined ? <VideoEnrichmentStatusChip status={status} /> : null}
       </div>
 
-      <EnrichmentPanelBody
-        data={data}
-        control={control}
-        isBusy={isBusy}
-        hasArtist={hasArtist}
-        onApplyVideoSuggestion={onApplyVideoSuggestion}
-        onRun={triggerRun}
-        onApplySuggestion={applySuggestion}
-        onDismissSuggestion={dismissSuggestion}
-      />
+      <VideoDescriptionEditor control={control} />
+
+      <VideoEnrichmentErrorBoundary>
+        <EnrichmentPanelBody
+          data={data}
+          control={control}
+          isBusy={isBusy}
+          hasArtist={hasArtist}
+          onApplyVideoSuggestion={onApplyVideoSuggestion}
+          onRun={triggerRun}
+          onApplySuggestion={applySuggestion}
+          onDismissSuggestion={dismissSuggestion}
+        />
+      </VideoEnrichmentErrorBoundary>
     </section>
   );
 };

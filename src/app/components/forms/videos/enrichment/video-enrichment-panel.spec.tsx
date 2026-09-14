@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { Form } from '@/app/components/ui/form';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
 import { CLIENT_POLL_DEADLINE_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
@@ -22,6 +23,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// The nested results boundary logs through the console logger; keep it quiet.
+vi.mock('@/lib/utils/console-logger', () => ({ error: vi.fn() }));
 
 vi.mock('@/components/forms/_hooks/use-video-enrichment-status-query', () => ({
   useVideoEnrichmentStatusQuery: (videoId: string, options: unknown) =>
@@ -131,16 +134,24 @@ interface HarnessProps {
   artist?: string;
   /** Seed initial release date; `''` lets the enrichment date auto-fill. */
   releasedOn?: string;
+  /** Seed the stored description the panel's editor is bound to. */
+  description?: string;
 }
 
 /**
  * Wires `onApplyVideoSuggestion` into the real RHF form exactly like
  * `VideoForm` does (featured appends `feat.`, other fields overwrite), so the
- * panel's live-form applied-state derivation is exercised end to end.
+ * panel's live-form applied-state derivation is exercised end to end. Wrapped
+ * in `<Form>` because the panel hosts the bound description editor.
  */
-const Harness = ({ onApply = vi.fn(), artist = '', releasedOn = '2026-02-01' }: HarnessProps) => {
+const Harness = ({
+  onApply = vi.fn(),
+  artist = '',
+  releasedOn = '2026-02-01',
+  description = '',
+}: HarnessProps) => {
   const form = useForm<VideoFormData>({
-    defaultValues: { releasedOn, description: '', artist },
+    defaultValues: { releasedOn, description, artist },
   });
   const onApplyVideoSuggestion = (field: VideoLevelSuggestionField, value: string): void => {
     onApply(field, value);
@@ -152,13 +163,18 @@ const Harness = ({ onApply = vi.fn(), artist = '', releasedOn = '2026-02-01' }: 
     form.setValue(field, value);
   };
   return (
-    <VideoEnrichmentPanel
-      videoId="v1"
-      control={form.control}
-      onApplyVideoSuggestion={onApplyVideoSuggestion}
-    />
+    <Form {...form}>
+      <VideoEnrichmentPanel
+        videoId="v1"
+        control={form.control}
+        onApplyVideoSuggestion={onApplyVideoSuggestion}
+      />
+    </Form>
   );
 };
+
+/** The panel-hosted description editor (the form field, not a suggestion card). */
+const descriptionEditor = (): HTMLElement => screen.getByLabelText('Description');
 
 beforeEach(() => {
   setStatus(baseStatus);
@@ -424,19 +440,6 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     expect(mocks.applyVideoSuggestionAsync).not.toHaveBeenCalled();
   });
 
-  it('applies the admin-edited description text through the form callback', async () => {
-    const onApply = vi.fn();
-    setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
-    render(<Harness onApply={onApply} />);
-
-    const textarea = screen.getByRole('textbox', { name: /suggested description/i });
-    await userEvent.clear(textarea);
-    await userEvent.type(textarea, 'Edited in the panel.');
-    await userEvent.click(screen.getByRole('button', { name: /use this description/i }));
-
-    expect(onApply).toHaveBeenCalledWith('description', 'Edited in the panel.');
-  });
-
   it('marks the description card applied once the form holds the value', async () => {
     setStatus({ ...succeededStatus, suggestions: [descriptionSuggestion] });
     render(<Harness />);
@@ -492,30 +495,90 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
   });
 });
 
-describe('VideoEnrichmentPanel — dismissed video-level descriptions', () => {
+describe('VideoEnrichmentPanel — description editor', () => {
+  it('hosts the bound Description editor while the status is loading', () => {
+    setStatus(undefined);
+    render(<Harness description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+  });
+
+  it('hosts the editor in the never-enriched empty state', () => {
+    render(<Harness description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+    expect(screen.getByRole('button', { name: 'Run enrichment' })).toBeInTheDocument();
+  });
+
+  it('hosts the editor while a run is in flight', () => {
+    setStatus({ ...baseStatus, status: 'processing' });
+    render(<Harness description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+  });
+
+  it('hosts the editor after a failed run', () => {
+    setStatus({ ...baseStatus, status: 'failed', error: 'Lambda invoke failed' });
+    render(<Harness description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+  });
+
+  it('hosts the editor beside the results after a successful run', () => {
+    setStatus(succeededStatus);
+    render(<Harness description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+    expect(screen.getByTestId('video-release-date-suggestion')).toBeInTheDocument();
+  });
+
+  it('hosts the editor even when the artist is blank and the run is gated', () => {
+    render(<Harness artist="" description="Stored prose." />);
+
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+    expect(
+      screen.getByText('Add an artist or creator to enable web enrichment.')
+    ).toBeInTheDocument();
+  });
+
+  it('starts empty for a video with no description', () => {
+    render(<Harness />);
+
+    expect(descriptionEditor()).toHaveValue('');
+  });
+
+  it('keeps the editor when the results body crashes', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // A null suggestion list makes the results body throw on render.
+    setStatus({ ...succeededStatus, suggestions: null });
+    render(<Harness description="Stored prose." />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/enrichment panel failed/i);
+    expect(descriptionEditor()).toHaveValue('Stored prose.');
+    consoleError.mockRestore();
+  });
+});
+
+describe('VideoEnrichmentPanel — non-pending description rows', () => {
   const dismissedDescription = { ...descriptionSuggestion, status: 'dismissed' as const };
 
-  it('collapses a dismissed description to a muted Dismissed line', () => {
+  it('renders nothing for a dismissed (legacy) description row', () => {
     setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
     render(<Harness />);
 
-    expect(screen.getByText('Description: Dismissed')).toBeInTheDocument();
+    expect(screen.queryByTestId('video-description-suggestion')).not.toBeInTheDocument();
+    expect(screen.queryByText(/dismissed/i)).not.toBeInTheDocument();
   });
 
-  it('gives a dismissed description no active apply control', () => {
-    setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
-    render(<Harness />);
+  it('renders nothing extra for an applied description row — only the editor', () => {
+    setStatus({
+      ...succeededStatus,
+      suggestions: [{ ...descriptionSuggestion, status: 'applied' as const }],
+    });
+    render(<Harness description={descriptionSuggestion.value} />);
 
-    expect(screen.queryByRole('button', { name: /use this description/i })).not.toBeInTheDocument();
-  });
-
-  it('gives a dismissed description no editable textarea', () => {
-    setStatus({ ...succeededStatus, suggestions: [dismissedDescription] });
-    render(<Harness />);
-
-    expect(
-      screen.queryByRole('textbox', { name: /suggested description/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('video-description-suggestion')).not.toBeInTheDocument();
+    expect(descriptionEditor()).toHaveValue(descriptionSuggestion.value);
   });
 
   it('keeps only the pending description actionable when a dismissed one also exists', () => {

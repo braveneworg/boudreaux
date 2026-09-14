@@ -93,20 +93,22 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
         expect(body.releasedOn ?? '').toMatch(/^2020-06-01/);
       }).toPass({ timeout: 15_000 });
 
+      // The enrichment panel mounts PRE-SAVE (a draft row exists; every
+      // category qualifies) and hosts the only description editor.
+      const panel = adminPage.getByTestId('video-enrichment-panel');
+      await expect(panel).toBeVisible({ timeout: 15_000 });
+      const descriptionEditor = panel.getByLabel('Description', { exact: true });
+
       // The description is never left blank: the fake server probe prefills it
       // from the file's comment tag ("E2E probe description"), and once the
       // lookup resolved the blank-only auto-generate would otherwise fill it
-      // with the same fake synthesis the "Generate description" button uses
-      // (which names the title). Which lands first is a race, so accept either.
-      await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
-        /E2E Draft Song|E2E probe description/,
-        { timeout: 15_000 }
-      );
+      // with the same fake synthesis (which names the title). Which lands
+      // first is a race, so accept either.
+      await expect(descriptionEditor).toHaveValue(/E2E Draft Song|E2E probe description/, {
+        timeout: 15_000,
+      });
 
-      // The enrichment panel mounts PRE-SAVE (draft row exists + MUSIC default)
-      // and the auto-kicked fake run reaches a terminal 'Enriched' state.
-      const panel = adminPage.getByTestId('video-enrichment-panel');
-      await expect(panel).toBeVisible({ timeout: 15_000 });
+      // The auto-kicked fake run reaches a terminal 'Enriched' state.
       const chip = panel.getByTestId('video-enrichment-status-chip');
       // The auto-kicked fake enrichment dwells ≥4s; widen the terminal-state
       // wait so heavy parallel fake-enrichment contention can't starve it.
@@ -118,11 +120,10 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       await expect(descriptionCard).toBeVisible();
       await expect(featuredCard).toBeVisible();
 
-      // Apply the description into the form (client-only; the card flips applied).
+      // Apply the description into the panel's editor (client-only; the card
+      // flips applied).
       await descriptionCard.getByRole('button', { name: APPLY_DESCRIPTION }).click();
-      await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
-        /deterministic E2E description/
-      );
+      await expect(descriptionEditor).toHaveValue(/deterministic E2E description/);
       await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
 
       // Apply the discovered featured artist — the artist string gains its feat

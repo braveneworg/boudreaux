@@ -45,6 +45,10 @@ test.describe('Admin video enrichment', () => {
     const chip = panel.getByTestId('video-enrichment-status-chip');
     await expect(chip).toHaveText('Not enriched');
 
+    // The panel hosts the ONLY description editor, seeded from the stored row.
+    const descriptionEditor = panel.getByLabel('Description', { exact: true });
+    await expect(descriptionEditor).toHaveValue('E2E Enrich Hotel description for E2E.');
+
     await panel.getByRole('button', { name: 'Run enrichment' }).click();
 
     // In-flight indicator: the fake path pauses ≥4s before completing, so
@@ -82,14 +86,12 @@ test.describe('Admin video enrichment', () => {
     await expect(descriptionCard).toBeVisible();
     await expect(featuredCard).toBeVisible();
 
-    // The description suggestion is an editable textarea; applying writes the
-    // current text into the mounted form (client-only — video-level applies
-    // never hit the server) and flips the card to Applied. `getByLabel` is
-    // exact so it targets the form field, not the card's "Suggested description".
+    // The stored description is non-blank, so the suggestion stays a pending
+    // read-only card; "Use this description" overwrites the panel's editor
+    // (client-only — video-level applies never hit the server) and the card
+    // flips to Applied. Never Saved: the seed row is shared across retries.
     await descriptionCard.getByRole('button', { name: 'Use this description' }).click();
-    await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
-      /deterministic E2E description/
-    );
+    await expect(descriptionEditor).toHaveValue(/deterministic E2E description/);
     await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
 
     // Dismissing the featured-artist card IS server-side for video-level fields;
@@ -151,6 +153,8 @@ test.describe('Admin video enrichment', () => {
     const panel = adminPage.getByTestId('video-enrichment-panel');
     await expect(panel).toBeVisible();
     const chip = panel.getByTestId('video-enrichment-status-chip');
+    const descriptionEditor = panel.getByLabel('Description', { exact: true });
+    await expect(descriptionEditor).toHaveValue('E2E Enrich India description for E2E.');
 
     // Wait for a settled status, then take whichever trigger it offers (a
     // re-run goes through the confirm dialog).
@@ -176,9 +180,7 @@ test.describe('Admin video enrichment', () => {
     // Applying is client-only (writes into the mounted form); never Save — the
     // seed row is shared across retries.
     await descriptionCard.getByRole('button', { name: 'Use this description' }).click();
-    await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
-      /informational video/
-    );
+    await expect(descriptionEditor).toHaveValue(/informational video/);
     await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
   });
 });

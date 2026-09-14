@@ -12,7 +12,6 @@ import { Label } from '@/app/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import { DescriptionField } from './description-field';
 import { ReleaseDateField } from './release-date-field';
 import { useVideoArtistFields } from './use-video-artist-fields';
 
@@ -133,8 +132,8 @@ export const VideoMetadataSection = ({
           )}
         />
       </div>
-
-      <DescriptionField control={control} setValue={setValue} />
+      {/* No Description field here: the enrichment panel hosts the only editor
+          (ADR-0005), so it exists only once a draft/edit row does. */}
     </section>
   );
 };
