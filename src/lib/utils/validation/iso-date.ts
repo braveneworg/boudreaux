@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 
 /**
  * Day-precision ISO date helpers (`YYYY-MM-DD`). Shared by the client forms,
- * the description-lookup routes, the suggestion apply action, and the
+ * the release description-lookup route, the suggestion apply action, and the
  * release-date lookup service so every layer agrees on what "a day" is.
  * Import-safe from Client Components (no server-only dependencies).
  */

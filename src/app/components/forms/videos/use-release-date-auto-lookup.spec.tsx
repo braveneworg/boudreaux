@@ -12,7 +12,6 @@ import { useForm, type UseFormReturn } from 'react-hook-form';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import { lookupPairKey } from './release-date-lookup-policy';
 import {
   RELEASE_DATE_LOOKUP_DEBOUNCE_MS,
   useReleaseDateAutoLookup,
@@ -213,14 +212,13 @@ describe('useReleaseDateAutoLookup — a find', () => {
     expect(result.current.releasedOnDirty).toBe(true);
   });
 
-  it('reports found and the resolved pair key', async () => {
+  it('reports found once the lookup lands a date', async () => {
     mockRefetch.mockResolvedValueOnce(found('2019-08-04'));
     const { flushNext, result } = renderLookup();
 
     await flushNext();
 
     expect(result.current.status).toBe('found');
-    expect(result.current.resolvedKey).toBe(lookupPairKey('My Bad', 'Ceschi'));
   });
 
   it('reports searching while an attempt is on the wire', async () => {
@@ -285,16 +283,6 @@ describe('useReleaseDateAutoLookup — the budget', () => {
     expect(mockRefetch).toHaveBeenCalledTimes(3);
     expect(pendingDelays()).toEqual([]);
     expect(result.current.status).toBe('exhausted');
-  });
-
-  it('reports the resolved pair key once exhausted', async () => {
-    const { flushNext, result } = renderLookup();
-
-    await flushNext();
-    await flushNext();
-    await flushNext();
-
-    expect(result.current.resolvedKey).toBe(lookupPairKey('My Bad', 'Ceschi'));
   });
 
   it('counts a rejected attempt against the budget', async () => {
@@ -407,7 +395,6 @@ describe('useReleaseDateAutoLookup — pair changes and lifecycle', () => {
     });
 
     expect(result.current.status).toBe('exhausted');
-    expect(result.current.resolvedKey).toBe(lookupPairKey('My Bad', 'Ceschi'));
   });
 
   it('cancels the armed timer on unmount', async () => {

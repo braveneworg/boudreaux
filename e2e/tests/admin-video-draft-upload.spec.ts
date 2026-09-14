@@ -99,12 +99,10 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       await expect(panel).toBeVisible({ timeout: 15_000 });
       const descriptionEditor = panel.getByLabel('Description', { exact: true });
 
-      // The description is never left blank: the fake server probe prefills it
-      // from the file's comment tag ("E2E probe description"), and once the
-      // lookup resolved the blank-only auto-generate would otherwise fill it
-      // with the same fake synthesis (which names the title). Which lands
-      // first is a race, so accept either.
-      await expect(descriptionEditor).toHaveValue(/E2E Draft Song|E2E probe description/, {
+      // Nothing synthesizes a description outside enrichment any more; the
+      // only pre-enrichment writer left is the fake server probe's comment-tag
+      // prefill ("E2E probe description").
+      await expect(descriptionEditor).toHaveValue('E2E probe description', {
         timeout: 15_000,
       });
 

@@ -135,7 +135,7 @@ describe('isReleaseDescriptionLookupTask', () => {
     const { isReleaseDescriptionLookupTask } = await import('./release-description-lookup.js');
 
     expect(isReleaseDescriptionLookupTask({ task: 'release-description-lookup' })).toBe(true);
-    expect(isReleaseDescriptionLookupTask({ task: 'video-description-lookup' })).toBe(false);
+    expect(isReleaseDescriptionLookupTask({ task: 'video-enrichment' })).toBe(false);
     expect(isReleaseDescriptionLookupTask(null)).toBe(false);
   });
 });

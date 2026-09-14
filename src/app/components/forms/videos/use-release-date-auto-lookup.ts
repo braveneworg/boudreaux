@@ -62,12 +62,6 @@ export interface UseReleaseDateAutoLookupArgs {
 
 export interface UseReleaseDateAutoLookupResult {
   status: ReleaseDateLookupStatus;
-  /**
-   * The CURRENT pair's key once its lookup has resolved — found, exhausted,
-   * or a find beaten by a date typed in flight — else null. The description
-   * auto-generate compares it with its own current pair.
-   */
-  resolvedKey: string | null;
 }
 
 /** Per-pair progress, kept across renders in a ref and read only by effects. */
@@ -85,7 +79,6 @@ interface PairState {
  */
 interface PairView {
   status: ReleaseDateLookupStatus;
-  resolved: boolean;
 }
 
 type ShowPairView = (key: string, view: PairView) => void;
@@ -93,26 +86,22 @@ type ShowPairView = (key: string, view: PairView) => void;
 const defaultNow = (): Date => new Date();
 
 /**
- * What the field shows for the CURRENT pair, and whether that pair resolved.
- * A run only lives while the gate is open, so `searching` with a closed gate
- * (upload failed before a row existed, category changed, a date typed while
- * the fetch was in flight) means the run was cancelled — read it as idle
- * rather than announcing a search that is not happening. Likewise "No release
- * date found" makes no sense once a date has been set by hand.
+ * What the field shows for the CURRENT pair. A run only lives while the gate
+ * is open, so `searching` with a closed gate (upload failed before a row
+ * existed, category changed, a date typed while the fetch was in flight)
+ * means the run was cancelled — read it as idle rather than announcing a
+ * search that is not happening. Likewise "No release date found" makes no
+ * sense once a date has been set by hand.
  */
 const deriveLookupResult = (
   view: PairView | undefined,
-  pairKey: string,
   releasedOn: string,
   gateOpen: boolean
 ): UseReleaseDateAutoLookupResult => {
   const shown = view?.status ?? 'idle';
   const cutOff = shown === 'searching' && !gateOpen;
   const hiddenByDate = shown === 'exhausted' && Boolean(releasedOn.trim());
-  return {
-    status: cutOff || hiddenByDate ? 'idle' : shown,
-    resolvedKey: view?.resolved ? pairKey : null,
-  };
+  return { status: cutOff || hiddenByDate ? 'idle' : shown };
 };
 
 const getPairState = (pairs: Map<string, PairState>, key: string): PairState => {
@@ -152,11 +141,11 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
     // the pair still counts as resolved, with the admin's date as the one to
     // describe.
     if (getValues('releasedOn')?.trim()) {
-      show(key, { status: 'idle', resolved: true });
+      show(key, { status: 'idle' });
       return;
     }
     setValue('releasedOn', releasedOn, { shouldDirty: true, shouldValidate: true });
-    show(key, { status: 'found', resolved: true });
+    show(key, { status: 'found' });
   };
 
   const settle = (outcome: LookupOutcome): void => {
@@ -170,7 +159,7 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
 
   const fire = (): void => {
     state.budget = recordLookupAttempt(state.budget);
-    show(key, { status: 'searching', resolved: false });
+    show(key, { status: 'searching' });
     const promise = refetch()
       .then((result) => classifyLookupResult(result.data, now()))
       .catch((): LookupOutcome => ({ kind: 'miss' }));
@@ -185,7 +174,7 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
     const delayMs = nextAttemptDelayMs(state.budget);
     if (delayMs === null) {
       state.resolved = true;
-      show(key, { status: 'exhausted', resolved: true });
+      show(key, { status: 'exhausted' });
       return;
     }
     cancelTimer = scheduler.schedule(fire, delayMs);
@@ -284,5 +273,5 @@ export const useReleaseDateAutoLookup = ({
     queryClient,
   ]);
 
-  return deriveLookupResult(views.get(pairKey), pairKey, releasedOn, gateOpen);
+  return deriveLookupResult(views.get(pairKey), releasedOn, gateOpen);
 };

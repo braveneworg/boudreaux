@@ -9,17 +9,15 @@ import { useForm } from 'react-hook-form';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
-import { useDescriptionAutoGenerate } from './use-description-auto-generate';
 import { useReleaseDateAutoLookup } from './use-release-date-auto-lookup';
 import { useReleaseDateAutosave } from './use-release-date-autosave';
 import { useVideoAutoFill, type UseVideoAutoFillArgs } from './use-video-auto-fill';
 
 vi.mock('server-only', () => ({}));
 vi.mock('./use-release-date-auto-lookup', () => ({
-  useReleaseDateAutoLookup: vi.fn(() => ({ status: 'idle', resolvedKey: null })),
+  useReleaseDateAutoLookup: vi.fn(() => ({ status: 'idle' })),
 }));
 vi.mock('./use-release-date-autosave', () => ({ useReleaseDateAutosave: vi.fn() }));
-vi.mock('./use-description-auto-generate', () => ({ useDescriptionAutoGenerate: vi.fn() }));
 
 const row = (releasedOn: Date | null): VideoRow =>
   ({
@@ -57,10 +55,9 @@ const renderAutoFill = (overrides: Partial<Omit<UseVideoAutoFillArgs, 'form'>> =
 
 const lookupArgs = () => vi.mocked(useReleaseDateAutoLookup).mock.calls.at(-1)?.[0];
 const autosaveArgs = () => vi.mocked(useReleaseDateAutosave).mock.calls.at(-1)?.[0];
-const describeArgs = () => vi.mocked(useDescriptionAutoGenerate).mock.calls.at(-1)?.[0];
 
 beforeEach(() => {
-  vi.mocked(useReleaseDateAutoLookup).mockReturnValue({ status: 'idle', resolvedKey: null });
+  vi.mocked(useReleaseDateAutoLookup).mockReturnValue({ status: 'idle' });
 });
 
 describe('useVideoAutoFill — lookup args', () => {
@@ -125,23 +122,31 @@ describe('useVideoAutoFill — autosave args', () => {
   });
 });
 
-describe('useVideoAutoFill — description and status', () => {
-  it('hands the resolved lookup key to the description auto-generate', () => {
-    vi.mocked(useReleaseDateAutoLookup).mockReturnValue({
-      status: 'found',
-      resolvedKey: 'my bad ceschi',
-    });
-
-    renderAutoFill();
-
-    expect(describeArgs()).toMatchObject({ lookupResolvedKey: 'my bad ceschi' });
-  });
-
+describe('useVideoAutoFill — status', () => {
   it('returns the lookup status for the field hint', () => {
-    vi.mocked(useReleaseDateAutoLookup).mockReturnValue({ status: 'exhausted', resolvedKey: 'k' });
+    vi.mocked(useReleaseDateAutoLookup).mockReturnValue({ status: 'exhausted' });
 
     const { result } = renderAutoFill();
 
     expect(result.current.releaseDateLookupStatus).toBe('exhausted');
+  });
+
+  it('never writes the description — no fill hook touches it', () => {
+    vi.mocked(useReleaseDateAutoLookup).mockReturnValue({ status: 'found' });
+
+    const { result } = renderHook(() => {
+      const form = useForm<VideoFormData>({ defaultValues: { description: '' } });
+      useVideoAutoFill({
+        form,
+        uploadStatus: 'idle',
+        video: undefined,
+        isEditMode: false,
+        effectiveVideoId: 'draft-1',
+        category: 'MUSIC',
+      });
+      return form;
+    });
+
+    expect(result.current.getValues('description')).toBe('');
   });
 });

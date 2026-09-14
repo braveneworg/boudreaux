@@ -149,10 +149,11 @@ export const releaseDateLookupLimiter = rateLimit({
 export const RELEASE_DATE_LOOKUP_LIMIT = 10;
 
 /**
- * Description web synthesis (admin video form) — 5 requests per minute.
- * The most expensive lookup: three Serper searches, up to two Jina page
- * reads, and a Gemini call per press, so the cap sits below the
- * release-date lookup's.
+ * Description web synthesis (admin release form's blurb) — 5 requests per
+ * minute. The most expensive lookup: three Serper searches, up to two Jina
+ * page reads, and a Gemini call per press, so the cap sits below the
+ * release-date lookup's. (Video descriptions have no sync route — they come
+ * only from the async enrichment run.)
  */
 export const descriptionLookupLimiter = rateLimit({
   interval: 60 * 1000,

@@ -6,7 +6,6 @@
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
-import { useDescriptionAutoGenerate } from './use-description-auto-generate';
 import {
   useReleaseDateAutoLookup,
   type ReleaseDateLookupStatus,
@@ -38,12 +37,13 @@ export interface UseVideoAutoFillResult {
  * them, keeping it under the component line cap:
  *
  * 1. the bounded release-date lookup (fills an empty date),
- * 2. the release-date autosave (persists any date change once a row exists),
- * 3. the description auto-generate (blank-only, after the lookup resolves).
+ * 2. the release-date autosave (persists any date change once a row exists).
  *
- * In edit mode the row counts as persisted only once it has loaded, so the
- * lookup's edit-open gate sees the row's real (possibly empty) date and the
- * autosave seeds from it instead of writing on open.
+ * The description is deliberately NOT filled here: it is only ever entered in
+ * the enrichment panel's editor or written there by the async enrichment run
+ * (ADR-0005). In edit mode the row counts as persisted only once it has
+ * loaded, so the lookup's edit-open gate sees the row's real (possibly empty)
+ * date and the autosave seeds from it instead of writing on open.
  */
 export const useVideoAutoFill = ({
   form,
@@ -54,7 +54,7 @@ export const useVideoAutoFill = ({
   category,
 }: UseVideoAutoFillArgs): UseVideoAutoFillResult => {
   const hasPersistedRow = isEditMode ? Boolean(video) : effectiveVideoId !== undefined;
-  const { status, resolvedKey } = useReleaseDateAutoLookup({
+  const { status } = useReleaseDateAutoLookup({
     form,
     uploadStatus,
     hasPersistedRow,
@@ -65,6 +65,5 @@ export const useVideoAutoFill = ({
     videoId: effectiveVideoId,
     persistedReleasedOn: video ? formatDateForForm(video.releasedOn) : '',
   });
-  useDescriptionAutoGenerate({ form, lookupResolvedKey: resolvedKey });
   return { releaseDateLookupStatus: status };
 };

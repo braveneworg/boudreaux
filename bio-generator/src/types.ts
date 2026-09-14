@@ -188,39 +188,12 @@ export type ReleaseDateLookupResult =
   | { ok: false; error: string };
 
 /**
- * Synchronous description-lookup invoke from the admin video form. The artist
- * is required (unlike the release-date lookup) because the synthesized prose
- * must name the artist.
- */
-export const videoDescriptionLookupInputSchema = z.object({
-  task: z.literal('video-description-lookup'),
-  title: z.string().min(1),
-  artist: z.string().min(1),
-  releasedOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
-    .optional(),
-});
-
-export type VideoDescriptionLookupInput = z.infer<typeof videoDescriptionLookupInputSchema>;
-
-export type VideoDescriptionLookupResult =
-  | {
-      ok: true;
-      result: {
-        description: string;
-        confidence: 'high' | 'medium' | 'low';
-        sources: string[];
-      } | null;
-    }
-  | { ok: false; error: string };
-
-/**
- * Synchronous blurb invoke from the admin release form. Like the video
- * description lookup the artist is required — the prose must name one. The
+ * Synchronous blurb invoke from the admin release form. The artist is
+ * required (unlike the release-date lookup) — the prose must name one. The
  * remaining release facts are optional context, and `labelNotes` carries the
  * label's own authored notes: authoritative context the blurb is built from
- * and must not contradict.
+ * and must not contradict. (A video description has no sync task: it is only
+ * ever synthesized by the async `video-enrichment` run.)
  */
 export const releaseDescriptionLookupInputSchema = z.object({
   task: z.literal('release-description-lookup'),

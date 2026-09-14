@@ -55,7 +55,6 @@ const mocks = vi.hoisted(() => ({
   selectVideoPosterAsync: vi.fn(),
   updateVideoReleaseDateAsync: vi.fn(),
   releaseDateRefetch: vi.fn(),
-  descriptionRefetch: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
   useVideoProducersQuery: vi.fn(),
@@ -123,23 +122,14 @@ vi.mock('./_hooks/use-video-producers-query', () => ({
   useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
-// The automatic lookups call `refetch()` themselves, so both resolve at the
-// factory level (a miss by default) — a bare vi.fn() would make them throw.
+// The automatic release-date lookup calls `refetch()` itself, so it resolves
+// at the factory level (a miss by default) — a bare vi.fn() would make it throw.
 vi.mock('./_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: () => ({
     isFetching: false,
     error: null,
     data: undefined,
     refetch: mocks.releaseDateRefetch,
-  }),
-}));
-
-vi.mock('./_hooks/use-video-description-lookup-query', () => ({
-  useVideoDescriptionLookupQuery: () => ({
-    isFetching: false,
-    error: null,
-    data: undefined,
-    refetch: mocks.descriptionRefetch,
   }),
 }));
 
@@ -419,7 +409,6 @@ beforeEach(() => {
   mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
   mocks.updateVideoReleaseDateAsync.mockResolvedValue({ success: true });
   mocks.releaseDateRefetch.mockResolvedValue({ data: null });
-  mocks.descriptionRefetch.mockResolvedValue({ data: null });
   mocks.uploadVideoMultipart.mockResolvedValue({
     success: true,
     s3Key: 'media/videos/aaa/clip.mp4',
