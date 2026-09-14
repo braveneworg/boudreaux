@@ -572,6 +572,48 @@ describe('VideoForm — metadata prefill (only-empty)', () => {
 });
 
 describe('VideoForm — upload flow', () => {
+  it('shows the preparing spinner from selection until the first byte', async () => {
+    mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+
+    expect(await screen.findByText('Preparing upload…')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('swaps the spinner for the progress bar on the first byte', async () => {
+    let reportProgress: ((fraction: number) => void) | undefined;
+    mocks.uploadVideoMultipart.mockImplementation(
+      (_file: File, { onProgress }: { onProgress?: (f: number) => void }) => {
+        reportProgress = onProgress;
+        return new Promise(() => undefined);
+      }
+    );
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('Preparing upload…');
+    await waitFor(() => expect(reportProgress).toBeDefined());
+    act(() => reportProgress?.(0.01));
+
+    expect(await screen.findByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText('Preparing upload…')).not.toBeInTheDocument();
+  });
+
+  it('keeps Save disabled while the upload is being prepared', async () => {
+    mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('Preparing upload…');
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
   it('renders the upload progress reported via onProgress', async () => {
     mocks.uploadVideoMultipart.mockImplementation(
       (_file: File, { onProgress }: { onProgress?: (f: number) => void }) => {

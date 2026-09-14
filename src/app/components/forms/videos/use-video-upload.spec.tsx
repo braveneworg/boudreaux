@@ -6,8 +6,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { uploadVideoMultipart } from '@/lib/utils/multipart-upload';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import { useVideoUpload } from './use-video-upload';
-import { captureVideoPosterCandidates, type PosterCandidate } from './video-metadata';
+import { isUploadPreparing, useVideoUpload } from './use-video-upload';
+import {
+  captureVideoPosterCandidates,
+  extractVideoDuration,
+  type PosterCandidate,
+} from './video-metadata';
 
 import type { UseFormReturn } from 'react-hook-form';
 
@@ -129,5 +133,79 @@ describe('useVideoUpload — onUploadComplete callback', () => {
 
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(onUploadComplete).not.toHaveBeenCalled();
+  });
+});
+
+describe('useVideoUpload — preparing state', () => {
+  it('enters preparing synchronously on select, before any extraction settles', async () => {
+    vi.mocked(uploadVideoMultipart).mockImplementation(() => new Promise(() => {}));
+
+    const { result } = setup();
+    act(() => {
+      result.current.selectFile(videoFile());
+    });
+
+    expect(result.current.status).toBe('preparing');
+  });
+
+  it('resets progress to zero when preparing', async () => {
+    vi.mocked(uploadVideoMultipart).mockImplementation(() => new Promise(() => {}));
+
+    const { result } = setup();
+    act(() => {
+      result.current.selectFile(videoFile());
+    });
+
+    expect(result.current.progress).toBe(0);
+  });
+
+  it('moves to uploading at 0% once the multipart starts', async () => {
+    vi.mocked(uploadVideoMultipart).mockImplementation(() => new Promise(() => {}));
+
+    const { result } = setup();
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+    await waitFor(() => expect(uploadVideoMultipart).toHaveBeenCalled());
+
+    expect(result.current.status).toBe('uploading');
+    expect(result.current.progress).toBe(0);
+  });
+
+  it('reports an error when the metadata extraction rejects', async () => {
+    vi.mocked(extractVideoDuration).mockRejectedValueOnce(new Error('decoder exploded'));
+
+    const { result } = setup();
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.errorMessage).toBe('Could not read the video file.');
+  });
+
+  it('never starts the multipart when the metadata extraction rejects', async () => {
+    vi.mocked(extractVideoDuration).mockRejectedValueOnce(new Error('decoder exploded'));
+
+    const { result } = setup();
+    await act(async () => {
+      result.current.selectFile(videoFile());
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(uploadVideoMultipart).not.toHaveBeenCalled();
+  });
+});
+
+describe('isUploadPreparing', () => {
+  it.each([
+    ['idle', 0, false],
+    ['preparing', 0, true],
+    ['uploading', 0, true],
+    ['uploading', 1, false],
+    ['success', 0, false],
+    ['error', 0, false],
+  ] as const)('%s at %d percent → %s', (status, progress, expected) => {
+    expect(isUploadPreparing(status, progress)).toBe(expected);
   });
 });

@@ -250,9 +250,9 @@ const handleVideoUnpublish = async ({
 const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | undefined =>
   video ? video.publishedAt : undefined;
 
-/** Save is blocked while either the video multipart or the poster PUT is in flight. */
+/** Save is blocked while the video is being prepared or uploaded, or the poster PUT is in flight. */
 const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
-  uploadStatus === 'uploading' || isPosterUploading;
+  uploadStatus === 'preparing' || uploadStatus === 'uploading' || isPosterUploading;
 
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */

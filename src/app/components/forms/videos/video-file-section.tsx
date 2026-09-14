@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2, Loader2, X } from 'lucide-react';
 import { useWatch } from 'react-hook-form';
 
 import { formatFileSize } from '@/app/components/forms/digital-formats/file-helpers';
@@ -11,15 +11,48 @@ import { Button } from '@/app/components/ui/button';
 import { Progress } from '@/app/components/ui/progress';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
+import { isUploadPreparing, type UseVideoUploadResult } from './use-video-upload';
 import { VideoDropzone } from './video-dropzone';
 
-import type { UseVideoUploadResult } from './use-video-upload';
 import type { Control } from 'react-hook-form';
 
 interface VideoFileSectionProps {
   control: Control<VideoFormData>;
   upload: UseVideoUploadResult;
 }
+
+/**
+ * Spinner shown from file selection until the first uploaded byte. Cancel is
+ * offered only once the multipart has started (`uploading`) — before that no
+ * abort controller exists, so there is nothing to cancel yet.
+ */
+const PreparingView = ({
+  canCancel,
+  onCancel,
+}: {
+  canCancel: boolean;
+  onCancel: () => void;
+}): React.ReactElement => (
+  <div className="space-y-3">
+    <div
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+      className="border-input flex items-center gap-2 rounded-none border p-3"
+    >
+      <Loader2 className="size-5 animate-spin" aria-hidden />
+      <p className="text-sm text-zinc-700">Preparing upload…</p>
+    </div>
+    {canCancel ? (
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          <X className="mr-1 size-4" aria-hidden />
+          Cancel upload
+        </Button>
+      </div>
+    ) : null}
+  </div>
+);
 
 const UploadingView = ({
   progress,
@@ -95,9 +128,9 @@ const UploadDoneView = ({
 );
 
 /**
- * The video file section: dropzone → progress + cancel → done/replace, driven by
- * the upload state machine. Blocks nothing itself; the parent gates submit on the
- * hidden `s3Key` the successful upload writes.
+ * The video file section: dropzone → preparing spinner → progress + cancel →
+ * done/replace, driven by the upload state machine. Blocks nothing itself; the
+ * parent gates submit on the hidden `s3Key` the successful upload writes.
  */
 export const VideoFileSection = ({
   control,
@@ -109,6 +142,9 @@ export const VideoFileSection = ({
   const durationSeconds = useWatch({ control, name: 'durationSeconds' });
 
   const renderArea = (): React.ReactElement => {
+    if (isUploadPreparing(upload.status, upload.progress)) {
+      return <PreparingView canCancel={upload.status === 'uploading'} onCancel={upload.cancel} />;
+    }
     if (upload.status === 'uploading') {
       return <UploadingView progress={upload.progress} onCancel={upload.cancel} />;
     }
