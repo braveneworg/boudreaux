@@ -75,12 +75,22 @@ export const videoKnownIdentitySchema = z.object({
   bornOn: isoDate.optional(),
 });
 
-/** Invoke event the web app sends to the video-enrichment Lambda. */
+/** Video categories the Lambda branches on (mirrors the web app's `VideoCategory`). */
+export const VIDEO_CATEGORIES = ['MUSIC', 'INFORMATIONAL'] as const;
+
+export type VideoEnrichmentCategory = (typeof VIDEO_CATEGORIES)[number];
+
+/**
+ * Invoke event the web app sends to the video-enrichment Lambda. `category`
+ * is optional so a pre-category web app payload still validates; the Lambda
+ * treats an absent category as MUSIC.
+ */
 export const videoEnrichmentInputSchema = z.object({
   task: z.literal('video-enrichment'),
   videoId: z.string().min(1),
   title: z.string().min(1),
   artistDisplay: z.string().min(1),
+  category: z.enum(VIDEO_CATEGORIES).optional(),
   releasedOn: isoDate.optional(),
   artists: z
     .array(

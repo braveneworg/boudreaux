@@ -324,6 +324,22 @@ describe('videoEnrichmentInputSchema', () => {
     const jobToken = 'x'.repeat(201);
     expect(videoEnrichmentInputSchema.safeParse({ ...validInput, jobToken }).success).toBe(false);
   });
+
+  it('keeps an INFORMATIONAL category', () => {
+    const parsed = videoEnrichmentInputSchema.parse({ ...validInput, category: 'INFORMATIONAL' });
+    expect(parsed.category).toBe('INFORMATIONAL');
+  });
+
+  it('accepts an event without a category (a pre-category web app payload)', () => {
+    const parsed = videoEnrichmentInputSchema.parse(validInput);
+    expect(parsed.category).toBeUndefined();
+  });
+
+  it('rejects an unknown category', () => {
+    expect(
+      videoEnrichmentInputSchema.safeParse({ ...validInput, category: 'PODCAST' }).success
+    ).toBe(false);
+  });
 });
 
 describe('videoEnrichmentResultSchema', () => {

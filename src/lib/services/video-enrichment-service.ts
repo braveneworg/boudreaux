@@ -17,6 +17,7 @@ import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-en
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { Json } from '@/lib/types/domain/shared';
+import type { VideoCategory } from '@/lib/types/domain/video';
 import type {
   CreateSuggestionRow,
   VideoEnrichmentState,
@@ -79,6 +80,8 @@ export interface VideoEnrichmentLambdaInput {
   videoId: string;
   title: string;
   artistDisplay: string;
+  /** Drives the Lambda's flow: INFORMATIONAL skips the music lookups. */
+  category: VideoCategory;
   releasedOn?: string;
   artists: Array<{
     artistId: string;
@@ -538,6 +541,7 @@ const dispatchEnrichment = async (
     videoId: state.id,
     title: state.title,
     artistDisplay: state.artist,
+    category: state.category,
     releasedOn: toIsoDate(state.releasedOn),
     artists: toLambdaArtists(rows),
     callbackUrl: `${base}/api/videos/${state.id}/enrichment/callback`,

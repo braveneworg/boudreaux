@@ -410,6 +410,15 @@ describe('runEnrichmentJob', () => {
     expect(sentPayload()).not.toHaveProperty('releasedOn');
   });
 
+  it('sends the video category in the Lambda payload', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().category).toBe('MUSIC');
+  });
+
   it('sends the linked artists with their known identity fields', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
