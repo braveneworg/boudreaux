@@ -493,10 +493,18 @@ const resolveFakeDelayMs = (): number => {
 const sleep = (ms: number): Promise<void> =>
   ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 
-/** Fake/E2E path: one synthetic checkpoint, a dwell, then persist the fixture. */
-const runFakeEnrichment = async (videoId: string, rows: VideoArtistWithArtist[]): Promise<void> => {
-  await VideoRepository.setEnrichmentProgress(videoId, {
-    stage: 'musicbrainz',
+/**
+ * Fake/E2E path: one synthetic checkpoint (the first stage the real Lambda
+ * posts for the category — `web-search` for INFORMATIONAL, which skips the
+ * music lookups), a dwell, then persist the category's fixture.
+ */
+const runFakeEnrichment = async (
+  state: VideoEnrichmentState,
+  rows: VideoArtistWithArtist[]
+): Promise<void> => {
+  const informational = state.category === 'INFORMATIONAL';
+  await VideoRepository.setEnrichmentProgress(state.id, {
+    stage: informational ? 'web-search' : 'musicbrainz',
     counts: { artists: rows.length },
     at: new Date().toISOString(),
   });
@@ -504,8 +512,9 @@ const runFakeEnrichment = async (videoId: string, rows: VideoArtistWithArtist[])
   await sleep(resolveFakeDelayMs());
   const data = videoEnrichmentFixture({
     artists: rows.map(({ artistId }) => ({ artistId })),
+    category: state.category,
   });
-  await VideoEnrichmentService.completeCallback(videoId, { ok: true, data });
+  await VideoEnrichmentService.completeCallback(state.id, { ok: true, data });
 };
 
 /** Real path: mint a token, store it, fire the fire-and-forget Event invoke. */
@@ -628,7 +637,7 @@ export class VideoEnrichmentService {
 
   /**
    * Run enrichment as a background job. Ineligible videos (see
-   * `isEnrichmentEligible`: non-MUSIC or blank artist) return silently;
+   * `isEnrichmentEligible`: a blank artist, in any category) return silently;
    * refuses to double-dispatch while a non-stale job is already `processing`
    * (a `pending` handoff from the trigger action proceeds). The fake/E2E path
    * finishes in-process; the real path fires an Event invoke and leaves the
@@ -647,7 +656,7 @@ export class VideoEnrichmentService {
       const rows = await VideoArtistRepository.findByVideoId(videoId);
 
       if (process.env.BIO_GENERATOR_FAKE === 'true') {
-        await runFakeEnrichment(videoId, rows);
+        await runFakeEnrichment(state, rows);
         return;
       }
       await dispatchEnrichment(state, rows);

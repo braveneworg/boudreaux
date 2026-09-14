@@ -498,13 +498,13 @@ describe('createVideoAction', () => {
       expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
 
-    it('does not dispatch web enrichment for an INFORMATIONAL video', async () => {
+    it('dispatches web enrichment for an INFORMATIONAL video too', async () => {
       mockParsedSuccess({ ...parsedData, category: 'INFORMATIONAL' });
 
       await createVideoAction(initialFormState, buildFormData());
       await afterCallbacks[0]?.();
 
-      expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
 
     it('still probes when the artist sync fails', async () => {

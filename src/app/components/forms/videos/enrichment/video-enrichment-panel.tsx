@@ -380,8 +380,8 @@ const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElemen
 };
 
 /**
- * Admin panel orchestrating the async web-enrichment lifecycle for a MUSIC
- * video: trigger/re-run (re-run behind a confirm dialog), status polling
+ * Admin panel orchestrating the async web-enrichment lifecycle for a video of
+ * any category: trigger/re-run (re-run behind a confirm dialog), status polling
  * with a 20-minute client give-up (mirroring the bio section's
  * CLIENT_POLL_DEADLINE pattern), a live stage timeline, and per-artist /
  * video-level suggestion review. Artist applies are pessimistic server

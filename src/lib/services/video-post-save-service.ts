@@ -10,7 +10,6 @@ import {
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
-import type { VideoCategory } from '@/lib/types/domain/video';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { loggers } from '@/lib/utils/logger';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
@@ -25,10 +24,12 @@ const logger = loggers.media;
 /** Which save produced the post-save work. */
 export type VideoSaveIntent = 'draft' | 'create' | 'update';
 
-/** The values a save persisted — the planner reads only what it decides on. */
+/**
+ * The values a save persisted — the planner reads only what it decides on.
+ * No category: enrichment eligibility is decided on the artist alone.
+ */
 export interface SavedVideoValues {
   artist: string;
-  category: VideoCategory;
   s3Key: string;
   /** Absent means "the payload omitted producers"; `[]` means "clear them all". */
   producers?: VideoProducerInput[];

@@ -136,14 +136,49 @@ test.describe('Admin video enrichment', () => {
     await expect(leadCard.getByText('Applied', { exact: true })).toBeVisible();
   });
 
-  test('an informational video shows probe data but never the panel', async ({ adminPage }) => {
+  test('an informational video enriches to a description-only result', async ({ adminPage }) => {
+    // One fake run (≥4s pause) + 2.5s polling.
+    test.slow();
+
     await adminPage.goto(`/admin/videos/${ENRICH_INFO_VIDEO_ID}`);
 
     await expect(adminPage.getByTestId('video-technical-metadata-card')).toBeVisible({
       timeout: 15_000,
     });
-    // Absent from the DOM entirely — not merely hidden (toHaveCount counts
-    // hidden elements, so 0 is the only safe assertion).
-    await expect(adminPage.getByTestId('video-enrichment-panel')).toHaveCount(0);
+    // Every category enriches once the video names a creator — the panel mounts
+    // for the INFORMATIONAL video too. No `Not enriched` pre-assertion: a retry
+    // of this test lands on an already-enriched shared seed row.
+    const panel = adminPage.getByTestId('video-enrichment-panel');
+    await expect(panel).toBeVisible();
+    const chip = panel.getByTestId('video-enrichment-status-chip');
+
+    // Wait for a settled status, then take whichever trigger it offers (a
+    // re-run goes through the confirm dialog).
+    await expect(chip).toHaveText(/^(Not enriched|Enriched)$/, { timeout: 15_000 });
+    if ((await chip.textContent()) === 'Enriched') {
+      await panel.getByRole('button', { name: 'Re-run enrichment' }).click();
+      const dialog = adminPage.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Re-run', exact: true }).click();
+    } else {
+      await panel.getByRole('button', { name: 'Run enrichment' }).click();
+    }
+    await expect(chip).toHaveText('Enriching…', { timeout: 20_000 });
+    await expect(chip).toHaveText('Enriched', { timeout: 30_000 });
+
+    // The INFORMATIONAL fixture mirrors the Lambda: no artist suggestions, no
+    // release date, no featured artist — only the creator-framed description.
+    await expect(panel.getByTestId('video-artist-suggestion-card')).toHaveCount(0);
+    await expect(panel.getByTestId('video-release-date-suggestion')).toHaveCount(0);
+    await expect(panel.getByTestId('video-featured-artist-suggestion')).toHaveCount(0);
+    const descriptionCard = panel.getByTestId('video-description-suggestion');
+    await expect(descriptionCard.getByText('Medium', { exact: true })).toBeVisible();
+
+    // Applying is client-only (writes into the mounted form); never Save — the
+    // seed row is shared across retries.
+    await descriptionCard.getByRole('button', { name: 'Use this description' }).click();
+    await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
+      /informational video/
+    );
+    await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
   });
 });

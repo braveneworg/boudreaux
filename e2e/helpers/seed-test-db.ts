@@ -135,6 +135,7 @@ const ENRICH_MUSIC_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d2b1';
 const ENRICH_INFO_VIDEO_ID = '65a1b2c3d4e5f6a7b8c9d2b2';
 const ENRICH_LEAD_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a1';
 const ENRICH_GUEST_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a2';
+const ENRICH_NARRATOR_ARTIST_ID = '65a1b2c3d4e5f6a7b8c9d2a3';
 
 /**
  * Deterministic id of the Producer seeded for the video uploader v2 E2E specs
@@ -558,13 +559,15 @@ const seedVideos = async (prisma: PrismaClient): Promise<void> => {
 
 /**
  * Seed the dedicated video-enrichment fixtures: two probed videos (MUSIC +
- * INFORMATIONAL) and the two shell artists the MUSIC video's artist string
- * splits into ('E2E Enrich Lead feat. E2E Enrich Guest'). Slugs/displayNames
- * match the canonical findOrCreateByName derivation so a Run in the spec
- * attaches suggestions to THESE rows instead of creating duplicates. The
- * artists' createdAt is pinned to 2020 so they sort last in the admin
- * artists list and never become the first-listed artist the bio-generation
- * spec regenerates.
+ * INFORMATIONAL) and the shell artists their artist strings split into — the
+ * MUSIC video's 'E2E Enrich Lead feat. E2E Enrich Guest' and the INFORMATIONAL
+ * video's creator 'E2E Enrich Narrator' (every category enriches once it names
+ * an artist, so the narrator needs a join row for the run to have linked
+ * artists). Slugs/displayNames match the canonical findOrCreateByName
+ * derivation so a Run in the spec attaches suggestions to THESE rows instead of
+ * creating duplicates. The artists' createdAt is pinned to 2020 so they sort
+ * last in the admin artists list and never become the first-listed artist the
+ * bio-generation spec regenerates.
  */
 const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
   await prisma.artist.createMany({
@@ -584,6 +587,14 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
         slug: 'e2e-enrich-guest',
         displayName: 'E2E Enrich Guest',
         createdAt: new Date('2020-01-05T00:00:00Z'),
+      },
+      {
+        id: ENRICH_NARRATOR_ARTIST_ID,
+        firstName: 'E2E',
+        surname: 'Enrich Narrator',
+        slug: 'e2e-enrich-narrator',
+        displayName: 'E2E Enrich Narrator',
+        createdAt: new Date('2020-01-06T00:00:00Z'),
       },
     ],
   });
@@ -664,6 +675,12 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
         artistId: ENRICH_GUEST_ARTIST_ID,
         role: 'FEATURED',
         sortOrder: 1,
+      },
+      {
+        videoId: ENRICH_INFO_VIDEO_ID,
+        artistId: ENRICH_NARRATOR_ARTIST_ID,
+        role: 'PRIMARY',
+        sortOrder: 0,
       },
     ],
   });

@@ -1873,12 +1873,15 @@ describe('VideoForm — enrichment panel mount gating', () => {
     );
   });
 
-  it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
+  it('mounts the panel for an INFORMATIONAL video in edit mode', async () => {
+    // editVideo is INFORMATIONAL: every category enriches once a row exists.
     asVideo(editVideo);
     render(<VideoForm videoId="v1" />);
 
-    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
-    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'v1'
+    );
   });
 
   it('keeps the panel out of the DOM in create mode', () => {
@@ -1887,7 +1890,7 @@ describe('VideoForm — enrichment panel mount gating', () => {
     expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
   });
 
-  it('mounts the panel in create mode once a draft row exists (MUSIC)', async () => {
+  it('mounts the panel in create mode once a draft row exists', async () => {
     mocks.useVideoDraft.mockReturnValue({
       draftId: 'draft-video-id',
       handleUploadComplete: vi.fn(),
@@ -1895,7 +1898,7 @@ describe('VideoForm — enrichment panel mount gating', () => {
     });
     render(<VideoForm />);
 
-    // Default category is MUSIC; the draft id now stands in as the row id.
+    // Any category qualifies; the draft id stands in as the row id.
     expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
       'data-video-id',
       'draft-video-id'

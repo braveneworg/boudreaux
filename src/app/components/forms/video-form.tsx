@@ -22,10 +22,7 @@ import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-na
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { toIsoDay } from '@/lib/utils/validation/iso-date';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
-import {
-  isEnrichableCategory,
-  type VideoLevelSuggestionField,
-} from '@/lib/validation/video-enrichment-schema';
+import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
@@ -139,7 +136,6 @@ const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<
 
 interface EnrichmentPanelMountProps {
   videoId: string | undefined;
-  category: VideoFormData['category'] | undefined;
   control: Control<VideoFormData>;
   onApplyVideoSuggestion: (field: VideoLevelSuggestionField, value: string) => void;
 }
@@ -277,17 +273,17 @@ const resolvePersistedRow = (
 });
 
 /**
- * Category-gated (the artist half of eligibility is handled inside the panel,
- * which must render for an artist-less MUSIC video to show the add-artist
- * hint), row-required: mounts as soon as a draft/edit row exists.
+ * Row-required, category-agnostic: mounts as soon as a draft/edit row exists,
+ * for every category. The artist half of eligibility is handled inside the
+ * panel, which must render for an artist-less video to show the add-artist
+ * hint.
  */
 const EnrichmentPanelMount = ({
   videoId,
-  category,
   control,
   onApplyVideoSuggestion,
 }: EnrichmentPanelMountProps): React.ReactElement | null =>
-  videoId !== undefined && isEnrichableCategory(category) ? (
+  videoId !== undefined ? (
     <VideoEnrichmentErrorBoundary>
       <VideoEnrichmentPanel
         videoId={videoId}
@@ -554,7 +550,6 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
             <VideoProducersSection control={control} />
             <EnrichmentPanelMount
               videoId={effectiveVideoId}
-              category={categoryValue}
               control={control}
               onApplyVideoSuggestion={handleApplyVideoSuggestion}
             />

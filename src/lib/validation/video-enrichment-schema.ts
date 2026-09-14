@@ -11,7 +11,6 @@ import {
 } from '@fakefour/job-contract';
 import { z } from 'zod';
 
-import type { VideoCategory } from '@/lib/types/domain/video';
 import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { objectIdSchema } from './bio-generation-schema';
@@ -41,42 +40,34 @@ export type {
  */
 export type EnrichmentStatus = AsyncJobStatus;
 
-/** The one category whose videos carry web enrichment. */
-export const isEnrichableCategory = (category: VideoCategory | null | undefined): boolean =>
-  category === 'MUSIC';
-
 /** A video can only be enriched when its artist/creator field names someone. */
 export const hasEnrichableArtist = (artist: string | null | undefined): boolean =>
   (artist ?? '').trim() !== '';
 
-/** The two facts enrichment eligibility is decided on. */
+/** The one fact enrichment eligibility is decided on. */
 export interface EnrichmentEligibilityInput {
-  category: VideoCategory | null | undefined;
   artist: string | null | undefined;
 }
 
-/** Which half of the eligibility rule a video fails, for per-half copy. */
-export type EnrichmentIneligibilityReason = 'category' | 'artist';
+/** Which part of the eligibility rule a video fails, for actionable copy. */
+export type EnrichmentIneligibilityReason = 'artist';
 
 /**
- * The single authority on enrichment eligibility: a MUSIC video that names an
- * artist. The conjunction of the two halves exists only here — every gate
- * (the post-save planner, the enrichment service's execution backstop, the
- * manual trigger action, and the admin UI) consumes this, the boolean
- * `isEnrichmentEligible`, or a single half above. Never restate the rule
- * inline: the halves drifting apart is exactly how a video gets stranded at
- * `pending` (a trigger accepts what dispatch later refuses).
+ * The single authority on enrichment eligibility: a video that names an artist
+ * or creator, in any category (the Lambda branches on the category itself —
+ * INFORMATIONAL videos get a creator-framed, description-only run). The rule
+ * exists only here — every gate (the post-save planner, the enrichment
+ * service's execution backstop, the manual trigger action, and the admin UI)
+ * consumes this, the boolean `isEnrichmentEligible`, or `hasEnrichableArtist`.
+ * Never restate the rule inline: gates drifting apart is exactly how a video
+ * gets stranded at `pending` (a trigger accepts what dispatch later refuses).
  *
- * @returns The failing half, or `null` when the video is eligible.
+ * @returns The failing part, or `null` when the video is eligible.
  */
 export const enrichmentIneligibilityReason = ({
-  category,
   artist,
-}: EnrichmentEligibilityInput): EnrichmentIneligibilityReason | null => {
-  if (!isEnrichableCategory(category)) return 'category';
-  if (!hasEnrichableArtist(artist)) return 'artist';
-  return null;
-};
+}: EnrichmentEligibilityInput): EnrichmentIneligibilityReason | null =>
+  hasEnrichableArtist(artist) ? null : 'artist';
 
 /** Boolean view of {@link enrichmentIneligibilityReason} for yes/no gates. */
 export const isEnrichmentEligible = (input: EnrichmentEligibilityInput): boolean =>
