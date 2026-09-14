@@ -129,6 +129,8 @@ interface HarnessProps {
   onApply?: (field: VideoLevelSuggestionField, value: string) => void;
   /** Seed initial artist so featured-apply composes against it. */
   artist?: string;
+  /** Seed initial release date; `''` lets the enrichment date auto-fill. */
+  releasedOn?: string;
 }
 
 /**
@@ -136,9 +138,9 @@ interface HarnessProps {
  * `VideoForm` does (featured appends `feat.`, other fields overwrite), so the
  * panel's live-form applied-state derivation is exercised end to end.
  */
-const Harness = ({ onApply = vi.fn(), artist = '' }: HarnessProps) => {
+const Harness = ({ onApply = vi.fn(), artist = '', releasedOn = '2026-02-01' }: HarnessProps) => {
   const form = useForm<VideoFormData>({
-    defaultValues: { releasedOn: '2026-02-01', description: '', artist },
+    defaultValues: { releasedOn, description: '', artist },
   });
   const onApplyVideoSuggestion = (field: VideoLevelSuggestionField, value: string): void => {
     onApply(field, value);
@@ -344,14 +346,31 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
     });
   });
 
-  it('auto-applies the release-date suggestion into the form and resolves it server-side', async () => {
+  it('keeps the release-date suggestion pending when the form already has a date', async () => {
     const onApply = vi.fn();
     setStatus(succeededStatus);
     render(<Harness onApply={onApply} />);
 
-    // No click: the fetched date is applied automatically on arrival, and the
-    // suggestion is marked applied so it cannot re-apply over the admin's date
-    // on a later visit (a pending suggestion re-fires every mount).
+    // The found date stays: an enrichment date fills only an EMPTY field. With
+    // a date in the form the card offers "Use this date" and nothing resolves.
+    const card = screen.getByTestId('video-release-date-suggestion');
+    expect(
+      within(card).getByRole('button', { name: 'Apply Release date suggestion' })
+    ).toBeEnabled();
+    expect(within(card).queryByText('Applied')).not.toBeInTheDocument();
+    await act(async () => {});
+    expect(onApply).not.toHaveBeenCalled();
+    expect(mocks.applyVideoSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('auto-fills an empty release date from the suggestion and resolves it server-side', async () => {
+    const onApply = vi.fn();
+    setStatus(succeededStatus);
+    render(<Harness onApply={onApply} releasedOn="" />);
+
+    // No click: the fetched date fills the empty field on arrival, and the
+    // suggestion is marked applied so it cannot re-fill on a later visit (a
+    // pending suggestion re-fires every mount).
     await waitFor(() => expect(onApply).toHaveBeenCalledWith('releasedOn', '2020-06-01'));
     expect(mocks.applyVideoSuggestion).toHaveBeenCalledWith({
       suggestionId: 's3',
@@ -361,8 +380,8 @@ describe('VideoEnrichmentPanel — apply wiring', () => {
   });
 
   it('dismisses a video-level suggestion server-side', async () => {
-    // Release date auto-applies, so its card no longer shows Dismiss; the
-    // featured-artist card stays pending and exercises the same dismiss path.
+    // The featured-artist card stays pending and exercises the same dismiss
+    // path every video-level card shares.
     setStatus({ ...succeededStatus, suggestions: [featuredArtistSuggestion] });
     render(<Harness />);
 

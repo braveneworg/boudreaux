@@ -70,6 +70,33 @@ variants), **bio images**, and reference links.
 extracted by ffprobe) and **enrichment** (externally sourced facts such as
 release date, gated on the video being MUSIC-category with a known artist).
 
+**release date** — the day-precision UTC day a Video was released. It is
+**never defaulted**: a **draft** may have none, and today only ever appears
+because a human typed it. Publishing requires one. See
+[ADR-0004](docs/adr/0004-release-date-is-never-defaulted.md).
+_Avoid_: release datetime, upload date.
+
+**draft** — a Video row that has not been published, created the moment its
+upload completes so that later work has a row to attach to. A draft may lack a
+release date and a description.
+
+**release-date lookup** — the bounded automatic search for a Video's release
+date from its title and artist, run on upload and on opening a dateless draft.
+It retries a fixed number of times per distinct title-and-artist pair and then
+stops; a result equal to today's UTC day is a **miss**, not a find.
+_Avoid_: autofill, "Find release date".
+
+**pending suggestion** — an enrichment fact that awaits human review before it
+changes a Video. A release-date suggestion fills only an **empty** release date
+by itself; when a date already exists it stays pending until applied or
+dismissed.
+_Avoid_: auto-apply (that is what happens to it, not what it is).
+
+**autosave** — persistence of a single field the moment it changes, without
+Save. Today only a persisted Video's release date autosaves, whether a human
+picked it or the release-date lookup filled it; Save and Publish still carry
+the whole form.
+
 **async job lifecycle** — the shared shape of every background job (bio
 generation, video enrichment): `pending → processing → succeeded/failed`, an
 atomic token claim, progress checkpoints, and client polling. Its decisions

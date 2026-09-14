@@ -88,6 +88,14 @@ describe('mapVideoToFormValues', () => {
   it('formats a null publishedAt to an empty string', () => {
     expect(mapVideoToFormValues({ ...baseVideo, publishedAt: null }).publishedAt).toBe('');
   });
+
+  it('formats a dated releasedOn to YYYY-MM-DD', () => {
+    expect(mapVideoToFormValues(baseVideo).releasedOn).toBe('2024-01-02');
+  });
+
+  it('maps a null releasedOn (dateless draft) to an empty string', () => {
+    expect(mapVideoToFormValues({ ...baseVideo, releasedOn: null }).releasedOn).toBe('');
+  });
 });
 
 describe('validateVideoFile', () => {

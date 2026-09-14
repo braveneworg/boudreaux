@@ -339,3 +339,17 @@ describe('ReleaseForm — delete (hard)', () => {
     });
   });
 });
+
+describe('ReleaseForm — card chrome', () => {
+  it('renders the form card without the ink shadow edge', async () => {
+    render(<ReleaseForm />);
+
+    const card = await waitFor(() => {
+      const found = document.querySelector('[data-slot="card"]');
+      if (!found) throw new Error('card not rendered');
+      return found;
+    });
+    expect(card).toHaveClass('shadow-none');
+    expect(card).not.toHaveClass('shadow-zine-ink');
+  });
+});

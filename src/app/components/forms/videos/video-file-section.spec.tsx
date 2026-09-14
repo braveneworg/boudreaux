@@ -62,3 +62,51 @@ describe('VideoFileSection', () => {
     expect(screen.getByText('Uploaded')).toBeInTheDocument();
   });
 });
+
+describe('VideoFileSection — preparing', () => {
+  it('shows a busy status while the file is being prepared', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'preparing' }} />);
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('aria-busy', 'true');
+    expect(status).toHaveTextContent('Preparing upload…');
+  });
+
+  it('replaces the dropzone while preparing', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'preparing' }} />);
+
+    expect(screen.queryByLabelText('Choose a video file')).not.toBeInTheDocument();
+  });
+
+  it('shows no progress bar while preparing', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'preparing' }} />);
+
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('offers no Cancel while preparing (no upload exists to abort yet)', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'preparing' }} />);
+
+    expect(screen.queryByRole('button', { name: 'Cancel upload' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the spinner at uploading 0% (no byte has moved yet)', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'uploading', progress: 0 }} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing upload…');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('offers Cancel at uploading 0% (the multipart controller exists)', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'uploading', progress: 0 }} />);
+
+    expect(screen.getByRole('button', { name: 'Cancel upload' })).toBeInTheDocument();
+  });
+
+  it('swaps to the progress bar once the first byte lands', () => {
+    render(<Harness upload={{ ...baseUpload, status: 'uploading', progress: 1 }} />);
+
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText('Preparing upload…')).not.toBeInTheDocument();
+  });
+});

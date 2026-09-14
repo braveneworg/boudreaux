@@ -24,8 +24,24 @@ import {
 
 import type { UseFormReturn } from 'react-hook-form';
 
-/** Lifecycle of the multipart video upload the form drives. */
-export type VideoUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
+/**
+ * Lifecycle of the multipart video upload the form drives. `preparing` spans
+ * file selection to the multipart start (metadata extraction + poster
+ * capture, which can take seconds on a large file); see
+ * {@link isUploadPreparing} for the UI's "nothing has moved yet" window.
+ */
+export type VideoUploadStatus = 'idle' | 'preparing' | 'uploading' | 'success' | 'error';
+
+/** Shown when the client-side extractors reject before the upload starts. */
+const PREPARE_FAILED_MESSAGE = 'Could not read the video file.';
+
+/**
+ * True while the admin has picked a file but no byte has reached S3 yet —
+ * `preparing`, or `uploading` still at 0%. The file section shows a spinner
+ * for this whole window instead of a dropzone or a 0% bar.
+ */
+export const isUploadPreparing = (status: VideoUploadStatus, progress: number): boolean =>
+  status === 'preparing' || (status === 'uploading' && progress === 0);
 
 interface UseVideoUploadArgs {
   preGeneratedId: string;
@@ -143,6 +159,9 @@ export const useVideoUpload = ({
     [form, onPosterCandidates, startUpload]
   );
 
+  // `preparing` is set synchronously on select so the spinner replaces the
+  // dropzone before the (possibly seconds-long) extraction begins. A rejected
+  // extractor used to strand the dropzone silently; it now surfaces as an error.
   const selectFile = useCallback(
     (file: File): void => {
       const validationError = validateVideoFile(file);
@@ -152,7 +171,13 @@ export const useVideoUpload = ({
         return;
       }
       lastFileRef.current = file;
-      void runSelect(file);
+      setStatus('preparing');
+      setProgress(0);
+      setErrorMessage(null);
+      runSelect(file).catch(() => {
+        setStatus('error');
+        setErrorMessage(PREPARE_FAILED_MESSAGE);
+      });
     },
     [runSelect]
   );

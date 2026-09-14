@@ -76,6 +76,33 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       videoId = adminPage.url().split('/').pop();
       expect(videoId).toMatch(/^[0-9a-f]{24}$/);
 
+      // The automatic release-date lookup fires as soon as the upload starts
+      // (title + artist prefilled, MUSIC, empty date). With BIO_GENERATOR_FAKE
+      // the fake lookup always finds 2020-06-01, which the DatePicker shows as
+      // 06/01/2020 — and never today: the draft row carries NO date of its own.
+      const dateInput = adminPage.getByPlaceholder('mm/dd/yyyy').first();
+      await expect(dateInput).toHaveValue('06/01/2020', { timeout: 15_000 });
+      await expect(adminPage.getByText('No release date found. Set it manually.')).toHaveCount(0);
+
+      // The found date autosaves onto the draft row through the single-field
+      // action — poll the detail route until the day lands.
+      await expect(async () => {
+        const response = await adminPage.request.get(`/api/videos/${videoId}`);
+        expect(response.ok()).toBe(true);
+        const body = (await response.json()) as { releasedOn?: string | null };
+        expect(body.releasedOn ?? '').toMatch(/^2020-06-01/);
+      }).toPass({ timeout: 15_000 });
+
+      // The description is never left blank: the fake server probe prefills it
+      // from the file's comment tag ("E2E probe description"), and once the
+      // lookup resolved the blank-only auto-generate would otherwise fill it
+      // with the same fake synthesis the "Generate description" button uses
+      // (which names the title). Which lands first is a race, so accept either.
+      await expect(adminPage.getByLabel('Description', { exact: true })).toHaveValue(
+        /E2E Draft Song|E2E probe description/,
+        { timeout: 15_000 }
+      );
+
       // The enrichment panel mounts PRE-SAVE (draft row exists + MUSIC default)
       // and the auto-kicked fake run reaches a terminal 'Enriched' state.
       const panel = adminPage.getByTestId('video-enrichment-panel');

@@ -23,6 +23,20 @@ const baseWireRow = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+describe('videoRowSchema — releasedOn', () => {
+  it('coerces an ISO releasedOn to a Date', () => {
+    const parsed = videoRowSchema.parse(baseWireRow);
+
+    expect(parsed.releasedOn).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+  });
+
+  it('accepts a null releasedOn (a draft may have no release date)', () => {
+    const parsed = videoRowSchema.parse({ ...baseWireRow, releasedOn: null });
+
+    expect(parsed.releasedOn).toBeNull();
+  });
+});
+
 describe('videoRowSchema — probe/enrichment wire fields', () => {
   it('parses a listing row with every probe field absent', () => {
     const parsed = videoRowSchema.parse(baseWireRow);

@@ -16,12 +16,15 @@ import { DescriptionField } from './description-field';
 import { ReleaseDateField } from './release-date-field';
 import { useVideoArtistFields } from './use-video-artist-fields';
 
+import type { ReleaseDateLookupStatus } from './use-release-date-auto-lookup';
 import type { Control, UseFormSetValue } from 'react-hook-form';
 
 interface VideoMetadataSectionProps {
   control: Control<VideoFormData>;
   setValue: UseFormSetValue<VideoFormData>;
   onSelectDate: (dateString: string, fieldName: string) => void;
+  /** The automatic release-date lookup's state, shown as a hint under the field. */
+  releaseDateLookupStatus?: ReleaseDateLookupStatus;
 }
 
 const CategoryField = ({ control }: { control: Control<VideoFormData> }): React.ReactElement => (
@@ -57,6 +60,7 @@ export const VideoMetadataSection = ({
   control,
   setValue,
   onSelectDate,
+  releaseDateLookupStatus,
 }: VideoMetadataSectionProps): React.ReactElement => {
   const { primary, featured, setPrimary, setFeatured } = useVideoArtistFields({
     control,
@@ -104,7 +108,11 @@ export const VideoMetadataSection = ({
       <CategoryField control={control} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <ReleaseDateField control={control} onSelectDate={onSelectDate} />
+        <ReleaseDateField
+          control={control}
+          onSelectDate={onSelectDate}
+          lookupStatus={releaseDateLookupStatus}
+        />
         <FormField
           control={control}
           name="durationSeconds"

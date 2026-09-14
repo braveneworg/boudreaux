@@ -102,6 +102,12 @@ describe('VideoAdminCard', () => {
     expect(screen.getByText('-')).toBeInTheDocument();
   });
 
+  it('renders a dash for a draft without a release date', () => {
+    renderCard({ ...baseVideo, releasedOn: null });
+
+    expect(screen.getByText('-')).toBeInTheDocument();
+  });
+
   it('passes the resolved stream URL to the player', () => {
     renderCard();
 

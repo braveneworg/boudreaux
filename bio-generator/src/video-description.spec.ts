@@ -179,6 +179,62 @@ describe('resolveDescriptionSuggestion', () => {
     expect(options.userPrompt).toContain('- MusicBrainz first-release date: 2021-04-09.');
   });
 
+  it('states the release date in the user prompt when one is supplied', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
+
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.userPrompt).toContain('Release date: 2021-04-09.');
+  });
+
+  // A release date is never inferred: a draft with no date must not produce
+  // prose that claims a same-day, recent, or any-year release.
+  it('marks the release date unknown in the user prompt when none is supplied', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+    const { releasedOn: _releasedOn, ...dateless } = baseArgs;
+
+    await resolveDescriptionSuggestion(
+      { ...dateless, facts: ['Credited artists: Ceschi.'] },
+      withReader({ searchWeb, requestJson })
+    );
+
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.userPrompt).toContain('Release date: unknown');
+    expect(options.userPrompt).not.toMatch(/Release date: \d{4}/);
+  });
+
+  it('puts no calendar day at all into the user prompt when the date is unknown', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+    const { releasedOn: _releasedOn, ...dateless } = baseArgs;
+
+    await resolveDescriptionSuggestion(
+      { ...dateless, facts: ['Credited artists: Ceschi.'] },
+      withReader({ searchWeb, requestJson })
+    );
+
+    const [, options] = requestJson.mock.calls[0];
+    // Clock-free: the only ISO day the prompt could carry is the one supplied,
+    // and none was — so no YYYY-MM-DD may appear, today's included.
+    expect(options.userPrompt).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('forbids inferring a release date in the system prompt', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveDescriptionSuggestion(baseArgs, withReader({ searchWeb, requestJson }));
+
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.systemPrompt).toContain(
+      'State when the song or video was released ONLY when the "Release date:" line supplies a date'
+    );
+    expect(options.systemPrompt).toContain('never call it new, recent, upcoming, or from any year');
+  });
+
   it('sends the no-visual-claims instruction in the system prompt', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue(adjudication);

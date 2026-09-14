@@ -112,15 +112,62 @@ export class VideoService {
     }
   }
 
-  /** Publish a video by stamping `publishedAt` with the current time. */
+  /**
+   * Publish a video by stamping `publishedAt` with the current time. A
+   * published video always carries a release date (ADR-0004): the list-level
+   * Publish action has no form to require one, so the refusal lives here.
+   */
   static async publishVideo(id: string): Promise<ServiceResponse<Video>> {
     try {
+      const existing = await VideoRepository.findById(id);
+      if (!existing) {
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
+      }
+      if (!existing.releasedOn) {
+        return {
+          success: false,
+          error: 'Set a release date before publishing',
+          code: 'VALIDATION',
+        };
+      }
       const video = await VideoRepository.update(id, { publishedAt: new Date() });
       return { success: true, data: video };
     } catch (error) {
       return failFromError(error, {
         NOT_FOUND: 'Video not found',
         UNKNOWN: 'Failed to publish video',
+      });
+    }
+  }
+
+  /**
+   * Persist ONLY the release date — the single writer behind the edit form's
+   * autosave. `null` clears it, which a draft may do (its date is never
+   * inferred) but a published video may not: published ⇒ dated is enforced
+   * here, not in the schema (ADR-0004).
+   */
+  static async updateVideoReleaseDate(
+    id: string,
+    releasedOn: Date | null
+  ): Promise<ServiceResponse<Video>> {
+    try {
+      const existing = await VideoRepository.findById(id);
+      if (!existing) {
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
+      }
+      if (releasedOn === null && existing.publishedAt) {
+        return {
+          success: false,
+          error: 'A published video must keep a release date',
+          code: 'VALIDATION',
+        };
+      }
+      const video = await VideoRepository.update(id, { releasedOn });
+      return { success: true, data: video };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Video not found',
+        UNKNOWN: 'Failed to save the release date',
       });
     }
   }

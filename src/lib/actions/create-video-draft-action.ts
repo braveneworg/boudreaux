@@ -44,13 +44,16 @@ const draftTitle = (title: string | undefined, fileName: string): string => {
   return (parsed || fileName).slice(0, 200);
 };
 
-/** Draft release date: the form value when parseable, else today (UTC day). */
-const draftReleasedOn = (value: string | undefined): Date => {
-  if (value) {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-  return new Date(new Date().toISOString().slice(0, 10));
+/**
+ * Draft release date: the form value when parseable, else unset. A release date
+ * is never inferred — today only ever appears because a human typed it (the
+ * auto-lookup and enrichment fill an empty field later, and Save/Publish still
+ * require one; ADR-0004).
+ */
+const parseDraftReleasedOn = (value: string | undefined): Date | undefined => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
 /** Poster fields for the draft — validated to the video's own namespace, else dropped. */
@@ -86,22 +89,29 @@ const resolveDraftPosterInput = (data: VideoDraftInput): DraftPosterInput => {
   };
 };
 
-/** Repository payload for the draft — `publishedAt` omitted: always a draft. */
-const buildDraftCreateInput = (data: VideoDraftInput, userId: string): CreateVideoData => ({
-  id: data.preGeneratedId,
-  title: draftTitle(data.title, data.fileName),
-  artist: data.artist?.trim() ?? '',
-  category: data.category,
-  description: data.description?.trim() || undefined,
-  releasedOn: draftReleasedOn(data.releasedOn),
-  durationSeconds: parseDurationSeconds(data.durationSeconds),
-  s3Key: data.s3Key,
-  fileName: data.fileName,
-  fileSize: parseFileSize(data.fileSize),
-  mimeType: data.mimeType,
-  ...resolveDraftPosterInput(data),
-  createdBy: userId,
-});
+/**
+ * Repository payload for the draft — `publishedAt` omitted: always a draft;
+ * `releasedOn` omitted (not nulled) when the form has none, so the row simply
+ * lacks the field.
+ */
+const buildDraftCreateInput = (data: VideoDraftInput, userId: string): CreateVideoData => {
+  const releasedOn = parseDraftReleasedOn(data.releasedOn);
+  return {
+    id: data.preGeneratedId,
+    title: draftTitle(data.title, data.fileName),
+    artist: data.artist?.trim() ?? '',
+    category: data.category,
+    description: data.description?.trim() || undefined,
+    ...(releasedOn ? { releasedOn } : {}),
+    durationSeconds: parseDurationSeconds(data.durationSeconds),
+    s3Key: data.s3Key,
+    fileName: data.fileName,
+    fileSize: parseFileSize(data.fileSize),
+    mimeType: data.mimeType,
+    ...resolveDraftPosterInput(data),
+    createdBy: userId,
+  };
+};
 
 const DRAFT_FAILED: CreateVideoDraftResult = {
   success: false,
@@ -131,10 +141,12 @@ const markEnrichmentPending = async (videoId: string): Promise<void> => {
 /**
  * Server Action: create the video row as an unpublished draft the moment the
  * S3 multipart upload completes, so enrichment can run while the admin is
- * still filling the form. Idempotent (an existing row returns success and
- * changes nothing — guards double-fire on flaky networks). When enrichment
- * will dispatch (MUSIC + non-blank artist) the job is marked `pending` before
- * the response so the edit page's status poll engages. In `after()` the
+ * still filling the form. The draft carries no release date unless the form
+ * already holds one — it is never defaulted to today. Idempotent (an existing
+ * row returns success and changes nothing — guards double-fire on flaky
+ * networks). When enrichment will dispatch (MUSIC + non-blank artist) the job
+ * is marked `pending` before the response so the edit page's status poll
+ * engages. In `after()` the
  * post-save pipeline runs the {@link planVideoPostSave} plan: the probe
  * always, artist sync when the artist snapshot is non-blank, and enrichment
  * only when the video is enrichment-eligible. A failure here NEVER blocks

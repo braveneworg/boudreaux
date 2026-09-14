@@ -12,9 +12,12 @@ import { runVideoEnrichmentAction } from '@/lib/actions/run-video-enrichment-act
 import { queryKeys } from '@/lib/query-keys';
 
 /**
- * Input for one suggestion apply/dismiss. `releasedOn` suggestions must NEVER
- * be sent with `op: 'apply'` (the server rejects them) — the release date is
- * applied into the RHF form instead; dismiss is allowed.
+ * Input for one suggestion apply/dismiss. For the video-level `releasedOn`
+ * suggestion an `op: 'apply'` is resolve-only: the server marks it applied
+ * without touching the row (the form fills and autosaves the date itself).
+ * `description` / `featuredArtist` suggestions must never be sent with
+ * `op: 'apply'` (the server rejects them) — they apply into the RHF form;
+ * dismiss is allowed for all.
  */
 export interface ApplyVideoSuggestionInput {
   suggestionId: string;

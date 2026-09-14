@@ -35,7 +35,8 @@ export type Video = {
   artist: string;
   category: VideoCategory;
   description: string | null;
-  releasedOn: Date;
+  /** Day-precision release date; null on a draft that has none (never defaulted). */
+  releasedOn: Date | null;
   durationSeconds: number | null;
   s3Key: string;
   fileName: string;
@@ -89,7 +90,7 @@ export interface CreateVideoData {
   artist: string;
   category: VideoCategory;
   description?: string | null;
-  releasedOn: Date;
+  releasedOn?: Date | null;
   durationSeconds?: number | null;
   s3Key: string;
   fileName: string;

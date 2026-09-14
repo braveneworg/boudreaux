@@ -10,9 +10,10 @@ import { expect, test } from '../fixtures/auth.fixture';
  * assert the form renders, that an empty submit surfaces the required-field
  * errors plus the missing-upload blocker, that the category radios select, that
  * the Music category is pre-checked on load (Task 2), that the artist comboboxes
- * and producer combobox behave correctly (Tasks 14/15/9), and that the
- * "Find release date" button fills the date field when BIO_GENERATOR_FAKE=true
- * (Task 21).
+ * and producer combobox behave correctly (Tasks 14/15/9), and that "Generate
+ * description" fills the field when BIO_GENERATOR_FAKE=true. The release date
+ * has no button any more — its automatic lookup only runs once an upload has
+ * started, which `admin-video-draft-upload.spec.ts` covers end to end.
  */
 
 test.describe('Admin video form — create', () => {
@@ -234,36 +235,6 @@ test.describe('Admin video form — create', () => {
     // The removed pill is gone; the seeded one remains.
     await expect(pillsList.getByText('Brand New Producer')).toHaveCount(0);
     await expect(pillsList.getByText('E2E Producer One')).toBeVisible();
-  });
-
-  // ── Task 21: Find release date button ────────────────────────────────────
-
-  test('Find release date fills the date field when BIO_GENERATOR_FAKE is true (Task 21)', async ({
-    adminPage,
-  }) => {
-    await adminPage.goto('/admin/videos/new');
-
-    // The button is disabled when the title is empty.
-    const findBtn = adminPage.getByRole('button', { name: 'Find release date' });
-    await expect(findBtn).toBeDisabled();
-
-    // Fill the title — the button becomes enabled.
-    await adminPage.getByLabel('Title').fill('Test Video Title');
-    await expect(findBtn).toBeEnabled();
-
-    // The date input is initially empty.
-    const dateInput = adminPage.getByPlaceholder('mm/dd/yyyy').first();
-    await expect(dateInput).toHaveValue('');
-
-    // Click the button. With BIO_GENERATOR_FAKE=true the fake lookup returns
-    // releasedOn: '2020-06-01', which the DatePicker formats as '06/01/2020'.
-    await findBtn.click();
-
-    // Wait for the async lookup to complete and the field to be filled.
-    // Codec-agnostic: we assert the value changed from empty, not a specific toast.
-    await expect(dateInput).not.toHaveValue('', { timeout: 10_000 });
-    // Verify it is exactly the fixture date (locale-independent input value).
-    await expect(dateInput).toHaveValue('06/01/2020');
   });
 
   test('Generate description fills the field when BIO_GENERATOR_FAKE is true', async ({

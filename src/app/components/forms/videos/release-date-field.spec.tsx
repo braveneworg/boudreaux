@@ -3,49 +3,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import React from 'react';
-
 import { zodResolver } from '@hookform/resolvers/zod';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
 
 import { Form } from '@/app/components/ui/form';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { ReleaseDateField } from './release-date-field';
-import { useReleaseDateLookupQuery } from '../_hooks/use-release-date-lookup-query';
 
-import type { UseFormSetValue } from 'react-hook-form';
-
-// ---------------------------------------------------------------------------
-// Import mocked modules for assertion
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-const mockRefetch = vi.fn();
-
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-vi.mock('../_hooks/use-release-date-lookup-query', () => ({
-  useReleaseDateLookupQuery: vi.fn(() => ({
-    isFetching: false,
-    error: null,
-    data: undefined,
-    refetch: mockRefetch,
-  })),
-}));
+import type { ReleaseDateLookupStatus } from './use-release-date-auto-lookup';
 
 vi.mock('@/ui/datepicker', () => ({
   DatePicker: ({
@@ -65,17 +34,12 @@ vi.mock('@/ui/datepicker', () => ({
   ),
 }));
 
-// ---------------------------------------------------------------------------
-// Wrapper — owns a real RHF form. Exposes setValueRef so tests can push
-// values into the RHF store after mount (same pattern as video-metadata-section.spec).
-// ---------------------------------------------------------------------------
-
 interface WrapperProps {
   onSelectDate?: (dateString: string, fieldName: string) => void;
-  setValueRef: React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+  lookupStatus?: ReleaseDateLookupStatus;
 }
 
-const Wrapper = ({ onSelectDate = vi.fn(), setValueRef }: WrapperProps): React.ReactElement => {
+const Wrapper = ({ onSelectDate = vi.fn(), lookupStatus }: WrapperProps): React.ReactElement => {
   const form = useForm<VideoFormData>({
     resolver: zodResolver(createVideoSchema),
     defaultValues: {
@@ -90,205 +54,73 @@ const Wrapper = ({ onSelectDate = vi.fn(), setValueRef }: WrapperProps): React.R
     },
   });
 
-  setValueRef.current = form.setValue;
-
   return (
     <Form {...form}>
-      <ReleaseDateField control={form.control} onSelectDate={onSelectDate} />
+      <ReleaseDateField
+        control={form.control}
+        onSelectDate={onSelectDate}
+        lookupStatus={lookupStatus}
+      />
     </Form>
   );
 };
-
-const makeSetValueRef = (): React.MutableRefObject<UseFormSetValue<VideoFormData> | null> => ({
-  current: null,
-});
-
-// Wrapper whose form omits `title`/`artist` from defaultValues, so RHF's
-// `useWatch` yields `undefined` for both after the first render — exercising the
-// `title ?? ''` / `artist ?? ''` nullish fallbacks in ReleaseDateField.
-const WrapperNoArtistDefaults = (): React.ReactElement => {
-  const form = useForm<VideoFormData>({
-    defaultValues: {
-      category: 'MUSIC',
-      description: '',
-      releasedOn: '',
-      s3Key: '',
-      fileName: '',
-      mimeType: 'video/mp4',
-    },
-  });
-
-  return (
-    <Form {...form}>
-      <ReleaseDateField control={form.control} onSelectDate={vi.fn()} />
-    </Form>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('ReleaseDateField', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(useReleaseDateLookupQuery).mockReturnValue({
-      isFetching: false,
-      error: null,
-      data: undefined,
-      refetch: mockRefetch,
-    });
+  it('labels the date picker', () => {
+    render(<Wrapper />);
+
+    expect(screen.getByText('Release date')).toBeInTheDocument();
+    expect(screen.getByLabelText('release-date')).toBeInTheDocument();
   });
 
-  it('disables the find button when the title is empty', () => {
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-    expect(screen.getByRole('button', { name: 'Find release date' })).toBeDisabled();
+  it('has no lookup button — the lookup is automatic', () => {
+    render(<Wrapper />);
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('enables the find button when the title has a value', () => {
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    expect(screen.getByRole('button', { name: 'Find release date' })).not.toBeDisabled();
-  });
-
-  it('shows "Searching…" label and disables button while fetching', () => {
-    vi.mocked(useReleaseDateLookupQuery).mockReturnValue({
-      isFetching: true,
-      error: null,
-      data: undefined,
-      refetch: mockRefetch,
-    });
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-    const button = screen.getByRole('button', { name: 'Searching…' });
-    expect(button).toBeDisabled();
-  });
-
-  it('fills the release date and toasts success on a successful lookup', async () => {
+  it('forwards a picked date to onSelectDate with the field name', async () => {
     const onSelectDate = vi.fn();
-    mockRefetch.mockResolvedValue({
-      data: { releasedOn: '2020-06-01', confidence: 'high', sources: ['https://example.com'] },
-      error: null,
-      status: 'success',
-    });
+    render(<Wrapper onSelectDate={onSelectDate} />);
 
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} onSelectDate={onSelectDate} />);
+    await userEvent.type(screen.getByLabelText('release-date'), '2');
 
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
-    });
-
-    await waitFor(() => {
-      expect(onSelectDate).toHaveBeenCalledWith('2020-06-01', 'releasedOn');
-    });
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('2020-06-01'));
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('high'));
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('https://example.com'));
+    expect(onSelectDate).toHaveBeenCalledWith('2', 'releasedOn');
   });
 
-  it('omits the source hint from the success toast when sources is empty', async () => {
-    const onSelectDate = vi.fn();
-    mockRefetch.mockResolvedValue({
-      data: { releasedOn: '2021-03-04', confidence: 'low', sources: [] },
-      error: null,
-      status: 'success',
-    });
+  it('shows the searching hint while the lookup is on the wire', () => {
+    render(<Wrapper lookupStatus="searching" />);
 
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} onSelectDate={onSelectDate} />);
-
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
-    });
-
-    await waitFor(() => {
-      expect(onSelectDate).toHaveBeenCalledWith('2021-03-04', 'releasedOn');
-    });
-    expect(toast.success).toHaveBeenCalledWith('Found 2021-03-04 (low confidence)');
+    expect(screen.getByRole('status')).toHaveTextContent('Looking up release date…');
   });
 
-  it('toasts "No release date found" when result is null', async () => {
-    mockRefetch.mockResolvedValue({
-      data: null,
-      error: null,
-      status: 'success',
-    });
+  it('shows the set-it-manually hint once the lookup has given up', () => {
+    render(<Wrapper lookupStatus="exhausted" />);
 
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
-    });
-
-    await waitFor(() => {
-      expect(toast.info).toHaveBeenCalledWith('No release date found');
-    });
+    expect(screen.getByRole('status')).toHaveTextContent('No release date found. Set it manually.');
   });
 
-  it('toasts a destructive error when refetch resolves with an error status', async () => {
-    mockRefetch.mockResolvedValue({
-      data: undefined,
-      error: new Error('Network error'),
-      status: 'error',
-    });
+  it('shows no hint while idle', () => {
+    render(<Wrapper lookupStatus="idle" />);
 
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
-    });
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Release date lookup failed');
-    });
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
-  it('toasts a destructive error when refetch throws', async () => {
-    mockRefetch.mockRejectedValue(new Error('Unexpected error'));
+  it('shows no hint once a date was found', () => {
+    render(<Wrapper lookupStatus="found" />);
 
-    const setValueRef = makeSetValueRef();
-    render(<Wrapper setValueRef={setValueRef} />);
-
-    act(() => {
-      setValueRef.current?.('title', 'Some Song');
-    });
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Find release date' }));
-    });
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Release date lookup failed');
-    });
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
-  it('renders with the find button disabled when title and artist are undefined', () => {
-    render(<WrapperNoArtistDefaults />);
-    expect(screen.getByRole('button', { name: 'Find release date' })).toBeDisabled();
+  it('defaults to no hint when no status is given', () => {
+    render(<Wrapper />);
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('announces the hint politely', () => {
+    render(<Wrapper lookupStatus="searching" />);
+
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
   });
 });

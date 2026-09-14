@@ -3,7 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useState } from 'react';
 
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  renderHook,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -17,6 +25,18 @@ import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { UseFormSetValue } from 'react-hook-form';
 
 type PosterCandidate = videoMetadata.PosterCandidate;
+
+// Every query hook the form uses is mocked below; the provider exists only for
+// the automatic release-date lookup, which reaches the client to cancel an
+// in-flight attempt when its (title, artist) pair changes.
+const render = (ui: React.ReactNode): ReturnType<typeof rtlRender> => {
+  const queryClient = new QueryClient();
+  const wrap = (element: React.ReactNode): React.ReactElement => (
+    <QueryClientProvider client={queryClient}>{element}</QueryClientProvider>
+  );
+  const result = rtlRender(wrap(ui));
+  return { ...result, rerender: (element: React.ReactNode) => result.rerender(wrap(element)) };
+};
 
 /** Build a scored candidate whose blob size encodes its identity for assertions. */
 const posterCandidate = (content: string, score: number, atSeconds = 3.7): PosterCandidate => ({
@@ -32,6 +52,9 @@ const mocks = vi.hoisted(() => ({
   createVideoAsync: vi.fn(),
   updateVideoAsync: vi.fn(),
   selectVideoPosterAsync: vi.fn(),
+  updateVideoReleaseDateAsync: vi.fn(),
+  releaseDateRefetch: vi.fn(),
+  descriptionRefetch: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
   useVideoProducersQuery: vi.fn(),
@@ -80,6 +103,10 @@ vi.mock('@/hooks/mutations/use-video-mutations', () => ({
     selectVideoPosterAsync: mocks.selectVideoPosterAsync,
     isSelectingVideoPoster: false,
   }),
+  useUpdateVideoReleaseDateMutation: () => ({
+    updateVideoReleaseDateAsync: mocks.updateVideoReleaseDateAsync,
+    isUpdatingVideoReleaseDate: false,
+  }),
 }));
 
 vi.mock('./_hooks/use-video-query', () => ({
@@ -95,12 +122,14 @@ vi.mock('./_hooks/use-video-producers-query', () => ({
   useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
+// The automatic lookups call `refetch()` themselves, so both resolve at the
+// factory level (a miss by default) — a bare vi.fn() would make them throw.
 vi.mock('./_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: () => ({
     isFetching: false,
     error: null,
     data: undefined,
-    refetch: vi.fn(),
+    refetch: mocks.releaseDateRefetch,
   }),
 }));
 
@@ -109,7 +138,7 @@ vi.mock('./_hooks/use-video-description-lookup-query', () => ({
     isFetching: false,
     error: null,
     data: undefined,
-    refetch: vi.fn(),
+    refetch: mocks.descriptionRefetch,
   }),
 }));
 
@@ -377,6 +406,9 @@ beforeEach(() => {
   });
   mocks.updateVideoAsync.mockResolvedValue({ success: true, fields: {}, data: { videoId: 'v1' } });
   mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
+  mocks.updateVideoReleaseDateAsync.mockResolvedValue({ success: true });
+  mocks.releaseDateRefetch.mockResolvedValue({ data: null });
+  mocks.descriptionRefetch.mockResolvedValue({ data: null });
   mocks.uploadVideoMultipart.mockResolvedValue({
     success: true,
     s3Key: 'media/videos/aaa/clip.mp4',
@@ -571,7 +603,97 @@ describe('VideoForm — metadata prefill (only-empty)', () => {
   });
 });
 
+describe('VideoForm — release date', () => {
+  it('normalises a picked ISO datetime to the local YYYY-MM-DD day', () => {
+    render(<VideoForm />);
+    const localMidnight = new Date(2024, 4, 1, 0, 0, 0);
+
+    fireEvent.change(screen.getByLabelText('Release date'), {
+      target: { value: localMidnight.toISOString() },
+    });
+
+    expect(screen.getByLabelText('Release date')).toHaveValue('2024-05-01');
+  });
+
+  it('starts the automatic lookup as soon as the upload starts', async () => {
+    mocks.extractVideoTags.mockResolvedValue({ title: 'Tag Title', artist: 'Tag Artist' });
+    mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+
+    await waitFor(() => expect(mocks.releaseDateRefetch).toHaveBeenCalled(), { timeout: 3000 });
+  });
+
+  it('fills an empty date from the lookup and shows no hint afterwards', async () => {
+    mocks.extractVideoTags.mockResolvedValue({ title: 'Tag Title', artist: 'Tag Artist' });
+    mocks.releaseDateRefetch.mockResolvedValue({
+      data: { releasedOn: '2019-08-04', confidence: 'high', sources: [] },
+    });
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+
+    await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2019-08-04'), {
+      timeout: 3000,
+    });
+    expect(screen.queryByText(/Looking up release date|No release date found/)).toBeNull();
+  });
+
+  it('renders the form card without the ink shadow edge', () => {
+    render(<VideoForm />);
+
+    const card = document.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('shadow-none');
+    expect(card).not.toHaveClass('shadow-zine-ink');
+  });
+});
+
 describe('VideoForm — upload flow', () => {
+  it('shows the preparing spinner from selection until the first byte', async () => {
+    mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+
+    expect(await screen.findByText('Preparing upload…')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('swaps the spinner for the progress bar on the first byte', async () => {
+    let reportProgress: ((fraction: number) => void) | undefined;
+    mocks.uploadVideoMultipart.mockImplementation(
+      (_file: File, { onProgress }: { onProgress?: (f: number) => void }) => {
+        reportProgress = onProgress;
+        return new Promise(() => undefined);
+      }
+    );
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('Preparing upload…');
+    await waitFor(() => expect(reportProgress).toBeDefined());
+    act(() => reportProgress?.(0.01));
+
+    expect(await screen.findByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText('Preparing upload…')).not.toBeInTheDocument();
+  });
+
+  it('keeps Save disabled while the upload is being prepared', async () => {
+    mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('Preparing upload…');
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
   it('renders the upload progress reported via onProgress', async () => {
     mocks.uploadVideoMultipart.mockImplementation(
       (_file: File, { onProgress }: { onProgress?: (f: number) => void }) => {

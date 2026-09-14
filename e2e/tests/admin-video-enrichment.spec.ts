@@ -9,7 +9,11 @@ import { ENRICH_INFO_VIDEO_ID, ENRICH_MUSIC_VIDEO_ID } from '../helpers/seed-tes
  * BIO_GENERATOR_FAKE=true (playwright.config.ts), so Run enrichment writes the
  * deterministic videoEnrichmentFixture suggestions instead of invoking the
  * Lambda: per artist bornOn 1985-03-15 (high) + akaNames 'E2E Alias' (medium)
- * with musicbrainz.org sources, and releasedOn 2020-06-01 (medium).
+ * with musicbrainz.org sources, and releasedOn 2020-06-01 (medium). The seeded
+ * row already has a release date, so that suggestion stays a pending "Use this
+ * date" card — an enrichment date fills only an EMPTY field — and this spec
+ * never clicks it: the click would autosave onto the shared seed row and break
+ * retries.
  *
  * Parallel safety: both videos, both shell artists, and every suggestion row
  * touched here are DEDICATED to this spec (unique 'E2E Enrich' titles/names,
@@ -61,11 +65,16 @@ test.describe('Admin video enrichment', () => {
     // MusicBrainz source; the release-date suggestion renders separately.
     await expect(leadCard.getByText('1985-03-15')).toBeVisible();
     await expect(leadCard.getByText('High', { exact: true })).toBeVisible();
-    // The fetched release date auto-applies into the form, so the card shows the
-    // value (exact, to skip the "Current: …" copy) and flips to Applied.
+    // The seeded row already has a release date, so the enrichment date stays a
+    // pending card: it shows the value (exact, to skip the "Current: …" copy)
+    // with an enabled "Use this date" and no Applied badge. Not clicked — see
+    // the file header.
     const releaseDateCard = panel.getByTestId('video-release-date-suggestion');
     await expect(releaseDateCard.getByText('2020-06-01', { exact: true })).toBeVisible();
-    await expect(releaseDateCard.getByText('Applied', { exact: true })).toBeVisible();
+    await expect(
+      releaseDateCard.getByRole('button', { name: 'Apply Release date suggestion' })
+    ).toBeEnabled();
+    await expect(releaseDateCard.getByText('Applied', { exact: true })).toHaveCount(0);
 
     // The fixture also emits video-level description + featured-artist cards.
     const descriptionCard = panel.getByTestId('video-description-suggestion');

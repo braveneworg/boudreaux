@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/app/components/ui/form';
 import { Textarea } from '@/app/components/ui/textarea';
+import { ISO_DATE_PATTERN } from '@/lib/utils/validation/iso-date';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { useVideoDescriptionLookupQuery } from '../_hooks/use-video-description-lookup-query';
@@ -22,8 +23,6 @@ interface DescriptionFieldProps {
   control: Control<VideoFormData>;
   setValue: UseFormSetValue<VideoFormData>;
 }
-
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const buildSuccessMessage = (sources: string[]): string =>
   sources[0] ? `Generated a description — ${sources[0]}` : 'Generated a description';

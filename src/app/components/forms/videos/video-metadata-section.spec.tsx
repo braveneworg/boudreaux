@@ -16,18 +16,6 @@ import type { UseFormSetValue } from 'react-hook-form';
 
 vi.mock('server-only', () => ({}));
 
-// ---------------------------------------------------------------------------
-// Mock: useReleaseDateLookupQuery — idle (not fetching, no data)
-// ---------------------------------------------------------------------------
-vi.mock('../_hooks/use-release-date-lookup-query', () => ({
-  useReleaseDateLookupQuery: () => ({
-    isFetching: false,
-    error: null,
-    data: undefined,
-    refetch: vi.fn(),
-  }),
-}));
-
 // Mock: useVideoDescriptionLookupQuery — idle (not fetching, no data)
 vi.mock('../_hooks/use-video-description-lookup-query', () => ({
   useVideoDescriptionLookupQuery: () => ({
@@ -139,9 +127,14 @@ vi.mock('@/ui/datepicker', () => ({
 interface WrapperProps {
   setValueRef: React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
   omitCategory?: boolean;
+  releaseDateLookupStatus?: 'idle' | 'searching' | 'found' | 'exhausted';
 }
 
-const Wrapper = ({ setValueRef, omitCategory = false }: WrapperProps): React.ReactElement => {
+const Wrapper = ({
+  setValueRef,
+  omitCategory = false,
+  releaseDateLookupStatus,
+}: WrapperProps): React.ReactElement => {
   const form = useForm<VideoFormData>({
     resolver: zodResolver(createVideoSchema),
     defaultValues: {
@@ -164,10 +157,31 @@ const Wrapper = ({ setValueRef, omitCategory = false }: WrapperProps): React.Rea
         control={form.control}
         setValue={form.setValue}
         onSelectDate={() => undefined}
+        releaseDateLookupStatus={releaseDateLookupStatus}
       />
     </Form>
   );
 };
+
+describe('VideoMetadataSection — release-date lookup hint', () => {
+  it('passes the lookup status through to the release-date field', () => {
+    const setValueRef = {
+      current: null,
+    } as React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+    render(<Wrapper setValueRef={setValueRef} releaseDateLookupStatus="exhausted" />);
+
+    expect(screen.getByText('No release date found. Set it manually.')).toBeInTheDocument();
+  });
+
+  it('shows no hint by default', () => {
+    const setValueRef = {
+      current: null,
+    } as React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+    render(<Wrapper setValueRef={setValueRef} />);
+
+    expect(screen.queryByText(/release date found|Looking up/)).not.toBeInTheDocument();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Tests
