@@ -14,6 +14,7 @@ import { ArtistService, type ArtistEnrichedField } from '@/lib/services/artist-s
 import type { VideoEnrichmentSuggestionRecord } from '@/lib/types/domain/video-enrichment';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
+import { isRealCalendarDate } from '@/lib/utils/validation/iso-date';
 import {
   applyVideoSuggestionInputSchema,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
@@ -50,26 +51,6 @@ const ARTIST_FIELDS: readonly ArtistEnrichedField[] = [
 
 /** The applyable fields whose value is written as a Prisma `DateTime`. */
 const DATE_FIELDS: readonly ArtistEnrichedField[] = ['bornOn'];
-
-/** Strict `YYYY-MM-DD` shape gate (day-precision, zero-padded). */
-const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Real-calendar validity for a day-precision date string. A regex alone is
- * insufficient (it accepts `2020-13-45` / `2021-02-30`), so the parsed UTC
- * components must round-trip back to the input: impossible months/days
- * overflow into another month and fail the equality check.
- */
-const isRealCalendarDate = (value: string): boolean => {
-  if (!YYYY_MM_DD.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() === month - 1 &&
-    parsed.getUTCDate() === day
-  );
-};
 
 /** Narrow a stored suggestion field to the applyable whitelist, or null. */
 const toArtistField = (field: string): ArtistEnrichedField | null =>
@@ -143,25 +124,33 @@ const dismissSuggestion = async (
   return { success: true, op: 'dismiss' };
 };
 
-/** Load + gate the pending suggestion, its whitelist field, and artist id. */
-const loadApplicableSuggestion = async (
-  suggestionId: string
-): Promise<
+/** How a pending suggestion is handled by an `apply`. */
+type LoadedSuggestion =
   | {
-      ok: true;
+      kind: 'artist';
       suggestion: VideoEnrichmentSuggestionRecord;
       field: ArtistEnrichedField;
       artistId: string;
     }
-  | { ok: false; result: ApplyVideoSuggestionActionResult }
-> => {
+  | { kind: 'release-date'; suggestion: VideoEnrichmentSuggestionRecord }
+  | { kind: 'rejected'; result: ApplyVideoSuggestionActionResult };
+
+/** Is this the video-level release-date suggestion (resolve-only on apply)? */
+const isReleaseDateSuggestion = (suggestion: VideoEnrichmentSuggestionRecord): boolean =>
+  suggestion.artistId === null && suggestion.field === 'releasedOn';
+
+/** Load + gate the pending suggestion, its whitelist field, and artist id. */
+const loadApplicableSuggestion = async (suggestionId: string): Promise<LoadedSuggestion> => {
   const suggestion = await VideoEnrichmentSuggestionRepository.findById(suggestionId);
   if (!suggestion || suggestion.status !== 'pending') {
-    return { ok: false, result: ALREADY_RESOLVED };
+    return { kind: 'rejected', result: ALREADY_RESOLVED };
+  }
+  if (isReleaseDateSuggestion(suggestion)) {
+    return { kind: 'release-date', suggestion };
   }
   if ((VIDEO_LEVEL_SUGGESTION_FIELDS as readonly string[]).includes(suggestion.field)) {
     return {
-      ok: false,
+      kind: 'rejected',
       result: {
         success: false,
         error: 'This suggestion applies in the edit form, not on the server.',
@@ -171,15 +160,42 @@ const loadApplicableSuggestion = async (
   const field = toArtistField(suggestion.field);
   const { artistId } = suggestion;
   if (!field || !artistId) {
-    return { ok: false, result: { success: false, error: 'Unsupported suggestion field.' } };
+    return { kind: 'rejected', result: { success: false, error: 'Unsupported suggestion field.' } };
   }
   // Date-valued fields are written as Prisma `DateTime`; validate strict
   // real-calendar validity BEFORE any write so `2020-13-45` / `2021-02-30`
   // never reach the database (the wire schema is field-agnostic string).
   if (DATE_FIELDS.includes(field) && !isRealCalendarDate(suggestion.value)) {
-    return { ok: false, result: INVALID_DATE };
+    return { kind: 'rejected', result: INVALID_DATE };
   }
-  return { ok: true, suggestion, field, artistId };
+  return { kind: 'artist', suggestion, field, artistId };
+};
+
+/**
+ * Resolve-only apply for the video-level release-date suggestion: mark it
+ * applied so it cannot re-fill the field on a later visit, but write NOTHING
+ * to the video row — `updateVideoReleaseDateAction` (the form's autosave) is
+ * the single writer of `releasedOn`, and the form has already filled and
+ * autosaved the value by the time this runs.
+ */
+const resolveReleaseDateSuggestion = async (
+  suggestion: VideoEnrichmentSuggestionRecord,
+  userId: string
+): Promise<ApplyVideoSuggestionActionResult> => {
+  const applied = await VideoEnrichmentSuggestionRepository.markApplied(suggestion.id, userId);
+  if (!applied) return ALREADY_RESOLVED;
+  logSecurityEvent({
+    event: 'media.video.updated',
+    userId,
+    metadata: {
+      suggestionId: suggestion.id,
+      videoId: suggestion.videoId,
+      field: 'releasedOn',
+      action: 'enrichment-suggestion-resolved',
+    },
+  });
+  revalidateSuggestionPaths();
+  return { success: true, op: 'apply' };
 };
 
 const applySuggestion = async (
@@ -188,7 +204,10 @@ const applySuggestion = async (
   userId: string
 ): Promise<ApplyVideoSuggestionActionResult> => {
   const loaded = await loadApplicableSuggestion(suggestionId);
-  if (!loaded.ok) return loaded.result;
+  if (loaded.kind === 'rejected') return loaded.result;
+  if (loaded.kind === 'release-date') {
+    return resolveReleaseDateSuggestion(loaded.suggestion, userId);
+  }
   const { suggestion, field, artistId } = loaded;
 
   const rows = await VideoArtistRepository.findByVideoId(suggestion.videoId);
@@ -219,12 +238,18 @@ const applySuggestion = async (
 };
 
 /**
- * Applies or dismisses one enrichment suggestion. Admin-only. Applies go
- * through the artist field whitelist with an `expectedCurrent`
- * optimistic-concurrency guard; the video-level fields (release date,
- * description, featured artist) are never server-applied (they flow into the
- * RHF edit form instead, because a `videos.detail` refetch would wipe dirty
- * edits).
+ * Applies or dismisses one enrichment suggestion. Admin-only. Three apply
+ * paths, by field:
+ *
+ * - Artist fields go through the whitelist with an `expectedCurrent`
+ *   optimistic-concurrency guard and are written to the Artist row.
+ * - The video-level `releasedOn` suggestion is RESOLVE-ONLY: the row is never
+ *   written here (the form fills the field and autosaves it through
+ *   `updateVideoReleaseDateAction`); the apply just marks it applied so it
+ *   cannot re-fill an empty field on a later visit.
+ * - The other video-level fields (description, featured artist) are never
+ *   server-applied — they flow into the RHF edit form, because a
+ *   `videos.detail` refetch would wipe dirty edits.
  *
  * @param input - `{ suggestionId, op, expectedCurrent? }` (Zod-validated).
  */

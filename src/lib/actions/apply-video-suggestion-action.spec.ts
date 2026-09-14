@@ -130,7 +130,10 @@ describe('applyVideoSuggestionAction', () => {
     );
   });
 
-  it('refuses to server-apply a releasedOn suggestion (client-side only)', async () => {
+  // The release date itself is written by the form (its autosave action is the
+  // single writer of `releasedOn`); an apply here only RESOLVES the suggestion
+  // so it cannot re-fill the field on a later visit.
+  it('marks a pending releasedOn suggestion applied without writing the row', async () => {
     vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
       suggestion({ artistId: null, field: 'releasedOn', value: '2020-06-01' })
     );
@@ -140,11 +143,60 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({
-      success: false,
-      error: 'This suggestion applies in the edit form, not on the server.',
-    });
+    expect(result).toEqual({ success: true, op: 'apply' });
+    expect(VideoEnrichmentSuggestionRepository.markApplied).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      'admin-1'
+    );
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
+  });
+
+  it('audits and revalidates a resolved releasedOn suggestion', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'releasedOn', value: '2020-06-01' })
+    );
+
+    await applyVideoSuggestionAction({ suggestionId: SUGGESTION_ID, op: 'apply' });
+
+    expect(logSecurityEvent).toHaveBeenCalledWith({
+      event: 'media.video.updated',
+      userId: 'admin-1',
+      metadata: {
+        suggestionId: SUGGESTION_ID,
+        videoId: VIDEO_ID,
+        field: 'releasedOn',
+        action: 'enrichment-suggestion-resolved',
+      },
+    });
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/videos');
+  });
+
+  it('reports already-resolved when the releasedOn markApplied loses the race', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'releasedOn', value: '2020-06-01' })
+    );
+    vi.mocked(VideoEnrichmentSuggestionRepository.markApplied).mockResolvedValue(false);
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+  });
+
+  it('does not resolve a releasedOn suggestion that is no longer pending', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'releasedOn', value: '2020-06-01', status: 'dismissed' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'apply',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(VideoEnrichmentSuggestionRepository.markApplied).not.toHaveBeenCalled();
   });
 
   it('refuses to server-apply a description suggestion (client-side only)', async () => {
