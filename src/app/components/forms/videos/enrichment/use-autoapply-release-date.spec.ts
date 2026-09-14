@@ -71,16 +71,40 @@ describe('findReleaseDateSuggestion', () => {
 });
 
 describe('useAutoApplyReleaseDateSuggestion', () => {
-  it('auto-applies the release-date suggestion into an untouched field', async () => {
+  // The found date stays: an enrichment date fills only an EMPTY field. With a
+  // date present (typed, auto-looked-up, or loaded from the row) the
+  // suggestion stays a pending card with "Use this date".
+  it('never overwrites an existing date, even when the field is clean', async () => {
     const { onApply } = renderHarness([releaseDateSuggestion('2019-05-01')]);
+
+    await act(async () => {});
+
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('fills an empty date', async () => {
+    const { onApply } = renderHarness([releaseDateSuggestion('2019-05-01')], '');
 
     await act(async () => {});
 
     expect(onApply).toHaveBeenCalledWith('releasedOn', '2019-05-01');
   });
 
-  it('does not auto-apply once the admin has edited the date', async () => {
+  it('fills a date that was cleared after mount', async () => {
     const { onApply, rerender, getForm } = renderHarness([]);
+
+    await act(async () => {
+      getForm().setValue('releasedOn', '');
+    });
+    await act(async () => {
+      rerender({ suggestions: [releaseDateSuggestion('2019-05-01')] });
+    });
+
+    expect(onApply).toHaveBeenCalledWith('releasedOn', '2019-05-01');
+  });
+
+  it('does not fill once a date has been typed after mount', async () => {
+    const { onApply, rerender, getForm } = renderHarness([], '');
 
     await act(async () => {
       getForm().setValue('releasedOn', '2001-01-01', { shouldDirty: true });
@@ -92,9 +116,9 @@ describe('useAutoApplyReleaseDateSuggestion', () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('auto-applies at most once for the same suggestion across refetches', async () => {
+  it('fills at most once for the same suggestion across refetches', async () => {
     const suggestion = releaseDateSuggestion('2019-05-01');
-    const { onApply, rerender } = renderHarness([suggestion]);
+    const { onApply, rerender } = renderHarness([suggestion], '');
 
     await act(async () => {});
     await act(async () => {
@@ -105,39 +129,35 @@ describe('useAutoApplyReleaseDateSuggestion', () => {
   });
 
   it('ignores a dismissed release-date suggestion', async () => {
-    const { onApply } = renderHarness([
-      releaseDateSuggestion('2019-05-01', { status: 'dismissed' }),
-    ]);
+    const { onApply } = renderHarness(
+      [releaseDateSuggestion('2019-05-01', { status: 'dismissed' })],
+      ''
+    );
 
     await act(async () => {});
 
     expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('resolves the auto-applied suggestion server-side', async () => {
-    const { onResolve } = renderHarness([releaseDateSuggestion('2019-05-01')]);
+  it('resolves the suggestion server-side only when it filled the field', async () => {
+    const { onResolve } = renderHarness([releaseDateSuggestion('2019-05-01')], '');
 
     await act(async () => {});
 
     expect(onResolve).toHaveBeenCalledWith('sug-1');
   });
 
-  it('does not resolve when the admin has edited the date', async () => {
-    const { onResolve, rerender, getForm } = renderHarness([]);
+  it('does not resolve when the field already had a date', async () => {
+    const { onResolve } = renderHarness([releaseDateSuggestion('2019-05-01')]);
 
-    await act(async () => {
-      getForm().setValue('releasedOn', '2001-01-01', { shouldDirty: true });
-    });
-    await act(async () => {
-      rerender({ suggestions: [releaseDateSuggestion('2019-05-01')] });
-    });
+    await act(async () => {});
 
     expect(onResolve).not.toHaveBeenCalled();
   });
 
   it('resolves at most once for the same suggestion across refetches', async () => {
     const suggestion = releaseDateSuggestion('2019-05-01');
-    const { onResolve, rerender } = renderHarness([suggestion]);
+    const { onResolve, rerender } = renderHarness([suggestion], '');
 
     await act(async () => {});
     await act(async () => {
@@ -148,9 +168,10 @@ describe('useAutoApplyReleaseDateSuggestion', () => {
   });
 
   it('does not resolve a dismissed suggestion', async () => {
-    const { onResolve } = renderHarness([
-      releaseDateSuggestion('2019-05-01', { status: 'dismissed' }),
-    ]);
+    const { onResolve } = renderHarness(
+      [releaseDateSuggestion('2019-05-01', { status: 'dismissed' })],
+      ''
+    );
 
     await act(async () => {});
 

@@ -407,12 +407,12 @@ export const VideoEnrichmentPanel = ({
   const artistValue = useWatch({ control, name: 'artist' });
   const hasArtist = hasEnrichableArtist(artistValue);
 
-  // The fetched release date should be used automatically — apply the suggestion
-  // into the form the moment it appears, unless the admin has edited the field.
-  // The auto-apply also resolves the suggestion server-side (same mutation as
-  // the explicit Apply button, sans expectedCurrent — the form was just filled
-  // with this exact value): left `pending`, it would re-apply over the admin's
-  // saved date on every later visit.
+  // An enrichment release date fills only an EMPTY field the moment it appears;
+  // a date already in the form (typed, auto-looked-up, or loaded) stays and the
+  // suggestion remains a pending "Use this date" card. The fill also resolves
+  // the suggestion server-side (resolve-only apply — the form autosaves the
+  // value itself): left `pending`, it would re-fill an emptied field on every
+  // later visit.
   const resolveAutoAppliedSuggestion = useCallback(
     (suggestionId: string): void => applyVideoSuggestion({ suggestionId, op: 'apply' }),
     [applyVideoSuggestion]
