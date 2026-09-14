@@ -8,7 +8,6 @@ import { extractProbePrefillTags, type ProbePrefillTags } from './probe-tags';
 const NULL_TAGS: ProbePrefillTags = {
   title: null,
   artist: null,
-  description: null,
   durationSeconds: null,
 };
 
@@ -17,6 +16,17 @@ describe('extractProbePrefillTags', () => {
   it('never emits a release date, even from a container date tag', () => {
     const raw = { format: { duration: '100.0', tags: { date: '2019-08-01' } } };
     expect(extractProbePrefillTags(raw)).not.toHaveProperty('releasedOn');
+  });
+
+  // ── Description is NEVER prefilled from the file (enrichment panel only) ──
+  it('never emits a description, even from comment/description tags', () => {
+    const raw = {
+      format: {
+        duration: '100.0',
+        tags: { comment: 'Live performance', description: 'A description', DESCRIPTION: 'Upper' },
+      },
+    };
+    expect(extractProbePrefillTags(raw)).not.toHaveProperty('description');
   });
 
   // ── Case 1: Lowercase MP4-style tags ────────────────────────────────────
@@ -35,7 +45,6 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: 'My Song',
       artist: 'The Band',
-      description: 'Live performance',
       durationSeconds: 245,
     });
   });
@@ -56,12 +65,11 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: 'Matroska Track',
       artist: 'MKV Artist',
-      description: 'Festival recording',
       durationSeconds: 181,
     });
   });
 
-  // ── Case 3: Fallbacks — album_artist and description ────────────────────
+  // ── Case 3: Fallback — album_artist ─────────────────────────────────────
   it('falls back to album_artist when artist is absent', () => {
     const raw = {
       format: {
@@ -75,34 +83,6 @@ describe('extractProbePrefillTags', () => {
     };
     const result = extractProbePrefillTags(raw);
     expect(result.artist).toBe('The Album Artist');
-  });
-
-  it('falls back to description tag when comment is absent', () => {
-    const raw = {
-      format: {
-        duration: '120.000000',
-        tags: {
-          title: 'Track',
-          description: 'A description fallback',
-        },
-      },
-    };
-    const result = extractProbePrefillTags(raw);
-    expect(result.description).toBe('A description fallback');
-  });
-
-  it('falls back to description tag when comment is absent (uppercase)', () => {
-    const raw = {
-      format: {
-        duration: '120.000000',
-        tags: {
-          TITLE: 'Track',
-          DESCRIPTION: 'Uppercase description',
-        },
-      },
-    };
-    const result = extractProbePrefillTags(raw);
-    expect(result.description).toBe('Uppercase description');
   });
 
   // ── Case 4: duration parsing ─────────────────────────────────────────────
@@ -170,7 +150,6 @@ describe('extractProbePrefillTags', () => {
     expect(extractProbePrefillTags(raw)).toEqual<ProbePrefillTags>({
       title: null,
       artist: null,
-      description: null,
       durationSeconds: 100,
     });
   });

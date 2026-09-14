@@ -49,11 +49,14 @@ describe('videoProbeFixture', () => {
     );
   });
 
-  it('yields deterministic prefill tags for the admin form', () => {
+  // The raw fixture deliberately keeps its `comment: 'E2E probe description'`
+  // tag (as it keeps its `date` tag): a description is never taken from the
+  // file, so the extractor must ignore it — this pins that the tag is there
+  // to be ignored, not merely absent.
+  it('yields deterministic prefill tags for the admin form, ignoring the comment tag', () => {
     expect(extractProbePrefillTags(videoProbeFixture.raw('https://example.com/x.mp4'))).toEqual({
       title: 'E2E Probe Title',
       artist: 'E2E Probe Artist',
-      description: 'E2E probe description',
       durationSeconds: 245,
     });
   });

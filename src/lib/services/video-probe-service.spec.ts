@@ -268,7 +268,6 @@ describe('VideoProbeService.probeForPrefill', () => {
     title: 'Fixture Title',
     artist: 'Fixture Artist',
     releasedOn: '2020-01-01',
-    description: null,
     durationSeconds: 120,
   };
 

@@ -10,14 +10,15 @@
 export interface ProbePrefillTags {
   title: string | null;
   artist: string | null;
-  /** From `comment` tag, falling back to `description`. */
-  description: string | null;
   /** `format.duration` parsed, rounded, must be > 0. */
   durationSeconds: number | null;
 }
 // The release date is deliberately never prefilled from the file: container
 // `date`/`creation_time` tags carry the encode/export timestamp far more often
 // than a real release date. It is set only by the admin or by web enrichment.
+// The description is never prefilled from the file either (ADR-0005): the
+// `comment`/`description` tags are encoder or exporter notes, not editorial
+// prose. It is entered only in the enrichment panel or by web enrichment.
 
 // ── Private guards (same pattern as normalize.ts, kept decoupled) ──────────
 
@@ -63,7 +64,6 @@ export const extractProbePrefillTags = (raw: unknown): ProbePrefillTags => {
   const NULL_RESULT: ProbePrefillTags = {
     title: null,
     artist: null,
-    description: null,
     durationSeconds: null,
   };
 
@@ -75,11 +75,10 @@ export const extractProbePrefillTags = (raw: unknown): ProbePrefillTags => {
   const rawTags = isRecord(format.tags) ? format.tags : null;
   const tags = rawTags !== null ? lowercaseTags(rawTags) : {};
 
-  const { title: t, artist: a, album_artist: aa, comment: c, description: desc } = tags;
+  const { title: t, artist: a, album_artist: aa } = tags;
   const title = asString(t);
   const artist = asString(a) ?? asString(aa);
-  const description = asString(c) ?? asString(desc);
   const durationSeconds = parseDuration(format.duration);
 
-  return { title, artist, description, durationSeconds };
+  return { title, artist, durationSeconds };
 };

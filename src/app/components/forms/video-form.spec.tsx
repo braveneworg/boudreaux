@@ -1986,6 +1986,40 @@ describe('VideoForm — server probe prefill', () => {
     );
   });
 
+  it('never writes the description from probe tags', async () => {
+    // A stale server still sending `description` (and `releasedOn`) must be
+    // ignored end to end: the client schema strips both and the prefill helper
+    // reads neither. The draft mock mounts the panel so its editor is readable.
+    mocks.useVideoProbePrefillQuery.mockReturnValue({
+      data: {
+        ok: true,
+        tags: {
+          title: 'Probe Title',
+          artist: 'Probe Artist',
+          releasedOn: '2022-09-15',
+          description: 'Probe description',
+          durationSeconds: 300,
+        },
+      },
+      isPending: false,
+      isError: false,
+    });
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+      draftCandidateUrls: [],
+    });
+
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Probe Title'));
+    expect(screen.getByLabelText('Description')).toHaveValue('');
+  });
+
   it('leaves a user-typed field untouched when the hook returns ok:true', async () => {
     // The probe hook returns data only after the upload succeeds (enabled:true call).
     // Before that it returns no data so the effect doesn't fire early.

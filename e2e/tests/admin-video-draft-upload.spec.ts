@@ -20,12 +20,14 @@ import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helper
  * metadata, and upload-complete creates an UNPUBLISHED draft row whose URL
  * swaps in place to the edit route (history.replaceState — the mounted form
  * survives). With BIO_GENERATOR_FAKE true the draft's post-save pipeline
- * auto-kicks the fake enrichment,
- * which completes in ~4s with the deterministic videoEnrichmentFixture: a
- * video-level description and a discovered featured artist 'E2E Discovered
- * Feature'. Applying the description fills the form; applying the featured
- * artist appends a feat clause; Save persists via the UPDATE path and the
- * re-kicked artist sync links a FEATURED shell for the discovered name.
+ * auto-kicks the fake enrichment, which completes in ~4s with the
+ * deterministic videoEnrichmentFixture: a video-level description and a
+ * discovered featured artist 'E2E Discovered Feature'. The draft's
+ * description is blank (nothing prefills it from the file), so the server
+ * auto-applies the synthesized prose and the panel's editor mirrors it with
+ * no click; applying the featured artist appends a feat clause; Save persists
+ * via the UPDATE path and the re-kicked artist sync links a FEATURED shell for
+ * the discovered name.
  *
  * Parallel safety: this spec CREATES a real (unpublished, non-archived) video
  * mid-run, which the count-pinning specs (admin-dashboard / admin-videos-list)
@@ -34,7 +36,6 @@ import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helper
  */
 
 /** The apply-button accessible name is the aria-label `Apply <field label> suggestion`. */
-const APPLY_DESCRIPTION = 'Use this description';
 const APPLY_FEATURED_ARTIST = 'Apply Featured artist suggestion';
 
 /** The discovered featured artist the fake fixture emits (video-enrichment-fixture.ts). */
@@ -99,30 +100,25 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       await expect(panel).toBeVisible({ timeout: 15_000 });
       const descriptionEditor = panel.getByLabel('Description', { exact: true });
 
-      // Nothing synthesizes a description outside enrichment any more; the
-      // only pre-enrichment writer left is the fake server probe's comment-tag
-      // prefill ("E2E probe description").
-      await expect(descriptionEditor).toHaveValue('E2E probe description', {
-        timeout: 15_000,
-      });
-
-      // The auto-kicked fake run reaches a terminal 'Enriched' state.
+      // The auto-kicked fake run reaches a terminal 'Enriched' state. It
+      // dwells ≥4s; widen the terminal-state wait so heavy parallel
+      // fake-enrichment contention can't starve it.
       const chip = panel.getByTestId('video-enrichment-status-chip');
-      // The auto-kicked fake enrichment dwells ≥4s; widen the terminal-state
-      // wait so heavy parallel fake-enrichment contention can't starve it.
       await expect(chip).toHaveText('Enriched', { timeout: 45_000 });
 
-      // The two video-level cards the fixture emits both render.
-      const descriptionCard = panel.getByTestId('video-description-suggestion');
-      const featuredCard = panel.getByTestId('video-featured-artist-suggestion');
-      await expect(descriptionCard).toBeVisible();
-      await expect(featuredCard).toBeVisible();
+      // Nothing prefills a description from the file (the fake probe's comment
+      // tag is ignored) and nothing synthesizes one outside enrichment, so the
+      // draft row was blank when the run completed: the server auto-applied
+      // the synthesized prose and the panel's editor mirrors it — no click.
+      // An applied description row renders no card at all.
+      await expect(descriptionEditor).toHaveValue(/deterministic E2E description/, {
+        timeout: 15_000,
+      });
+      await expect(panel.getByTestId('video-description-suggestion')).toHaveCount(0);
 
-      // Apply the description into the panel's editor (client-only; the card
-      // flips applied).
-      await descriptionCard.getByRole('button', { name: APPLY_DESCRIPTION }).click();
-      await expect(descriptionEditor).toHaveValue(/deterministic E2E description/);
-      await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
+      // The discovered featured artist still renders as a pending card.
+      const featuredCard = panel.getByTestId('video-featured-artist-suggestion');
+      await expect(featuredCard).toBeVisible();
 
       // Apply the discovered featured artist — the artist string gains its feat
       // clause, so it now appears as a pill in the Selected featured artists list.
