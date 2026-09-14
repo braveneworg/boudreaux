@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import type { VideoCategory } from '@/lib/types/domain/video';
 import type { VideoEnrichmentData } from '@/lib/validation/video-enrichment-schema';
 import type { NormalizedProbe } from '@/lib/video-probe/normalize';
 
@@ -80,19 +81,46 @@ const FIXTURE_MB_SOURCE = {
   label: 'MusicBrainz',
 } as const;
 const FIXTURE_WD_SOURCE = { url: 'https://www.wikidata.org/wiki/Q0', label: 'Wikidata' } as const;
+const FIXTURE_WEB_SOURCE = { url: 'https://example.com/e2e-fixture', label: 'Web' } as const;
+
+/** The INFORMATIONAL fixture's description — creator-framed, no track or date. */
+export const INFORMATIONAL_FIXTURE_DESCRIPTION =
+  'A deterministic E2E description of the informational video, its creator, and what it covers.';
 
 /**
- * Deterministic enrichment result used when `BIO_GENERATOR_FAKE=true`. Emits,
- * per artist: a high-confidence bornOn (1985-03-15) and a medium-confidence
- * akaNames ('E2E Alias'); plus video-level facts (a medium-confidence release
- * date 2020-06-01, a synthesized description, and one discovered featured
- * artist 'E2E Discovered Feature') so E2E can assert the full run → suggest →
- * apply flow.
+ * Deterministic enrichment result used when `BIO_GENERATOR_FAKE=true`,
+ * shaped per category to mirror the Lambda. MUSIC emits, per artist: a
+ * high-confidence bornOn (1985-03-15) and a medium-confidence akaNames
+ * ('E2E Alias'); plus video-level facts (a medium-confidence release date
+ * 2020-06-01, a synthesized description, and one discovered featured artist
+ * 'E2E Discovered Feature') so E2E can assert the full run → suggest → apply
+ * flow. INFORMATIONAL emits no artist rows and only the description.
  */
 export const videoEnrichmentFixture = (input: {
   artists: Array<{ artistId: string }>;
-}): VideoEnrichmentData => ({
-  artists: input.artists.map(({ artistId }) => ({
+  category: VideoCategory;
+}): VideoEnrichmentData =>
+  input.category === 'INFORMATIONAL'
+    ? informationalEnrichmentFixture()
+    : musicEnrichmentFixture(input.artists);
+
+/** The INFORMATIONAL result: description only, as the Lambda's flow returns it. */
+const informationalEnrichmentFixture = (): VideoEnrichmentData => ({
+  artists: [],
+  video: {
+    description: {
+      value: INFORMATIONAL_FIXTURE_DESCRIPTION,
+      confidence: 'medium',
+      sources: [FIXTURE_WEB_SOURCE],
+      note: 'Deterministic fixture description (E2E, informational).',
+    },
+  },
+  model: 'fake/deterministic',
+});
+
+/** The MUSIC result: per-artist identity facts plus every video-level fact. */
+const musicEnrichmentFixture = (artists: Array<{ artistId: string }>): VideoEnrichmentData => ({
+  artists: artists.map(({ artistId }) => ({
     artistId,
     suggestions: [
       {

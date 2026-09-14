@@ -26,10 +26,6 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_PRO_MODEL,
 } from './types.js';
-import {
-  isVideoDescriptionLookupTask,
-  runVideoDescriptionLookupLambda,
-} from './video-description-lookup.js';
 import { isVideoEnrichmentTask, runVideoEnrichmentLambda } from './video-enrichment.js';
 import { verifyScrapedImages } from './vision.js';
 import { getWikidataData } from './wikidata.js';
@@ -49,7 +45,6 @@ import type {
   ProgressStage,
   ReleaseDateLookupResult,
   ReleaseDescriptionLookupResult,
-  VideoDescriptionLookupResult,
   VideoEnrichmentResult,
 } from './types.js';
 import type { VerifiedScrapedImage, VisionContext } from './vision.js';
@@ -930,7 +925,6 @@ export const runLambda = async (
   | BioGenerationResult
   | VideoEnrichmentResult
   | ReleaseDateLookupResult
-  | VideoDescriptionLookupResult
   | ReleaseDescriptionLookupResult
 > => {
   // Route on the task discriminator FIRST so the bio path below stays
@@ -938,9 +932,6 @@ export const runLambda = async (
   // `task` field).
   if (isReleaseDateLookupTask(event)) {
     return runReleaseDateLookupLambda(event);
-  }
-  if (isVideoDescriptionLookupTask(event)) {
-    return runVideoDescriptionLookupLambda(event);
   }
   if (isReleaseDescriptionLookupTask(event)) {
     return runReleaseDescriptionLookupLambda(event);
@@ -996,6 +987,5 @@ export const lambdaHandler = async (
   | BioGenerationResult
   | VideoEnrichmentResult
   | ReleaseDateLookupResult
-  | VideoDescriptionLookupResult
   | ReleaseDescriptionLookupResult
 > => runLambda(event);

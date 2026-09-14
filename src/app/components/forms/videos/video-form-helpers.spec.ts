@@ -171,12 +171,11 @@ const makeForm = (overrides: Partial<VideoFormData> = {}): UseFormReturn<VideoFo
 const fullTags: ProbePrefillTags = {
   title: 'Probed Title',
   artist: 'Probed Artist',
-  description: 'A probed description',
   durationSeconds: 245,
 };
 
 describe('applyServerProbePrefill', () => {
-  it('fills empty title, artist, and description from non-null tags', () => {
+  it('fills empty title and artist, never the description', () => {
     const form = makeForm();
     applyServerProbePrefill(form, fullTags);
 
@@ -188,10 +187,13 @@ describe('applyServerProbePrefill', () => {
       shouldDirty: true,
       shouldValidate: true,
     });
-    expect(form.setValue).toHaveBeenCalledWith('description', 'A probed description', {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
+    // A description is never taken from the file (ADR-0005) — it is entered
+    // in the enrichment panel or written there by the enrichment run.
+    expect(form.setValue).not.toHaveBeenCalledWith(
+      'description',
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   it('never fills the release date from the probe tags', () => {
@@ -233,7 +235,6 @@ describe('applyServerProbePrefill', () => {
     applyServerProbePrefill(form, {
       title: null,
       artist: null,
-      description: null,
       durationSeconds: null,
     });
 
@@ -247,7 +248,6 @@ describe('applyServerProbePrefill', () => {
     applyServerProbePrefill(form, {
       title: null,
       artist: null,
-      description: null,
       durationSeconds: 120,
     });
 

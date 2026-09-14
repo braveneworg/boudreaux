@@ -315,10 +315,10 @@ describe('createVideoDraftAction', () => {
     expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
   });
 
-  it('does not mark pending for a non-MUSIC draft', async () => {
+  it('marks pending for an INFORMATIONAL draft that names a creator', async () => {
     await createVideoDraftAction({ ...validInput, category: 'INFORMATIONAL' });
 
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(ID, 'pending');
   });
 
   it('still succeeds when the pending write fails', async () => {

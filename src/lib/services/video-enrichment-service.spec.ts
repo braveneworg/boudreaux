@@ -18,6 +18,7 @@ import type {
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
 import { STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
+import { INFORMATIONAL_FIXTURE_DESCRIPTION } from './video-enrichment-fixture';
 import { VideoEnrichmentService } from './video-enrichment-service';
 
 vi.mock('server-only', () => ({}));
@@ -279,17 +280,21 @@ describe('syncVideoArtists', () => {
 });
 
 describe('runEnrichmentJob', () => {
-  it('does nothing for an INFORMATIONAL video', async () => {
+  it('runs an INFORMATIONAL video that names a creator', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL' })
+      baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
     );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
 
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
 
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'processing', {
+      error: null,
+    });
+    expect(sentPayload().category).toBe('INFORMATIONAL');
   });
 
-  it('does nothing for a MUSIC video whose artist is blank', async () => {
+  it('does nothing for a video whose artist is blank', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
 
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
@@ -335,6 +340,44 @@ describe('runEnrichmentJob', () => {
     expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(
       VIDEO_ID,
       expect.objectContaining({ stage: 'musicbrainz' })
+    );
+  });
+
+  it('persists a description-only result for an INFORMATIONAL video on the fake path', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    // A stored description keeps the fixture row pending instead of auto-applied.
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ category: 'INFORMATIONAL', description: 'Existing prose.' })
+    );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({
+        artistId: null,
+        field: 'description',
+        value: INFORMATIONAL_FIXTURE_DESCRIPTION,
+      }),
+    ]);
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
+      error: null,
+    });
+  });
+
+  it('checkpoints web-search, not musicbrainz, for an INFORMATIONAL video on the fake path', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ category: 'INFORMATIONAL' })
+    );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledTimes(1);
+    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(
+      VIDEO_ID,
+      expect.objectContaining({ stage: 'web-search' })
     );
   });
 
@@ -408,6 +451,15 @@ describe('runEnrichmentJob', () => {
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
 
     expect(sentPayload()).not.toHaveProperty('releasedOn');
+  });
+
+  it('sends the video category in the Lambda payload', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload().category).toBe('MUSIC');
   });
 
   it('sends the linked artists with their known identity fields', async () => {

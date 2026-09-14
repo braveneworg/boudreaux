@@ -16,16 +16,6 @@ import type { UseFormSetValue } from 'react-hook-form';
 
 vi.mock('server-only', () => ({}));
 
-// Mock: useVideoDescriptionLookupQuery — idle (not fetching, no data)
-vi.mock('../_hooks/use-video-description-lookup-query', () => ({
-  useVideoDescriptionLookupQuery: () => ({
-    isFetching: false,
-    error: null,
-    data: undefined,
-    refetch: vi.fn(),
-  }),
-}));
-
 // ---------------------------------------------------------------------------
 // Mock: useArtistListQuery — return empty list so comboboxes stay idle
 // ---------------------------------------------------------------------------
@@ -186,6 +176,18 @@ describe('VideoMetadataSection — release-date lookup hint', () => {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('VideoMetadataSection — description', () => {
+  it('renders no Description field — the enrichment panel hosts the only editor', () => {
+    const setValueRef = {
+      current: null,
+    } as React.MutableRefObject<UseFormSetValue<VideoFormData> | null>;
+    render(<Wrapper setValueRef={setValueRef} />);
+
+    expect(screen.queryByLabelText('Description')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /generate description/i })).not.toBeInTheDocument();
+  });
+});
 
 describe('VideoMetadataSection — artist comboboxes', () => {
   it('renders the primary artist combobox with the "Artist / Creator" label', () => {

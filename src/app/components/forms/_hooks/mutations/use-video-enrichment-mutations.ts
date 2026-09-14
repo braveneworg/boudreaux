@@ -16,8 +16,10 @@ import { queryKeys } from '@/lib/query-keys';
  * suggestion an `op: 'apply'` is resolve-only: the server marks it applied
  * without touching the row (the form fills and autosaves the date itself).
  * `description` / `featuredArtist` suggestions must never be sent with
- * `op: 'apply'` (the server rejects them) — they apply into the RHF form;
- * dismiss is allowed for all.
+ * `op: 'apply'` (the server rejects them) — they apply into the RHF form.
+ * Dismiss is sent only for `releasedOn` / `featuredArtist` rows (and artist
+ * facts); a description suggestion is never dismissed — it is applied into
+ * the panel's editor or simply ignored (ADR-0005).
  */
 export interface ApplyVideoSuggestionInput {
   suggestionId: string;

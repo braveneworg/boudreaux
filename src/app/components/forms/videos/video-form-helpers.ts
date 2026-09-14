@@ -99,9 +99,9 @@ export const applyVideoPrefill = (
  * so values the admin has already typed are never clobbered. Called after a
  * successful upload once the probe API returns.
  *
- * Unlike `applyVideoPrefill` (client-side file extractor), this helper also
- * fills `description` because ffprobe sees comment/description tags that the
- * client-side WebM/MP4 parser does not expose.
+ * Fills title, artist, and duration only. The description is never taken
+ * from the file (ADR-0005): it is entered in the enrichment panel's editor or
+ * written there by the enrichment run.
  */
 export const applyServerProbePrefill = (
   form: UseFormReturn<VideoFormData>,
@@ -109,7 +109,7 @@ export const applyServerProbePrefill = (
 ): void => {
   const values = form.getValues();
   const setIfEmpty = (
-    name: 'title' | 'artist' | 'description',
+    name: 'title' | 'artist',
     current: string | undefined,
     value: string | null
   ): void => {
@@ -119,7 +119,6 @@ export const applyServerProbePrefill = (
   };
   setIfEmpty('title', values.title, tags.title);
   setIfEmpty('artist', values.artist, tags.artist);
-  setIfEmpty('description', values.description, tags.description);
   if (!values.durationSeconds && tags.durationSeconds !== null) {
     form.setValue('durationSeconds', String(tags.durationSeconds), {
       shouldDirty: true,

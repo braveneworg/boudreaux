@@ -232,8 +232,10 @@ test.describe('Admin video — probe-metadata endpoint contract', () => {
     // the endpoint omits it even though the fixture carries a '2019-08-01' date
     // tag (the field is admin/enrichment-driven only).
     expect(body.tags?.releasedOn).toBeUndefined();
-    // comment tag 'E2E probe description' → description (primary, falls back from comment).
-    expect(body.tags?.description).toBe('E2E probe description');
+    // The description is never derived from the file's comment/description
+    // tags either — the endpoint omits it even though the fixture carries an
+    // 'E2E probe description' comment tag (the field is enrichment-panel only).
+    expect(body.tags?.description).toBeUndefined();
     expect(body.tags?.durationSeconds).toBe(245);
   });
 

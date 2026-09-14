@@ -24,11 +24,9 @@ import { logSecurityEvent } from '@/utils/audit-log';
 
 const logger = loggers.media;
 
-/** Actionable copy per failing half of the eligibility rule. */
+/** Actionable copy per failing part of the eligibility rule. */
 const ineligibleCopyFor = (reason: EnrichmentIneligibilityReason): string => {
   switch (reason) {
-    case 'category':
-      return 'Enrichment runs only on videos in the MUSIC category.';
     case 'artist':
       return 'Add an artist or creator and save before running enrichment.';
     default: {
@@ -62,7 +60,8 @@ const resolveInFlightEnrichmentStatus = (state: {
  * The heavy probe → enrich flow, run via `after()` once the response is sent.
  * The probe is best-effort — a failure is logged and never blocks enrichment
  * (probe errors persist on the video row for the admin to see). The service
- * gates MUSIC-only and records its own terminal status; neither call throws.
+ * re-checks eligibility (a named artist, any category) and records its own
+ * terminal status; neither call throws.
  */
 const runEnrichmentAfterResponse = async (videoId: string): Promise<void> => {
   try {

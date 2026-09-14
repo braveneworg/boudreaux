@@ -10,10 +10,11 @@ import { fetchAndParse } from '@/utils/fetch-and-parse';
 
 // ── Response schema ───────────────────────────────────────────────────────────
 
+// Strip-mode: a `description` (or `releasedOn`) a stale server still sends is
+// dropped here — neither is ever prefilled from the file (ADR-0004/0005).
 const probePrefillTagsSchema = z.object({
   title: z.string().nullable(),
   artist: z.string().nullable(),
-  description: z.string().nullable(),
   durationSeconds: z.number().nullable(),
 });
 

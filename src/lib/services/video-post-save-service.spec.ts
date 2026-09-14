@@ -9,7 +9,6 @@ import {
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
-import type { VideoCategory } from '@/lib/types/domain/video';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
 
@@ -38,16 +37,17 @@ vi.mock('@/lib/repositories/video-artist-repository', () => ({
 
 const S3_KEY = 'media/videos/v1/clip.mp4';
 
-/** Saved values for a create/draft, overridable per case. */
+/**
+ * Saved values for a create/draft, overridable per case. The planner reads no
+ * category: enrichment eligibility is decided on the artist alone.
+ */
 const nextValues = (overrides: {
   artist?: string;
-  category?: VideoCategory;
   s3Key?: string;
   producers?: VideoProducerInput[];
   artistDetails?: VideoArtistDetail[];
 }) => ({
   artist: 'Band',
-  category: 'MUSIC' as VideoCategory,
   s3Key: S3_KEY,
   ...overrides,
 });
@@ -104,19 +104,10 @@ describe('planVideoPostSave', () => {
   });
 
   describe('the enrichment dispatch gate', () => {
-    it('dispatches for a MUSIC video that has an artist', () => {
+    it('dispatches for a video that has an artist', () => {
       const plan = planVideoPostSave({ intent: 'create', next: nextValues({}) });
 
       expect(plan.dispatchEnrichment).toBe(true);
-    });
-
-    it('does not dispatch for a non-MUSIC video', () => {
-      const plan = planVideoPostSave({
-        intent: 'create',
-        next: nextValues({ category: 'INFORMATIONAL' }),
-      });
-
-      expect(plan.dispatchEnrichment).toBe(false);
     });
 
     it('does not dispatch when the artist is blank', () => {

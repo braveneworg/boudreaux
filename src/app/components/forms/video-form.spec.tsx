@@ -17,12 +17,13 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
+import type * as videoDescriptionEditor from '@/app/components/forms/videos/enrichment/video-description-editor';
 import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
 import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import type { UseFormSetValue } from 'react-hook-form';
+import type { Control, UseFormSetValue } from 'react-hook-form';
 
 type PosterCandidate = videoMetadata.PosterCandidate;
 
@@ -54,7 +55,6 @@ const mocks = vi.hoisted(() => ({
   selectVideoPosterAsync: vi.fn(),
   updateVideoReleaseDateAsync: vi.fn(),
   releaseDateRefetch: vi.fn(),
-  descriptionRefetch: vi.fn(),
   useVideoQuery: vi.fn(),
   useVideoProbePrefillQuery: vi.fn(),
   useVideoProducersQuery: vi.fn(),
@@ -122,23 +122,14 @@ vi.mock('./_hooks/use-video-producers-query', () => ({
   useVideoProducersQuery: (...args: unknown[]) => mocks.useVideoProducersQuery(...args),
 }));
 
-// The automatic lookups call `refetch()` themselves, so both resolve at the
-// factory level (a miss by default) — a bare vi.fn() would make them throw.
+// The automatic release-date lookup calls `refetch()` itself, so it resolves
+// at the factory level (a miss by default) — a bare vi.fn() would make it throw.
 vi.mock('./_hooks/use-release-date-lookup-query', () => ({
   useReleaseDateLookupQuery: () => ({
     isFetching: false,
     error: null,
     data: undefined,
     refetch: mocks.releaseDateRefetch,
-  }),
-}));
-
-vi.mock('./_hooks/use-video-description-lookup-query', () => ({
-  useVideoDescriptionLookupQuery: () => ({
-    isFetching: false,
-    error: null,
-    data: undefined,
-    refetch: mocks.descriptionRefetch,
   }),
 }));
 
@@ -242,15 +233,24 @@ vi.mock('@/app/components/forms/videos/video-producers-section', () => ({
   VideoProducersSection: () => <div data-testid="video-producers-section" />,
 }));
 
-vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () => ({
-  VideoEnrichmentPanel: ({
+// The panel mock renders the REAL bound description editor: the form's only
+// Description field lives inside the panel, so the load/apply specs that read
+// `getByLabelText('Description')` exercise the genuine RHF binding.
+vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', async () => {
+  const { VideoDescriptionEditor } = await vi.importActual<typeof videoDescriptionEditor>(
+    '@/app/components/forms/videos/enrichment/video-description-editor'
+  );
+  const VideoEnrichmentPanel = ({
     videoId,
+    control,
     onApplyVideoSuggestion,
   }: {
     videoId: string;
+    control: Control<VideoFormData>;
     onApplyVideoSuggestion: (field: string, value: string) => void;
   }) => (
     <div data-testid="video-enrichment-panel" data-video-id={videoId}>
+      <VideoDescriptionEditor control={control} />
       <button type="button" onClick={() => onApplyVideoSuggestion('releasedOn', '2024-08-08')}>
         Apply enriched date
       </button>
@@ -267,8 +267,9 @@ vi.mock('@/app/components/forms/videos/enrichment/video-enrichment-panel', () =>
         Apply enriched featured artist
       </button>
     </div>
-  ),
-}));
+  );
+  return { VideoEnrichmentPanel };
+});
 
 // A minimal controllable DatePicker so date fields are plain inputs associated
 // with their FormLabel (accessible name comes from the label, not aria-label).
@@ -408,7 +409,6 @@ beforeEach(() => {
   mocks.selectVideoPosterAsync.mockResolvedValue({ success: true });
   mocks.updateVideoReleaseDateAsync.mockResolvedValue({ success: true });
   mocks.releaseDateRefetch.mockResolvedValue({ data: null });
-  mocks.descriptionRefetch.mockResolvedValue({ data: null });
   mocks.uploadVideoMultipart.mockResolvedValue({
     success: true,
     s3Key: 'media/videos/aaa/clip.mp4',
@@ -1873,12 +1873,15 @@ describe('VideoForm — enrichment panel mount gating', () => {
     );
   });
 
-  it('keeps the panel out of the DOM for an INFORMATIONAL video', async () => {
+  it('mounts the panel for an INFORMATIONAL video in edit mode', async () => {
+    // editVideo is INFORMATIONAL: every category enriches once a row exists.
     asVideo(editVideo);
     render(<VideoForm videoId="v1" />);
 
-    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
-    expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
+      'data-video-id',
+      'v1'
+    );
   });
 
   it('keeps the panel out of the DOM in create mode', () => {
@@ -1887,7 +1890,7 @@ describe('VideoForm — enrichment panel mount gating', () => {
     expect(screen.queryByTestId('video-enrichment-panel')).not.toBeInTheDocument();
   });
 
-  it('mounts the panel in create mode once a draft row exists (MUSIC)', async () => {
+  it('mounts the panel in create mode once a draft row exists', async () => {
     mocks.useVideoDraft.mockReturnValue({
       draftId: 'draft-video-id',
       handleUploadComplete: vi.fn(),
@@ -1895,7 +1898,7 @@ describe('VideoForm — enrichment panel mount gating', () => {
     });
     render(<VideoForm />);
 
-    // Default category is MUSIC; the draft id now stands in as the row id.
+    // Any category qualifies; the draft id stands in as the row id.
     expect(await screen.findByTestId('video-enrichment-panel')).toHaveAttribute(
       'data-video-id',
       'draft-video-id'
@@ -1981,6 +1984,40 @@ describe('VideoForm — server probe prefill', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Artist / Creator')).toHaveValue('Probe Artist')
     );
+  });
+
+  it('never writes the description from probe tags', async () => {
+    // A stale server still sending `description` (and `releasedOn`) must be
+    // ignored end to end: the client schema strips both and the prefill helper
+    // reads neither. The draft mock mounts the panel so its editor is readable.
+    mocks.useVideoProbePrefillQuery.mockReturnValue({
+      data: {
+        ok: true,
+        tags: {
+          title: 'Probe Title',
+          artist: 'Probe Artist',
+          releasedOn: '2022-09-15',
+          description: 'Probe description',
+          durationSeconds: 300,
+        },
+      },
+      isPending: false,
+      isError: false,
+    });
+    mocks.useVideoDraft.mockReturnValue({
+      draftId: 'draft-video-id',
+      handleUploadComplete: vi.fn(),
+      draftCandidateUrls: [],
+    });
+
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Probe Title'));
+    expect(screen.getByLabelText('Description')).toHaveValue('');
   });
 
   it('leaves a user-typed field untouched when the hook returns ok:true', async () => {

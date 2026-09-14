@@ -144,8 +144,8 @@ const markEnrichmentPending = async (videoId: string): Promise<void> => {
  * still filling the form. The draft carries no release date unless the form
  * already holds one — it is never defaulted to today. Idempotent (an existing
  * row returns success and changes nothing — guards double-fire on flaky
- * networks). When enrichment will dispatch (MUSIC + non-blank artist) the job
- * is marked `pending` before the response so the edit page's status poll
+ * networks). When enrichment will dispatch (a non-blank artist, any category)
+ * the job is marked `pending` before the response so the edit page's status poll
  * engages. In `after()` the
  * post-save pipeline runs the {@link planVideoPostSave} plan: the probe
  * always, artist sync when the artist snapshot is non-blank, and enrichment
@@ -184,7 +184,7 @@ export const createVideoDraftAction = async (input: unknown): Promise<CreateVide
     const artist = data.artist ?? '';
     const plan = planVideoPostSave({
       intent: 'draft',
-      next: { artist, category: data.category, s3Key: data.s3Key },
+      next: { artist, s3Key: data.s3Key },
     });
 
     if (plan.dispatchEnrichment) await markEnrichmentPending(response.data.id);

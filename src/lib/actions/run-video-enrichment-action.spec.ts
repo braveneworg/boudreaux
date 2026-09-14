@@ -98,19 +98,15 @@ describe('runVideoEnrichmentAction', () => {
     expect(afterMock).not.toHaveBeenCalled();
   });
 
-  it('refuses a non-MUSIC video even when it has an artist (no pending write)', async () => {
+  it('accepts an INFORMATIONAL video that names a creator', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL', artist: 'Ceschi' })
+      baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
     );
 
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 
-    expect(result).toEqual({
-      success: false,
-      error: 'Enrichment runs only on videos in the MUSIC category.',
-    });
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
-    expect(afterMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true, status: 'pending' });
+    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'pending');
   });
 
   it('echoes a fresh in-flight status instead of double-triggering', async () => {

@@ -488,13 +488,13 @@ describe('updateVideoAction', () => {
       expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
 
-    it('does not dispatch enrichment for an INFORMATIONAL video', async () => {
+    it('dispatches enrichment for an INFORMATIONAL video on an artist change', async () => {
       mockParsedSuccess({ ...parsedData, artist: 'New Band', category: 'INFORMATIONAL' });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
       await getEnrichmentCallback()?.();
 
-      expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
+      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
     });
 
     it('does not schedule a kick when the update fails', async () => {

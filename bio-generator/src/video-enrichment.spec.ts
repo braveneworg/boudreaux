@@ -895,6 +895,114 @@ describe('runVideoEnrichment recording-first', () => {
   });
 });
 
+describe('runVideoEnrichment INFORMATIONAL', () => {
+  const informationalInput: VideoEnrichmentInput = {
+    ...baseInput,
+    category: 'INFORMATIONAL',
+    title: 'Why Vinyl Sounds Different',
+    artistDisplay: 'Narrator Nell',
+    artists: [{ artistId: 'a'.repeat(24), name: 'Narrator Nell', role: 'primary' }],
+  };
+  const description = {
+    value: 'Narrator Nell explains why vinyl sounds different.',
+    confidence: 'medium' as const,
+    sources: [{ url: 'https://example.com/vinyl' }],
+    note: 'Sourced from the creator page.',
+  };
+
+  it('skips every music lookup: no MusicBrainz, Wikidata, identity, or release-date call', async () => {
+    const deps = buildDeps();
+
+    await runVideoEnrichment(informationalInput, deps);
+
+    expect(deps.searchRecordingCandidates).not.toHaveBeenCalled();
+    expect(deps.searchArtistCandidates).not.toHaveBeenCalled();
+    expect(deps.lookupArtistIdentity).not.toHaveBeenCalled();
+    expect(deps.getWikidataData).not.toHaveBeenCalled();
+    expect(deps.resolveIdentityFallback).not.toHaveBeenCalled();
+    expect(deps.resolveReleaseDateSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('returns a description-only result with no artist suggestions', async () => {
+    const deps = buildDeps({
+      resolveDescriptionSuggestion: vi.fn().mockResolvedValue(description),
+    });
+
+    const result = await runVideoEnrichment(informationalInput, deps);
+
+    expect(result).toEqual({ artists: [], video: { description }, model: expect.any(String) });
+  });
+
+  it('omits the video block when no description could be synthesized', async () => {
+    const deps = buildDeps({ resolveDescriptionSuggestion: vi.fn().mockResolvedValue(null) });
+
+    const result = await runVideoEnrichment(informationalInput, deps);
+
+    expect(result).toEqual({ artists: [], model: expect.any(String) });
+    expect(result).not.toHaveProperty('video');
+  });
+
+  it('skips the synthesis entirely without a Serper key', async () => {
+    const deps = buildDeps({ getSerperApiKey: vi.fn().mockResolvedValue(null) });
+
+    const result = await runVideoEnrichment(informationalInput, deps);
+
+    expect(deps.resolveDescriptionSuggestion).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty('video');
+  });
+
+  it('synthesizes with the INFORMATIONAL category, no facts, and no release date', async () => {
+    const deps = buildDeps();
+
+    await runVideoEnrichment(informationalInput, deps);
+
+    expect(deps.resolveDescriptionSuggestion).toHaveBeenCalledTimes(1);
+    const [args, descriptionDeps] = vi.mocked(deps.resolveDescriptionSuggestion).mock.calls[0];
+    expect(args).toEqual({
+      title: 'Why Vinyl Sounds Different',
+      artistDisplay: 'Narrator Nell',
+      category: 'INFORMATIONAL',
+      facts: [],
+      serperKey: 'serper-key',
+      geminiKey: 'gemini-key',
+      model: expect.any(String),
+    });
+    expect(args).not.toHaveProperty('releasedOn');
+    expect(descriptionDeps).toEqual({ searchWeb: deps.searchSerperWeb });
+  });
+
+  it('reports exactly the web-search, adjudicating, and finalizing stages', async () => {
+    const deps = buildDeps();
+
+    await runVideoEnrichment(
+      { ...informationalInput, progressUrl: 'https://example.com/progress', jobToken: 'token-1' },
+      deps
+    );
+
+    const stages = vi.mocked(deps.postProgress).mock.calls.map(([args]) => args.stage);
+    expect(stages).toEqual(['web-search', 'adjudicating', 'finalizing']);
+  });
+
+  it('runs the MUSIC flow when the event carries no category', async () => {
+    const deps = buildDeps();
+    const { category: _category, ...uncategorized } = informationalInput;
+
+    await runVideoEnrichment(uncategorized, deps);
+
+    expect(deps.searchRecordingCandidates).toHaveBeenCalledTimes(1);
+    expect(deps.searchArtistCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the MUSIC flow for an explicit MUSIC category', async () => {
+    const deps = buildDeps();
+
+    await runVideoEnrichment({ ...baseInput, category: 'MUSIC' }, deps);
+
+    expect(deps.searchRecordingCandidates).toHaveBeenCalledTimes(1);
+    expect(deps.resolveReleaseDateSuggestion).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('runVideoEnrichmentLambda', () => {
   it('returns an invalid-input envelope for a malformed event', async () => {
     const result = await runVideoEnrichmentLambda({ task: 'video-enrichment' }, buildDeps());

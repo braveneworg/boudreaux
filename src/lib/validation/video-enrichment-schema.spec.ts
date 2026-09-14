@@ -6,7 +6,6 @@ import {
   applyVideoSuggestionInputSchema,
   enrichmentIneligibilityReason,
   hasEnrichableArtist,
-  isEnrichableCategory,
   isEnrichmentEligible,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_PROGRESS_STAGES,
@@ -73,42 +72,26 @@ describe('video-enrichment-schema', () => {
   // owned by the shared module and asserted in `@/utils/async-job-lifecycle.spec.ts`.
 
   describe('enrichment eligibility', () => {
-    it('a MUSIC video with an artist is eligible', () => {
-      expect(isEnrichmentEligible({ category: 'MUSIC', artist: 'Ceschi' })).toBe(true);
+    // Eligibility is decided on the artist alone: the category is not an input,
+    // so an INFORMATIONAL video that names a creator enriches like a MUSIC one.
+    it('a video with an artist is eligible', () => {
+      expect(isEnrichmentEligible({ artist: 'Ceschi' })).toBe(true);
     });
 
-    it('a non-MUSIC video with an artist is not eligible', () => {
-      expect(isEnrichmentEligible({ category: 'INFORMATIONAL', artist: 'Ceschi' })).toBe(false);
+    it('a video with a blank artist is not eligible', () => {
+      expect(isEnrichmentEligible({ artist: '   ' })).toBe(false);
     });
 
-    it('a MUSIC video with a blank artist is not eligible', () => {
-      expect(isEnrichmentEligible({ category: 'MUSIC', artist: '   ' })).toBe(false);
+    it('a video with no artist at all is not eligible', () => {
+      expect(isEnrichmentEligible({ artist: null })).toBe(false);
     });
 
-    it('a missing category is not eligible', () => {
-      expect(isEnrichmentEligible({ category: null, artist: 'Ceschi' })).toBe(false);
-    });
-
-    it('isEnrichableCategory accepts only MUSIC', () => {
-      expect(isEnrichableCategory('MUSIC')).toBe(true);
-    });
-
-    it('isEnrichableCategory rejects other categories', () => {
-      expect(isEnrichableCategory('INFORMATIONAL')).toBe(false);
-    });
-
-    it('reports a category reason for a non-MUSIC video', () => {
-      expect(enrichmentIneligibilityReason({ category: 'INFORMATIONAL', artist: 'Ceschi' })).toBe(
-        'category'
-      );
-    });
-
-    it('reports an artist reason for a MUSIC video with a blank artist', () => {
-      expect(enrichmentIneligibilityReason({ category: 'MUSIC', artist: ' ' })).toBe('artist');
+    it('reports an artist reason for a blank artist', () => {
+      expect(enrichmentIneligibilityReason({ artist: ' ' })).toBe('artist');
     });
 
     it('reports no reason for an eligible video', () => {
-      expect(enrichmentIneligibilityReason({ category: 'MUSIC', artist: 'Ceschi' })).toBeNull();
+      expect(enrichmentIneligibilityReason({ artist: 'Ceschi' })).toBeNull();
     });
 
     it('hasEnrichableArtist rejects undefined', () => {

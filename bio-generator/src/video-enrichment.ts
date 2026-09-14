@@ -676,16 +676,63 @@ const synthesizeDescription = ({
   );
 };
 
+/** Grouped args for {@link runInformationalEnrichment} (object arg: `max-params`). */
+interface InformationalRunArgs {
+  input: VideoEnrichmentInput;
+  deps: VideoEnrichmentDeps;
+  report: VideoReport;
+  keys: { gemini: string; serper: string | null };
+  model: string;
+}
+
 /**
- * Orchestrates one video-enrichment run: a recording-first MusicBrainz match
- * whose credits fast-path each linked artist's identity lookup (and discover
- * unlinked featured artists); per artist, a candidate gate (score ≥90 +
- * name/alias equality, ≤2 identity lookups) with Wikidata corroboration and the
- * P106 music-occupation gate; a web+Gemini identity fallback (always low
- * confidence) when structured sources miss; a unified-name split check; and a
- * release-date adjudication merging the MB date with the web verdict. Facts
- * equal to the `known` block are skipped. Sequential and best-effort throughout
- * — one artist's failure never aborts the run.
+ * The INFORMATIONAL flow: no MusicBrainz, Wikidata, identity, release-date, or
+ * featured-artist work — only a creator-framed description synthesized from
+ * web search (skipped without a Serper key). Deliberately bypasses
+ * {@link synthesizeDescription}: that path falls back to `input.releasedOn`,
+ * and an informational description must carry no release-date claim. The
+ * timeline's music stages are never checkpointed, so they render as skipped.
+ */
+const runInformationalEnrichment = async ({
+  input,
+  deps,
+  report,
+  keys,
+  model,
+}: InformationalRunArgs): Promise<VideoEnrichmentData> => {
+  await report('web-search');
+  await report('adjudicating');
+  const description = keys.serper
+    ? await deps.resolveDescriptionSuggestion(
+        {
+          title: input.title,
+          artistDisplay: input.artistDisplay,
+          category: 'INFORMATIONAL',
+          facts: [],
+          serperKey: keys.serper,
+          geminiKey: keys.gemini,
+          model,
+        },
+        { searchWeb: deps.searchSerperWeb }
+      )
+    : null;
+  await report('finalizing');
+  return { artists: [], ...(description ? { video: { description } } : {}), model };
+};
+
+/**
+ * Orchestrates one video-enrichment run. An INFORMATIONAL video takes the
+ * description-only {@link runInformationalEnrichment} path; a MUSIC video (or
+ * a pre-category invoke with no `category`) runs the full flow: a
+ * recording-first MusicBrainz match whose credits fast-path each linked
+ * artist's identity lookup (and discover unlinked featured artists); per
+ * artist, a candidate gate (score ≥90 + name/alias equality, ≤2 identity
+ * lookups) with Wikidata corroboration and the P106 music-occupation gate; a
+ * web+Gemini identity fallback (always low confidence) when structured sources
+ * miss; a unified-name split check; and a release-date adjudication merging
+ * the MB date with the web verdict. Facts equal to the `known` block are
+ * skipped. Sequential and best-effort throughout — one artist's failure never
+ * aborts the run.
  */
 export const runVideoEnrichment = async (
   input: VideoEnrichmentInput,
@@ -694,6 +741,9 @@ export const runVideoEnrichment = async (
   const report = buildVideoReport(input, deps);
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const keys = { gemini: await deps.getGeminiApiKey(), serper: await deps.getSerperApiKey() };
+  if (input.category === 'INFORMATIONAL') {
+    return runInformationalEnrichment({ input, deps, report, keys, model });
+  }
 
   await report('musicbrainz', { artists: input.artists.length });
   const recording = await findMatchedRecording(input, deps).catch(() => null);
