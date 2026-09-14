@@ -19,6 +19,7 @@ import {
   FormMessage,
 } from '@/app/components/ui/form';
 import { Textarea } from '@/app/components/ui/textarea';
+import { ISO_DATE_PATTERN } from '@/lib/utils/validation/iso-date';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
 import { useReleaseDescriptionLookupQuery } from '../_hooks/use-release-description-lookup-query';
@@ -31,8 +32,6 @@ interface ReleaseDescriptionFieldProps {
   /** Display name of the album artist; the blurb must name one to generate. */
   artistName: string | null;
 }
-
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const buildSuccessMessage = (sources: string[]): string =>
   sources[0] ? `Generated a blurb — ${sources[0]}` : 'Generated a blurb';

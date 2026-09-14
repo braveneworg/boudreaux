@@ -8,12 +8,11 @@ import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseDescriptionLookupService } from '@/lib/services/release-description-lookup-service';
 import { loggers } from '@/lib/utils/logger';
+import { ISO_DATE_PATTERN } from '@/lib/utils/validation/iso-date';
 
 export const dynamic = 'force-dynamic';
 
 const logger = loggers.media;
-
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /** `"VINYL_12_INCH,DIGITAL"` → `['VINYL_12_INCH', 'DIGITAL']`; blanks dropped. */
 const parseFormats = (raw: string | null): string[] =>

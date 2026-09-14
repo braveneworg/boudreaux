@@ -83,6 +83,53 @@ describe('ReleaseDateLookupService.lookup', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
+  // Domain rule: a release date is never inferred. A lookup that lands on
+  // today's UTC day is a miss — the web has nothing, and the model guessed.
+  describe('today rule', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const foundPayload = (releasedOn: string) => ({
+      Payload: new TextEncoder().encode(
+        JSON.stringify({
+          ok: true,
+          result: { releasedOn, confidence: 'high', sources: ['https://x'] },
+        })
+      ),
+    });
+
+    it('discards a result equal to today (UTC) as not found', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-09-14T03:00:00.000Z'));
+      delete process.env.BIO_GENERATOR_FAKE;
+      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
+      sendMock.mockResolvedValueOnce(foundPayload('2026-09-14'));
+
+      expect(await ReleaseDateLookupService.lookup('Song', 'Band')).toBeNull();
+    });
+
+    it('keeps a result dated yesterday (UTC)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-09-14T03:00:00.000Z'));
+      delete process.env.BIO_GENERATOR_FAKE;
+      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
+      sendMock.mockResolvedValueOnce(foundPayload('2026-09-13'));
+
+      expect((await ReleaseDateLookupService.lookup('Song', 'Band'))?.releasedOn).toBe(
+        '2026-09-13'
+      );
+    });
+
+    it('applies the rule to the fake path too', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2020-06-01T12:00:00.000Z'));
+      vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+      expect(await ReleaseDateLookupService.lookup('Song', 'Band')).toBeNull();
+    });
+  });
+
   it('throws when the Lambda response carries no payload', async () => {
     delete process.env.BIO_GENERATOR_FAKE;
     vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fn');
