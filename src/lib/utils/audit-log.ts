@@ -50,6 +50,7 @@ export type AuditEvent =
   | 'media.video.restored'
   | 'media.video.deleted'
   | 'media.video.poster_selected'
+  | 'media.video.release_date_set'
   | 'media.track.created'
   | 'media.track.updated'
   | 'media.tracks.bulk_created'

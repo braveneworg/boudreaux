@@ -13,6 +13,7 @@ import { restoreVideoAction } from '@/lib/actions/restore-video-action';
 import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
+import { updateVideoReleaseDateAction } from '@/lib/actions/update-video-release-date-action';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
@@ -25,6 +26,7 @@ import {
   useSelectVideoPosterMutation,
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
+  useUpdateVideoReleaseDateMutation,
 } from './use-video-mutations';
 
 // ── Predicate helpers shared across tests ─────────────────────────────────────
@@ -57,6 +59,9 @@ vi.mock('@/lib/actions/restore-video-action', () => ({ restoreVideoAction: vi.fn
 vi.mock('@/lib/actions/delete-video-action', () => ({ deleteVideoAction: vi.fn() }));
 vi.mock('@/lib/actions/select-video-poster-action', () => ({
   selectVideoPosterAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/update-video-release-date-action', () => ({
+  updateVideoReleaseDateAction: vi.fn(),
 }));
 
 interface MutationOptions<TVariables> {
@@ -349,6 +354,35 @@ describe('useSelectVideoPosterMutation', () => {
 
   it('does not invalidate on failure', async () => {
     const opts = getOptions(useSelectVideoPosterMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateVideoReleaseDateMutation', () => {
+  it('calls updateVideoReleaseDateAction with the video id and day', async () => {
+    vi.mocked(updateVideoReleaseDateAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ videoId: string; releasedOn: string }>(
+      useUpdateVideoReleaseDateMutation
+    );
+
+    await opts.mutationFn({ videoId: 'v-1', releasedOn: '2020-06-01' });
+
+    expect(updateVideoReleaseDateAction).toHaveBeenCalledWith('v-1', '2020-06-01');
+  });
+
+  it('invalidates the videos cache on success', async () => {
+    const opts = getOptions(useUpdateVideoReleaseDateMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useUpdateVideoReleaseDateMutation);
 
     await opts.onSuccess({ success: false }, {});
 

@@ -12,6 +12,7 @@ import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-action';
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
+import { updateVideoReleaseDateAction } from '@/lib/actions/update-video-release-date-action';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
@@ -160,5 +161,27 @@ export const useSelectVideoPosterMutation = () => {
     selectVideoPoster: mutate,
     selectVideoPosterAsync: mutateAsync,
     isSelectingVideoPoster: isPending,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link updateVideoReleaseDateAction} — the
+ * single-field autosave behind the edit form's release date. `releasedOn` is
+ * a `YYYY-MM-DD` day or `''` to clear. Invalidates the video caches on a
+ * successful result so the detail and listings refetch the new date.
+ */
+export const useUpdateVideoReleaseDateMutation = () => {
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string; releasedOn: string }
+  >(
+    ({ videoId, releasedOn }) => updateVideoReleaseDateAction(videoId, releasedOn),
+    invalidateVideoQueries
+  );
+
+  return {
+    updateVideoReleaseDate: mutate,
+    updateVideoReleaseDateAsync: mutateAsync,
+    isUpdatingVideoReleaseDate: isPending,
   };
 };

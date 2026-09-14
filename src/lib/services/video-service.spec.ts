@@ -282,6 +282,7 @@ describe('VideoService', () => {
 
   describe('publishVideo', () => {
     it('stamps publishedAt with the current time', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
       const published = { ...mockVideo, publishedAt: new Date() };
       vi.mocked(VideoRepository.update).mockResolvedValue(published);
 
@@ -293,7 +294,38 @@ describe('VideoService', () => {
       });
     });
 
+    it('returns NOT_FOUND when the video is missing', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(null);
+
+      const result = await VideoService.publishVideo('non-existent');
+
+      expect(result).toMatchObject({ success: false, error: 'Video not found', code: 'NOT_FOUND' });
+    });
+
+    // A published video always carries a release date — the list-level Publish
+    // action has no form to require one, so the service is the choke point.
+    it('refuses to publish a video without a release date', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({ ...mockVideo, releasedOn: null });
+
+      const result = await VideoService.publishVideo('video-123');
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Set a release date before publishing',
+        code: 'VALIDATION',
+      });
+    });
+
+    it('does not touch the row when refusing a dateless publish', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({ ...mockVideo, releasedOn: null });
+
+      await VideoService.publishVideo('video-123');
+
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
     it('maps a DataError NOT_FOUND to a failure response', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
       vi.mocked(VideoRepository.update).mockRejectedValue(
         new DataError('NOT_FOUND', 'Record not found')
       );
@@ -304,11 +336,83 @@ describe('VideoService', () => {
     });
 
     it('maps an unknown error to a failure response', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
       vi.mocked(VideoRepository.update).mockRejectedValue(new Error('Unknown error'));
 
       const result = await VideoService.publishVideo('video-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to publish video' });
+    });
+  });
+
+  describe('updateVideoReleaseDate', () => {
+    const day = new Date('2020-06-01T00:00:00.000Z');
+
+    it('persists only the release date', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
+      const updated = { ...mockVideo, releasedOn: day };
+      vi.mocked(VideoRepository.update).mockResolvedValue(updated);
+
+      const result = await VideoService.updateVideoReleaseDate('video-123', day);
+
+      expect(result).toMatchObject({ success: true, data: updated });
+      expect(VideoRepository.update).toHaveBeenCalledWith('video-123', { releasedOn: day });
+    });
+
+    it('returns NOT_FOUND when the video is missing', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(null);
+
+      const result = await VideoService.updateVideoReleaseDate('non-existent', day);
+
+      expect(result).toMatchObject({ success: false, error: 'Video not found', code: 'NOT_FOUND' });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('clears the release date on a draft', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(mockVideo);
+      const cleared = { ...mockVideo, releasedOn: null };
+      vi.mocked(VideoRepository.update).mockResolvedValue(cleared);
+
+      const result = await VideoService.updateVideoReleaseDate('video-123', null);
+
+      expect(result).toMatchObject({ success: true, data: cleared });
+      expect(VideoRepository.update).toHaveBeenCalledWith('video-123', { releasedOn: null });
+    });
+
+    it('refuses to clear the release date on a published video', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        publishedAt: new Date('2024-02-01'),
+      });
+
+      const result = await VideoService.updateVideoReleaseDate('video-123', null);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'A published video must keep a release date',
+        code: 'VALIDATION',
+      });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('still lets a published video change its release date', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        publishedAt: new Date('2024-02-01'),
+      });
+      vi.mocked(VideoRepository.update).mockResolvedValue({ ...mockVideo, releasedOn: day });
+
+      const result = await VideoService.updateVideoReleaseDate('video-123', day);
+
+      expect(result).toMatchObject({ success: true });
+    });
+
+    it('maps an unknown error to a failure response', async () => {
+      vi.mocked(VideoRepository.findById).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await VideoService.updateVideoReleaseDate('video-123', day);
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to save the release date' });
     });
   });
 
