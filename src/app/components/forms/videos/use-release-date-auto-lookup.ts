@@ -24,6 +24,7 @@ import {
 } from './release-date-lookup-policy';
 import { useReleaseDateLookupQuery } from '../_hooks/use-release-date-lookup-query';
 
+import type { VideoUploadStatus } from './use-video-upload';
 import type { UseFormReturn } from 'react-hook-form';
 
 /** Injectable timer so specs drive the backoff without fake timers. */
@@ -49,7 +50,7 @@ export type ReleaseDateLookupStatus = 'idle' | 'searching' | 'found' | 'exhauste
 export interface UseReleaseDateAutoLookupArgs {
   form: UseFormReturn<VideoFormData>;
   /** The multipart upload state machine's status. */
-  uploadStatus: string;
+  uploadStatus: VideoUploadStatus;
   /** True once a Video row exists (edit mode, or the draft created at upload). */
   hasPersistedRow: boolean;
   category: string | undefined;
@@ -62,43 +63,56 @@ export interface UseReleaseDateAutoLookupArgs {
 export interface UseReleaseDateAutoLookupResult {
   status: ReleaseDateLookupStatus;
   /**
-   * The pair key whose lookup last resolved (found or exhausted), or null.
-   * The description auto-generate compares it with its own current pair.
+   * The CURRENT pair's key once its lookup has resolved — found, exhausted,
+   * or a find beaten by a date typed in flight — else null. The description
+   * auto-generate compares it with its own current pair.
    */
   resolvedKey: string | null;
 }
 
-/** Per-pair progress, kept across renders in a ref. */
+/** Per-pair progress, kept across renders in a ref and read only by effects. */
 interface PairState {
   budget: LookupBudget;
   /** The attempt currently on the wire, shared across effect re-runs. */
   inFlight: Promise<LookupOutcome> | null;
-  /** Found or exhausted — never searched again this mount. */
+  /** Found, exhausted, or beaten by a typed date — never searched again this mount. */
   resolved: boolean;
 }
 
-interface LookupView {
-  key: string;
+/**
+ * What one pair shows. Kept in state PER pair (not one slot for the latest
+ * pair) so editing the title away and back restores that pair's hint.
+ */
+interface PairView {
   status: ReleaseDateLookupStatus;
+  resolved: boolean;
 }
+
+type ShowPairView = (key: string, view: PairView) => void;
 
 const defaultNow = (): Date => new Date();
 
 /**
- * What the field shows for the CURRENT pair, and which pair last resolved. A
- * searching/exhausted hint makes no sense once a date has been set by hand
- * (typing one closes the gate, so a run cut off mid-flight would otherwise
- * read "searching" forever).
+ * What the field shows for the CURRENT pair, and whether that pair resolved.
+ * A run only lives while the gate is open, so `searching` with a closed gate
+ * (upload failed before a row existed, category changed, a date typed while
+ * the fetch was in flight) means the run was cancelled — read it as idle
+ * rather than announcing a search that is not happening. Likewise "No release
+ * date found" makes no sense once a date has been set by hand.
  */
 const deriveLookupResult = (
-  view: LookupView,
+  view: PairView | undefined,
   pairKey: string,
-  releasedOn: string
+  releasedOn: string,
+  gateOpen: boolean
 ): UseReleaseDateAutoLookupResult => {
-  const currentStatus = view.key === pairKey ? view.status : 'idle';
-  const status = releasedOn.trim() && currentStatus !== 'found' ? 'idle' : currentStatus;
-  const resolvedKey = view.status === 'found' || view.status === 'exhausted' ? view.key : null;
-  return { status, resolvedKey };
+  const shown = view?.status ?? 'idle';
+  const cutOff = shown === 'searching' && !gateOpen;
+  const hiddenByDate = shown === 'exhausted' && Boolean(releasedOn.trim());
+  return {
+    status: cutOff || hiddenByDate ? 'idle' : shown,
+    resolvedKey: view?.resolved ? pairKey : null,
+  };
 };
 
 const getPairState = (pairs: Map<string, PairState>, key: string): PairState => {
@@ -117,7 +131,7 @@ interface LookupRunDeps {
   refetch: () => Promise<{ data?: { releasedOn: string } | null }>;
   getValues: UseFormReturn<VideoFormData>['getValues'];
   setValue: UseFormReturn<VideoFormData>['setValue'];
-  setView: (view: LookupView) => void;
+  show: ShowPairView;
 }
 
 /**
@@ -128,19 +142,21 @@ interface LookupRunDeps {
  * budget is spent. Returns a cancel: any later result is discarded.
  */
 const startLookupRun = (deps: LookupRunDeps): (() => void) => {
-  const { key, state, scheduler, now, refetch, getValues, setValue, setView } = deps;
+  const { key, state, scheduler, now, refetch, getValues, setValue, show } = deps;
   let cancelled = false;
   let cancelTimer: (() => void) | null = null;
 
   const fill = (releasedOn: string): void => {
     state.resolved = true;
-    // Re-read the live value: a date typed while the fetch was in flight wins.
+    // Re-read the live value: a date typed while the fetch was in flight wins —
+    // the pair still counts as resolved, with the admin's date as the one to
+    // describe.
     if (getValues('releasedOn')?.trim()) {
-      setView({ key, status: 'idle' });
+      show(key, { status: 'idle', resolved: true });
       return;
     }
     setValue('releasedOn', releasedOn, { shouldDirty: true, shouldValidate: true });
-    setView({ key, status: 'found' });
+    show(key, { status: 'found', resolved: true });
   };
 
   const settle = (outcome: LookupOutcome): void => {
@@ -154,7 +170,7 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
 
   const fire = (): void => {
     state.budget = recordLookupAttempt(state.budget);
-    setView({ key, status: 'searching' });
+    show(key, { status: 'searching', resolved: false });
     const promise = refetch()
       .then((result) => classifyLookupResult(result.data, now()))
       .catch((): LookupOutcome => ({ kind: 'miss' }));
@@ -169,7 +185,7 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
     const delayMs = nextAttemptDelayMs(state.budget);
     if (delayMs === null) {
       state.resolved = true;
-      setView({ key, status: 'exhausted' });
+      show(key, { status: 'exhausted', resolved: true });
       return;
     }
     cancelTimer = scheduler.schedule(fire, delayMs);
@@ -231,12 +247,15 @@ export const useReleaseDateAutoLookup = ({
   const queryClient = useQueryClient();
   const { refetch } = useReleaseDateLookupQuery(debouncedTitle, debouncedArtist);
   const pairs = useRef<Map<string, PairState>>(new Map());
-  const [view, setView] = useState<LookupView>({ key: '', status: 'idle' });
+  const [views, setViews] = useState<ReadonlyMap<string, PairView>>(() => new Map());
 
   useEffect(() => {
     if (!gateOpen) return;
     const state = getPairState(pairs.current, pairKey);
     if (state.resolved) return;
+    const show: ShowPairView = (key, view) => {
+      setViews((previous) => new Map(previous).set(key, view));
+    };
     const cancelRun = startLookupRun({
       key: pairKey,
       state,
@@ -245,7 +264,7 @@ export const useReleaseDateAutoLookup = ({
       refetch,
       getValues,
       setValue,
-      setView,
+      show,
     });
     const queryKey = queryKeys.videos.releaseDateLookup(debouncedTitle, debouncedArtist);
     return () => {
@@ -265,5 +284,5 @@ export const useReleaseDateAutoLookup = ({
     queryClient,
   ]);
 
-  return deriveLookupResult(view, pairKey, releasedOn);
+  return deriveLookupResult(views.get(pairKey), pairKey, releasedOn, gateOpen);
 };

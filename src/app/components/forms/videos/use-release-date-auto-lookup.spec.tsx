@@ -20,6 +20,8 @@ import {
   type UseReleaseDateAutoLookupArgs,
 } from './use-release-date-auto-lookup';
 
+import type { VideoUploadStatus } from './use-video-upload';
+
 vi.mock('server-only', () => ({}));
 
 const mockRefetch = vi.hoisted(() => vi.fn());
@@ -76,7 +78,7 @@ const miss = { data: null };
 const FIXED_NOW = (): Date => new Date('2026-09-14T12:00:00.000Z');
 
 interface HarnessOptions {
-  uploadStatus?: string;
+  uploadStatus?: VideoUploadStatus;
   hasPersistedRow?: boolean;
   category?: string;
   title?: string;
@@ -252,6 +254,16 @@ describe('useReleaseDateAutoLookup — a find', () => {
     expect(result.current.status).toBe('idle');
   });
 
+  it('drops the searching hint when the upload fails before a row exists', async () => {
+    mockRefetch.mockImplementationOnce(() => new Promise(() => undefined));
+    const { flushNext, rerender, result } = renderLookup();
+    await flushNext();
+
+    rerender({ uploadStatus: 'error', hasPersistedRow: false, category: 'MUSIC' });
+
+    expect(result.current.status).toBe('idle');
+  });
+
   it("treats a result equal to today's UTC day as a miss", async () => {
     mockRefetch.mockResolvedValueOnce(found('2026-09-14'));
     const { flushNext, getForm, pendingDelays } = renderLookup();
@@ -377,6 +389,25 @@ describe('useReleaseDateAutoLookup — pair changes and lifecycle', () => {
     });
 
     expect(result.current.status).toBe('idle');
+  });
+
+  it('shows the exhausted hint again when the admin edits back to that pair', async () => {
+    const { flushNext, getForm, result } = renderLookup();
+    await flushNext();
+    await flushNext();
+    await flushNext();
+
+    await act(async () => {
+      getForm().setValue('artist', 'Someone Else');
+    });
+    // The other pair's first attempt fires (a miss) before the admin edits back.
+    await flushNext();
+    await act(async () => {
+      getForm().setValue('artist', 'Ceschi');
+    });
+
+    expect(result.current.status).toBe('exhausted');
+    expect(result.current.resolvedKey).toBe(lookupPairKey('My Bad', 'Ceschi'));
   });
 
   it('cancels the armed timer on unmount', async () => {
