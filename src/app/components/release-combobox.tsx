@@ -25,7 +25,15 @@ export interface ReleaseComboboxOption {
   id: string;
   title: string;
   coverArtSrc: string | null;
+  /** Muted qualifier after the title, e.g. the album artist of a featured appearance. */
+  subtitle?: string | null;
 }
+
+/** Muted qualifier rendered after a release title when the option carries one. */
+const ReleaseSubtitle = ({ subtitle }: { subtitle: string | null | undefined }) =>
+  subtitle ? (
+    <span className="text-muted-foreground shrink-0 truncate text-xs">{subtitle}</span>
+  ) : null;
 
 interface ReleaseComboboxProps {
   releases: ReleaseComboboxOption[];
@@ -76,6 +84,7 @@ export const ReleaseCombobox = ({
           <span className="flex min-w-0 items-center gap-2">
             <ReleaseThumb src={selected?.coverArtSrc ?? null} title={selected?.title ?? ''} />
             <span className="truncate">{selected?.title ?? 'Select a release'}</span>
+            <ReleaseSubtitle subtitle={selected?.subtitle} />
           </span>
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
         </Button>
@@ -98,6 +107,7 @@ export const ReleaseCombobox = ({
                 >
                   <ReleaseThumb src={release.coverArtSrc} title={release.title} />
                   <span className="truncate">{release.title}</span>
+                  <ReleaseSubtitle subtitle={release.subtitle} />
                   <Check
                     className={cn(
                       'ml-auto size-4',

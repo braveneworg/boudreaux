@@ -98,6 +98,13 @@ export interface ArtistReleaseScalars {
   releaseId: string;
 }
 
+/**
+ * How a release relates to the artist whose page lists it: their own release
+ * (`primary`), a guest appearance (`featured`), or a release by a band they
+ * belong to (`member`). Derived by `collectArtistReleases`, never stored.
+ */
+export type ReleaseCredit = 'primary' | 'featured' | 'member';
+
 /** A release→url join row with its `Url` (`releaseUrls.include.url`). */
 export interface ReleaseUrlRecord {
   id: string;

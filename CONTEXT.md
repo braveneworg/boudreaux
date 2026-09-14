@@ -64,7 +64,16 @@ _In_ `src/lib/decorators/`.
 variants), **bio images**, and reference links.
 
 **Release** — a published body of work by an Artist, with tracks and
-**digital formats** available for download.
+**digital formats** available for download. Its first credited Artist is its
+**album artist**.
+
+**release credit** — how a Release relates to the Artist whose page lists it:
+**primary** (the Artist is its album artist), **featured** (credited, but not
+first), or **member** (a release by a band the Artist belongs to). Derived
+from credit order and band membership when the page is built, never stored;
+an Artist's page lists every release they hold a credit on, primary first.
+See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
+_Avoid_: role (that is the Video term), guest.
 
 **Video** — an uploaded video asset with **probe** metadata (technical fields
 extracted by ffprobe), a **description**, and **enrichment** (externally

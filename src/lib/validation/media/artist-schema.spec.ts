@@ -29,6 +29,27 @@ describe('artistWithPublishedReleasesSchema', () => {
     expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
   });
 
+  it('accepts every release credit the service can assign', () => {
+    const [row] = artistWithPublishedReleases.releases;
+    const withCredits = {
+      ...artistWithPublishedReleases,
+      releases: [
+        row,
+        { ...row, id: 'ar2', credit: 'featured' },
+        { ...row, id: 'ar3', credit: 'member' },
+      ],
+    };
+
+    expect(() => artistWithPublishedReleasesSchema.parse(withCredits)).not.toThrow();
+  });
+
+  it('rejects a release row with an unknown credit', () => {
+    const [row] = artistWithPublishedReleases.releases;
+    const invalid = { ...artistWithPublishedReleases, releases: [{ ...row, credit: 'guest' }] };
+
+    expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
+  });
+
   it('retains the bio image face signal fields through the scalar mirror', () => {
     const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
     expect(parsed.bioImages[0].hasFace).toBe(true);

@@ -44,6 +44,21 @@ describe('ReleaseCombobox', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a release subtitle in the trigger and the list when one is given', async () => {
+    const user = userEvent.setup();
+    const withSubtitle = [releases[0], { ...releases[1], subtitle: 'by The Problems' }];
+    render(<ReleaseCombobox releases={withSubtitle} selectedId="r2" onSelect={vi.fn()} />);
+
+    expect(screen.getByRole('combobox')).toHaveTextContent('by The Problems');
+
+    await user.click(screen.getByRole('combobox'));
+
+    expect(screen.getByRole('option', { name: /Second Album/ })).toHaveTextContent(
+      'by The Problems'
+    );
+    expect(screen.getByRole('option', { name: /First Album/ })).not.toHaveTextContent('by');
+  });
+
   it('falls back to the first release when the selected id is unknown', () => {
     render(<ReleaseCombobox releases={releases} selectedId="missing" onSelect={vi.fn()} />);
 

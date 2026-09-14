@@ -85,6 +85,17 @@ interface ArtistReleaseSelectorProps {
 }
 
 /**
+ * Qualifier for a release the artist did not put out themselves — a featured
+ * appearance or a band release — naming the release's album artist (its first
+ * credit). The artist's own releases get no qualifier.
+ */
+const releaseSubtitle = ({ credit, release }: ArtistRelease): string | null => {
+  if (credit === 'primary') return null;
+  const albumArtist = release.artistReleases.at(0)?.artist;
+  return albumArtist ? `by ${getArtistDisplayName(albumArtist)}` : null;
+};
+
+/**
  * Release picker shown when an artist has 2+ playable releases. Selecting an
  * entry resolves it back to its index and forwards to {@link ArtistPlayer}'s
  * `handleReleaseSelect` (which loads + streams the first track).
@@ -102,6 +113,7 @@ const ArtistReleaseSelector = ({
       id: ar.release.id,
       title: ar.release.title,
       coverArtSrc: getReleaseCoverArt(ar.release)?.src ?? null,
+      subtitle: releaseSubtitle(ar),
     }))}
     onSelect={(id) => {
       const index = releases.findIndex((ar: ArtistRelease) => ar.release.id === id);

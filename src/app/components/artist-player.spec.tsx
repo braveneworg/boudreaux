@@ -242,7 +242,12 @@ vi.mock('./release-combobox', () => ({
     onSelect,
     ariaLabel,
   }: {
-    releases: Array<{ id: string; title: string; coverArtSrc: string | null }>;
+    releases: Array<{
+      id: string;
+      title: string;
+      coverArtSrc: string | null;
+      subtitle?: string | null;
+    }>;
     selectedId: string;
     onSelect: (id: string) => void;
     ariaLabel?: string;
@@ -255,6 +260,7 @@ vi.mock('./release-combobox', () => ({
           aria-label={`Play ${release.title}`}
           aria-pressed={release.id === selectedId}
           data-cover-src={release.coverArtSrc ?? 'null'}
+          data-subtitle={release.subtitle ?? ''}
           onClick={() => onSelect(release.id)}
         >
           {release.title}
@@ -409,6 +415,50 @@ describe('ArtistPlayer', () => {
         artist: baseArtist,
       })),
     }) as unknown as ArtistWithPublishedReleases;
+
+  describe('release credits', () => {
+    const band = { id: 'band-1', firstName: '', surname: '', displayName: 'The Problems' };
+    const own = createRelease('own', 'Own Album', [mockFile1]);
+    const guest = {
+      ...createRelease('guest', 'Guest Album', [mockFile2]),
+      artistReleases: [
+        { id: 'ar-band-guest', artistId: band.id, releaseId: 'guest', artist: band },
+        { id: 'ar-self-guest', artistId: baseArtist.id, releaseId: 'guest', artist: baseArtist },
+      ],
+    };
+    const artist = {
+      ...baseArtist,
+      releases: [
+        {
+          id: 'ar-own',
+          artistId: baseArtist.id,
+          releaseId: 'own',
+          release: own,
+          credit: 'primary',
+        },
+        {
+          id: 'ar-guest',
+          artistId: baseArtist.id,
+          releaseId: 'guest',
+          release: guest,
+          credit: 'featured',
+        },
+      ],
+    } as unknown as ArtistWithPublishedReleases;
+
+    it('labels a featured or band appearance with the album artist and leaves own releases bare', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByRole('button', { name: 'Play Own Album' })).toHaveAttribute(
+        'data-subtitle',
+        ''
+      );
+      expect(screen.getByRole('button', { name: 'Play Guest Album' })).toHaveAttribute(
+        'data-subtitle',
+        'by The Problems'
+      );
+    });
+  });
 
   describe('empty state', () => {
     it('should render empty state when artist has no releases', () => {

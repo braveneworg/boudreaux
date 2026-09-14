@@ -13,7 +13,7 @@ import type {
   ArtistNameRecord,
   ArtistScalars,
   ArtistSearchMatch,
-  ArtistWithPublishedReleases,
+  ArtistWithReleaseGraph,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
@@ -131,26 +131,33 @@ const artistSearchInclude = {
   },
 } as const satisfies Prisma.ArtistInclude;
 
-/** Public artist-detail include — full nested release + bio graph. */
-const artistWithPublishedReleasesInclude = {
+/** The full media `Release` graph loaded behind every artist-detail release join. */
+const releaseGraphInclude = {
+  images: true,
+  artistReleases: { include: { artist: true } },
+  digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+  releaseUrls: { include: { url: true } },
+} as const satisfies Prisma.ReleaseInclude;
+
+/** `ArtistRelease` join rows with the release graph — reused for the artist and its bands. */
+const artistReleaseRowsInclude = {
+  include: { release: { include: releaseGraphInclude } },
+} as const satisfies Prisma.Artist$releasesArgs;
+
+/**
+ * Public artist-detail include — full nested release + bio graph, plus the
+ * same release graph for every band the artist is a member of so the page can
+ * list band releases beside the artist's own.
+ */
+const artistWithReleaseGraphInclude = {
   images: true,
   labels: true,
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
   bioLinks: { orderBy: { sortOrder: 'asc' } },
   members: { include: { member: true } },
-  releases: {
-    include: {
-      release: {
-        include: {
-          images: true,
-          artistReleases: { include: { artist: true } },
-          digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
-          releaseUrls: { include: { url: true } },
-        },
-      },
-    },
-  },
+  releases: artistReleaseRowsInclude,
+  memberOf: { include: { artist: { include: { releases: artistReleaseRowsInclude } } } },
 } as const satisfies Prisma.ArtistInclude;
 
 // Compile-time drift guards: fail `pnpm run typecheck` if a hand-written domain
@@ -167,9 +174,9 @@ type _ArtistListWithBioDrift = AssertExact<
   ArtistListWithBio,
   Prisma.ArtistGetPayload<{ include: typeof artistListWithBioInclude }>
 >;
-type _ArtistWithPublishedReleasesDrift = AssertExact<
-  ArtistWithPublishedReleases,
-  Prisma.ArtistGetPayload<{ include: typeof artistWithPublishedReleasesInclude }>
+type _ArtistWithReleaseGraphDrift = AssertExact<
+  ArtistWithReleaseGraph,
+  Prisma.ArtistGetPayload<{ include: typeof artistWithReleaseGraphInclude }>
 >;
 type _ArtistSearchMatchDrift = AssertExact<
   ArtistSearchMatch,
@@ -179,7 +186,7 @@ const _artistDrift: _ArtistDrift = true;
 const _artistDetailDrift: _ArtistDetailDrift = true;
 const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
 const _artistListWithBioDrift: _ArtistListWithBioDrift = true;
-const _artistWithPublishedReleasesDrift: _ArtistWithPublishedReleasesDrift = true;
+const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
 // =============================================================================
 // Translators (domain input -> Prisma input; the return type is the drift guard)
@@ -473,12 +480,13 @@ export class ArtistRepository {
 
   /**
    * Find a single active, published, non-deleted artist by slug with the full
-   * nested release + bio include used on the public detail page. The service
-   * post-filters releases to published, non-deleted.
+   * nested release + bio include used on the public detail page, including
+   * the releases of every band the artist belongs to. The service folds the
+   * band releases in and post-filters to published, non-deleted.
    */
   static async findPublishedBySlugWithReleases(
     slug: string
-  ): Promise<ArtistWithPublishedReleases | null> {
+  ): Promise<ArtistWithReleaseGraph | null> {
     return runQuery(() =>
       prisma.artist.findFirst({
         where: {
@@ -486,7 +494,7 @@ export class ArtistRepository {
           isActive: true,
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         },
-        include: artistWithPublishedReleasesInclude,
+        include: artistWithReleaseGraphInclude,
       })
     );
   }

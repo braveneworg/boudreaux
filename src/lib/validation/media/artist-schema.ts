@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import type { ArtistDetail } from '@/lib/types/domain/artist';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import { RELEASE_CREDITS } from '@/lib/utils/artist-release-credits';
 
 import { releaseSchema } from './release-schema';
 import {
@@ -90,7 +91,11 @@ export const artistDetailSchema = artistScalarSchema.extend({
   images: z.array(imageSchema),
 }) satisfies z.ZodType<ArtistDetail>;
 
-/** Artist with full published release data, for the public artist detail page. */
+/**
+ * Artist with full published release data, for the public artist detail page.
+ * Each release row carries the credit the service derived for it (own release,
+ * featured appearance, or band release) so the page can order and label rows.
+ */
 export const artistWithPublishedReleasesSchema = artistScalarSchema.extend({
   images: z.array(imageSchema),
   labels: z.array(artistLabelSchema),
@@ -104,6 +109,7 @@ export const artistWithPublishedReleasesSchema = artistScalarSchema.extend({
       artistId: z.string(),
       releaseId: z.string(),
       release: releaseSchema,
+      credit: z.enum(RELEASE_CREDITS),
     })
   ),
 }) satisfies z.ZodType<ArtistWithPublishedReleases>;

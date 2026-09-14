@@ -33,6 +33,7 @@ import type {
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import type { ImageRecord } from '@/lib/types/domain/image';
+import { collectArtistReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
@@ -853,8 +854,10 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and digital format data.
-   * Post-query filters to only published, non-deleted releases.
+   * Get an artist by slug with full release and digital format data: every
+   * published, non-deleted release the artist is credited on (their own
+   * releases and featured appearances) plus the published releases of every
+   * band they belong to, each tagged with its credit and listed own-first.
    */
   static async getArtistBySlugWithReleases(
     slug: string
@@ -866,20 +869,20 @@ export class ArtistService {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
-      // Filter to only published, non-deleted releases (Prisma MongoDB
-      // doesn't support nested where on junction table includes). Bio prose is
+      // The band graph is folded into `releases` and not exposed; the
+      // published/non-deleted filter runs here because Prisma MongoDB doesn't
+      // support a nested where on junction-table includes. Bio prose is
       // sanitized on read so redisplay is safe regardless of how it was
-      // authored (AI-generated bios are also sanitized at write time).
+      // authored (generated bios are also sanitized at write time).
+      const { memberOf: _bands, ...publicArtist } = artist;
       const filteredArtist: ArtistWithPublishedReleases = {
-        ...artist,
+        ...publicArtist,
         bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
         // Short bio is rich-text too (Tiptap); kept as sanitized HTML for
         // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        releases: artist.releases.filter(
-          (ar) => ar.release.publishedAt != null && ar.release.deletedOn == null
-        ),
+        releases: collectArtistReleases(artist),
       };
 
       return { success: true, data: filteredArtist };
