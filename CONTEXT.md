@@ -67,8 +67,9 @@ variants), **bio images**, and reference links.
 **digital formats** available for download.
 
 **Video** — an uploaded video asset with **probe** metadata (technical fields
-extracted by ffprobe) and **enrichment** (externally sourced facts such as
-release date, gated on the video being MUSIC-category with a known artist).
+extracted by ffprobe), a **description**, and **enrichment** (externally
+sourced facts such as release date; available to any category once the video
+names an artist or creator).
 
 **release date** — the day-precision UTC day a Video was released. It is
 **never defaulted**: a **draft** may have none, and today only ever appears
@@ -91,6 +92,19 @@ changes a Video. A release-date suggestion fills only an **empty** release date
 by itself; when a date already exists it stays pending until applied or
 dismissed.
 _Avoid_: auto-apply (that is what happens to it, not what it is).
+
+**description** — the prose stored on a Video and shown on its page. It is
+only ever entered through the enrichment panel — typed by a human there, or
+taken from a **description suggestion**. It is never taken from the file and
+never synthesized outside enrichment; a **draft** may lack one. See
+[ADR-0005](docs/adr/0005-description-is-edited-only-in-the-enrichment-panel.md).
+_Avoid_: blurb (a Release's listing copy), summary.
+
+**description suggestion** — the **pending suggestion** that targets a Video's
+description: enrichment's synthesized prose, offered beside the description
+with its confidence and sources. Applying it overwrites the description; a
+blank description takes it without review, and it is never dismissed. See
+[ADR-0005](docs/adr/0005-description-is-edited-only-in-the-enrichment-panel.md).
 
 **autosave** — persistence of a single field the moment it changes, without
 Save. Today only a persisted Video's release date autosaves, whether a human
