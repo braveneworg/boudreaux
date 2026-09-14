@@ -268,6 +268,133 @@ describe('resolveDescriptionSuggestion', () => {
     expect(options.systemPrompt).toMatch(/never invent, alter/i);
   });
 
+  it('keeps the music prompt and queries for an explicit MUSIC category', async () => {
+    const searchWeb = vi.fn().mockResolvedValue(evidence);
+    const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+    await resolveDescriptionSuggestion(
+      { ...baseArgs, category: 'MUSIC' },
+      withReader({ searchWeb, requestJson })
+    );
+
+    expect(searchWeb.mock.calls.map(([query]) => query)).toEqual([
+      '"Ceschi" "Bite Through Stone"',
+      'Ceschi Bite Through Stone song',
+      'Ceschi Bite Through Stone review',
+    ]);
+    const [, options] = requestJson.mock.calls[0];
+    expect(options.systemPrompt).toContain('music video page');
+    expect(options.userPrompt).toContain('Video: "Bite Through Stone" by Ceschi.');
+    expect(options.userPrompt).toContain('Release date: 2021-04-09.');
+  });
+
+  describe('INFORMATIONAL category', () => {
+    const informationalArgs: VideoDescriptionArgs = {
+      title: 'Why Vinyl Sounds Different',
+      artistDisplay: 'Narrator Nell',
+      category: 'INFORMATIONAL',
+      facts: [],
+      serperKey: 'serper-key',
+      geminiKey: 'gemini-key',
+      model: 'gemini-2.5-flash',
+    };
+
+    it('frames the creator and the topic, never a musical artist', async () => {
+      const searchWeb = vi.fn().mockResolvedValue(evidence);
+      const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+      await resolveDescriptionSuggestion(informationalArgs, withReader({ searchWeb, requestJson }));
+
+      const [, options] = requestJson.mock.calls[0];
+      expect(options.systemPrompt).toContain('informational video page');
+      expect(options.systemPrompt).toContain("Always name the video's creator");
+      expect(options.systemPrompt).toContain('never as a musical artist');
+      expect(options.systemPrompt).toContain('Describe what the video covers');
+      expect(options.userPrompt).toContain(
+        'Video: "Why Vinyl Sounds Different", an informational video by Narrator Nell.'
+      );
+    });
+
+    it('carries no release-date line and forbids any release-timing claim', async () => {
+      const searchWeb = vi.fn().mockResolvedValue(evidence);
+      const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+      await resolveDescriptionSuggestion(
+        { ...informationalArgs, releasedOn: '2021-04-09' },
+        withReader({ searchWeb, requestJson })
+      );
+
+      const [, options] = requestJson.mock.calls[0];
+      expect(options.userPrompt).not.toContain('Release date:');
+      expect(options.userPrompt).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+      expect(options.systemPrompt).toContain('Say nothing about when it was released');
+      expect(options.systemPrompt).toContain(
+        'never call it new, recent, upcoming, or from any year'
+      );
+    });
+
+    it('asks for no quotations instead of verbatim press quotes', async () => {
+      const searchWeb = vi.fn().mockResolvedValue(evidence);
+      const requestJson = vi.fn().mockResolvedValue(adjudication);
+
+      await resolveDescriptionSuggestion(informationalArgs, withReader({ searchWeb, requestJson }));
+
+      const [, options] = requestJson.mock.calls[0];
+      expect(options.systemPrompt).toContain('Do not include quotations.');
+      expect(options.systemPrompt).not.toContain('verbatim inside');
+      expect(options.systemPrompt).not.toContain('attributed inline');
+    });
+
+    it('sweeps two queries and never a review search', async () => {
+      const searchWeb = vi.fn().mockResolvedValue([]);
+
+      await resolveDescriptionSuggestion(informationalArgs, withReader({ searchWeb }));
+
+      expect(searchWeb.mock.calls.map(([query]) => query)).toEqual([
+        '"Narrator Nell" "Why Vinyl Sounds Different"',
+        'Narrator Nell Why Vinyl Sounds Different video',
+      ]);
+    });
+
+    it('never reads evidence pages for excerpts', async () => {
+      const searchWeb = vi.fn().mockResolvedValue(evidence);
+      const requestJson = vi.fn().mockResolvedValue(adjudication);
+      const readPage = vi.fn().mockResolvedValue({ content: 'page text', images: [] });
+      const getScrapeKey = vi.fn().mockResolvedValue('jina-key');
+
+      await resolveDescriptionSuggestion(informationalArgs, {
+        searchWeb,
+        requestJson,
+        readPage,
+        getScrapeKey,
+      });
+
+      expect(readPage).not.toHaveBeenCalled();
+      const [, options] = requestJson.mock.calls[0];
+      expect(options.userPrompt).not.toContain('PAGE EXCERPTS');
+    });
+
+    it('still returns the fixed-medium suggestion with subset-enforced sources', async () => {
+      const searchWeb = vi.fn().mockResolvedValue(evidence);
+      const requestJson = vi.fn().mockResolvedValue({
+        ...adjudication,
+        sourceUrls: ['https://example.com/song', 'https://fabricated.example.com/'],
+      });
+
+      const result = await resolveDescriptionSuggestion(
+        informationalArgs,
+        withReader({ searchWeb, requestJson })
+      );
+
+      expect(result).toEqual({
+        value: adjudication.description,
+        confidence: 'medium',
+        sources: [{ url: 'https://example.com/song' }],
+        note: adjudication.rationale,
+      });
+    });
+  });
+
   it('feeds top-page excerpts into the prompt as quote material', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue(adjudication);

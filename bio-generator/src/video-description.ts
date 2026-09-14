@@ -10,9 +10,9 @@ import { getScrapeApiKey } from './lib/secrets.js';
 import { adjudicate, boundedProse, boundedRationale, enforceSourceSubset } from './release-date.js';
 import { DEFAULT_GEMINI_MODEL } from './types.js';
 
-import type { AdjudicationDeps } from './release-date.js';
+import type { AdjudicationDeps, AdjudicationRun } from './release-date.js';
 import type { SerperWebResult } from './serper.js';
-import type { VideoSuggestion } from './types.js';
+import type { VideoEnrichmentCategory, VideoSuggestion } from './types.js';
 
 /** The hard ceiling the system prompt states; enforced here by truncation. */
 const MAX_DESCRIPTION_CHARS = 900;
@@ -32,10 +32,14 @@ export const descriptionAdjudicationSchema = z.object({
   rationale: boundedRationale('description'),
 });
 
+type DescriptionAdjudication = z.infer<typeof descriptionAdjudicationSchema>;
+
 /** Arguments for {@link resolveDescriptionSuggestion}. */
 export interface VideoDescriptionArgs {
   title: string;
   artistDisplay: string;
+  /** Selects the prompt strategy; absent means MUSIC (a pre-category invoke). */
+  category?: VideoEnrichmentCategory;
   releasedOn?: string;
   /** Structured facts gathered earlier this run, one plain line each. */
   facts: string[];
@@ -108,6 +112,44 @@ const buildDescriptionPrompt =
       .join('\n');
 
 /**
+ * INFORMATIONAL prompt: the named artist is the video's creator (a person or
+ * organisation), the prose covers the topic, and — with no release-date
+ * adjudication in that flow — nothing may be said about when it was released.
+ */
+const informationalSystemPrompt = [
+  'You write a factual editorial description of an informational video page',
+  'from web search evidence.',
+  'Aim for about 500 characters of prose (roughly 450-550; never exceed 900).',
+  "Always name the video's creator — the person or organisation it is credited",
+  'to — and frame them as its creator or subject, never as a musical artist.',
+  'Describe what the video covers: its topic, the questions or ideas it takes',
+  'up, and why the creator is a relevant voice on it.',
+  'NEVER describe visuals or events in the video itself.',
+  'Say nothing about when it was released — never call it new, recent,',
+  'upcoming, or from any year, and never treat the current date as its release.',
+  'Do not include quotations.',
+  'Use ONLY the evidence provided; never invent facts, dates, names, or URLs.',
+  'sourceUrls MUST be copied verbatim from the evidence links.',
+  'Respond with a single JSON object and nothing else.',
+].join(' ');
+
+/** Builds the INFORMATIONAL user prompt: creator framing, evidence, no date line. */
+const buildInformationalPrompt =
+  ({ title, artistDisplay, facts }: VideoDescriptionArgs) =>
+  (evidence: string): string =>
+    [
+      `Video: "${title}", an informational video by ${artistDisplay}.`,
+      facts.length > 0 ? `VERIFIED FACTS:\n${facts.map((fact) => `- ${fact}`).join('\n')}` : '',
+      'EVIDENCE:',
+      evidence,
+      '',
+      'Return JSON: {"description": "about 500 characters" or null,',
+      '"sourceUrls": [evidence links used], "rationale": "<= 300 chars"}',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+/**
  * Best-effort read of the top evidence pages (Jina Reader) for verbatim quote
  * material. A failed key lookup or page read skips that page; returns null
  * when nothing readable survived so the prompt omits the block entirely.
@@ -128,13 +170,49 @@ const gatherQuoteExcerpts = async (
   return blocks.length > 0 ? blocks.join('\n---\n') : null;
 };
 
+/** The category-specific parts of one description adjudication run. */
+type DescriptionStrategy = Pick<
+  AdjudicationRun<DescriptionAdjudication>,
+  'queries' | 'systemPrompt' | 'buildUserPrompt' | 'augmentEvidence'
+>;
+
+/** MUSIC: three searches (incl. press reviews) plus page excerpts for quotes. */
+const musicStrategy = (
+  args: VideoDescriptionArgs,
+  deps: VideoDescriptionDeps
+): DescriptionStrategy => ({
+  queries: [
+    `"${args.artistDisplay}" "${args.title}"`,
+    `${args.artistDisplay} ${args.title} song`,
+    `${args.artistDisplay} ${args.title} review`,
+  ],
+  systemPrompt: descriptionSystemPrompt,
+  buildUserPrompt: buildDescriptionPrompt(args),
+  augmentEvidence: (evidence) => gatherQuoteExcerpts(evidence, deps),
+});
+
+/** INFORMATIONAL: two searches, no review sweep, no page reads (no quotes wanted). */
+const informationalStrategy = (args: VideoDescriptionArgs): DescriptionStrategy => ({
+  queries: [`"${args.artistDisplay}" "${args.title}"`, `${args.artistDisplay} ${args.title} video`],
+  systemPrompt: informationalSystemPrompt,
+  buildUserPrompt: buildInformationalPrompt(args),
+});
+
+/** Picks the strategy for the video's category; absent = MUSIC (pre-category invoke). */
+const descriptionStrategy = (
+  args: VideoDescriptionArgs,
+  deps: VideoDescriptionDeps
+): DescriptionStrategy =>
+  args.category === 'INFORMATIONAL' ? informationalStrategy(args) : musicStrategy(args, deps);
+
 /**
  * Synthesizes an editorial description (~500 characters, always naming the
- * artist, weaving in verbatim press quotes with inline attribution when the
- * material offers them) from gathered facts, three web searches, and a
- * best-effort read of the top result pages. Confidence is FIXED at medium
- * (LLM-synthesized prose). Never throws — failures degrade to null and the
- * run continues.
+ * artist). MUSIC weaves in verbatim press quotes with inline attribution when
+ * the material offers them, from gathered facts, three web searches, and a
+ * best-effort read of the top result pages; INFORMATIONAL frames the artist
+ * as the video's creator from two web searches, with no quotes and no
+ * release-date claim. Confidence is FIXED at medium (LLM-synthesized prose).
+ * Never throws — failures degrade to null and the run continues.
  */
 export const resolveDescriptionSuggestion = async (
   args: VideoDescriptionArgs,
@@ -143,18 +221,11 @@ export const resolveDescriptionSuggestion = async (
   try {
     const outcome = await adjudicate(
       {
-        queries: [
-          `"${args.artistDisplay}" "${args.title}"`,
-          `${args.artistDisplay} ${args.title} song`,
-          `${args.artistDisplay} ${args.title} review`,
-        ],
+        ...descriptionStrategy(args, deps),
         serperKey: args.serperKey,
         geminiKey: args.geminiKey,
         model: args.model ?? DEFAULT_GEMINI_MODEL,
         schema: descriptionAdjudicationSchema,
-        systemPrompt: descriptionSystemPrompt,
-        buildUserPrompt: buildDescriptionPrompt(args),
-        augmentEvidence: (evidence) => gatherQuoteExcerpts(evidence, deps),
       },
       deps
     );

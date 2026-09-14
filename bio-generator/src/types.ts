@@ -161,6 +161,7 @@ export {
   videoEnrichmentDataSchema,
   videoEnrichmentResultSchema,
   type VideoProgressStage,
+  type VideoEnrichmentCategory,
   type VideoEnrichmentInput,
   type VideoSuggestion,
   type VideoEnrichmentData,

@@ -36,6 +36,7 @@ export {
 } from './bio-generation';
 
 export {
+  VIDEO_CATEGORIES,
   VIDEO_PROGRESS_STAGES,
   VIDEO_SUGGESTION_FIELDS,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
@@ -48,6 +49,7 @@ export {
   videoEnrichmentResultSchema,
   videoEnrichmentCallbackSchema,
   videoEnrichmentProgressPostSchema,
+  type VideoEnrichmentCategory,
   type VideoProgressStage,
   type VideoSuggestionField,
   type VideoLevelSuggestionField,
