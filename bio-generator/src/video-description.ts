@@ -69,9 +69,23 @@ const descriptionSystemPrompt = [
   'quote; omit quotes entirely when the material offers none.',
   'Use ONLY the evidence, excerpts, and facts provided; never invent facts,',
   'dates, or URLs.',
+  'State when the song or video was released ONLY when the "Release date:" line',
+  'supplies a date. When it reads "unknown", say nothing about when it came',
+  'out — never call it new, recent, upcoming, or from any year, and never',
+  'treat the current date as its release.',
   'sourceUrls MUST be copied verbatim from the evidence links.',
   'Respond with a single JSON object and nothing else.',
 ].join(' ');
+
+/**
+ * The release-date line of the user prompt. A release date is never inferred
+ * (ADR-0004 in the web app): a dateless draft says so explicitly rather than
+ * omitting the line, so the model cannot fill the gap with "today".
+ */
+const releaseDateLine = (releasedOn: string | undefined): string =>
+  releasedOn
+    ? `Release date: ${releasedOn}.`
+    : 'Release date: unknown (do not state or infer one).';
 
 /** Builds the description user prompt from the evidence block (+ excerpts). */
 const buildDescriptionPrompt =
@@ -79,7 +93,7 @@ const buildDescriptionPrompt =
   (evidence: string, excerpts?: string | null): string =>
     [
       `Video: "${title}" by ${artistDisplay}.`,
-      releasedOn ? `Release date: ${releasedOn}.` : '',
+      releaseDateLine(releasedOn),
       facts.length > 0 ? `VERIFIED FACTS:\n${facts.map((fact) => `- ${fact}`).join('\n')}` : '',
       'EVIDENCE:',
       evidence,
