@@ -133,21 +133,21 @@ const informationalSystemPrompt = [
   'Respond with a single JSON object and nothing else.',
 ].join(' ');
 
-/** Builds the INFORMATIONAL user prompt: creator framing, evidence, no date line. */
+/**
+ * Builds the INFORMATIONAL user prompt: creator framing, evidence, and the JSON
+ * shape — no release-date line and no facts block (the flow gathers none).
+ */
 const buildInformationalPrompt =
-  ({ title, artistDisplay, facts }: VideoDescriptionArgs) =>
+  ({ title, artistDisplay }: VideoDescriptionArgs) =>
   (evidence: string): string =>
     [
       `Video: "${title}", an informational video by ${artistDisplay}.`,
-      facts.length > 0 ? `VERIFIED FACTS:\n${facts.map((fact) => `- ${fact}`).join('\n')}` : '',
       'EVIDENCE:',
       evidence,
       '',
       'Return JSON: {"description": "about 500 characters" or null,',
       '"sourceUrls": [evidence links used], "rationale": "<= 300 chars"}',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ].join('\n');
 
 /**
  * Best-effort read of the top evidence pages (Jina Reader) for verbatim quote

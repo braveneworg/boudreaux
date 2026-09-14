@@ -138,8 +138,7 @@ const startLookupRun = (deps: LookupRunDeps): (() => void) => {
   const fill = (releasedOn: string): void => {
     state.resolved = true;
     // Re-read the live value: a date typed while the fetch was in flight wins —
-    // the pair still counts as resolved, with the admin's date as the one to
-    // describe.
+    // the pair still counts as resolved (never searched again this mount).
     if (getValues('releasedOn')?.trim()) {
       show(key, { status: 'idle' });
       return;

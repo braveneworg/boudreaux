@@ -17,7 +17,6 @@ import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-en
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { Json } from '@/lib/types/domain/shared';
-import type { VideoCategory } from '@/lib/types/domain/video';
 import type {
   CreateSuggestionRow,
   VideoEnrichmentState,
@@ -54,6 +53,8 @@ import {
 
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
+import type { VideoEnrichmentCategory } from '@fakefour/job-contract';
+
 const logger = loggers.media;
 
 let lambdaClient: LambdaClient | null = null;
@@ -80,8 +81,12 @@ export interface VideoEnrichmentLambdaInput {
   videoId: string;
   title: string;
   artistDisplay: string;
-  /** Drives the Lambda's flow: INFORMATIONAL skips the music lookups. */
-  category: VideoCategory;
+  /**
+   * Drives the Lambda's flow: INFORMATIONAL skips the music lookups. Typed
+   * against the CONTRACT's category so the web union and the wire enum cannot
+   * drift silently — `state.category` must remain assignable to it.
+   */
+  category: VideoEnrichmentCategory;
   releasedOn?: string;
   artists: Array<{
     artistId: string;
