@@ -14,12 +14,13 @@ import {
 import { useReleaseDateAutosave } from './use-release-date-autosave';
 import { formatDateForForm } from './video-form-helpers';
 
+import type { VideoUploadStatus } from './use-video-upload';
 import type { UseFormReturn } from 'react-hook-form';
 
 export interface UseVideoAutoFillArgs {
   form: UseFormReturn<VideoFormData>;
   /** The multipart upload state machine's status. */
-  uploadStatus: string;
+  uploadStatus: VideoUploadStatus;
   /** The loaded row in edit mode (undefined until the query settles). */
   video: VideoRow | null | undefined;
   isEditMode: boolean;

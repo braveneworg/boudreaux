@@ -10,10 +10,11 @@ import {
   recordLookupAttempt,
   RELEASE_DATE_LOOKUP_DELAYS_MS,
   shouldLookupReleaseDate,
+  type ReleaseDateLookupGate,
 } from './release-date-lookup-policy';
 
 describe('shouldLookupReleaseDate', () => {
-  const base = {
+  const base: ReleaseDateLookupGate = {
     uploadStatus: 'uploading',
     hasPersistedRow: false,
     category: 'MUSIC',

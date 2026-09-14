@@ -18,5 +18,3 @@ export const videoReleaseDateSchema = z.union([
     .regex(ISO_DATE_PATTERN, { message: 'Release date must be YYYY-MM-DD' })
     .refine(isRealCalendarDate, { message: 'Release date is not a calendar day' }),
 ]);
-
-export type VideoReleaseDateInput = z.infer<typeof videoReleaseDateSchema>;
