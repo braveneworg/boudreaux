@@ -206,7 +206,7 @@ describe('resolveDescriptionSuggestion', () => {
     expect(options.userPrompt).not.toMatch(/Release date: \d{4}/);
   });
 
-  it('never puts today into the user prompt when the date is unknown', async () => {
+  it('puts no calendar day at all into the user prompt when the date is unknown', async () => {
     const searchWeb = vi.fn().mockResolvedValue(evidence);
     const requestJson = vi.fn().mockResolvedValue(adjudication);
     const { releasedOn: _releasedOn, ...dateless } = baseArgs;
@@ -217,7 +217,9 @@ describe('resolveDescriptionSuggestion', () => {
     );
 
     const [, options] = requestJson.mock.calls[0];
-    expect(options.userPrompt).not.toContain(new Date().toISOString().slice(0, 10));
+    // Clock-free: the only ISO day the prompt could carry is the one supplied,
+    // and none was — so no YYYY-MM-DD may appear, today's included.
+    expect(options.userPrompt).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it('forbids inferring a release date in the system prompt', async () => {
