@@ -1004,7 +1004,7 @@ model Video {
   artist           String
   category         VideoCategory
   description      String?
-  releasedOn       DateTime
+  releasedOn       DateTime? // Never defaulted: a draft may have none; publish requires one (ADR-0004)
   durationSeconds  Int?
   s3Key            String
   fileName         String

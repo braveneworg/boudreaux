@@ -109,11 +109,33 @@ describe('createVideoDraftAction', () => {
     expect(input.publishedAt).toBeUndefined();
   });
 
-  it('falls back to today for the release date', async () => {
+  it('leaves the release date unset when the form has none', async () => {
     await createVideoDraftAction(validInput);
 
     const input = vi.mocked(VideoService.createVideo).mock.calls[0][0];
-    expect(input.releasedOn).toBeInstanceOf(Date);
+    expect(input).not.toHaveProperty('releasedOn');
+  });
+
+  it('leaves the release date unset when the form value is unparseable', async () => {
+    await createVideoDraftAction({ ...validInput, releasedOn: 'not-a-day' });
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+    expect(input).not.toHaveProperty('releasedOn');
+  });
+
+  // Domain rule: a release date is never inferred — today only ever appears
+  // because a human typed it. Freeze the clock so the assertion is exact.
+  it('never stamps today as the release date', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-14T12:00:00.000Z'));
+    try {
+      await createVideoDraftAction(validInput);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const input = vi.mocked(VideoService.createVideo).mock.calls[0][0];
+    expect(input.releasedOn).not.toEqual(new Date('2026-09-14T00:00:00.000Z'));
   });
 
   it('kicks the post-save pipeline with a probing plan', async () => {

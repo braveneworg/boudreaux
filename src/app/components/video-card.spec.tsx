@@ -131,6 +131,12 @@ describe('VideoCard', () => {
     expect(screen.getByText('Jan 15, 2026')).toBeInTheDocument();
   });
 
+  it('omits the release-date row when the video has no release date', () => {
+    render(<VideoCard video={{ ...baseVideo, releasedOn: null }} />);
+
+    expect(screen.queryByText('Release date:')).not.toBeInTheDocument();
+  });
+
   it('labels the duration', () => {
     render(<VideoCard video={baseVideo} />);
 

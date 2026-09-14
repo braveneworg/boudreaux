@@ -52,7 +52,8 @@ export interface VideoEnrichmentState {
   category: VideoCategory;
   artist: string;
   title: string;
-  releasedOn: Date;
+  /** Null when the draft has no release date yet. */
+  releasedOn: Date | null;
   /** The admin-entered description; the callback drops a matching suggestion. */
   description: string | null;
   s3Key: string;

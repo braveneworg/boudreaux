@@ -399,6 +399,17 @@ describe('runEnrichmentJob', () => {
     });
   });
 
+  it('omits releasedOn from the payload when the draft has no release date', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ releasedOn: null })
+    );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(sentPayload()).not.toHaveProperty('releasedOn');
+  });
+
   it('sends the linked artists with their known identity fields', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
@@ -644,6 +655,18 @@ describe('getEnrichmentStatus', () => {
       status: 'failed',
       error: STALE_JOB_TIMEOUT_MESSAGE,
     });
+  });
+
+  it('reports an empty currentReleasedOn for a draft without a release date', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ releasedOn: null })
+    );
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
+    vi.mocked(VideoEnrichmentSuggestionRepository.findByVideoId).mockResolvedValue([]);
+
+    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
+
+    expect(result?.currentReleasedOn).toBe('');
   });
 
   it('assembles the wire shape with day-precision dates and suggestion rows', async () => {
@@ -1151,6 +1174,31 @@ describe('completeCallback', () => {
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
       expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2020-06-01' }),
+    ]);
+  });
+
+  it('persists the release date as a suggestion when the draft has no date yet', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValueOnce(
+      baseState({ releasedOn: null })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          releasedOn: {
+            value: '2021-04-09',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2021-04-09' }),
     ]);
   });
 

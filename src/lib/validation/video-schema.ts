@@ -40,7 +40,8 @@ export const videoRowSchema = z.object({
   artist: z.string(),
   category: videoCategorySchema,
   description: nullableString,
-  releasedOn: date,
+  // Null on a draft that has no release date yet (never defaulted server-side).
+  releasedOn: nullableDate,
   durationSeconds: z.number().nullable(),
   s3Key: z.string(),
   fileName: z.string(),

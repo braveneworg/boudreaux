@@ -102,10 +102,12 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
         </div>
 
         <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-600">
-          <div className="flex gap-1">
-            <dt className="font-medium text-zinc-950">Release date:</dt>
-            <dd>{formatTourDate(video.releasedOn)}</dd>
-          </div>
+          {video.releasedOn ? (
+            <div className="flex gap-1">
+              <dt className="font-medium text-zinc-950">Release date:</dt>
+              <dd>{formatTourDate(video.releasedOn)}</dd>
+            </div>
+          ) : null}
           <div className="flex gap-1">
             <dt className="font-medium text-zinc-950">Duration:</dt>
             <dd>{formatVideoDuration(video.durationSeconds)}</dd>
