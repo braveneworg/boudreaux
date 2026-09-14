@@ -641,6 +641,14 @@ describe('VideoForm — release date', () => {
     });
     expect(screen.queryByText(/Looking up release date|No release date found/)).toBeNull();
   });
+
+  it('renders the form card without the ink shadow edge', () => {
+    render(<VideoForm />);
+
+    const card = document.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('shadow-none');
+    expect(card).not.toHaveClass('shadow-zine-ink');
+  });
 });
 
 describe('VideoForm — upload flow', () => {

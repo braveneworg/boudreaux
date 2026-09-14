@@ -528,7 +528,7 @@ export const ReleaseForm = ({
         },
       ]}
     >
-      <Card className="w-full border-none px-0 pb-0">
+      <Card className="w-full border-none px-0 pb-0 shadow-none">
         <ReleaseCardHeader isEditMode={isEditMode} />
         <Form {...releaseForm}>
           <form ref={formRef} onSubmit={submitForm} noValidate>

@@ -531,7 +531,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
         { anchorText: formTitle, url: '/admin/videos', isActive: true },
       ]}
     >
-      <Card className="w-full border-none px-0 pb-0">
+      <Card className="w-full border-none px-0 pb-0 shadow-none">
         <CardHeader className="px-0">
           <CardTitle>{formTitle}</CardTitle>
         </CardHeader>
