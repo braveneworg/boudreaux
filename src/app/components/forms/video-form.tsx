@@ -20,6 +20,7 @@ import {
 } from '@/hooks/mutations/use-video-mutations';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
+import { toIsoDay } from '@/lib/utils/validation/iso-date';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
 import {
   isEnrichableCategory,
@@ -34,8 +35,8 @@ import { useVideoQuery } from './_hooks/use-video-query';
 import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
-import { useReleaseDateAutoFill } from './videos/use-release-date-autofill';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
+import { useVideoAutoFill } from './videos/use-video-auto-fill';
 import { useVideoDraft } from './videos/use-video-draft';
 import { useVideoPosterStrip } from './videos/use-video-poster-strip';
 import { useVideoPosterUpload } from './videos/use-video-poster-upload';
@@ -382,11 +383,22 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   });
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
-  useReleaseDateAutoFill({ uploadStatus: upload.status, form });
+  const { releaseDateLookupStatus } = useVideoAutoFill({
+    form,
+    uploadStatus: upload.status,
+    video,
+    isEditMode,
+    effectiveVideoId,
+    category: categoryValue,
+  });
 
+  // The DatePicker commits a full ISO datetime; the release date is stored as
+  // a day, so normalise it here (local day — what the admin picked) before it
+  // reaches the autosave, the description prompt, or Save.
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {
-      setValue(fieldName as keyof VideoFormData, dateString, {
+      const value = fieldName === 'releasedOn' ? (toIsoDay(dateString) ?? '') : dateString;
+      setValue(fieldName as keyof VideoFormData, value, {
         shouldDirty: true,
         shouldValidate: true,
       });
@@ -531,6 +543,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
               control={control}
               setValue={setValue}
               onSelectDate={handleSelectDate}
+              releaseDateLookupStatus={releaseDateLookupStatus}
             />
             <VideoArtistReviewSection
               entries={entries}

@@ -32,9 +32,11 @@ const fetchLookup = async (
 };
 
 /**
- * On-demand web lookup of a video's release date. Disabled by default — call
- * `refetch()` from the "Find release date" button. Returns the parsed result
- * or null; forwards the AbortSignal.
+ * On-demand web lookup of a video's release date. Disabled by default — every
+ * attempt is an explicit `refetch()` from the automatic lookup
+ * (`useReleaseDateAutoLookup`), so a cached null never short-circuits an
+ * attempt and nothing refetches on focus. Returns the parsed result or null;
+ * forwards the AbortSignal.
  *
  * @param title - The video title to look up.
  * @param artist - The artist name (optional; only set when non-empty).
