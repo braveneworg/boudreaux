@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { ImageRecord } from './image';
-import type { ArtistReleaseScalars, Release, ReleaseScalars } from './release';
+import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
 
@@ -170,19 +170,39 @@ export type Artist = ArtistScalars & {
   urls: UrlRecord[];
 };
 
+/** An `ArtistRelease` join row carrying the full media `Release` graph. */
+export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: Release };
+
 /**
- * Public artist-detail payload: scalars plus images, labels, urls, bio
- * images/links, band members (with member scalars), and release joins carrying
- * the full media `Release` graph.
+ * Repository payload behind the public artist-detail page: scalars plus
+ * images, labels, urls, bio images/links, band members (with member scalars),
+ * the artist's own release joins, and — via `memberOf` — the release joins of
+ * every band the artist belongs to, all carrying the full media `Release`
+ * graph. The service flattens this into {@link ArtistWithPublishedReleases}.
  */
-export interface ArtistWithPublishedReleases extends ArtistScalars {
+export interface ArtistWithReleaseGraph extends ArtistScalars {
   images: ImageRecord[];
   labels: ArtistLabelRecord[];
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
   bioLinks: ArtistBioLinkRecord[];
   members: Array<ArtistMemberScalars & { member: ArtistScalars }>;
-  releases: Array<ArtistReleaseScalars & { release: Release }>;
+  releases: ArtistReleaseGraphRow[];
+  memberOf: Array<
+    ArtistMemberScalars & { artist: ArtistScalars & { releases: ArtistReleaseGraphRow[] } }
+  >;
+}
+
+/**
+ * Public artist-detail payload: {@link ArtistWithReleaseGraph} with the band
+ * graph folded into `releases` — every published release the artist is on,
+ * each tagged with its {@link ReleaseCredit} and listed own-releases-first.
+ */
+export interface ArtistWithPublishedReleases extends Omit<
+  ArtistWithReleaseGraph,
+  'memberOf' | 'releases'
+> {
+  releases: Array<ArtistReleaseGraphRow & { credit: ReleaseCredit }>;
 }
 
 /** Public artists-index row: scalars plus primary bio images. */

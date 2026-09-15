@@ -427,6 +427,19 @@ describe('ArtistRepository', () => {
       expect(arg?.include?.releases).toBeDefined();
       expect(arg?.include?.bioImages).toBeDefined();
     });
+
+    it('loads the releases of every band the artist is a member of with the same release graph', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+
+      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
+      const include = arg?.include as Record<string, unknown> | undefined;
+      const memberOf = include?.memberOf as {
+        include: { artist: { include: { releases: unknown } } };
+      };
+      expect(memberOf.include.artist.include.releases).toEqual(include?.releases);
+    });
   });
 
   describe('findUniqueBySlug', () => {

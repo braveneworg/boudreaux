@@ -10,6 +10,7 @@ import { ArrowRight, Loader2, Music2 } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { useArtistBySlugQuery } from '@/hooks/queries/use-artist-by-slug-query';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import { compareByCreditThenNewest } from '@/lib/utils/artist-release-credits';
 import { toBioTeaser } from '@/lib/utils/bio-teaser';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
@@ -35,22 +36,16 @@ const hasPlayableTracks = (artistRelease: ArtistRelease): boolean =>
   (artistRelease.release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files
     .length ?? 0) > 0;
 
-/** Sort comparator: most recently released first (missing dates sort last). */
-const byReleasedOnDesc = (a: ArtistRelease, b: ArtistRelease): number => {
-  const dateA = a.release.releasedOn ? new Date(a.release.releasedOn).getTime() : 0;
-  const dateB = b.release.releasedOn ? new Date(b.release.releasedOn).getTime() : 0;
-  return dateB - dateA;
-};
-
 /**
- * Project an artist down to only its releases with playable tracks, sorted
- * newest-first — the shape the {@link ArtistPlayer} expects.
+ * Project an artist down to only its releases with playable tracks — own
+ * releases first, then featured and band appearances, newest first within
+ * each — the shape the {@link ArtistPlayer} expects.
  */
 const withPlayableReleases = (
   artist: ArtistWithPublishedReleases
 ): ArtistWithPublishedReleases => ({
   ...artist,
-  releases: artist.releases.filter(hasPlayableTracks).sort(byReleasedOnDesc),
+  releases: artist.releases.filter(hasPlayableTracks).sort(compareByCreditThenNewest),
 });
 
 type ArtistBioImage = ArtistWithPublishedReleases['bioImages'][number];

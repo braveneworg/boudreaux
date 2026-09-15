@@ -11,7 +11,12 @@ vi.mock('@/hooks/queries/use-artist-by-slug-query', () => ({
 }));
 
 vi.mock('./artist-player', () => ({
-  ArtistPlayer: () => <div data-testid="artist-player" />,
+  ArtistPlayer: ({ artist }: { artist: { releases: Array<{ release: { id: string } }> } }) => (
+    <div
+      data-testid="artist-player"
+      data-release-order={artist.releases.map(({ release }) => release.id).join(',')}
+    />
+  ),
 }));
 
 vi.mock('./expandable-thumbnail', () => ({
@@ -186,13 +191,14 @@ describe('ArtistDetailContent', () => {
     expect(screen.getByRole('link', { name: /read full bio/i })).toBeInTheDocument();
   });
 
-  it('filters out releases without MP3_320KBPS files and keeps playable ones', () => {
+  it('filters out releases without MP3_320KBPS files and orders playable ones newest first', () => {
     useArtistBySlugQueryMock.mockReturnValue({
       isPending: false,
       data: {
         ...artist,
         releases: [
           {
+            credit: 'primary',
             release: {
               id: 'r-old',
               releasedOn: '2020-01-01',
@@ -200,6 +206,7 @@ describe('ArtistDetailContent', () => {
             },
           },
           {
+            credit: 'primary',
             release: {
               id: 'r-new',
               releasedOn: '2023-01-01',
@@ -207,6 +214,7 @@ describe('ArtistDetailContent', () => {
             },
           },
           {
+            credit: 'primary',
             release: {
               id: 'r-none',
               releasedOn: null,
@@ -214,6 +222,7 @@ describe('ArtistDetailContent', () => {
             },
           },
           {
+            credit: 'primary',
             release: {
               id: 'r-wrong',
               releasedOn: '2022-01-01',
@@ -224,10 +233,42 @@ describe('ArtistDetailContent', () => {
       },
     });
 
-    // ArtistPlayer is mocked to a stub; the render exercises the filter/sort
-    // branches without throwing, which is the coverage target here.
     render(<ArtistDetailContent slug="test-artist" />);
 
-    expect(screen.getByTestId('artist-player')).toBeInTheDocument();
+    expect(screen.getByTestId('artist-player')).toHaveAttribute(
+      'data-release-order',
+      'r-new,r-old'
+    );
+  });
+
+  it('keeps the artist’s own releases ahead of newer featured and band appearances', () => {
+    const playable = [{ formatType: 'MP3_320KBPS', files: [{ id: 'f' }] }];
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        releases: [
+          {
+            credit: 'member',
+            release: { id: 'band', releasedOn: '2025-01-01', digitalFormats: playable },
+          },
+          {
+            credit: 'featured',
+            release: { id: 'guest', releasedOn: '2024-01-01', digitalFormats: playable },
+          },
+          {
+            credit: 'primary',
+            release: { id: 'own', releasedOn: '2010-01-01', digitalFormats: playable },
+          },
+        ],
+      },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByTestId('artist-player')).toHaveAttribute(
+      'data-release-order',
+      'own,guest,band'
+    );
   });
 });
