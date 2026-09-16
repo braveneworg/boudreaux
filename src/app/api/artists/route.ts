@@ -6,13 +6,16 @@ import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
+import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
+import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { CreateArtistData } from '@/lib/types/domain/artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { validateBody } from '@/lib/utils/validate-request';
+import { artistListingQuerySchema } from '@/lib/validation/artist-listing-query-schema';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
 export const dynamic = 'force-dynamic';
@@ -41,57 +44,109 @@ const requireAdmin = (session: ServerSession | null): NextResponse | null =>
     : null;
 
 /**
- * GET /api/artists
- * Returns a skip/offset page of artists for the admin listing, optionally
- * filtered by a server-side `search` term and `published`/`deleted` state.
- *
- * Query params: `skip` (default 0), `take` (default 24, clamped to 100),
- * `search`, `published` ('true'/'false'), `deleted` ('true').
+ * The public listing carries no per-user data, so it may be shared-cached
+ * briefly; the admin listing never is.
  */
-export async function GET(request: NextRequest) {
+const PUBLIC_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+} as const;
+const ADMIN_CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
+
+/**
+ * Handle the public `listing=published` branch — no sign-in required. The
+ * query is degraded to defaults rather than rejected (see
+ * `artistListingQuerySchema`), and the service's narrow projection is what
+ * ships: no contact fields ever leave here.
+ */
+const handlePublishedListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
+  const filters = artistListingQuerySchema.parse({
+    search: searchParams.get('search') ?? undefined,
+    sort: searchParams.get('sort') ?? undefined,
+    skip: searchParams.get('skip') ?? undefined,
+    take: searchParams.get('take') ?? undefined,
+  });
+
+  const result = await ArtistService.listPublishedArtists(filters);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
+  }
+
+  return NextResponse.json(
+    {
+      rows: result.data,
+      nextSkip: computeNextSkip(result.data.length, filters.skip, filters.take),
+    },
+    { headers: PUBLIC_CACHE_HEADERS }
+  );
+};
+
+/** Handle the admin (default) branch — gated on a signed-in admin session. */
+const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
+  const session = await auth();
+  const authError = requireAdmin(session);
+  if (authError) {
+    return authError;
+  }
+
+  const { skip, take } = parsePagination(searchParams);
+  const search = searchParams.get('search');
+  const published = parsePublished(searchParams.get('published'));
+  const deleted = searchParams.get('deleted') === 'true';
+
+  const params = {
+    skip,
+    take,
+    ...(search && { search }),
+    ...(published !== undefined && { published }),
+    ...(deleted && { deleted }),
+  };
+
+  const result = await ArtistService.getArtists(params);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
+  }
+
+  return NextResponse.json(
+    {
+      rows: result.data,
+      nextSkip: computeNextSkip(result.data.length, skip, take),
+    },
+    { headers: ADMIN_CACHE_HEADERS }
+  );
+};
+
+/**
+ * GET /api/artists
+ *
+ * Rate-limited on the public tier (like `/api/videos`); auth is per branch.
+ *
+ * Query params:
+ *   listing   – When "published", returns one page of listed artists for any
+ *               visitor via `ArtistService.listPublishedArtists` (ADR-0007);
+ *               honors `skip`, `take`, `sort` (`alpha` | `newest`), and a
+ *               name/aka/genre/release-title `search`.
+ *   skip, take, search, published, deleted – Pagination/filter params for the
+ *               admin listing mode (requires the admin role; `skip` default 0,
+ *               `take` default 24 clamped to 100, `published` 'true'/'false',
+ *               `deleted` 'true').
+ */
+export const GET = withRateLimit(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest) => {
   try {
-    const session = await auth();
-    const authError = requireAdmin(session);
-    if (authError) {
-      return authError;
-    }
-
     const searchParams = request.nextUrl.searchParams;
-    const { skip, take } = parsePagination(searchParams);
-    const search = searchParams.get('search');
-    const published = parsePublished(searchParams.get('published'));
-    const deleted = searchParams.get('deleted') === 'true';
 
-    const params = {
-      skip,
-      take,
-      ...(search && { search }),
-      ...(published !== undefined && { published }),
-      ...(deleted && { deleted }),
-    };
-
-    const result = await ArtistService.getArtists(params);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(
-      {
-        rows: result.data,
-        nextSkip: computeNextSkip(result.data.length, skip, take),
-      },
-      {
-        headers: {
-          'Cache-Control': 'private, no-store',
-        },
-      }
-    );
+    return searchParams.get('listing') === 'published'
+      ? await handlePublishedListing(searchParams)
+      : await handleAdminListing(searchParams);
   } catch (error) {
     loggers.media.error('Artist GET error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * POST /api/artists

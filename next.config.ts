@@ -266,6 +266,14 @@ const config = {
     return buildResponseHeaders();
   },
 
+  async redirects() {
+    return [
+      // The standalone artist search page was folded into the index (its
+      // combobox now lives on /artists); the old URL stays reachable.
+      { source: '/artists/search', destination: '/artists', permanent: true },
+    ];
+  },
+
   // Configure rewrites if needed
   async rewrites() {
     return [

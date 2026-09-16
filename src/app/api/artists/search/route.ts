@@ -40,30 +40,14 @@ const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResul
   };
 };
 
-const handleFullFormat = async (query: string): Promise<NextResponse> => {
-  const result = query
-    ? await ArtistService.searchPublishedArtists({ search: query, take: 50 })
-    : { success: true as const, data: [] };
-
-  if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-  }
-
-  return NextResponse.json(
-    { artists: result.data },
-    { headers: { 'Cache-Control': CACHE_HEADER } }
-  );
-};
-
 /**
  * GET /api/artists/search?q=...
- * Public endpoint — searches published, active artists by name, group, or
- * release title.
+ * Public endpoint behind the home-page artist typeahead — searches active
+ * artists holding a direct credit on a published release by name, group, or
+ * release title, returning the lightweight combobox shape.
  *
  * Query params:
- *   q      – Search query (minimum 3 characters for combobox mode).
- *   format – When "full", returns raw artist objects for the search results page.
- *            Default returns lightweight combobox-optimized shape.
+ *   q – Search query (minimum 3 characters; shorter queries return no results).
  */
 export const GET = withRateLimit(
   searchLimiter,
@@ -71,11 +55,6 @@ export const GET = withRateLimit(
 )(async (request: NextRequest) => {
   try {
     const query = request.nextUrl.searchParams.get('q') ?? '';
-    const format = request.nextUrl.searchParams.get('format');
-
-    if (format === 'full') {
-      return await handleFullFormat(query);
-    }
 
     if (query.length < 3) {
       return NextResponse.json({ results: [] }, { headers: { 'Cache-Control': CACHE_HEADER } });

@@ -22,7 +22,7 @@ flowchart TD
         SVC["BioGenerationService"]
         IMGSVC["BioImageService<br/>(rehostWithVariants)"]
         ASVC["ArtistService<br/>(sanitize on read/write)"]
-        REPO["ArtistRepository<br/>(replaceBioContent,<br/>listPublishedWithBio)"]
+        REPO["ArtistRepository<br/>(replaceBioContent,<br/>listListed)"]
         SAN["sanitizeBioHtml /<br/>sanitizeBioText"]
         VAR["generateVariantsFromBuffer<br/>(image-variants util)"]
     end

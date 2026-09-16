@@ -78,8 +78,50 @@ export const compareByCreditThenNewest = <
  * Public listing rule: only published, non-deleted releases. `publishedAt` may
  * be absent on legacy Mongo documents, which counts as unpublished.
  */
-const isListable = ({ publishedAt, deletedOn }: CreditableRelease): boolean =>
+export const isListable = ({
+  publishedAt,
+  deletedOn,
+}: Pick<CreditableRelease, 'publishedAt' | 'deletedOn'>): boolean =>
   publishedAt != null && deletedOn == null;
+
+/** The release fields the artists-index summary reads from a direct release join. */
+export interface SummarizableReleaseRow {
+  release: Pick<CreditableRelease, 'id' | 'releasedOn' | 'publishedAt' | 'deletedOn'> & {
+    title: string;
+  };
+}
+
+/** The artists-index release summary: how many listed releases, and the newest of them. */
+export interface ListedReleaseSummary {
+  releaseCount: number;
+  newestRelease: { id: string; title: string; releasedOn: Date } | null;
+}
+
+/**
+ * Summarise an artist's DIRECT release credits for the artists index: the
+ * number of listed (published, non-deleted) releases and the newest of them
+ * by release date. Band releases are deliberately not counted — the index
+ * lists only directly credited artists (ADR-0007), so a member credit neither
+ * lists an artist nor inflates their count.
+ */
+export const summarizeListedReleases = (rows: SummarizableReleaseRow[]): ListedReleaseSummary => {
+  const listed = rows.map(({ release }) => release).filter(isListable);
+  const newest = listed.reduce<SummarizableReleaseRow['release'] | null>(
+    (best, release) =>
+      best === null || releasedOnTime(release.releasedOn) > releasedOnTime(best.releasedOn)
+        ? release
+        : best,
+    null
+  );
+
+  return {
+    releaseCount: listed.length,
+    newestRelease:
+      newest === null
+        ? null
+        : { id: newest.id, title: newest.title, releasedOn: new Date(newest.releasedOn ?? 0) },
+  };
+};
 
 /**
  * Build the artist page's release list from the artist's release graph: every

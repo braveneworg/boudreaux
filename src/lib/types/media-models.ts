@@ -1,12 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type {
-  Artist,
-  ArtistListWithBio,
-  ArtistScalars,
-  ArtistWithPublishedReleases,
-} from '@/lib/types/domain/artist';
+import type { Artist, ArtistScalars, ArtistWithPublishedReleases } from '@/lib/types/domain/artist';
 import type { FeaturedArtist, FeaturedArtistFormatFile } from '@/lib/types/domain/featured-artist';
 import type {
   PublishedReleaseDetail,
@@ -32,7 +27,7 @@ export type { Format, Json, Platform } from '@/lib/types/domain/shared';
 
 // Artist types are now hand-written, Prisma-free domain types (drift-checked in
 // artist-repository). Imported above for local use, re-exported for back-compat.
-export type { Artist, ArtistListWithBio, ArtistWithPublishedReleases };
+export type { Artist, ArtistWithPublishedReleases };
 
 // Release output types are now hand-written, Prisma-free domain types
 // (drift-checked in release-repository). Imported above for local use,
@@ -205,9 +200,9 @@ export interface ReleaseUrl {
   url: UrlRecord;
 }
 
-// `ArtistListWithBio` and `ArtistWithPublishedReleases` are re-exported from the
-// domain layer at the top of this file; their query includes live in
-// artist-repository (drift-checked against the domain types). The public release
+// `ArtistWithPublishedReleases` is re-exported from the domain layer at the top
+// of this file; its query include lives in artist-repository (drift-checked
+// against the domain type). The public release
 // listing/detail/carousel types are re-exported from the domain layer near the
 // top of this file; their query includes/selects live in release-repository
 // (drift-checked against the domain types).

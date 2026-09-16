@@ -21,7 +21,10 @@ import type {
   ArtistBioLinkRecord,
   ArtistDetail,
   ArtistListFilters,
-  ArtistListWithBio,
+  ArtistListingFilters,
+  ArtistListingName,
+  ArtistListingRecord,
+  ArtistListingRow,
   ArtistNameRecord,
   ArtistScalars,
   ArtistSearchMatch,
@@ -33,9 +36,10 @@ import type {
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import type { ImageRecord } from '@/lib/types/domain/image';
-import { collectArtistReleases } from '@/lib/utils/artist-release-credits';
+import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { generateSlug } from '@/lib/utils/generate-slug';
+import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object, getS3Client } from '@/lib/utils/s3-client';
@@ -821,9 +825,10 @@ export class ArtistService {
   }
 
   /**
-   * Search published (active, non-deleted) artists.
-   * Used by the public artist search feature. The repository owns the Mongo-safe
-   * `where` (published + non-deleted + has-published-release) construction.
+   * Search active, non-deleted artists that hold a direct credit on a published
+   * release (the playlist "By artist" search). The repository owns the
+   * Mongo-safe `where`; unlike the artists index this does not require the
+   * artist row itself to be published.
    */
   static async searchPublishedArtists(
     params?: ArtistListFilters
@@ -836,18 +841,44 @@ export class ArtistService {
     }
   }
 
+  /** Alphabetical order for the band-relationship lines on a listing row. */
+  private static compareListingNames(a: ArtistListingName, b: ArtistListingName): number {
+    return getArtistDisplayName(a).localeCompare(getArtistDisplayName(b));
+  }
+
   /**
-   * List published artists for the public `/artists` index, with their primary
-   * bio images and short bios sanitized for redisplay.
+   * Project one repository listing record onto the public listing row: the band
+   * joins flattened to name projections, the direct release joins summarised
+   * into `releaseCount` + `newestRelease` (listed releases only) and dropped,
+   * and the short bio reduced to plain text for the card teaser.
    */
-  static async listPublishedArtists(): Promise<ServiceResponse<ArtistListWithBio[]>> {
+  private static toArtistListingRow({
+    members,
+    memberOf,
+    releases,
+    ...artist
+  }: ArtistListingRecord): ArtistListingRow {
+    return {
+      ...artist,
+      shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
+      members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
+      memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
+      ...summarizeListedReleases(releases),
+    };
+  }
+
+  /**
+   * List one page of listed artists for the public `/artists` index and its
+   * search combobox (ADR-0007). This is the single projection behind both the
+   * `/api/artists?listing=published` route and the page's SSR prefetch, so the
+   * hydrated first page and every fetched page share one shape.
+   */
+  static async listPublishedArtists(
+    filters: ArtistListingFilters
+  ): Promise<ServiceResponse<ArtistListingRow[]>> {
     try {
-      const artists = await ArtistRepository.listPublishedWithBio({ skip: 0, take: 100 });
-      const sanitized = artists.map((artist) => ({
-        ...artist,
-        shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
-      }));
-      return { success: true, data: sanitized };
+      const records = await ArtistRepository.listListed(filters);
+      return { success: true, data: records.map(ArtistService.toArtistListingRow) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve artists' });
     }

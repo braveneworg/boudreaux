@@ -401,6 +401,15 @@ describe('ArtistRepository', () => {
       expect(arg?.include?.images).toEqual({ orderBy: { sortOrder: 'asc' }, take: 1 });
     });
 
+    it('does not require the artist itself to be published (playlist search keeps its rule)', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.searchPublished({ search: 'foo' });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).not.toHaveProperty('publishedOn');
+    });
+
     it('adds a title/name search AND clause when a search term is given', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
@@ -408,6 +417,232 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where?.AND).toBeDefined();
+    });
+  });
+
+  describe('listListed', () => {
+    const notDeleted = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
+    const listedReleaseClause = {
+      some: {
+        release: {
+          publishedAt: { not: null },
+          OR: notDeleted,
+        },
+      },
+    };
+    const searchOr = (arg: { where?: { AND?: Array<{ OR?: unknown[] }> } } | undefined) =>
+      arg?.where?.AND?.[0]?.OR ?? [];
+
+    /** A listing record whose only listed release carries the given date. */
+    const listedRecord = (id: string, displayName: string, releasedOn: Date | null) => ({
+      id,
+      displayName,
+      releases:
+        releasedOn === null
+          ? []
+          : [
+              {
+                release: {
+                  id: `${id}-r`,
+                  title: `${displayName} LP`,
+                  releasedOn,
+                  publishedAt: new Date('2024-01-01'),
+                  deletedOn: null,
+                },
+              },
+            ],
+    });
+
+    it('lists only active, published, non-deleted artists with a listed direct release', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({
+        isActive: true,
+        publishedOn: { not: null },
+        OR: notDeleted,
+        releases: listedReleaseClause,
+      });
+    });
+
+    it('selects a narrow projection with no contact fields', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg).not.toHaveProperty('include');
+      expect(arg?.select).not.toHaveProperty('phone');
+      expect(arg?.select).not.toHaveProperty('email');
+      expect(arg?.select).not.toHaveProperty('address1');
+    });
+
+    it('selects up to three primary bio images in sort order', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({
+        where: { isPrimary: true },
+        orderBy: { sortOrder: 'asc' },
+        take: 3,
+      });
+    });
+
+    it('selects the band graph and the narrow release projection', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.members).toBeDefined();
+      expect(arg?.select?.memberOf).toBeDefined();
+      expect(arg?.select?.releases).toEqual({
+        select: {
+          release: {
+            select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+          },
+        },
+      });
+    });
+
+    it('matches the search term against every name field, aka names, genres, and release titles', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ search: 'foo', sort: 'alpha', skip: 0, take: 24 });
+
+      const contains = { contains: 'foo', mode: 'insensitive' };
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(searchOr(arg as never)).toEqual([
+        { firstName: contains },
+        { surname: contains },
+        { displayName: contains },
+        { slug: contains },
+        { akaNames: contains },
+        { genres: contains },
+        {
+          releases: {
+            some: {
+              release: { title: contains, publishedAt: { not: null }, OR: notDeleted },
+            },
+          },
+        },
+      ]);
+    });
+
+    it('omits the search clause when no term is given', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).not.toHaveProperty('AND');
+    });
+
+    it('pages the A–Z order in the database', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 24, take: 24 });
+
+      expect(result).toEqual([{ id: 'a' }]);
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg).toMatchObject({ orderBy: { displayName: 'asc' }, skip: 24, take: 24 });
+    });
+
+    it('fetches every listed artist for the newest-release order instead of paging in the database', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'newest', skip: 24, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg).not.toHaveProperty('skip');
+      expect(arg).not.toHaveProperty('take');
+      expect(arg).not.toHaveProperty('orderBy');
+    });
+
+    it('orders by the newest listed release date, newest first', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('old', 'Old Act', new Date('2010-01-01')),
+        listedRecord('new', 'New Act', new Date('2025-01-01')),
+        listedRecord('mid', 'Mid Act', new Date('2018-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['new', 'mid', 'old']);
+    });
+
+    it('ignores unlisted releases when ranking by newest release', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        {
+          ...listedRecord('drafty', 'Drafty', new Date('2010-01-01')),
+          releases: [
+            ...listedRecord('drafty', 'Drafty', new Date('2010-01-01')).releases,
+            {
+              release: {
+                id: 'draft',
+                title: 'Draft',
+                releasedOn: new Date('2030-01-01'),
+                publishedAt: null,
+                deletedOn: null,
+              },
+            },
+          ],
+        },
+        listedRecord('steady', 'Steady', new Date('2020-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['steady', 'drafty']);
+    });
+
+    it('breaks a newest-release tie by display name', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('zed', 'Zed', new Date('2020-01-01')),
+        listedRecord('abe', 'Abe', new Date('2020-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['abe', 'zed']);
+    });
+
+    it('sorts an artist with no dated listed release last', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('undated', 'Undated', null),
+        listedRecord('dated', 'Dated', new Date('2001-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['dated', 'undated']);
+    });
+
+    it('slices the newest-release order to the requested page', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('a', 'A', new Date('2025-01-01')),
+        listedRecord('b', 'B', new Date('2024-01-01')),
+        listedRecord('c', 'C', new Date('2023-01-01')),
+        listedRecord('d', 'D', new Date('2022-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 1, take: 2 });
+
+      expect(result.map(({ id }) => id)).toEqual(['b', 'c']);
+    });
+
+    it('maps a connection failure to an UNAVAILABLE DataError', async () => {
+      vi.mocked(prisma.artist.findMany).mockRejectedValue(
+        new Prisma.PrismaClientInitializationError('down', '6.0.0')
+      );
+
+      await expect(
+        ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 })
+      ).rejects.toMatchObject({ code: 'UNAVAILABLE' });
     });
   });
 

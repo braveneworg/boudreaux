@@ -61,7 +61,7 @@ depicts it. See the [coverage section](#validation-coverage) below.
 
 1. [useInfiniteReleasesQuery](#1-useinfinitereleasesquery) · 2. [useInfinitePublishedReleasesQuery](#2-useinfinitepublishedreleasesquery) · 3. [useReleaseListQuery](#3-usereleaselistquery) · 4. [useReleaseQuery](#4-usereleasequery) · 5. [useReleaseRelatedQuery](#5-usereleaserelatedquery) · 6. [useReleaseDigitalFormatsQuery](#6-usereleasedigitalformatsquery) · 7. [useReleaseUserStatusQuery](#7-usereleaseuserstatusquery)
 
-**Artists & featured** 8. [useInfiniteArtistsQuery](#8-useinfiniteartistsquery) · 9. [useArtistListQuery](#9-useartistlistquery) · 10. [useArtistBySlugQuery](#10-useartistbyslugquery) · 11. [useArtistSearchQuery](#11-useartistsearchquery) · 12. [useArtistNavSearchQuery](#12-useartistnavsearchquery) · 13. [useInfiniteFeaturedArtistsQuery](#13-useinfinitefeaturedartistsquery) · 14. [useActiveFeaturedArtistsQuery](#14-useactivefeaturedartistsquery)
+**Artists & featured** 8. [useInfiniteArtistsQuery](#8-useinfiniteartistsquery) · 9. [useArtistListQuery](#9-useartistlistquery) · 10. [useArtistBySlugQuery](#10-useartistbyslugquery) · 11. [useInfinitePublishedArtistsQuery](#11-useinfinitepublishedartistsquery) · 12. [useArtistNavSearchQuery](#12-useartistnavsearchquery) · 13. [useInfiniteFeaturedArtistsQuery](#13-useinfinitefeaturedartistsquery) · 14. [useActiveFeaturedArtistsQuery](#14-useactivefeaturedartistsquery)
 
 **Downloads & commerce** 15. [useDownloadQuotaQuery](#15-usedownloadquotaquery) · 16. [useFreeDownloadStatusQuery](#16-usefreedownloadstatusquery) · 17. [useDownloadAnalyticsQuery](#17-usedownloadanalyticsquery) · 18. [useCollectionQuery](#18-usecollectionquery)
 
@@ -121,13 +121,13 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 **Validated.** Fetches one artist (plus published releases and signed stream URLs) by slug from `/api/artists/slug/{slug}?withReleases=true` (rate-limited), which validates the slug regex and calls `ArtistService.getArtistBySlugWithReleases`. Special-cases a **404 to `null`** and throws `Error('Failed to fetch artist')` otherwise; on 200 it validates the body with `parseResponse` against `artistWithPublishedReleasesSchema` (drift throws `ResponseValidationError`). Gated on a non-empty `slug`. PDF page 10.
 
-### 11. useArtistSearchQuery
+### 11. useInfinitePublishedArtistsQuery
 
-**Validated.** Searches published artists in "full" format via `/api/artists/search?q=&format=full` (rate-limited), which calls `ArtistService.searchPublishedArtists({ take: 50 })`. Uses `fetchAndParse` + inline `artistSearchResponseSchema`; `Error('Failed to search artists')` on non-OK. Gated on `query.length > 0`, `keepPreviousData`. (Exported and tested, but currently has no live call site.) PDF page 11.
+**Validated.** Public artists index (`artists-content`): one infinite query, keyed by sort (`alpha` | `newest`) and the debounced search, feeds both the card grid and the search combobox (its dropdown is `pages[0].rows.slice(0, 8)`). Pages `/api/artists?listing=published` (`take=24`, rate-limited on `publicLimiter`, no auth); the route parses the query with `artistListingQuerySchema` (degrading bad values to defaults, never 400) and calls `ArtistService.listPublishedArtists`, which lists only **listed artists** (ADR-0007: active, published, not deleted, directly credited on a published release) via a narrow Prisma `select` that never carries contact fields. `newest` is ordered by each artist's latest listed release in memory (Mongo cannot sort by a relation aggregate). Validates against `artistListingPageSchema`; `keepPreviousData` smooths sort/search transitions; the first page is SSR-prefetched under the same key. PDF page 11.
 
 ### 12. useArtistNavSearchQuery
 
-**Validated.** Drives the nav/header artist typeahead by hitting the **same** `/api/artists/search` endpoint with **no `format` param**, returning the lightweight combobox shape (`{ results: [{ artistSlug, artistName, thumbnailSrc, releases }] }`) from `ArtistService.searchPublishedArtists({ take: 20 })`. Validates via inline `artistNavSearchResponseSchema`; gates on `query.length >= 3` (mirroring the server's `< 3 → []` short-circuit); consumers debounce ~250ms. PDF page 12.
+**Validated.** Drives the home-page artist typeahead (`ArtistSearchInput`) by hitting `/api/artists/search`, returning the lightweight combobox shape (`{ results: [{ artistSlug, artistName, thumbnailSrc, releases }] }`) from `ArtistService.searchPublishedArtists({ take: 20 })`. Validates via inline `artistNavSearchResponseSchema`; gates on `query.length >= 3` (mirroring the server's `< 3 → []` short-circuit); consumers debounce ~250ms. PDF page 12.
 
 ### 13. useInfiniteFeaturedArtistsQuery
 
@@ -250,7 +250,7 @@ cast.**
 All 34, by domain:
 
 - **Releases & catalog:** useInfiniteReleasesQuery, useInfinitePublishedReleasesQuery, useReleaseListQuery, useReleaseQuery, useReleaseRelatedQuery, useReleaseDigitalFormatsQuery, useReleaseUserStatusQuery
-- **Artists & featured:** useInfiniteArtistsQuery, useArtistListQuery, useArtistBySlugQuery, useArtistSearchQuery, useArtistNavSearchQuery, useInfiniteFeaturedArtistsQuery, useActiveFeaturedArtistsQuery
+- **Artists & featured:** useInfiniteArtistsQuery, useArtistListQuery, useArtistBySlugQuery, useInfinitePublishedArtistsQuery, useArtistNavSearchQuery, useInfiniteFeaturedArtistsQuery, useActiveFeaturedArtistsQuery
 - **Downloads & commerce:** useDownloadQuotaQuery, useFreeDownloadStatusQuery, useDownloadAnalyticsQuery, useCollectionQuery
 - **Tours & venues:** useInfiniteToursQuery, useTourQuery, useTourDatesQuery, useVenueSearchQuery, useVenueDetailQuery
 - **Banners & system:** useBannersQuery, useNotificationBannerSearchQuery, useCdnStatusQuery, useHealthStatusQuery

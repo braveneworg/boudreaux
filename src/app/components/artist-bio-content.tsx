@@ -9,6 +9,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { useArtistBySlugQuery } from '@/hooks/queries/use-artist-by-slug-query';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { splitList } from '@/lib/utils/split-list';
 
 import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
@@ -17,12 +18,6 @@ import { ZinePanel } from './ui/zine-panel';
 interface ArtistBioContentProps {
   slug: string;
 }
-
-const splitList = (value: string | null | undefined): string[] =>
-  value
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter(Boolean) ?? [];
 
 /**
  * Client content for the full artist bio page at `/artists/[slug]/bio`.

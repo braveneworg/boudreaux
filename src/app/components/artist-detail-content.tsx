@@ -13,6 +13,7 @@ import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { compareByCreditThenNewest } from '@/lib/utils/artist-release-credits';
 import { toBioTeaser } from '@/lib/utils/bio-teaser';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { splitList } from '@/lib/utils/split-list';
 
 import { ArtistPlayer } from './artist-player';
 import { ExpandableThumbnail } from './expandable-thumbnail';
@@ -22,12 +23,6 @@ interface ArtistDetailContentProps {
   slug: string;
   initialReleaseId?: string;
 }
-
-const splitList = (value: string | null | undefined): string[] =>
-  value
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter(Boolean) ?? [];
 
 type ArtistRelease = ArtistWithPublishedReleases['releases'][number];
 

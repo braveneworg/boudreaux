@@ -75,6 +75,13 @@ an Artist's page lists every release they hold a credit on, primary first.
 See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
 
+**listed artist** — an Artist shown on the public artists index and found by
+its search: active, published, not deleted, and directly credited (primary or
+featured) on at least one published Release. A member credit alone does not
+list an Artist. See
+[ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md).
+_Avoid_: visible artist, public artist.
+
 **Video** — an uploaded video asset with **probe** metadata (technical fields
 extracted by ffprobe), a **description**, and **enrichment** (externally
 sourced facts such as release date; available to any category once the video

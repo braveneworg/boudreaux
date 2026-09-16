@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { test, expect } from '../../fixtures/base.fixture';
+import { scrollToLoad } from '../../helpers/infinite-scroll';
+
+import type { Page } from '@playwright/test';
 
 test.describe('Artist Page', () => {
   test.describe('Release Combobox', () => {
@@ -81,7 +84,18 @@ test.describe('Artist Page', () => {
   });
 
   test.describe('Artists index', () => {
-    test('should list the artist with a short bio and View more link', async ({ page }) => {
+    /** Open the search combobox and return its typing input (never `.fill()` the trigger). */
+    const openSearch = async (page: Page) => {
+      await page.getByRole('button', { name: 'Search artists' }).click();
+      return page.getByPlaceholder('Search by name, genre, or release');
+    };
+
+    /** The artist cards currently in the grid. */
+    const cards = (page: Page) => page.locator('[data-slot="card"]');
+
+    test('lists the artist with a short bio and a card link to the detail page', async ({
+      page,
+    }) => {
       await page.goto('/artists');
 
       await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
@@ -89,12 +103,108 @@ test.describe('Artist Page', () => {
       });
       await expect(page.getByText(/genre-blurring act/i)).toBeVisible();
 
-      // "View more" navigates to the detail page.
-      await page
-        .getByRole('link', { name: /view more/i })
-        .first()
-        .click();
+      // The whole card is clickable through the stretched name link.
+      await page.getByRole('link', { name: 'E2E Artist', exact: true }).click();
       await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
+    });
+
+    test('prepopulates the search dropdown with the first eight artists', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await openSearch(page);
+
+      await expect(page.getByRole('option')).toHaveCount(8);
+      await expect(page.getByRole('option').first()).toContainText('E2E Artist');
+    });
+
+    test('narrows the grid and the dropdown by release title as the user types', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await (await openSearch(page)).fill('Album Three');
+
+      await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.getByRole('option')).toContainText('E2E Artist');
+      await expect(cards(page)).toHaveCount(1);
+    });
+
+    test('matches artists by genre', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await (await openSearch(page)).fill('Punk');
+
+      await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.getByRole('option')).toContainText('E2E Band');
+    });
+
+    test('finds an artist beyond the first page (search runs server-side)', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await (await openSearch(page)).fill('Roster 25');
+
+      await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.getByRole('option')).toContainText('E2E Roster 25');
+    });
+
+    test('selecting a suggestion fills the field and narrows the grid without navigating', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await (await openSearch(page)).fill('E2E Band');
+      await page.getByRole('option', { name: /E2E Band/ }).click();
+
+      await expect(page.getByRole('button', { name: 'Search artists' })).toHaveText(/E2E Band/);
+      await expect(page).toHaveURL(/\/artists$/);
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      await expect(cards(page).first()).toContainText('E2E Band');
+    });
+
+    test('shows release credits, band relationships, and active years on the cards', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+
+      const artistCard = cards(page).filter({ hasText: 'Member of E2E Band' });
+      await expect(artistCard).toHaveCount(1, { timeout: 15_000 });
+      await expect(artistCard).toContainText('3 releases · Latest: E2E Album Three (2024)');
+
+      const bandCard = cards(page).filter({ hasText: 'Members: E2E Artist' });
+      await expect(bandCard).toHaveCount(1);
+      await expect(bandCard).toContainText('Formed 2010');
+      await expect(bandCard).toContainText('1 release · Latest: E2E Band Single (2025)');
+    });
+
+    test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
+
+      await page.getByRole('radio', { name: 'Newest release' }).click();
+
+      await expect(cards(page).first()).toContainText('E2E Band', { timeout: 10_000 });
+    });
+
+    test('loads the second page on scroll', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('E2E Roster 25')).toHaveCount(0);
+
+      await scrollToLoad(page, page.getByRole('link', { name: 'E2E Roster 25', exact: true }));
+    });
+
+    test('redirects the retired search page to the index', async ({ page }) => {
+      await page.goto('/artists/search');
+
+      await expect(page).toHaveURL(/\/artists$/);
+      await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
+        timeout: 15_000,
+      });
     });
   });
 });

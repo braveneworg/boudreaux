@@ -790,6 +790,7 @@ const seedTestDatabase = async () => {
     await prisma.venue.deleteMany({});
     await prisma.artistFeaturedArtist.deleteMany({});
     await prisma.artistRelease.deleteMany({});
+    await prisma.artistMember.deleteMany({});
     await prisma.artistLabel.deleteMany({});
     await prisma.artistUrl.deleteMany({});
     // Bio images/links have a required Artist relation, so they must be removed
@@ -1271,6 +1272,80 @@ const seedTestDatabase = async () => {
         data: { artistId: e2eArtist.id, releaseId: e2eRelease3.id },
       }),
     ]);
+
+    // Artists-index fixtures (ADR-0007: the index lists only artists directly
+    // credited on a published release). Without these rows the seed has exactly
+    // ONE listed artist, so the index specs could not exercise search, band
+    // lines, the newest-release sort, or a second page.
+    //
+    // E2E Band: a listed band whose only member is E2E Artist, with one
+    // published, format-less single (no player ever sees it). Exercises the
+    // "Member of" / "Members:" lines, the "Formed 2010" year, genre search
+    // ("Punk"), and the newest-release sort (2025 beats E2E Artist's 2024).
+    // createdAt is pinned far in the past so the band never becomes the admin
+    // list's first row (the bio-generation spec regenerates that artist).
+    const e2eBand = await prisma.artist.create({
+      data: {
+        firstName: 'E2E',
+        surname: 'Band',
+        slug: 'e2e-band',
+        displayName: 'E2E Band',
+        publishedOn: new Date(),
+        formedOn: new Date('2010-01-01'),
+        genres: 'Punk',
+        createdAt: new Date('2019-06-01T00:00:00Z'),
+      },
+    });
+    const e2eBandSingle = await prisma.release.create({
+      data: {
+        title: 'E2E Band Single',
+        releasedOn: new Date('2025-01-01'),
+        coverArt: PLACEHOLDER_COVER_ART,
+        publishedAt: new Date(),
+      },
+    });
+    await prisma.artistRelease.create({
+      data: { artistId: e2eBand.id, releaseId: e2eBandSingle.id },
+    });
+    await prisma.artistMember.create({
+      data: { artistId: e2eBand.id, memberId: e2eArtist.id },
+    });
+
+    // 25 roster artists sharing one published, format-less compilation so the
+    // public index has a second page (A–Z page 1 = E2E Artist, E2E Band,
+    // E2E Roster 01–22; page 2 = Roster 23–25). Bulk-created with createMany
+    // (concurrent create() read-backs race in CI on fresh collections) and
+    // linked with one createMany as well; createdAt is pinned in the past for
+    // the same admin-list reason as the band.
+    const rosterNumbers = Array.from({ length: 25 }, (_, index) =>
+      String(index + 1).padStart(2, '0')
+    );
+    await prisma.artist.createMany({
+      data: rosterNumbers.map((nn) => ({
+        firstName: 'E2E',
+        surname: `Roster ${nn}`,
+        slug: `e2e-roster-${nn}`,
+        displayName: `E2E Roster ${nn}`,
+        publishedOn: new Date(),
+        createdAt: new Date('2019-01-01T00:00:00Z'),
+      })),
+    });
+    const rosterArtists = await prisma.artist.findMany({
+      where: { slug: { startsWith: 'e2e-roster-' } },
+      select: { id: true },
+      orderBy: { slug: 'asc' },
+    });
+    const rosterCompilation = await prisma.release.create({
+      data: {
+        title: 'E2E Roster Compilation',
+        releasedOn: new Date('2000-01-01'),
+        coverArt: PLACEHOLDER_COVER_ART,
+        publishedAt: new Date(),
+      },
+    });
+    await prisma.artistRelease.createMany({
+      data: rosterArtists.map(({ id }) => ({ artistId: id, releaseId: rosterCompilation.id })),
+    });
 
     // Create MP3_320KBPS digital formats with track files for each E2E release.
     // The artist page filters releases to only those with playable MP3_320KBPS files.

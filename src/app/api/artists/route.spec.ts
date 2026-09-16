@@ -24,12 +24,22 @@ vi.mock('@/auth', () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } }),
 }));
 
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  publicLimiter: { check: vi.fn().mockResolvedValue(undefined) },
+  PUBLIC_LIMIT: 30,
+}));
+
 vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
     getArtists: vi.fn(),
     createArtist: vi.fn(),
+    listPublishedArtists: vi.fn(),
   },
 }));
+
+// The collection route is `withRateLimit(...)(handler)`, whose type requires a
+// route context second argument; the handler ignores its params.
+const emptyContext = { params: Promise.resolve({}) };
 
 // Create POST reference after mocking
 const POST = postHandler;
@@ -78,7 +88,7 @@ describe('Artist API Routes', () => {
       vi.mocked(auth).mockResolvedValueOnce(null as never);
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -92,7 +102,7 @@ describe('Artist API Routes', () => {
       } as never);
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -108,7 +118,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -128,7 +138,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?skip=0&take=2');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(data.nextSkip).toBe(2);
@@ -141,7 +151,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Cache-Control')).toBe('private, no-store');
@@ -154,7 +164,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?skip=10&take=5');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
@@ -170,7 +180,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?search=john');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
@@ -187,7 +197,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?published=true');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith(
@@ -202,7 +212,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?published=false');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith(
@@ -217,7 +227,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?deleted=true');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith(
@@ -234,7 +244,7 @@ describe('Artist API Routes', () => {
       const request = new NextRequest(
         'http://localhost:3000/api/artists?skip=5&take=10&search=doe'
       );
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
@@ -251,7 +261,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -269,7 +279,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(503);
@@ -284,7 +294,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -295,7 +305,7 @@ describe('Artist API Routes', () => {
       vi.mocked(ArtistService.getArtists).mockRejectedValue(Error('Unexpected error'));
 
       const request = new NextRequest('http://localhost:3000/api/artists');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -309,7 +319,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?take=500');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
@@ -325,7 +335,7 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?skip=-5');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
@@ -341,13 +351,167 @@ describe('Artist API Routes', () => {
       });
 
       const request = new NextRequest('http://localhost:3000/api/artists?skip=invalid&take=abc');
-      const response = await GET(request);
+      const response = await GET(request, emptyContext);
 
       expect(response.status).toBe(200);
       expect(ArtistService.getArtists).toHaveBeenCalledWith({
         skip: 0,
         take: 24,
       });
+    });
+  });
+
+  describe('GET /api/artists?listing=published', () => {
+    const listingRow = {
+      id: 'artist-1',
+      slug: 'e2e-artist',
+      firstName: 'E2E',
+      middleName: null,
+      surname: 'Artist',
+      title: null,
+      suffix: null,
+      displayName: 'E2E Artist',
+      akaNames: null,
+      genres: null,
+      instruments: null,
+      shortBio: null,
+      bornOn: null,
+      diedOn: null,
+      formedOn: null,
+      bioImages: [],
+      members: [],
+      memberOf: [],
+      releaseCount: 1,
+      newestRelease: { id: 'r-1', title: 'LP', releasedOn: new Date('2024-01-01') },
+    };
+
+    const callPublished = (query = '') =>
+      GET(
+        new NextRequest(`http://localhost:3000/api/artists?listing=published${query}`),
+        emptyContext
+      );
+
+    beforeEach(() => {
+      vi.mocked(ArtistService.listPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [],
+      });
+    });
+
+    it('serves the published listing without consulting auth at all', async () => {
+      vi.mocked(auth).mockClear();
+
+      const response = await callPublished();
+
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
+    });
+
+    it('calls the listing service with the default A–Z page', async () => {
+      await callPublished();
+
+      expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
+        sort: 'alpha',
+        skip: 0,
+        take: 24,
+      });
+    });
+
+    it('forwards a trimmed search term, the sort, and the pagination', async () => {
+      await callPublished('&search=%20punk%20&sort=newest&skip=24&take=12');
+
+      expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
+        search: 'punk',
+        sort: 'newest',
+        skip: 24,
+        take: 12,
+      });
+    });
+
+    it('degrades a malformed listing query to defaults instead of a 400', async () => {
+      const response = await callPublished('&sort=sideways&skip=nope&take=500');
+
+      expect(response.status).toBe(200);
+      expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
+        sort: 'alpha',
+        skip: 0,
+        take: 100,
+      });
+    });
+
+    it('returns the rows with a null nextSkip for a short page', async () => {
+      vi.mocked(ArtistService.listPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [listingRow],
+      });
+
+      const response = await callPublished();
+      const data = await response.json();
+
+      expect(data.rows).toHaveLength(1);
+      expect(data.nextSkip).toBeNull();
+    });
+
+    it('returns the next offset when a full page comes back', async () => {
+      vi.mocked(ArtistService.listPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [listingRow],
+      });
+
+      const response = await callPublished('&take=1');
+      const data = await response.json();
+
+      expect(data.nextSkip).toBe(1);
+    });
+
+    it('never ships contact fields on a listing row', async () => {
+      vi.mocked(ArtistService.listPublishedArtists).mockResolvedValue({
+        success: true,
+        data: [listingRow],
+      });
+
+      const response = await callPublished();
+      const data = await response.json();
+
+      expect(data.rows[0]).not.toHaveProperty('email');
+      expect(data.rows[0]).not.toHaveProperty('phone');
+      expect(data.rows[0]).not.toHaveProperty('address1');
+    });
+
+    it('sets a shared, short-lived Cache-Control header on the public listing', async () => {
+      const response = await callPublished();
+
+      expect(response.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=60, stale-while-revalidate=300'
+      );
+    });
+
+    it('maps a database-unavailable failure to 503', async () => {
+      vi.mocked(ArtistService.listPublishedArtists).mockResolvedValue({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
+
+      const response = await callPublished();
+
+      expect(response.status).toBe(503);
+    });
+
+    it('maps a thrown error to 500', async () => {
+      vi.mocked(ArtistService.listPublishedArtists).mockRejectedValueOnce(new Error('boom'));
+
+      const response = await callPublished();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Internal server error' });
+    });
+
+    it('does not call the admin listing for the published branch', async () => {
+      await callPublished();
+
+      expect(ArtistService.getArtists).not.toHaveBeenCalled();
     });
   });
 

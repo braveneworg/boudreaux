@@ -5,18 +5,48 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
+import type { ArtistListingRow } from '@/lib/types/domain/artist';
+
 import ArtistsIndexPage from './page';
 
 vi.mock('server-only', () => ({}));
 
-const mockListPublishedArtists = vi.fn().mockResolvedValue({ success: true, data: [] });
+// Mock next/navigation — redirect must throw to halt execution like the real one.
+const mockRedirect = vi.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`);
+});
+vi.mock('next/navigation', () => ({
+  redirect: (url: string) => mockRedirect(url),
+}));
+
+// Mock TanStack Query SSR utilities — execute the queryFn so coverage sees it.
+const mockPrefetchInfiniteQuery = vi
+  .fn()
+  .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
+    if (opts.queryFn) {
+      await Promise.resolve(opts.queryFn());
+    }
+  });
+const mockDehydratedState = { queries: [], mutations: [] };
+vi.mock('@tanstack/react-query', () => ({
+  dehydrate: () => mockDehydratedState,
+  HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@/lib/utils/get-query-client', () => ({
+  getQueryClient: () => ({
+    prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
+  }),
+}));
+
+const mockListPublishedArtists = vi.fn();
 vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
     listPublishedArtists: (...args: unknown[]) => mockListPublishedArtists(...args),
   },
 }));
 
-// Mock child components
+// Mock the shell containers + the client content island.
 vi.mock('@/app/components/ui/page-container', () => ({
   PageContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="page-container">{children}</div>
@@ -41,15 +71,45 @@ vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
   ),
 }));
 
-vi.mock('@/app/components/artist-list-card', () => ({
-  ArtistListCard: ({ artist }: { artist: { id: string; name: string } }) => (
-    <div data-testid="artist-list-card">{artist.name}</div>
-  ),
+vi.mock('@/app/components/artists-content', () => ({
+  ArtistsContent: () => <div data-testid="artists-content">Artists Content</div>,
 }));
+
+const mockRow: ArtistListingRow = {
+  id: 'artist-1',
+  slug: 'e2e-artist',
+  firstName: 'E2E',
+  middleName: null,
+  surname: 'Artist',
+  title: null,
+  suffix: null,
+  displayName: 'E2E Artist',
+  akaNames: null,
+  genres: null,
+  instruments: null,
+  shortBio: null,
+  bornOn: null,
+  diedOn: null,
+  formedOn: null,
+  bioImages: [],
+  members: [],
+  memberOf: [],
+  releaseCount: 1,
+  newestRelease: { id: 'r-1', title: 'LP', releasedOn: new Date('2024-01-01T00:00:00.000Z') },
+};
 
 describe('ArtistsIndexPage', () => {
   beforeEach(() => {
     mockListPublishedArtists.mockResolvedValue({ success: true, data: [] });
+  });
+
+  // The page is public: no session is mocked anywhere in this spec, and the
+  // page must never redirect an anonymous visitor.
+  it('should never redirect to signin', async () => {
+    const Page = await ArtistsIndexPage();
+    render(Page);
+
+    expect(mockRedirect).not.toHaveBeenCalled();
   });
 
   it('should render page structure with PageContainer and ContentContainer', async () => {
@@ -76,20 +136,20 @@ describe('ArtistsIndexPage', () => {
     const Page = await ArtistsIndexPage();
     render(Page);
 
+    const heading = screen.getByRole('heading', { level: 1 });
     const headingImage = screen.getByRole('img', { name: /artists/i });
+    expect(heading).toContainElement(headingImage);
     expect(headingImage).toHaveAttribute('alt', 'artists');
   });
 
-  it('should wrap the heading and artist list in a hot-pink zine panel', async () => {
+  it('should wrap the heading and content in a hot-pink zine panel', async () => {
     const Page = await ArtistsIndexPage();
     const { container } = render(Page);
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
-    expect(panel).toBeInTheDocument();
     expect(panel).toHaveClass('zine-accent-hot-pink');
-
-    const headingImage = screen.getByRole('img', { name: /artists/i });
-    expect(panel).toContainElement(headingImage);
+    expect(panel).toContainElement(screen.getByRole('img', { name: /artists/i }));
+    expect(panel).toContainElement(screen.getByTestId('artists-content'));
   });
 
   it('should render the breadcrumb inside the zine panel', async () => {
@@ -100,42 +160,53 @@ describe('ArtistsIndexPage', () => {
     expect(panel).toContainElement(screen.getByTestId('breadcrumb-menu'));
   });
 
-  it('should render a link to the artist search page', async () => {
+  it('should no longer link to a separate search page', async () => {
     const Page = await ArtistsIndexPage();
     render(Page);
 
-    const searchLink = screen.getByRole('link', { name: /search artists/i });
-    expect(searchLink).toHaveAttribute('href', '/artists/search');
+    expect(screen.queryByRole('link', { name: /search artists/i })).not.toBeInTheDocument();
   });
 
-  it('should render an ArtistListCard for each published artist', async () => {
-    mockListPublishedArtists.mockResolvedValue({
-      success: true,
-      data: [
-        { id: 'artist-1', name: 'First Artist' },
-        { id: 'artist-2', name: 'Second Artist' },
-      ],
-    });
-
+  it('should prefetch the first A–Z page as an infinite query', async () => {
     const Page = await ArtistsIndexPage();
     render(Page);
 
-    expect(screen.getAllByTestId('artist-list-card')).toHaveLength(2);
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        queryKey: ['artists', 'publishedInfinite', 'alpha', ''],
+        initialPageParam: 0,
+      })
+    );
   });
 
-  it('should render an empty state when no artists are published', async () => {
-    const Page = await ArtistsIndexPage();
-    render(Page);
+  it('should read the artist service directly for the first page', async () => {
+    await ArtistsIndexPage();
 
-    expect(screen.getByText(/no artists have been published yet/i)).toBeInTheDocument();
+    expect(mockListPublishedArtists).toHaveBeenCalledWith({ sort: 'alpha', skip: 0, take: 24 });
   });
 
-  it('should render an error state when the service call fails', async () => {
-    mockListPublishedArtists.mockResolvedValue({ success: false, error: 'boom' });
+  it('should shape the prefetched first page exactly like the listing route', async () => {
+    mockListPublishedArtists.mockResolvedValue({ success: true, data: [mockRow] });
 
+    await ArtistsIndexPage();
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({ rows: [mockRow], nextSkip: null });
+  });
+
+  it('should degrade to an empty first page when the service fails', async () => {
+    mockListPublishedArtists.mockResolvedValue({ success: false, error: 'Database unavailable' });
+
+    await ArtistsIndexPage();
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
+  });
+
+  it('should render ArtistsContent within the hydration boundary', async () => {
     const Page = await ArtistsIndexPage();
     render(Page);
 
-    expect(screen.getByText(/artists are unavailable right now/i)).toBeInTheDocument();
+    expect(screen.getByTestId('artists-content')).toBeInTheDocument();
   });
 });
