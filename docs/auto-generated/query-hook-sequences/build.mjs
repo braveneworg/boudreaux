@@ -447,40 +447,48 @@ sequenceDiagram
     end`,
   },
   {
-    file: '11-use-artist-search-query.mmd',
-    title: '11. useArtistSearchQuery — full-format artist search',
-    src: `%% useArtistSearchQuery — full-format artist search
+    file: '11-use-infinite-published-artists-query.mmd',
+    title: '11. useInfinitePublishedArtistsQuery — public artists index (infinite + combobox)',
+    src: `%% useInfinitePublishedArtistsQuery — public artists index (grid + search dropdown)
 sequenceDiagram
     autonumber
-    actor U as User
-    participant C as Consumer<br/>(search results)
-    participant H as useArtistSearchQuery<br/>(useQuery, enabled query.length>0)
+    actor U as Visitor
+    participant C as Component<br/>(artists-content /<br/>artist-search-combobox)
+    participant H as useInfinitePublishedArtistsQuery<br/>(useInfiniteQuery, keepPreviousData)
     participant F as fetchAndParse
-    participant R as GET /api/artists/search?q&format=full<br/>(withRateLimit · searchLimiter)
-    participant SV as ArtistService<br/>.searchPublishedArtists
-    participant DB as Prisma · MongoDB
-    participant V as artistSearchResponseSchema
+    participant R as GET /api/artists?listing=published<br/>(withRateLimit · publicLimiter)
+    participant Q as artistListingQuerySchema
+    participant SV as ArtistService<br/>.listPublishedArtists
+    participant DB as Prisma · MongoDB<br/>(artist.findMany select)
+    participant V as artistListingPageSchema
     participant RC as QueryCache.onError
-    C->>H: useArtistSearchQuery(query)
-    H->>F: queryFn({signal})
-    F->>R: fetch(url, {signal})
-    R->>SV: searchPublishedArtists({search, take: 50})
-    SV->>DB: findMany(isActive, has published release, name contains)
-    DB-->>SV: rows
+    C->>H: useInfinitePublishedArtistsQuery(sort, debounced search)
+    H->>F: queryFn({pageParam=skip, signal})
+    F->>R: fetch(/api/artists?listing=published&skip&take=24&sort&search, {signal})
+    R->>Q: parse(search, sort, skip, take) — degrade to defaults, never 400
+    R->>SV: listPublishedArtists({search, sort, skip, take})
+    alt sort = alpha
+        SV->>DB: findMany(listed where, narrow select, orderBy displayName, skip, take)
+    else sort = newest
+        SV->>DB: findMany(listed where, narrow select)
+        SV->>SV: order by newest listed release, slice(skip, take)
+    end
+    DB-->>SV: records (no contact fields)
+    SV->>SV: toArtistListingRow — flatten bands, count + newest listed release, sanitize shortBio
     SV-->>R: { success, data }
-    R-->>F: 200 { artists } (s-maxage=60)
+    R-->>F: 200 { rows, nextSkip } (s-maxage=60, swr=300)
     F->>V: safeParse(body)
     alt valid
         V-->>F: parsed
-        F-->>H: { artists }
-        H-->>C: { data }
+        F-->>H: page
+        H-->>C: data.pages (grid) · pages[0].rows.slice(0, 8) (dropdown)
     else contract drift
         V-->>F: error
         F-->>H: throw ResponseValidationError
-        H->>RC: reports to /api/client-errors
-    else response not ok (503/500)
-        R-->>F: 4xx/5xx
-        F-->>H: throw Error('Failed to search artists')
+        H->>RC: onError reports to /api/client-errors
+    else not ok / 503 DB unavailable
+        R-->>F: 4xx/5xx/503
+        F-->>H: throw Error('Failed to fetch artists')
     end`,
   },
   {

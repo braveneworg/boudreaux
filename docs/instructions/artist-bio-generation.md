@@ -56,12 +56,12 @@ editor** rather than a plain textarea.
 
 ### Data layer
 
-| File                                        | Purpose                                                                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `prisma/schema.prisma`                      | New `ArtistBioImage` & `ArtistBioLink` models; new `Artist.bioGeneratedAt`, `Artist.bioModel`; `bioImages`/`bioLinks` relations |
-| `src/lib/types/media-models.ts`             | Add `bioImages`/`bioLinks` to `artistWithPublishedReleasesInclude`; new `artistListWithBioInclude` + `ArtistListWithBio` type   |
-| `src/lib/validation/media-models-schema.ts` | Zod scalar schemas for the two new models + new artist fields                                                                   |
-| `src/lib/repositories/artist-repository.ts` | `listPublishedWithBio()` (public index) and `replaceBioContent()` (transactional bio replace)                                   |
+| File                                        | Purpose                                                                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prisma/schema.prisma`                      | New `ArtistBioImage` & `ArtistBioLink` models; new `Artist.bioGeneratedAt`, `Artist.bioModel`; `bioImages`/`bioLinks` relations                      |
+| `src/lib/types/media-models.ts`             | Add `bioImages`/`bioLinks` to `artistWithPublishedReleasesInclude`; new artists-index projection (now `artistListingSelect` + `ArtistListingRecord`) |
+| `src/lib/validation/media-models-schema.ts` | Zod scalar schemas for the two new models + new artist fields                                                                                        |
+| `src/lib/repositories/artist-repository.ts` | `listListed()` (public index) and `replaceBioContent()` (transactional bio replace)                                                                  |
 
 ### Services / actions / validation
 
