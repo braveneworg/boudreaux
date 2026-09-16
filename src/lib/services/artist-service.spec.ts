@@ -64,7 +64,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findFirstByName: vi.fn(),
     findMany: vi.fn(),
     searchPublished: vi.fn(),
-    listPublishedWithBio: vi.fn(),
+    listListed: vi.fn(),
     findPublishedBySlugWithReleases: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -2297,52 +2297,151 @@ describe('ArtistService', () => {
   });
 
   describe('listPublishedArtists', () => {
-    it('returns published artists with their short bios sanitized to plain text', async () => {
-      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
-        { ...mockArtist, shortBio: '<p>Hello <b>world</b></p>' },
-      ] as never);
+    const listingName = (id: string, displayName: string) => ({
+      id,
+      displayName,
+      firstName: displayName,
+      middleName: null,
+      surname: '',
+      title: null,
+      suffix: null,
+    });
 
-      const result = await ArtistService.listPublishedArtists();
+    const listedRelease = (id: string, title: string, releasedOn: string) => ({
+      release: {
+        id,
+        title,
+        releasedOn: new Date(releasedOn),
+        publishedAt: new Date('2024-01-01'),
+        deletedOn: null,
+      },
+    });
 
-      expect(ArtistRepository.listPublishedWithBio).toHaveBeenCalledWith({ skip: 0, take: 100 });
-      expect(result.success).toBe(true);
+    const listingRecord = {
+      id: 'artist-1',
+      slug: 'e2e-artist',
+      firstName: 'E2E',
+      middleName: null,
+      surname: 'Artist',
+      title: null,
+      suffix: null,
+      displayName: 'E2E Artist',
+      akaNames: null,
+      genres: 'Experimental, Electronic',
+      instruments: null,
+      shortBio: '<p>Hello <b>world</b></p>',
+      bornOn: null,
+      diedOn: null,
+      formedOn: null,
+      bioImages: [],
+      members: [
+        { member: listingName('m-2', 'Zed Member') },
+        { member: listingName('m-1', 'Abe Member') },
+      ],
+      memberOf: [{ artist: listingName('b-1', 'E2E Band') }],
+      releases: [
+        listedRelease('r-1', 'E2E Album One', '2024-03-01'),
+        listedRelease('r-3', 'E2E Album Three', '2024-09-01'),
+        listedRelease('r-2', 'E2E Album Two', '2024-06-01'),
+        {
+          release: {
+            id: 'r-draft',
+            title: 'Unreleased',
+            releasedOn: new Date('2030-01-01'),
+            publishedAt: null,
+            deletedOn: null,
+          },
+        },
+      ],
+    };
+
+    const filters = { sort: 'alpha' as const, skip: 0, take: 24 };
+
+    const listOne = async () => {
+      vi.mocked(ArtistRepository.listListed).mockResolvedValue([listingRecord] as never);
+      const result = await ArtistService.listPublishedArtists(filters);
+      return result.success ? result.data[0] : undefined;
+    };
+
+    it('forwards the listing filters to the repository', async () => {
+      vi.mocked(ArtistRepository.listListed).mockResolvedValue([] as never);
+
+      await ArtistService.listPublishedArtists({ ...filters, search: 'punk', sort: 'newest' });
+
+      expect(ArtistRepository.listListed).toHaveBeenCalledWith({
+        ...filters,
+        search: 'punk',
+        sort: 'newest',
+      });
     });
 
     it('strips markup from the short bio (plain-text sanitization)', async () => {
-      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
-        { ...mockArtist, shortBio: '<p>Hello <b>world</b></p>' },
-      ] as never);
+      const row = await listOne();
 
-      const result = await ArtistService.listPublishedArtists();
-
-      const shortBio = result.success ? result.data[0]?.shortBio : undefined;
-      expect(shortBio).not.toContain('<');
+      expect(row?.shortBio).toBe('Hello world');
     });
 
     it('leaves a null short bio untouched', async () => {
-      vi.mocked(ArtistRepository.listPublishedWithBio).mockResolvedValue([
-        { ...mockArtist, shortBio: null },
+      vi.mocked(ArtistRepository.listListed).mockResolvedValue([
+        { ...listingRecord, shortBio: null },
       ] as never);
 
-      const result = await ArtistService.listPublishedArtists();
+      const result = await ArtistService.listPublishedArtists(filters);
 
       const shortBio = result.success ? result.data[0]?.shortBio : 'unexpected';
       expect(shortBio).toBeNull();
     });
 
+    it('counts only the listed direct releases', async () => {
+      const row = await listOne();
+
+      expect(row?.releaseCount).toBe(3);
+    });
+
+    it('summarises the newest listed release', async () => {
+      const row = await listOne();
+
+      expect(row?.newestRelease).toEqual({
+        id: 'r-3',
+        title: 'E2E Album Three',
+        releasedOn: new Date('2024-09-01'),
+      });
+    });
+
+    it('does not expose the raw release joins on the row', async () => {
+      const row = await listOne();
+
+      expect(row).not.toHaveProperty('releases');
+    });
+
+    it('flattens the bands the artist belongs to', async () => {
+      const row = await listOne();
+
+      expect(row?.memberOf).toEqual([listingName('b-1', 'E2E Band')]);
+    });
+
+    it('flattens the band members in display-name order', async () => {
+      const row = await listOne();
+
+      expect(row?.members.map(({ displayName }) => displayName)).toEqual([
+        'Abe Member',
+        'Zed Member',
+      ]);
+    });
+
     it('returns Database unavailable on a connection failure', async () => {
       const initError = new DataError('UNAVAILABLE', 'boom');
-      vi.mocked(ArtistRepository.listPublishedWithBio).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.listListed).mockRejectedValue(initError);
 
-      const result = await ArtistService.listPublishedArtists();
+      const result = await ArtistService.listPublishedArtists(filters);
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
 
     it('returns a generic error on an unexpected failure', async () => {
-      vi.mocked(ArtistRepository.listPublishedWithBio).mockRejectedValue(new Error('nope'));
+      vi.mocked(ArtistRepository.listListed).mockRejectedValue(new Error('nope'));
 
-      const result = await ArtistService.listPublishedArtists();
+      const result = await ArtistService.listPublishedArtists(filters);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artists' });
     });

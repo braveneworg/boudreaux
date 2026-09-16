@@ -4,43 +4,85 @@
 
 import Link from 'next/link';
 
-import { ArrowRight, Music2, User } from 'lucide-react';
+import { Music2, User } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
-import type { ArtistListWithBio } from '@/lib/types/media-models';
+import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
+import { formatArtistActiveYears } from '@/lib/utils/artist-active-years';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { splitList } from '@/lib/utils/split-list';
 
 import { BioHtml } from './bio-html';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 
 interface ArtistListCardProps {
-  artist: ArtistListWithBio;
+  artist: ArtistListingRow;
 }
 
-const splitList = (value: string | null | undefined): string[] =>
-  value
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter(Boolean) ?? [];
+/** How many genre badges a card shows before the rest are left to the detail page. */
+const MAX_GENRES = 3;
+
+/** Comma-join the display names of related artists for a band line. */
+const joinNames = (names: ArtistListingName[]): string =>
+  names.map((name) => getArtistDisplayName(name)).join(', ');
+
+/** `"Member of A, B"` for a member, `"Members: A, B"` for a band, `null` when neither applies. */
+const formatBandLine = ({
+  memberOf,
+  members,
+}: Pick<ArtistListingRow, 'memberOf' | 'members'>): string | null => {
+  if (memberOf.length > 0) return `Member of ${joinNames(memberOf)}`;
+  if (members.length > 0) return `Members: ${joinNames(members)}`;
+  return null;
+};
+
+/** Active years and instruments joined by a middle dot; `null` when neither is set. */
+const formatMetaLine = (
+  artist: Pick<ArtistListingRow, 'formedOn' | 'bornOn' | 'diedOn' | 'instruments'>
+): string | null => {
+  const parts = [formatArtistActiveYears(artist), artist.instruments?.trim() || null].filter(
+    (part): part is string => part !== null
+  );
+  return parts.length > 0 ? parts.join(' · ') : null;
+};
+
+/** `"3 releases · Latest: Title (2024)"`, singular-aware; `null` when nothing is listed. */
+const formatReleaseCredits = ({
+  releaseCount,
+  newestRelease,
+}: Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'>): string | null => {
+  if (releaseCount === 0 || newestRelease === null) return null;
+  const noun = releaseCount === 1 ? 'release' : 'releases';
+  const year = newestRelease.releasedOn.getUTCFullYear();
+  return `${releaseCount} ${noun} · Latest: ${newestRelease.title} (${year})`;
+};
 
 /**
- * Public artists-index card: a few identifying images, the short bio, genres,
- * and a "View more" link to the artist detail page. Mobile-first single column;
- * images sit above the text on small screens and beside it from `sm` up.
+ * Public artists-index card. Hierarchy, top to bottom: identifying images →
+ * name → active years and instruments → genres → band relationships → short
+ * bio → release credits. The whole card is clickable through the name link,
+ * which is stretched over the card with a pseudo-element: the card cannot be
+ * one `<a>` because each thumbnail holds its own dialog trigger, so the
+ * thumbnails wrapper sits above the stretched link (`relative z-10`).
+ * Mobile-first single column; images sit above the text on small screens and
+ * beside it from `sm` up.
  *
- * @param artist - Published artist with its primary bio images.
+ * @param artist - A listed artist row (ADR-0007) from the artists index query.
  */
 export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const displayName = getArtistDisplayName(artist);
-  const genres = splitList(artist.genres).slice(0, 3);
+  const genres = splitList(artist.genres).slice(0, MAX_GENRES);
   const images = artist.bioImages;
+  const meta = formatMetaLine(artist);
+  const bandLine = formatBandLine(artist);
+  const credits = formatReleaseCredits(artist);
 
   return (
-    <Card className="shadow-zine-sm overflow-hidden bg-white">
+    <Card className="shadow-zine-sm relative overflow-hidden bg-white">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
         {images.length > 0 ? (
-          <ul className="flex shrink-0 gap-2">
+          <ul data-slot="artist-thumbnails" className="relative z-10 flex shrink-0 gap-2">
             {images.map((image) => (
               <li key={image.id} className="size-20 sm:size-24">
                 <ExpandableThumbnail
@@ -62,13 +104,25 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           </div>
         )}
 
-        <div className="min-w-0 space-y-2">
-          <Link href={`/artists/${artist.slug}`} className="text-lg font-semibold hover:underline">
-            {displayName}
-          </Link>
+        <div className="min-w-0 flex-1 space-y-2">
+          <h2 className="text-lg leading-tight font-semibold">
+            {/* Stretched over the card: the whole card navigates to the artist. */}
+            <Link
+              href={`/artists/${artist.slug}`}
+              className="after:absolute after:inset-0 after:content-[''] hover:underline"
+            >
+              {displayName}
+            </Link>
+          </h2>
+
+          {meta && (
+            <p data-slot="artist-meta" className="text-muted-foreground text-xs tracking-wide">
+              {meta}
+            </p>
+          )}
 
           {genres.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5">
+            <ul className="flex flex-wrap gap-1.5" aria-label="Genres">
               {genres.map((genre) => (
                 <li key={genre}>
                   <Badge variant="secondary" className="gap-1 text-xs">
@@ -80,6 +134,8 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
             </ul>
           )}
 
+          {bandLine && <p className="text-sm text-zinc-700">{bandLine}</p>}
+
           {artist.shortBio && (
             <BioHtml
               html={artist.shortBio}
@@ -87,13 +143,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
             />
           )}
 
-          <Link
-            href={`/artists/${artist.slug}`}
-            className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
-          >
-            View more
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
+          {credits && <p className="text-sm font-medium text-zinc-950">{credits}</p>}
         </div>
       </CardContent>
     </Card>

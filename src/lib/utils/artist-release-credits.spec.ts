@@ -5,6 +5,8 @@ import {
   collectArtistReleases,
   compareByCreditThenNewest,
   deriveOwnReleaseCredit,
+  isListable,
+  summarizeListedReleases,
 } from './artist-release-credits';
 
 import type { CreditableRelease } from './artist-release-credits';
@@ -210,5 +212,91 @@ describe('collectArtistReleases', () => {
     });
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('isListable', () => {
+  it('lists a published, non-deleted release', () => {
+    expect(isListable({ publishedAt: new Date('2024-01-01'), deletedOn: null })).toBe(true);
+  });
+
+  it('hides an unpublished release', () => {
+    expect(isListable({ publishedAt: null, deletedOn: null })).toBe(false);
+  });
+
+  it('hides a deleted release even when published', () => {
+    expect(
+      isListable({ publishedAt: new Date('2024-01-01'), deletedOn: new Date('2024-02-01') })
+    ).toBe(false);
+  });
+
+  it('treats a missing publishedAt field (legacy Mongo document) as unpublished', () => {
+    expect(isListable({ deletedOn: null })).toBe(false);
+  });
+});
+
+describe('summarizeListedReleases', () => {
+  const listedRow = (id: string, title: string, releasedOn: Date | string) => ({
+    release: { id, title, releasedOn, publishedAt: new Date('2024-01-01'), deletedOn: null },
+  });
+
+  it('counts only published, non-deleted releases', () => {
+    const rows = [
+      listedRow('a', 'A', new Date('2020-01-01')),
+      { release: { id: 'b', title: 'B', releasedOn: new Date('2025-01-01'), publishedAt: null } },
+      {
+        release: {
+          id: 'c',
+          title: 'C',
+          releasedOn: new Date('2026-01-01'),
+          publishedAt: new Date('2024-01-01'),
+          deletedOn: new Date('2024-02-01'),
+        },
+      },
+    ];
+
+    expect(summarizeListedReleases(rows).releaseCount).toBe(1);
+  });
+
+  it('picks the newest listed release by release date', () => {
+    const rows = [
+      listedRow('old', 'Old', new Date('2020-01-01')),
+      listedRow('new', 'New', new Date('2024-09-01')),
+      listedRow('mid', 'Mid', new Date('2022-01-01')),
+    ];
+
+    expect(summarizeListedReleases(rows).newestRelease).toEqual({
+      id: 'new',
+      title: 'New',
+      releasedOn: new Date('2024-09-01'),
+    });
+  });
+
+  it('never picks an unlisted release as the newest, even when it is the latest', () => {
+    const rows = [
+      listedRow('listed', 'Listed', new Date('2020-01-01')),
+      {
+        release: {
+          id: 'draft',
+          title: 'Draft',
+          releasedOn: new Date('2026-01-01'),
+          publishedAt: null,
+        },
+      },
+    ];
+
+    expect(summarizeListedReleases(rows).newestRelease?.id).toBe('listed');
+  });
+
+  it('returns a zero count and no newest release when nothing is listed', () => {
+    expect(summarizeListedReleases([])).toEqual({ releaseCount: 0, newestRelease: null });
+  });
+
+  it('rebuilds a string release date as a Date on the newest release', () => {
+    const rows = [listedRow('s', 'S', '2023-05-05T00:00:00.000Z')];
+
+    expect(summarizeListedReleases(rows).newestRelease?.releasedOn).toEqual(
+      new Date('2023-05-05T00:00:00.000Z')
+    );
   });
 });

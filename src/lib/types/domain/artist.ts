@@ -205,9 +205,100 @@ export interface ArtistWithPublishedReleases extends Omit<
   releases: Array<ArtistReleaseGraphRow & { credit: ReleaseCredit }>;
 }
 
-/** Public artists-index row: scalars plus primary bio images. */
-export interface ArtistListWithBio extends ArtistScalars {
-  bioImages: ArtistBioImageRecord[];
+/** Sort orders offered by the public artists index. */
+export type ArtistListingSort = 'alpha' | 'newest';
+
+/** Pagination, search, and sort for the public artists index. */
+export interface ArtistListingFilters {
+  /** Case-insensitive term matched against names, aka names, genres, and release titles. */
+  search?: string;
+  sort: ArtistListingSort;
+  skip: number;
+  take: number;
+}
+
+/** The name projection of a related artist (band member or band) on a listing row. */
+export interface ArtistListingName {
+  id: string;
+  displayName: string | null;
+  firstName: string;
+  middleName: string | null;
+  surname: string;
+  title: string | null;
+  suffix: string | null;
+}
+
+/** The bio-image projection the listing card and search dropdown render. */
+export interface ArtistListingBioImage {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  title: string | null;
+  attribution: string | null;
+  license: string | null;
+  licenseUrl: string | null;
+  sourceUrl: string | null;
+}
+
+/** Narrow release projection loaded behind every listing-row release join. */
+export interface ArtistListingReleaseRecord {
+  id: string;
+  title: string;
+  releasedOn: Date;
+  publishedAt: Date | null;
+  deletedOn: Date | null;
+}
+
+/**
+ * Repository payload behind the public artists index: the identifying scalars
+ * (never contact details), capped primary bio images, band members, bands the
+ * artist belongs to, and the artist's direct release joins carrying the narrow
+ * release projection. The service flattens this into {@link ArtistListingRow}.
+ */
+export interface ArtistListingRecord {
+  id: string;
+  slug: string;
+  firstName: string;
+  middleName: string | null;
+  surname: string;
+  title: string | null;
+  suffix: string | null;
+  displayName: string | null;
+  akaNames: string | null;
+  genres: string | null;
+  instruments: string | null;
+  shortBio: string | null;
+  bornOn: Date | null;
+  diedOn: Date | null;
+  formedOn: Date | null;
+  bioImages: ArtistListingBioImage[];
+  members: Array<{ member: ArtistListingName }>;
+  memberOf: Array<{ artist: ArtistListingName }>;
+  releases: Array<{ release: ArtistListingReleaseRecord }>;
+}
+
+/** The newest listed release credited to an artist, as shown on the listing row. */
+export interface ArtistListingNewestRelease {
+  id: string;
+  title: string;
+  releasedOn: Date;
+}
+
+/**
+ * Public artists-index row (the wire shape of `/api/artists?listing=published`
+ * and the SSR prefetch): {@link ArtistListingRecord} with the release joins
+ * summarised into a count plus the newest listed release, and the band joins
+ * flattened to their name projections.
+ */
+export interface ArtistListingRow extends Omit<
+  ArtistListingRecord,
+  'members' | 'memberOf' | 'releases'
+> {
+  members: ArtistListingName[];
+  memberOf: ArtistListingName[];
+  /** Published, non-deleted releases the artist holds a direct credit on. */
+  releaseCount: number;
+  newestRelease: ArtistListingNewestRelease | null;
 }
 
 /**

@@ -9,7 +9,8 @@ import type {
   Artist,
   ArtistDetail,
   ArtistListFilters,
-  ArtistListWithBio,
+  ArtistListingFilters,
+  ArtistListingRecord,
   ArtistNameRecord,
   ArtistScalars,
   ArtistSearchMatch,
@@ -18,6 +19,8 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import type { Json } from '@/lib/types/domain/shared';
+import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
+import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 
 import { runQuery } from './_internal/map-prisma-error';
@@ -115,10 +118,65 @@ const artistDetailInclude = {
   images: { orderBy: { sortOrder: 'asc' } },
 } as const satisfies Prisma.ArtistInclude;
 
-/** Public artists-index include — primary bio images beside the short bio. */
-const artistListWithBioInclude = {
-  bioImages: { where: { isPrimary: true }, orderBy: { sortOrder: 'asc' }, take: 3 },
-} as const satisfies Prisma.ArtistInclude;
+/** Name projection of a related artist (band member / band) on a listing row. */
+const artistListingNameSelect = {
+  id: true,
+  displayName: true,
+  firstName: true,
+  middleName: true,
+  surname: true,
+  title: true,
+  suffix: true,
+} as const satisfies Prisma.ArtistSelect;
+
+/**
+ * Public artists-index select — the identifying scalars only (this payload
+ * leaves the server, so contact fields are never selected), up to three
+ * primary bio images, the band graph as name projections, and the artist's
+ * direct release joins with the narrow release projection the listing rule and
+ * the "newest release" summary read.
+ */
+const artistListingSelect = {
+  id: true,
+  slug: true,
+  firstName: true,
+  middleName: true,
+  surname: true,
+  title: true,
+  suffix: true,
+  displayName: true,
+  akaNames: true,
+  genres: true,
+  instruments: true,
+  shortBio: true,
+  bornOn: true,
+  diedOn: true,
+  formedOn: true,
+  bioImages: {
+    where: { isPrimary: true },
+    orderBy: { sortOrder: 'asc' },
+    take: 3,
+    select: {
+      id: true,
+      url: true,
+      thumbnailUrl: true,
+      title: true,
+      attribution: true,
+      license: true,
+      licenseUrl: true,
+      sourceUrl: true,
+    },
+  },
+  members: { select: { member: { select: artistListingNameSelect } } },
+  memberOf: { select: { artist: { select: artistListingNameSelect } } },
+  releases: {
+    select: {
+      release: {
+        select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+      },
+    },
+  },
+} as const satisfies Prisma.ArtistSelect;
 
 /** Public-search include — first image plus release joins carrying the narrow
  * release projection the search consumes. */
@@ -170,9 +228,9 @@ type _ArtistDetailDrift = AssertExact<
   ArtistDetail,
   Prisma.ArtistGetPayload<{ include: typeof artistDetailInclude }>
 >;
-type _ArtistListWithBioDrift = AssertExact<
-  ArtistListWithBio,
-  Prisma.ArtistGetPayload<{ include: typeof artistListWithBioInclude }>
+type _ArtistListingRecordDrift = AssertExact<
+  ArtistListingRecord,
+  Prisma.ArtistGetPayload<{ select: typeof artistListingSelect }>
 >;
 type _ArtistWithReleaseGraphDrift = AssertExact<
   ArtistWithReleaseGraph,
@@ -185,7 +243,7 @@ type _ArtistSearchMatchDrift = AssertExact<
 const _artistDrift: _ArtistDrift = true;
 const _artistDetailDrift: _ArtistDetailDrift = true;
 const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
-const _artistListWithBioDrift: _ArtistListWithBioDrift = true;
+const _artistListingRecordDrift: _ArtistListingRecordDrift = true;
 const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
 // =============================================================================
@@ -251,42 +309,68 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
   return and.length > 0 ? { AND: and } : {};
 };
 
-/** Build the public-search `where` from a search term (Mongo null-safe). */
-const buildSearchWhere = (search?: string): Prisma.ArtistWhereInput => ({
-  isActive: true,
-  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-  releases: {
-    some: {
-      release: {
-        publishedAt: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-      },
-    },
-  },
-  ...(search && {
-    AND: [
-      {
-        OR: [
-          { firstName: { contains: search, mode: 'insensitive' as const } },
-          { surname: { contains: search, mode: 'insensitive' as const } },
-          { displayName: { contains: search, mode: 'insensitive' as const } },
-          { slug: { contains: search, mode: 'insensitive' as const } },
-          {
-            releases: {
-              some: {
-                release: {
-                  title: { contains: search, mode: 'insensitive' as const },
-                  publishedAt: { isSet: true },
-                  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-                },
+/** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
+const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
+
+/** A release that the public may see: published and not soft-deleted. */
+const listedReleaseWhere = {
+  publishedAt: { not: null },
+  OR: [...notDeletedOr],
+} as const satisfies Prisma.ReleaseWhereInput;
+
+/**
+ * Build the `where` shared by the public artists index and the public artist
+ * search: an active, non-deleted artist holding a DIRECT credit on at least
+ * one listed release (a member credit alone never qualifies — ADR-0007), with
+ * an optional case-insensitive search across the name fields, aka names,
+ * genres, and the titles of their listed releases.
+ *
+ * `requirePublished` adds the artist-level `publishedOn` gate the index uses;
+ * the playlist "By artist" search deliberately keeps today's rule without it.
+ */
+const buildListedWhere = (
+  search: string | undefined,
+  { requirePublished }: { requirePublished: boolean }
+): Prisma.ArtistWhereInput => {
+  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+  return {
+    isActive: true,
+    ...(requirePublished && { publishedOn: { not: null } }),
+    OR: [...notDeletedOr],
+    releases: { some: { release: listedReleaseWhere } },
+    ...(search && {
+      AND: [
+        {
+          OR: [
+            { firstName: contains(search) },
+            { surname: contains(search) },
+            { displayName: contains(search) },
+            { slug: contains(search) },
+            { akaNames: contains(search) },
+            { genres: contains(search) },
+            {
+              releases: {
+                some: { release: { title: contains(search), ...listedReleaseWhere } },
               },
             },
-          },
-        ],
-      },
-    ],
-  }),
-});
+          ],
+        },
+      ],
+    }),
+  };
+};
+
+/** Epoch millis of an artist's newest listed release; no listed release sorts last. */
+const newestListedReleaseTime = (record: ArtistListingRecord): number =>
+  summarizeListedReleases(record.releases).newestRelease?.releasedOn.getTime() ?? -Infinity;
+
+/**
+ * Newest-release order for the artists index: latest listed release first,
+ * ties (and artists without a dated listed release) by display name.
+ */
+const compareByNewestRelease = (a: ArtistListingRecord, b: ArtistListingRecord): number =>
+  newestListedReleaseTime(b) - newestListedReleaseTime(a) ||
+  getArtistDisplayName(a).localeCompare(getArtistDisplayName(b));
 
 /** A regenerated bio-link row before it is stamped `origin: 'generated'`. */
 type GeneratedLinkInput = { label: string; url: string; kind: string | null; sortOrder: number };
@@ -352,29 +436,37 @@ export class ArtistRepository {
   }
 
   /**
-   * List published, active, non-deleted artists for the public `/artists`
-   * index, including their primary bio images. Ordered by display name.
+   * List one page of listed artists for the public `/artists` index — active,
+   * published, non-deleted, and directly credited on a listed release — with
+   * the narrow {@link artistListingSelect} projection and an optional search.
+   *
+   * `alpha` pages by display name in the database. `newest` orders by each
+   * artist's latest listed release, which Prisma on MongoDB cannot sort by (it
+   * is a relation aggregate), so the listed roster is read whole and ordered +
+   * sliced here; the roster is small, and ADR-0007 records the revisit trigger.
    */
-  static async listPublishedWithBio({
+  static async listListed({
+    search,
+    sort,
     skip,
     take,
-  }: {
-    skip: number;
-    take: number;
-  }): Promise<ArtistListWithBio[]> {
-    return runQuery(() =>
-      prisma.artist.findMany({
-        where: {
-          isActive: true,
-          publishedOn: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        orderBy: { displayName: 'asc' },
-        skip,
-        take,
-        include: artistListWithBioInclude,
-      })
+  }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
+    const where = buildListedWhere(search, { requirePublished: true });
+    if (sort === 'alpha') {
+      return runQuery(() =>
+        prisma.artist.findMany({
+          where,
+          orderBy: { displayName: 'asc' },
+          skip,
+          take,
+          select: artistListingSelect,
+        })
+      );
+    }
+    const records = await runQuery(() =>
+      prisma.artist.findMany({ where, select: artistListingSelect })
     );
+    return [...records].sort(compareByNewestRelease).slice(skip, skip + take);
   }
 
   /**
@@ -459,8 +551,10 @@ export class ArtistRepository {
   }
 
   /**
-   * List active, published artists for the public search feature, with the
-   * lightweight images/releases include the search UI consumes.
+   * Search active, non-deleted artists that hold a direct credit on a listed
+   * release (the playlist "By artist" search), with the lightweight
+   * images/releases include that search consumes. Unlike the index, this does
+   * not require the artist row itself to be published.
    */
   static async searchPublished({
     search,
@@ -469,7 +563,7 @@ export class ArtistRepository {
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     return runQuery(() =>
       prisma.artist.findMany({
-        where: buildSearchWhere(search),
+        where: buildListedWhere(search, { requirePublished: false }),
         skip,
         take,
         orderBy: { displayName: 'asc' },

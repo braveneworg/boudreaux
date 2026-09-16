@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import type { ArtistListWithBio } from '@/lib/types/media-models';
+import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
 
 import { ArtistListCard } from './artist-list-card';
 
@@ -18,63 +18,208 @@ vi.mock('./bio-html', () => ({
   BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
 }));
 
-vi.mock('@/lib/utils/get-artist-display-name', () => ({
-  getArtistDisplayName: (artist: { displayName?: string | null }) =>
-    artist.displayName ?? 'Unknown',
-}));
+const name = (id: string, displayName: string): ArtistListingName => ({
+  id,
+  displayName,
+  firstName: displayName,
+  middleName: null,
+  surname: '',
+  title: null,
+  suffix: null,
+});
 
-const baseArtist = {
+const baseArtist: ArtistListingRow = {
   id: 'a1',
-  displayName: 'Test Artist',
   slug: 'test-artist',
-  shortBio: 'A short teaser bio.',
+  firstName: 'Test',
+  middleName: null,
+  surname: 'Artist',
+  title: null,
+  suffix: null,
+  displayName: 'Test Artist',
+  akaNames: null,
   genres: 'hip-hop, soul',
+  instruments: null,
+  shortBio: 'A short teaser bio.',
+  bornOn: null,
+  diedOn: null,
+  formedOn: null,
   bioImages: [],
-} as unknown as ArtistListWithBio;
+  members: [],
+  memberOf: [],
+  releaseCount: 3,
+  newestRelease: { id: 'r3', title: 'Third Album', releasedOn: new Date('2024-09-01T00:00:00Z') },
+};
 
 describe('ArtistListCard', () => {
-  it('links the artist name and View more to the detail page', () => {
+  it('links the artist name to the detail page', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
-    const links = screen.getAllByRole('link');
-    const hrefs = links.map((link) => link.getAttribute('href'));
-    expect(hrefs).toContain('/artists/test-artist');
-    expect(screen.getByRole('link', { name: /view more/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Test Artist' })).toHaveAttribute(
+      'href',
+      '/artists/test-artist'
+    );
   });
 
-  it('renders the short bio and genres', () => {
+  it('stretches the name link over the whole card so the card is clickable', () => {
     render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Test Artist' })).toHaveClass(
+      'after:absolute',
+      'after:inset-0'
+    );
+  });
+
+  it('no longer renders a separate View more link', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('renders the short bio and up to three genres', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, genres: 'hip-hop, soul, jazz, funk' }} />);
 
     expect(screen.getByText('A short teaser bio.')).toBeInTheDocument();
     expect(screen.getByText('hip-hop')).toBeInTheDocument();
     expect(screen.getByText('soul')).toBeInTheDocument();
+    expect(screen.getByText('jazz')).toBeInTheDocument();
+    expect(screen.queryByText('funk')).not.toBeInTheDocument();
+  });
+
+  it('renders the release-credits line with the newest release and its year', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByText('3 releases · Latest: Third Album (2024)')).toBeInTheDocument();
+  });
+
+  it('uses the singular for a single release', () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          releaseCount: 1,
+          newestRelease: {
+            id: 'r1',
+            title: 'Only One',
+            releasedOn: new Date('2020-05-05T00:00:00Z'),
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByText('1 release · Latest: Only One (2020)')).toBeInTheDocument();
+  });
+
+  it('omits the credits line when the artist has no listed release', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, releaseCount: 0, newestRelease: null }} />);
+
+    expect(screen.queryByText(/Latest:/)).not.toBeInTheDocument();
+  });
+
+  it('renders the bands the artist is a member of', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, memberOf: [name('b1', 'E2E Band'), name('b2', 'Other Band')] }}
+      />
+    );
+
+    expect(screen.getByText('Member of E2E Band, Other Band')).toBeInTheDocument();
+  });
+
+  it('renders the members of a band', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, members: [name('m1', 'E2E Artist'), name('m2', 'Drummer')] }}
+      />
+    );
+
+    expect(screen.getByText('Members: E2E Artist, Drummer')).toBeInTheDocument();
+  });
+
+  it('omits the band line when the artist has no band relationships', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.queryByText(/Member of|Members:/)).not.toBeInTheDocument();
+  });
+
+  it('renders the formation year for a band', () => {
+    render(
+      <ArtistListCard artist={{ ...baseArtist, formedOn: new Date('2010-01-01T00:00:00Z') }} />
+    );
+
+    expect(screen.getByText('Formed 2010')).toBeInTheDocument();
+  });
+
+  it('renders the instruments as a muted meta line', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, instruments: 'guitar, vocals' }} />);
+
+    expect(screen.getByText('guitar, vocals')).toBeInTheDocument();
+  });
+
+  it('separates active years and instruments with a middle dot', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bornOn: new Date('1975-01-01T00:00:00Z'), instruments: 'drums' }}
+      />
+    );
+
+    expect(screen.getByText('b. 1975 · drums')).toBeInTheDocument();
+  });
+
+  it('omits the meta line when neither active years nor instruments are set', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    expect(container.querySelector('[data-slot="artist-meta"]')).not.toBeInTheDocument();
   });
 
   it('renders primary image thumbnails when present', () => {
-    const withImages = {
-      ...baseArtist,
-      bioImages: [
-        {
-          id: 'bi1',
-          artistId: 'a1',
-          url: 'https://x/a.jpg',
-          thumbnailUrl: null,
-          title: 'Portrait',
-          attribution: 'Commons',
-          license: null,
-          sourceUrl: null,
-          width: null,
-          height: null,
-          isPrimary: true,
-          sortOrder: 0,
-          createdAt: new Date(),
-        },
-      ],
-    } as unknown as ArtistListWithBio;
-
-    render(<ArtistListCard artist={withImages} />);
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            {
+              id: 'bi1',
+              url: 'https://x/a.jpg',
+              thumbnailUrl: null,
+              title: 'Portrait',
+              attribution: 'Commons',
+              license: null,
+              licenseUrl: null,
+              sourceUrl: null,
+            },
+          ],
+        }}
+      />
+    );
 
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
+  });
+
+  it('raises the thumbnails above the stretched link so they open their dialog', () => {
+    const { container } = render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            {
+              id: 'bi1',
+              url: 'https://x/a.jpg',
+              thumbnailUrl: null,
+              title: null,
+              attribution: null,
+              license: null,
+              licenseUrl: null,
+              sourceUrl: null,
+            },
+          ],
+        }}
+      />
+    );
+
+    const thumbs = container.querySelector('[data-slot="artist-thumbnails"]');
+    expect(thumbs).toHaveClass('relative', 'z-10');
   });
 
   it('shows a placeholder icon when there are no images', () => {
@@ -87,7 +232,7 @@ describe('ArtistListCard', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     const card = container.querySelector('[data-slot="card"]');
-    expect(card).toHaveClass('shadow-zine-sm', 'bg-white');
+    expect(card).toHaveClass('shadow-zine-sm', 'bg-white', 'relative');
     expect(card).not.toHaveClass('hover:shadow-md');
     expect(card).not.toHaveClass('transition-shadow');
   });
