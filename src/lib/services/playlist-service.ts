@@ -985,9 +985,10 @@ export class PlaylistService {
   }
 
   /**
-   * Artists whose name matches the query (the `/api/artists/search` service
-   * path), expanded through their published, non-deleted releases into MP3
-   * track files, attributed with the artist's display name.
+   * Artists whose name or release title matches the query
+   * (`ArtistService.searchPublishedArtists` — artists holding a direct credit
+   * on a published release), expanded through their published, non-deleted
+   * releases into MP3 track files, attributed with the artist's display name.
    */
   private static async searchArtistMatches(q: string): Promise<PlaylistSearchItem[]> {
     const result = await ArtistService.searchPublishedArtists({
