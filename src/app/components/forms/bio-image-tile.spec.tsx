@@ -237,6 +237,39 @@ describe('BioImageTile', () => {
     expect(screen.getByText('Add attribution')).toBeInTheDocument();
   });
 
+  it('shows no alt editor unless the tile is given an alt handler', () => {
+    renderTile();
+    expect(
+      screen.queryByRole('button', { name: 'Edit alt text for Ceschi Ramos' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers "Add alt text" when an alt handler is given and the row has none', () => {
+    renderTile({ onEditAlt: vi.fn() });
+    expect(screen.getByText('Add alt text')).toBeInTheDocument();
+  });
+
+  it('shows the current alt text when the row has one', () => {
+    renderTile({ onEditAlt: vi.fn(), image: { ...TITLED, alt: 'Ceschi on stage' } });
+    expect(screen.getByText('Alt: Ceschi on stage')).toBeInTheDocument();
+  });
+
+  it('saves an edited alt text with the image id', async () => {
+    const onEditAlt = vi.fn();
+    renderTile({ onEditAlt });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Ceschi Ramos' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Alt text' }), 'Ceschi on stage');
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(onEditAlt).toHaveBeenCalledWith('i1', 'Ceschi on stage');
+  });
+
+  it('edits only one field at a time', async () => {
+    renderTile({ onEditAlt: vi.fn() });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Ceschi Ramos' }));
+    expect(screen.getByRole('textbox', { name: 'Alt text' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Attribution' })).not.toBeInTheDocument();
+  });
+
   it('renders extra actions before the delete button and extra badges beside the license', () => {
     renderTile({
       actions: <button type="button">Use as display image</button>,

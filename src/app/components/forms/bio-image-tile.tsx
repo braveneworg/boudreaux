@@ -58,12 +58,75 @@ export interface BioImageTileProps {
   onDelete: (id: string) => void;
   onInsert: (image: BioStatusImage) => void;
   onEditAttribution: (imageId: string, attribution: string) => void;
+  /** When given, the tile shows the alt text with an inline editor (display images need alt). */
+  onEditAlt?: (imageId: string, alt: string) => void;
   disabled: boolean;
   /** Extra controls rendered in the tile's action row, before the delete button. */
   actions?: ReactNode;
   /** Extra badges rendered beside the license and face badges. */
   badges?: ReactNode;
 }
+
+type EditingField = 'attribution' | 'alt' | null;
+
+interface EditableTextRowProps {
+  /** Accessible name of the editor input, e.g. "Attribution". */
+  label: string;
+  value: string | null | undefined;
+  /** Shown when the row has no value yet, e.g. "Add attribution". */
+  emptyLabel: string;
+  /** Accessible name of the pencil button. */
+  editLabel: string;
+  /** Optional prefix rendered before the value, e.g. "Alt: ". */
+  prefix?: string;
+  editing: boolean;
+  disabled: boolean;
+  onEdit: () => void;
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}
+
+/** One editable text line on a tile: the value (or an empty hint) with a pencil, or the inline editor. */
+const EditableTextRow = ({
+  label,
+  value,
+  emptyLabel,
+  editLabel,
+  prefix = '',
+  editing,
+  disabled,
+  onEdit,
+  onSave,
+  onCancel,
+}: EditableTextRowProps): JSX.Element =>
+  editing ? (
+    <BioImageInlineTextEditor
+      label={label}
+      initialValue={value ?? ''}
+      onSave={onSave}
+      onCancel={onCancel}
+    />
+  ) : (
+    <div className="flex items-center gap-1">
+      {value ? (
+        <p className="text-muted-foreground line-clamp-2 flex-1 text-[11px]">
+          {prefix}
+          {value}
+        </p>
+      ) : (
+        <span className="text-muted-foreground flex-1 text-[11px]">{emptyLabel}</span>
+      )}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onEdit}
+        aria-label={editLabel}
+        className="hover:text-primary shrink-0 p-0.5"
+      >
+        <Pencil className="size-3.5" aria-hidden />
+      </button>
+    </div>
+  );
 
 /**
  * Single draggable bio image tile with preview, insert, delete, and
@@ -78,12 +141,13 @@ export const BioImageTile = ({
   onDelete,
   onInsert,
   onEditAttribution,
+  onEditAlt,
   disabled,
   actions,
   badges,
 }: BioImageTileProps): JSX.Element => {
   const { thumbSrc, title, deleteLabel, previewLabel, alt } = resolveImageLabels(image);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<EditingField>(null);
 
   const onDragStart = (event: DragEvent<HTMLLIElement>): void => {
     event.dataTransfer.setData(
@@ -101,9 +165,14 @@ export const BioImageTile = ({
     event.dataTransfer.effectAllowed = 'copy';
   };
 
-  const handleSave = (attribution: string): void => {
+  const handleSaveAttribution = (attribution: string): void => {
     onEditAttribution(image.id, attribution);
-    setEditing(false);
+    setEditing(null);
+  };
+
+  const handleSaveAlt = (value: string): void => {
+    onEditAlt?.(image.id, value);
+    setEditing(null);
   };
 
   return (
@@ -130,32 +199,30 @@ export const BioImageTile = ({
         unoptimized
         className="h-24 w-full object-cover"
       />
-      {editing ? (
-        <BioImageInlineTextEditor
-          label="Attribution"
-          initialValue={image.attribution ?? ''}
-          onSave={handleSave}
-          onCancel={() => setEditing(false)}
+      <EditableTextRow
+        label="Attribution"
+        value={image.attribution}
+        emptyLabel="Add attribution"
+        editLabel={`Edit attribution for ${previewLabel}`}
+        editing={editing === 'attribution'}
+        disabled={disabled}
+        onEdit={() => setEditing('attribution')}
+        onSave={handleSaveAttribution}
+        onCancel={() => setEditing(null)}
+      />
+      {onEditAlt && (
+        <EditableTextRow
+          label="Alt text"
+          value={image.alt}
+          emptyLabel="Add alt text"
+          editLabel={`Edit alt text for ${previewLabel}`}
+          prefix="Alt: "
+          editing={editing === 'alt'}
+          disabled={disabled}
+          onEdit={() => setEditing('alt')}
+          onSave={handleSaveAlt}
+          onCancel={() => setEditing(null)}
         />
-      ) : (
-        <div className="flex items-center gap-1">
-          {image.attribution ? (
-            <p className="text-muted-foreground line-clamp-2 flex-1 text-[11px]">
-              {image.attribution}
-            </p>
-          ) : (
-            <span className="text-muted-foreground flex-1 text-[11px]">Add attribution</span>
-          )}
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setEditing(true)}
-            aria-label={`Edit attribution for ${previewLabel}`}
-            className="hover:text-primary shrink-0 p-0.5"
-          >
-            <Pencil className="size-3.5" aria-hidden />
-          </button>
-        </div>
       )}
       <div className="flex flex-wrap items-center gap-1">
         <LicenseBadge license={image.license} licenseUrl={image.licenseUrl} />

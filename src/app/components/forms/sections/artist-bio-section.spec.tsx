@@ -76,10 +76,13 @@ describe('ArtistBioSection', () => {
     expect(rail.compareDocumentPosition(editors) & FOLLOWING).toBeTruthy();
   });
 
-  it('omits the palette rail in create mode', () => {
+  it('explains that images wait for the first save in create mode', () => {
     render(<ArtistBioSection {...editModeProps} isEditMode={false} artistId={null} />);
 
-    expect(screen.queryByTestId('bio-media-rail')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bio-media-rail')).toHaveTextContent(
+      'Images become available after the artist is saved.'
+    );
+    expect(screen.queryByTestId('bio-media-palettes-artist-1')).not.toBeInTheDocument();
   });
 
   it('always renders the editors column', () => {

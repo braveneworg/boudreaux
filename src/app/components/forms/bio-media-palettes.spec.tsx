@@ -16,10 +16,19 @@ import { BioMediaPalettes } from './bio-media-palettes';
 import type { Editor } from '@tiptap/react';
 
 const statusMock = vi.hoisted(() => vi.fn());
+const refetchMock = vi.hoisted(() => vi.fn());
 const deleteBioLink = vi.hoisted(() => vi.fn());
 const deleteBioImage = vi.hoisted(() => vi.fn());
 const updateBioImageAttribution = vi.hoisted(() => vi.fn());
-const pending = vi.hoisted(() => ({ link: false, image: false, updating: false }));
+const updateBioImageAlt = vi.hoisted(() => vi.fn());
+const setDisplayImages = vi.hoisted(() => vi.fn());
+const pending = vi.hoisted(() => ({
+  link: false,
+  image: false,
+  updating: false,
+  alt: false,
+  setting: false,
+}));
 /** Controls what `registry.getTarget()` returns for insert tests. */
 const mockGetTarget = vi.hoisted(() => vi.fn(() => null as Editor | null));
 
@@ -34,6 +43,24 @@ vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
     updateBioImageAttribution,
     isUpdatingBioImageAttribution: pending.updating,
   }),
+  useUpdateBioImageAltMutation: () => ({
+    updateBioImageAlt,
+    isUpdatingBioImageAlt: pending.alt,
+  }),
+  useSetDisplayImagesMutation: () => ({
+    setDisplayImages,
+    isSettingDisplayImages: pending.setting,
+  }),
+}));
+
+// The upload zone owns the presign pipeline; stub it with a button that
+// reports a row so the wrapper's refetch wiring can be exercised.
+vi.mock('./bio-image-upload-zone', () => ({
+  BioImageUploadZone: ({ onUploaded }: { onUploaded: (image: { id: string }) => void }) => (
+    <button type="button" onClick={() => onUploaded({ id: 'new' })}>
+      Simulate upload
+    </button>
+  ),
 }));
 
 vi.mock('@/lib/utils/api-base-url', () => ({
@@ -66,6 +93,7 @@ const IMAGE_ROW: BioStatusImage = {
   thumbnailUrl: null,
   title: 'Portrait',
   attribution: 'Wikimedia Commons',
+  alt: 'Portrait of the artist',
   isPrimary: true,
   displayOrder: null,
 };
@@ -83,12 +111,12 @@ const contentWith = (
   model: 'fake/deterministic',
 });
 
-const mockStatus = (data: BioGenerationStatusResponse | undefined): void => {
+const mockStatus = (data: BioGenerationStatusResponse | undefined, isPending = false): void => {
   statusMock.mockReturnValue({
     data,
-    isPending: false,
+    isPending,
     error: Error('Unknown error'),
-    refetch: vi.fn(),
+    refetch: refetchMock,
   });
 };
 
@@ -96,6 +124,9 @@ beforeEach(() => {
   pending.link = false;
   pending.image = false;
   pending.updating = false;
+  pending.alt = false;
+  pending.setting = false;
+  refetchMock.mockReset();
   mockStatus({
     status: 'succeeded',
     error: null,
@@ -122,42 +153,48 @@ describe('BioMediaPalettes', () => {
     expect(screen.getByRole('group', { name: 'Discovered links' })).toBeInTheDocument();
   });
 
-  it('renders the image palette when generated content exists', () => {
+  it('renders the image manager when generated content exists', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(screen.getByRole('group', { name: 'Discovered images' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
   });
 
-  it('renders nothing when the artist has no generated content', () => {
+  // Uploading is the manager's job, so it mounts even before anything exists.
+  it('mounts the manager with an empty pool when the artist has no generated content', () => {
     mockStatus({ status: null, error: null, content: null });
 
-    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
+    render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
+    expect(screen.getByText(/No images yet/)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
   });
 
-  it('renders nothing while a generation job is still processing', () => {
+  it('mounts the manager with an empty pool while a generation job is still processing', () => {
     mockStatus({ status: 'processing', error: null, content: null });
 
-    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
+    render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
+    expect(screen.getByText(/No images yet/)).toBeInTheDocument();
   });
 
-  it('renders nothing before the status query resolves', () => {
-    mockStatus(undefined);
+  it('shows the manager loading state before the status query resolves', () => {
+    mockStatus(undefined, true);
 
-    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
+    render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading images');
   });
 
-  it('renders nothing when the content has no links and no images', () => {
+  it('mounts the manager with an empty pool when the content has no links and no images', () => {
     mockStatus({ status: 'succeeded', error: null, content: contentWith([], []) });
 
-    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
+    render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
   });
 
   it('omits the link palette when there are no links', () => {
@@ -168,12 +205,49 @@ describe('BioMediaPalettes', () => {
     expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
   });
 
-  it('omits the image palette when there are no images', () => {
+  it('shows an empty pool when the artist has links but no images', () => {
     mockStatus({ status: 'succeeded', error: null, content: contentWith([LINK_ROW], []) });
 
     render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(screen.queryByRole('group', { name: 'Discovered images' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Discovered links' })).toBeInTheDocument();
+    expect(screen.getByText(/No images yet/)).toBeInTheDocument();
+  });
+
+  it('routes "use as display image" through the set mutation', async () => {
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Use Portrait as display image' }));
+
+    expect(setDisplayImages).toHaveBeenCalledWith([IMAGE_ROW.id]);
+  });
+
+  it('routes an alt text edit through the alt mutation', async () => {
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Portrait' }));
+    const input = screen.getByRole('textbox', { name: 'Alt text' });
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Portrait of X');
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(updateBioImageAlt).toHaveBeenCalledWith({ imageId: IMAGE_ROW.id, alt: 'Portrait of X' });
+  });
+
+  it('refetches the status after an upload so the new row joins the pool', async () => {
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
+
+    expect(refetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the manager while a display-image write is pending', () => {
+    pending.setting = true;
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('button', { name: 'Delete image Portrait' })).toBeDisabled();
   });
 
   it('routes a link delete through the mutation', async () => {
@@ -311,12 +385,12 @@ describe('BioMediaPalettes', () => {
     );
   });
 
-  it('renders the palettes when persisted content exists without a succeeded job', () => {
+  it('renders the pool when persisted content exists without a succeeded job', () => {
     mockStatus({ status: null, error: null, content: contentWith([LINK_ROW], [IMAGE_ROW]) });
 
     render(<BioMediaPalettes artistId="artist-1" />);
 
-    expect(screen.getByRole('group', { name: 'Discovered images' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
   });
 
   it('routes an image attribution edit through the mutation', async () => {
