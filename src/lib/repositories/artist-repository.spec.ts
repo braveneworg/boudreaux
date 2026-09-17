@@ -985,6 +985,19 @@ describe('ArtistRepository', () => {
       expect(arg.data.bioLinks.create).toEqual([{ ...content.links[0], origin: 'generated' }]);
     });
 
+    // Display images are chosen by humans and survive regeneration (ADR-0008):
+    // the recreated generated rows must never carry a display position, so the
+    // AI can suggest (isPrimary) but never choose.
+    it('never writes a display position on the recreated generated rows', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioImages.create[0]).not.toHaveProperty('displayOrder');
+    });
+
     it('carries the face signal fields into the recreated generated image rows', async () => {
       const tx = buildTx({});
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
