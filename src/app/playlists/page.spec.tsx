@@ -204,13 +204,13 @@ describe('PlaylistsPage', () => {
     expect(screen.getByTestId('next-image')).toHaveAttribute('data-alt', 'My Playlists');
   });
 
-  it('should render the Home and My Playlists breadcrumbs', async () => {
+  it('should pass only the My Playlists crumb (BreadcrumbMenu adds Home itself)', async () => {
     const Page = await PlaylistsPage();
     render(Page);
 
     const nav = screen.getByTestId('breadcrumb-menu');
+    // BreadcrumbMenu renders the Home crumb itself; passing one too doubled it.
     expect(JSON.parse(nav.getAttribute('data-items') ?? '[]')).toEqual([
-      { anchorText: 'Home', url: '/', isActive: false },
       { anchorText: 'My Playlists', url: '/playlists', isActive: true },
     ]);
   });

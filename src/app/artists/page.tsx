@@ -29,10 +29,7 @@ export const metadata: Metadata = {
   description: 'Browse artists on the label, with bios, images, and releases.',
 };
 
-const breadcrumbItems = [
-  { anchorText: 'Home', url: '/', isActive: false },
-  { anchorText: 'Artists', url: '/artists', isActive: true },
-];
+const breadcrumbItems = [{ anchorText: 'Artists', url: '/artists', isActive: true }];
 
 export default async function ArtistsIndexPage() {
   const queryClient = getQueryClient();

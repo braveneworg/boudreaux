@@ -120,16 +120,14 @@ describe('ArtistsIndexPage', () => {
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
-  it('should render BreadcrumbMenu with Home and Artists items', async () => {
+  it('should pass only the Artists crumb (BreadcrumbMenu adds Home itself)', async () => {
     const Page = await ArtistsIndexPage();
     render(Page);
 
     const breadcrumbs = screen.getByTestId('breadcrumb-menu');
     const items = JSON.parse(breadcrumbs.getAttribute('data-items') || '[]');
-    expect(items).toEqual([
-      { anchorText: 'Home', url: '/', isActive: false },
-      { anchorText: 'Artists', url: '/artists', isActive: true },
-    ]);
+    // BreadcrumbMenu renders the Home crumb itself; passing one too doubled it.
+    expect(items).toEqual([{ anchorText: 'Artists', url: '/artists', isActive: true }]);
   });
 
   it('should render the artists heading as an image', async () => {

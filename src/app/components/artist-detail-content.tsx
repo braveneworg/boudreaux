@@ -167,7 +167,6 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
     Boolean(artist.bio) || artist.bioImages.length > 0 || artist.bioLinks.length > 0;
 
   const breadcrumbItems = [
-    { anchorText: 'Home', url: '/', isActive: false },
     { anchorText: 'Artists', url: '/artists', isActive: false },
     {
       anchorText: displayName,

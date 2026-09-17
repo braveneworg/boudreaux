@@ -36,10 +36,7 @@ export const metadata: Metadata = {
   description: 'Build and manage your playlists from the Fake Four catalog.',
 };
 
-const breadcrumbItems = [
-  { anchorText: 'Home', url: '/', isActive: false },
-  { anchorText: 'My Playlists', url: '/playlists', isActive: true },
-];
+const breadcrumbItems = [{ anchorText: 'My Playlists', url: '/playlists', isActive: true }];
 
 /**
  * Builds the SSR prefetch queryFn for the signed-in user's first list page —
