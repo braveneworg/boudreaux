@@ -59,7 +59,6 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
   const { bioImages } = artist;
 
   const breadcrumbItems = [
-    { anchorText: 'Home', url: '/', isActive: false },
     { anchorText: 'Artists', url: '/artists', isActive: false },
     {
       anchorText: displayName,

@@ -62,7 +62,6 @@ export default async function PlaylistDetailPage({ params }: PlaylistDetailPageP
   queryClient.setQueryData(queryKeys.playlists.detail(id), detail);
 
   const breadcrumbItems = [
-    { anchorText: 'Home', url: '/', isActive: false },
     { anchorText: 'My Playlists', url: '/playlists', isActive: false },
     { anchorText: detail.title, url: `/playlists/${id}`, isActive: true },
   ];
