@@ -67,6 +67,7 @@ const IMAGE_ROW: BioStatusImage = {
   title: 'Portrait',
   attribution: 'Wikimedia Commons',
   isPrimary: true,
+  displayOrder: null,
 };
 
 const contentWith = (
@@ -288,6 +289,7 @@ describe('BioMediaPalettes', () => {
       title: 'Fallback Title',
       attribution: null,
       isPrimary: false,
+      displayOrder: null,
     };
     statusMock.mockReturnValue({
       data: {
@@ -347,6 +349,7 @@ describe('BioMediaPalettes', () => {
       title: null,
       attribution: null,
       isPrimary: false,
+      displayOrder: null,
     };
     statusMock.mockReturnValue({
       data: {

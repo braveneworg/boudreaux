@@ -188,6 +188,9 @@ describe('ArtistListCard', () => {
               license: null,
               licenseUrl: null,
               sourceUrl: null,
+              alt: null,
+              isPrimary: false,
+              displayOrder: null,
             },
           ],
         }}
@@ -212,6 +215,9 @@ describe('ArtistListCard', () => {
               license: null,
               licenseUrl: null,
               sourceUrl: null,
+              alt: null,
+              isPrimary: false,
+              displayOrder: null,
             },
           ],
         }}

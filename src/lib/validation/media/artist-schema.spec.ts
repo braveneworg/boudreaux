@@ -63,4 +63,21 @@ describe('artistWithPublishedReleasesSchema', () => {
     };
     expect(() => artistWithPublishedReleasesSchema.parse(withNullFace)).not.toThrow();
   });
+
+  // A plain z.object strips unknown keys, so a display position the wire
+  // carries but the schema does not know would vanish client-side and the
+  // page would silently fall back to the suggested images.
+  it('retains a human-chosen displayOrder through the scalar mirror', () => {
+    const chosen = {
+      ...artistWithPublishedReleases,
+      bioImages: [{ ...artistWithPublishedReleases.bioImages[0], displayOrder: 2 }],
+    };
+    const parsed = artistWithPublishedReleasesSchema.parse(chosen);
+    expect(parsed.bioImages[0].displayOrder).toBe(2);
+  });
+
+  it('accepts a null displayOrder on a bio image row', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
+    expect(parsed.bioImages[0].displayOrder).toBeNull();
+  });
 });

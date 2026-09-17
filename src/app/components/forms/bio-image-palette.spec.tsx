@@ -44,6 +44,7 @@ const IMAGES: BioStatusImage[] = [
     width: 800,
     height: 600,
     isPrimary: true,
+    displayOrder: null,
   },
   {
     id: 'i2',
@@ -56,6 +57,7 @@ const IMAGES: BioStatusImage[] = [
     width: null,
     height: null,
     isPrimary: false,
+    displayOrder: null,
   },
 ];
 
@@ -167,6 +169,7 @@ describe('BioImagePalette', () => {
       width: 1024,
       height: 768,
       isPrimary: false,
+      displayOrder: null,
     };
     render(
       <BioImagePalette
@@ -352,6 +355,7 @@ describe('BioImagePalette', () => {
         width: null,
         height: null,
         isPrimary: false,
+        displayOrder: null,
         origin: 'generated',
       },
       {
@@ -365,6 +369,7 @@ describe('BioImagePalette', () => {
         width: null,
         height: null,
         isPrimary: false,
+        displayOrder: null,
         origin: 'custom',
       },
       {
@@ -378,6 +383,7 @@ describe('BioImagePalette', () => {
         width: null,
         height: null,
         isPrimary: false,
+        displayOrder: null,
         origin: 'generated',
       },
     ];
@@ -459,6 +465,7 @@ describe('BioImagePalette', () => {
           width: null,
           height: null,
           isPrimary: false,
+          displayOrder: null,
           origin: null,
         },
       ];
@@ -489,6 +496,7 @@ describe('BioImagePalette', () => {
       width: null,
       height: null,
       isPrimary: false,
+      displayOrder: null,
       ...overrides,
     });
 
@@ -558,6 +566,7 @@ describe('BioImagePalette', () => {
       width: null,
       height: null,
       isPrimary: false,
+      displayOrder: null,
       ...overrides,
     });
 

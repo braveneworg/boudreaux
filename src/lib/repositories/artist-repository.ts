@@ -91,6 +91,7 @@ export interface BioGenerationStateRecord {
     hasFace: boolean | null;
     faceScore: number | null;
     origin: string | null;
+    displayOrder: number | null;
   }>;
   bioLinks: Array<{
     id: string;
@@ -165,6 +166,9 @@ const artistListingSelect = {
       license: true,
       licenseUrl: true,
       sourceUrl: true,
+      alt: true,
+      isPrimary: true,
+      displayOrder: true,
     },
   },
   members: { select: { member: { select: artistListingNameSelect } } },
@@ -835,6 +839,7 @@ export class ArtistRepository {
               hasFace: true,
               faceScore: true,
               origin: true,
+              displayOrder: true,
             },
           },
           bioLinks: {

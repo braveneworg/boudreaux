@@ -38,6 +38,7 @@ const artistBioImageSchema = z.object({
   faceScore: z.number().nullable(),
   origin: nullableString,
   sortOrder: z.number(),
+  displayOrder: z.number().int().nullable(),
   createdAt: date,
 });
 

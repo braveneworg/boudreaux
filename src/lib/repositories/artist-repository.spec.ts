@@ -492,6 +492,17 @@ describe('ArtistRepository', () => {
       });
     });
 
+    it('selects the display-image fields on listing bio images', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({
+        select: { alt: true, isPrimary: true, displayOrder: true },
+      });
+    });
+
     it('selects the band graph and the narrow release projection', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
@@ -1140,6 +1151,15 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { width: true, height: true } });
+    });
+
+    it('selects displayOrder on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a8');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { displayOrder: true } });
     });
 
     it('selects licenseUrl on the bioImages select', async () => {

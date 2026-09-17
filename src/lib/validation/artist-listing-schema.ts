@@ -3,7 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
+import type {
+  ArtistListingBioImage,
+  ArtistListingName,
+  ArtistListingRow,
+} from '@/lib/types/domain/artist';
 import { date, nullableDate, nullableString } from '@/lib/validation/media/shared-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 
@@ -26,7 +30,12 @@ const artistListingNameSchema = z.object({
   suffix: nullableString,
 }) satisfies z.ZodType<ArtistListingName>;
 
-/** Primary bio image as rendered by the listing card and search dropdown. */
+/**
+ * Bio image as rendered by the listing card and search dropdown, carrying the
+ * suggestion flag and the human-chosen display position. A plain object strips
+ * unknown keys, so every rendered field must be listed here or it vanishes
+ * client-side.
+ */
 const artistListingBioImageSchema = z.object({
   id: z.string(),
   url: z.string(),
@@ -36,7 +45,10 @@ const artistListingBioImageSchema = z.object({
   license: nullableString,
   licenseUrl: nullableString,
   sourceUrl: nullableString,
-});
+  alt: nullableString,
+  isPrimary: z.boolean(),
+  displayOrder: z.number().int().nullable(),
+}) satisfies z.ZodType<ArtistListingBioImage>;
 
 /** The newest listed release credited to the artist, or `null`. */
 const artistListingNewestReleaseSchema = z

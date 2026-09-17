@@ -51,12 +51,12 @@ export { bioGenerationImageSchema, bioGenerationLinkSchema };
  * Content fields of the persisted bio-image row (`ArtistBioImageRecord`) that
  * the Lambda contract must carry — everything except DB bookkeeping (`id`,
  * `artistId`, `sortOrder`, `createdAt`), repository-stamped provenance
- * (`origin`), and the rehost-only `originalUrl`, none of which the Lambda
- * produces.
+ * (`origin`), the human-owned display position (`displayOrder`), and the
+ * rehost-only `originalUrl`, none of which the Lambda produces.
  */
 type BioImageContentField = keyof Omit<
   ArtistBioImageRecord,
-  'artistId' | 'createdAt' | 'id' | 'origin' | 'originalUrl' | 'sortOrder'
+  'artistId' | 'createdAt' | 'displayOrder' | 'id' | 'origin' | 'originalUrl' | 'sortOrder'
 >;
 
 // Coverage ties the shared wire image schema to the domain bio-image row: a
@@ -86,17 +86,26 @@ export const bioStatusLinkUrlSchema = z
 /** Row provenance: AI-discovered (`generated`) or admin-authored (`custom`). */
 export const bioOriginSchema = z.enum(['generated', 'custom']).nullable().optional();
 
+/**
+ * Human-chosen display position on the status wire: a non-negative integer
+ * when the admin chose the image, `null` otherwise. Absent (rows serialised
+ * before the field existed) reads as not chosen.
+ */
+const displayOrderSchema = z.number().int().min(0).nullable().default(null);
+
 /** Persisted bio image row as returned by the status endpoint (DB row id included). */
 export const bioStatusImageSchema = bioGenerationImageSchema.extend({
   id: z.string(),
   attribution: z.string().nullable(),
   origin: bioOriginSchema,
+  displayOrder: displayOrderSchema,
 });
 
 // Same coverage tie for the status wire, which additionally carries the DB row
-// `id` and `origin` (still no `artistId`/`sortOrder`/`createdAt`/`originalUrl`).
+// `id`, `origin`, and the human-owned `displayOrder` (still no
+// `artistId`/`sortOrder`/`createdAt`/`originalUrl`).
 type _BioStatusImageCoverage = AssertExtends<
-  BioImageContentField | 'id' | 'origin',
+  BioImageContentField | 'displayOrder' | 'id' | 'origin',
   keyof z.infer<typeof bioStatusImageSchema>
 >;
 const _bioStatusImageCoverage: _BioStatusImageCoverage = true;
@@ -196,6 +205,8 @@ export interface GeneratedBioContent {
     faceScore?: number | null;
     /** Provenance from the status endpoint (`generated`/`custom`); absent on the lambda path. */
     origin?: string | null;
+    /** Human-chosen display position from the status endpoint; `null` = not chosen; absent on the lambda path. */
+    displayOrder?: number | null;
   }>;
   links: Array<{
     /** DB row id — present when content comes from the status endpoint; absent on the lambda path. */

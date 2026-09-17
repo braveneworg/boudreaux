@@ -412,8 +412,10 @@ model ArtistUrl {
 
 // Images discovered for an artist during AI bio generation. Re-hosted into our
 // own S3 (with `sharp` variants) and served via the CDN — `url` is a CDN URL,
-// not an external one. `isPrimary` marks the 2–3 best images surfaced beside
-// the short bio on listings and the detail page.
+// not an external one. `isPrimary` is the vision pass's suggestion of the 2–3
+// best identifying images; `displayOrder` is the admin's choice of which
+// images appear beside the short bio on listings and the detail page (the
+// suggestion is only shown while no human has chosen).
 model ArtistBioImage {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   artist       Artist   @relation(fields: [artistId], references: [id])
@@ -440,6 +442,10 @@ model ArtistBioImage {
   /// value is treated as generated, so regeneration deletes it like a generated row.
   origin       String?
   sortOrder    Int      @default(0)
+  /// Human-chosen display position (0-based, capped by DISPLAY_IMAGE_CAP) among
+  /// the artist's display images; null = not chosen. Written only by an admin,
+  /// never by regeneration — the AI's opinion stays in `isPrimary`.
+  displayOrder Int?
   createdAt    DateTime @default(now())
 
   @@index([artistId])
