@@ -9,22 +9,44 @@ import { toast } from 'sonner';
 import { createArtistBioLinkAction } from '@/lib/actions/create-artist-bio-link-action';
 import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
 import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
+import { setArtistDisplayImagesAction } from '@/lib/actions/set-artist-display-images-action';
+import { updateArtistBioImageAltAction } from '@/lib/actions/update-artist-bio-image-alt-action';
 import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
 import { queryKeys } from '@/lib/query-keys';
+import type { BioGenerationStatusResponse } from '@/lib/validation/bio-generation-schema';
 
 import {
+  applyDisplayImagesToStatus,
   useCreateBioLinkMutation,
   useDeleteBioImageMutation,
   useDeleteBioLinkMutation,
+  useSetDisplayImagesMutation,
+  useUpdateBioImageAltMutation,
   useUpdateBioImageAttributionMutation,
 } from './use-bio-media-mutations';
 
 const useMutationMock = vi.hoisted(() => vi.fn());
 const invalidateQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const cancelQueriesMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const getQueryDataMock = vi.hoisted(() => vi.fn());
+const setQueryDataMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (options: unknown) => useMutationMock(options),
-  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
+  useQueryClient: () => ({
+    invalidateQueries: invalidateQueriesMock,
+    cancelQueries: cancelQueriesMock,
+    getQueryData: getQueryDataMock,
+    setQueryData: setQueryDataMock,
+  }),
+}));
+
+vi.mock('@/lib/actions/set-artist-display-images-action', () => ({
+  setArtistDisplayImagesAction: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/update-artist-bio-image-alt-action', () => ({
+  updateArtistBioImageAltAction: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/delete-artist-bio-link-action', () => ({
@@ -81,6 +103,9 @@ beforeEach(() => {
   useMutationMock.mockReset();
   useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
   invalidateQueriesMock.mockClear();
+  cancelQueriesMock.mockClear();
+  getQueryDataMock.mockReset();
+  setQueryDataMock.mockClear();
 });
 
 describe('useDeleteBioLinkMutation', () => {
@@ -315,5 +340,245 @@ describe('useUpdateBioImageAttributionMutation', () => {
     const { result } = renderHook(() => useUpdateBioImageAttributionMutation('artist-1'));
 
     expect(result.current.isUpdatingBioImageAttribution).toBe(true);
+  });
+});
+
+interface AltMutationOptions {
+  mutationFn: (input: { imageId: string; alt: string | null }) => Promise<unknown>;
+  onSuccess: (result: { success: boolean; error?: string }) => void;
+}
+
+const getAltOptions = (renderFn: () => unknown): AltMutationOptions => {
+  renderHook(renderFn);
+  return useMutationMock.mock.calls.at(-1)?.[0] as AltMutationOptions;
+};
+
+describe('useUpdateBioImageAltMutation', () => {
+  it('calls updateArtistBioImageAltAction with the input', async () => {
+    vi.mocked(updateArtistBioImageAltAction).mockResolvedValue({ success: true });
+    const opts = getAltOptions(() => useUpdateBioImageAltMutation('artist-1'));
+
+    await opts.mutationFn({ imageId: 'i1', alt: 'Ceschi on stage' });
+
+    expect(updateArtistBioImageAltAction).toHaveBeenCalledWith({
+      imageId: 'i1',
+      alt: 'Ceschi on stage',
+    });
+  });
+
+  it('invalidates the bio-generation query after an alt update', () => {
+    const opts = getAltOptions(() => useUpdateBioImageAltMutation('artist-1'));
+
+    opts.onSuccess({ success: true });
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.artists.bioGeneration('artist-1'),
+    });
+  });
+
+  it('surfaces a failed update as an error toast without invalidating', () => {
+    const opts = getAltOptions(() => useUpdateBioImageAltMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'x' });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('x');
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a generic message when the failure has no error', () => {
+    const opts = getAltOptions(() => useUpdateBioImageAltMutation('artist-1'));
+
+    opts.onSuccess({ success: false });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update alt text');
+  });
+
+  it('exposes the pending state from the mutation', () => {
+    useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: true });
+
+    const { result } = renderHook(() => useUpdateBioImageAltMutation('artist-1'));
+
+    expect(result.current.isUpdatingBioImageAlt).toBe(true);
+  });
+});
+
+const statusImage = (id: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  url: `https://cdn/${id}.webp`,
+  attribution: null,
+  isPrimary: false,
+  displayOrder: null,
+  origin: 'generated' as const,
+  ...overrides,
+});
+
+const statusWith = (images: ReturnType<typeof statusImage>[]): BioGenerationStatusResponse => ({
+  status: 'succeeded',
+  error: null,
+  content: {
+    shortBio: '',
+    longBio: '',
+    altBio: '',
+    genres: null,
+    images,
+    links: [],
+    model: 'm',
+  },
+});
+
+describe('applyDisplayImagesToStatus', () => {
+  it('assigns each chosen image its index and clears the rest', () => {
+    const status = statusWith([
+      statusImage('a', { displayOrder: 0 }),
+      statusImage('b'),
+      statusImage('c'),
+    ]);
+
+    const next = applyDisplayImagesToStatus(status, ['c', 'b']);
+
+    expect(next.content?.images.map(({ id, displayOrder }) => [id, displayOrder])).toEqual([
+      ['a', null],
+      ['b', 1],
+      ['c', 0],
+    ]);
+  });
+
+  it('marks every chosen image custom, as the repository will', () => {
+    const status = statusWith([statusImage('a'), statusImage('b', { origin: 'custom' })]);
+
+    const next = applyDisplayImagesToStatus(status, ['a']);
+
+    expect(next.content?.images.map(({ origin }) => origin)).toEqual(['custom', 'custom']);
+  });
+
+  it('leaves a status without content untouched', () => {
+    const status: BioGenerationStatusResponse = { status: 'pending', error: null, content: null };
+
+    expect(applyDisplayImagesToStatus(status, ['a'])).toBe(status);
+  });
+});
+
+interface DisplayImagesMutationOptions {
+  mutationFn: (imageIds: string[]) => Promise<unknown>;
+  onMutate: (imageIds: string[]) => Promise<{ previous: BioGenerationStatusResponse | undefined }>;
+  onSuccess: (
+    result: { success: boolean; error?: string },
+    imageIds: string[],
+    context: { previous: BioGenerationStatusResponse | undefined } | undefined
+  ) => void;
+  onError: (
+    error: Error,
+    imageIds: string[],
+    context: { previous: BioGenerationStatusResponse | undefined } | undefined
+  ) => void;
+  onSettled: () => void;
+}
+
+const getDisplayImagesOptions = (renderFn: () => unknown): DisplayImagesMutationOptions => {
+  renderHook(renderFn);
+  return useMutationMock.mock.calls.at(-1)?.[0] as DisplayImagesMutationOptions;
+};
+
+describe('useSetDisplayImagesMutation', () => {
+  const key = queryKeys.artists.bioGeneration('artist-1');
+
+  it('calls setArtistDisplayImagesAction with the artist and the ordered ids', async () => {
+    vi.mocked(setArtistDisplayImagesAction).mockResolvedValue({ success: true });
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    await opts.mutationFn(['b', 'a']);
+
+    expect(setArtistDisplayImagesAction).toHaveBeenCalledWith({
+      artistId: 'artist-1',
+      imageIds: ['b', 'a'],
+    });
+  });
+
+  it('cancels in-flight status fetches and writes the choice optimistically', async () => {
+    const previous = statusWith([statusImage('a'), statusImage('b')]);
+    getQueryDataMock.mockReturnValue(previous);
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    const context = await opts.onMutate(['b']);
+
+    expect(cancelQueriesMock).toHaveBeenCalledWith({ queryKey: key });
+    expect(context).toEqual({ previous });
+    expect(setQueryDataMock).toHaveBeenCalledWith(
+      key,
+      expect.objectContaining({
+        content: expect.objectContaining({
+          images: [
+            expect.objectContaining({ id: 'a', displayOrder: null }),
+            expect.objectContaining({ id: 'b', displayOrder: 0, origin: 'custom' }),
+          ],
+        }),
+      })
+    );
+  });
+
+  it('writes nothing optimistically when the status is not cached yet', async () => {
+    getQueryDataMock.mockReturnValue(undefined);
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    const context = await opts.onMutate(['b']);
+
+    expect(context).toEqual({ previous: undefined });
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('rolls back and toasts when the server refuses the set', () => {
+    const previous = statusWith([statusImage('a')]);
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    opts.onSuccess({ success: false, error: 'Add alt text first' }, ['a'], { previous });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(key, previous);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Add alt text first');
+  });
+
+  it('falls back to a generic message when the refusal has no error', () => {
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    opts.onSuccess({ success: false }, ['a'], { previous: undefined });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update display images');
+  });
+
+  it('keeps the optimistic state and stays silent when the server accepts', () => {
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    opts.onSuccess({ success: true }, ['a'], { previous: statusWith([]) });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+  });
+
+  it('rolls back and toasts when the action throws', () => {
+    const previous = statusWith([statusImage('a')]);
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    opts.onError(new Error('network'), ['a'], { previous });
+
+    expect(setQueryDataMock).toHaveBeenCalledWith(key, previous);
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update display images');
+  });
+
+  it('invalidates the status query and the picker pool once settled', () => {
+    const opts = getDisplayImagesOptions(() => useSetDisplayImagesMutation('artist-1'));
+
+    opts.onSettled();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: key });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: queryKeys.artists.bioImages('artist-1'),
+    });
+  });
+
+  it('exposes the pending state from the mutation', () => {
+    useMutationMock.mockReturnValue({ mutate: vi.fn(), isPending: true });
+
+    const { result } = renderHook(() => useSetDisplayImagesMutation('artist-1'));
+
+    expect(result.current.isSettingDisplayImages).toBe(true);
   });
 });
