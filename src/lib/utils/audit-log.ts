@@ -25,6 +25,7 @@ export type AuditEvent =
   | 'media.artist_bio_image.created'
   | 'media.artist_bio_image.deleted'
   | 'media.artist_bio_image.updated'
+  | 'media.artist_display_images.updated'
   | 'media.artist.archived'
   | 'media.artist.restored'
   | 'media.artist.published'
