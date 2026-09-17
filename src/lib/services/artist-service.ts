@@ -38,6 +38,12 @@ import { DataError } from '@/lib/types/domain/errors';
 import type { ImageRecord } from '@/lib/types/domain/image';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import {
+  DISPLAY_IMAGE_CAP,
+  isDisplayEligible,
+  orderBioImagesForPicker,
+  resolveDisplayImages,
+} from '@/lib/utils/display-images';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
@@ -850,7 +856,8 @@ export class ArtistService {
    * Project one repository listing record onto the public listing row: the band
    * joins flattened to name projections, the direct release joins summarised
    * into `releaseCount` + `newestRelease` (listed releases only) and dropped,
-   * and the short bio reduced to plain text for the card teaser.
+   * the bio image candidates resolved to the artist's display images, and the
+   * short bio reduced to plain text for the card teaser.
    */
   private static toArtistListingRow({
     members,
@@ -860,6 +867,7 @@ export class ArtistService {
   }: ArtistListingRecord): ArtistListingRow {
     return {
       ...artist,
+      bioImages: resolveDisplayImages(artist.bioImages),
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
@@ -1032,6 +1040,86 @@ export class ArtistService {
   /** Persists one manually-added bio image and returns the created row. */
   static async createBioImage(input: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
     return ArtistBioImageRepository.create(input);
+  }
+
+  /** Updates one bio image's alt text (admin edit). */
+  static async updateBioImageAlt(imageId: string, alt: string | null): Promise<void> {
+    await ArtistBioImageRepository.updateAlt(imageId, alt);
+  }
+
+  /**
+   * Replace an artist's display images with `imageIds`, in display order. The
+   * rules of the set live here: at most {@link DISPLAY_IMAGE_CAP}, each id once,
+   * every id one of the artist's own bio images, and every chosen image with
+   * alt text (the public page renders them as content). The repository write
+   * promotes the chosen rows to `origin: 'custom'` so a regeneration keeps a
+   * human's choice; the AI's `isPrimary` suggestion is never touched.
+   *
+   * @returns The artist's slug on success, so the caller can revalidate the
+   *   public artist page.
+   */
+  static async setDisplayImages(
+    artistId: string,
+    imageIds: string[]
+  ): Promise<ServiceResponse<{ slug: string }>> {
+    if (imageIds.length > DISPLAY_IMAGE_CAP) {
+      return {
+        success: false,
+        error: `Choose at most ${DISPLAY_IMAGE_CAP} display images`,
+        code: 'LIMIT_EXCEEDED',
+      };
+    }
+    if (new Set(imageIds).size !== imageIds.length) {
+      return { success: false, error: 'Each image can be chosen only once', code: 'VALIDATION' };
+    }
+
+    try {
+      const artist = await ArtistRepository.findById(artistId);
+      if (!artist) {
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+      }
+
+      // An empty list clears the set; there is nothing to look up or gate.
+      const rows =
+        imageIds.length === 0
+          ? []
+          : await ArtistBioImageRepository.findManyByIds(artistId, imageIds);
+      if (rows.length !== imageIds.length) {
+        return {
+          success: false,
+          error: "One of the images is not one of this artist's bio images",
+          code: 'NOT_FOUND',
+        };
+      }
+      if (rows.some((row) => !isDisplayEligible(row))) {
+        return {
+          success: false,
+          error: 'Add alt text before using an image as a display image',
+          code: 'VALIDATION',
+        };
+      }
+
+      await ArtistBioImageRepository.setDisplayOrder(artistId, imageIds);
+      return { success: true, data: { slug: artist.slug } };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to update display images' });
+    }
+  }
+
+  /**
+   * List an artist's bio image pool in picker order — display images first,
+   * then the suggested images, then the rest — for the admin cover-art picker.
+   */
+  static async listBioImages(artistId: string): Promise<ServiceResponse<ArtistBioImageRecord[]>> {
+    try {
+      if (!(await ArtistRepository.existsById(artistId))) {
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+      }
+      const rows = await ArtistBioImageRepository.findManyByArtist(artistId);
+      return { success: true, data: orderBioImagesForPicker(rows) };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to retrieve bio images' });
+    }
   }
 
   /** Persists one admin-authored bio link and returns the created row.
