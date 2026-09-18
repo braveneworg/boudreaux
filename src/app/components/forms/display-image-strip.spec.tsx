@@ -106,6 +106,13 @@ describe('DisplayImageStrip', () => {
     expect(onReorder).toHaveBeenLastCalledWith(['b', 'a', 'c']);
   });
 
+  it('moves the image with the arrow keys while the earlier button has focus too', async () => {
+    const { onReorder } = renderStrip();
+    screen.getByRole('button', { name: 'Move Charlie earlier' }).focus();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(onReorder).toHaveBeenCalledWith(['a', 'c', 'b']);
+  });
+
   it('ignores an arrow key at the edge', async () => {
     const { onReorder } = renderStrip();
     screen.getByRole('button', { name: 'Move Alpha later' }).focus();

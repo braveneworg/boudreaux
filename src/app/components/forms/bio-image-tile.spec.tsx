@@ -263,6 +263,16 @@ describe('BioImageTile', () => {
     expect(onEditAlt).toHaveBeenCalledWith('i1', 'Ceschi on stage');
   });
 
+  it('cancelling the alt editor leaves the alt text unchanged', async () => {
+    const onEditAlt = vi.fn();
+    renderTile({ onEditAlt, image: { ...TITLED, alt: 'Ceschi on stage' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Ceschi Ramos' }));
+    await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(onEditAlt).not.toHaveBeenCalled();
+    expect(screen.getByText('Alt: Ceschi on stage')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Alt text' })).not.toBeInTheDocument();
+  });
+
   it('edits only one field at a time', async () => {
     renderTile({ onEditAlt: vi.fn() });
     await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Ceschi Ramos' }));

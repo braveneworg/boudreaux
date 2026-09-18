@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
@@ -104,6 +104,27 @@ describe('BioImageUploadZone', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/JPEG, PNG, or WebP/);
     expect(uploadBioImage).not.toHaveBeenCalled();
+  });
+
+  it('accepts a dropped file through the drop zone', async () => {
+    vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: true, data: record });
+    const { onUploaded, input } = renderZone();
+    const zone = input.parentElement as HTMLElement;
+
+    fireEvent.dragOver(zone, { dataTransfer: { files: [jpeg] } });
+    fireEvent.drop(zone, { dataTransfer: { files: [jpeg] } });
+
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(record));
+  });
+
+  it('ignores a drop that carries no file', async () => {
+    const { input } = renderZone();
+    const zone = input.parentElement as HTMLElement;
+
+    fireEvent.drop(zone, { dataTransfer: { files: [] } });
+
+    await waitFor(() => expect(uploadBioImage).not.toHaveBeenCalled());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('disables the inputs and the drop zone when disabled', () => {

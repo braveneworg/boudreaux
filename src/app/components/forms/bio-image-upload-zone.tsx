@@ -76,7 +76,8 @@ export const BioImageUploadZone = ({
   };
 
   const handleFiles = (files: FileList | null): void => {
-    const file = files?.item(0);
+    // Index access rather than `.item()` so a synthetic drop's plain array works too.
+    const file = files?.[0];
     if (!file || disabled || isUploading) return;
     void upload(file);
   };

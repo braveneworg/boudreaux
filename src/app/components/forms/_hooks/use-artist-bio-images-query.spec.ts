@@ -79,6 +79,22 @@ describe('useArtistBioImagesQuery', () => {
     expect(queries[1]?.enabled).toBe(false);
   });
 
+  it('fetches a single pool through the shared helper, forwarding the signal', async () => {
+    mockUseQueries.mockReturnValue([{ data: undefined, isPending: true }]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([wireRow])));
+
+    renderHook(() => useArtistBioImagesQuery(['a']));
+
+    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { signal } = new AbortController();
+
+    await expect(queries[0]?.queryFn({ signal })).resolves.toEqual([
+      expect.objectContaining({ id: wireRow.id }),
+    ]);
+    expect(global.fetch).toHaveBeenCalledWith('/api/artists/a/bio-images', { signal });
+    vi.unstubAllGlobals();
+  });
+
   it('maps each requested artist to its pool and reports pending', () => {
     mockUseQueries.mockReturnValue([
       { data: [wireRow], isPending: false },
