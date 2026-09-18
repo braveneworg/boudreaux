@@ -63,6 +63,24 @@ _In_ `src/lib/decorators/`.
 **Artist** — a person or act. Carries a generated **bio** (long, short, and alt
 variants), **bio images**, and reference links.
 
+**bio image** — one image in an Artist's pool: discovered by a bio generation
+job or uploaded by an admin, always re-hosted on our CDN with its license and
+attribution. A bio image is either **generated** (owned by the job, replaced on
+regeneration) or **custom** (owned by a human, kept through regeneration). An
+admin upload is custom from birth; choosing a generated image as a display
+image makes it custom. See
+[ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
+_Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
+
+**display images** — the ordered set of up to three bio images shown for an
+Artist on the public artist page and index cards. Chosen and ordered only by a
+human; a bio generation job may **suggest** images but never chooses or
+displaces a human's choice. While no human has chosen, the page shows the
+suggested images. See
+[ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
+_Avoid_: primary images, hero image, featured images (featured is a release
+credit).
+
 **Release** — a published body of work by an Artist, with tracks and
 **digital formats** available for download. Its first credited Artist is its
 **album artist**.
