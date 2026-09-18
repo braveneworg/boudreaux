@@ -246,6 +246,36 @@ const createBioPaletteLinkRow = async (label: string): Promise<void> => {
 };
 
 /**
+ * Insert one extra ArtistBioImage row for the bio-palette artist, with alt
+ * text so it is eligible as a display image. The display-image spec creates
+ * its own uniquely-titled row per run (and per retry) so choosing and
+ * un-choosing it never races the shared seeded rows other tests assert on.
+ * The thumbnail is a data URL so the manager tile (rendered `unoptimized`)
+ * always loads.
+ */
+const createBioPaletteImageRow = async (title: string, alt: string): Promise<void> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    await prisma.artistBioImage.create({
+      data: {
+        artistId: BIO_PALETTE_ARTIST_ID,
+        url: `https://cdn.fakefourrecords.com/media/artists/e2e-bio-palette/bio/${title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')}.jpg`,
+        thumbnailUrl: PLACEHOLDER_COVER_ART,
+        title,
+        alt,
+        attribution: 'E2E display attribution',
+        origin: 'generated',
+        sortOrder: 99,
+      },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/**
  * Far-future session expiry so the minted cookies never lapse mid-suite.
  */
 const sessionExpiresAt = (): Date => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -1091,6 +1121,10 @@ const seedTestDatabase = async () => {
         genres: 'Experimental, Electronic',
         bioModel: 'fake/deterministic',
         bioGeneratedAt: new Date(),
+        // Two bio images: the job's suggestion (isPrimary) and a human's
+        // chosen display image (displayOrder, custom). The public artist page
+        // and index card must show the chosen one, not the suggested one
+        // (ADR-0008); the bio page gallery still shows both.
         bioImages: {
           create: [
             {
@@ -1099,6 +1133,16 @@ const seedTestDatabase = async () => {
               title: 'E2E Artist portrait',
               isPrimary: true,
               sortOrder: 0,
+            },
+            {
+              url: 'https://picsum.photos/seed/e2e-bio-chosen/1200/800',
+              thumbnailUrl: 'https://picsum.photos/seed/e2e-bio-chosen/400/300',
+              title: 'E2E Artist chosen portrait',
+              alt: 'E2E Artist chosen portrait',
+              isPrimary: false,
+              origin: 'custom',
+              displayOrder: 0,
+              sortOrder: 1,
             },
           ],
         },
@@ -1691,6 +1735,7 @@ export {
   BIO_CUSTOM_MEDIA_ARTIST_ID,
   BIO_FILTER_INSERT_ARTIST_ID,
   BIO_PALETTE_ARTIST_ID,
+  createBioPaletteImageRow,
   createBioPaletteLinkRow,
   createDisposableSignoutState,
   E2E_PRODUCER_ONE_ID,
