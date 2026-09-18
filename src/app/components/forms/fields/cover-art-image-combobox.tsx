@@ -3,12 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import Image from 'next/image';
 
 import { Check, ChevronsUpDown } from 'lucide-react';
 
+import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import {
   Command,
@@ -19,10 +20,14 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { getArtistImagesAction } from '@/lib/actions/artist-image-actions';
 import { cn } from '@/lib/utils';
+import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
+import { useArtistBioImagesQuery } from '../_hooks/use-artist-bio-images-query';
 import { useArtistsQuery } from '../_hooks/use-artists-query';
+
+/** How a pool row relates to the artist's display images, for the option badge. */
+type ImageRole = 'display' | 'suggested' | null;
 
 interface ArtistImageOption {
   id: string;
@@ -31,6 +36,7 @@ interface ArtistImageOption {
   artistName: string;
   caption?: string;
   altText?: string;
+  role: ImageRole;
 }
 
 interface CoverArtImageComboboxProps {
@@ -41,6 +47,30 @@ interface CoverArtImageComboboxProps {
   onSelect: (src: string) => void;
 }
 
+const imageRole = (image: BioStatusImage): ImageRole => {
+  if (typeof image.displayOrder === 'number') return 'display';
+  if (image.isPrimary) return 'suggested';
+  return null;
+};
+
+const artistLabel = (
+  artist: { displayName?: string | null; firstName?: string; surname?: string } | null | undefined
+): string => {
+  if (!artist) return '(no name)';
+  return (
+    artist.displayName ||
+    [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
+    '(no name)'
+  );
+};
+
+/**
+ * "Or select from artist images": a cmdk combobox over the bio image pools of
+ * the given artists — display images first, then the job's suggestions, then
+ * the rest — so a release or featured-artist cover can reuse the same photo
+ * the artist page shows without re-uploading it. Selecting an option hands
+ * its CDN URL to the parent field.
+ */
 export const CoverArtImageCombobox = ({
   artistIds,
   currentValue,
@@ -48,79 +78,29 @@ export const CoverArtImageCombobox = ({
   isUploading,
   onSelect,
 }: CoverArtImageComboboxProps): React.ReactElement | null => {
-  const [rawArtistImages, setRawArtistImages] = useState<ArtistImageOption[]>([]);
-  const [isLoadingArtistImages, setIsLoadingArtistImages] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const artistIdsKey = JSON.stringify([...artistIds].sort());
   const sortedArtistIds = useMemo<string[]>(() => JSON.parse(artistIdsKey), [artistIdsKey]);
   const { artistsById } = useArtistsQuery(sortedArtistIds);
+  const { imagesByArtistId, isPending: isLoadingArtistImages } =
+    useArtistBioImagesQuery(sortedArtistIds);
 
-  const nameByArtistId = useMemo<Map<string, string>>(() => {
-    const map = new Map<string, string>();
-    for (const [id, artist] of Object.entries(artistsById)) {
-      map.set(
-        id,
-        artist
-          ? artist.displayName ||
-              [artist.firstName, artist.surname].filter(Boolean).join(' ') ||
-              '(no name)'
-          : '(no name)'
-      );
-    }
-    return map;
-  }, [artistsById]);
-
-  const artistImages = useMemo<ArtistImageOption[]>(
-    () =>
-      rawArtistImages.map((img) => ({
-        ...img,
-        artistName: nameByArtistId.get(img.artistId) ?? '(no name)',
-      })),
-    [rawArtistImages, nameByArtistId]
-  );
-
-  useEffect(() => {
-    const parsedIds: string[] = JSON.parse(artistIdsKey);
-    if (parsedIds.length === 0) {
-      setRawArtistImages([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchArtistImages = async () => {
-      setIsLoadingArtistImages(true);
-      try {
-        const imageResults = await Promise.all(
-          parsedIds.map(async (artistId) => {
-            const imagesResult = await getArtistImagesAction(artistId);
-            if (imagesResult.success && imagesResult.data) {
-              return imagesResult.data.map<ArtistImageOption>((img) => ({
-                id: img.id,
-                src: img.src,
-                artistId,
-                artistName: '(no name)',
-                caption: img.caption,
-                altText: img.altText,
-              }));
-            }
-            return [];
-          })
-        );
-        if (!cancelled) setRawArtistImages(imageResults.flat());
-      } catch (err) {
-        console.error('Failed to fetch artist images:', err);
-      } finally {
-        if (!cancelled) setIsLoadingArtistImages(false);
-      }
-    };
-
-    fetchArtistImages();
-    return () => {
-      cancelled = true;
-    };
-  }, [artistIdsKey]);
+  const artistImages = useMemo<ArtistImageOption[]>(() => {
+    const names = new Map(Object.entries(artistsById));
+    const pools = new Map(Object.entries(imagesByArtistId));
+    return sortedArtistIds.flatMap((artistId) =>
+      (pools.get(artistId) ?? []).map<ArtistImageOption>((image) => ({
+        id: image.id,
+        src: image.url,
+        artistId,
+        artistName: artistLabel(names.get(artistId)),
+        caption: image.title ?? undefined,
+        altText: image.alt ?? undefined,
+        role: imageRole(image),
+      }))
+    );
+  }, [sortedArtistIds, artistsById, imagesByArtistId]);
 
   const getTriggerLabel = (): string => {
     if (isLoadingArtistImages) return 'Loading artist images...';
@@ -185,7 +165,19 @@ export const CoverArtImageCombobox = ({
                       />
                     </div>
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm">{img.artistName}</span>
+                      <span className="flex items-center gap-1 truncate text-sm">
+                        {img.artistName}
+                        {img.role === 'display' && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Display
+                          </Badge>
+                        )}
+                        {img.role === 'suggested' && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Suggested
+                          </Badge>
+                        )}
+                      </span>
                       {img.caption && (
                         <span className="truncate text-xs text-zinc-950">{img.caption}</span>
                       )}

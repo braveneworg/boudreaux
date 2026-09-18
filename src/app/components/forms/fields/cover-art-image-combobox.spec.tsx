@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createElement } from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { ImageUploadActionResult } from '@/lib/actions/artist-image-actions';
+import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 import { artistDetailSchema } from '@/lib/validation/media/artist-schema';
 
 import { CoverArtImageCombobox } from './cover-art-image-combobox';
@@ -16,8 +16,8 @@ import type { ArtistDetail } from '../_hooks/use-artist-query';
 const useArtistsQuery = vi.hoisted(() => vi.fn());
 vi.mock('../_hooks/use-artists-query', () => ({ useArtistsQuery }));
 
-const getArtistImagesAction = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/actions/artist-image-actions', () => ({ getArtistImagesAction }));
+const useArtistBioImagesQuery = vi.hoisted(() => vi.fn());
+vi.mock('../_hooks/use-artist-bio-images-query', () => ({ useArtistBioImagesQuery }));
 
 // Render next/image as a plain <img> via createElement (not JSX) so findByAltText
 // works while sidestepping the @next/next/no-img-element lint rule.
@@ -27,9 +27,6 @@ vi.mock('next/image', () => ({
 
 // Radix Command (cmdk) scrolls the active item into view on open; jsdom lacks it.
 Element.prototype.scrollIntoView = vi.fn();
-
-/** Type of a single artist image returned by `getArtistImagesAction`. */
-type ActionImage = NonNullable<ImageUploadActionResult['data']>[number];
 
 /**
  * Builds a fully-typed {@link ArtistDetail} by parsing a minimal raw object
@@ -95,18 +92,13 @@ const buildArtist = (overrides: {
     images: [],
   });
 
-/** Builds a single artist-image fixture as returned by the server action. */
-const buildImage = (overrides: Partial<ActionImage> & { id: string }): ActionImage => ({
-  src: `https://cdn.test/${overrides.id}.jpg`,
-  caption: undefined,
-  altText: undefined,
-  sortOrder: 0,
+/** Builds one bio image pool row as the picker query returns it. */
+const buildImage = (overrides: Partial<BioStatusImage> & { id: string }): BioStatusImage => ({
+  url: `https://cdn.test/${overrides.id}.jpg`,
+  attribution: null,
+  isPrimary: false,
+  displayOrder: null,
   ...overrides,
-});
-
-const successResult = (images: ActionImage[]): ImageUploadActionResult => ({
-  success: true,
-  data: images,
 });
 
 const baseProps = {
@@ -121,14 +113,17 @@ const setArtistsById = (artistsById: Record<string, ArtistDetail | null | undefi
   useArtistsQuery.mockReturnValue({ artistsById, isPending: false });
 };
 
-// On mount the component fetches artist images, disabling the trigger while the
-// request is in flight. Wait for it to settle (re-enable) before clicking, so
-// the open click isn't dropped by the momentarily-disabled button. Returns the
-// trigger button captured before opening — once open, cmdk's CommandInput also
-// exposes `role="combobox"`, so a fresh `getByRole('combobox')` is ambiguous.
+const setPools = (
+  imagesByArtistId: Record<string, BioStatusImage[] | undefined>,
+  isPending = false
+): void => {
+  useArtistBioImagesQuery.mockReturnValue({ imagesByArtistId, isPending });
+};
+
+// Once open, cmdk's CommandInput also exposes `role="combobox"`, so capture the
+// trigger before opening rather than querying it again afterwards.
 const openPopover = async (user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> => {
   const trigger = screen.getByRole('combobox');
-  await waitFor(() => expect(trigger).toBeEnabled());
   await user.click(trigger);
   return trigger;
 };
@@ -136,7 +131,7 @@ const openPopover = async (user: ReturnType<typeof userEvent.setup>): Promise<HT
 describe('CoverArtImageCombobox', () => {
   beforeEach(() => {
     setArtistsById({ 'artist-1': buildArtist({ id: 'artist-1', displayName: 'The Band' }) });
-    getArtistImagesAction.mockResolvedValue(successResult([]));
+    setPools({ 'artist-1': [] });
   });
 
   it('renders nothing when no artist ids are provided', () => {
@@ -151,13 +146,16 @@ describe('CoverArtImageCombobox', () => {
     expect(screen.getByText('Or select from artist images:')).toBeInTheDocument();
   });
 
-  it('shows the default trigger label when nothing is selected', async () => {
+  it('shows the default trigger label when nothing is selected', () => {
     render(<CoverArtImageCombobox {...baseProps} />);
 
-    // Wait for the on-mount image fetch to settle so the transient
-    // "Loading artist images..." label has cleared.
-    await waitFor(() => expect(screen.getByRole('combobox')).toBeEnabled());
     expect(screen.getByRole('combobox')).toHaveTextContent('Choose from artist images...');
+  });
+
+  it('queries the bio image pools of every provided artist, in a stable order', () => {
+    render(<CoverArtImageCombobox {...baseProps} artistIds={['artist-2', 'artist-1']} />);
+
+    expect(useArtistBioImagesQuery).toHaveBeenCalledWith(['artist-1', 'artist-2']);
   });
 
   it('opens the popover on click', async () => {
@@ -187,48 +185,29 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByText('No artist images found.')).toBeInTheDocument();
   });
 
-  it('disables the trigger while a fetch is in flight (loading label)', async () => {
-    let resolveAction: (value: ImageUploadActionResult) => void = () => {};
-    getArtistImagesAction.mockReturnValue(
-      new Promise<ImageUploadActionResult>((resolve) => {
-        resolveAction = resolve;
-      })
-    );
+  it('disables the trigger with a loading label while the pools are pending', () => {
+    setPools({ 'artist-1': undefined }, true);
     render(<CoverArtImageCombobox {...baseProps} />);
 
-    expect(await screen.findByText('Loading artist images...')).toBeInTheDocument();
-
-    resolveAction(successResult([]));
+    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('combobox')).toHaveTextContent('Loading artist images...');
   });
 
   it('disables the trigger via the disabled prop', () => {
-    getArtistImagesAction.mockResolvedValue(successResult([]));
     render(<CoverArtImageCombobox {...baseProps} disabled />);
 
     expect(screen.getByRole('combobox')).toBeDisabled();
   });
 
   it('disables the trigger via the isUploading prop', () => {
-    getArtistImagesAction.mockResolvedValue(successResult([]));
     render(<CoverArtImageCombobox {...baseProps} isUploading />);
 
     expect(screen.getByRole('combobox')).toBeDisabled();
   });
 
-  it('fetches images for every provided artist id', async () => {
-    getArtistImagesAction.mockResolvedValue(successResult([]));
-    setArtistsById({
-      'artist-1': buildArtist({ id: 'artist-1', displayName: 'One' }),
-      'artist-2': buildArtist({ id: 'artist-2', displayName: 'Two' }),
-    });
-    render(<CoverArtImageCombobox {...baseProps} artistIds={['artist-2', 'artist-1']} />);
-
-    await waitFor(() => expect(getArtistImagesAction).toHaveBeenCalledTimes(2));
-  });
-
-  it('renders an option for each returned image with its artist name', async () => {
+  it('renders an option for each pool image with its artist name', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -236,11 +215,67 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByText('The Band')).toBeInTheDocument();
   });
 
-  it('renders the image caption when present', async () => {
+  it('keeps the pool order the query returns: display images first', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', caption: 'Live at the Apollo' })])
-    );
+    setPools({
+      'artist-1': [
+        buildImage({ id: 'display', title: 'Chosen', displayOrder: 0 }),
+        buildImage({ id: 'suggested', title: 'Suggested', isPrimary: true }),
+        buildImage({ id: 'rest', title: 'Rest' }),
+      ],
+    });
+    render(<CoverArtImageCombobox {...baseProps} />);
+
+    await openPopover(user);
+
+    const options = await screen.findAllByRole('option');
+    expect(options.map((option) => within(option).getByRole('img').getAttribute('alt'))).toEqual([
+      'Chosen',
+      'Suggested',
+      'Rest',
+    ]);
+  });
+
+  it('badges display images and suggested images', async () => {
+    const user = userEvent.setup({ delay: null });
+    setPools({
+      'artist-1': [
+        buildImage({ id: 'display', displayOrder: 0 }),
+        buildImage({ id: 'suggested', isPrimary: true }),
+        buildImage({ id: 'rest' }),
+      ],
+    });
+    render(<CoverArtImageCombobox {...baseProps} />);
+
+    await openPopover(user);
+
+    const [display, suggested, rest] = await screen.findAllByRole('option');
+    expect(within(display).getByText('Display')).toBeInTheDocument();
+    expect(within(suggested).getByText('Suggested')).toBeInTheDocument();
+    expect(within(rest).queryByText(/Display|Suggested/)).not.toBeInTheDocument();
+  });
+
+  it('lists the pools of several artists in artist order', async () => {
+    const user = userEvent.setup({ delay: null });
+    setArtistsById({
+      'artist-1': buildArtist({ id: 'artist-1', displayName: 'One' }),
+      'artist-2': buildArtist({ id: 'artist-2', displayName: 'Two' }),
+    });
+    setPools({
+      'artist-1': [buildImage({ id: 'a' })],
+      'artist-2': [buildImage({ id: 'b' })],
+    });
+    render(<CoverArtImageCombobox {...baseProps} artistIds={['artist-2', 'artist-1']} />);
+
+    await openPopover(user);
+
+    const options = await screen.findAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(['One', 'Two']);
+  });
+
+  it('renders the image title as the caption when present', async () => {
+    const user = userEvent.setup({ delay: null });
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', title: 'Live at the Apollo' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -248,11 +283,9 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByText('Live at the Apollo')).toBeInTheDocument();
   });
 
-  it('uses altText for the image alt when provided', async () => {
+  it('uses the image alt text for the thumbnail when provided', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', altText: 'A cool photo', caption: 'cap' })])
-    );
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', alt: 'A cool photo', title: 'cap' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -260,11 +293,9 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByAltText('A cool photo')).toBeInTheDocument();
   });
 
-  it('falls back to caption for the image alt when altText is absent', async () => {
+  it('falls back to the title for the thumbnail alt when alt text is absent', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', caption: 'Just a caption' })])
-    );
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', title: 'Just a caption' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -272,9 +303,9 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByAltText('Just a caption')).toBeInTheDocument();
   });
 
-  it('falls back to a generic alt when neither altText nor caption is present', async () => {
+  it('falls back to a generic alt when neither alt text nor title is present', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -282,12 +313,10 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByAltText('Artist image')).toBeInTheDocument();
   });
 
-  it('calls onSelect with the image src when an option is chosen', async () => {
+  it('calls onSelect with the image url when an option is chosen', async () => {
     const user = userEvent.setup({ delay: null });
     const onSelect = vi.fn();
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', src: 'https://cdn.test/chosen.jpg' })])
-    );
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', url: 'https://cdn.test/chosen.jpg' })] });
     render(<CoverArtImageCombobox {...baseProps} onSelect={onSelect} />);
 
     await openPopover(user);
@@ -298,7 +327,7 @@ describe('CoverArtImageCombobox', () => {
 
   it('closes the popover after an option is chosen', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -309,20 +338,16 @@ describe('CoverArtImageCombobox', () => {
     );
   });
 
-  it('shows the selected trigger label when currentValue matches an image', async () => {
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', src: 'https://cdn.test/sel.jpg' })])
-    );
+  it('shows the selected trigger label when currentValue matches an image', () => {
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', url: 'https://cdn.test/sel.jpg' })] });
     render(<CoverArtImageCombobox {...baseProps} currentValue="https://cdn.test/sel.jpg" />);
 
-    expect(await screen.findByText('The Band - image selected')).toBeInTheDocument();
+    expect(screen.getByText('The Band - image selected')).toBeInTheDocument();
   });
 
   it('marks the selected option with an opaque check indicator', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', src: 'https://cdn.test/sel.jpg' })])
-    );
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', url: 'https://cdn.test/sel.jpg' })] });
     render(<CoverArtImageCombobox {...baseProps} currentValue="https://cdn.test/sel.jpg" />);
 
     await openPopover(user);
@@ -332,9 +357,7 @@ describe('CoverArtImageCombobox', () => {
 
   it('does not mark an unselected option as checked', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue(
-      successResult([buildImage({ id: 'img-1', src: 'https://cdn.test/other.jpg' })])
-    );
+    setPools({ 'artist-1': [buildImage({ id: 'img-1', url: 'https://cdn.test/other.jpg' })] });
     render(<CoverArtImageCombobox {...baseProps} currentValue="https://cdn.test/sel.jpg" />);
 
     await openPopover(user);
@@ -347,7 +370,7 @@ describe('CoverArtImageCombobox', () => {
     setArtistsById({
       'artist-1': buildArtist({ id: 'artist-1', firstName: 'Ada', surname: 'Lovelace' }),
     });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -358,7 +381,7 @@ describe('CoverArtImageCombobox', () => {
   it('shows "(no name)" when an artist has no name parts', async () => {
     const user = userEvent.setup({ delay: null });
     setArtistsById({ 'artist-1': buildArtist({ id: 'artist-1' }) });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -369,7 +392,7 @@ describe('CoverArtImageCombobox', () => {
   it('shows "(no name)" when the queried artist entry is null', async () => {
     const user = userEvent.setup({ delay: null });
     setArtistsById({ 'artist-1': null });
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -377,10 +400,10 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByText('(no name)')).toBeInTheDocument();
   });
 
-  it('shows "(no name)" when the image artist id is absent from the name map', async () => {
+  it('shows "(no name)" when the artist is absent from the name map', async () => {
     const user = userEvent.setup({ delay: null });
     setArtistsById({});
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
+    setPools({ 'artist-1': [buildImage({ id: 'img-1' })] });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
@@ -388,47 +411,13 @@ describe('CoverArtImageCombobox', () => {
     expect(await screen.findByText('(no name)')).toBeInTheDocument();
   });
 
-  it('skips images for an artist whose action reports failure', async () => {
+  it('treats a pool that has not loaded as empty', async () => {
     const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue({ success: false, error: 'boom' });
+    setPools({ 'artist-1': undefined });
     render(<CoverArtImageCombobox {...baseProps} />);
 
     await openPopover(user);
 
     expect(await screen.findByText('No artist images found.')).toBeInTheDocument();
-  });
-
-  it('skips images for an artist whose action succeeds with no data', async () => {
-    const user = userEvent.setup({ delay: null });
-    getArtistImagesAction.mockResolvedValue({ success: true });
-    render(<CoverArtImageCombobox {...baseProps} />);
-
-    await openPopover(user);
-
-    expect(await screen.findByText('No artist images found.')).toBeInTheDocument();
-  });
-
-  it('logs and recovers when the image fetch rejects', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    getArtistImagesAction.mockRejectedValue(new Error('network down'));
-    render(<CoverArtImageCombobox {...baseProps} />);
-
-    await waitFor(() =>
-      expect(consoleError).toHaveBeenCalledWith('Failed to fetch artist images:', expect.any(Error))
-    );
-
-    consoleError.mockRestore();
-  });
-
-  it('clears images and skips fetching when artist ids become empty after mount', async () => {
-    getArtistImagesAction.mockResolvedValue(successResult([buildImage({ id: 'img-1' })]));
-    const { rerender } = render(<CoverArtImageCombobox {...baseProps} />);
-
-    await waitFor(() => expect(getArtistImagesAction).toHaveBeenCalledTimes(1));
-    getArtistImagesAction.mockClear();
-
-    rerender(<CoverArtImageCombobox {...baseProps} artistIds={[]} />);
-
-    expect(getArtistImagesAction).not.toHaveBeenCalled();
   });
 });
