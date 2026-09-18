@@ -81,6 +81,10 @@ vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
     delete: vi.fn(),
     findForRehost: vi.fn(),
     findCustomUrls: vi.fn(),
+    findManyByArtist: vi.fn(),
+    findManyByIds: vi.fn(),
+    setDisplayOrder: vi.fn(),
+    updateAlt: vi.fn(),
     updateUrl: vi.fn(),
     updateAttribution: vi.fn(),
   },
@@ -2414,6 +2418,38 @@ describe('ArtistService', () => {
       expect(row).not.toHaveProperty('releases');
     });
 
+    it('resolves the display images: a human choice beats the suggested images', async () => {
+      const image = (id: string, overrides: Record<string, unknown>) => ({
+        id,
+        url: `https://cdn/${id}.webp`,
+        thumbnailUrl: null,
+        title: null,
+        attribution: null,
+        license: null,
+        licenseUrl: null,
+        sourceUrl: null,
+        alt: 'described',
+        isPrimary: false,
+        displayOrder: null,
+        ...overrides,
+      });
+      vi.mocked(ArtistRepository.listListed).mockResolvedValue([
+        {
+          ...listingRecord,
+          bioImages: [
+            image('suggested', { isPrimary: true }),
+            image('second', { displayOrder: 1 }),
+            image('first', { displayOrder: 0 }),
+          ],
+        },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists(filters);
+
+      const ids = result.success ? result.data[0]?.bioImages.map(({ id }) => id) : result;
+      expect(ids).toEqual(['first', 'second']);
+    });
+
     it('flattens the bands the artist belongs to', async () => {
       const row = await listOne();
 
@@ -2654,6 +2690,168 @@ describe('ArtistService', () => {
       await ArtistService.updateBioImageAttribution('img-1', 'Credit');
 
       expect(ArtistBioImageRepository.updateAttribution).toHaveBeenCalledWith('img-1', 'Credit');
+    });
+  });
+
+  describe('updateBioImageAlt', () => {
+    it('delegates the alt update to the repository', async () => {
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValue(undefined as never);
+
+      await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
+
+      expect(ArtistBioImageRepository.updateAlt).toHaveBeenCalledWith('img-1', 'Ceschi on stage');
+    });
+  });
+
+  describe('setDisplayImages', () => {
+    const eligible = (id: string) => ({ id, alt: 'described', origin: 'generated' });
+
+    beforeEach(() => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValue({
+        id: 'a1',
+        slug: 'ceschi',
+      } as never);
+      vi.mocked(ArtistBioImageRepository.setDisplayOrder).mockResolvedValue(undefined);
+    });
+
+    // Persistent implementations and unconsumed one-shots leak across the
+    // shuffled file (docs/lessons/testing), so drain them after every test.
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findById).mockReset();
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockReset();
+      vi.mocked(ArtistBioImageRepository.setDisplayOrder).mockReset();
+    });
+
+    it('writes the ordered ids and returns the artist slug for revalidation', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([
+        eligible('img-2'),
+        eligible('img-1'),
+      ]);
+
+      const result = await ArtistService.setDisplayImages('a1', ['img-1', 'img-2']);
+
+      expect(result).toEqual({ success: true, data: { slug: 'ceschi' } });
+      expect(ArtistBioImageRepository.setDisplayOrder).toHaveBeenCalledWith('a1', [
+        'img-1',
+        'img-2',
+      ]);
+    });
+
+    it('clears every display image when given an empty list', async () => {
+      const result = await ArtistService.setDisplayImages('a1', []);
+
+      expect(result).toMatchObject({ success: true });
+      expect(ArtistBioImageRepository.setDisplayOrder).toHaveBeenCalledWith('a1', []);
+    });
+
+    it('rejects more than the cap with LIMIT_EXCEEDED', async () => {
+      const result = await ArtistService.setDisplayImages('a1', ['i1', 'i2', 'i3', 'i4']);
+
+      expect(result).toMatchObject({ success: false, code: 'LIMIT_EXCEEDED' });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+    });
+
+    it('rejects a repeated id with VALIDATION', async () => {
+      const result = await ArtistService.setDisplayImages('a1', ['i1', 'i1']);
+
+      expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+    });
+
+    it('returns NOT_FOUND for an unknown artist', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(null);
+
+      const result = await ArtistService.setDisplayImages('missing', ['i1']);
+
+      expect(result).toMatchObject({ success: false, code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+    });
+
+    it("returns NOT_FOUND when an id is not one of the artist's images", async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([eligible('img-1')]);
+
+      const result = await ArtistService.setDisplayImages('a1', ['img-1', 'foreign']);
+
+      expect(result).toMatchObject({ success: false, code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+    });
+
+    it('refuses to choose an image without alt text', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([
+        eligible('img-1'),
+        { id: 'img-2', alt: '  ', origin: 'custom' },
+      ]);
+
+      const result = await ArtistService.setDisplayImages('a1', ['img-1', 'img-2']);
+
+      expect(result).toMatchObject({
+        success: false,
+        code: 'VALIDATION',
+        error: expect.stringContaining('alt text'),
+      });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+    });
+
+    it('maps a repository failure through the data error code', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([eligible('img-1')]);
+      vi.mocked(ArtistBioImageRepository.setDisplayOrder).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'db down')
+      );
+
+      const result = await ArtistService.setDisplayImages('a1', ['img-1']);
+
+      expect(result).toMatchObject({ success: false, code: 'UNAVAILABLE' });
+    });
+  });
+
+  describe('listBioImages', () => {
+    const poolRow = (id: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      isPrimary: false,
+      displayOrder: null,
+      ...overrides,
+    });
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.existsById).mockReset();
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockReset();
+    });
+
+    it('returns the pool in picker order: chosen, suggested, then the rest', async () => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce({ id: 'a1' });
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValueOnce([
+        poolRow('rest'),
+        poolRow('suggested', { isPrimary: true }),
+        poolRow('chosen', { displayOrder: 0 }),
+      ] as never);
+
+      const result = await ArtistService.listBioImages('a1');
+
+      expect(result.success ? result.data.map(({ id }) => id) : result).toEqual([
+        'chosen',
+        'suggested',
+        'rest',
+      ]);
+    });
+
+    it('returns NOT_FOUND for an unknown artist', async () => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(null);
+
+      const result = await ArtistService.listBioImages('missing');
+
+      expect(result).toMatchObject({ success: false, code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.findManyByArtist).not.toHaveBeenCalled();
+    });
+
+    it('maps a repository failure through the data error code', async () => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce({ id: 'a1' });
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'db down')
+      );
+
+      const result = await ArtistService.listBioImages('a1');
+
+      expect(result).toMatchObject({ success: false, code: 'UNAVAILABLE' });
     });
   });
 

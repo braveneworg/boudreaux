@@ -12,6 +12,7 @@ import { useArtistBySlugQuery } from '@/hooks/queries/use-artist-by-slug-query';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { compareByCreditThenNewest } from '@/lib/utils/artist-release-credits';
 import { toBioTeaser } from '@/lib/utils/bio-teaser';
+import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 
@@ -78,7 +79,7 @@ const ArtistDetailHeader = ({
               <ExpandableThumbnail
                 src={image.url}
                 thumbnailSrc={image.thumbnailUrl}
-                alt={image.title ?? `${displayName} image`}
+                alt={image.alt ?? image.title ?? `${displayName} image`}
                 caption={image.title}
                 attribution={image.attribution}
                 license={image.license}
@@ -159,10 +160,9 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   const displayName = getArtistDisplayName(artist);
   const genres = splitList(artist.genres);
 
-  // Show the 2–3 best identifying images beside the short bio; fall back to the
-  // first few discovered images when none are explicitly marked primary.
-  const primaryImages = artist.bioImages.filter((image) => image.isPrimary);
-  const detailImages = (primaryImages.length ? primaryImages : artist.bioImages).slice(0, 3);
+  // The artist's display images beside the short bio: the human's chosen rows,
+  // else the job's suggested rows, else the first discovered ones (ADR-0008).
+  const detailImages = resolveDisplayImages(artist.bioImages);
   const hasFullBio =
     Boolean(artist.bio) || artist.bioImages.length > 0 || artist.bioLinks.length > 0;
 

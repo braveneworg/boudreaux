@@ -4,19 +4,24 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '../fixtures/auth.fixture';
-import { BIO_PALETTE_ARTIST_ID, createBioPaletteLinkRow } from '../helpers/seed-test-db';
+import {
+  BIO_PALETTE_ARTIST_ID,
+  createBioPaletteImageRow,
+  createBioPaletteLinkRow,
+} from '../helpers/seed-test-db';
 
 import type { Page } from '@playwright/test';
 
 /**
- * E2E coverage for the admin bio link/image palettes and the bio editor's
- * figure + link flows, against the dedicated seeded palette artist
- * (bioStatus 'succeeded' with persisted ArtistBioLink/ArtistBioImage rows).
+ * E2E coverage for the admin bio link palette, the bio image manager (pool,
+ * display images), and the bio editor's figure + link flows, against the
+ * dedicated seeded palette artist (bioStatus 'succeeded' with persisted
+ * ArtistBioLink/ArtistBioImage rows).
  *
- * Palette-tile → editor drag-and-drop is intentionally NOT covered here:
- * synthetic DataTransfer drags over ProseMirror drop coordinates are not
- * reliably reproducible in Playwright, and the drop handler is fully
- * unit-covered in `src/app/components/ui/bio-editor-drop.spec.ts`.
+ * Tile → editor drag-and-drop is intentionally NOT covered here: synthetic
+ * DataTransfer drags over ProseMirror drop coordinates are not reliably
+ * reproducible in Playwright, and the drop handler is fully unit-covered in
+ * `src/app/components/ui/bio-editor-drop.spec.ts`.
  */
 
 const gotoArtistEdit = async (adminPage: Page): Promise<void> => {
@@ -36,10 +41,54 @@ test.describe('Admin bio palettes', () => {
     await expect(linksGroup).toBeVisible();
     await expect(linksGroup.getByText('E2E Wikipedia')).toBeVisible();
 
-    const imagesGroup = adminPage.getByRole('group', { name: 'Discovered images' });
-    await expect(imagesGroup).toHaveCount(1);
-    await expect(imagesGroup).toBeVisible();
-    await expect(imagesGroup.getByText('E2E seeded attribution')).toBeVisible();
+    const manager = adminPage.getByRole('region', { name: 'Bio images' });
+    await expect(manager).toHaveCount(1);
+    await expect(manager).toBeVisible();
+    const pool = manager.getByRole('group', { name: 'Image pool' });
+    await expect(pool.getByText('E2E seeded attribution')).toBeVisible();
+  });
+
+  test('an image without alt text cannot be chosen as a display image', async ({ adminPage }) => {
+    await gotoArtistEdit(adminPage);
+
+    // The seeded portrait carries no alt text, so the service would refuse
+    // it; the manager disables the affordance up front and says why.
+    const use = adminPage.getByRole('button', {
+      name: 'Use E2E palette portrait as display image',
+    });
+    await expect(use).toHaveCount(1, { timeout: 15_000 });
+    await expect(use).toBeDisabled();
+    await expect(use).toHaveAccessibleDescription(/alt text/i);
+  });
+
+  test('choosing a display image fills the strip and survives reload', async ({ adminPage }) => {
+    // A uniquely-titled, alt-bearing row per run (and per retry) so choosing
+    // and un-choosing it never touches the shared seeded rows.
+    const title = `E2E display ${randomUUID().slice(0, 8)}`;
+    await createBioPaletteImageRow(title, `${title} described`);
+
+    await gotoArtistEdit(adminPage);
+
+    const use = adminPage.getByRole('button', { name: `Use ${title} as display image` });
+    await expect(use).toHaveCount(1, { timeout: 15_000 });
+    await expect(use).toBeEnabled();
+    await use.click();
+
+    const strip = adminPage.getByRole('list', { name: 'Display images' });
+    // Accessible-name matching is a substring match, so the position suffix
+    // ("… display image 1 of 1") need not be pinned.
+    const chosen = strip.getByRole('listitem', { name: `${title}, display image` });
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+
+    // The choice is persisted by the set action, not held in form state.
+    await adminPage.reload();
+    await expect(chosen).toHaveCount(1, { timeout: 15_000 });
+    await expect(chosen).toBeVisible();
+
+    // Removing it from the strip is the same set write, and leaves the row in the pool.
+    await adminPage.getByRole('button', { name: `Remove ${title} from display images` }).click();
+    await expect(chosen).toHaveCount(0, { timeout: 15_000 });
+    await expect(use).toBeEnabled();
   });
 
   test('deleting a palette link removes the tile', async ({ adminPage }) => {

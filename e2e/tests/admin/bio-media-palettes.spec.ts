@@ -7,10 +7,10 @@ import { BIO_FILTER_INSERT_ARTIST_ID } from '../../helpers/seed-test-db';
 import type { Page } from '@playwright/test';
 
 /**
- * E2E coverage for the bio media palette filter, click-to-insert (touch /
- * keyboard path), and persistence flows. Uses a dedicated seeded artist with
- * no initial bioStatus so the palettes do not render on page load; the test
- * triggers generation to get the deterministic fixture rows (Wikipedia link,
+ * E2E coverage for the bio link palette and image manager filter,
+ * click-to-insert (touch / keyboard path), and persistence flows. Uses a
+ * dedicated seeded artist with no initial bioStatus so no rows exist on page
+ * load; the test triggers generation to get the deterministic fixture rows (Wikipedia link,
  * press link "An interview with the artist", photo image, cover image
  * "Fixture Album"). No releases are linked to this artist so the fixture
  * produces exactly 2 links and 2 images — counts are stable across retries.
@@ -51,10 +51,14 @@ test.describe('Admin bio media palettes', () => {
     await expect(linksGroup).toBeVisible();
     await expect(linksGroup.getByText('Discovered links (', { exact: false })).toBeVisible();
 
-    const imagesGroup = adminPage.getByRole('group', { name: 'Discovered images' });
+    // The image manager region always mounts; its pool grid (a role=group)
+    // appears once the generated rows land.
+    const manager = adminPage.getByRole('region', { name: 'Bio images' });
+    await expect(manager).toHaveCount(1, { timeout: 15_000 });
+    await expect(manager.getByText('Image pool (', { exact: false })).toBeVisible();
+    const imagesGroup = manager.getByRole('group', { name: 'Image pool' });
     await expect(imagesGroup).toHaveCount(1, { timeout: 15_000 });
     await expect(imagesGroup).toBeVisible();
-    await expect(imagesGroup.getByText('Discovered images (', { exact: false })).toBeVisible();
 
     // 3. Filter links by 'interview' → press link visible, Wikipedia filtered out.
     //    The filter matches label OR kind substring (case-insensitive), so
@@ -115,12 +119,12 @@ test.describe('Admin bio media palettes', () => {
     await expect(coverFigureImages).toHaveCount(2, { timeout: 15_000 });
 
     // 7. Cover badge visible on the cover tile; eye preview dialog still opens.
-    //    The palette re-renders from the persisted rows (bioStatus 'succeeded' is
+    //    The pool re-renders from the persisted rows (bioStatus 'succeeded' is
     //    unchanged by saving the bio form). The cover image has kind='cover' which
     //    renders as an overlay Badge. The eye button opens a preview dialog whose
     //    accessible name matches the image title ("Fixture Album").
-    //    Use exact:true so "Discovered" (which contains "cover" as a substring)
-    //    and "Cover Art Archive" are not matched — only the badge text "cover".
+    //    Use exact:true so "Cover Art Archive" is not matched — only the badge
+    //    text "cover".
     await expect(imagesGroup).toBeVisible({ timeout: 15_000 });
     await expect(imagesGroup.getByText('cover', { exact: true })).toBeVisible();
     await adminPage.getByRole('button', { name: 'Preview Fixture Album' }).click();

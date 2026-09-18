@@ -56,6 +56,7 @@ const makeBioImageRecord = (): ArtistBioImageRecord => ({
   width: null,
   height: null,
   isPrimary: false,
+  displayOrder: null,
   kind: null,
   alt: null,
   hasFace: null,

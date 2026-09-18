@@ -99,7 +99,7 @@ export const ArtistBioContent = ({ slug }: ArtistBioContentProps) => {
                   <ExpandableThumbnail
                     src={image.url}
                     thumbnailSrc={image.thumbnailUrl}
-                    alt={image.title ?? `${displayName} image`}
+                    alt={image.alt ?? image.title ?? `${displayName} image`}
                     caption={image.title}
                     attribution={image.attribution}
                     license={image.license}

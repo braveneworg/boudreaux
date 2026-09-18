@@ -479,16 +479,31 @@ describe('ArtistRepository', () => {
       expect(arg?.select).not.toHaveProperty('address1');
     });
 
-    it('selects up to three primary bio images in sort order', async () => {
+    // Display-image candidates: the human's chosen rows or the job's suggested
+    // rows. `displayOrder: { gte: 0 }` matches only numbers (null and absent
+    // both fail), and the cap is applied by the service after resolution —
+    // Mongo sorts nulls first, so a DB-level take would return unchosen rows.
+    it('selects the chosen-or-suggested bio images in sort order without a DB cap', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({
-        where: { isPrimary: true },
+        where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
         orderBy: { sortOrder: 'asc' },
-        take: 3,
+      });
+      expect(arg?.select?.bioImages).not.toHaveProperty('take');
+    });
+
+    it('selects the display-image fields on listing bio images', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({
+        select: { alt: true, isPrimary: true, displayOrder: true },
       });
     });
 
@@ -974,6 +989,19 @@ describe('ArtistRepository', () => {
       expect(arg.data.bioLinks.create).toEqual([{ ...content.links[0], origin: 'generated' }]);
     });
 
+    // Display images are chosen by humans and survive regeneration (ADR-0008):
+    // the recreated generated rows must never carry a display position, so the
+    // AI can suggest (isPrimary) but never choose.
+    it('never writes a display position on the recreated generated rows', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      const arg = tx.artist.update.mock.calls[0][0];
+      expect(arg.data.bioImages.create[0]).not.toHaveProperty('displayOrder');
+    });
+
     it('carries the face signal fields into the recreated generated image rows', async () => {
       const tx = buildTx({});
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
@@ -1140,6 +1168,15 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({ select: { width: true, height: true } });
+    });
+
+    it('selects displayOrder on the bioImages select', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a8');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioImages).toMatchObject({ select: { displayOrder: true } });
     });
 
     it('selects licenseUrl on the bioImages select', async () => {

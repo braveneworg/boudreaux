@@ -39,6 +39,9 @@ const wireRow = {
       license: null,
       licenseUrl: null,
       sourceUrl: null,
+      alt: 'E2E Artist on stage',
+      isPrimary: true,
+      displayOrder: null,
     },
   ],
   members: [],
@@ -75,6 +78,28 @@ describe('artistListingRowSchema', () => {
     const parsed = artistListingRowSchema.parse({ ...wireRow, email: 'x@example.com' });
 
     expect(parsed).not.toHaveProperty('email');
+  });
+
+  it('retains the display-image fields on a listing bio image', () => {
+    const chosen = {
+      ...wireRow,
+      bioImages: [{ ...wireRow.bioImages[0], displayOrder: 0 }],
+    };
+
+    const parsed = artistListingRowSchema.parse(chosen);
+
+    expect(parsed.bioImages[0]).toMatchObject({
+      alt: 'E2E Artist on stage',
+      isPrimary: true,
+      displayOrder: 0,
+    });
+  });
+
+  it('rejects a listing bio image missing its suggestion flag', () => {
+    const { isPrimary: _isPrimary, ...withoutFlag } = wireRow.bioImages[0];
+    const row = { ...wireRow, bioImages: [withoutFlag] };
+
+    expect(artistListingRowSchema.safeParse(row).success).toBe(false);
   });
 });
 

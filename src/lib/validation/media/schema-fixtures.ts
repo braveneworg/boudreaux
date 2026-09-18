@@ -262,6 +262,7 @@ export const artistWithPublishedReleases = {
       faceScore: 97.4,
       origin: 'generated',
       sortOrder: 0,
+      displayOrder: null,
       createdAt: ISO,
     },
   ],

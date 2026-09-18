@@ -111,9 +111,11 @@ export interface ArtistBioImageRecord {
   hasFace: boolean | null;
   /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
   faceScore: number | null;
-  /** Provenance: `'generated'` (AI discovery) or `'custom'` (admin upload); `null`/missing on legacy rows, read as generated. */
+  /** Provenance: `'generated'` (owned by the job) or `'custom'` (owned by a human); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
+  /** Human-chosen display position (0-based) among the artist's display images; `null` = not chosen. Never written by regeneration. */
+  displayOrder: number | null;
   createdAt: Date;
 }
 
@@ -228,7 +230,11 @@ export interface ArtistListingName {
   suffix: string | null;
 }
 
-/** The bio-image projection the listing card and search dropdown render. */
+/**
+ * The bio-image projection the listing card and search dropdown render. Carries
+ * the suggestion flag and the human-chosen position so the service can resolve
+ * the artist's display images.
+ */
 export interface ArtistListingBioImage {
   id: string;
   url: string;
@@ -238,6 +244,9 @@ export interface ArtistListingBioImage {
   license: string | null;
   licenseUrl: string | null;
   sourceUrl: string | null;
+  alt: string | null;
+  isPrimary: boolean;
+  displayOrder: number | null;
 }
 
 /** Narrow release projection loaded behind every listing-row release join. */

@@ -306,6 +306,52 @@ describe('face-signal wire additions', () => {
   });
 });
 
+describe('display order status additions', () => {
+  const statusImage = {
+    id: '665f1f77bcf86cd799439011',
+    url: 'https://cdn.example/a.webp',
+    attribution: null,
+    isPrimary: false,
+  };
+
+  it('retains a human-chosen displayOrder on the status image schema', () => {
+    const parsed = bioStatusImageSchema.parse({ ...statusImage, displayOrder: 1 });
+    expect(parsed.displayOrder).toBe(1);
+  });
+
+  it('accepts a null displayOrder (not chosen)', () => {
+    const parsed = bioStatusImageSchema.parse({ ...statusImage, displayOrder: null });
+    expect(parsed.displayOrder).toBeNull();
+  });
+
+  it('defaults an absent displayOrder to null', () => {
+    const parsed = bioStatusImageSchema.parse(statusImage);
+    expect(parsed.displayOrder).toBeNull();
+  });
+
+  it('rejects a negative displayOrder', () => {
+    expect(bioStatusImageSchema.safeParse({ ...statusImage, displayOrder: -1 }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a fractional displayOrder', () => {
+    expect(bioStatusImageSchema.safeParse({ ...statusImage, displayOrder: 0.5 }).success).toBe(
+      false
+    );
+  });
+
+  it('never accepts displayOrder on the Lambda wire schema', () => {
+    const parsed = bioGenerationImageSchema.parse({
+      url: 'https://upload.wikimedia.org/a.jpg',
+      attribution: 'Wikimedia Commons',
+      isPrimary: true,
+      displayOrder: 0,
+    });
+    expect(parsed).not.toHaveProperty('displayOrder');
+  });
+});
+
 describe('bioProgressSchema', () => {
   const validAt = '2026-07-08T00:00:00.000Z';
 

@@ -8,10 +8,12 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $transaction: vi.fn(),
     artistBioImage: {
       delete: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       create: vi.fn(),
       aggregate: vi.fn(),
     },
@@ -239,6 +241,141 @@ describe('ArtistBioImageRepository', () => {
         where: { id: 'img-1' },
         data: { attribution: null },
       });
+    });
+  });
+
+  describe('updateAlt', () => {
+    it('updates the alt text by id', async () => {
+      vi.mocked(prisma.artistBioImage.update).mockResolvedValue({} as never);
+
+      await ArtistBioImageRepository.updateAlt('img-1', 'Ceschi on stage');
+
+      expect(prisma.artistBioImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { alt: 'Ceschi on stage' },
+      });
+    });
+
+    it('supports clearing the alt text to null', async () => {
+      vi.mocked(prisma.artistBioImage.update).mockResolvedValue({} as never);
+
+      await ArtistBioImageRepository.updateAlt('img-1', null);
+
+      expect(prisma.artistBioImage.update).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        data: { alt: null },
+      });
+    });
+  });
+
+  describe('findManyByArtist', () => {
+    it('lists the artist rows in pool (sortOrder) order', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([{ id: 'img-1' }] as never);
+
+      const rows = await ArtistBioImageRepository.findManyByArtist('a1');
+
+      expect(rows).toEqual([{ id: 'img-1' }]);
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        orderBy: { sortOrder: 'asc' },
+      });
+    });
+  });
+
+  describe('findManyByIds', () => {
+    it('selects the eligibility projection scoped to the artist', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([
+        { id: 'img-1', alt: 'x', origin: 'generated' },
+      ] as never);
+
+      const rows = await ArtistBioImageRepository.findManyByIds('a1', ['img-1', 'img-2']);
+
+      expect(rows).toEqual([{ id: 'img-1', alt: 'x', origin: 'generated' }]);
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', id: { in: ['img-1', 'img-2'] } },
+        select: { id: true, alt: true, origin: true },
+      });
+    });
+
+    it('short-circuits to an empty list without querying when no ids are given', async () => {
+      const rows = await ArtistBioImageRepository.findManyByIds('a1', []);
+
+      expect(rows).toEqual([]);
+      expect(prisma.artistBioImage.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setDisplayOrder', () => {
+    const tx = {
+      artistBioImage: {
+        updateMany: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+
+    beforeEach(() => {
+      tx.artistBioImage.updateMany.mockResolvedValue({ count: 0 });
+      tx.artistBioImage.update.mockResolvedValue({});
+      vi.mocked(prisma.$transaction).mockImplementation(
+        async (callback: unknown) => (callback as (client: typeof tx) => Promise<void>)(tx) as never
+      );
+    });
+
+    it('clears every position for the artist before writing the new ones', async () => {
+      await ArtistBioImageRepository.setDisplayOrder('a1', ['img-b', 'img-a']);
+
+      expect(tx.artistBioImage.updateMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        data: { displayOrder: null },
+      });
+      expect(tx.artistBioImage.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.artistBioImage.update.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('writes contiguous positions in the given order, scoped to the artist', async () => {
+      await ArtistBioImageRepository.setDisplayOrder('a1', ['img-b', 'img-a']);
+
+      expect(tx.artistBioImage.update).toHaveBeenNthCalledWith(1, {
+        where: { id: 'img-b', artistId: 'a1' },
+        data: { displayOrder: 0, origin: 'custom' },
+      });
+      expect(tx.artistBioImage.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 'img-a', artistId: 'a1' },
+        data: { displayOrder: 1, origin: 'custom' },
+      });
+    });
+
+    it('promotes every chosen row to custom so regeneration keeps it', async () => {
+      await ArtistBioImageRepository.setDisplayOrder('a1', ['img-a']);
+
+      const [call] = tx.artistBioImage.update.mock.calls;
+      expect(call[0].data.origin).toBe('custom');
+    });
+
+    it('only clears when given an empty list', async () => {
+      await ArtistBioImageRepository.setDisplayOrder('a1', []);
+
+      expect(tx.artistBioImage.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.artistBioImage.update).not.toHaveBeenCalled();
+    });
+
+    it('runs the clear and the writes inside one transaction', async () => {
+      await ArtistBioImageRepository.setDisplayOrder('a1', ['img-a']);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.artistBioImage.updateMany).not.toHaveBeenCalled();
+      expect(prisma.artistBioImage.update).not.toHaveBeenCalled();
+    });
+
+    it('translates a transaction failure into a DataError', async () => {
+      vi.mocked(prisma.$transaction).mockRejectedValueOnce(new Error('boom'));
+
+      await expect(ArtistBioImageRepository.setDisplayOrder('a1', ['img-a'])).rejects.toMatchObject(
+        {
+          name: 'DataError',
+        }
+      );
     });
   });
 });

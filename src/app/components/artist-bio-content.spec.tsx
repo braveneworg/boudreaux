@@ -131,6 +131,20 @@ describe('ArtistBioContent', () => {
     expect(screen.queryByText('funk')).not.toBeInTheDocument();
   });
 
+  it('prefers the image alt text over its title in the gallery', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [{ ...artist.bioImages[0], alt: 'The artist mid-song' }],
+      },
+    });
+
+    render(<ArtistBioContent slug="test-artist" />);
+
+    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'The artist mid-song');
+  });
+
   it('falls back to a generated alt text for an untitled bio image', () => {
     useArtistBySlugQueryMock.mockReturnValue({
       isPending: false,

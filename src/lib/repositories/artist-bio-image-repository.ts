@@ -17,6 +17,13 @@ export interface BioImageRehostRow {
   originalUrl: string | null;
 }
 
+/** The projection the display-image rules read before choosing rows. */
+export interface BioImageEligibilityRow {
+  id: string;
+  alt: string | null;
+  origin: string | null;
+}
+
 /**
  * Data access for `ArtistBioImage` rows — the images discovered during AI bio
  * generation or added by an admin. A child collection of the `Artist`
@@ -103,6 +110,55 @@ export class ArtistBioImageRepository {
   static async updateAttribution(imageId: string, attribution: string | null): Promise<void> {
     await runQuery(() =>
       prisma.artistBioImage.update({ where: { id: imageId }, data: { attribution } })
+    );
+  }
+
+  /** Updates a single bio image row's alt text (admin edit). */
+  static async updateAlt(imageId: string, alt: string | null): Promise<void> {
+    await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { alt } }));
+  }
+
+  /** Lists an artist's full bio image rows in pool (`sortOrder`) order. */
+  static async findManyByArtist(artistId: string): Promise<ArtistBioImageRecord[]> {
+    return runQuery(() =>
+      prisma.artistBioImage.findMany({ where: { artistId }, orderBy: { sortOrder: 'asc' } })
+    ) as Promise<ArtistBioImageRecord[]>;
+  }
+
+  /**
+   * Reads the eligibility projection of the given rows, scoped to the artist
+   * so a row belonging to another artist is simply absent from the result.
+   */
+  static async findManyByIds(artistId: string, ids: string[]): Promise<BioImageEligibilityRow[]> {
+    if (ids.length === 0) return [];
+    return runQuery(() =>
+      prisma.artistBioImage.findMany({
+        where: { artistId, id: { in: ids } },
+        select: { id: true, alt: true, origin: true },
+      })
+    );
+  }
+
+  /**
+   * Replaces the artist's display images with `orderedIds` in one transaction:
+   * every position for the artist is cleared, then each given row takes its
+   * index as `displayOrder` and is promoted to `origin: 'custom'` so a bio
+   * regeneration keeps it (`ArtistRepository.replaceBioContent` deletes only
+   * non-custom rows). The `where` carries `artistId` so a foreign row id can
+   * never be written. Callers validate the cap, uniqueness, ownership, and
+   * alt-text eligibility before reaching here.
+   */
+  static async setDisplayOrder(artistId: string, orderedIds: string[]): Promise<void> {
+    await runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.artistBioImage.updateMany({ where: { artistId }, data: { displayOrder: null } });
+        for (const [displayOrder, id] of orderedIds.entries()) {
+          await tx.artistBioImage.update({
+            where: { id, artistId },
+            data: { displayOrder, origin: 'custom' },
+          });
+        }
+      })
     );
   }
 }

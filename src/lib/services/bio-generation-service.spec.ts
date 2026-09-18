@@ -286,6 +286,16 @@ describe('persistGeneratedBio', () => {
     expect(content.altBio).not.toContain('<script>');
   });
 
+  // A human's display-image choice outlives regeneration (ADR-0008): the job
+  // persists its suggestion in isPrimary and never a display position.
+  it('persists images without a display position, keeping isPrimary as the suggestion', async () => {
+    await persistGeneratedBio(artistId, baseData, []);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.images[0]).toMatchObject({ isPrimary: true });
+    expect(content.images[0]).not.toHaveProperty('displayOrder');
+  });
+
   it('rewrites an inline image:N placeholder in the alt bio to the CDN url', async () => {
     const content = await persistGeneratedBio(
       artistId,

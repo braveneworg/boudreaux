@@ -300,6 +300,7 @@ describe('ArtistForm', () => {
               url: 'https://cdn/x.webp',
               attribution: null,
               isPrimary: false,
+              displayOrder: null,
             },
           ],
           links: [],

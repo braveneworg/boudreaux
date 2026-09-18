@@ -121,14 +121,20 @@ export const ArtistBioSection = ({
         below xl: palettes above editors (DOM order matches visual order). */}
     <BioEditorRegistryProvider>
       <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
-        {isEditMode && artistId && (
-          <div
-            data-testid="bio-media-rail"
-            className="xl:sticky xl:top-24 xl:order-2 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
-          >
+        <div
+          data-testid="bio-media-rail"
+          className="xl:sticky xl:top-24 xl:order-2 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
+        >
+          {isEditMode && artistId ? (
             <BioMediaPalettes artistId={artistId} />
-          </div>
-        )}
+          ) : (
+            // Images (and their display-image choice) hang off a persisted
+            // artist row, so create mode explains the wait instead of hiding it.
+            <p className="text-muted-foreground text-sm">
+              Images become available after the artist is saved.
+            </p>
+          )}
+        </div>
         <div data-testid="bio-editors-column" className="space-y-4 xl:order-1">
           <BioEditorField
             control={control}

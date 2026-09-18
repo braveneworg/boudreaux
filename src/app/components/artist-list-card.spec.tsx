@@ -188,6 +188,9 @@ describe('ArtistListCard', () => {
               license: null,
               licenseUrl: null,
               sourceUrl: null,
+              alt: null,
+              isPrimary: false,
+              displayOrder: null,
             },
           ],
         }}
@@ -195,6 +198,33 @@ describe('ArtistListCard', () => {
     );
 
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
+  });
+
+  it('prefers the image alt text over the title for the thumbnail', () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            {
+              id: 'bi1',
+              url: 'https://x/a.jpg',
+              thumbnailUrl: null,
+              title: 'Portrait',
+              attribution: null,
+              license: null,
+              licenseUrl: null,
+              sourceUrl: null,
+              alt: 'Test Artist on stage',
+              isPrimary: false,
+              displayOrder: 0,
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Test Artist on stage');
   });
 
   it('raises the thumbnails above the stretched link so they open their dialog', () => {
@@ -212,6 +242,9 @@ describe('ArtistListCard', () => {
               license: null,
               licenseUrl: null,
               sourceUrl: null,
+              alt: null,
+              isPrimary: false,
+              displayOrder: null,
             },
           ],
         }}

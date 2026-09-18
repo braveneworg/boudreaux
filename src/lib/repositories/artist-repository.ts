@@ -91,6 +91,7 @@ export interface BioGenerationStateRecord {
     hasFace: boolean | null;
     faceScore: number | null;
     origin: string | null;
+    displayOrder: number | null;
   }>;
   bioLinks: Array<{
     id: string;
@@ -131,8 +132,8 @@ const artistListingNameSelect = {
 
 /**
  * Public artists-index select — the identifying scalars only (this payload
- * leaves the server, so contact fields are never selected), up to three
- * primary bio images, the band graph as name projections, and the artist's
+ * leaves the server, so contact fields are never selected), the display-image
+ * candidates, the band graph as name projections, and the artist's
  * direct release joins with the narrow release projection the listing rule and
  * the "newest release" summary read.
  */
@@ -152,10 +153,13 @@ const artistListingSelect = {
   bornOn: true,
   diedOn: true,
   formedOn: true,
+  // Display-image candidates: the human's chosen rows (`displayOrder: { gte:
+  // 0 }` matches only numbers — null and absent both fail) or the job's
+  // suggested rows. No DB-level take: Mongo sorts nulls first, so a cap here
+  // would return unchosen rows; the service resolves and caps after the read.
   bioImages: {
-    where: { isPrimary: true },
+    where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
     orderBy: { sortOrder: 'asc' },
-    take: 3,
     select: {
       id: true,
       url: true,
@@ -165,6 +169,9 @@ const artistListingSelect = {
       license: true,
       licenseUrl: true,
       sourceUrl: true,
+      alt: true,
+      isPrimary: true,
+      displayOrder: true,
     },
   },
   members: { select: { member: { select: artistListingNameSelect } } },
@@ -835,6 +842,7 @@ export class ArtistRepository {
               hasFace: true,
               faceScore: true,
               origin: true,
+              displayOrder: true,
             },
           },
           bioLinks: {

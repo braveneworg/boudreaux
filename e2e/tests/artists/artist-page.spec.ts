@@ -54,6 +54,21 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('link', { name: /read full bio/i })).toBeVisible();
     });
 
+    // The seed carries a suggested (isPrimary) portrait and a human-chosen
+    // display image; the page shows the chosen one only (ADR-0008).
+    test('shows the chosen display image instead of the suggested one', async ({ page }) => {
+      await page.goto('/artists/e2e-artist');
+
+      const chosen = page.getByRole('button', {
+        name: 'Expand image: E2E Artist chosen portrait',
+      });
+      await expect(chosen).toHaveCount(1, { timeout: 15_000 });
+      await expect(chosen).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
+      ).toHaveCount(0);
+    });
+
     test('should open the full bio page with the long bio, inline link, and image', async ({
       page,
     }) => {
@@ -106,6 +121,23 @@ test.describe('Artist Page', () => {
       // The whole card is clickable through the stretched name link.
       await page.getByRole('link', { name: 'E2E Artist', exact: true }).click();
       await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
+    });
+
+    test('the card shows the chosen display image instead of the suggested one', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+
+      await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
+        timeout: 15_000,
+      });
+      const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
+      await expect(
+        card.getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
+      ).toBeVisible();
+      await expect(
+        card.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
+      ).toHaveCount(0);
     });
 
     test('prepopulates the search dropdown with the first eight artists', async ({ page }) => {
