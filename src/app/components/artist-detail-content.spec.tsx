@@ -138,6 +138,55 @@ describe('ArtistDetailContent', () => {
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
   });
 
+  it('prefers the image alt text over its title', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [{ ...artist.bioImages[0], alt: 'The artist mid-song' }],
+      },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'The artist mid-song');
+  });
+
+  // Display images are chosen by humans; the job's isPrimary is only a
+  // suggestion shown while nothing has been chosen (ADR-0008).
+  it('shows the chosen display images in their order instead of the suggested ones', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [
+          { ...artist.bioImages[0], id: 's', title: 'Suggested', isPrimary: true },
+          {
+            ...artist.bioImages[0],
+            id: 'c2',
+            title: 'Chosen second',
+            isPrimary: false,
+            displayOrder: 1,
+          },
+          {
+            ...artist.bioImages[0],
+            id: 'c1',
+            title: 'Chosen first',
+            isPrimary: false,
+            displayOrder: 0,
+          },
+        ],
+      },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getAllByTestId('thumb').map((thumb) => thumb.getAttribute('data-alt'))).toEqual([
+      'Chosen first',
+      'Chosen second',
+    ]);
+  });
+
   it('falls back to non-primary images and the display name alt when none are primary or titled', () => {
     useArtistBySlugQueryMock.mockReturnValue({
       isPending: false,

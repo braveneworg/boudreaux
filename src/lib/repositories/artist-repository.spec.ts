@@ -479,17 +479,21 @@ describe('ArtistRepository', () => {
       expect(arg?.select).not.toHaveProperty('address1');
     });
 
-    it('selects up to three primary bio images in sort order', async () => {
+    // Display-image candidates: the human's chosen rows or the job's suggested
+    // rows. `displayOrder: { gte: 0 }` matches only numbers (null and absent
+    // both fail), and the cap is applied by the service after resolution —
+    // Mongo sorts nulls first, so a DB-level take would return unchosen rows.
+    it('selects the chosen-or-suggested bio images in sort order without a DB cap', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({
-        where: { isPrimary: true },
+        where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
         orderBy: { sortOrder: 'asc' },
-        take: 3,
       });
+      expect(arg?.select?.bioImages).not.toHaveProperty('take');
     });
 
     it('selects the display-image fields on listing bio images', async () => {

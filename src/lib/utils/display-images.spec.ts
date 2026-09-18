@@ -94,6 +94,15 @@ describe('resolveDisplayImages', () => {
     expect(resolveDisplayImages([])).toEqual([]);
   });
 
+  it('treats an absent position as not chosen (rows serialised before the field existed)', () => {
+    const rows = [
+      { id: 'legacy', isPrimary: true, alt: null },
+      { id: 'chosen', isPrimary: false, alt: null, displayOrder: 0 },
+    ];
+
+    expect(resolveDisplayImages(rows).map(({ id }) => id)).toEqual(['chosen']);
+  });
+
   it('does not mutate the input', () => {
     const rows = [row('b', { displayOrder: 1 }), row('a', { displayOrder: 0 })];
     const snapshot = [...rows];

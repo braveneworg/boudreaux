@@ -22,15 +22,20 @@ export const DISPLAY_IMAGE_CAP = 3;
 export interface DisplayImageCandidate {
   /** The bio generation job's suggestion; never a human's choice. */
   isPrimary: boolean;
-  /** Human-chosen 0-based position; `null` when not chosen. */
-  displayOrder: number | null;
+  /**
+   * Human-chosen 0-based position; `null` when not chosen. Absent on rows
+   * serialised before the field existed, which also reads as not chosen.
+   */
+  displayOrder?: number | null;
 }
+
+/** Whether a human has chosen this row (an absent position is "not chosen"). */
+const isChosen = <T extends DisplayImageCandidate>(row: T): row is T & { displayOrder: number } =>
+  typeof row.displayOrder === 'number';
 
 /** Rows a human has chosen, ordered by their chosen position. */
 const chosenInOrder = <T extends DisplayImageCandidate>(rows: readonly T[]): T[] =>
-  rows
-    .filter((row): row is T & { displayOrder: number } => row.displayOrder !== null)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  rows.filter(isChosen).sort((a, b) => a.displayOrder - b.displayOrder);
 
 /**
  * Resolve an artist's display images from its bio image pool. Rows are
@@ -79,7 +84,7 @@ export const orderBioImagesForPicker = <T extends DisplayImageCandidate>(
   rows: readonly T[]
 ): T[] => {
   const chosen = chosenInOrder(rows);
-  const suggested = rows.filter((row) => row.displayOrder === null && row.isPrimary);
-  const rest = rows.filter((row) => row.displayOrder === null && !row.isPrimary);
+  const suggested = rows.filter((row) => !isChosen(row) && row.isPrimary);
+  const rest = rows.filter((row) => !isChosen(row) && !row.isPrimary);
   return [...chosen, ...suggested, ...rest];
 };
