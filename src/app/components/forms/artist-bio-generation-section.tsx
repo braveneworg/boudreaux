@@ -103,7 +103,7 @@ const BioResultPreview = ({ result }: BioResultPreviewProps) => (
 
     <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
       <Trash2 className="size-3" aria-hidden />
-      Regenerating replaces the palette images and links. Save the form to keep the result.
+      Regenerating replaces the palette images and links.
     </p>
   </div>
 );
@@ -135,13 +135,14 @@ export const ArtistBioGenerationSection = ({
   const status = useArtistBioGenerationStatusQuery(artistId, { enabled: active });
 
   // Generation runs in the background; surface its terminal status once. On
-  // success we populate the form from the polled content; on failure we toast.
+  // success we populate the form from the polled content — which the job has
+  // already persisted, so there is nothing left to Save; on failure we toast.
   useEffect(() => {
     if (!active || !status.data) return;
     if (status.data.status === 'succeeded' && status.data.content) {
       setResult(status.data.content);
       onGenerated(status.data.content);
-      toast.success('Bios generated — review below, then Save to keep them.');
+      toast.success('Bios generated and saved.');
       setActive(false);
     } else if (status.data.status === 'failed') {
       toast.error(status.data.error || 'Bio generation failed.');

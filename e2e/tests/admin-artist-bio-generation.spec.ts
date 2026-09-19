@@ -97,24 +97,25 @@ test.describe('Admin AI bio generation', () => {
     const longBioEditor = adminPage.getByRole('textbox', { name: 'Bio' });
     await expect(longBioEditor.locator('figure.bio-figure')).toHaveCount(2);
 
-    // Public page (a second tab, so the dirty admin form survives): both
-    // floated figures render with captions — the persisted generation output.
+    // The job persisted what it generated, so the form adopts it as SAVED
+    // content: the completion toast says so and Save stays disabled — there is
+    // nothing for the admin to scroll down and keep. Assert after the toast,
+    // which fires in the same effect that populates the form (onGenerated); a
+    // pristine form's Save is disabled too, so an earlier check proves nothing.
+    const generatedToast = adminPage.getByText(/bios generated and saved/i);
+    await expect(generatedToast).toBeVisible({ timeout: 30_000 });
+    const save = adminPage.getByRole('button', { name: 'Save', exact: true });
+    await expect(save).toBeDisabled();
+
+    // Public page (a second tab, so the admin form survives): both floated
+    // figures render with captions — the persisted generation output, live
+    // without any Save.
     const publicPage = await adminPage.context().newPage();
     await assertPublicBioFigures(publicPage, slug);
 
-    // Round-trip: save WITHOUT edits (generation itself dirtied the form),
-    // then re-visit the public page — the figures must survive the
-    // editor-backed form → server sanitize → DB → renderer loop with no drift.
-    const save = adminPage.getByRole('button', { name: 'Save', exact: true });
-    await expect(save).toBeEnabled({ timeout: 10_000 });
-    await save.click();
-    const savedToast = adminPage.getByText(/saved successfully/i);
-    await expect(savedToast).toBeVisible({ timeout: 15_000 });
-    // Let the toast auto-dismiss so the post-regenerate save's toast assertion
-    // below cannot match this stale one.
-    await expect(savedToast).not.toBeVisible({ timeout: 15_000 });
-    await assertPublicBioFigures(publicPage, slug);
-    await publicPage.close();
+    // Let the toast auto-dismiss so the post-regenerate toast assertion below
+    // cannot match this stale one.
+    await expect(generatedToast).not.toBeVisible({ timeout: 15_000 });
 
     // Regenerate replaces the preview (also async — poll again). Wait for the
     // completion toast — it fires in the SAME effect that populates the form
@@ -123,9 +124,7 @@ test.describe('Admin AI bio generation', () => {
     // the palette signal alone races a late onGenerated overwrite that would
     // revert the edit and un-dirty the form (disabling Save).
     await regenerate.click();
-    await expect(adminPage.getByText(/bios generated — review below/i)).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(generatedToast).toBeVisible({ timeout: 30_000 });
     await expect(
       discoveredLinks.getByRole('button', { name: 'Delete link Wikipedia' })
     ).toBeVisible({ timeout: 30_000 });
@@ -141,6 +140,12 @@ test.describe('Admin AI bio generation', () => {
 
     // A success toast confirms the save without navigating away from the form.
     await expect(adminPage.getByText(/saved successfully/i)).toBeVisible({ timeout: 15_000 });
+
+    // Round-trip: that Save submitted the untouched long bio too, so the
+    // figures must survive the editor-backed form → server sanitize → DB →
+    // renderer loop with no drift.
+    await assertPublicBioFigures(publicPage, slug);
+    await publicPage.close();
   });
 
   test('exposes bulleted and numbered list buttons in the bio editors', async ({ adminPage }) => {
