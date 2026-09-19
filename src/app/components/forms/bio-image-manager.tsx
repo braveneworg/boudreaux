@@ -6,7 +6,7 @@
 import { useId, useState } from 'react';
 import type { JSX } from 'react';
 
-import { Star } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Input } from '@/app/components/ui/input';
@@ -178,9 +178,10 @@ export const BioImageManager = ({
                           onClick={() => use(image)}
                           aria-label={`Use ${previewLabel} as display image`}
                           aria-describedby={reason ? hintId : undefined}
+                          title={reason ? REASON_COPY.get(reason) : 'Add to display images'}
                           className="hover:text-primary p-0.5 disabled:opacity-40"
                         >
-                          <Star className="size-3.5" aria-hidden />
+                          <Plus className="size-3.5" aria-hidden />
                         </button>
                         {reason && (
                           <span id={hintId} className="sr-only">

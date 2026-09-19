@@ -8,7 +8,7 @@ import type { DragEvent, JSX, ReactNode } from 'react';
 
 import Image from 'next/image';
 
-import { Eye, Pencil, Plus, X } from 'lucide-react';
+import { Eye, Pencil, TextCursorInput, X } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import {
@@ -235,6 +235,7 @@ export const BioImageTile = ({
             <button
               type="button"
               aria-label={`Preview ${previewLabel}`}
+              title="Preview"
               className="hover:text-primary p-0.5"
             >
               <Eye className="size-3.5" aria-hidden />
@@ -261,9 +262,10 @@ export const BioImageTile = ({
           disabled={disabled}
           onClick={() => onInsert(image)}
           aria-label={`Insert image ${previewLabel}`}
+          title="Insert into the bio at the cursor"
           className="hover:text-primary p-0.5"
         >
-          <Plus className="size-3.5" aria-hidden />
+          <TextCursorInput className="size-3.5" aria-hidden />
         </button>
         {actions}
         <button
@@ -271,6 +273,7 @@ export const BioImageTile = ({
           disabled={disabled}
           onClick={() => onDelete(image.id)}
           aria-label={`Delete image ${deleteLabel}`}
+          title="Delete from the pool"
           className="hover:text-destructive ml-auto p-0.5"
         >
           <X className="size-3.5" aria-hidden />

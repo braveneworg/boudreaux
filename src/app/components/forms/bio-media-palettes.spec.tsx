@@ -4,6 +4,7 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 
 import type {
   BioGenerationStatusResponse,
@@ -65,6 +66,10 @@ vi.mock('./bio-image-upload-zone', () => ({
 
 vi.mock('@/lib/utils/api-base-url', () => ({
   getApiBaseUrl: () => 'https://fakefourrecords.com',
+}));
+
+vi.mock('sonner', () => ({
+  toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
 
 // Expose a controllable registry so insert tests can drive the target editor.
@@ -292,15 +297,16 @@ describe('BioMediaPalettes', () => {
 
   // ── insertLink ──────────────────────────────────────────────────────────────
 
-  it('insertLink is a no-op when no editor is registered (getTarget returns null)', async () => {
+  it('insertLink explains itself instead of silently doing nothing when no editor is focused', async () => {
     mockGetTarget.mockReturnValue(null);
     render(<BioMediaPalettes artistId="artist-1" />);
 
-    // Click the insert button. With no target editor the function returns early
-    // and no error is thrown; the only side-effect is the getTarget() call.
     await userEvent.click(screen.getByRole('button', { name: 'Insert link Wikipedia' }));
 
     expect(mockGetTarget).toHaveBeenCalled();
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith(
+      'Click into a bio editor first, then insert.'
+    );
   });
 
   it('insertLink calls chain().focus().insertContent(bioLink).run() on the target editor', async () => {
@@ -326,13 +332,16 @@ describe('BioMediaPalettes', () => {
 
   // ── insertImage ─────────────────────────────────────────────────────────────
 
-  it('insertImage is a no-op when no editor is registered (getTarget returns null)', async () => {
+  it('insertImage explains itself instead of silently doing nothing when no editor is focused', async () => {
     mockGetTarget.mockReturnValue(null);
     render(<BioMediaPalettes artistId="artist-1" />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Insert image Portrait' }));
 
     expect(mockGetTarget).toHaveBeenCalled();
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith(
+      'Click into a bio editor first, then insert.'
+    );
   });
 
   it('insertImage calls chain().focus().insertContent(bioFigure).run() on the target editor', async () => {

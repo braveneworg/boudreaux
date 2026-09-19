@@ -145,6 +145,12 @@ describe('BioImageManager', () => {
     expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'suggested']);
   });
 
+  it('explains the "use" button on hover, and swaps the hover text for the reason when disabled', () => {
+    renderManager();
+    expect(useButton('suggested')).toHaveAttribute('title', 'Add to display images');
+    expect(useButton('bare')).toHaveAttribute('title', 'Add alt text before using this image');
+  });
+
   it('disables "use" on a tile that is already chosen, with the reason', () => {
     renderManager();
     const button = useButton('first');

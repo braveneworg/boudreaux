@@ -5,6 +5,8 @@
 
 import type { JSX } from 'react';
 
+import { toast } from 'sonner';
+
 import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/bio-editor-insert';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
 import type { BioStatusImage, BioStatusLink } from '@/lib/validation/bio-generation-schema';
@@ -24,6 +26,9 @@ import { BioLinkPalette } from './bio-link-palette';
 interface BioMediaPalettesProps {
   artistId: string;
 }
+
+/** Shown when an insert button is pressed while no bio editor holds the cursor. */
+const NO_EDITOR_TARGET_COPY = 'Click into a bio editor first, then insert.';
 
 /** The persisted media on a status response, empty until content exists. */
 const contentMedia = (
@@ -66,7 +71,10 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
 
   const insertLink = (link: BioStatusLink): void => {
     const target = registry.getTarget();
-    if (!target) return;
+    if (!target) {
+      toast.info(NO_EDITOR_TARGET_COPY);
+      return;
+    }
     target
       .chain()
       .focus()
@@ -83,7 +91,10 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
 
   const insertImage = (image: BioStatusImage): void => {
     const target = registry.getTarget();
-    if (!target) return;
+    if (!target) {
+      toast.info(NO_EDITOR_TARGET_COPY);
+      return;
+    }
     target
       .chain()
       .focus()
