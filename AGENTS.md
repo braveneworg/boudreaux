@@ -1,6 +1,6 @@
 # boudreaux — Agent & Contributor Guidelines
 
-Last updated: 2026-09-13
+Last updated: 2026-09-19
 
 Single source of truth for how to work in this repository — for humans and for
 every AI coding agent. Tool-specific files (e.g. `CLAUDE.md`) defer to this
@@ -198,3 +198,13 @@ See `docs/agents/triage-labels.md`.
 
 Single-context: `CONTEXT.md` at the root is the glossary; decisions live in
 `docs/adr/`. See `docs/agents/domain.md`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
