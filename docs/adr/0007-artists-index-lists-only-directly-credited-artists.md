@@ -34,8 +34,12 @@ non-deleted release. A member credit alone does not list an artist.**
   Band output on the card is explained by the "Member of X" line, and the
   release count on the card counts direct credits only, so the count and the
   listing rule agree.
-- Search matches first name, surname, display name, slug, aka names, genres,
-  and the titles of the artist's listed releases, case-insensitively.
+- Search matches every name part (title, first, middle, surname, suffix),
+  display name, slug, aka names, genres, and the titles of the artist's listed
+  releases, case-insensitively. The query is split into words and every word
+  must match some field, so a name typed — or picked from the dropdown — as it
+  is displayed ("Dr. John Q. Smith Jr.") finds an artist whose display name is
+  composed from its parts.
 - The index is one shared infinite query: its first page, sliced to eight
   rows, is the search dropdown, so the grid and the suggestions never
   disagree. Picking a suggestion fills the field with the artist's name and
@@ -70,6 +74,10 @@ non-deleted release. A member credit alone does not list an artist.**
   stays hidden until one is linked.
 - There is no admin writer for `ArtistMember`, so "Member of" / "Members:"
   lines appear only where that data has been entered by script.
-- The in-memory newest-release sort reads the whole listed roster per page.
+- Both sorts read the whole listed roster per page and order it in memory:
+  newest-release because it is a relation aggregate, and A–Z because it ranks
+  by the displayed name, which is composed from the name parts when no display
+  name is stored (a database sort on `displayName` files those artists first,
+  outside the alphabet).
   Revisit (with a stored column or a Mongo aggregation) if the listed roster
   grows past a few hundred artists.

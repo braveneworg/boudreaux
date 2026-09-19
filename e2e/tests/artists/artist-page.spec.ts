@@ -147,9 +147,7 @@ test.describe('Artist Page', () => {
       await openSearch(page);
 
       await expect(page.getByRole('option')).toHaveCount(8);
-      // The composed-name artist has no stored displayName, which the A–Z order
-      // sorts first — E2E Artist follows it.
-      await expect(page.getByRole('option').nth(1)).toContainText('E2E Artist');
+      await expect(page.getByRole('option').first()).toContainText('E2E Artist');
     });
 
     test('narrows the grid and the dropdown by release title as the user types', async ({
@@ -206,13 +204,13 @@ test.describe('Artist Page', () => {
       await page.goto('/artists');
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
-      // No stored displayName: the suggestion types "Dr. Quillon M. Tokensmith
+      // No stored displayName: the suggestion types "Prof. Quillon M. Tokensmith
       // Jr." into the field, a string no single searched field contains.
       await (await openSearch(page)).fill('Tokensmith');
       await page.getByRole('option', { name: /Tokensmith/ }).click();
 
       await expect(page.getByRole('button', { name: 'Search artists' })).toHaveText(
-        'Dr. Quillon M. Tokensmith Jr.'
+        'Prof. Quillon M. Tokensmith Jr.'
       );
       await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
       await expect(cards(page).first()).toContainText('Tokensmith');
@@ -247,9 +245,7 @@ test.describe('Artist Page', () => {
 
     test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
       await page.goto('/artists');
-      // Card 0 is the composed-name artist (no stored displayName sorts first);
-      // the named artists follow in A–Z order.
-      await expect(cards(page).nth(1)).toContainText('E2E Artist', { timeout: 15_000 });
+      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
 
       await page.getByRole('radio', { name: 'Newest release' }).click();
 
@@ -262,6 +258,19 @@ test.describe('Artist Page', () => {
       await expect(page.getByText('E2E Roster 25')).toHaveCount(0);
 
       await scrollToLoad(page, page.getByRole('link', { name: 'E2E Roster 25', exact: true }));
+    });
+
+    test('files an artist without a stored display name under their composed name', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // "Prof. Quillon M. Tokensmith Jr." sorts under P — after every E2E row,
+      // so it arrives with the last page and closes the grid.
+      await scrollToLoad(page, page.getByRole('link', { name: /Tokensmith/ }));
+
+      await expect(cards(page).last()).toContainText('Tokensmith');
     });
 
     test('redirects the retired search page to the index', async ({ page }) => {

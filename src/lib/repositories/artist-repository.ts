@@ -383,6 +383,15 @@ const buildListedWhere = (
   };
 };
 
+/**
+ * A–Z order for the artists index: by the name the artist is displayed under,
+ * ignoring letter case and accents, ties by id so paging stays stable.
+ */
+const compareByDisplayName = (a: ArtistListingRecord, b: ArtistListingRecord): number =>
+  getArtistDisplayName(a).localeCompare(getArtistDisplayName(b), 'en', {
+    sensitivity: 'base',
+  }) || a.id.localeCompare(b.id);
+
 /** Epoch millis of an artist's newest listed release; no listed release sorts last. */
 const newestListedReleaseTime = (record: ArtistListingRecord): number =>
   summarizeListedReleases(record.releases).newestRelease?.releasedOn.getTime() ?? -Infinity;
@@ -463,10 +472,13 @@ export class ArtistRepository {
    * published, non-deleted, and directly credited on a listed release — with
    * the narrow {@link artistListingSelect} projection and an optional search.
    *
-   * `alpha` pages by display name in the database. `newest` orders by each
-   * artist's latest listed release, which Prisma on MongoDB cannot sort by (it
-   * is a relation aggregate), so the listed roster is read whole and ordered +
-   * sliced here; the roster is small, and ADR-0007 records the revisit trigger.
+   * Neither order can be sorted in the database: `alpha` ranks by the name an
+   * artist is displayed under, which is composed from the name parts when no
+   * `displayName` is stored (a DB sort on `displayName` files those nulls
+   * first, outside the alphabet), and `newest` by each artist's latest listed
+   * release, a relation aggregate Prisma on MongoDB cannot sort by. The listed
+   * roster is read whole and ordered + sliced here; the roster is small, and
+   * ADR-0007 records the revisit trigger.
    */
   static async listListed({
     search,
@@ -475,21 +487,11 @@ export class ArtistRepository {
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
     const where = buildListedWhere(search, { requirePublished: true });
-    if (sort === 'alpha') {
-      return runQuery(() =>
-        prisma.artist.findMany({
-          where,
-          orderBy: { displayName: 'asc' },
-          skip,
-          take,
-          select: artistListingSelect,
-        })
-      );
-    }
     const records = await runQuery(() =>
       prisma.artist.findMany({ where, select: artistListingSelect })
     );
-    return [...records].sort(compareByNewestRelease).slice(skip, skip + take);
+    const compare = sort === 'alpha' ? compareByDisplayName : compareByNewestRelease;
+    return [...records].sort(compare).slice(skip, skip + take);
   }
 
   /**

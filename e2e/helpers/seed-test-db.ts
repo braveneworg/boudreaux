@@ -1356,9 +1356,9 @@ const seedTestDatabase = async () => {
     });
 
     // 25 roster artists sharing one published, format-less compilation so the
-    // public index has a second page (A–Z page 1 = the composed-name artist
-    // below, E2E Artist, E2E Band, E2E Roster 01–21; page 2 = Roster 22–25).
-    // Bulk-created with createMany
+    // public index has a second page (A–Z page 1 = E2E Artist, E2E Band,
+    // E2E Roster 01–22; page 2 = Roster 23–25 and the composed-name artist
+    // below). Bulk-created with createMany
     // (concurrent create() read-backs race in CI on fresh collections) and
     // linked with one createMany as well; createdAt is pinned in the past for
     // the same admin-list reason as the band.
@@ -1393,15 +1393,15 @@ const seedTestDatabase = async () => {
     });
 
     // Composed-name artist: NO stored displayName, so the index shows the name
-    // built from the parts — "Dr. Quillon M. Tokensmith Jr." — which no single
-    // field contains. Exercises token search: picking the suggestion (which
-    // types that composed name) and multi-word typed queries must still find
-    // them. Credited on the roster compilation so no release count moves. A
-    // null displayName sorts FIRST in the A–Z order (Mongo orders null before
-    // strings), so this row leads page 1 of the index.
+    // built from the parts — "Prof. Quillon M. Tokensmith Jr." — which no
+    // single field contains. Exercises token search: picking the suggestion
+    // (which types that composed name) and multi-word typed queries must still
+    // find them. Credited on the roster compilation so no release count moves.
+    // Also pins the A–Z order: the composed name files under P, the LAST row of
+    // the index — a database sort on the null displayName would put it first.
     const composedNameArtist = await prisma.artist.create({
       data: {
-        title: 'Dr.',
+        title: 'Prof.',
         firstName: 'Quillon',
         middleName: 'Marlowe',
         surname: 'Tokensmith',

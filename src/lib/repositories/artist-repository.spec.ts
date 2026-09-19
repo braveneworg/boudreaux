@@ -616,14 +616,72 @@ describe('ArtistRepository', () => {
       expect(arg?.where).not.toHaveProperty('AND');
     });
 
-    it('pages the A–Z order in the database', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
+    it('fetches every listed artist for the A–Z order instead of paging in the database', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 24, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 24, take: 24 });
 
-      expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg).toMatchObject({ orderBy: { displayName: 'asc' }, skip: 24, take: 24 });
+      expect(arg).not.toHaveProperty('skip');
+      expect(arg).not.toHaveProperty('take');
+      expect(arg).not.toHaveProperty('orderBy');
+    });
+
+    it('sorts an artist without a stored display name by the name composed from its parts', async () => {
+      const composed = {
+        ...listedRecord('composed', '', null),
+        displayName: null,
+        title: 'Dr.',
+        firstName: 'Quillon',
+        middleName: null,
+        surname: 'Tokensmith',
+        suffix: null,
+      };
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('e', 'Eve', null),
+        composed,
+        listedRecord('c', 'Cara', null),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      // "Dr. Quillon Tokensmith" files under D — between Cara and Eve.
+      expect(result.map(({ id }) => id)).toEqual(['c', 'composed', 'e']);
+    });
+
+    it('orders A–Z without regard to letter case', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('z', 'Zed', null),
+        listedRecord('b', 'bob', null),
+        listedRecord('a', 'Alice', null),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['a', 'b', 'z']);
+    });
+
+    it('breaks an A–Z tie by id so pages never reshuffle', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('2', 'Same', null),
+        listedRecord('1', 'Same', null),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['1', '2']);
+    });
+
+    it('slices the A–Z order to the requested page', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('c', 'Cara', null),
+        listedRecord('a', 'Alice', null),
+        listedRecord('b', 'Bob', null),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'alpha', skip: 1, take: 1 });
+
+      expect(result.map(({ id }) => id)).toEqual(['b']);
     });
 
     it('fetches every listed artist for the newest-release order instead of paging in the database', async () => {
