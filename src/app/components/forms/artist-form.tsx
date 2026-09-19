@@ -41,6 +41,7 @@ import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
+import { useApplyGeneratedBio } from './_hooks/use-apply-generated-bio';
 import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
 import { type ArtistDetail, useArtistQuery } from './_hooks/use-artist-query';
 import { type SubmitMode, useEntitySubmit } from './_hooks/use-entity-submit';
@@ -301,7 +302,7 @@ export const ArtistForm = ({
     resolver: zodResolver(createArtistSchema),
     defaultValues: buildArtistDefaults(user?.id),
   });
-  const { control, setValue } = artistForm;
+  const { control } = artistForm;
 
   // Fetch artist data when initialArtistId is provided. The gated hook owns the
   // request lifecycle; the effects below project its data/error into form state.
@@ -451,19 +452,18 @@ export const ArtistForm = ({
     [artistForm]
   );
 
+  // The generation job has already persisted what it produced, so the form
+  // adopts it as saved content — no scroll-down-and-Save step.
+  const applyGeneratedBio = useApplyGeneratedBio({ form: artistForm, artistId });
+
   const handleBioGenerated = useCallback(
     (content: GeneratedBioContent): void => {
-      setValue('shortBio', content.shortBio, { shouldDirty: true });
-      setValue('bio', content.longBio, { shouldDirty: true });
-      setValue('altBio', content.altBio, { shouldDirty: true });
-      if (content.genres) {
-        setValue('genres', content.genres, { shouldDirty: true });
-      }
+      applyGeneratedBio(content);
       setBioPickerImages(
         content.images.map((image) => ({ url: image.url, alt: image.title ?? '' }))
       );
     },
-    [setValue]
+    [applyGeneratedBio]
   );
 
   const onInvalidSubmit = useCallback((errors: Record<string, { message?: string }>): void => {

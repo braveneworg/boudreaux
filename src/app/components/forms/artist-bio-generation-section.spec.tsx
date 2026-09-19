@@ -107,6 +107,25 @@ describe('ArtistBioGenerationSection', () => {
     expect(screen.getByRole('button', { name: /regenerate bios/i })).toBeInTheDocument();
   });
 
+  it('announces the generated bios as already saved', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Bios generated and saved.'));
+  });
+
+  it('does not tell the admin to save the form to keep the result', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await screen.findByText(/regenerating replaces the palette images and links/i);
+    expect(screen.queryByText(/save the form/i)).not.toBeInTheDocument();
+  });
+
   it('shows an in-progress hint while the job is processing', async () => {
     statusReturn = { status: 'processing', error: null, content: null };
     const onGenerated = vi.fn();
