@@ -147,7 +147,9 @@ test.describe('Artist Page', () => {
       await openSearch(page);
 
       await expect(page.getByRole('option')).toHaveCount(8);
-      await expect(page.getByRole('option').first()).toContainText('E2E Artist');
+      // The composed-name artist has no stored displayName, which the A–Z order
+      // sorts first — E2E Artist follows it.
+      await expect(page.getByRole('option').nth(1)).toContainText('E2E Artist');
     });
 
     test('narrows the grid and the dropdown by release title as the user types', async ({
@@ -198,6 +200,36 @@ test.describe('Artist Page', () => {
       await expect(cards(page).first()).toContainText('E2E Band');
     });
 
+    test('selecting an artist whose name is composed from its parts keeps them in the grid', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // No stored displayName: the suggestion types "Dr. Quillon M. Tokensmith
+      // Jr." into the field, a string no single searched field contains.
+      await (await openSearch(page)).fill('Tokensmith');
+      await page.getByRole('option', { name: /Tokensmith/ }).click();
+
+      await expect(page.getByRole('button', { name: 'Search artists' })).toHaveText(
+        'Dr. Quillon M. Tokensmith Jr.'
+      );
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      await expect(cards(page).first()).toContainText('Tokensmith');
+    });
+
+    test('matches a multi-word query whose words live in different fields', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // "Quillon" is the first name, "Roster" only appears in the release title.
+      await (await openSearch(page)).fill('quillon roster');
+
+      await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.getByRole('option')).toContainText('Tokensmith');
+      await expect(cards(page)).toHaveCount(1);
+    });
+
     test('shows release credits, band relationships, and active years on the cards', async ({
       page,
     }) => {
@@ -215,7 +247,9 @@ test.describe('Artist Page', () => {
 
     test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
       await page.goto('/artists');
-      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
+      // Card 0 is the composed-name artist (no stored displayName sorts first);
+      // the named artists follow in A–Z order.
+      await expect(cards(page).nth(1)).toContainText('E2E Artist', { timeout: 15_000 });
 
       await page.getByRole('radio', { name: 'Newest release' }).click();
 
