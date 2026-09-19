@@ -424,8 +424,52 @@ describe('ArtistRepository', () => {
           },
         },
       });
-      expect(arg?.orderBy).toEqual({ displayName: 'asc' });
       expect(arg?.include?.images).toEqual({ orderBy: { sortOrder: 'asc' }, take: 1 });
+    });
+
+    it('fetches every match instead of ordering and paging in the database', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.searchPublished({ skip: 10, take: 10 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg).not.toHaveProperty('skip');
+      expect(arg).not.toHaveProperty('take');
+      expect(arg).not.toHaveProperty('orderBy');
+    });
+
+    it('orders matches by displayed name, composing it when none is stored', async () => {
+      const named = (id: string, displayName: string) => ({ id, displayName });
+      const composed = {
+        id: 'composed',
+        displayName: null,
+        title: 'Dr.',
+        firstName: 'Quillon',
+        middleName: null,
+        surname: 'Tokensmith',
+        suffix: null,
+      };
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        named('e', 'Eve'),
+        composed,
+        named('c', 'cara'),
+      ] as never);
+
+      const result = await ArtistRepository.searchPublished({});
+
+      expect(result.map(({ id }) => id)).toEqual(['c', 'composed', 'e']);
+    });
+
+    it('slices the ordered matches to the requested page', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        { id: 'c', displayName: 'Cara' },
+        { id: 'a', displayName: 'Alice' },
+        { id: 'b', displayName: 'Bob' },
+      ] as never);
+
+      const result = await ArtistRepository.searchPublished({ skip: 1, take: 1 });
+
+      expect(result.map(({ id }) => id)).toEqual(['b']);
     });
 
     it('does not require the artist itself to be published (playlist search keeps its rule)', async () => {

@@ -74,7 +74,8 @@ non-deleted release. A member credit alone does not list an artist.**
   stays hidden until one is linked.
 - There is no admin writer for `ArtistMember`, so "Member of" / "Members:"
   lines appear only where that data has been entered by script.
-- Both sorts read the whole listed roster per page and order it in memory:
+- Both index sorts — and the playlist "By artist" search, which shares the
+  A–Z order — read the whole listed roster per page and order it in memory:
   newest-release because it is a relation aggregate, and A–Z because it ranks
   by the displayed name, which is composed from the name parts when no display
   name is stored (a database sort on `displayName` files those artists first,

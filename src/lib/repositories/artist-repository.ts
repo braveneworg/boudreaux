@@ -20,7 +20,7 @@ import type {
 } from '@/lib/types/domain/artist';
 import type { Json } from '@/lib/types/domain/shared';
 import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
-import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getArtistDisplayName, type ArtistNameFields } from '@/lib/utils/get-artist-display-name';
 import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 
@@ -384,10 +384,14 @@ const buildListedWhere = (
 };
 
 /**
- * A–Z order for the artists index: by the name the artist is displayed under,
- * ignoring letter case and accents, ties by id so paging stays stable.
+ * A–Z order for the artists index and the playlist "By artist" search: by the
+ * name the artist is displayed under, ignoring letter case and accents, ties by
+ * id so paging stays stable.
  */
-const compareByDisplayName = (a: ArtistListingRecord, b: ArtistListingRecord): number =>
+const compareByDisplayName = (
+  a: ArtistNameFields & { id: string },
+  b: ArtistNameFields & { id: string }
+): number =>
   getArtistDisplayName(a).localeCompare(getArtistDisplayName(b), 'en', {
     sensitivity: 'base',
   }) || a.id.localeCompare(b.id);
@@ -579,22 +583,22 @@ export class ArtistRepository {
    * Search active, non-deleted artists that hold a direct credit on a listed
    * release (the playlist "By artist" search), with the lightweight
    * images/releases include that search consumes. Unlike the index, this does
-   * not require the artist row itself to be published.
+   * not require the artist row itself to be published. Matches are ordered by
+   * displayed name and sliced here, for the same reason as the index's A–Z
+   * order ({@link ArtistRepository.listListed}).
    */
   static async searchPublished({
     search,
     skip = 0,
     take = 50,
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
-    return runQuery(() =>
+    const matches = await runQuery(() =>
       prisma.artist.findMany({
         where: buildListedWhere(search, { requirePublished: false }),
-        skip,
-        take,
-        orderBy: { displayName: 'asc' },
         include: artistSearchInclude,
       })
     );
+    return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
   }
 
   /**
