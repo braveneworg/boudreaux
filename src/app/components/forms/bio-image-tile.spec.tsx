@@ -170,11 +170,27 @@ describe('BioImageTile', () => {
     expect(dialogImage).toHaveAttribute('data-height', '600');
   });
 
-  it('inserts the image when Plus is pressed', async () => {
+  it('inserts the image into the bio when the insert button is pressed', async () => {
     const { onInsert } = renderTile();
     await userEvent.click(screen.getByRole('button', { name: 'Insert image Ceschi Ramos' }));
     expect(onInsert).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://example.com/photo.jpg' })
+    );
+  });
+
+  it('explains the insert, preview, and delete buttons on hover', () => {
+    renderTile();
+    expect(screen.getByRole('button', { name: 'Insert image Ceschi Ramos' })).toHaveAttribute(
+      'title',
+      'Insert into the bio at the cursor'
+    );
+    expect(screen.getByRole('button', { name: 'Preview Ceschi Ramos' })).toHaveAttribute(
+      'title',
+      'Preview'
+    );
+    expect(screen.getByRole('button', { name: 'Delete image Ceschi Ramos' })).toHaveAttribute(
+      'title',
+      'Delete from the pool'
     );
   });
 
