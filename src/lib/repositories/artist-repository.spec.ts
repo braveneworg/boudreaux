@@ -211,19 +211,46 @@ describe('ArtistRepository', () => {
 
       await ArtistRepository.findMany({ deleted: true, search: 'foo' });
 
+      const contains = { contains: 'foo', mode: 'insensitive' };
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
         AND: [
           {
             OR: [
-              { firstName: { contains: 'foo', mode: 'insensitive' } },
-              { surname: { contains: 'foo', mode: 'insensitive' } },
-              { displayName: { contains: 'foo', mode: 'insensitive' } },
-              { slug: { contains: 'foo', mode: 'insensitive' } },
+              { firstName: contains },
+              { middleName: contains },
+              { surname: contains },
+              { displayName: contains },
+              { title: contains },
+              { suffix: contains },
+              { slug: contains },
             ],
           },
         ],
       });
+    });
+
+    it('requires every word of a multi-word search to match some name field', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true, search: 'Dr. John Smith' });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
+      expect(and.map(({ OR }) => OR[0].firstName)).toEqual([
+        { contains: 'Dr', mode: 'insensitive' },
+        { contains: 'John', mode: 'insensitive' },
+        { contains: 'Smith', mode: 'insensitive' },
+      ]);
+    });
+
+    it('omits the search clause when the search holds nothing searchable', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.findMany({ deleted: true, search: ' . - ' });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).toEqual({});
     });
   });
 
@@ -533,8 +560,11 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(searchOr(arg as never)).toEqual([
         { firstName: contains },
+        { middleName: contains },
         { surname: contains },
         { displayName: contains },
+        { title: contains },
+        { suffix: contains },
         { slug: contains },
         { akaNames: contains },
         { genres: contains },
@@ -546,6 +576,35 @@ describe('ArtistRepository', () => {
           },
         },
       ]);
+    });
+
+    it('requires every word of a composed display name to match some field', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({
+        search: 'Dr. Quillon M. Tokensmith Jr.',
+        sort: 'alpha',
+        skip: 0,
+        take: 24,
+      });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
+      expect(and.map(({ OR }) => OR[0].firstName)).toEqual(
+        ['Dr', 'Quillon', 'M', 'Tokensmith', 'Jr'].map((token) => ({
+          contains: token,
+          mode: 'insensitive',
+        }))
+      );
+    });
+
+    it('omits the search clause when the term holds nothing searchable', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ search: ' . - ', sort: 'alpha', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).not.toHaveProperty('AND');
     });
 
     it('omits the search clause when no term is given', async () => {

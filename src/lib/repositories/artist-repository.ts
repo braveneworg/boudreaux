@@ -21,6 +21,7 @@ import type {
 import type { Json } from '@/lib/types/domain/shared';
 import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 
 import { runQuery } from './_internal/map-prisma-error';
@@ -288,10 +289,39 @@ const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
 /** Build a Prisma update payload from domain update data. */
 const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => ({ ...data });
 
+/** Case-insensitive substring filter for one search token. */
+const containsToken = (token: string) => ({ contains: token, mode: 'insensitive' as const });
+
+/**
+ * The clauses one search token may match among an artist's name fields — every
+ * part `getArtistDisplayName` can compose a name from, plus the slug, so a name
+ * typed (or picked) as it is displayed always finds its artist.
+ */
+const nameFieldClauses = (token: string): Prisma.ArtistWhereInput[] => [
+  { firstName: containsToken(token) },
+  { middleName: containsToken(token) },
+  { surname: containsToken(token) },
+  { displayName: containsToken(token) },
+  { title: containsToken(token) },
+  { suffix: containsToken(token) },
+  { slug: containsToken(token) },
+];
+
+/**
+ * Token search shared by the admin and public listings: one OR block per
+ * search token, to be ANDed together — every token must match some field, but
+ * different tokens may match different fields ("john smith" → firstName +
+ * surname). Empty when the search holds nothing searchable.
+ */
+const buildTokenSearch = (
+  search: string,
+  clausesFor: (token: string) => Prisma.ArtistWhereInput[]
+): Prisma.ArtistWhereInput[] =>
+  tokenizeSearchQuery(search).map((token) => ({ OR: clausesFor(token) }));
+
 /** Build the admin-listing `where` from domain filters (Mongo null-safe). */
 const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => {
   const { search, published, deleted } = filters;
-  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
   const and: Prisma.ArtistWhereInput[] = [];
 
   if (!deleted) {
@@ -303,14 +333,7 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
     and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
   }
   if (search) {
-    and.push({
-      OR: [
-        { firstName: contains(search) },
-        { surname: contains(search) },
-        { displayName: contains(search) },
-        { slug: contains(search) },
-      ],
-    });
+    and.push(...buildTokenSearch(search, nameFieldClauses));
   }
 
   return and.length > 0 ? { AND: and } : {};
@@ -329,8 +352,8 @@ const listedReleaseWhere = {
  * Build the `where` shared by the public artists index and the public artist
  * search: an active, non-deleted artist holding a DIRECT credit on at least
  * one listed release (a member credit alone never qualifies — ADR-0007), with
- * an optional case-insensitive search across the name fields, aka names,
- * genres, and the titles of their listed releases.
+ * an optional case-insensitive token search — every word must match one of
+ * the name fields, aka names, genres, or the titles of their listed releases.
  *
  * `requirePublished` adds the artist-level `publishedOn` gate the index uses;
  * the playlist "By artist" search deliberately keeps today's rule without it.
@@ -339,31 +362,24 @@ const buildListedWhere = (
   search: string | undefined,
   { requirePublished }: { requirePublished: boolean }
 ): Prisma.ArtistWhereInput => {
-  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+  const tokenSearch = search
+    ? buildTokenSearch(search, (token) => [
+        ...nameFieldClauses(token),
+        { akaNames: containsToken(token) },
+        { genres: containsToken(token) },
+        {
+          releases: {
+            some: { release: { title: containsToken(token), ...listedReleaseWhere } },
+          },
+        },
+      ])
+    : [];
   return {
     isActive: true,
     ...(requirePublished && { publishedOn: { not: null } }),
     OR: [...notDeletedOr],
     releases: { some: { release: listedReleaseWhere } },
-    ...(search && {
-      AND: [
-        {
-          OR: [
-            { firstName: contains(search) },
-            { surname: contains(search) },
-            { displayName: contains(search) },
-            { slug: contains(search) },
-            { akaNames: contains(search) },
-            { genres: contains(search) },
-            {
-              releases: {
-                some: { release: { title: contains(search), ...listedReleaseWhere } },
-              },
-            },
-          ],
-        },
-      ],
-    }),
+    ...(tokenSearch.length > 0 && { AND: tokenSearch }),
   };
 };
 
