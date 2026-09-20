@@ -250,43 +250,14 @@ describe('ArtistsContent list', () => {
     expect(cards.map((card) => card.textContent)).toEqual(['Alpha', 'Bravo']);
   });
 
-  it('stacks the cards one per row as a feed, never in columns', () => {
+  it('lays the cards out as a one-column grid that becomes two columns on large screens', () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
     );
 
     render(<ArtistsContent />);
 
-    const list = screen.getByRole('list');
-    expect(list).toHaveClass('flex', 'flex-col', 'gap-4');
-    expect(list).not.toHaveClass('lg:grid-cols-2');
-  });
-
-  it('caps and centers the feed column so the bio measure stays readable', () => {
-    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
-      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
-    );
-
-    const { container } = render(<ArtistsContent />);
-
-    expect(container.querySelector('[data-slot="artists-feed"]')).toHaveClass(
-      'mx-auto',
-      'w-full',
-      'max-w-3xl'
-    );
-  });
-
-  it('keeps the toolbar inside the capped feed column so it aligns with the cards', () => {
-    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
-      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
-    );
-
-    const { container } = render(<ArtistsContent />);
-
-    const feed = container.querySelector<HTMLElement>('[data-slot="artists-feed"]');
-    const sort = screen.getByRole('radiogroup', { name: 'Sort artists' });
-
-    expect(feed).toContainElement(sort);
+    expect(screen.getByRole('list')).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
   });
 
   it('wires the infinite-scroll sentinel to the paging state', () => {
@@ -323,20 +294,6 @@ describe('ArtistsContent states', () => {
     render(<ArtistsContent />);
 
     expect(screen.getByText(/loading artists/i)).toBeInTheDocument();
-  });
-
-  it('shapes the skeleton as the same capped single-column feed', () => {
-    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
-      toInfiniteResult({ isPending: true, data: undefined }) as never
-    );
-
-    const { container } = render(<ArtistsContent />);
-
-    expect(container.querySelector('[data-slot="artists-feed"]')).toHaveClass(
-      'mx-auto',
-      'w-full',
-      'max-w-3xl'
-    );
   });
 
   it('renders an error state with a retry action', async () => {

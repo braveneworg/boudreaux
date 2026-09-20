@@ -105,7 +105,7 @@ test.describe('Artist Page', () => {
       return page.getByPlaceholder('Search by name, genre, or release');
     };
 
-    /** The artist cards currently in the feed. */
+    /** The artist cards currently in the grid. */
     const cards = (page: Page) => page.locator('[data-slot="card"]');
 
     test('lists the artist with a short bio and a card link to the detail page', async ({

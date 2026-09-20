@@ -33,15 +33,11 @@ const isArtistListingSort = (value: string): value is ArtistListingSort =>
 
 /**
  * Initial-load skeleton mirroring the real layout — the search/sort toolbar
- * and four image-left/details-right card placeholders stacked in the capped
- * feed column — so nothing jumps when the first page lands.
+ * and four image-left/details-right card placeholders in the two-column grid —
+ * so nothing jumps when the first page lands.
  */
 const ArtistsSkeleton = (): ReactElement => (
-  <div
-    data-slot="artists-feed"
-    className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-4"
-    aria-busy="true"
-  >
+  <div className="flex flex-col gap-6 py-4" aria-busy="true">
     <p role="status" className="sr-only">
       Loading artists…
     </p>
@@ -49,7 +45,7 @@ const ArtistsSkeleton = (): ReactElement => (
       <Skeleton className="h-9 w-full sm:max-w-xs" />
       <Skeleton className="h-9 w-48" />
     </div>
-    <div className="flex flex-col gap-4">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {[0, 1, 2, 3].map((key) => (
         <div key={key} className="flex flex-col gap-4 bg-white p-4 sm:flex-row">
           <Skeleton className="size-20 shrink-0 sm:size-24" />
@@ -91,18 +87,11 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * Pages through listed artists (ADR-0007) with infinite scroll; the first page
  * is hydrated from the SSR prefetch. A toolbar pairs a debounced search
  * combobox — whose dropdown prepopulates with the first matches of the same
- * query that feeds the list — with an A–Z / newest-release sort toggle. The
+ * query that feeds the grid — with an A–Z / newest-release sort toggle. The
  * query and sort are part of the query key, so changing either resets
  * pagination while `keepPreviousData` keeps the current cards on screen during
  * the transition. Picking a suggestion fills the field with the artist's name
- * so the list narrows to them; the card itself is the way into the artist page.
- *
- * The page reads as a browsable feed, not a scannable directory: one card per
- * row, in a `max-w-3xl` column centered in the zine panel. The cap is what
- * keeps the card's full-width short bio to a readable measure — the panel's
- * own column runs to `83rem`, wide enough to stretch a three-line bio past 170
- * characters a line. The toolbar sits inside the same capped column so it
- * aligns with the cards rather than floating over a wider strip.
+ * so the grid narrows to them; the card itself is the way into the artist page.
  */
 export const ArtistsContent = (): ReactElement => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
@@ -141,7 +130,7 @@ export const ArtistsContent = (): ReactElement => {
   const artists = data?.pages.flatMap((page) => page.rows) ?? [];
 
   return (
-    <div data-slot="artists-feed" className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-4">
+    <div className="flex flex-col gap-6 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ArtistSearchCombobox
           search={searchInput}
@@ -168,7 +157,7 @@ export const ArtistsContent = (): ReactElement => {
       {artists.length === 0 ? (
         <ArtistsEmpty search={search} />
       ) : (
-        <ul className="flex flex-col gap-4">
+        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {artists.map((artist) => (
             <li key={artist.id}>
               <ArtistListCard artist={artist} />
