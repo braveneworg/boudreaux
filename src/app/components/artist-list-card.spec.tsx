@@ -26,6 +26,24 @@ const name = (id: string, displayName: string): ArtistListingName => ({
   suffix: null,
 });
 
+type BioImage = ArtistListingRow['bioImages'][number];
+
+/** A listing bio-image row; the listing service already resolved these. */
+const bioImage = (id: string, overrides: Partial<BioImage> = {}): BioImage => ({
+  id,
+  url: `https://x/${id}.jpg`,
+  thumbnailUrl: null,
+  title: null,
+  attribution: null,
+  license: null,
+  licenseUrl: null,
+  sourceUrl: null,
+  alt: null,
+  isPrimary: false,
+  displayOrder: null,
+  ...overrides,
+});
+
 const baseArtist: ArtistListingRow = {
   id: 'a1',
   slug: 'test-artist',
@@ -455,6 +473,27 @@ describe('ArtistListCard', () => {
     );
 
     expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
+  });
+
+  it('shows one photo only, however many display images the row carries', () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            bioImage('bi1', { alt: 'First' }),
+            bioImage('bi2', { alt: 'Second' }),
+            bioImage('bi3', { alt: 'Third' }),
+          ],
+        }}
+      />
+    );
+
+    // The listing row arrives already resolved — chosen, else suggested, else
+    // pool order — so the first row is the one photo worth showing.
+    const photos = screen.getAllByRole('img');
+    expect(photos).toHaveLength(1);
+    expect(photos[0]).toHaveAccessibleName('First');
   });
 
   it('sets the gap right of the image to the card’s own 24px side padding', () => {
