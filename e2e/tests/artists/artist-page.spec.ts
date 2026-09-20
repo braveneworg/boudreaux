@@ -237,9 +237,11 @@ test.describe('Artist Page', () => {
       await expect(artistCard).toHaveCount(1, { timeout: 15_000 });
       await expect(artistCard).toContainText('3 releases · Latest: E2E Album Three (2024)');
 
-      const bandCard = cards(page).filter({ hasText: 'Members: E2E Artist' });
+      // A band's roster no longer renders on the card — only what an act
+      // belongs to — so the formation year is what identifies the band card.
+      const bandCard = cards(page).filter({ hasText: 'Formed 2010' });
       await expect(bandCard).toHaveCount(1);
-      await expect(bandCard).toContainText('Formed 2010');
+      await expect(bandCard).not.toContainText('Members:');
       await expect(bandCard).toContainText('1 release · Latest: E2E Band Single (2025)');
     });
 

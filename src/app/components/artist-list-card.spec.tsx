@@ -78,17 +78,28 @@ describe('ArtistListCard', () => {
     expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
   });
 
-  it('carries exactly two links: the artist name and the latest release', () => {
+  it('carries the name, the latest release, and the full-bio link, in that order', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
       'Test Artist',
       'Third Album',
+      'View full bio',
     ]);
   });
 
-  it('carries only the name link when the artist has no listed release', () => {
-    render(<ArtistListCard artist={{ ...baseArtist, releaseCount: 0, newestRelease: null }} />);
+  it('carries only the name link when the artist has no release and no bio', () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          releaseCount: 0,
+          newestRelease: null,
+          shortBio: null,
+          bioImages: [],
+        }}
+      />
+    );
 
     expect(screen.getAllByRole('link')).toHaveLength(1);
   });
@@ -168,14 +179,15 @@ describe('ArtistListCard', () => {
     expect(screen.getByText('Member of E2E Band, Other Band')).toBeInTheDocument();
   });
 
-  it('renders the members of a band', () => {
+  it('no longer lists a band’s members', () => {
     render(
       <ArtistListCard
         artist={{ ...baseArtist, members: [name('m1', 'E2E Artist'), name('m2', 'Drummer')] }}
       />
     );
 
-    expect(screen.getByText('Members: E2E Artist, Drummer')).toBeInTheDocument();
+    expect(screen.queryByText(/Members:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Drummer/)).not.toBeInTheDocument();
   });
 
   it('omits the band line when the artist has no band relationships', () => {
@@ -248,12 +260,35 @@ describe('ArtistListCard', () => {
     expect(details).not.toContainElement(bio);
   });
 
-  it('renders the short bio last, beneath the images and everything else', () => {
+  it('renders the short bio beneath the images and everything else', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
-    const content = container.querySelector('[data-slot="card-content"]');
+    const slots = [...(container.querySelector('[data-slot="card-content"]')?.children ?? [])].map(
+      (child) => child.getAttribute('data-slot')
+    );
 
-    expect(content?.lastElementChild?.getAttribute('data-slot')).toBe('artist-short-bio');
+    expect(slots).toEqual(['artist-summary-row', 'artist-short-bio', 'artist-full-bio-link']);
+  });
+
+  it('links to the full bio page from the bottom of the card', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: /view full bio/i })).toHaveAttribute(
+      'href',
+      '/artists/test-artist/bio'
+    );
+  });
+
+  it('raises the full-bio link above the stretched card link', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: /view full bio/i })).toHaveClass('relative', 'z-10');
+  });
+
+  it('omits the full-bio link when the artist has neither a short bio nor images', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, shortBio: null, bioImages: [] }} />);
+
+    expect(screen.queryByRole('link', { name: /view full bio/i })).not.toBeInTheDocument();
   });
 
   it('clamps the short bio to four lines', () => {

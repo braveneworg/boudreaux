@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 
-import { Music2, User } from 'lucide-react';
+import { ArrowRight, Music2, User } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
@@ -26,15 +26,13 @@ const MAX_GENRES = 3;
 const joinNames = (names: ArtistListingName[]): string =>
   names.map((name) => getArtistDisplayName(name)).join(', ');
 
-/** `"Member of A, B"` for a member, `"Members: A, B"` for a band, `null` when neither applies. */
-const formatBandLine = ({
-  memberOf,
-  members,
-}: Pick<ArtistListingRow, 'memberOf' | 'members'>): string | null => {
-  if (memberOf.length > 0) return `Member of ${joinNames(memberOf)}`;
-  if (members.length > 0) return `Members: ${joinNames(members)}`;
-  return null;
-};
+/**
+ * `"Member of A, B"` for an artist who plays in bands; `null` when they play in
+ * none. A band's own roster is deliberately absent — the index card says what
+ * an act belongs to, not who is in it; the line-up lives on the artist page.
+ */
+const formatBandLine = ({ memberOf }: Pick<ArtistListingRow, 'memberOf'>): string | null =>
+  memberOf.length > 0 ? `Member of ${joinNames(memberOf)}` : null;
 
 /**
  * Formation year and instruments joined by a middle dot; `null` when neither is
@@ -59,10 +57,11 @@ const formatReleaseCount = (releaseCount: number): string =>
 
 /**
  * Public artists-index card. A summary row — identifying images beside the
- * name, formation year and instruments, genres, band relationships, and
- * release credits — sits above the short bio, which runs the full width of the
- * card beneath the images and every other detail so the teaser prose has room
- * to breathe. The whole card is clickable through the name link, which is
+ * name, formation year and instruments, genres, the bands the artist belongs
+ * to, and release credits — sits above the short bio, which runs the full
+ * width of the card beneath the images and every other detail so the teaser
+ * prose has room to breathe, and a closing "View full bio" link. The whole
+ * card is clickable through the name link, which is
  * stretched over the card with a pseudo-element: the card cannot be one `<a>`
  * because it holds its own nested interactive elements — each thumbnail's
  * dialog trigger and the latest-release link — so those sit above the
@@ -78,6 +77,11 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const meta = formatMetaLine(artist);
   const bandLine = formatBandLine(artist);
   const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
+  // The bio page renders for any artist, so gate the link on there being
+  // something to read. The listing row carries no `bio`/`bioLinks` — the exact
+  // `hasFullBio` the detail page computes — but the generator always writes a
+  // short bio alongside a long one, so these two stand in for it.
+  const hasBioPage = Boolean(artist.shortBio) || images.length > 0;
 
   return (
     <Card className="shadow-zine-sm relative overflow-hidden bg-white">
@@ -164,6 +168,19 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
               className="text-muted-foreground line-clamp-4 text-sm"
             />
           </div>
+        )}
+
+        {/* Raised above the stretched card link, and `w-fit` so the hit target
+            is the words rather than the full width of the card. */}
+        {hasBioPage && (
+          <Link
+            data-slot="artist-full-bio-link"
+            href={`/artists/${artist.slug}/bio`}
+            className="text-primary relative z-10 inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+          >
+            View full bio
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
         )}
       </CardContent>
     </Card>
