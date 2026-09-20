@@ -3,9 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import Link from 'next/link';
-
-import { ArrowRight, Loader2, Music2 } from 'lucide-react';
+import { Loader2, Music2 } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { useArtistBySlugQuery } from '@/hooks/queries/use-artist-by-slug-query';
@@ -16,6 +14,7 @@ import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 
+import { ArtistFullBio } from './artist-full-bio';
 import { ArtistPlayer } from './artist-player';
 import { ExpandableThumbnail } from './expandable-thumbnail';
 import { ZinePanel } from './ui/zine-panel';
@@ -48,32 +47,29 @@ type ArtistBioImage = ArtistWithPublishedReleases['bioImages'][number];
 
 interface ArtistDetailHeaderProps {
   artist: ArtistWithPublishedReleases;
-  slug: string;
   displayName: string;
   genres: string[];
   detailImages: ArtistBioImage[];
-  hasFullBio: boolean;
 }
 
 /**
- * Concise artist header: a few identifying thumbnails, genre badges, a short bio
- * teaser, and a "Read full bio" link. Rendered only when there is something to
- * show (short bio, genres, or images).
+ * Concise artist header: a few identifying thumbnails, genre badges and a short
+ * bio teaser. No "Read full bio" link — the full biography sits further down
+ * this same page. Rendered only when there is something to show (short bio,
+ * genres, or images).
  */
 const ArtistDetailHeader = ({
   artist,
-  slug,
   displayName,
   genres,
   detailImages,
-  hasFullBio,
 }: ArtistDetailHeaderProps) => {
   if (!artist.shortBio && genres.length === 0 && detailImages.length === 0) return null;
 
   return (
     <section className="flex flex-col gap-4 sm:flex-row sm:items-start">
       {detailImages.length > 0 && (
-        <ul className="flex shrink-0 gap-2">
+        <ul data-slot="artist-display-images" className="flex shrink-0 gap-2">
           {detailImages.map((image) => (
             <li key={image.id} className="size-20 sm:size-24">
               <ExpandableThumbnail
@@ -109,26 +105,18 @@ const ArtistDetailHeader = ({
           // (with inline links) lives on the dedicated /bio page.
           <p className="text-muted-foreground text-sm">{toBioTeaser(artist.shortBio)}</p>
         )}
-        {hasFullBio && (
-          <Link
-            href={`/artists/${slug}/bio`}
-            className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
-          >
-            Read full bio
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        )}
       </div>
     </section>
   );
 };
 
 /**
- * Client content wrapper for the artist detail page.
+ * Client content wrapper for the artist page — the one page for an artist.
  *
- * Concise by design — short bio, genres, a few identifying images, and the
- * release combobox + player. The full bio, image gallery, and links live on
- * the dedicated bio page reached via "Read full bio".
+ * Short bio, genres and a few identifying images up top, then the release
+ * combobox + player, then the full biography and image gallery. The bio used
+ * to live at `/artists/[slug]/bio`; that route now redirects here, so a reader
+ * never navigates twice to read it.
  */
 export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailContentProps) => {
   const { isPending, error, data } = useArtistBySlugQuery(slug);
@@ -163,9 +151,10 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   // The artist's display images beside the short bio: the human's chosen rows,
   // else the job's suggested rows, else the first discovered ones (ADR-0008).
   const detailImages = resolveDisplayImages(artist.bioImages);
-  const hasFullBio =
-    Boolean(artist.bio) || artist.bioImages.length > 0 || artist.bioLinks.length > 0;
-
+  // The biography gallery shows what the header does not, so no portrait
+  // renders twice now that both sit on one page.
+  const shownInHeader = new Set(detailImages.map(({ id }) => id));
+  const galleryImages = artist.bioImages.filter(({ id }) => !shownInHeader.has(id));
   const breadcrumbItems = [
     { anchorText: 'Artists', url: '/artists', isActive: false },
     {
@@ -181,14 +170,14 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
       <ZinePanel chat accent="hot-pink" contentClassName="space-y-5" breadcrumbs={breadcrumbItems}>
         <ArtistDetailHeader
           artist={artist}
-          slug={slug}
           displayName={displayName}
           genres={genres}
           detailImages={detailImages}
-          hasFullBio={hasFullBio}
         />
 
         <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
+
+        <ArtistFullBio displayName={displayName} bioImages={galleryImages} bio={artist.bio} />
       </ZinePanel>
     </div>
   );

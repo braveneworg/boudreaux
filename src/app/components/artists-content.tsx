@@ -27,25 +27,32 @@ const MAX_SUGGESTIONS = 8;
 /** Debounce applied to the typed query before it reaches the server. */
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** The sort toggle's options, in the order they read left to right. */
+const ARTIST_SORT_OPTIONS: ReadonlyArray<{ value: ArtistListingSort; label: string }> = [
+  { value: 'alpha', label: 'A–Z' },
+  { value: 'newest', label: 'Newest release' },
+];
+
 /** Whether a toggle value is one of the listing's sort orders. */
 const isArtistListingSort = (value: string): value is ArtistListingSort =>
   (ARTIST_LISTING_SORTS as readonly string[]).includes(value);
 
 /**
- * Initial-load skeleton mirroring the real layout — the search/sort toolbar
- * and four image-left/details-right card placeholders in the two-column grid —
- * so nothing jumps when the first page lands.
+ * Initial-load skeleton mirroring the real layout — the full-width search/sort
+ * toolbar and four image-left/details-right card placeholders in the
+ * three-quarter-width single column — so nothing jumps when the first page
+ * lands.
  */
 const ArtistsSkeleton = (): ReactElement => (
   <div className="flex flex-col gap-6 py-4" aria-busy="true">
     <p role="status" className="sr-only">
       Loading artists…
     </p>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Skeleton className="h-9 w-full sm:max-w-xs" />
-      <Skeleton className="h-9 w-48" />
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <Skeleton className="h-9 w-48 shrink-0" />
+      <Skeleton className="h-9 w-full sm:max-w-md" />
     </div>
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div data-slot="artists-skeleton-list" className="flex w-full flex-col gap-4">
       {[0, 1, 2, 3].map((key) => (
         <div key={key} className="flex flex-col gap-4 bg-white p-4 sm:flex-row">
           <Skeleton className="size-20 shrink-0 sm:size-24" />
@@ -87,11 +94,17 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * Pages through listed artists (ADR-0007) with infinite scroll; the first page
  * is hydrated from the SSR prefetch. A toolbar pairs a debounced search
  * combobox — whose dropdown prepopulates with the first matches of the same
- * query that feeds the grid — with an A–Z / newest-release sort toggle. The
+ * query that feeds the list — with an A–Z / newest-release sort toggle. The
  * query and sort are part of the query key, so changing either resets
  * pagination while `keepPreviousData` keeps the current cards on screen during
  * the transition. Picking a suggestion fills the field with the artist's name
- * so the grid narrows to them; the card itself is the way into the artist page.
+ * so the list narrows to them; the card itself is the way into the artist page.
+ *
+ * The page reads as a browsable feed: one card per row, each running the full
+ * width of the zine panel, so the card's own full-width short bio carries the
+ * measure. Sort sits left of search in a toolbar at that same full width, the
+ * two grouped at the left edge rather than pushed to opposite ends, and the
+ * search field is capped at `sm:max-w-md` so it does not swallow the row.
  */
 export const ArtistsContent = (): ReactElement => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
@@ -131,33 +144,46 @@ export const ArtistsContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-6 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div data-slot="artists-toolbar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Not the `outline` variant: that draws a per-item hairline border and
+            a soft shadow, neither of which is the zine look. One hard black
+            frame with an ink offset wraps the pair, and the divider rides on
+            the second item. `flex-none` is load-bearing — `ToggleGroupItem`
+            defaults to `flex-1` (basis 0), which splits a `w-fit` group evenly
+            between the items while `whitespace-nowrap` refuses to wrap, so the
+            longer label spilled past its own box. */}
+        <ToggleGroup
+          type="single"
+          value={sort}
+          onValueChange={handleSortChange}
+          aria-label="Sort artists"
+          className="shadow-zine-ink w-fit shrink-0 border-2 border-black bg-zinc-50"
+        >
+          {ARTIST_SORT_OPTIONS.map(({ value, label }) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              className="data-[state=on]:bg-menu-item-pink-300 h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:text-black"
+            >
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
         <ArtistSearchCombobox
           search={searchInput}
           onSearchChange={setSearchInput}
           results={artists.slice(0, MAX_SUGGESTIONS)}
           isFetching={isFetching}
           onSelect={handleSuggestionSelect}
-          className="sm:max-w-xs"
+          className="sm:max-w-md"
         />
-
-        <ToggleGroup
-          type="single"
-          value={sort}
-          onValueChange={handleSortChange}
-          variant="outline"
-          aria-label="Sort artists"
-          className="shrink-0"
-        >
-          <ToggleGroupItem value="alpha">A–Z</ToggleGroupItem>
-          <ToggleGroupItem value="newest">Newest release</ToggleGroupItem>
-        </ToggleGroup>
       </div>
 
       {artists.length === 0 ? (
         <ArtistsEmpty search={search} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ul className="flex w-full flex-col gap-4">
           {artists.map((artist) => (
             <li key={artist.id}>
               <ArtistListCard artist={artist} />

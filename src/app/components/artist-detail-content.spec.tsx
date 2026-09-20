@@ -23,6 +23,14 @@ vi.mock('./expandable-thumbnail', () => ({
   ExpandableThumbnail: ({ alt }: { alt: string }) => <span data-testid="thumb" data-alt={alt} />,
 }));
 
+// The full biography is its own component with its own spec; stub it so the
+// header's display thumbnails stay the only `thumb` nodes in this one.
+vi.mock('./artist-full-bio', () => ({
+  ArtistFullBio: ({ bio, bioImages }: { bio: string | null; bioImages: Array<{ id: string }> }) => (
+    <div data-testid="artist-full-bio" data-bio={bio ?? ''} data-images={bioImages.length} />
+  ),
+}));
+
 vi.mock('@/lib/utils/get-artist-display-name', () => ({
   getArtistDisplayName: (artist: { displayName?: string | null }) =>
     artist.displayName ?? 'Unknown',
@@ -61,18 +69,42 @@ describe('ArtistDetailContent', () => {
     expect(screen.getByTestId('artist-player')).toBeInTheDocument();
   });
 
-  it('links "Read full bio" to the bio page', () => {
+  it('carries the full biography on the page instead of linking away to it', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
 
     render(<ArtistDetailContent slug="test-artist" />);
 
-    expect(screen.getByRole('link', { name: /read full bio/i })).toHaveAttribute(
-      'href',
-      '/artists/test-artist/bio'
+    expect(screen.getByTestId('artist-full-bio')).toHaveAttribute('data-bio', '<p>Long bio.</p>');
+    expect(screen.queryByRole('link', { name: /read full bio/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the header’s display images out of the biography gallery', () => {
+    useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    // The header already shows the resolved display image; the gallery gets
+    // only what is left, so no portrait renders twice on the page.
+    const shownInHeader = screen.getAllByTestId('thumb').length;
+    expect(screen.getByTestId('artist-full-bio')).toHaveAttribute(
+      'data-images',
+      String(artist.bioImages.length - shownInHeader)
     );
   });
 
-  it('does not show the full bio area when no bio content exists', () => {
+  it('leaves the biography gallery empty when the header shows every image', () => {
+    const [only] = artist.bioImages;
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, bioImages: [only] },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByTestId('artist-full-bio')).toHaveAttribute('data-images', '0');
+  });
+
+  it('still renders the biography section when the artist has no bio written', () => {
     useArtistBySlugQueryMock.mockReturnValue({
       isPending: false,
       data: { ...artist, bio: null, bioImages: [], bioLinks: [] },
@@ -80,7 +112,7 @@ describe('ArtistDetailContent', () => {
 
     render(<ArtistDetailContent slug="test-artist" />);
 
-    expect(screen.queryByRole('link', { name: /read full bio/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('artist-full-bio')).toHaveAttribute('data-bio', '');
   });
 
   it('wraps the artist header and player in a hot-pink zine panel', () => {
@@ -222,22 +254,6 @@ describe('ArtistDetailContent', () => {
 
     expect(screen.queryByTestId('thumb')).not.toBeInTheDocument();
     expect(screen.queryByText('jazz')).not.toBeInTheDocument();
-  });
-
-  it('shows the full bio link when only bioLinks exist (no bio text)', () => {
-    useArtistBySlugQueryMock.mockReturnValue({
-      isPending: false,
-      data: {
-        ...artist,
-        bio: null,
-        bioImages: [],
-        bioLinks: [{ id: 'l1', url: 'https://x', label: 'Site', kind: null }],
-      },
-    });
-
-    render(<ArtistDetailContent slug="test-artist" />);
-
-    expect(screen.getByRole('link', { name: /read full bio/i })).toBeInTheDocument();
   });
 
   it('filters out releases without MP3_320KBPS files and orders playable ones newest first', () => {

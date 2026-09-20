@@ -138,13 +138,13 @@ describe('ArtistsContent search', () => {
     expect(screen.getByRole('button', { name: 'Search artists' })).toBeInTheDocument();
   });
 
-  it('places the search trigger before the sort toggle', () => {
+  it('places the sort toggle to the left of the search trigger', () => {
     render(<ArtistsContent />);
 
-    const search = screen.getByRole('button', { name: 'Search artists' });
     const toggle = screen.getByRole('radiogroup', { name: 'Sort artists' });
+    const search = screen.getByRole('button', { name: 'Search artists' });
 
-    expect(search.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('forwards the typed search term to the query', async () => {
@@ -250,14 +250,71 @@ describe('ArtistsContent list', () => {
     expect(cards.map((card) => card.textContent)).toEqual(['Alpha', 'Bravo']);
   });
 
-  it('lays the cards out as a one-column grid that becomes two columns on large screens', () => {
+  it('stacks the cards in a single column, never in two', () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
     );
 
     render(<ArtistsContent />);
 
-    expect(screen.getByRole('list')).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    const list = screen.getByRole('list');
+    expect(list).toHaveClass('flex', 'flex-col', 'gap-4');
+    expect(list).not.toHaveClass('lg:grid-cols-2');
+  });
+
+  it('runs the cards the full width of the panel', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    render(<ArtistsContent />);
+
+    const list = screen.getByRole('list');
+    expect(list).toHaveClass('w-full');
+    expect(list).not.toHaveClass('lg:w-3/4');
+  });
+
+  it('leaves the toolbar at full panel width so the search bar does not move', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    const toolbar = container.querySelector('[data-slot="artists-toolbar"]');
+    expect(toolbar).toBeInTheDocument();
+    expect(toolbar).not.toHaveClass('lg:w-3/4');
+  });
+
+  it('sizes each sort option to its own label so the longer one cannot overflow', () => {
+    render(<ArtistsContent />);
+
+    const newest = screen.getByRole('radio', { name: 'Newest release' });
+    expect(newest).toHaveClass('flex-none');
+    expect(newest).not.toHaveClass('flex-1');
+  });
+
+  it('dresses the sort toggle in the punk-zine frame', () => {
+    render(<ArtistsContent />);
+
+    const group = screen.getByRole('radiogroup', { name: 'Sort artists' });
+    expect(group).toHaveClass('shadow-zine-ink', 'border-2', 'border-black');
+  });
+
+  it('fills the selected sort with the zine accent', () => {
+    render(<ArtistsContent />);
+
+    expect(screen.getByRole('radio', { name: 'A–Z' })).toHaveClass(
+      'data-[state=on]:bg-menu-item-pink-300'
+    );
+  });
+
+  it('gives the search field a wider cap than the old narrow default', () => {
+    render(<ArtistsContent />);
+
+    const search = screen.getByRole('button', { name: 'Search artists' });
+    expect(search).toHaveClass('sm:max-w-md');
+    expect(search).not.toHaveClass('sm:max-w-xs');
   });
 
   it('wires the infinite-scroll sentinel to the paging state', () => {
@@ -294,6 +351,18 @@ describe('ArtistsContent states', () => {
     render(<ArtistsContent />);
 
     expect(screen.getByText(/loading artists/i)).toBeInTheDocument();
+  });
+
+  it('shapes the skeleton as the same full-width single column', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ isPending: true, data: undefined }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    const list = container.querySelector('[data-slot="artists-skeleton-list"]');
+    expect(list).toHaveClass('w-full');
+    expect(list).not.toHaveClass('lg:w-3/4');
   });
 
   it('renders an error state with a retry action', async () => {

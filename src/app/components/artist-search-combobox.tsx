@@ -76,15 +76,20 @@ export const ArtistSearchCombobox = ({
           type="button"
           aria-expanded={open}
           aria-label="Search artists"
-          // Trigger styled as the search field it replaces, with a focus/open
+          // Trigger styled as the search field it replaces, wearing the same
+          // punk-zine box as the sort toggle beside it: hard 2px black border,
+          // square corners, paper fill, and a 2px ink offset. The resting
+          // label is full ink rather than a muted grey, so an empty field
+          // reads the same weight as the releases search does. Focus and open
           // ring in the ARTISTS section accent (hot pink).
           className={cn(
-            'focus-visible:ring-menu-item-pink-400 data-[state=open]:ring-menu-item-pink-400 flex w-full items-center gap-2 border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-[color,box-shadow] hover:border-zinc-400 focus-visible:ring-[3px] focus-visible:outline-none data-[state=open]:ring-[3px]',
-            hasQuery ? 'text-zinc-950' : 'text-zinc-500',
+            'focus-visible:ring-menu-item-pink-400 data-[state=open]:ring-menu-item-pink-400 shadow-zine-ink flex w-full items-center gap-2 border-2 border-black bg-zinc-50 px-3 py-2 text-sm text-zinc-950 transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-none data-[state=open]:ring-[3px]',
             className
           )}
         >
-          <Search aria-hidden className="size-4 shrink-0 text-zinc-500" />
+          {/* Heavier stroke than lucide's default 2 so the glyph holds its own
+              against the 2px zine border around it. */}
+          <Search aria-hidden strokeWidth={2.5} className="size-4 shrink-0 text-black" />
           <span className="min-w-0 flex-1 truncate text-left">
             {hasQuery ? search : SEARCH_PLACEHOLDER}
           </span>

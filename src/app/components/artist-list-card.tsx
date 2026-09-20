@@ -2,19 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import Image from 'next/image';
 import Link from 'next/link';
 
-import { Music2, User } from 'lucide-react';
+import { ArrowRight, Music2, User } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
-import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
-import { formatArtistActiveYears } from '@/lib/utils/artist-active-years';
+import type { ArtistListingRow } from '@/lib/types/domain/artist';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 
 import { BioHtml } from './bio-html';
-import { ExpandableThumbnail } from './expandable-thumbnail';
 
 interface ArtistListCardProps {
   artist: ArtistListingRow;
@@ -23,50 +22,132 @@ interface ArtistListCardProps {
 /** How many genre badges a card shows before the rest are left to the detail page. */
 const MAX_GENRES = 3;
 
-/** Comma-join the display names of related artists for a band line. */
-const joinNames = (names: ArtistListingName[]): string =>
-  names.map((name) => getArtistDisplayName(name)).join(', ');
+/** Intrinsic size requested from the CDN loader: 2× the 144px frame at `sm`. */
+const THUMBNAIL_SOURCE_PX = 288;
 
-/** `"Member of A, B"` for a member, `"Members: A, B"` for a band, `null` when neither applies. */
-const formatBandLine = ({
-  memberOf,
-  members,
-}: Pick<ArtistListingRow, 'memberOf' | 'members'>): string | null => {
-  if (memberOf.length > 0) return `Member of ${joinNames(memberOf)}`;
-  if (members.length > 0) return `Members: ${joinNames(members)}`;
-  return null;
-};
-
-/** Active years and instruments joined by a middle dot; `null` when neither is set. */
-const formatMetaLine = (
-  artist: Pick<ArtistListingRow, 'formedOn' | 'bornOn' | 'diedOn' | 'instruments'>
-): string | null => {
-  const parts = [formatArtistActiveYears(artist), artist.instruments?.trim() || null].filter(
-    (part): part is string => part !== null
-  );
+/**
+ * Formation year and instruments joined by a middle dot; `null` when neither is
+ * set. A person's `bornOn`/`diedOn` are deliberately absent — the index card
+ * carries no lifespan, only what describes the act. The year is read in UTC so
+ * a stored UTC-day date never shifts a year back.
+ */
+const formatMetaLine = ({
+  formedOn,
+  instruments,
+}: Pick<ArtistListingRow, 'formedOn' | 'instruments'>): string | null => {
+  const parts = [
+    formedOn ? `Formed ${formedOn.getUTCFullYear()}` : null,
+    instruments?.trim() || null,
+  ].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(' · ') : null;
 };
 
-/** `"3 releases · Latest: Title (2024)"`, singular-aware; `null` when nothing is listed. */
-const formatReleaseCredits = ({
-  releaseCount,
-  newestRelease,
-}: Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'>): string | null => {
-  if (releaseCount === 0 || newestRelease === null) return null;
-  const noun = releaseCount === 1 ? 'release' : 'releases';
-  const year = newestRelease.releasedOn.getUTCFullYear();
-  return `${releaseCount} ${noun} · Latest: ${newestRelease.title} (${year})`;
-};
+interface ArtistThumbnailsProps {
+  slug: string;
+  displayName: string;
+  images: ArtistListingRow['bioImages'];
+}
 
 /**
- * Public artists-index card. Hierarchy, top to bottom: identifying images →
- * name → active years and instruments → genres → band relationships → short
- * bio → release credits. The whole card is clickable through the name link,
- * which is stretched over the card with a pseudo-element: the card cannot be
- * one `<a>` because each thumbnail holds its own dialog trigger, so the
- * thumbnails wrapper sits above the stretched link (`relative z-10`).
- * Mobile-first single column; images sit above the text on small screens and
- * beside it from `sm` up.
+ * The card's identifying images, as one link into the artist page. They are a
+ * way in, not a lightbox — the card navigates rather than opening a dialog.
+ * The placeholder sits inside the link too, so an artist with no images still
+ * has a clickable photo slot, and `aria-label` names the link for that case,
+ * where there is no `alt` to name it.
+ */
+const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) => (
+  <Link
+    data-slot="artist-thumbnails"
+    href={`/artists/${slug}`}
+    aria-label={`${displayName} artist page`}
+    className="focus-visible:ring-primary flex shrink-0 gap-2 focus-visible:ring-2 focus-visible:outline-none"
+  >
+    {images.length > 0 ? (
+      images.map((image) => (
+        <span
+          key={image.id}
+          className="block size-32 overflow-hidden border-2 border-black sm:size-36"
+        >
+          <Image
+            src={image.thumbnailUrl ?? image.url}
+            alt={image.alt ?? image.title ?? `${displayName} image`}
+            width={THUMBNAIL_SOURCE_PX}
+            height={THUMBNAIL_SOURCE_PX}
+            className="size-full object-cover transition-transform duration-300 hover:scale-110"
+          />
+        </span>
+      ))
+    ) : (
+      <span className="bg-muted flex size-32 shrink-0 items-center justify-center sm:size-36">
+        <User className="text-muted-foreground size-10" aria-hidden />
+      </span>
+    )}
+  </Link>
+);
+
+interface ArtistBioColumnProps {
+  slug: string;
+  shortBio: string | null;
+  hasBioPage: boolean;
+}
+
+/**
+ * The card's right-hand column from `lg` up: the short-bio teaser under its
+ * own heading, and a "View full bio" link pinned to the bottom right.
+ */
+const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) => (
+  <div
+    data-slot="artist-bio-column"
+    className="flex min-w-0 flex-col gap-2 lg:flex-1 lg:justify-between"
+  >
+    {shortBio && (
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold tracking-wider text-zinc-950 uppercase">Short bio</h3>
+        {/* Wrapper, not a `BioHtml` prop: the clamp must stay on `BioHtml`'s
+            own box, since `line-clamp` only clamps the element it is applied
+            to. zinc-600 (#52525b) on the white card is 7.73:1 — the muted
+            token it replaced was #71717b at 4.83:1, passing AA for 14px body
+            text but with almost no margin, and this is the longest run of
+            prose on the card. */}
+        <div data-slot="artist-short-bio">
+          <BioHtml html={shortBio} className="line-clamp-4 text-sm text-zinc-600" />
+        </div>
+      </div>
+    )}
+
+    {/* `self-end` right-aligns it; `w-fit` keeps the hit target on the words
+        rather than the full width of the column. */}
+    {hasBioPage && (
+      <Link
+        data-slot="artist-full-bio-link"
+        href={`/artists/${slug}`}
+        className="text-primary inline-flex w-fit items-center gap-1 self-end text-sm font-medium hover:underline"
+      >
+        View full bio
+        <ArrowRight className="size-4" aria-hidden />
+      </Link>
+    )}
+  </div>
+);
+
+/**
+ * Public artists-index card, in two columns from `lg` up: a summary row —
+ * identifying images beside the name, formation year and instruments, genres,
+ * and release credits — and, to its right, a bio column holding the short-bio
+ * teaser above a right-aligned "View full bio" link. Below `lg` the two stack,
+ * so the reading order is unchanged: images, details, bio, link. Band
+ * relationships are deliberately absent: neither the bands an act belongs to
+ * nor its roster appears here; both live on the artist page.
+ *
+ * The card body itself is inert — no stretched link over the whole surface.
+ * Four explicit targets carry the navigation instead: the images and the name
+ * both open the artist page, the latest-release title opens that release, and
+ * the closing link jumps to the biography on that same page. Clicking anywhere
+ * else does nothing,
+ * so a reader can select the bio text without being navigated away.
+ *
+ * Mobile-first single column; images sit above the text on the smallest
+ * screens and beside it from `sm` up.
  *
  * @param artist - A listed artist row (ADR-0007) from the artists index query.
  */
@@ -75,76 +156,90 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const genres = splitList(artist.genres).slice(0, MAX_GENRES);
   const images = artist.bioImages;
   const meta = formatMetaLine(artist);
-  const bandLine = formatBandLine(artist);
-  const credits = formatReleaseCredits(artist);
+  const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
+  // The artist page renders for any artist, so gate the link on there being a
+  // biography worth jumping to. The listing row carries no `bio`/`bioLinks`,
+  // but the generator always writes a short bio alongside a long one, so these
+  // two stand in for it.
+  const hasBioPage = Boolean(artist.shortBio) || images.length > 0;
 
   return (
-    <Card className="shadow-zine-sm relative overflow-hidden bg-white">
-      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
-        {images.length > 0 ? (
-          <ul data-slot="artist-thumbnails" className="relative z-10 flex shrink-0 gap-2">
-            {images.map((image) => (
-              <li key={image.id} className="size-20 sm:size-24">
-                <ExpandableThumbnail
-                  src={image.url}
-                  thumbnailSrc={image.thumbnailUrl}
-                  alt={image.alt ?? image.title ?? `${displayName} image`}
-                  caption={image.title}
-                  attribution={image.attribution}
-                  license={image.license}
-                  sourceUrl={image.sourceUrl}
-                  className="size-full"
-                />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="bg-muted flex size-20 shrink-0 items-center justify-center sm:size-24">
-            <User className="text-muted-foreground size-8" aria-hidden />
+    <Card className="shadow-zine-sm overflow-hidden bg-white">
+      <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-start lg:gap-6">
+        {/* `sm:gap-6` once the row goes horizontal: `CardContent` keeps its own
+            `px-6`, so the image sits 24px from the card edge and the gap to its
+            right has to be the same 24px to read as even. */}
+        <div
+          data-slot="artist-summary-row"
+          className="flex flex-col gap-4 sm:flex-row sm:gap-6 lg:flex-1"
+        >
+          <ArtistThumbnails slug={artist.slug} displayName={displayName} images={images} />
+
+          <div data-slot="artist-details" className="min-w-0 flex-1 space-y-2">
+            {/* The cutout face is a single-weight display font, so no
+                `font-semibold` — it carries the emphasis itself, the same way
+                video-card titles do. */}
+            <h2 className="text-xl leading-tight break-words text-zinc-950">
+              <Link
+                href={`/artists/${artist.slug}`}
+                className="font-fake-four-cutout hover:underline"
+              >
+                {displayName}
+              </Link>
+            </h2>
+
+            {meta && (
+              <p data-slot="artist-meta" className="text-muted-foreground text-xs tracking-wide">
+                {meta}
+              </p>
+            )}
+
+            {genres.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5" aria-label="Genres">
+                {genres.map((genre) => (
+                  <li key={genre}>
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Music2 className="size-3" aria-hidden />
+                      {genre}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {newestRelease && (
+              <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
+                Latest:{' '}
+                <Link
+                  href={`/releases/${newestRelease.id}`}
+                  className="underline underline-offset-2 hover:no-underline"
+                >
+                  {newestRelease.title}
+                </Link>{' '}
+                ({newestRelease.releasedOn.getUTCFullYear()})
+              </p>
+            )}
+
+            {/* Only worth offering when there is more than the one already
+                named above. It points at the artist page, where the release
+                combobox and player hold the whole catalogue — there is no
+                artist-filtered view of /releases to send them to. */}
+            {artist.releaseCount > 1 && (
+              <Link
+                data-slot="artist-all-releases-link"
+                href={`/artists/${artist.slug}`}
+                className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+              >
+                View all artist releases
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            )}
           </div>
-        )}
-
-        <div className="min-w-0 flex-1 space-y-2">
-          <h2 className="text-lg leading-tight font-semibold">
-            {/* Stretched over the card: the whole card navigates to the artist. */}
-            <Link
-              href={`/artists/${artist.slug}`}
-              className="after:absolute after:inset-0 after:content-[''] hover:underline"
-            >
-              {displayName}
-            </Link>
-          </h2>
-
-          {meta && (
-            <p data-slot="artist-meta" className="text-muted-foreground text-xs tracking-wide">
-              {meta}
-            </p>
-          )}
-
-          {genres.length > 0 && (
-            <ul className="flex flex-wrap gap-1.5" aria-label="Genres">
-              {genres.map((genre) => (
-                <li key={genre}>
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    <Music2 className="size-3" aria-hidden />
-                    {genre}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {bandLine && <p className="text-sm text-zinc-700">{bandLine}</p>}
-
-          {artist.shortBio && (
-            <BioHtml
-              html={artist.shortBio}
-              className="text-muted-foreground line-clamp-3 text-sm"
-            />
-          )}
-
-          {credits && <p className="text-sm font-medium text-zinc-950">{credits}</p>}
         </div>
+
+        {(artist.shortBio || hasBioPage) && (
+          <ArtistBioColumn slug={artist.slug} shortBio={artist.shortBio} hasBioPage={hasBioPage} />
+        )}
       </CardContent>
     </Card>
   );

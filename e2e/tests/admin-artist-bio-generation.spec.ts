@@ -25,10 +25,11 @@ const openFirstArtistEdit = async (adminPage: Page): Promise<void> => {
  * portrait) composes to a right float and image 1 (cover) to a left float.
  * Assertions target what the BioHtml renderer actually emits — the
  * `bio-figure` class plus Tailwind float utilities — scoped to the long-bio
- * article so the discovered-image gallery can never satisfy them.
+ * article so the discovered-image gallery can never satisfy them. The bio now
+ * lives on the artist page itself, not a separate /bio route.
  */
 const assertPublicBioFigures = async (page: Page, slug: string): Promise<void> => {
-  await page.goto(`/artists/${slug}/bio`);
+  await page.goto(`/artists/${slug}`);
   const figures = page.locator('article figure.bio-figure');
   await expect(figures).toHaveCount(2, { timeout: 15_000 });
   await expect(figures.first()).toHaveClass(/float-right/);

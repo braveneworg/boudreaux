@@ -46,12 +46,15 @@ test.describe('Artist Page', () => {
   });
 
   test.describe('Bio surfaces', () => {
-    test('should show the short bio, genres, and a Read full bio link', async ({ page }) => {
+    test('should show the short bio and genres, with no link away to a bio page', async ({
+      page,
+    }) => {
       await page.goto('/artists/e2e-artist');
 
       await expect(page.getByText(/genre-blurring act/i)).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Experimental')).toBeVisible();
-      await expect(page.getByRole('link', { name: /read full bio/i })).toBeVisible();
+      // The biography is on this page now, so nothing links away to it.
+      await expect(page.getByRole('link', { name: /read full bio/i })).toHaveCount(0);
     });
 
     // The seed carries a suggested (isPrimary) portrait and a human-chosen
@@ -59,28 +62,32 @@ test.describe('Artist Page', () => {
     test('shows the chosen display image instead of the suggested one', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      const chosen = page.getByRole('button', {
+      // Scoped to the header's display images: the biography's gallery below
+      // carries the images the header does not, the suggested portrait among
+      // them, so an unscoped query would match it there.
+      const header = page.locator('[data-slot="artist-display-images"]');
+      const chosen = header.getByRole('button', {
         name: 'Expand image: E2E Artist chosen portrait',
       });
       await expect(chosen).toHaveCount(1, { timeout: 15_000 });
       await expect(chosen).toBeVisible();
       await expect(
-        page.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
+        header.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
       ).toHaveCount(0);
     });
 
-    test('should open the full bio page with the long bio, inline link, and image', async ({
+    test('carries the long bio, inline link, and image on the artist page itself', async ({
       page,
     }) => {
       await page.goto('/artists/e2e-artist');
 
-      await page.getByRole('link', { name: /read full bio/i }).click();
-      await expect(page).toHaveURL(/\/artists\/e2e-artist\/bio$/);
-
-      await expect(page.getByText(/immersive soundscapes/i)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Biography' })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText(/immersive soundscapes/i)).toBeVisible();
 
       // Links are woven inline in the prose — there is no separate links list
-      // section at the bottom of the bio page anymore.
+      // section at the bottom of the biography anymore.
       await expect(page.getByRole('heading', { name: 'Links' })).toHaveCount(0);
 
       // BioHtml maps the inline <a> in the bio body to a hardened Next Link with
@@ -95,6 +102,13 @@ test.describe('Artist Page', () => {
       // `_w{width}` variant convention (custom CDN loader, no `unoptimized`).
       const inlineImage = page.getByRole('img', { name: 'E2E inline bio image' });
       await expect(inlineImage).toHaveAttribute('srcset', /_w\d+/);
+    });
+
+    test('permanently redirects the old /bio URL to the artist page', async ({ page }) => {
+      await page.goto('/artists/e2e-artist/bio');
+
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/, { timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Biography' })).toBeVisible();
     });
   });
 
@@ -118,7 +132,7 @@ test.describe('Artist Page', () => {
       });
       await expect(page.getByText(/genre-blurring act/i)).toBeVisible();
 
-      // The whole card is clickable through the stretched name link.
+      // The name is its own link now — the card surface is inert.
       await page.getByRole('link', { name: 'E2E Artist', exact: true }).click();
       await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
     });
@@ -131,13 +145,11 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
         timeout: 15_000,
       });
+      // The card's images link to the artist page rather than opening a
+      // dialog, so the chosen row is asserted through the rendered <img>.
       const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
-      await expect(
-        card.getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
-      ).toBeVisible();
-      await expect(
-        card.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
-      ).toHaveCount(0);
+      await expect(card.getByRole('img', { name: 'E2E Artist chosen portrait' })).toBeVisible();
+      await expect(card.getByRole('img', { name: 'E2E Artist portrait' })).toHaveCount(0);
     });
 
     test('prepopulates the search dropdown with the first eight artists', async ({ page }) => {
@@ -228,19 +240,24 @@ test.describe('Artist Page', () => {
       await expect(cards(page)).toHaveCount(1);
     });
 
-    test('shows release credits, band relationships, and active years on the cards', async ({
+    test('shows release credits and active years on the cards, and no band lines', async ({
       page,
     }) => {
       await page.goto('/artists');
 
-      const artistCard = cards(page).filter({ hasText: 'Member of E2E Band' });
+      // Band relationships no longer render at all — neither "Member of" nor
+      // the roster — so the release credit identifies the artist's card.
+      const artistCard = cards(page).filter({ hasText: 'E2E Album Three' });
       await expect(artistCard).toHaveCount(1, { timeout: 15_000 });
-      await expect(artistCard).toContainText('3 releases · Latest: E2E Album Three (2024)');
+      await expect(artistCard).toContainText('Latest: E2E Album Three (2024)');
+      await expect(artistCard).not.toContainText('Member of');
 
-      const bandCard = cards(page).filter({ hasText: 'Members: E2E Artist' });
+      // A band's roster no longer renders on the card — only what an act
+      // belongs to — so the formation year is what identifies the band card.
+      const bandCard = cards(page).filter({ hasText: 'Formed 2010' });
       await expect(bandCard).toHaveCount(1);
-      await expect(bandCard).toContainText('Formed 2010');
-      await expect(bandCard).toContainText('1 release · Latest: E2E Band Single (2025)');
+      await expect(bandCard).not.toContainText('Members:');
+      await expect(bandCard).toContainText('Latest: E2E Band Single (2025)');
     });
 
     test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
@@ -267,8 +284,13 @@ test.describe('Artist Page', () => {
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
       // "Prof. Quillon M. Tokensmith Jr." sorts under P — after every E2E row,
-      // so it arrives with the last page and closes the grid.
-      await scrollToLoad(page, page.getByRole('link', { name: /Tokensmith/ }));
+      // so it arrives with the last page and closes the grid. Matched exactly:
+      // the card's image link is labelled "<name> artist page", so a loose
+      // /Tokensmith/ resolves to two links and trips strict mode.
+      await scrollToLoad(
+        page,
+        page.getByRole('link', { name: 'Prof. Quillon M. Tokensmith Jr.', exact: true })
+      );
 
       await expect(cards(page).last()).toContainText('Tokensmith');
     });
