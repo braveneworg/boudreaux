@@ -198,6 +198,36 @@ test.describe('Artist Page', () => {
       await expect(cards(page).first()).toContainText('E2E Band');
     });
 
+    test('selecting an artist whose name is composed from its parts keeps them in the grid', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // No stored displayName: the suggestion types "Prof. Quillon M. Tokensmith
+      // Jr." into the field, a string no single searched field contains.
+      await (await openSearch(page)).fill('Tokensmith');
+      await page.getByRole('option', { name: /Tokensmith/ }).click();
+
+      await expect(page.getByRole('button', { name: 'Search artists' })).toHaveText(
+        'Prof. Quillon M. Tokensmith Jr.'
+      );
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      await expect(cards(page).first()).toContainText('Tokensmith');
+    });
+
+    test('matches a multi-word query whose words live in different fields', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // "Quillon" is the first name, "Roster" only appears in the release title.
+      await (await openSearch(page)).fill('quillon roster');
+
+      await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
+      await expect(page.getByRole('option')).toContainText('Tokensmith');
+      await expect(cards(page)).toHaveCount(1);
+    });
+
     test('shows release credits, band relationships, and active years on the cards', async ({
       page,
     }) => {
@@ -228,6 +258,19 @@ test.describe('Artist Page', () => {
       await expect(page.getByText('E2E Roster 25')).toHaveCount(0);
 
       await scrollToLoad(page, page.getByRole('link', { name: 'E2E Roster 25', exact: true }));
+    });
+
+    test('files an artist without a stored display name under their composed name', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      // "Prof. Quillon M. Tokensmith Jr." sorts under P — after every E2E row,
+      // so it arrives with the last page and closes the grid.
+      await scrollToLoad(page, page.getByRole('link', { name: /Tokensmith/ }));
+
+      await expect(cards(page).last()).toContainText('Tokensmith');
     });
 
     test('redirects the retired search page to the index', async ({ page }) => {

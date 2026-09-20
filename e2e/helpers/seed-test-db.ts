@@ -1357,7 +1357,8 @@ const seedTestDatabase = async () => {
 
     // 25 roster artists sharing one published, format-less compilation so the
     // public index has a second page (A–Z page 1 = E2E Artist, E2E Band,
-    // E2E Roster 01–22; page 2 = Roster 23–25). Bulk-created with createMany
+    // E2E Roster 01–22; page 2 = Roster 23–25 and the composed-name artist
+    // below). Bulk-created with createMany
     // (concurrent create() read-backs race in CI on fresh collections) and
     // linked with one createMany as well; createdAt is pinned in the past for
     // the same admin-list reason as the band.
@@ -1389,6 +1390,29 @@ const seedTestDatabase = async () => {
     });
     await prisma.artistRelease.createMany({
       data: rosterArtists.map(({ id }) => ({ artistId: id, releaseId: rosterCompilation.id })),
+    });
+
+    // Composed-name artist: NO stored displayName, so the index shows the name
+    // built from the parts — "Prof. Quillon M. Tokensmith Jr." — which no
+    // single field contains. Exercises token search: picking the suggestion
+    // (which types that composed name) and multi-word typed queries must still
+    // find them. Credited on the roster compilation so no release count moves.
+    // Also pins the A–Z order: the composed name files under P, the LAST row of
+    // the index — a database sort on the null displayName would put it first.
+    const composedNameArtist = await prisma.artist.create({
+      data: {
+        title: 'Prof.',
+        firstName: 'Quillon',
+        middleName: 'Marlowe',
+        surname: 'Tokensmith',
+        suffix: 'Jr.',
+        slug: 'e2e-composed-name',
+        publishedOn: new Date(),
+        createdAt: new Date('2019-01-01T00:00:00Z'),
+      },
+    });
+    await prisma.artistRelease.create({
+      data: { artistId: composedNameArtist.id, releaseId: rosterCompilation.id },
     });
 
     // Create MP3_320KBPS digital formats with track files for each E2E release.

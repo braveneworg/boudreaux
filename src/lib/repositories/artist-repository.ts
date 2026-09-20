@@ -20,7 +20,8 @@ import type {
 } from '@/lib/types/domain/artist';
 import type { Json } from '@/lib/types/domain/shared';
 import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
-import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
+import { getArtistDisplayName, type ArtistNameFields } from '@/lib/utils/get-artist-display-name';
+import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 
 import { runQuery } from './_internal/map-prisma-error';
@@ -288,10 +289,39 @@ const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
 /** Build a Prisma update payload from domain update data. */
 const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => ({ ...data });
 
+/** Case-insensitive substring filter for one search token. */
+const containsToken = (token: string) => ({ contains: token, mode: 'insensitive' as const });
+
+/**
+ * The clauses one search token may match among an artist's name fields — every
+ * part `getArtistDisplayName` can compose a name from, plus the slug, so a name
+ * typed (or picked) as it is displayed always finds its artist.
+ */
+const nameFieldClauses = (token: string): Prisma.ArtistWhereInput[] => [
+  { firstName: containsToken(token) },
+  { middleName: containsToken(token) },
+  { surname: containsToken(token) },
+  { displayName: containsToken(token) },
+  { title: containsToken(token) },
+  { suffix: containsToken(token) },
+  { slug: containsToken(token) },
+];
+
+/**
+ * Token search shared by the admin and public listings: one OR block per
+ * search token, to be ANDed together — every token must match some field, but
+ * different tokens may match different fields ("john smith" → firstName +
+ * surname). Empty when the search holds nothing searchable.
+ */
+const buildTokenSearch = (
+  search: string,
+  clausesFor: (token: string) => Prisma.ArtistWhereInput[]
+): Prisma.ArtistWhereInput[] =>
+  tokenizeSearchQuery(search).map((token) => ({ OR: clausesFor(token) }));
+
 /** Build the admin-listing `where` from domain filters (Mongo null-safe). */
 const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => {
   const { search, published, deleted } = filters;
-  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
   const and: Prisma.ArtistWhereInput[] = [];
 
   if (!deleted) {
@@ -303,14 +333,7 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
     and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
   }
   if (search) {
-    and.push({
-      OR: [
-        { firstName: contains(search) },
-        { surname: contains(search) },
-        { displayName: contains(search) },
-        { slug: contains(search) },
-      ],
-    });
+    and.push(...buildTokenSearch(search, nameFieldClauses));
   }
 
   return and.length > 0 ? { AND: and } : {};
@@ -329,8 +352,8 @@ const listedReleaseWhere = {
  * Build the `where` shared by the public artists index and the public artist
  * search: an active, non-deleted artist holding a DIRECT credit on at least
  * one listed release (a member credit alone never qualifies — ADR-0007), with
- * an optional case-insensitive search across the name fields, aka names,
- * genres, and the titles of their listed releases.
+ * an optional case-insensitive token search — every word must match one of
+ * the name fields, aka names, genres, or the titles of their listed releases.
  *
  * `requirePublished` adds the artist-level `publishedOn` gate the index uses;
  * the playlist "By artist" search deliberately keeps today's rule without it.
@@ -339,33 +362,39 @@ const buildListedWhere = (
   search: string | undefined,
   { requirePublished }: { requirePublished: boolean }
 ): Prisma.ArtistWhereInput => {
-  const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
+  const tokenSearch = search
+    ? buildTokenSearch(search, (token) => [
+        ...nameFieldClauses(token),
+        { akaNames: containsToken(token) },
+        { genres: containsToken(token) },
+        {
+          releases: {
+            some: { release: { title: containsToken(token), ...listedReleaseWhere } },
+          },
+        },
+      ])
+    : [];
   return {
     isActive: true,
     ...(requirePublished && { publishedOn: { not: null } }),
     OR: [...notDeletedOr],
     releases: { some: { release: listedReleaseWhere } },
-    ...(search && {
-      AND: [
-        {
-          OR: [
-            { firstName: contains(search) },
-            { surname: contains(search) },
-            { displayName: contains(search) },
-            { slug: contains(search) },
-            { akaNames: contains(search) },
-            { genres: contains(search) },
-            {
-              releases: {
-                some: { release: { title: contains(search), ...listedReleaseWhere } },
-              },
-            },
-          ],
-        },
-      ],
-    }),
+    ...(tokenSearch.length > 0 && { AND: tokenSearch }),
   };
 };
+
+/**
+ * A–Z order for the artists index and the playlist "By artist" search: by the
+ * name the artist is displayed under, ignoring letter case and accents, ties by
+ * id so paging stays stable.
+ */
+const compareByDisplayName = (
+  a: ArtistNameFields & { id: string },
+  b: ArtistNameFields & { id: string }
+): number =>
+  getArtistDisplayName(a).localeCompare(getArtistDisplayName(b), 'en', {
+    sensitivity: 'base',
+  }) || a.id.localeCompare(b.id);
 
 /** Epoch millis of an artist's newest listed release; no listed release sorts last. */
 const newestListedReleaseTime = (record: ArtistListingRecord): number =>
@@ -447,10 +476,13 @@ export class ArtistRepository {
    * published, non-deleted, and directly credited on a listed release — with
    * the narrow {@link artistListingSelect} projection and an optional search.
    *
-   * `alpha` pages by display name in the database. `newest` orders by each
-   * artist's latest listed release, which Prisma on MongoDB cannot sort by (it
-   * is a relation aggregate), so the listed roster is read whole and ordered +
-   * sliced here; the roster is small, and ADR-0007 records the revisit trigger.
+   * Neither order can be sorted in the database: `alpha` ranks by the name an
+   * artist is displayed under, which is composed from the name parts when no
+   * `displayName` is stored (a DB sort on `displayName` files those nulls
+   * first, outside the alphabet), and `newest` by each artist's latest listed
+   * release, a relation aggregate Prisma on MongoDB cannot sort by. The listed
+   * roster is read whole and ordered + sliced here; the roster is small, and
+   * ADR-0007 records the revisit trigger.
    */
   static async listListed({
     search,
@@ -459,21 +491,11 @@ export class ArtistRepository {
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
     const where = buildListedWhere(search, { requirePublished: true });
-    if (sort === 'alpha') {
-      return runQuery(() =>
-        prisma.artist.findMany({
-          where,
-          orderBy: { displayName: 'asc' },
-          skip,
-          take,
-          select: artistListingSelect,
-        })
-      );
-    }
     const records = await runQuery(() =>
       prisma.artist.findMany({ where, select: artistListingSelect })
     );
-    return [...records].sort(compareByNewestRelease).slice(skip, skip + take);
+    const compare = sort === 'alpha' ? compareByDisplayName : compareByNewestRelease;
+    return [...records].sort(compare).slice(skip, skip + take);
   }
 
   /**
@@ -561,22 +583,22 @@ export class ArtistRepository {
    * Search active, non-deleted artists that hold a direct credit on a listed
    * release (the playlist "By artist" search), with the lightweight
    * images/releases include that search consumes. Unlike the index, this does
-   * not require the artist row itself to be published.
+   * not require the artist row itself to be published. Matches are ordered by
+   * displayed name and sliced here, for the same reason as the index's A–Z
+   * order ({@link ArtistRepository.listListed}).
    */
   static async searchPublished({
     search,
     skip = 0,
     take = 50,
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
-    return runQuery(() =>
+    const matches = await runQuery(() =>
       prisma.artist.findMany({
         where: buildListedWhere(search, { requirePublished: false }),
-        skip,
-        take,
-        orderBy: { displayName: 'asc' },
         include: artistSearchInclude,
       })
     );
+    return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
   }
 
   /**
