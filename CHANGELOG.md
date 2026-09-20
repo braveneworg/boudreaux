@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.339.0] - 2026-09-19
+
+### Added
+
+- feat(artists): ✨ generated bios need no Save (#753)
+
+### Changed
+
+- docs: 📝 keep the Next.js agent-rules block in AGENTS.md (#752)
+
 ## [4.338.0] - 2026-09-19
 
 ### Fixed
