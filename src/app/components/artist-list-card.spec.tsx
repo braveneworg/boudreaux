@@ -168,31 +168,20 @@ describe('ArtistListCard', () => {
     expect(screen.queryByText(/Latest:/)).not.toBeInTheDocument();
   });
 
-  it('renders the bands the artist is a member of', () => {
+  it('carries no band relationships at all — neither the bands nor the roster', () => {
     render(
       <ArtistListCard
-        artist={{ ...baseArtist, memberOf: [name('b1', 'E2E Band'), name('b2', 'Other Band')] }}
+        artist={{
+          ...baseArtist,
+          memberOf: [name('b1', 'E2E Band'), name('b2', 'Other Band')],
+          members: [name('m1', 'E2E Artist'), name('m2', 'Drummer')],
+        }}
       />
     );
-
-    expect(screen.getByText('Member of E2E Band, Other Band')).toBeInTheDocument();
-  });
-
-  it('no longer lists a band’s members', () => {
-    render(
-      <ArtistListCard
-        artist={{ ...baseArtist, members: [name('m1', 'E2E Artist'), name('m2', 'Drummer')] }}
-      />
-    );
-
-    expect(screen.queryByText(/Members:/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Drummer/)).not.toBeInTheDocument();
-  });
-
-  it('omits the band line when the artist has no band relationships', () => {
-    render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.queryByText(/Member of|Members:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Other Band/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Drummer/)).not.toBeInTheDocument();
   });
 
   it('renders the formation year for a band', () => {
@@ -259,14 +248,49 @@ describe('ArtistListCard', () => {
     expect(details).not.toContainElement(bio);
   });
 
-  it('renders the short bio beneath the images and everything else', () => {
+  it('sets the bio column beside the summary row from lg up, stacked below it before that', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
-    const slots = [...(container.querySelector('[data-slot="card-content"]')?.children ?? [])].map(
-      (child) => child.getAttribute('data-slot')
+    const content = container.querySelector('[data-slot="card-content"]');
+    const slots = [...(content?.children ?? [])].map((child) => child.getAttribute('data-slot'));
+
+    expect(slots).toEqual(['artist-summary-row', 'artist-bio-column']);
+    expect(content).toHaveClass('flex-col', 'lg:flex-row');
+  });
+
+  it('keeps the bio and its full-bio link together in the bio column', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const column = container.querySelector('[data-slot="artist-bio-column"]');
+
+    expect(column?.querySelector('[data-slot="artist-short-bio"]')).toBeInTheDocument();
+    expect(column?.querySelector('[data-slot="artist-full-bio-link"]')).toBeInTheDocument();
+  });
+
+  it('heads the short bio with a "Short bio" label, below the artist name in rank', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('heading', { name: 'Short bio', level: 3 })).toBeInTheDocument();
+  });
+
+  it('omits the Short bio heading when there is no short bio', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, shortBio: null }} />);
+
+    expect(screen.queryByRole('heading', { name: 'Short bio' })).not.toBeInTheDocument();
+  });
+
+  it('pushes the full-bio link to the right edge of the card', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: /view full bio/i })).toHaveClass('self-end');
+  });
+
+  it('drops the bio column entirely when there is nothing to put in it', () => {
+    const { container } = render(
+      <ArtistListCard artist={{ ...baseArtist, shortBio: null, bioImages: [] }} />
     );
 
-    expect(slots).toEqual(['artist-summary-row', 'artist-short-bio', 'artist-full-bio-link']);
+    expect(container.querySelector('[data-slot="artist-bio-column"]')).not.toBeInTheDocument();
   });
 
   it('links to the full bio page from the bottom of the card', () => {
@@ -282,6 +306,17 @@ describe('ArtistListCard', () => {
     render(<ArtistListCard artist={{ ...baseArtist, shortBio: null, bioImages: [] }} />);
 
     expect(screen.queryByRole('link', { name: /view full bio/i })).not.toBeInTheDocument();
+  });
+
+  it('inks the short bio dark enough to clear AA on the white card', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const bio = container.querySelector('[data-slot="artist-short-bio"]');
+
+    // zinc-600 (#52525b) on white is 7.73:1; the muted token it replaced was
+    // #71717b at 4.83:1 — passing AA, but with no margin at all.
+    expect(bio?.firstElementChild).toHaveClass('text-zinc-600');
+    expect(bio?.firstElementChild).not.toHaveClass('text-muted-foreground');
   });
 
   it('clamps the short bio to four lines', () => {
@@ -377,6 +412,34 @@ describe('ArtistListCard', () => {
     );
 
     expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
+  });
+
+  it('sizes the thumbnail frame to sit level with the details beside it', () => {
+    const { container } = render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            {
+              id: 'bi1',
+              url: 'https://x/a.jpg',
+              thumbnailUrl: null,
+              title: 'Portrait',
+              attribution: null,
+              license: null,
+              licenseUrl: null,
+              sourceUrl: null,
+              alt: null,
+              isPrimary: false,
+              displayOrder: null,
+            },
+          ],
+        }}
+      />
+    );
+
+    const frame = container.querySelector('[data-slot="artist-thumbnails"] > span');
+    expect(frame).toHaveClass('size-32', 'sm:size-36');
   });
 
   it('shows a placeholder icon when there are no images', () => {

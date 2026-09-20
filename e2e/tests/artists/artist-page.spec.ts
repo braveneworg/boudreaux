@@ -226,14 +226,17 @@ test.describe('Artist Page', () => {
       await expect(cards(page)).toHaveCount(1);
     });
 
-    test('shows release credits, band relationships, and active years on the cards', async ({
+    test('shows release credits and active years on the cards, and no band lines', async ({
       page,
     }) => {
       await page.goto('/artists');
 
-      const artistCard = cards(page).filter({ hasText: 'Member of E2E Band' });
+      // Band relationships no longer render at all — neither "Member of" nor
+      // the roster — so the release credit identifies the artist's card.
+      const artistCard = cards(page).filter({ hasText: 'E2E Album Three' });
       await expect(artistCard).toHaveCount(1, { timeout: 15_000 });
       await expect(artistCard).toContainText('3 releases · Latest: E2E Album Three (2024)');
+      await expect(artistCard).not.toContainText('Member of');
 
       // A band's roster no longer renders on the card — only what an act
       // belongs to — so the formation year is what identifies the band card.
