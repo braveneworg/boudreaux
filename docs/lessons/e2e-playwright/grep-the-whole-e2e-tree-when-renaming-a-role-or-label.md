@@ -15,3 +15,29 @@ run each matching spec's neighbors locally (see
 `run-neighboring-specs-before-push.md`). A locator that resolves to 0 elements
 is the CI symptom; the cause is always a rename that a non-recursive grep
 never saw.
+
+## Adding an accessible name breaks locators too
+
+The mirror case costs a shard just as easily, and no grep for an _old_ string
+will find it: giving an element a new accessible name can make an existing
+loose locator match **two** elements and trip Playwright's strict mode.
+
+On the artist-card rework (2026-09-20, PR #755) the card's images became a
+link labelled `"<display name> artist page"`. That is a second link carrying
+the artist's name, so `getByRole('link', { name: /Tokensmith/ })` — which had
+resolved to the name link alone for months — started resolving to two and
+failed shard 2. The same push also left
+`toContainText('3 releases · Latest: …')` behind after the card stopped
+printing a release count.
+
+So, additionally:
+
+- After adding an `aria-label`, `alt`, or any new visible text that repeats a
+  value specs already query (a name, a title), grep `e2e/` for that value and
+  make every matching locator unambiguous — `{ exact: true }`, or scope it to
+  a container.
+- Grep for the **rendered strings you changed**, not just the ones you
+  removed: a card's text content is asserted verbatim by `toContainText`.
+- Run the specs, don't reason about them. `pnpm exec playwright test
+<file> --project=chromium` on each touched spec takes under a minute and
+  catches both classes before CI does.

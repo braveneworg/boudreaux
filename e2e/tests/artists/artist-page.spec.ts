@@ -249,7 +249,7 @@ test.describe('Artist Page', () => {
       // the roster — so the release credit identifies the artist's card.
       const artistCard = cards(page).filter({ hasText: 'E2E Album Three' });
       await expect(artistCard).toHaveCount(1, { timeout: 15_000 });
-      await expect(artistCard).toContainText('3 releases · Latest: E2E Album Three (2024)');
+      await expect(artistCard).toContainText('Latest: E2E Album Three (2024)');
       await expect(artistCard).not.toContainText('Member of');
 
       // A band's roster no longer renders on the card — only what an act
@@ -257,7 +257,7 @@ test.describe('Artist Page', () => {
       const bandCard = cards(page).filter({ hasText: 'Formed 2010' });
       await expect(bandCard).toHaveCount(1);
       await expect(bandCard).not.toContainText('Members:');
-      await expect(bandCard).toContainText('1 release · Latest: E2E Band Single (2025)');
+      await expect(bandCard).toContainText('Latest: E2E Band Single (2025)');
     });
 
     test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
@@ -284,8 +284,13 @@ test.describe('Artist Page', () => {
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
       // "Prof. Quillon M. Tokensmith Jr." sorts under P — after every E2E row,
-      // so it arrives with the last page and closes the grid.
-      await scrollToLoad(page, page.getByRole('link', { name: /Tokensmith/ }));
+      // so it arrives with the last page and closes the grid. Matched exactly:
+      // the card's image link is labelled "<name> artist page", so a loose
+      // /Tokensmith/ resolves to two links and trips strict mode.
+      await scrollToLoad(
+        page,
+        page.getByRole('link', { name: 'Prof. Quillon M. Tokensmith Jr.', exact: true })
+      );
 
       await expect(cards(page).last()).toContainText('Tokensmith');
     });
