@@ -27,6 +27,12 @@ const MAX_SUGGESTIONS = 8;
 /** Debounce applied to the typed query before it reaches the server. */
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** The sort toggle's options, in the order they read left to right. */
+const ARTIST_SORT_OPTIONS: ReadonlyArray<{ value: ArtistListingSort; label: string }> = [
+  { value: 'alpha', label: 'A–Z' },
+  { value: 'newest', label: 'Newest release' },
+];
+
 /** Whether a toggle value is one of the listing's sort orders. */
 const isArtistListingSort = (value: string): value is ArtistListingSort =>
   (ARTIST_LISTING_SORTS as readonly string[]).includes(value);
@@ -42,11 +48,11 @@ const ArtistsSkeleton = (): ReactElement => (
     <p role="status" className="sr-only">
       Loading artists…
     </p>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <Skeleton className="h-9 w-48 shrink-0" />
       <Skeleton className="h-9 w-full sm:max-w-md" />
-      <Skeleton className="h-9 w-48" />
     </div>
-    <div data-slot="artists-skeleton-list" className="mx-auto flex w-full flex-col gap-4 lg:w-3/4">
+    <div data-slot="artists-skeleton-list" className="flex w-full flex-col gap-4">
       {[0, 1, 2, 3].map((key) => (
         <div key={key} className="flex flex-col gap-4 bg-white p-4 sm:flex-row">
           <Skeleton className="size-20 shrink-0 sm:size-24" />
@@ -94,13 +100,11 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * the transition. Picking a suggestion fills the field with the artist's name
  * so the list narrows to them; the card itself is the way into the artist page.
  *
- * The page reads as a browsable feed: one card per row, the column held to
- * three quarters of the panel width from `lg` up and centered, so the card's
- * full-width short bio keeps a readable measure. The toolbar deliberately
- * stays at full panel width rather than narrowing with the cards — it keeps
- * the search field lined up with the breadcrumb and the `ARTISTS` heading
- * above it, and that field is capped wider (`sm:max-w-md`) to hold its own
- * against the wider cards below.
+ * The page reads as a browsable feed: one card per row, each running the full
+ * width of the zine panel, so the card's own full-width short bio carries the
+ * measure. Sort sits left of search in a toolbar at that same full width, the
+ * two grouped at the left edge rather than pushed to opposite ends, and the
+ * search field is capped at `sm:max-w-md` so it does not swallow the row.
  */
 export const ArtistsContent = (): ReactElement => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
@@ -140,10 +144,32 @@ export const ArtistsContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-6 py-4">
-      <div
-        data-slot="artists-toolbar"
-        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-      >
+      <div data-slot="artists-toolbar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Not the `outline` variant: that draws a per-item hairline border and
+            a soft shadow, neither of which is the zine look. One hard black
+            frame with an ink offset wraps the pair, and the divider rides on
+            the second item. `flex-none` is load-bearing — `ToggleGroupItem`
+            defaults to `flex-1` (basis 0), which splits a `w-fit` group evenly
+            between the items while `whitespace-nowrap` refuses to wrap, so the
+            longer label spilled past its own box. */}
+        <ToggleGroup
+          type="single"
+          value={sort}
+          onValueChange={handleSortChange}
+          aria-label="Sort artists"
+          className="shadow-zine-ink w-fit shrink-0 border-2 border-black bg-zinc-50"
+        >
+          {ARTIST_SORT_OPTIONS.map(({ value, label }) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              className="data-[state=on]:bg-menu-item-pink-300 h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:text-black"
+            >
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
         <ArtistSearchCombobox
           search={searchInput}
           onSearchChange={setSearchInput}
@@ -152,24 +178,12 @@ export const ArtistsContent = (): ReactElement => {
           onSelect={handleSuggestionSelect}
           className="sm:max-w-md"
         />
-
-        <ToggleGroup
-          type="single"
-          value={sort}
-          onValueChange={handleSortChange}
-          variant="outline"
-          aria-label="Sort artists"
-          className="shrink-0"
-        >
-          <ToggleGroupItem value="alpha">A–Z</ToggleGroupItem>
-          <ToggleGroupItem value="newest">Newest release</ToggleGroupItem>
-        </ToggleGroup>
       </div>
 
       {artists.length === 0 ? (
         <ArtistsEmpty search={search} />
       ) : (
-        <ul className="mx-auto flex w-full flex-col gap-4 lg:w-3/4">
+        <ul className="flex w-full flex-col gap-4">
           {artists.map((artist) => (
             <li key={artist.id}>
               <ArtistListCard artist={artist} />

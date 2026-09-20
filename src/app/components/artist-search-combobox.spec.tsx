@@ -78,6 +78,30 @@ const baseProps = {
 };
 
 describe('ArtistSearchCombobox', () => {
+  it('shows the placeholder in the same ink as a typed query, matching the releases search', () => {
+    render(<ArtistSearchCombobox {...baseProps} search="" />);
+
+    const trigger = screen.getByRole('button', { name: 'Search artists' });
+    expect(trigger).toHaveClass('text-zinc-950');
+    expect(trigger).not.toHaveClass('text-zinc-500');
+  });
+
+  it('draws the search icon in bold black ink', () => {
+    const { container } = render(<ArtistSearchCombobox {...baseProps} />);
+
+    const icon = container.querySelector('button[aria-label="Search artists"] svg');
+    expect(icon).toHaveClass('text-black');
+    expect(icon).toHaveAttribute('stroke-width', '2.5');
+  });
+
+  it('wears the punk-zine box: hard black border and ink offset, like the sort toggle', () => {
+    render(<ArtistSearchCombobox {...baseProps} />);
+
+    const trigger = screen.getByRole('button', { name: 'Search artists' });
+    expect(trigger).toHaveClass('border-2', 'border-black', 'shadow-zine-ink', 'bg-zinc-50');
+    expect(trigger).not.toHaveClass('border-zinc-950');
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
