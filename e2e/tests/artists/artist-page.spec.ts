@@ -46,12 +46,15 @@ test.describe('Artist Page', () => {
   });
 
   test.describe('Bio surfaces', () => {
-    test('should show the short bio, genres, and a Read full bio link', async ({ page }) => {
+    test('should show the short bio and genres, with no link away to a bio page', async ({
+      page,
+    }) => {
       await page.goto('/artists/e2e-artist');
 
       await expect(page.getByText(/genre-blurring act/i)).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Experimental')).toBeVisible();
-      await expect(page.getByRole('link', { name: /read full bio/i })).toBeVisible();
+      // The biography is on this page now, so nothing links away to it.
+      await expect(page.getByRole('link', { name: /read full bio/i })).toHaveCount(0);
     });
 
     // The seed carries a suggested (isPrimary) portrait and a human-chosen
@@ -59,28 +62,31 @@ test.describe('Artist Page', () => {
     test('shows the chosen display image instead of the suggested one', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      const chosen = page.getByRole('button', {
+      // Scoped to the header's display images: the biography's gallery below
+      // shows every discovered image, the suggested portrait included.
+      const header = page.locator('[data-slot="artist-display-images"]');
+      const chosen = header.getByRole('button', {
         name: 'Expand image: E2E Artist chosen portrait',
       });
       await expect(chosen).toHaveCount(1, { timeout: 15_000 });
       await expect(chosen).toBeVisible();
       await expect(
-        page.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
+        header.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
       ).toHaveCount(0);
     });
 
-    test('should open the full bio page with the long bio, inline link, and image', async ({
+    test('carries the long bio, inline link, and image on the artist page itself', async ({
       page,
     }) => {
       await page.goto('/artists/e2e-artist');
 
-      await page.getByRole('link', { name: /read full bio/i }).click();
-      await expect(page).toHaveURL(/\/artists\/e2e-artist\/bio$/);
-
-      await expect(page.getByText(/immersive soundscapes/i)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Biography' })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText(/immersive soundscapes/i)).toBeVisible();
 
       // Links are woven inline in the prose — there is no separate links list
-      // section at the bottom of the bio page anymore.
+      // section at the bottom of the biography anymore.
       await expect(page.getByRole('heading', { name: 'Links' })).toHaveCount(0);
 
       // BioHtml maps the inline <a> in the bio body to a hardened Next Link with
@@ -95,6 +101,13 @@ test.describe('Artist Page', () => {
       // `_w{width}` variant convention (custom CDN loader, no `unoptimized`).
       const inlineImage = page.getByRole('img', { name: 'E2E inline bio image' });
       await expect(inlineImage).toHaveAttribute('srcset', /_w\d+/);
+    });
+
+    test('permanently redirects the old /bio URL to the artist page', async ({ page }) => {
+      await page.goto('/artists/e2e-artist/bio');
+
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/, { timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Biography' })).toBeVisible();
     });
   });
 
@@ -118,7 +131,7 @@ test.describe('Artist Page', () => {
       });
       await expect(page.getByText(/genre-blurring act/i)).toBeVisible();
 
-      // The whole card is clickable through the stretched name link.
+      // The name is its own link now — the card surface is inert.
       await page.getByRole('link', { name: 'E2E Artist', exact: true }).click();
       await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
     });

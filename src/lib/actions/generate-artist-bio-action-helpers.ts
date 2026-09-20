@@ -39,13 +39,12 @@ export const resolveInFlightBioStatus = (
  * synchronous fake path here and the async Lambda callback route (Task B7/B8),
  * so both completion paths invalidate the same set of pages.
  *
- * @param slug - The artist slug whose detail/bio pages should be revalidated.
+ * @param slug - The artist slug whose page should be revalidated.
  */
 export const revalidateArtistBioPaths = (slug: string): void => {
   revalidatePath('/admin/artists');
   revalidatePath('/artists');
   revalidatePath(`/artists/${slug}`);
-  revalidatePath(`/artists/${slug}/bio`);
 };
 
 interface RunBioGenerationParams {

@@ -96,7 +96,7 @@ describe('ArtistListCard', () => {
       '/artists/test-artist',
       '/releases/r3',
       '/artists/test-artist',
-      '/artists/test-artist/bio',
+      '/artists/test-artist',
     ]);
   });
 
@@ -336,12 +336,12 @@ describe('ArtistListCard', () => {
     expect(container.querySelector('[data-slot="artist-bio-column"]')).not.toBeInTheDocument();
   });
 
-  it('links to the full bio page from the bottom of the card', () => {
+  it('points the full-bio link at the artist page, where the bio now lives', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.getByRole('link', { name: /view full bio/i })).toHaveAttribute(
       'href',
-      '/artists/test-artist/bio'
+      '/artists/test-artist'
     );
   });
 

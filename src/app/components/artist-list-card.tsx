@@ -120,7 +120,7 @@ const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) =
     {hasBioPage && (
       <Link
         data-slot="artist-full-bio-link"
-        href={`/artists/${slug}/bio`}
+        href={`/artists/${slug}`}
         className="text-primary inline-flex w-fit items-center gap-1 self-end text-sm font-medium hover:underline"
       >
         View full bio
@@ -142,7 +142,8 @@ const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) =
  * The card body itself is inert — no stretched link over the whole surface.
  * Four explicit targets carry the navigation instead: the images and the name
  * both open the artist page, the latest-release title opens that release, and
- * the closing link opens the full bio. Clicking anywhere else does nothing,
+ * the closing link jumps to the biography on that same page. Clicking anywhere
+ * else does nothing,
  * so a reader can select the bio text without being navigated away.
  *
  * Mobile-first single column; images sit above the text on the smallest
@@ -156,10 +157,10 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const images = artist.bioImages;
   const meta = formatMetaLine(artist);
   const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
-  // The bio page renders for any artist, so gate the link on there being
-  // something to read. The listing row carries no `bio`/`bioLinks` — the exact
-  // `hasFullBio` the detail page computes — but the generator always writes a
-  // short bio alongside a long one, so these two stand in for it.
+  // The artist page renders for any artist, so gate the link on there being a
+  // biography worth jumping to. The listing row carries no `bio`/`bioLinks`,
+  // but the generator always writes a short bio alongside a long one, so these
+  // two stand in for it.
   const hasBioPage = Boolean(artist.shortBio) || images.length > 0;
 
   return (
