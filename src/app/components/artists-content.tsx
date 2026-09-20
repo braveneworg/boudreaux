@@ -32,9 +32,10 @@ const isArtistListingSort = (value: string): value is ArtistListingSort =>
   (ARTIST_LISTING_SORTS as readonly string[]).includes(value);
 
 /**
- * Initial-load skeleton mirroring the real layout — the search/sort toolbar
- * and four image-left/details-right card placeholders in the two-column grid —
- * so nothing jumps when the first page lands.
+ * Initial-load skeleton mirroring the real layout — the full-width search/sort
+ * toolbar and four image-left/details-right card placeholders in the
+ * three-quarter-width single column — so nothing jumps when the first page
+ * lands.
  */
 const ArtistsSkeleton = (): ReactElement => (
   <div className="flex flex-col gap-6 py-4" aria-busy="true">
@@ -42,10 +43,10 @@ const ArtistsSkeleton = (): ReactElement => (
       Loading artists…
     </p>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Skeleton className="h-9 w-full sm:max-w-xs" />
+      <Skeleton className="h-9 w-full sm:max-w-md" />
       <Skeleton className="h-9 w-48" />
     </div>
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div data-slot="artists-skeleton-list" className="mx-auto flex w-full flex-col gap-4 lg:w-3/4">
       {[0, 1, 2, 3].map((key) => (
         <div key={key} className="flex flex-col gap-4 bg-white p-4 sm:flex-row">
           <Skeleton className="size-20 shrink-0 sm:size-24" />
@@ -87,11 +88,19 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * Pages through listed artists (ADR-0007) with infinite scroll; the first page
  * is hydrated from the SSR prefetch. A toolbar pairs a debounced search
  * combobox — whose dropdown prepopulates with the first matches of the same
- * query that feeds the grid — with an A–Z / newest-release sort toggle. The
+ * query that feeds the list — with an A–Z / newest-release sort toggle. The
  * query and sort are part of the query key, so changing either resets
  * pagination while `keepPreviousData` keeps the current cards on screen during
  * the transition. Picking a suggestion fills the field with the artist's name
- * so the grid narrows to them; the card itself is the way into the artist page.
+ * so the list narrows to them; the card itself is the way into the artist page.
+ *
+ * The page reads as a browsable feed: one card per row, the column held to
+ * three quarters of the panel width from `lg` up and centered, so the card's
+ * full-width short bio keeps a readable measure. The toolbar deliberately
+ * stays at full panel width rather than narrowing with the cards — it keeps
+ * the search field lined up with the breadcrumb and the `ARTISTS` heading
+ * above it, and that field is capped wider (`sm:max-w-md`) to hold its own
+ * against the wider cards below.
  */
 export const ArtistsContent = (): ReactElement => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
@@ -131,14 +140,17 @@ export const ArtistsContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-6 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        data-slot="artists-toolbar"
+        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      >
         <ArtistSearchCombobox
           search={searchInput}
           onSearchChange={setSearchInput}
           results={artists.slice(0, MAX_SUGGESTIONS)}
           isFetching={isFetching}
           onSelect={handleSuggestionSelect}
-          className="sm:max-w-xs"
+          className="sm:max-w-md"
         />
 
         <ToggleGroup
@@ -157,7 +169,7 @@ export const ArtistsContent = (): ReactElement => {
       {artists.length === 0 ? (
         <ArtistsEmpty search={search} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ul className="mx-auto flex w-full flex-col gap-4 lg:w-3/4">
           {artists.map((artist) => (
             <li key={artist.id}>
               <ArtistListCard artist={artist} />

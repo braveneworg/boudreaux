@@ -250,14 +250,56 @@ describe('ArtistsContent list', () => {
     expect(cards.map((card) => card.textContent)).toEqual(['Alpha', 'Bravo']);
   });
 
-  it('lays the cards out as a one-column grid that becomes two columns on large screens', () => {
+  it('stacks the cards in a single column, never in two', () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
     );
 
     render(<ArtistsContent />);
 
-    expect(screen.getByRole('list')).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    const list = screen.getByRole('list');
+    expect(list).toHaveClass('flex', 'flex-col', 'gap-4');
+    expect(list).not.toHaveClass('lg:grid-cols-2');
+  });
+
+  it('holds the cards to three quarters of the panel width on large screens', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    render(<ArtistsContent />);
+
+    expect(screen.getByRole('list')).toHaveClass('w-full', 'lg:w-3/4');
+  });
+
+  it('centers the card column in the panel', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    render(<ArtistsContent />);
+
+    expect(screen.getByRole('list')).toHaveClass('mx-auto');
+  });
+
+  it('leaves the toolbar at full panel width so the search bar does not move', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    const toolbar = container.querySelector('[data-slot="artists-toolbar"]');
+    expect(toolbar).toBeInTheDocument();
+    expect(toolbar).not.toHaveClass('lg:w-3/4');
+  });
+
+  it('gives the search field a wider cap than the old narrow default', () => {
+    render(<ArtistsContent />);
+
+    const search = screen.getByRole('button', { name: 'Search artists' });
+    expect(search).toHaveClass('sm:max-w-md');
+    expect(search).not.toHaveClass('sm:max-w-xs');
   });
 
   it('wires the infinite-scroll sentinel to the paging state', () => {
@@ -294,6 +336,20 @@ describe('ArtistsContent states', () => {
     render(<ArtistsContent />);
 
     expect(screen.getByText(/loading artists/i)).toBeInTheDocument();
+  });
+
+  it('shapes the skeleton as the same single column of three-quarter-width cards', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ isPending: true, data: undefined }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    expect(container.querySelector('[data-slot="artists-skeleton-list"]')).toHaveClass(
+      'mx-auto',
+      'w-full',
+      'lg:w-3/4'
+    );
   });
 
   it('renders an error state with a retry action', async () => {
