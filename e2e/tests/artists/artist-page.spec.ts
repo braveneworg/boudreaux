@@ -63,7 +63,8 @@ test.describe('Artist Page', () => {
       await page.goto('/artists/e2e-artist');
 
       // Scoped to the header's display images: the biography's gallery below
-      // shows every discovered image, the suggested portrait included.
+      // carries the images the header does not, the suggested portrait among
+      // them, so an unscoped query would match it there.
       const header = page.locator('[data-slot="artist-display-images"]');
       const chosen = header.getByRole('button', {
         name: 'Expand image: E2E Artist chosen portrait',

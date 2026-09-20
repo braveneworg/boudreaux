@@ -15,15 +15,16 @@ interface ArtistFullBioProps {
 }
 
 /**
- * The long-form half of the artist page: the full discovered-image gallery as
- * expandable thumbnails, then the sanitized long bio.
+ * The long-form half of the artist page: an expandable-thumbnail gallery,
+ * then the sanitized long bio.
  *
  * This used to be a page of its own at `/artists/[slug]/bio`; it now sits
  * below the player on the artist page itself, so a reader never has to
  * navigate a second time to read the biography.
  *
  * @param displayName - The artist's display name, used for image alt text.
- * @param bioImages - Every discovered bio image, in pool order.
+ * @param bioImages - The gallery's images, in pool order. The caller passes
+ *   only what the page header is not already showing, so nothing appears twice.
  * @param bio - Sanitized long-bio HTML, or `null` when none is written yet.
  */
 export const ArtistFullBio = ({ displayName, bioImages, bio }: ArtistFullBioProps) => (

@@ -151,6 +151,10 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   // The artist's display images beside the short bio: the human's chosen rows,
   // else the job's suggested rows, else the first discovered ones (ADR-0008).
   const detailImages = resolveDisplayImages(artist.bioImages);
+  // The biography gallery shows what the header does not, so no portrait
+  // renders twice now that both sit on one page.
+  const shownInHeader = new Set(detailImages.map(({ id }) => id));
+  const galleryImages = artist.bioImages.filter(({ id }) => !shownInHeader.has(id));
   const breadcrumbItems = [
     { anchorText: 'Artists', url: '/artists', isActive: false },
     {
@@ -173,7 +177,7 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
 
         <ArtistPlayer artist={withPlayableReleases(artist)} initialReleaseId={initialReleaseId} />
 
-        <ArtistFullBio displayName={displayName} bioImages={artist.bioImages} bio={artist.bio} />
+        <ArtistFullBio displayName={displayName} bioImages={galleryImages} bio={artist.bio} />
       </ZinePanel>
     </div>
   );

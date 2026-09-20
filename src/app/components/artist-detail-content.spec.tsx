@@ -78,15 +78,30 @@ describe('ArtistDetailContent', () => {
     expect(screen.queryByRole('link', { name: /read full bio/i })).not.toBeInTheDocument();
   });
 
-  it('hands the full gallery to the biography, not just the chosen display images', () => {
+  it('keeps the header’s display images out of the biography gallery', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
 
     render(<ArtistDetailContent slug="test-artist" />);
 
+    // The header already shows the resolved display image; the gallery gets
+    // only what is left, so no portrait renders twice on the page.
+    const shownInHeader = screen.getAllByTestId('thumb').length;
     expect(screen.getByTestId('artist-full-bio')).toHaveAttribute(
       'data-images',
-      String(artist.bioImages.length)
+      String(artist.bioImages.length - shownInHeader)
     );
+  });
+
+  it('leaves the biography gallery empty when the header shows every image', () => {
+    const [only] = artist.bioImages;
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, bioImages: [only] },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByTestId('artist-full-bio')).toHaveAttribute('data-images', '0');
   });
 
   it('still renders the biography section when the artist has no bio written', () => {
