@@ -157,20 +157,68 @@ describe('ArtistListCard', () => {
     expect(screen.getByText('guitar, vocals')).toBeInTheDocument();
   });
 
-  it('separates active years and instruments with a middle dot', () => {
+  it('separates the formation year and instruments with a middle dot', () => {
     render(
       <ArtistListCard
-        artist={{ ...baseArtist, bornOn: new Date('1975-01-01T00:00:00Z'), instruments: 'drums' }}
+        artist={{ ...baseArtist, formedOn: new Date('2010-01-01T00:00:00Z'), instruments: 'drums' }}
       />
     );
 
-    expect(screen.getByText('b. 1975 · drums')).toBeInTheDocument();
+    expect(screen.getByText('Formed 2010 · drums')).toBeInTheDocument();
   });
 
-  it('omits the meta line when neither active years nor instruments are set', () => {
+  it('never shows a birth year', () => {
+    const { container } = render(
+      <ArtistListCard artist={{ ...baseArtist, bornOn: new Date('1975-01-01T00:00:00Z') }} />
+    );
+
+    expect(container.querySelector('[data-slot="artist-meta"]')).not.toBeInTheDocument();
+  });
+
+  it('never shows a death year alongside the instruments', () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bornOn: new Date('1975-01-01T00:00:00Z'),
+          diedOn: new Date('2010-01-01T00:00:00Z'),
+          instruments: 'drums',
+        }}
+      />
+    );
+
+    expect(screen.getByText('drums')).toBeInTheDocument();
+  });
+
+  it('omits the meta line when neither a formation year nor instruments are set', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     expect(container.querySelector('[data-slot="artist-meta"]')).not.toBeInTheDocument();
+  });
+
+  it('keeps the short bio out of the details column beside the images', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const details = container.querySelector<HTMLElement>('[data-slot="artist-details"]');
+    const bio = container.querySelector<HTMLElement>('[data-slot="artist-short-bio"]');
+
+    expect(details).toBeInTheDocument();
+    expect(bio).toBeInTheDocument();
+    expect(details).not.toContainElement(bio);
+  });
+
+  it('renders the short bio last, beneath the images and everything else', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const content = container.querySelector('[data-slot="card-content"]');
+
+    expect(content?.lastElementChild?.getAttribute('data-slot')).toBe('artist-short-bio');
+  });
+
+  it('omits the short bio slot when the artist has no short bio', () => {
+    const { container } = render(<ArtistListCard artist={{ ...baseArtist, shortBio: null }} />);
+
+    expect(container.querySelector('[data-slot="artist-short-bio"]')).not.toBeInTheDocument();
   });
 
   it('renders primary image thumbnails when present', () => {
