@@ -42,10 +42,6 @@ const formatMetaLine = ({
   return parts.length > 0 ? parts.join(' · ') : null;
 };
 
-/** `"3 releases"` / `"1 release"`, singular-aware. */
-const formatReleaseCount = (releaseCount: number): string =>
-  `${releaseCount} ${releaseCount === 1 ? 'release' : 'releases'}`;
-
 interface ArtistThumbnailsProps {
   slug: string;
   displayName: string;
@@ -169,12 +165,24 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   return (
     <Card className="shadow-zine-sm overflow-hidden bg-white">
       <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-start lg:gap-6">
-        <div data-slot="artist-summary-row" className="flex flex-col gap-4 sm:flex-row lg:flex-1">
+        {/* `sm:gap-6` once the row goes horizontal: `CardContent` keeps its own
+            `px-6`, so the image sits 24px from the card edge and the gap to its
+            right has to be the same 24px to read as even. */}
+        <div
+          data-slot="artist-summary-row"
+          className="flex flex-col gap-4 sm:flex-row sm:gap-6 lg:flex-1"
+        >
           <ArtistThumbnails slug={artist.slug} displayName={displayName} images={images} />
 
           <div data-slot="artist-details" className="min-w-0 flex-1 space-y-2">
-            <h2 className="text-lg leading-tight font-semibold">
-              <Link href={`/artists/${artist.slug}`} className="hover:underline">
+            {/* The cutout face is a single-weight display font, so no
+                `font-semibold` — it carries the emphasis itself, the same way
+                video-card titles do. */}
+            <h2 className="text-xl leading-tight break-words text-zinc-950">
+              <Link
+                href={`/artists/${artist.slug}`}
+                className="font-fake-four-cutout hover:underline"
+              >
                 {displayName}
               </Link>
             </h2>
@@ -200,7 +208,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
 
             {newestRelease && (
               <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
-                {formatReleaseCount(artist.releaseCount)} · Latest:{' '}
+                Latest:{' '}
                 <Link
                   href={`/releases/${newestRelease.id}`}
                   className="underline underline-offset-2 hover:no-underline"
@@ -209,6 +217,21 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
                 </Link>{' '}
                 ({newestRelease.releasedOn.getUTCFullYear()})
               </p>
+            )}
+
+            {/* Only worth offering when there is more than the one already
+                named above. It points at the artist page, where the release
+                combobox and player hold the whole catalogue — there is no
+                artist-filtered view of /releases to send them to. */}
+            {artist.releaseCount > 1 && (
+              <Link
+                data-slot="artist-all-releases-link"
+                href={`/artists/${artist.slug}`}
+                className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+              >
+                View all artist releases
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
             )}
           </div>
         </div>

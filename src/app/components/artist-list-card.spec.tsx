@@ -59,6 +59,12 @@ describe('ArtistListCard', () => {
     );
   });
 
+  it('sets the artist name in the Fake Four cutout face, like the video cards', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Test Artist' })).toHaveClass('font-fake-four-cutout');
+  });
+
   it('does not stretch the name link over the card, so the card body is inert', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
@@ -89,6 +95,7 @@ describe('ArtistListCard', () => {
       '/artists/test-artist',
       '/artists/test-artist',
       '/releases/r3',
+      '/artists/test-artist',
       '/artists/test-artist/bio',
     ]);
   });
@@ -119,16 +126,25 @@ describe('ArtistListCard', () => {
     expect(screen.queryByText('funk')).not.toBeInTheDocument();
   });
 
-  it('renders the release-credits line with the newest release and its year', () => {
+  it('renders the credits line as just the newest release and its year', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     expect(container.querySelector('[data-slot="artist-credits"]')).toHaveTextContent(
-      '3 releases · Latest: Third Album (2024)'
+      'Latest: Third Album (2024)'
     );
   });
 
-  it('uses the singular for a single release', () => {
-    const { container } = render(
+  it('offers an all-releases link when the artist has more than one release', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: /view all artist releases/i })).toHaveAttribute(
+      'href',
+      '/artists/test-artist'
+    );
+  });
+
+  it('withholds the all-releases link when the artist has exactly one release', () => {
+    render(
       <ArtistListCard
         artist={{
           ...baseArtist,
@@ -142,8 +158,35 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(container.querySelector('[data-slot="artist-credits"]')).toHaveTextContent(
-      '1 release · Latest: Only One (2020)'
+    expect(
+      screen.queryByRole('link', { name: /view all artist releases/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('withholds the all-releases link when the artist has no listed release', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, releaseCount: 0, newestRelease: null }} />);
+
+    expect(
+      screen.queryByRole('link', { name: /view all artist releases/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('sets the all-releases link below the Latest line', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const details = container.querySelector('[data-slot="artist-details"]');
+    const slots = [...(details?.children ?? [])].map((child) => child.getAttribute('data-slot'));
+
+    expect(slots.indexOf('artist-all-releases-link')).toBeGreaterThan(
+      slots.indexOf('artist-credits')
+    );
+  });
+
+  it('no longer counts the releases on that line', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    expect(container.querySelector('[data-slot="artist-credits"]')).not.toHaveTextContent(
+      /releases?\s·/
     );
   });
 
@@ -412,6 +455,12 @@ describe('ArtistListCard', () => {
     );
 
     expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
+  });
+
+  it('sets the gap right of the image to the card’s own 24px side padding', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    expect(container.querySelector('[data-slot="artist-summary-row"]')).toHaveClass('sm:gap-6');
   });
 
   it('sizes the thumbnail frame to sit level with the details beside it', () => {
