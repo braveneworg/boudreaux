@@ -15,7 +15,9 @@ vi.mock('./expandable-thumbnail', () => ({
 // pulls in html-react-parser, which requires the forks pool). BioHtml behavior
 // is covered in bio-html.spec; here we only need the teaser body to render.
 vi.mock('./bio-html', () => ({
-  BioHtml: ({ html }: { html: string }) => <div dangerouslySetInnerHTML={{ __html: html }} />,
+  BioHtml: ({ html, className }: { html: string; className?: string }) => (
+    <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+  ),
 }));
 
 const name = (id: string, displayName: string): ArtistListingName => ({
@@ -213,6 +215,14 @@ describe('ArtistListCard', () => {
     const content = container.querySelector('[data-slot="card-content"]');
 
     expect(content?.lastElementChild?.getAttribute('data-slot')).toBe('artist-short-bio');
+  });
+
+  it('clamps the short bio to four lines', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const bio = container.querySelector('[data-slot="artist-short-bio"]');
+
+    expect(bio?.firstElementChild).toHaveClass('line-clamp-4');
   });
 
   it('omits the short bio slot when the artist has no short bio', () => {

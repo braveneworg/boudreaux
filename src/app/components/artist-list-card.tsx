@@ -155,7 +155,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           <div data-slot="artist-short-bio">
             <BioHtml
               html={artist.shortBio}
-              className="text-muted-foreground line-clamp-3 text-sm"
+              className="text-muted-foreground line-clamp-4 text-sm"
             />
           </div>
         )}
