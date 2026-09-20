@@ -22,6 +22,14 @@ interface ArtistListCardProps {
 /** How many genre badges a card shows before the rest are left to the detail page. */
 const MAX_GENRES = 3;
 
+/**
+ * How many photos a card shows. The listing row already arrives resolved —
+ * the human's chosen rows, else the job's suggestions, else pool order, capped
+ * at `DISPLAY_IMAGE_CAP` — so the first row is the one worth showing, and the
+ * rest belong to the artist page's gallery.
+ */
+const MAX_CARD_IMAGES = 1;
+
 /** Intrinsic size requested from the CDN loader: 2× the 144px frame at `sm`. */
 const THUMBNAIL_SOURCE_PX = 288;
 
@@ -49,11 +57,12 @@ interface ArtistThumbnailsProps {
 }
 
 /**
- * The card's identifying images, as one link into the artist page. They are a
- * way in, not a lightbox — the card navigates rather than opening a dialog.
- * The placeholder sits inside the link too, so an artist with no images still
- * has a clickable photo slot, and `aria-label` names the link for that case,
- * where there is no `alt` to name it.
+ * The card's identifying photo, as a link into the artist page. It is a way
+ * in, not a lightbox — the card navigates rather than opening a dialog. The
+ * placeholder sits inside the link too, so an artist with no images still has
+ * a clickable photo slot, and `aria-label` names the link for that case, where
+ * there is no `alt` to name it. Takes a list rather than a single row so the
+ * caller owns how many it shows (see `MAX_CARD_IMAGES`).
  */
 const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) => (
   <Link
@@ -131,8 +140,8 @@ const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) =
 );
 
 /**
- * Public artists-index card, in two columns from `lg` up: a summary row —
- * identifying images beside the name, formation year and instruments, genres,
+ * Public artists-index card, in two columns from `lg` up: a summary row — one
+ * identifying photo beside the name, formation year and instruments, genres,
  * and release credits — and, to its right, a bio column holding the short-bio
  * teaser above a right-aligned "View full bio" link. Below `lg` the two stack,
  * so the reading order is unchanged: images, details, bio, link. Band
@@ -140,13 +149,13 @@ const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) =
  * nor its roster appears here; both live on the artist page.
  *
  * The card body itself is inert — no stretched link over the whole surface.
- * Four explicit targets carry the navigation instead: the images and the name
+ * Four explicit targets carry the navigation instead: the photo and the name
  * both open the artist page, the latest-release title opens that release, and
  * the closing link jumps to the biography on that same page. Clicking anywhere
  * else does nothing,
  * so a reader can select the bio text without being navigated away.
  *
- * Mobile-first single column; images sit above the text on the smallest
+ * Mobile-first single column; the photo sits above the text on the smallest
  * screens and beside it from `sm` up.
  *
  * @param artist - A listed artist row (ADR-0007) from the artists index query.
@@ -154,7 +163,7 @@ const ArtistBioColumn = ({ slug, shortBio, hasBioPage }: ArtistBioColumnProps) =
 export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const displayName = getArtistDisplayName(artist);
   const genres = splitList(artist.genres).slice(0, MAX_GENRES);
-  const images = artist.bioImages;
+  const images = artist.bioImages.slice(0, MAX_CARD_IMAGES);
   const meta = formatMetaLine(artist);
   const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
   // The artist page renders for any artist, so gate the link on there being a
