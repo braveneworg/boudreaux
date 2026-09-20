@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { ArrowRight, Music2, User } from 'lucide-react';
@@ -13,7 +14,6 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 
 import { BioHtml } from './bio-html';
-import { ExpandableThumbnail } from './expandable-thumbnail';
 
 interface ArtistListCardProps {
   artist: ArtistListingRow;
@@ -60,13 +60,16 @@ const formatReleaseCount = (releaseCount: number): string =>
  * name, formation year and instruments, genres, the bands the artist belongs
  * to, and release credits — sits above the short bio, which runs the full
  * width of the card beneath the images and every other detail so the teaser
- * prose has room to breathe, and a closing "View full bio" link. The whole
- * card is clickable through the name link, which is
- * stretched over the card with a pseudo-element: the card cannot be one `<a>`
- * because it holds its own nested interactive elements — each thumbnail's
- * dialog trigger and the latest-release link — so those sit above the
- * stretched link (`relative z-10`). Mobile-first single column; images sit
- * above the text on small screens and beside it from `sm` up.
+ * prose has room to breathe, and a closing "View full bio" link.
+ *
+ * The card body itself is inert — no stretched link over the whole surface.
+ * Four explicit targets carry the navigation instead: the images and the name
+ * both open the artist page, the latest-release title opens that release, and
+ * the closing link opens the full bio. Clicking anywhere else does nothing,
+ * so a reader can select the bio text without being navigated away.
+ *
+ * Mobile-first single column; images sit above the text on small screens and
+ * beside it from `sm` up.
  *
  * @param artist - A listed artist row (ADR-0007) from the artists index query.
  */
@@ -84,39 +87,45 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const hasBioPage = Boolean(artist.shortBio) || images.length > 0;
 
   return (
-    <Card className="shadow-zine-sm relative overflow-hidden bg-white">
+    <Card className="shadow-zine-sm overflow-hidden bg-white">
       <CardContent className="flex flex-col gap-4 p-4">
         <div data-slot="artist-summary-row" className="flex flex-col gap-4 sm:flex-row">
-          {images.length > 0 ? (
-            <ul data-slot="artist-thumbnails" className="relative z-10 flex shrink-0 gap-2">
-              {images.map((image) => (
-                <li key={image.id} className="size-20 sm:size-24">
-                  <ExpandableThumbnail
-                    src={image.url}
-                    thumbnailSrc={image.thumbnailUrl}
+          {/* The images are a way into the artist, not a lightbox: the card no
+              longer opens a dialog, it navigates. The placeholder is inside the
+              link too, so an artist without images still has a clickable photo
+              slot. `aria-label` names the link for the placeholder case, where
+              there is no `alt` to name it. */}
+          <Link
+            data-slot="artist-thumbnails"
+            href={`/artists/${artist.slug}`}
+            aria-label={`${displayName} artist page`}
+            className="focus-visible:ring-primary flex shrink-0 gap-2 focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {images.length > 0 ? (
+              images.map((image) => (
+                <span
+                  key={image.id}
+                  className="block size-20 overflow-hidden border-2 border-black sm:size-24"
+                >
+                  <Image
+                    src={image.thumbnailUrl ?? image.url}
                     alt={image.alt ?? image.title ?? `${displayName} image`}
-                    caption={image.title}
-                    attribution={image.attribution}
-                    license={image.license}
-                    sourceUrl={image.sourceUrl}
-                    className="size-full"
+                    width={240}
+                    height={240}
+                    className="size-full object-cover transition-transform duration-300 hover:scale-110"
                   />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="bg-muted flex size-20 shrink-0 items-center justify-center sm:size-24">
-              <User className="text-muted-foreground size-8" aria-hidden />
-            </div>
-          )}
+                </span>
+              ))
+            ) : (
+              <span className="bg-muted flex size-20 shrink-0 items-center justify-center sm:size-24">
+                <User className="text-muted-foreground size-8" aria-hidden />
+              </span>
+            )}
+          </Link>
 
           <div data-slot="artist-details" className="min-w-0 flex-1 space-y-2">
             <h2 className="text-lg leading-tight font-semibold">
-              {/* Stretched over the card: the whole card navigates to the artist. */}
-              <Link
-                href={`/artists/${artist.slug}`}
-                className="after:absolute after:inset-0 after:content-[''] hover:underline"
-              >
+              <Link href={`/artists/${artist.slug}`} className="hover:underline">
                 {displayName}
               </Link>
             </h2>
@@ -145,11 +154,9 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
             {newestRelease && (
               <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
                 {formatReleaseCount(artist.releaseCount)} · Latest:{' '}
-                {/* Raised above the card's stretched link, like the thumbnails,
-                    so this navigates to the release and not to the artist. */}
                 <Link
                   href={`/releases/${newestRelease.id}`}
-                  className="relative z-10 underline underline-offset-2 hover:no-underline"
+                  className="underline underline-offset-2 hover:no-underline"
                 >
                   {newestRelease.title}
                 </Link>{' '}
@@ -170,13 +177,12 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           </div>
         )}
 
-        {/* Raised above the stretched card link, and `w-fit` so the hit target
-            is the words rather than the full width of the card. */}
+        {/* `w-fit` so the hit target is the words, not the card's full width. */}
         {hasBioPage && (
           <Link
             data-slot="artist-full-bio-link"
             href={`/artists/${artist.slug}/bio`}
-            className="text-primary relative z-10 inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
+            className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
           >
             View full bio
             <ArrowRight className="size-4" aria-hidden />

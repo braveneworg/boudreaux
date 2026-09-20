@@ -131,13 +131,11 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
         timeout: 15_000,
       });
+      // The card's images link to the artist page rather than opening a
+      // dialog, so the chosen row is asserted through the rendered <img>.
       const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
-      await expect(
-        card.getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
-      ).toBeVisible();
-      await expect(
-        card.getByRole('button', { name: 'Expand image: E2E Artist portrait' })
-      ).toHaveCount(0);
+      await expect(card.getByRole('img', { name: 'E2E Artist chosen portrait' })).toBeVisible();
+      await expect(card.getByRole('img', { name: 'E2E Artist portrait' })).toHaveCount(0);
     });
 
     test('prepopulates the search dropdown with the first eight artists', async ({ page }) => {

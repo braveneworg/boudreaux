@@ -7,10 +7,6 @@ import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/art
 
 import { ArtistListCard } from './artist-list-card';
 
-vi.mock('./expandable-thumbnail', () => ({
-  ExpandableThumbnail: ({ alt }: { alt: string }) => <span data-testid="thumb" data-alt={alt} />,
-}));
-
 // Mock BioHtml so this spec stays on the fast vmThreads pool (the real BioHtml
 // pulls in html-react-parser, which requires the forks pool). BioHtml behavior
 // is covered in bio-html.spec; here we only need the teaser body to render.
@@ -63,12 +59,20 @@ describe('ArtistListCard', () => {
     );
   });
 
-  it('stretches the name link over the whole card so the card is clickable', () => {
+  it('does not stretch the name link over the card, so the card body is inert', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
-    expect(screen.getByRole('link', { name: 'Test Artist' })).toHaveClass(
-      'after:absolute',
-      'after:inset-0'
+    const name = screen.getByRole('link', { name: 'Test Artist' });
+    expect(name).not.toHaveClass('after:absolute');
+    expect(name).not.toHaveClass('after:inset-0');
+  });
+
+  it('links the images to the artist detail page', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: /Test Artist artist page/i })).toHaveAttribute(
+      'href',
+      '/artists/test-artist'
     );
   });
 
@@ -78,17 +82,18 @@ describe('ArtistListCard', () => {
     expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
   });
 
-  it('carries the name, the latest release, and the full-bio link, in that order', () => {
+  it('carries the image, name, latest release, and full-bio links, in that order', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Test Artist',
-      'Third Album',
-      'View full bio',
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/artists/test-artist',
+      '/artists/test-artist',
+      '/releases/r3',
+      '/artists/test-artist/bio',
     ]);
   });
 
-  it('carries only the name link when the artist has no release and no bio', () => {
+  it('carries only the image and name links when there is no release and no bio', () => {
     render(
       <ArtistListCard
         artist={{
@@ -101,7 +106,7 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getAllByRole('link')).toHaveLength(2);
   });
 
   it('renders the short bio and up to three genres', () => {
@@ -155,12 +160,6 @@ describe('ArtistListCard', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.getByRole('link', { name: 'Third Album' })).toHaveClass('underline');
-  });
-
-  it('raises the release link above the stretched card link so it opens the release', () => {
-    render(<ArtistListCard artist={baseArtist} />);
-
-    expect(screen.getByRole('link', { name: 'Third Album' })).toHaveClass('relative', 'z-10');
   });
 
   it('omits the credits line when the artist has no listed release', () => {
@@ -279,12 +278,6 @@ describe('ArtistListCard', () => {
     );
   });
 
-  it('raises the full-bio link above the stretched card link', () => {
-    render(<ArtistListCard artist={baseArtist} />);
-
-    expect(screen.getByRole('link', { name: /view full bio/i })).toHaveClass('relative', 'z-10');
-  });
-
   it('omits the full-bio link when the artist has neither a short bio nor images', () => {
     render(<ArtistListCard artist={{ ...baseArtist, shortBio: null, bioImages: [] }} />);
 
@@ -329,7 +322,7 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
+    expect(screen.getByRole('img', { name: 'Portrait' })).toBeInTheDocument();
   });
 
   it('prefers the image alt text over the title for the thumbnail', () => {
@@ -356,11 +349,11 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Test Artist on stage');
+    expect(screen.getByRole('img', { name: 'Test Artist on stage' })).toBeInTheDocument();
   });
 
-  it('raises the thumbnails above the stretched link so they open their dialog', () => {
-    const { container } = render(
+  it('no longer opens an image dialog from the card', () => {
+    render(
       <ArtistListCard
         artist={{
           ...baseArtist,
@@ -369,7 +362,7 @@ describe('ArtistListCard', () => {
               id: 'bi1',
               url: 'https://x/a.jpg',
               thumbnailUrl: null,
-              title: null,
+              title: 'Portrait',
               attribution: null,
               license: null,
               licenseUrl: null,
@@ -383,21 +376,29 @@ describe('ArtistListCard', () => {
       />
     );
 
-    const thumbs = container.querySelector('[data-slot="artist-thumbnails"]');
-    expect(thumbs).toHaveClass('relative', 'z-10');
+    expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
   });
 
   it('shows a placeholder icon when there are no images', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
-    expect(screen.queryByTestId('thumb')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('links the placeholder to the artist page too, so it is never a dead target', () => {
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
+
+    const placeholder = container.querySelector('.bg-muted');
+    const imageLink = screen.getByRole('link', { name: /Test Artist artist page/i });
+
+    expect(imageLink).toContainElement(placeholder as HTMLElement | null);
   });
 
   it('styles the card as a punk photo card without the soft hover shadow', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     const card = container.querySelector('[data-slot="card"]');
-    expect(card).toHaveClass('shadow-zine-sm', 'bg-white', 'relative');
+    expect(card).toHaveClass('shadow-zine-sm', 'bg-white');
     expect(card).not.toHaveClass('hover:shadow-md');
     expect(card).not.toHaveClass('transition-shadow');
   });
