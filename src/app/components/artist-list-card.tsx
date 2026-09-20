@@ -53,16 +53,9 @@ const formatMetaLine = ({
   return parts.length > 0 ? parts.join(' · ') : null;
 };
 
-/** `"3 releases · Latest: Title (2024)"`, singular-aware; `null` when nothing is listed. */
-const formatReleaseCredits = ({
-  releaseCount,
-  newestRelease,
-}: Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'>): string | null => {
-  if (releaseCount === 0 || newestRelease === null) return null;
-  const noun = releaseCount === 1 ? 'release' : 'releases';
-  const year = newestRelease.releasedOn.getUTCFullYear();
-  return `${releaseCount} ${noun} · Latest: ${newestRelease.title} (${year})`;
-};
+/** `"3 releases"` / `"1 release"`, singular-aware. */
+const formatReleaseCount = (releaseCount: number): string =>
+  `${releaseCount} ${releaseCount === 1 ? 'release' : 'releases'}`;
 
 /**
  * Public artists-index card. A summary row — identifying images beside the
@@ -71,10 +64,10 @@ const formatReleaseCredits = ({
  * card beneath the images and every other detail so the teaser prose has room
  * to breathe. The whole card is clickable through the name link, which is
  * stretched over the card with a pseudo-element: the card cannot be one `<a>`
- * because each thumbnail holds its own dialog trigger, so the thumbnails
- * wrapper sits above the stretched link (`relative z-10`). Mobile-first single
- * column; images sit above the text on small screens and beside it from `sm`
- * up.
+ * because it holds its own nested interactive elements — each thumbnail's
+ * dialog trigger and the latest-release link — so those sit above the
+ * stretched link (`relative z-10`). Mobile-first single column; images sit
+ * above the text on small screens and beside it from `sm` up.
  *
  * @param artist - A listed artist row (ADR-0007) from the artists index query.
  */
@@ -84,7 +77,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const images = artist.bioImages;
   const meta = formatMetaLine(artist);
   const bandLine = formatBandLine(artist);
-  const credits = formatReleaseCredits(artist);
+  const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
 
   return (
     <Card className="shadow-zine-sm relative overflow-hidden bg-white">
@@ -145,7 +138,20 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
 
             {bandLine && <p className="text-sm text-zinc-700">{bandLine}</p>}
 
-            {credits && <p className="text-sm font-medium text-zinc-950">{credits}</p>}
+            {newestRelease && (
+              <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
+                {formatReleaseCount(artist.releaseCount)} · Latest:{' '}
+                {/* Raised above the card's stretched link, like the thumbnails,
+                    so this navigates to the release and not to the artist. */}
+                <Link
+                  href={`/releases/${newestRelease.id}`}
+                  className="relative z-10 underline underline-offset-2 hover:no-underline"
+                >
+                  {newestRelease.title}
+                </Link>{' '}
+                ({newestRelease.releasedOn.getUTCFullYear()})
+              </p>
+            )}
           </div>
         </div>
 

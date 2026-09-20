@@ -76,6 +76,20 @@ describe('ArtistListCard', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
+  });
+
+  it('carries exactly two links: the artist name and the latest release', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Test Artist',
+      'Third Album',
+    ]);
+  });
+
+  it('carries only the name link when the artist has no listed release', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, releaseCount: 0, newestRelease: null }} />);
+
     expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
@@ -90,13 +104,15 @@ describe('ArtistListCard', () => {
   });
 
   it('renders the release-credits line with the newest release and its year', () => {
-    render(<ArtistListCard artist={baseArtist} />);
+    const { container } = render(<ArtistListCard artist={baseArtist} />);
 
-    expect(screen.getByText('3 releases · Latest: Third Album (2024)')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="artist-credits"]')).toHaveTextContent(
+      '3 releases · Latest: Third Album (2024)'
+    );
   });
 
   it('uses the singular for a single release', () => {
-    render(
+    const { container } = render(
       <ArtistListCard
         artist={{
           ...baseArtist,
@@ -110,7 +126,30 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(screen.getByText('1 release · Latest: Only One (2020)')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="artist-credits"]')).toHaveTextContent(
+      '1 release · Latest: Only One (2020)'
+    );
+  });
+
+  it('links the latest release title to its release page', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Third Album' })).toHaveAttribute(
+      'href',
+      '/releases/r3'
+    );
+  });
+
+  it('underlines the latest release title so it reads as a link', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Third Album' })).toHaveClass('underline');
+  });
+
+  it('raises the release link above the stretched card link so it opens the release', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Third Album' })).toHaveClass('relative', 'z-10');
   });
 
   it('omits the credits line when the artist has no listed release', () => {
