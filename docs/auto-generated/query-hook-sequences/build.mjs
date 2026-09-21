@@ -498,7 +498,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor U as User
-    participant C as ArtistSearchInput<br/>(useDebounce 250ms)
+    participant C as ArtistNavSearchCombobox<br/>(useDebounce 250ms)
     participant H as useArtistNavSearchQuery<br/>(useQuery, enabled query.length>=3)
     participant F as fetchAndParse
     participant R as GET /api/artists/search?q<br/>(combobox · searchLimiter)
