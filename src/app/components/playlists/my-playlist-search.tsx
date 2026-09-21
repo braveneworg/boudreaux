@@ -6,8 +6,8 @@
 
 import { useState, type ReactElement } from 'react';
 
-import { Search } from 'lucide-react';
-
+import { SearchComboboxTrigger } from '@/components/search-combobox-trigger';
+import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/components/search-result-row';
 import {
   Command,
   CommandEmpty,
@@ -17,9 +17,9 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 
 import { usePlaylistsQuery } from './_hooks/use-playlists-query';
+import { PlaylistCoverTiles } from './playlist-cover-tiles';
 
 interface MyPlaylistSearchProps {
   /** Fired with the picked playlist's id; the popover closes itself. */
@@ -31,7 +31,7 @@ interface MyPlaylistSearchProps {
 const SEARCH_PLACEHOLDER = 'Search your playlists…';
 
 /**
- * Mobile quick-jump into one of the user's playlists: a search-input-styled
+ * Mobile quick-jump into one of the user's playlists: the shared zine search
  * trigger opening a Popover+Command palette over `usePlaylistsQuery` rows.
  * cmdk's default filtering matches the typed query against playlist titles
  * (each item's `value`); selecting a row fires `onSelect` with its id and
@@ -50,18 +50,12 @@ export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <SearchComboboxTrigger
           aria-expanded={open}
           aria-label="Search your playlists"
-          className={cn(
-            'flex w-full items-center gap-2 border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm text-zinc-500',
-            className
-          )}
-        >
-          <Search aria-hidden="true" className="size-4 shrink-0" />
-          {SEARCH_PLACEHOLDER}
-        </button>
+          label={SEARCH_PLACEHOLDER}
+          className={className}
+        />
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         <Command>
@@ -70,8 +64,19 @@ export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps)
             <CommandEmpty>No playlists yet.</CommandEmpty>
             <CommandGroup>
               {listRows.map((row) => (
-                <CommandItem key={row.id} value={row.title} onSelect={() => handleSelect(row.id)}>
-                  <span className="min-w-0 flex-1 truncate">{row.title}</span>
+                <CommandItem
+                  key={row.id}
+                  value={row.title}
+                  onSelect={() => handleSelect(row.id)}
+                  className={SEARCH_RESULT_ITEM_CLASS}
+                >
+                  <SearchResultRow
+                    // Decorative: the adjacent title text names the row.
+                    thumbnail={
+                      <PlaylistCoverTiles images={row.coverImages} alt="" className="size-10" />
+                    }
+                    primary={row.title}
+                  />
                 </CommandItem>
               ))}
             </CommandGroup>

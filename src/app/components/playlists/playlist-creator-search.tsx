@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'react';
 
+import { ZINE_SEARCH_FIELD_CLASS } from '@/components/search-combobox-trigger';
 import {
   Command,
   CommandEmpty,
@@ -116,6 +117,7 @@ export const PlaylistCreatorSearch = ({
           onValueChange={setSearch}
           placeholder={SEARCH_PLACEHOLDER}
           aria-label="Search songs and videos"
+          wrapperClassName={ZINE_SEARCH_FIELD_CLASS}
         />
         <CommandList>
           <PlaylistSearchStatus hasQuery={hasQuery} isSearching={isPending} />

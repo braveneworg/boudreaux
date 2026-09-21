@@ -10,14 +10,16 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * The punk-zine search box for a search field that is not a button — an inline
- * cmdk input wrapper, say: hard 2px black border, paper fill, a 2px ink offset,
- * and a ring in the surrounding panel's accent while the field inside it has
- * focus. The magnifier inside is drawn at full, bold ink to match
- * `SearchComboboxTrigger`.
+ * The punk-zine search box for an inline cmdk search field — pass it as
+ * `CommandInput`'s `wrapperClassName`: hard 2px black border, paper fill, a 2px
+ * ink offset, and a ring in the surrounding panel's accent while the field
+ * inside it has focus. The magnifier inside is drawn at full, bold ink to match
+ * `SearchComboboxTrigger`. `border-b-2` replaces the wrapper's 1px divider
+ * (which would otherwise thin the box's bottom edge), and the margin keeps the
+ * ink offset and ring clear of `Command`'s `overflow-hidden`.
  */
 export const ZINE_SEARCH_FIELD_CLASS =
-  'border-2 border-black bg-zinc-50 shadow-zine-ink transition-[color,box-shadow] focus-within:ring-[3px] focus-within:ring-(--card-accent) [&_svg]:opacity-100 [&_svg]:stroke-[2.5px]';
+  'm-1.5 h-10 border-2 border-b-2 border-black bg-zinc-50 shadow-zine-ink transition-[color,box-shadow] focus-within:ring-[3px] focus-within:ring-(--card-accent) [&_svg]:opacity-100 [&_svg]:stroke-[2.5px]';
 
 export interface SearchComboboxTriggerProps extends Omit<ComponentProps<'button'>, 'children'> {
   /** The active query, or the placeholder when there is none. */

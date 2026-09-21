@@ -63,6 +63,36 @@ const findCommandInput = (): HTMLElement | null =>
 
 describe('MyPlaylistSearch', () => {
   describe('trigger', () => {
+    it('wears the same punk-zine box as the artists search', () => {
+      mockRows([]);
+      renderSearch();
+
+      expect(findTrigger()).toHaveClass(
+        'border-2',
+        'border-black',
+        'shadow-zine-ink',
+        'text-zinc-950'
+      );
+    });
+
+    it('rings in the accent of the panel it sits in', () => {
+      mockRows([]);
+      renderSearch();
+
+      expect(findTrigger()).toHaveClass('focus-visible:ring-(--card-accent)');
+    });
+
+    it('shows each playlist with its cover thumbnail once opened', async () => {
+      mockRows([ROAD_TRIP]);
+      const user = userEvent.setup();
+      renderSearch();
+
+      await user.click(findTrigger());
+
+      const option = await screen.findByRole('option', { name: 'Road Trip' });
+      expect(option.querySelector('[data-testid="playlist-cover-placeholder"]')).not.toBeNull();
+    });
+
     it('renders a button styled as a search input with the placeholder copy', () => {
       mockRows([]);
       renderSearch();

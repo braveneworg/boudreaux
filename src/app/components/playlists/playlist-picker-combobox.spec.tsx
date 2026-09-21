@@ -78,6 +78,18 @@ const findPlaylistInput = (): HTMLElement => screen.getByPlaceholderText('Find a
 
 describe('PlaylistPickerCombobox', () => {
   describe('rendering', () => {
+    it('boxes the search field in the punk-zine search box', () => {
+      mockRows([]);
+      renderPicker();
+
+      expect(document.querySelector('[data-slot="command-input-wrapper"]')).toHaveClass(
+        'border-2',
+        'border-black',
+        'shadow-zine-ink',
+        'focus-within:ring-(--card-accent)'
+      );
+    });
+
     it('renders the search input with the "Find a playlist…" placeholder', () => {
       mockRows([]);
       renderPicker();

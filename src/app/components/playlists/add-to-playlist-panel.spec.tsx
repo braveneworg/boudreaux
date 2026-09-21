@@ -97,6 +97,14 @@ const renderPanel = (overrides: Partial<PanelProps> = {}) => {
 };
 
 describe('AddToPlaylistPanel', () => {
+  it('carries the playlists accent, since its popover is portaled out of the page panel', () => {
+    mockRows([]);
+    mockFlow();
+    const { container } = renderPanel();
+
+    expect(container.firstElementChild).toHaveClass('zine-accent-kraft');
+  });
+
   it('calls pickPlaylist with the selected row when a picker option is clicked', async () => {
     const user = userEvent.setup();
     mockRows([ROAD_TRIP, CHILL_MIX]);
