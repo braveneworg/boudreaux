@@ -8,24 +8,22 @@ import { useVocabularyField } from '@/app/components/forms/fields/use-vocabulary
 import { VocabularyMultiCombobox } from '@/app/components/forms/fields/vocabulary-multi-combobox';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
-import type { Control, UseFormSetValue } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 /** Genres shown on an artist card — the rest render muted in the editor. */
 const CARD_GENRE_COUNT = 3;
 
 interface ArtistDetailsSectionProps {
   control: Control<ArtistFormData>;
-  setValue: UseFormSetValue<ArtistFormData>;
   isNameRequired: boolean;
 }
 
 export const ArtistDetailsSection = ({
   control,
-  setValue,
   isNameRequired,
 }: ArtistDetailsSectionProps): React.ReactElement => {
-  const genres = useVocabularyField({ control, setValue, name: 'genres' });
-  const tags = useVocabularyField({ control, setValue, name: 'tags' });
+  const genres = useVocabularyField({ control, name: 'genres' });
+  const tags = useVocabularyField({ control, name: 'tags' });
 
   return (
     <section className="space-y-4 pt-0">

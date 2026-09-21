@@ -41,11 +41,7 @@ const Harness = ({ genres, tags }: { genres?: string; tags?: string }): React.Re
 
   return (
     <Form {...form}>
-      <ArtistDetailsSection
-        control={form.control}
-        setValue={form.setValue}
-        isNameRequired={false}
-      />
+      <ArtistDetailsSection control={form.control} isNameRequired={false} />
     </Form>
   );
 };

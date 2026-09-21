@@ -505,11 +505,7 @@ export const ArtistForm = ({
             <div className="space-y-6">
               <Separator />
 
-              <ArtistDetailsSection
-                control={control}
-                setValue={artistForm.setValue}
-                isNameRequired={isNameRequired}
-              />
+              <ArtistDetailsSection control={control} isNameRequired={isNameRequired} />
 
               <Separator />
 

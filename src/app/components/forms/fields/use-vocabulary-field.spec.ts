@@ -30,11 +30,7 @@ const renderField = (genres?: string) =>
     void dirtyFields;
 
     return {
-      field: useVocabularyField({
-        control: form.control,
-        setValue: form.setValue,
-        name: 'genres',
-      }),
+      field: useVocabularyField({ control: form.control, name: 'genres' }),
       form,
     };
   });
