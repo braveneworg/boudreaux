@@ -120,13 +120,15 @@ describe('ArtistSearchCombobox', () => {
     expect(screen.getByRole('button', { name: 'Search artists' })).toHaveTextContent('punk');
   });
 
-  it('uses the hot-pink accent ring of the artists section', () => {
+  it('rings in the accent of the panel it sits in, not a colour of its own', () => {
     render(<ArtistSearchCombobox {...baseProps} />);
 
-    expect(screen.getByRole('button', { name: 'Search artists' })).toHaveClass(
-      'focus-visible:ring-menu-item-pink-400',
-      'data-[state=open]:ring-menu-item-pink-400'
+    const trigger = screen.getByRole('button', { name: 'Search artists' });
+    expect(trigger).toHaveClass(
+      'focus-visible:ring-(--card-accent)',
+      'data-[state=open]:ring-(--card-accent)'
     );
+    expect(trigger).not.toHaveClass('focus-visible:ring-menu-item-pink-400');
   });
 
   it('lists the matching artists with their newest release when opened', async () => {

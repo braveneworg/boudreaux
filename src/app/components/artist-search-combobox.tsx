@@ -7,8 +7,10 @@ import { useState, type ReactElement } from 'react';
 
 import Image from 'next/image';
 
-import { Search, User } from 'lucide-react';
+import { User } from 'lucide-react';
 
+import { SearchComboboxTrigger } from '@/app/components/search-combobox-trigger';
+import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/app/components/search-result-row';
 import {
   Command,
   CommandEmpty,
@@ -19,7 +21,6 @@ import {
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
-import { cn } from '@/lib/utils';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 const SEARCH_PLACEHOLDER = 'Search by name, genre, or release';
@@ -45,7 +46,7 @@ const rowImageSrc = ({ bioImages }: ArtistListingRow): string | null => {
 
 /**
  * Search combobox for the public /artists index (the artists counterpart of
- * `VideoSearchCombobox`): a search-box-styled trigger opens a
+ * `VideoSearchCombobox`): the shared zine search trigger opens a
  * keyboard-navigable dropdown that prepopulates with the artists matching the
  * typed name / aka / genre / release-title query. The query is lifted, so the
  * grid behind the dropdown narrows in step with it; picking a suggestion hands
@@ -72,28 +73,12 @@ export const ArtistSearchCombobox = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <SearchComboboxTrigger
           aria-expanded={open}
           aria-label="Search artists"
-          // Trigger styled as the search field it replaces, wearing the same
-          // punk-zine box as the sort toggle beside it: hard 2px black border,
-          // square corners, paper fill, and a 2px ink offset. The resting
-          // label is full ink rather than a muted grey, so an empty field
-          // reads the same weight as the releases search does. Focus and open
-          // ring in the ARTISTS section accent (hot pink).
-          className={cn(
-            'focus-visible:ring-menu-item-pink-400 data-[state=open]:ring-menu-item-pink-400 shadow-zine-ink flex w-full items-center gap-2 border-2 border-black bg-zinc-50 px-3 py-2 text-sm text-zinc-950 transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-none data-[state=open]:ring-[3px]',
-            className
-          )}
-        >
-          {/* Heavier stroke than lucide's default 2 so the glyph holds its own
-              against the 2px zine border around it. */}
-          <Search aria-hidden strokeWidth={2.5} className="size-4 shrink-0 text-black" />
-          <span className="min-w-0 flex-1 truncate text-left">
-            {hasQuery ? search : SEARCH_PLACEHOLDER}
-          </span>
-        </button>
+          label={hasQuery ? search : SEARCH_PLACEHOLDER}
+          className={className}
+        />
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         {/* Server provides the matches; disable cmdk's client-side filtering. */}
@@ -120,31 +105,27 @@ export const ArtistSearchCombobox = ({
                     key={artist.id}
                     value={artist.id}
                     onSelect={() => handleSelect(artist)}
-                    className="flex items-center gap-3 px-2 py-1.5"
+                    className={SEARCH_RESULT_ITEM_CLASS}
                   >
-                    {imageSrc ? (
-                      <Image
-                        src={imageSrc}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="size-10 shrink-0 object-cover"
-                      />
-                    ) : (
-                      <span className="flex size-10 shrink-0 items-center justify-center bg-zinc-200 text-zinc-500">
-                        <User aria-hidden className="size-4" />
-                      </span>
-                    )}
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm font-medium">
-                        {getArtistDisplayName(artist)}
-                      </span>
-                      {artist.newestRelease ? (
-                        <span className="truncate text-xs text-zinc-500">
-                          {artist.newestRelease.title}
-                        </span>
-                      ) : null}
-                    </span>
+                    <SearchResultRow
+                      thumbnail={
+                        imageSrc ? (
+                          <Image
+                            src={imageSrc}
+                            alt=""
+                            width={40}
+                            height={40}
+                            className="size-10 shrink-0 object-cover"
+                          />
+                        ) : (
+                          <span className="flex size-10 shrink-0 items-center justify-center bg-zinc-200 text-zinc-500">
+                            <User aria-hidden className="size-4" />
+                          </span>
+                        )
+                      }
+                      primary={getArtistDisplayName(artist)}
+                      secondary={artist.newestRelease?.title}
+                    />
                   </CommandItem>
                 );
               })}
