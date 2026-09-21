@@ -56,6 +56,21 @@ const baseProps = {
 };
 
 describe('VideoSearchCombobox', () => {
+  it('wears the same punk-zine box as the artists search', () => {
+    render(<VideoSearchCombobox {...baseProps} />);
+
+    const trigger = screen.getByRole('button', { name: 'Search videos' });
+    expect(trigger).toHaveClass('border-2', 'border-black', 'shadow-zine-ink', 'text-zinc-950');
+  });
+
+  it('rings in the accent of the panel it sits in, not a colour of its own', () => {
+    render(<VideoSearchCombobox {...baseProps} />);
+
+    const trigger = screen.getByRole('button', { name: 'Search videos' });
+    expect(trigger).toHaveClass('focus-visible:ring-(--card-accent)');
+    expect(trigger).not.toHaveClass('focus-visible:ring-menu-item-tan-400');
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });

@@ -161,7 +161,7 @@ describe('ReleaseSearchCombobox', () => {
     });
   });
 
-  it('tints the dropdown like the heading and drops the inner borders', async () => {
+  it('lists results under a plain query row with its divider, like the artists search', async () => {
     stubFetchReturning(mockReleases);
     const user = setupUser();
     renderCombobox();
@@ -169,43 +169,38 @@ describe('ReleaseSearchCombobox', () => {
     await user.click(screen.getByLabelText('Search releases'));
 
     // Radix portals the dropdown to the body — query the document.
-    // Results sit on plain paper; only the search-icon row wears the light
-    // offset highlight of the RELEASES wordmark's cyan, like a highlighter
-    // swipe across the query line.
-    const panel = document.querySelector('[data-slot="popover-content"]');
-    expect(panel).not.toHaveClass('bg-[#d0fffe]');
     const wrapper = document.querySelector('[data-slot="command-input-wrapper"]');
-    expect(wrapper).toHaveClass('bg-[#d0fffe]');
-
-    // No inner borders: globals.css keeps the zine box off cmdk search
-    // inputs site-wide (covered by E2E computed style), and the input
-    // wrapper's underline is suppressed inside the dropdown.
+    expect(wrapper).not.toHaveClass('bg-[#d0fffe]');
     const command = document.querySelector('[data-slot="command"]');
-    expect(command?.className).toContain('**:data-[slot=command-input-wrapper]:border-b-0');
+    expect(command?.className).not.toContain('border-b-0');
   });
 
-  it('rings the trigger box in the heading background cyan while open', async () => {
+  it('wears the same punk-zine box as the artists search', () => {
     stubFetchReturning(mockReleases);
-    const user = setupUser();
     renderCombobox();
 
-    // Mirrors the landing-page search focus treatment (3px ring), tinted to
-    // the RELEASES wordmark's #45fefc — around the "Search releases..." box,
-    // both while focused and while the dropdown is open.
+    const trigger = screen.getByLabelText('Search releases');
+    expect(trigger).toHaveClass('border-2', 'border-black', 'shadow-zine-ink', 'text-zinc-950');
+  });
+
+  it('draws a bold search icon on the trigger', () => {
+    stubFetchReturning(mockReleases);
+    renderCombobox();
+
+    const icon = screen.getByLabelText('Search releases').querySelector('svg');
+    expect(icon).toHaveAttribute('stroke-width', '2.5');
+  });
+
+  it('rings the trigger in the accent of the panel it sits in', () => {
+    stubFetchReturning(mockReleases);
+    renderCombobox();
+
     const trigger = screen.getByLabelText('Search releases');
     expect(trigger).toHaveClass(
-      'transition-[color,box-shadow]',
-      'focus-visible:ring-[3px]',
-      'focus-visible:ring-[#45fefc]',
-      'data-[state=open]:ring-[3px]',
-      'data-[state=open]:ring-[#45fefc]'
+      'focus-visible:ring-(--card-accent)',
+      'data-[state=open]:ring-(--card-accent)'
     );
-
-    await user.click(trigger);
-
-    // The inner dropdown field carries no focus ring of its own.
-    const wrapper = document.querySelector('[data-slot="command-input-wrapper"]');
-    expect(wrapper).not.toHaveClass('focus-within:ring-[3px]', 'focus-within:ring-[#45fefc]');
+    expect(trigger).not.toHaveClass('focus-visible:ring-[#45fefc]');
   });
 
   it('fetches and displays server results when the user types', async () => {

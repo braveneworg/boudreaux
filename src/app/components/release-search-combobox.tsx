@@ -18,6 +18,8 @@ import * as React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
+import { SearchComboboxTrigger } from '@/app/components/search-combobox-trigger';
+import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/app/components/search-result-row';
 import {
   Command,
   CommandEmpty,
@@ -107,32 +109,20 @@ export const ReleaseSearchCombobox = () => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <SearchComboboxTrigger
           aria-expanded={open}
           aria-label="Search releases"
-          // Landing-search focus treatment on the trigger box: a 3px ring
-          // tinted to the RELEASES wordmark's cyan, shown while focused and
-          // while the dropdown is open.
-          className="flex w-full items-center justify-between border border-zinc-950 bg-zinc-50 px-3 py-2 text-sm transition-[color,box-shadow] hover:border-zinc-400 focus-visible:ring-[3px] focus-visible:ring-[#45fefc] focus-visible:outline-none data-[state=open]:ring-[3px] data-[state=open]:ring-[#45fefc]"
-        >
-          Search releases...
-        </button>
+          label="Search releases..."
+        />
       </PopoverTrigger>
-      {/* Dropdown surface: paper results under a query row swiped in a light
-          offset highlight of the RELEASES wordmark's cyan (#45fefc), with the
-          wrapper's divider dropped so the swipe reads as one strip. */}
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         {/* Server provides the matches; disable cmdk's client-side filtering. */}
-        <Command
-          shouldFilter={false}
-          className="bg-transparent **:data-[slot=command-input-wrapper]:border-b-0"
-        >
+        <Command shouldFilter={false}>
           <CommandInput
             value={search}
             onValueChange={setSearch}
             placeholder="Search by artist, title, or catalog number..."
             aria-label="Search releases"
-            wrapperClassName="bg-[#d0fffe]"
           />
           <CommandList onScroll={handleListScroll}>
             <CommandEmpty>
@@ -147,25 +137,27 @@ export const ReleaseSearchCombobox = () => {
                     key={release.id}
                     value={release.id}
                     onSelect={() => handleSelect(release.id)}
-                    className="flex items-center gap-3 px-2 py-1.5"
+                    className={SEARCH_RESULT_ITEM_CLASS}
                   >
-                    {coverArt ? (
-                      <Image
-                        src={coverArt.src}
-                        alt={coverArt.alt}
-                        width={40}
-                        height={40}
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
-                        ♫
-                      </div>
-                    )}
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{release.title}</span>
-                      {artistName && <span className="text-xs text-zinc-500">{artistName}</span>}
-                    </div>
+                    <SearchResultRow
+                      thumbnail={
+                        coverArt ? (
+                          <Image
+                            src={coverArt.src}
+                            alt={coverArt.alt}
+                            width={40}
+                            height={40}
+                            className="size-10 shrink-0 object-cover"
+                          />
+                        ) : (
+                          <span className="flex size-10 shrink-0 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
+                            ♫
+                          </span>
+                        )
+                      }
+                      primary={release.title}
+                      secondary={artistName}
+                    />
                   </CommandItem>
                 );
               })}
