@@ -78,7 +78,9 @@ export const TourSearch = ({
           onChange={handleInputChange}
           placeholder={placeholder}
           disabled={disabled}
-          className="shadow-zine-ink h-10 pr-9 pl-9 text-sm text-zinc-950 placeholder:text-zinc-950"
+          // `type="search"` makes WebKit/Blink draw their own clear "×"; it is
+          // hidden so it doesn't sit beside the app's clear button.
+          className="shadow-zine-ink h-10 pr-9 pl-9 text-sm text-zinc-950 placeholder:text-zinc-950 [&::-webkit-search-cancel-button]:appearance-none"
           aria-label="Search tours by artist name"
         />
         {localValue && (

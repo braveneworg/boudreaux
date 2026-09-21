@@ -7,6 +7,14 @@ import userEvent from '@testing-library/user-event';
 import { TourSearch } from './tour-search';
 
 describe('TourSearch', () => {
+  it("hides the browser's own clear button, so only the app's shows", () => {
+    render(<TourSearch value="" onChange={() => {}} />);
+
+    expect(screen.getByLabelText('Search tours by artist name')).toHaveClass(
+      '[&::-webkit-search-cancel-button]:appearance-none'
+    );
+  });
+
   it('wears the same ink offset and full-ink text as the search comboboxes', () => {
     render(<TourSearch value="" onChange={() => {}} />);
 
