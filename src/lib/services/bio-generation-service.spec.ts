@@ -248,7 +248,7 @@ describe('persistGeneratedBio', () => {
     expect(content.longBio).not.toContain('<script>');
     expect(content.longBio).not.toContain('javascript:');
     expect(content.altBio).toContain('<strong>promo</strong>');
-    expect(content.genres).toBe('art rock');
+    expect(content.genres).toBe('art-rock');
     expect(content.model).toBe('gemini-2.5-pro');
     expect(content.images[0].url).toBe(
       'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg'
@@ -473,6 +473,20 @@ describe('persistGeneratedBio', () => {
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.genres).toBeNull();
+  });
+
+  it('normalises the generated genres into the stored lowercase-dashed form', async () => {
+    await persistGeneratedBio(artistId, withData({ genres: 'Indie Rock, Post Punk' }), []);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.genres).toBe('indie-rock,post-punk');
+  });
+
+  it('drops genres the model repeated in a different case', async () => {
+    await persistGeneratedBio(artistId, withData({ genres: 'Punk, punk' }), []);
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.genres).toBe('punk');
   });
 
   it('falls back to the original image dimensions and null title when re-host omits them', async () => {

@@ -26,6 +26,7 @@ import {
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
 import { validateBioLinks } from '@/lib/utils/validate-bio-links';
+import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import {
   bioProgressSchema,
   type BioGenerationData,
@@ -434,7 +435,11 @@ export const persistGeneratedBio = async (
   data: BioGenerationData,
   releases: ReleaseCoverSource[]
 ): Promise<GeneratedBioContent> => {
-  const genres = data.genres ? sanitizeBioText(data.genres) || null : null;
+  // Sanitize first (the value is model output), then normalise every term into
+  // the one storage form. Without the normalise step a blank-fill generation
+  // would reintroduce raw `"indie rock"` alongside curated `indie-rock` pills
+  // and the two would count as different genres (ADR-0009).
+  const genres = data.genres ? normalizeVocabularyList(sanitizeBioText(data.genres)) : null;
 
   // Re-host each discovered image into S3 via a cheap thumbnail so it is
   // CDN-served. Full variant re-hosting moves to save-time in PR 2.

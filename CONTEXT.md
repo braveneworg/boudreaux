@@ -81,6 +81,23 @@ suggested images. See
 _Avoid_: primary images, hero image, featured images (featured is a release
 credit).
 
+**genre** — one term describing the music an Artist makes, stored on
+`Artist.genres` as a comma-joined list in one normalised form: lowercase and
+dash-separated, with `&` and `+` spelled out (`R&B` stores as `r-and-b`).
+Human-owned: a bio generation job may **suggest** genres only into a blank
+field and never displaces a curated one. Rendered title-cased at read time,
+never stored that way. The first three appear on artist cards; the rest show
+only on the artist's own page. See
+[ADR-0009](docs/adr/0009-genres-are-human-owned-and-survive-regeneration.md).
+_Avoid_: style, category, `Genre` (the collection nothing reads — the column
+is the source of truth).
+
+**tag** — a free-form term on `Artist.tags`, normalised, owned, and rendered
+exactly like a **genre**, but never shown on the public pages. Tags are an
+admin's own filing vocabulary. See
+[ADR-0009](docs/adr/0009-genres-are-human-owned-and-survive-regeneration.md).
+_Avoid_: keyword, label (a Label is a signed-artist entity).
+
 **Release** — a published body of work by an Artist, with tracks and
 **digital formats** available for download. Its first credited Artist is its
 **album artist**.

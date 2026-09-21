@@ -722,6 +722,15 @@ describe('runBioGeneration', () => {
     expect(result.genres).toBe('rock');
   });
 
+  it('keeps existing genres when the model returns its own', async () => {
+    const result = await runBioGeneration(
+      { artistId: 'a1', displayName: 'Radiohead', existingGenres: 'post-punk' },
+      makeDeps()
+    );
+
+    expect(result.genres).toBe('post-punk');
+  });
+
   it('runs the quality pass on generated prose and returns the revised bios', async () => {
     const revised = {
       shortBio: 'Revised short.',
