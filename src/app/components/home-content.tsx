@@ -6,7 +6,7 @@
 import { useActiveFeaturedArtistsQuery } from '@/hooks/queries/use-active-featured-artists-query';
 import { useBannersQuery } from '@/hooks/queries/use-banners-query';
 
-import { ArtistSearchInput } from './artist-search-input';
+import { ArtistNavSearchCombobox } from './artist-nav-search-combobox';
 import { BannerCarousel } from './banner-carousel';
 import { BannerStrip } from './banner-strip';
 // Static import on purpose: the server HTML must contain the selected
@@ -58,7 +58,7 @@ export const HomeContent = () => {
         <ZinePanel chat accent="yellow">
           {/* Desktop: clear air beneath the search box before the split. */}
           <div className="lg:mb-8">
-            <ArtistSearchInput />
+            <ArtistNavSearchCombobox />
           </div>
           {/* grid-rows [auto,1fr] keeps the wordmark row content-sized so the
               tall row-spanning player can't inflate the gap beneath it. */}

@@ -53,7 +53,7 @@ non-deleted release. A member credit alone does not list an artist.**
   release summary. Contact fields (`phone`, `email`, address) are never
   selected; the previous index rendered `ArtistScalars` server-side only.
 - `/artists/search` redirects permanently to `/artists`. The home-page
-  typeahead (`ArtistSearchInput`, `/api/artists/search`) is a separate
+  typeahead (`ArtistNavSearchCombobox`, `/api/artists/search`) is a separate
   surface and is unchanged.
 
 ## Alternatives rejected

@@ -58,8 +58,8 @@ vi.mock('./banner-strip', () => ({
   ),
 }));
 
-vi.mock('./artist-search-input', () => ({
-  ArtistSearchInput: () => <div data-testid="artist-search" />,
+vi.mock('./artist-nav-search-combobox', () => ({
+  ArtistNavSearchCombobox: () => <div data-testid="artist-search" />,
 }));
 
 vi.mock('./ui/content-container', () => ({
