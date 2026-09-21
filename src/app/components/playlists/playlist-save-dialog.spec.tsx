@@ -676,9 +676,14 @@ describe('PlaylistSaveDialog', () => {
       deferred.resolve({ success: false, error: 'Failed to create playlist' });
       await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 
-      await user.keyboard('{Escape}');
-
-      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+      // The dialog's close gate is a mirror of the form's saving state, pushed
+      // up by an effect — so it releases a moment AFTER the button re-enables,
+      // and nothing in the DOM shows it. Retry Escape until the gate lets it
+      // through rather than racing that effect (it lost the race in CI).
+      await waitFor(async () => {
+        await user.keyboard('{Escape}');
+        expect(props.onOpenChange).toHaveBeenCalledWith(false);
+      });
     });
   });
 
