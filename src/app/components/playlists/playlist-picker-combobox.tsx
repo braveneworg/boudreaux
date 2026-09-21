@@ -8,6 +8,8 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import { Plus } from 'lucide-react';
 
+import { ZINE_SEARCH_FIELD_CLASS } from '@/app/components/search-combobox-trigger';
+import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/app/components/search-result-row';
 import {
   Command,
   CommandEmpty,
@@ -73,17 +75,32 @@ export const PlaylistPickerCombobox = ({
         onValueChange={setSearch}
         placeholder="Find a playlist…"
         aria-label="Find a playlist"
+        wrapperClassName={ZINE_SEARCH_FIELD_CLASS}
         ref={inputRef}
       />
       <CommandList>
         <CommandEmpty>{isPending ? 'Loading…' : 'No playlists yet.'}</CommandEmpty>
         <CommandGroup>
           {visibleRows.map((row) => (
-            <CommandItem key={row.id} value={row.id} onSelect={() => onPick(row)} className="gap-3">
-              {/* Decorative: the adjacent title text names the row. */}
-              <PlaylistCoverTiles images={row.coverImages} alt="" size="sm" />
-              <span className="min-w-0 flex-1 truncate">{row.title}</span>
-              <Plus aria-hidden="true" className="shrink-0" />
+            <CommandItem
+              key={row.id}
+              value={row.id}
+              onSelect={() => onPick(row)}
+              className={SEARCH_RESULT_ITEM_CLASS}
+            >
+              <SearchResultRow
+                // Decorative: the adjacent title text names the row.
+                thumbnail={
+                  <PlaylistCoverTiles
+                    images={row.coverImages}
+                    alt=""
+                    size="sm"
+                    className="size-10"
+                  />
+                }
+                primary={row.title}
+                trailing={<Plus aria-hidden="true" className="shrink-0" />}
+              />
             </CommandItem>
           ))}
         </CommandGroup>

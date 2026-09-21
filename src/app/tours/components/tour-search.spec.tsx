@@ -7,6 +7,32 @@ import userEvent from '@testing-library/user-event';
 import { TourSearch } from './tour-search';
 
 describe('TourSearch', () => {
+  it("hides the browser's own clear button, so only the app's shows", () => {
+    render(<TourSearch value="" onChange={() => {}} />);
+
+    expect(screen.getByLabelText('Search tours by artist name')).toHaveClass(
+      '[&::-webkit-search-cancel-button]:appearance-none'
+    );
+  });
+
+  it('wears the same ink offset and full-ink text as the search comboboxes', () => {
+    render(<TourSearch value="" onChange={() => {}} />);
+
+    expect(screen.getByLabelText('Search tours by artist name')).toHaveClass(
+      'shadow-zine-ink',
+      'text-zinc-950',
+      'placeholder:text-zinc-950'
+    );
+  });
+
+  it('draws the search icon in bold black ink', () => {
+    const { container } = render(<TourSearch value="" onChange={() => {}} />);
+
+    const icon = container.querySelector('svg');
+    expect(icon).toHaveClass('text-black');
+    expect(icon).toHaveAttribute('stroke-width', '2.5');
+  });
+
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });

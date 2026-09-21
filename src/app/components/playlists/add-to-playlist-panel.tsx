@@ -38,7 +38,10 @@ export const AddToPlaylistPanel = ({
   const flow = useAddToPlaylistFlow({ item, onAdded });
 
   return (
-    <div className="flex w-full flex-col gap-2">
+    // This panel renders inside a portaled popover, outside the page's
+    // ZinePanel, so it names the playlists accent itself — otherwise the
+    // picker's focus ring falls back to the site-default pink.
+    <div className="zine-accent-kraft flex w-full flex-col gap-2">
       <p className="px-2 text-sm font-semibold">Add to a playlist</p>
       {/* focusOnMount: this panel is lazy-loaded into an already-open popover,
           so Radix FocusScope's mount-time autofocus already ran (against the

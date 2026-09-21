@@ -166,6 +166,17 @@ const openPickerFor = async (user: UserEvent, row: HTMLElement): Promise<void> =
   user.click(within(row).getByRole('button', { name: 'Add to another playlist' }));
 
 describe('PlaylistCreatorSearch', () => {
+  it('boxes the search field in the punk-zine search box', () => {
+    renderSearch();
+
+    expect(document.querySelector('[data-slot="command-input-wrapper"]')).toHaveClass(
+      'border-2',
+      'border-black',
+      'shadow-zine-ink',
+      'focus-within:ring-(--card-accent)'
+    );
+  });
+
   describe('empty states', () => {
     it('shows the hint line while the query is under two characters', () => {
       renderSearch();

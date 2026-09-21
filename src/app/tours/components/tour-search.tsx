@@ -64,14 +64,23 @@ export const TourSearch = ({
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-950" />
+        {/* Same bold magnifier, ink offset and full-ink text as the search
+            comboboxes; the 2px border and accent focus ring come from the
+            site-wide form-control rule in globals.css. */}
+        <Search
+          aria-hidden
+          strokeWidth={2.5}
+          className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-black"
+        />
         <Input
           type="search"
           value={localValue}
           onChange={handleInputChange}
           placeholder={placeholder}
           disabled={disabled}
-          className="pr-9 pl-9"
+          // `type="search"` makes WebKit/Blink draw their own clear "×"; it is
+          // hidden so it doesn't sit beside the app's clear button.
+          className="shadow-zine-ink h-10 pr-9 pl-9 text-sm text-zinc-950 placeholder:text-zinc-950 [&::-webkit-search-cancel-button]:appearance-none"
           aria-label="Search tours by artist name"
         />
         {localValue && (
