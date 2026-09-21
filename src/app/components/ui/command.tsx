@@ -74,8 +74,10 @@ const CommandInput = ({
     <CommandPrimitive.Input
       ref={ref}
       data-slot="command-input"
+      // 16px below `md`: iOS Safari zooms the whole page when a focused
+      // field's text is smaller. Same convention as the shared `Input`.
       className={cn(
-        'flex h-10 w-full border-0 bg-transparent! py-3 text-sm outline-hidden placeholder:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50',
+        'flex h-10 w-full border-0 bg-transparent! py-3 text-base outline-hidden placeholder:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
         className
       )}
       {...props}

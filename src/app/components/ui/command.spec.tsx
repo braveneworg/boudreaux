@@ -58,6 +58,18 @@ describe('Command', () => {
   });
 
   describe('CommandInput component', () => {
+    it('keeps its text at 16px on small screens, so iOS Safari does not zoom the page on focus', () => {
+      render(
+        <Command>
+          <CommandInput placeholder="Type a command..." />
+        </Command>
+      );
+
+      const input = screen.getByPlaceholderText('Type a command...');
+      expect(input).toHaveClass('text-base', 'md:text-sm');
+      expect(input).not.toHaveClass('text-sm');
+    });
+
     it('renders input with search icon', () => {
       render(
         <Command>
