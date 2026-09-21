@@ -13,11 +13,11 @@ import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { ArtistBioSection } from '@/app/components/forms/sections/artist-bio-section';
+import { ArtistDatesSection } from '@/app/components/forms/sections/artist-dates-section';
+import { ArtistDetailsSection } from '@/app/components/forms/sections/artist-details-section';
 import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-footer';
 import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
 import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
-import { ArtistMusicAndDatesSection } from '@/app/components/forms/sections/artist-music-dates-section';
-import { ArtistNameSection } from '@/app/components/forms/sections/artist-name-section';
 import { uploadBioImage } from '@/app/components/forms/utils/upload-bio-image';
 import { Form } from '@/app/components/ui/form';
 import type {
@@ -505,7 +505,7 @@ export const ArtistForm = ({
             <div className="space-y-6">
               <Separator />
 
-              <ArtistNameSection control={control} isNameRequired={isNameRequired} />
+              <ArtistDetailsSection control={control} isNameRequired={isNameRequired} />
 
               <Separator />
 
@@ -520,7 +520,7 @@ export const ArtistForm = ({
 
               <Separator />
 
-              <ArtistMusicAndDatesSection control={control} onSelectDate={handleSelectDate} />
+              <ArtistDatesSection control={control} onSelectDate={handleSelectDate} />
             </div>
 
             <ArtistFormFooter

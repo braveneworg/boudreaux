@@ -59,6 +59,7 @@ import { splitFullName } from '@/lib/utils/split-full-name';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
+import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
 import type { ServiceResponse } from './service.types';
@@ -450,6 +451,8 @@ export class ArtistService {
       // create: a new artist has no generated bio rows, and a manually pasted
       // external image finalizes on the first update.
       const artist = await ArtistRepository.create(sanitizeBioWriteFields(data));
+      // New genres/tags change the suggestion counts this process serves.
+      ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -526,6 +529,8 @@ export class ArtistService {
       const sanitized = sanitizeBioWriteFields(data);
       const finalized = await finalizeBioImages(id, sanitized);
       const artist = await ArtistRepository.update(id, finalized);
+      // Edited genres/tags change the suggestion counts this process serves.
+      ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {

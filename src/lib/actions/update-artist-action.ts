@@ -46,6 +46,24 @@ const toOptionalDate = (value: string | undefined): Date | undefined =>
 const toOptionalString = (value: string | null | undefined): string | undefined =>
   value || undefined;
 
+/**
+ * Like {@link toOptionalString}, but a SUBMITTED blank clears the column
+ * instead of vanishing. `toOptionalString` turns `''` into `undefined` and
+ * Prisma omits `undefined`, so a field emptied in the form silently kept its
+ * old value — which is why clearing genres, the documented escape hatch from
+ * ADR-0009's "regeneration never refreshes a non-empty field", did nothing.
+ *
+ * An ABSENT field still yields `undefined`: only a value that was actually
+ * submitted and is blank means "clear this".
+ *
+ * Every other optional column has the same defect; fixing them all is issue
+ * #759, because each needs its own check that a blank is really meant to clear.
+ */
+const toClearableString = (value: string | null | undefined): string | null | undefined => {
+  if (value === undefined) return undefined;
+  return value?.trim() ? value : null;
+};
+
 const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({
   firstName: data.firstName || '',
   surname: data.surname || '',
@@ -58,8 +76,8 @@ const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => (
   bio: toOptionalString(data.bio),
   shortBio: toOptionalString(data.shortBio),
   altBio: toOptionalString(data.altBio),
-  genres: toOptionalString(data.genres),
-  tags: toOptionalString(data.tags),
+  genres: toClearableString(data.genres),
+  tags: toClearableString(data.tags),
   bornOn: toOptionalDate(data.bornOn),
   diedOn: toOptionalDate(data.diedOn),
   formedOn: toOptionalDate(data.formedOn),

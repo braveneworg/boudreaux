@@ -131,6 +131,9 @@ export const queryKeys = {
         params.search ?? '',
         String(params.take ?? ''),
       ] as const,
+    /** Genre/tag suggestions for the admin form's pill editors (`useArtistVocabularyQuery`). */
+    vocabulary: (field: 'genres' | 'tags', query: string) =>
+      [...queryKeys.artists.all, 'vocabulary', field, query.trim().toLowerCase()] as const,
     nameLookup: (names: string[]) =>
       [
         ...queryKeys.artists.all,

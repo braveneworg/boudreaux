@@ -410,3 +410,19 @@ export interface ArtistListFilters {
   skip?: number;
   take?: number;
 }
+
+/**
+ * Artist columns that hold a comma-joined, normalised vocabulary. The
+ * vocabulary endpoint takes one of these as its `field` param; `instruments`
+ * is the same shape and joins the list whenever a UI wants it.
+ */
+export const ARTIST_VOCABULARY_FIELDS = ['genres', 'tags'] as const;
+
+/** One of the vocabulary-bearing artist columns. */
+export type ArtistVocabularyField = (typeof ARTIST_VOCABULARY_FIELDS)[number];
+
+/** One suggestion: a normalised term and how many artists carry it. */
+export interface ArtistVocabularyEntry {
+  value: string;
+  count: number;
+}

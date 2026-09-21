@@ -14,6 +14,7 @@ import type {
   ArtistNameRecord,
   ArtistScalars,
   ArtistSearchMatch,
+  ArtistVocabularyField,
   ArtistWithReleaseGraph,
   CreateArtistData,
   UpdateArtistData,
@@ -342,6 +343,37 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
 /** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
 const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
 
+/** A row of the vocabulary source read — only ever the one selected column. */
+type VocabularyRow = { genres?: string | null; tags?: string | null };
+
+/**
+ * Per-field Prisma `select` for the vocabulary source read. An exhaustive
+ * switch rather than a keyed lookup: the column name never reaches Prisma as
+ * a string, and adding a field to `ArtistVocabularyField` makes this function
+ * fail to compile instead of silently falling through to another column.
+ */
+const vocabularySelect = (field: ArtistVocabularyField): Prisma.ArtistSelect => {
+  switch (field) {
+    case 'genres':
+      return { genres: true };
+    case 'tags':
+      return { tags: true };
+  }
+};
+
+/** Reads the selected column back off a row, closed over the same fields. */
+const readVocabularyColumn = (
+  field: ArtistVocabularyField,
+  row: VocabularyRow
+): string | null | undefined => {
+  switch (field) {
+    case 'genres':
+      return row.genres;
+    case 'tags':
+      return row.tags;
+  }
+};
+
 /** A release that the public may see: published and not soft-deleted. */
 const listedReleaseWhere = {
   publishedAt: { not: null },
@@ -442,6 +474,30 @@ const buildGeneratedLinks = (
  * so callers see vendor-neutral `DataError`s and hand-written domain types.
  */
 export class ArtistRepository {
+  /**
+   * Every non-empty value of one vocabulary column across all non-deleted
+   * artists, raw and un-split — the source the vocabulary service derives its
+   * usage-ranked suggestions from.
+   *
+   * Published and unpublished artists both count: the suggestions serve the
+   * admin form, where an unpublished artist's genres are just as real.
+   *
+   * The soft-delete filter is the unset-safe `notDeletedOr`, never a bare
+   * `deletedOn: null` — rows written before the column existed have no
+   * `deletedOn` at all and a bare null misses them (the Prisma/Mongo null
+   * filter quirk every other query in this file guards against).
+   */
+  static async listVocabularySource(field: ArtistVocabularyField): Promise<string[]> {
+    const rows = await runQuery(() =>
+      prisma.artist.findMany({
+        where: { OR: [...notDeletedOr] },
+        select: vocabularySelect(field),
+      })
+    );
+
+    return rows.map((row) => readVocabularyColumn(field, row) ?? '').filter(Boolean);
+  }
+
   /** Create a new artist, returning the full admin payload. */
   static async create(data: CreateArtistData): Promise<Artist> {
     return runQuery(() =>

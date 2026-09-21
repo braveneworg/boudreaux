@@ -130,6 +130,19 @@ export const artistNameLookupLimiter = rateLimit({
 });
 export const ARTIST_NAME_LOOKUP_LIMIT = 20;
 
+/**
+ * Genre/tag vocabulary search (admin artist form) — 30 requests per minute.
+ * Its own tier rather than a share of `producerSearchLimiter`: tiers are
+ * per-feature so one noisy combobox cannot lock an admin out of another. The
+ * slightly higher cap reflects a dropdown that also fires on open, before a
+ * single keystroke.
+ */
+export const artistVocabularyLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const ARTIST_VOCABULARY_LIMIT = 30;
+
 /** Producer name search (admin video form) — 20 requests per minute. */
 export const producerSearchLimiter = rateLimit({
   interval: 60 * 1000,

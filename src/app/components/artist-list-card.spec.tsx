@@ -138,10 +138,22 @@ describe('ArtistListCard', () => {
     render(<ArtistListCard artist={{ ...baseArtist, genres: 'hip-hop, soul, jazz, funk' }} />);
 
     expect(screen.getByText('A short teaser bio.')).toBeInTheDocument();
-    expect(screen.getByText('hip-hop')).toBeInTheDocument();
-    expect(screen.getByText('soul')).toBeInTheDocument();
-    expect(screen.getByText('jazz')).toBeInTheDocument();
-    expect(screen.queryByText('funk')).not.toBeInTheDocument();
+    expect(screen.getByText('Hip-Hop')).toBeInTheDocument();
+    expect(screen.getByText('Soul')).toBeInTheDocument();
+    expect(screen.getByText('Jazz')).toBeInTheDocument();
+    expect(screen.queryByText('Funk')).not.toBeInTheDocument();
+  });
+
+  it('renders a stored genre title-cased, not as the dashed storage form', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, genres: 'indie-rock' }} />);
+
+    expect(screen.getByText('Indie Rock')).toBeInTheDocument();
+  });
+
+  it('applies the display override to a stored genre', () => {
+    render(<ArtistListCard artist={{ ...baseArtist, genres: 'r-and-b' }} />);
+
+    expect(screen.getByText('R&B')).toBeInTheDocument();
   });
 
   it('renders the credits line as just the newest release and its year', () => {

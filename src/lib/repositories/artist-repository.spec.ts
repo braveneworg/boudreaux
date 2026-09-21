@@ -1377,6 +1377,76 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('listVocabularySource', () => {
+    it('filters soft-deleted artists with the unset-safe OR, not a bare null', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listVocabularySource('genres');
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where?.OR).toEqual([{ deletedOn: null }, { deletedOn: { isSet: false } }]);
+    });
+
+    it('does not filter on deletedOn outside the OR clause', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listVocabularySource('genres');
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).not.toHaveProperty('deletedOn');
+    });
+
+    it('selects only the requested column', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listVocabularySource('genres');
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select).toEqual({ genres: true });
+    });
+
+    it('selects the tags column when asked for tags', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listVocabularySource('tags');
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select).toEqual({ tags: true });
+    });
+
+    it('returns the raw un-split column values', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        { genres: 'indie-rock,post-punk' },
+        { genres: 'noise' },
+      ] as never);
+
+      const rows = await ArtistRepository.listVocabularySource('genres');
+
+      expect(rows).toEqual(['indie-rock,post-punk', 'noise']);
+    });
+
+    it('drops rows whose column is empty', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        { genres: 'noise' },
+        { genres: null },
+        { genres: '' },
+      ] as never);
+
+      const rows = await ArtistRepository.listVocabularySource('genres');
+
+      expect(rows).toEqual(['noise']);
+    });
+
+    it('includes unpublished artists, so admin vocabulary is complete', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listVocabularySource('genres');
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.where).not.toHaveProperty('publishedOn');
+    });
+  });
+
   describe('updateEnrichedField', () => {
     it('writes the single typed field plus the auditing updatedBy', async () => {
       vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
