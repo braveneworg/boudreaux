@@ -13,6 +13,7 @@ import { toBioTeaser } from '@/lib/utils/bio-teaser';
 import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
+import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
 import { ArtistFullBio } from './artist-full-bio';
 import { ArtistPlayer } from './artist-player';
@@ -94,7 +95,7 @@ const ArtistDetailHeader = ({
               <li key={genre}>
                 <Badge variant="secondary" className="gap-1">
                   <Music2 className="size-3" aria-hidden />
-                  {genre}
+                  {formatVocabularyTerm(genre)}
                 </Badge>
               </li>
             ))}

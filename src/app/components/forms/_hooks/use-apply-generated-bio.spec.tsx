@@ -138,6 +138,36 @@ describe('useApplyGeneratedBio', () => {
     expect(getForm().getValues('genres')).toBe('old genres');
   });
 
+  it('does not overwrite genres an admin is already editing', async () => {
+    const { result, getForm } = renderApply();
+
+    await act(async () => {
+      getForm().setValue('genres', 'my-own-pick', { shouldDirty: true });
+    });
+    await act(async () => result.current.applyGeneratedBio(generated));
+
+    expect(getForm().getValues('genres')).toBe('my-own-pick');
+  });
+
+  it('adopts generated genres while the field is untouched', async () => {
+    const { result, getForm } = renderApply();
+
+    await act(async () => result.current.applyGeneratedBio(generated));
+
+    expect(getForm().getValues('genres')).toBe('hip-hop, folk');
+  });
+
+  it('still adopts the bios when only genres are dirty', async () => {
+    const { result, getForm } = renderApply();
+
+    await act(async () => {
+      getForm().setValue('genres', 'my-own-pick', { shouldDirty: true });
+    });
+    await act(async () => result.current.applyGeneratedBio(generated));
+
+    expect(getForm().getValues('shortBio')).toBe(generated.shortBio);
+  });
+
   it('marks the cached artist detail stale so a revisit refetches the saved bios', async () => {
     const { result, client } = renderApply();
 

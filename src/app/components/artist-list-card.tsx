@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/app/components/ui/card';
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
+import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
 import { BioHtml } from './bio-html';
 
@@ -209,7 +210,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
                   <li key={genre}>
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <Music2 className="size-3" aria-hidden />
-                      {genre}
+                      {formatVocabularyTerm(genre)}
                     </Badge>
                   </li>
                 ))}

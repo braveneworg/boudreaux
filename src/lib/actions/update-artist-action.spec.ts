@@ -287,6 +287,78 @@ describe('updateArtistAction', () => {
       expect(result.success).toBe(true);
     });
 
+    it('writes null for genres when the field is submitted empty', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', genres: '' },
+        },
+      } as never);
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].genres).toBeNull();
+    });
+
+    it('writes null for tags when the field is submitted empty', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', tags: '  ' },
+        },
+      } as never);
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].tags).toBeNull();
+    });
+
+    it('keeps a non-empty genres value as written', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', genres: 'indie-rock' },
+        },
+      } as never);
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].genres).toBe('indie-rock');
+    });
+
+    it('leaves an empty non-vocabulary field as undefined, not null', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', displayName: '' },
+        },
+      } as never);
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-123' },
+      } as never);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].displayName).toBeUndefined();
+    });
+
     it('should handle artist update failure from service', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },

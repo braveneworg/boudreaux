@@ -65,8 +65,30 @@ describe('ArtistDetailContent', () => {
     render(<ArtistDetailContent slug="test-artist" />);
 
     expect(screen.getByText('Short teaser.')).toBeInTheDocument();
-    expect(screen.getByText('jazz')).toBeInTheDocument();
+    expect(screen.getByText('Jazz')).toBeInTheDocument();
     expect(screen.getByTestId('artist-player')).toBeInTheDocument();
+  });
+
+  it('renders a stored genre title-cased, not as the dashed storage form', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, genres: 'lo-fi,post-punk' },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByText('Post Punk')).toBeInTheDocument();
+  });
+
+  it('applies the display override to a stored genre', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: { ...artist, genres: 'lo-fi,post-punk' },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getByText('Lo-Fi')).toBeInTheDocument();
   });
 
   it('carries the full biography on the page instead of linking away to it', () => {

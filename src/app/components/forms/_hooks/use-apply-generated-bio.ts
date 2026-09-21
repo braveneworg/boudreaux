@@ -50,7 +50,7 @@ export const useApplyGeneratedBio = ({
   artistId,
 }: UseApplyGeneratedBioOptions): ((content: GeneratedBioContent) => void) => {
   const queryClient = useQueryClient();
-  const { setValue, resetField } = form;
+  const { setValue, resetField, getFieldState } = form;
 
   return useCallback(
     (content: GeneratedBioContent): void => {
@@ -62,7 +62,10 @@ export const useApplyGeneratedBio = ({
       adoptPersisted('shortBio', content.shortBio);
       adoptPersisted('bio', content.longBio);
       adoptPersisted('altBio', content.altBio);
-      if (content.genres) {
+      // Genres are human-owned (ADR-0009), and a generation can complete while
+      // an admin is mid-edit. Adopting then would replace their unsaved pills
+      // AND `resetField` would mark the form clean, so the loss is silent.
+      if (content.genres && !getFieldState('genres').isDirty) {
         adoptPersisted('genres', content.genres);
       }
 
@@ -73,6 +76,6 @@ export const useApplyGeneratedBio = ({
         });
       }
     },
-    [artistId, queryClient, resetField, setValue]
+    [artistId, getFieldState, queryClient, resetField, setValue]
   );
 };
