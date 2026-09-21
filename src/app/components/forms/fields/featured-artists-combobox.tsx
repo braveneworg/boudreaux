@@ -5,9 +5,8 @@
 
 import React, { useId, useState } from 'react';
 
-import { ChevronsUpDown, X } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 
-import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import {
   Command,
@@ -18,6 +17,7 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { RemovablePill } from '@/app/components/ui/removable-pill';
 import { useDebounce } from '@/hooks/use-debounce';
 
 import { buildArtistListParams, getArtistDisplayName } from './artist-combobox-helpers';
@@ -112,18 +112,7 @@ const PillsList = ({ names, disabled, onRemove }: PillsListProps): React.ReactEl
   <div className="flex flex-wrap gap-2" role="list" aria-label="Selected featured artists">
     {names.map((name) => (
       <span key={name} role="listitem" className="flex items-center gap-1">
-        <Badge variant="secondary" className="gap-1">
-          {name}
-          <button
-            type="button"
-            className="hover:bg-muted-foreground/20 ml-1"
-            disabled={disabled}
-            aria-label={`Remove ${name}`}
-            onClick={() => onRemove(name)}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
+        <RemovablePill label={name} disabled={disabled} onRemove={() => onRemove(name)} />
       </span>
     ))}
   </div>

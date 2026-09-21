@@ -7,9 +7,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Link from 'next/link';
 
-import { Check, ChevronsUpDown, Plus, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 
-import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import {
   Command,
@@ -21,6 +20,7 @@ import {
 } from '@/app/components/ui/command';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/app/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { RemovablePill } from '@/app/components/ui/removable-pill';
 import { useDebounce } from '@/hooks/use-debounce';
 
 import { useFieldValidator } from './use-field-validator';
@@ -166,18 +166,12 @@ const SelectedArtistBadges = ({
 }: SelectedArtistBadgesProps) => (
   <div className="flex flex-wrap gap-2">
     {selectedArtists.map((artist) => (
-      <Badge key={artist.id} variant="secondary" className="gap-1">
-        {getArtistDisplayName(artist)}
-        <button
-          type="button"
-          onClick={() => onRemove(artist.id)}
-          className="hover:bg-muted-foreground/20 ml-1"
-          disabled={disabled}
-          aria-label={`Remove ${getArtistDisplayName(artist)}`}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </Badge>
+      <RemovablePill
+        key={artist.id}
+        label={getArtistDisplayName(artist)}
+        disabled={disabled}
+        onRemove={() => onRemove(artist.id)}
+      />
     ))}
   </div>
 );
