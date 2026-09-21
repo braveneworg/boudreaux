@@ -82,7 +82,7 @@ export default function HomeLoading() {
         </div>
         <ContentContainer>
           <ZinePanel accent="yellow">
-            {/* Search input skeleton — matches ArtistSearchInput's h-9 row. */}
+            {/* Search skeleton — holds the ArtistNavSearchCombobox trigger's row. */}
             <div className="lg:mb-8">
               <div className="bg-muted h-9 w-full animate-pulse" />
             </div>

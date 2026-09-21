@@ -8,7 +8,7 @@ import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
-interface ArtistNavSearchResult {
+export interface ArtistNavSearchResult {
   artistSlug: string;
   artistName: string;
   thumbnailSrc: string | null;

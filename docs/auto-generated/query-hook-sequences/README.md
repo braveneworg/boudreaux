@@ -127,7 +127,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 ### 12. useArtistNavSearchQuery
 
-**Validated.** Drives the home-page artist typeahead (`ArtistSearchInput`) by hitting `/api/artists/search`, returning the lightweight combobox shape (`{ results: [{ artistSlug, artistName, thumbnailSrc, releases }] }`) from `ArtistService.searchPublishedArtists({ take: 20 })`. Validates via inline `artistNavSearchResponseSchema`; gates on `query.length >= 3` (mirroring the server's `< 3 → []` short-circuit); consumers debounce ~250ms. PDF page 12.
+**Validated.** Drives the home-page artist typeahead (`ArtistNavSearchCombobox`) by hitting `/api/artists/search`, returning the lightweight combobox shape (`{ results: [{ artistSlug, artistName, thumbnailSrc, releases }] }`) from `ArtistService.searchPublishedArtists({ take: 20 })`. Validates via inline `artistNavSearchResponseSchema`; gates on `query.length >= 3` (mirroring the server's `< 3 → []` short-circuit); consumers debounce ~250ms. PDF page 12.
 
 ### 13. useInfiniteFeaturedArtistsQuery
 
