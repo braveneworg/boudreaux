@@ -12,6 +12,7 @@ import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
+import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
 // Type honesty (#661): getArtistById surfaces ArtistRepository.findById, which
@@ -102,6 +103,10 @@ vi.mock('@/lib/utils/ip-guard', () => ({
   isPubliclyRoutableUrl: vi.fn(),
 }));
 
+vi.mock('./artist-vocabulary-service', () => ({
+  ArtistVocabularyService: { invalidate: vi.fn() },
+}));
+
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: vi.fn(),
@@ -185,6 +190,22 @@ describe('ArtistService', () => {
       displayName: 'John Doe',
       slug: 'john-doe',
     };
+
+    it('invalidates the vocabulary cache after a successful create', async () => {
+      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
+
+      await ArtistService.createArtist(createInput);
+
+      expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
+    });
+
+    it('does not invalidate the vocabulary cache when the create fails', async () => {
+      vi.mocked(ArtistRepository.create).mockRejectedValueOnce(Error('boom'));
+
+      await ArtistService.createArtist(createInput);
+
+      expect(ArtistVocabularyService.invalidate).not.toHaveBeenCalled();
+    });
 
     it('should create an artist successfully', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
@@ -404,6 +425,22 @@ describe('ArtistService', () => {
     const updateData: UpdateArtistData = {
       displayName: 'John Updated Doe',
     };
+
+    it('invalidates the vocabulary cache after a successful update', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', updateData);
+
+      expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
+    });
+
+    it('does not invalidate the vocabulary cache when the update fails', async () => {
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(Error('boom'));
+
+      await ArtistService.updateArtist('artist-123', updateData);
+
+      expect(ArtistVocabularyService.invalidate).not.toHaveBeenCalled();
+    });
 
     it('should update an artist successfully', async () => {
       const updatedArtist = { ...mockArtist, displayName: 'John Updated Doe' };
