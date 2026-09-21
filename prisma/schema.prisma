@@ -287,7 +287,7 @@ model Artist {
   bioJobToken           String? // Opaque per-job token for the async callback; set at dispatch, cleared on completion (guards stale/overtaken writes)
   bioProgress           Json? // Latest async-generation progress checkpoint { stage, detail?, counts?, at }; cleared when a new run is marked pending
   slug                  String                 @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
-  genres                String? // If stored with commas, split into array on retrieval; genres are created in Genre collection, but denormalized here for easy querying
+  genres                String? // Comma-joined, split into an array on retrieval. Source of truth (the Genre collection has no reader); normalised lowercase-dasherized and human-owned — see ADR-0009
   bornOn                DateTime? // Always feature artist on their birthday if known
   diedOn                DateTime?
   formedOn              DateTime? // Date the band was formed; only used for bands/groups

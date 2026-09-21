@@ -879,7 +879,9 @@ export const runBioGeneration = async (
   // at index >= MAX_PRIMARY, leaving the artist with no primary image.
   const rankedImages = applyImageRanking(images, checked.primaryImageIndexes);
 
-  const genres = checked.genres?.trim() || input.existingGenres?.trim() || null;
+  // An artist's genres are human-owned (ADR-0009): a curated value always
+  // wins, and the model only ever fills a field that is already blank.
+  const genres = input.existingGenres?.trim() || checked.genres?.trim() || null;
 
   return {
     shortBio: checked.shortBio,
