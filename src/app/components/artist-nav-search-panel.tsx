@@ -91,6 +91,10 @@ export const ArtistNavSearchPanel = ({
         onValueChange={onQueryChange}
         placeholder={ARTIST_NAV_SEARCH_PLACEHOLDER}
         aria-label="Search artists and releases"
+        // 16px below `md`: iOS Safari zooms the whole page when a focused
+        // field's text is smaller, and this field takes focus the moment the
+        // popover opens. Same convention as the shared `Input`.
+        className="text-base md:text-sm"
       />
       <CommandList>
         {message ? (

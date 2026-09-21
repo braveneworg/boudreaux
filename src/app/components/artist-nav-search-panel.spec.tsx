@@ -51,6 +51,14 @@ const renderPanel = (overrides: Partial<ArtistNavSearchPanelProps> = {}) => {
 };
 
 describe('ArtistNavSearchPanel', () => {
+  it('keeps its field at 16px on small screens, so iOS Safari does not zoom the page on focus', () => {
+    renderPanel();
+
+    const field = screen.getByPlaceholderText('Search artists & releases');
+    expect(field).toHaveClass('text-base', 'md:text-sm');
+    expect(field).not.toHaveClass('text-sm');
+  });
+
   it('focuses its search field on mount, since it lands in an already-open popover', () => {
     renderPanel();
 
