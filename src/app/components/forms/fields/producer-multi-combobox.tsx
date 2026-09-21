@@ -5,7 +5,7 @@
 
 import React, { useId, useState } from 'react';
 
-import { ChevronsUpDown, X } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
@@ -18,6 +18,7 @@ import {
   CommandList,
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { RemovablePill } from '@/app/components/ui/removable-pill';
 import { useDebounce } from '@/hooks/use-debounce';
 
 import { useProducersSearchQuery } from '../_hooks/use-producers-search-query';
@@ -111,18 +112,7 @@ const PillsList = ({ pills, disabled, onRemove }: PillsListProps): React.ReactEl
   <div className="flex flex-wrap gap-2" role="list" aria-label="Selected producers">
     {pills.map((pill) => (
       <span key={pill.id ?? pill.name} role="listitem" className="flex items-center gap-1">
-        <Badge variant="secondary" className="gap-1">
-          {pill.name}
-          <button
-            type="button"
-            className="hover:bg-muted-foreground/20 ml-1"
-            disabled={disabled}
-            aria-label={`Remove ${pill.name}`}
-            onClick={() => onRemove(pill.name)}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
+        <RemovablePill label={pill.name} disabled={disabled} onRemove={() => onRemove(pill.name)} />
         {pill.id === undefined && (
           <Badge variant="outline" className="text-xs">
             new

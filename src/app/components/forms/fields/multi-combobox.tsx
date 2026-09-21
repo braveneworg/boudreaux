@@ -7,7 +7,6 @@ import * as React from 'react';
 
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -17,6 +16,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RemovablePill } from '@/components/ui/removable-pill';
 import { cn } from '@/lib/utils';
 
 interface MultiComboboxOption {
@@ -118,19 +118,13 @@ const SelectedFormatBadges = ({
 }: SelectedFormatBadgesProps) => (
   <div className="flex flex-wrap gap-1.5" role="list" aria-label="Selected formats">
     {selectedOptions.map((option) => (
-      <Badge key={option.value} variant="secondary" className="gap-1 text-xs" role="listitem">
-        {option.label}
-        {!disabled && (
-          <button
-            type="button"
-            className="hover:text-foreground ml-0.5 outline-none"
-            onClick={() => onRemove(option.value)}
-            aria-label={`Remove ${option.label}`}
-          >
-            <X className="size-3" />
-          </button>
-        )}
-      </Badge>
+      <RemovablePill
+        key={option.value}
+        role="listitem"
+        label={option.label}
+        disabled={disabled}
+        onRemove={() => onRemove(option.value)}
+      />
     ))}
   </div>
 );
