@@ -36,7 +36,8 @@ interface FetchAndParseOptions<TFallback> {
  * Forwards the optional `AbortSignal` to `fetch` so the request is cancelled
  * automatically on unmount, invalidation, or a superseding refetch.
  *
- * A non-OK status throws `errorMessage` unless `fallbackByStatus` maps it, in
+ * A non-OK status throws an {@link HttpError} carrying `errorMessage`, the
+ * status, and any `Retry-After` hint, unless `fallbackByStatus` maps it, in
  * which case the mapped value resolves and the body is never read.
  *
  * @typeParam T - The validated response type produced by `schema`.
@@ -48,7 +49,8 @@ interface FetchAndParseOptions<TFallback> {
  *   `fallbackByStatus`.
  * @returns The parsed, schema-validated response body, or the value mapped for
  *   the response status.
- * @throws If the status is not OK and unmapped, or the body fails validation.
+ * @throws {HttpError} If the status is not OK and unmapped.
+ * @throws {ResponseValidationError} If the body fails validation.
  */
 export const fetchAndParse = async <T, TFallback = never>(
   url: string,
@@ -65,11 +67,60 @@ export const fetchAndParse = async <T, TFallback = never>(
     if (fallbackByStatus && Object.hasOwn(fallbackByStatus, response.status)) {
       return fallbackByStatus[response.status] as TFallback;
     }
-    throw new Error(errorMessage);
+    throw new HttpError(errorMessage, response.status, parseRetryAfter(readRetryAfter(response)));
   }
   const body: unknown = await response.json();
   return parseResponse(url, schema, body);
 };
+
+const MS_PER_SECOND = 1000;
+
+/** Reads the `Retry-After` header, tolerating fetch stubs that expose no `headers` at all. */
+const readRetryAfter = ({ headers }: { headers?: Headers }): string | null =>
+  headers?.get('retry-after') ?? null;
+
+/**
+ * Converts a `Retry-After` header into a wait in milliseconds. The header is
+ * either delta-seconds or an HTTP-date (RFC 9110 §10.2.3); a date already in
+ * the past means "now", and anything unparseable is treated as absent.
+ *
+ * @param header - The raw header value, or `null` when the response had none.
+ * @returns Milliseconds to wait, or `null` when there is no usable hint.
+ */
+export const parseRetryAfter = (header: string | null): number | null => {
+  if (header === null) return null;
+  const value = header.trim();
+  if (/^\d+$/.test(value)) return Number(value) * MS_PER_SECOND;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+};
+
+/**
+ * Error thrown by {@link fetchAndParse} for a non-OK response that no
+ * `fallbackByStatus` entry maps. The `message` stays the caller's
+ * `errorMessage` so existing matchers keep working; the status and the
+ * server's `Retry-After` hint let the global TanStack Query retry policy
+ * back off on throttling (429) and server errors without retrying a 4xx the
+ * user cannot fix by waiting.
+ */
+export class HttpError extends Error {
+  /** The HTTP status of the failed response. */
+  readonly status: number;
+  /** The server's `Retry-After` hint in milliseconds, or `null` when absent. */
+  readonly retryAfterMs: number | null;
+
+  /**
+   * @param message - The caller-facing failure message.
+   * @param status - The HTTP status of the failed response.
+   * @param retryAfterMs - The parsed `Retry-After` hint, or `null`.
+   */
+  constructor(message: string, status: number, retryAfterMs: number | null = null) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
 
 /**
  * Error thrown when a response body fails Zod validation. Distinguished from

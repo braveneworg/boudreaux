@@ -9,6 +9,7 @@ import type { JSX } from 'react';
 import { Plus } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
+import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import {
@@ -29,6 +30,14 @@ export interface BioImageManagerProps {
   images: BioStatusImage[];
   /** True while the pool is still loading; renders a placeholder instead of an empty pool. */
   isLoading?: boolean;
+  /**
+   * Why the pool could not be loaded, already phrased for the admin, or
+   * `null`/absent when it loaded. Shown (with Retry) instead of the empty
+   * state so a failed read never passes for an artist with no images.
+   */
+  loadError?: string | null;
+  /** Re-requests the pool after a load failure. */
+  onRetry?: () => void;
   onDelete: (imageId: string) => void;
   onInsert: (image: BioStatusImage) => void;
   onEditAttribution: (imageId: string, attribution: string) => void;
@@ -78,6 +87,8 @@ export const BioImageManager = ({
   artistId,
   images,
   isLoading = false,
+  loadError = null,
+  onRetry,
   onDelete,
   onInsert,
   onEditAttribution,
@@ -124,6 +135,13 @@ export const BioImageManager = ({
           <p role="status" className="text-muted-foreground text-xs">
             Loading images…
           </p>
+        ) : images.length === 0 && loadError ? (
+          <div role="alert" className="space-y-2 text-xs">
+            <p className="text-destructive">Couldn&apos;t load the image pool — {loadError}.</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => onRetry?.()}>
+              Retry
+            </Button>
+          </div>
         ) : images.length === 0 ? (
           <p className="text-muted-foreground text-xs">
             No images yet — upload one above or generate the bio to discover some.

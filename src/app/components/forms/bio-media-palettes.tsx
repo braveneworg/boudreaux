@@ -8,6 +8,7 @@ import type { JSX } from 'react';
 import { toast } from 'sonner';
 
 import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/bio-editor-insert';
+import { HttpError } from '@/lib/utils/fetch-and-parse';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
 import type { BioStatusImage, BioStatusLink } from '@/lib/validation/bio-generation-schema';
 
@@ -30,6 +31,22 @@ interface BioMediaPalettesProps {
 /** Shown when an insert button is pressed while no bio editor holds the cursor. */
 const NO_EDITOR_TARGET_COPY = 'Click into a bio editor first, then insert.';
 
+const HTTP_TOO_MANY_REQUESTS = 429;
+
+/**
+ * Admin-facing reason for a failed status read. A 429 is the reverse proxy
+ * (or the app) throttling a burst of admin navigation, so say that instead
+ * of the generic fetch message; every other failure keeps its own message.
+ * (`null` cannot happen once the query has settled in error, but the hook's
+ * type allows it.)
+ */
+const describeStatusError = (error: Error | null): string => {
+  if (error instanceof HttpError && error.status === HTTP_TOO_MANY_REQUESTS) {
+    return 'the server is rate limiting requests, try again in a moment';
+  }
+  return error?.message ?? 'Unknown error';
+};
+
 /** The persisted media on a status response, empty until content exists. */
 const contentMedia = (
   content: { links: BioStatusLink[]; images: BioStatusImage[] } | null | undefined
@@ -42,10 +59,12 @@ const contentMedia = (
  * The artist form's media rail: the discovered-links palette (only once the
  * artist has links) beside the bio image manager, which always mounts because
  * uploading is its job even when the pool is empty. Both are fed by the
- * persisted rows on the bio-generation status query. Rendered directly above
- * the bio editors so tiles drag straight in; the Plus button on each tile
- * inserts at the focused editor's cursor (touch/keyboard path). While any
- * mutation is pending every control is disabled.
+ * persisted rows on the bio-generation status query — and when that read
+ * fails outright the manager shows the failure with a Retry, never an empty
+ * pool. Rendered directly above the bio editors so tiles drag straight in;
+ * the Plus button on each tile inserts at the focused editor's cursor
+ * (touch/keyboard path). While any mutation is pending every control is
+ * disabled.
  *
  * @param artistId - The artist whose media to manage (edit mode only).
  */
@@ -60,6 +79,10 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
   const registry = useBioEditorRegistry();
 
   const { links, images } = contentMedia(status.data?.content);
+  // `isPending` is false once the query has settled in error with nothing
+  // cached, so this is exactly the "failed, no data" state the manager shows.
+  const loadError =
+    !status.isPending && status.data === undefined ? describeStatusError(status.error) : null;
 
   const isMutating = [
     isDeletingBioLink,
@@ -127,6 +150,8 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
         artistId={artistId}
         images={images}
         isLoading={status.isPending}
+        loadError={loadError}
+        onRetry={() => void status.refetch()}
         onDelete={deleteBioImage}
         onInsert={insertImage}
         onEditAttribution={(id, value) =>

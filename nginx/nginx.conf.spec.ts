@@ -150,6 +150,16 @@ describe('nginx.conf rate-limit zones', () => {
   it('keeps the general /api/ zone defined', () => {
     expect(CONFIG).toMatch(/limit_req_zone \$binary_remote_addr zone=api:/);
   });
+
+  // An admin edit page mounts ~6 /api/ calls; list → edit → list → edit inside
+  // a second, or two quick reloads, plus the client's retry wave, drained the
+  // old burst=20 and 429'd the bio-generation status read (2026-09-21).
+  it('gives the /api/ location burst headroom for an admin page mount', () => {
+    const location = resolveLocation(appLocations, '/api/artists/x/bio-generation');
+    const burst = Number(/limit_req zone=api burst=(\d+)/.exec(location?.body ?? '')?.[1]);
+
+    expect(burst).toBeGreaterThanOrEqual(50);
+  });
 });
 
 describe('nginx.conf OAuth callback routing', () => {

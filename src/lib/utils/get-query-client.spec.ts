@@ -29,6 +29,8 @@ describe('getQueryClient', () => {
 
   it('returns a QueryClient with default cache settings', async () => {
     const { getQueryClient } = await import('@/lib/utils/get-query-client');
+    // Same module registry as the client under test, so the identities match.
+    const { queryRetryDelay, shouldRetryQuery } = await import('@/lib/utils/query-retry');
     const client = getQueryClient();
 
     expect(client).toBeDefined();
@@ -38,7 +40,8 @@ describe('getQueryClient', () => {
           staleTime: 30 * 1000,
           gcTime: 5 * 60 * 1000,
           refetchOnWindowFocus: false,
-          retry: 1,
+          retry: shouldRetryQuery,
+          retryDelay: queryRetryDelay,
         },
       },
     });
@@ -49,6 +52,7 @@ describe('getQueryClient', () => {
     vi.resetModules();
 
     const { getQueryClient } = await import('@/lib/utils/get-query-client');
+    const { queryRetryDelay, shouldRetryQuery } = await import('@/lib/utils/query-retry');
     const client = getQueryClient();
 
     expect((client as unknown as { options: unknown }).options).toEqual({
@@ -57,7 +61,8 @@ describe('getQueryClient', () => {
           staleTime: 0,
           gcTime: 0,
           refetchOnWindowFocus: false,
-          retry: 1,
+          retry: shouldRetryQuery,
+          retryDelay: queryRetryDelay,
         },
       },
     });

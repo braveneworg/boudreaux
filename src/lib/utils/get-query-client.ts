@@ -7,6 +7,8 @@ import { cache } from 'react';
 
 import { QueryClient } from '@tanstack/react-query';
 
+import { queryRetryDelay, shouldRetryQuery } from './query-retry';
+
 const disableCache = process.env.NEXT_PUBLIC_DISABLE_QUERY_CACHE === 'true';
 
 /**
@@ -22,7 +24,9 @@ export const getQueryClient = cache(
           staleTime: disableCache ? 0 : 30 * 1000, // 30 seconds data is considered fresh and won't refresh
           gcTime: disableCache ? 0 : 5 * 60 * 1000, // 5 minutes unused data is garbage collected
           refetchOnWindowFocus: false,
-          retry: 1,
+          // Same retry policy as the browser client (providers.tsx).
+          retry: shouldRetryQuery,
+          retryDelay: queryRetryDelay,
         },
       },
     })

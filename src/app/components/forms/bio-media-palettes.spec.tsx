@@ -6,6 +6,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
+import { HttpError } from '@/lib/utils/fetch-and-parse';
 import type {
   BioGenerationStatusResponse,
   BioStatusImage,
@@ -125,6 +126,16 @@ const mockStatus = (data: BioGenerationStatusResponse | undefined, isPending = f
   });
 };
 
+/** A status query that has settled in error with no data (e.g. a 429 that outlived its retries). */
+const mockStatusError = (error: Error): void => {
+  statusMock.mockReturnValue({
+    data: undefined,
+    isPending: false,
+    error,
+    refetch: refetchMock,
+  });
+};
+
 beforeEach(() => {
   pending.link = false;
   pending.image = false;
@@ -191,6 +202,53 @@ describe('BioMediaPalettes', () => {
     render(<BioMediaPalettes artistId="artist-1" />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading images');
+  });
+
+  it('shows no load failure while the status query is still loading', () => {
+    mockStatus(undefined, true);
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // The status read is the manager's only data source; a throttled read must
+  // surface as a failure, never as an empty pool (nginx 429, 2026-09-21).
+  it('explains a throttled status read as rate limiting', () => {
+    mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load the image pool — the server is rate limiting requests, try again in a moment."
+    );
+  });
+
+  it('shows the error message when the status read failed for another reason', () => {
+    mockStatusError(new HttpError('Failed to fetch bio generation status', 500));
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load the image pool — Failed to fetch bio generation status."
+    );
+  });
+
+  it('hides the empty-pool copy when the status read failed', () => {
+    mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+
+    expect(screen.queryByText(/No images yet/)).not.toBeInTheDocument();
+  });
+
+  it('refetches the status when Retry is pressed on the load failure', async () => {
+    mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
+
+    render(<BioMediaPalettes artistId="artist-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('mounts the manager with an empty pool when the content has no links and no images', () => {
