@@ -66,9 +66,16 @@ describe('DisplayImageStrip', () => {
     );
   });
 
-  it('explains the fallback when nothing is chosen', () => {
+  // Mirrors every tier of `resolveDisplayImages`: chosen → suggested → the
+  // first pool rows. The copy once stopped at "suggested", so an admin with
+  // no suggested rows read "nothing is shown" while the page showed images.
+  it('explains every fallback tier when nothing is chosen', () => {
     renderStrip({ images: [] });
-    expect(screen.getByText(/shows the suggested images/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No display images chosen — the artist page shows the suggested images, or the first pool images when nothing is suggested.'
+      )
+    ).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Display images' })).not.toBeInTheDocument();
   });
 
