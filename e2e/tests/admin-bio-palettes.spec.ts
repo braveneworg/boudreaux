@@ -31,7 +31,78 @@ const gotoArtistEdit = async (adminPage: Page): Promise<void> => {
   });
 };
 
+/** The manager's only data source; nginx's api zone throttles it under rapid admin navigation. */
+const STATUS_ROUTE = '**/api/artists/*/bio-generation';
+
+/** What nginx returns when the api zone's burst is spent (`limit_req_status 429`). */
+const THROTTLED_RESPONSE = {
+  status: 429,
+  headers: { 'retry-after': '1' },
+  contentType: 'text/plain',
+  body: 'Too Many Requests',
+};
+
 test.describe('Admin bio palettes', () => {
+  // nginx's api zone once 429'd the status read during rapid admin navigation
+  // and the manager showed "Image pool (0)" for an artist with 36 images
+  // (2026-09-21). The client now backs off and retries; a transient 429 must
+  // recover without any admin action.
+  //
+  // Two throttled GETs, not one: the dev server's React StrictMode remount
+  // cancels the very first fetch, so a single 429 would be swallowed by the
+  // cancellation and the retry policy would never run locally. Two stays
+  // inside the policy's retry budget on CI's production build as well.
+  test('recovers the image pool after transient 429s on the status read', async ({ adminPage }) => {
+    const THROTTLED_GETS = 2;
+    let throttledGets = 0;
+    await adminPage.route(STATUS_ROUTE, async (route) => {
+      if (route.request().method() === 'GET' && throttledGets < THROTTLED_GETS) {
+        throttledGets += 1;
+        await route.fulfill(THROTTLED_RESPONSE);
+        return;
+      }
+      await route.continue();
+    });
+
+    await gotoArtistEdit(adminPage);
+
+    const manager = adminPage.getByRole('region', { name: 'Bio images' });
+    await expect(manager).toHaveCount(1, { timeout: 15_000 });
+    const pool = manager.getByRole('group', { name: 'Image pool' });
+    await expect(pool.getByText('E2E seeded attribution')).toBeVisible({ timeout: 15_000 });
+    await expect(manager.getByRole('alert')).toHaveCount(0);
+    expect(throttledGets).toBe(THROTTLED_GETS);
+  });
+
+  test('shows a retry alert when the status read keeps failing, and Retry recovers', async ({
+    adminPage,
+  }) => {
+    await adminPage.route(STATUS_ROUTE, async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill(THROTTLED_RESPONSE);
+        return;
+      }
+      await route.continue();
+    });
+
+    await gotoArtistEdit(adminPage);
+
+    const manager = adminPage.getByRole('region', { name: 'Bio images' });
+    await expect(manager).toHaveCount(1, { timeout: 15_000 });
+    // Two backed-off retries (Retry-After: 1 s each) precede the settled failure.
+    const alert = manager.getByRole('alert');
+    await expect(alert).toBeVisible({ timeout: 15_000 });
+    await expect(alert).toContainText('rate limiting');
+    await expect(manager.getByText('No images yet')).toHaveCount(0);
+
+    await adminPage.unroute(STATUS_ROUTE);
+    await alert.getByRole('button', { name: 'Retry' }).click();
+
+    const pool = manager.getByRole('group', { name: 'Image pool' });
+    await expect(pool.getByText('E2E seeded attribution')).toBeVisible({ timeout: 15_000 });
+    await expect(manager.getByRole('alert')).toHaveCount(0);
+  });
+
   test('bio palettes render the persisted rows', async ({ adminPage }) => {
     await gotoArtistEdit(adminPage);
 

@@ -249,6 +249,39 @@ describe('BioImageManager', () => {
     expect(screen.queryByText(/No images yet/)).not.toBeInTheDocument();
   });
 
+  // A failed status read must never look like an empty pool: an nginx 429
+  // once showed "Image pool (0)" for an artist with 36 images (2026-09-21).
+  it('shows the load failure instead of the empty state', () => {
+    renderManager({
+      images: [],
+      loadError: 'the server is rate limiting requests, try again in a moment',
+      onRetry: vi.fn(),
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load the image pool — the server is rate limiting requests, try again in a moment."
+    );
+    expect(screen.queryByText(/No images yet/)).not.toBeInTheDocument();
+  });
+
+  it('retries the load when Retry is pressed', async () => {
+    const onRetry = vi.fn();
+    renderManager({ images: [], loadError: 'something broke', onRetry });
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry.mock.calls).toEqual([[]]);
+  });
+
+  it('shows the loading status, not the failure, while a load is in flight', () => {
+    renderManager({ images: [], isLoading: true, loadError: 'something broke' });
+    expect(screen.getByRole('status')).toHaveTextContent('Loading images');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows the pool, not the failure, when images are already loaded', () => {
+    renderManager({ loadError: 'something broke' });
+    expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('disables the tiles, the strip, and the upload zone when disabled', () => {
     renderManager({ disabled: true });
     expect(useButton('suggested')).toBeDisabled();
