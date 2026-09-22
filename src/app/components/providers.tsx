@@ -9,6 +9,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { reportResponseValidationError } from '@/lib/query-error-reporter';
+import { queryRetryDelay, shouldRetryQuery } from '@/lib/utils/query-retry';
 
 import type { ThemeProviderProps } from 'next-themes';
 
@@ -30,7 +31,11 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
             staleTime: disableCache ? 0 : 5 * 60 * 1000,
             gcTime: disableCache ? 0 : 10 * 60 * 1000,
             refetchOnWindowFocus: false,
-            retry: 1,
+            // Retry only throttling, server errors, and network drops, with
+            // backoff + jitter: a fixed retry re-fired a whole page's
+            // throttled requests together and tripped the limiter again.
+            retry: shouldRetryQuery,
+            retryDelay: queryRetryDelay,
           },
         },
       })

@@ -3,12 +3,28 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { fetchAndParse, parseResponse, ResponseValidationError } from './fetch-and-parse';
+import {
+  fetchAndParse,
+  HttpError,
+  parseResponse,
+  ResponseValidationError,
+} from './fetch-and-parse';
 
 const schema = z.object({ id: z.string(), count: z.number() });
 
+/** Resolves with whatever `promise` rejects with, so the error object itself can be inspected. */
+const rejectionOf = async (promise: Promise<unknown>): Promise<unknown> => {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('fetchAndParse', () => {
@@ -68,6 +84,118 @@ describe('fetchAndParse', () => {
     await expect(fetchAndParse('/api/thing', schema)).rejects.toThrow(
       'Invalid response from /api/thing'
     );
+  });
+});
+
+describe('fetchAndParse — HttpError', () => {
+  it('throws an HttpError carrying the status and the error message on a non-OK response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 429, headers: new Headers() })
+    );
+
+    const error = await rejectionOf(
+      fetchAndParse('/api/thing', schema, { errorMessage: 'Failed to fetch thing' })
+    );
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({
+      name: 'HttpError',
+      status: 429,
+      message: 'Failed to fetch thing',
+      retryAfterMs: null,
+    });
+  });
+
+  it('parses a Retry-After header given in seconds into milliseconds', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '2' }),
+      })
+    );
+
+    const error = await rejectionOf(fetchAndParse('/api/thing', schema));
+
+    expect(error).toMatchObject({ retryAfterMs: 2000 });
+  });
+
+  it('parses an HTTP-date Retry-After header relative to now', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-21T00:00:00Z'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers({ 'retry-after': 'Mon, 21 Sep 2026 00:00:03 GMT' }),
+      })
+    );
+
+    const error = await rejectionOf(fetchAndParse('/api/thing', schema));
+
+    expect(error).toMatchObject({ retryAfterMs: 3000 });
+  });
+
+  it('clamps an HTTP-date Retry-After in the past to zero', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-21T00:00:10Z'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers({ 'retry-after': 'Mon, 21 Sep 2026 00:00:03 GMT' }),
+      })
+    );
+
+    const error = await rejectionOf(fetchAndParse('/api/thing', schema));
+
+    expect(error).toMatchObject({ retryAfterMs: 0 });
+  });
+
+  it('treats an unparseable Retry-After header as absent', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': 'soon' }),
+      })
+    );
+
+    const error = await rejectionOf(fetchAndParse('/api/thing', schema));
+
+    expect(error).toMatchObject({ retryAfterMs: null });
+  });
+
+  it('still throws the error message when a mapped status is absent from fallbackByStatus', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500, headers: new Headers() })
+    );
+
+    const error = await rejectionOf(
+      fetchAndParse('/api/thing', schema, { fallbackByStatus: { 404: null } })
+    );
+
+    expect(error).toMatchObject({ name: 'HttpError', status: 500, message: 'Request failed' });
+  });
+});
+
+describe('HttpError', () => {
+  it('defaults retryAfterMs to null', () => {
+    expect(new HttpError('Request failed', 500)).toMatchObject({
+      name: 'HttpError',
+      status: 500,
+      retryAfterMs: null,
+    });
+  });
+
+  it('is an Error, so existing message matchers keep working', () => {
+    expect(new HttpError('Request failed', 429, 1000)).toBeInstanceOf(Error);
   });
 });
 
