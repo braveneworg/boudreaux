@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { ZineToggleGroup, ZineToggleGroupItem } from '@/app/components/ui/zine-toggle-group';
 import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
 import { useInfinitePublishedVideosQuery } from '@/hooks/queries/use-infinite-published-videos-query';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -173,17 +173,16 @@ export const VideosContent = (): ReactElement => {
           className="sm:max-w-xs"
         />
 
-        <ToggleGroup
+        <ZineToggleGroup
           type="single"
           value={sort}
           onValueChange={handleSortChange}
-          variant="outline"
           aria-label="Sort videos by release date"
           className="shrink-0"
         >
-          <ToggleGroupItem value="desc">Newest first</ToggleGroupItem>
-          <ToggleGroupItem value="asc">Oldest first</ToggleGroupItem>
-        </ToggleGroup>
+          <ZineToggleGroupItem value="desc">Newest first</ZineToggleGroupItem>
+          <ZineToggleGroupItem value="asc">Oldest first</ZineToggleGroupItem>
+        </ZineToggleGroup>
       </div>
 
       {videos.length === 0 ? (

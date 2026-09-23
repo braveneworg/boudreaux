@@ -128,6 +128,22 @@ describe('VideosContent sorting', () => {
 
     expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
   });
+
+  it('dresses the sort toggle in the punk-zine frame', () => {
+    render(<VideosContent />);
+
+    const group = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+    expect(group).toHaveClass('shadow-zine-ink', 'border-2', 'border-black');
+    expect(group).not.toHaveAttribute('data-variant', 'outline');
+  });
+
+  it('fills the selected sort with the zine accent', () => {
+    render(<VideosContent />);
+
+    const newest = screen.getByRole('radio', { name: /newest first/i });
+    expect(newest).toHaveClass('data-[state=on]:bg-menu-item-pink-300', 'uppercase');
+    expect(newest).toHaveAttribute('data-state', 'on');
+  });
 });
 
 /** Open the search combobox and return its typing input. */
