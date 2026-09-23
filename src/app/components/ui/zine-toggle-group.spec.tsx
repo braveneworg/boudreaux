@@ -80,14 +80,17 @@ describe('ZineToggleGroupItem', () => {
     );
   });
 
-  it('fills the selected item with the zine accent', () => {
+  it("fills the selected item with the page's zine accent, not a fixed color", () => {
     renderPair();
 
     expect(screen.getByRole('radio', { name: 'First' })).toHaveClass(
-      'data-[state=on]:bg-menu-item-pink-300',
+      'data-[state=on]:bg-[var(--card-accent)]',
       'data-[state=on]:text-black'
     );
     expect(screen.getByRole('radio', { name: 'First' })).toHaveAttribute('data-state', 'on');
+    expect(screen.getByRole('radio', { name: 'First' })).not.toHaveClass(
+      'data-[state=on]:bg-menu-item-pink-300'
+    );
   });
 
   it('draws the divider on every item after the first', () => {

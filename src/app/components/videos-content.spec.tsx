@@ -141,7 +141,7 @@ describe('VideosContent sorting', () => {
     render(<VideosContent />);
 
     const newest = screen.getByRole('radio', { name: /newest first/i });
-    expect(newest).toHaveClass('data-[state=on]:bg-menu-item-pink-300', 'uppercase');
+    expect(newest).toHaveClass('data-[state=on]:bg-[var(--card-accent)]', 'uppercase');
     expect(newest).toHaveAttribute('data-state', 'on');
   });
 });

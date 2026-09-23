@@ -305,7 +305,7 @@ describe('ArtistsContent list', () => {
     render(<ArtistsContent />);
 
     expect(screen.getByRole('radio', { name: 'A–Z' })).toHaveClass(
-      'data-[state=on]:bg-menu-item-pink-300'
+      'data-[state=on]:bg-[var(--card-accent)]'
     );
   });
 
