@@ -10,7 +10,7 @@ import { Loader2, Users } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { ZineToggleGroup, ZineToggleGroupItem } from '@/app/components/ui/zine-toggle-group';
 import { useInfinitePublishedArtistsQuery } from '@/hooks/queries/use-infinite-published-artists-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
@@ -145,30 +145,19 @@ export const ArtistsContent = (): ReactElement => {
   return (
     <div className="flex flex-col gap-6 py-4">
       <div data-slot="artists-toolbar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Not the `outline` variant: that draws a per-item hairline border and
-            a soft shadow, neither of which is the zine look. One hard black
-            frame with an ink offset wraps the pair, and the divider rides on
-            the second item. `flex-none` is load-bearing — `ToggleGroupItem`
-            defaults to `flex-1` (basis 0), which splits a `w-fit` group evenly
-            between the items while `whitespace-nowrap` refuses to wrap, so the
-            longer label spilled past its own box. */}
-        <ToggleGroup
+        <ZineToggleGroup
           type="single"
           value={sort}
           onValueChange={handleSortChange}
           aria-label="Sort artists"
-          className="shadow-zine-ink w-fit shrink-0 border-2 border-black bg-zinc-50"
+          className="shrink-0"
         >
           {ARTIST_SORT_OPTIONS.map(({ value, label }) => (
-            <ToggleGroupItem
-              key={value}
-              value={value}
-              className="data-[state=on]:bg-menu-item-pink-300 h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:text-black"
-            >
+            <ZineToggleGroupItem key={value} value={value}>
               {label}
-            </ToggleGroupItem>
+            </ZineToggleGroupItem>
           ))}
-        </ToggleGroup>
+        </ZineToggleGroup>
 
         <ArtistSearchCombobox
           search={searchInput}
