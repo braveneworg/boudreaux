@@ -9,6 +9,8 @@ import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 
 import { ArtistsContent } from './artists-content';
 
+import type * as ArtistListCardModule from './artist-list-card';
+
 vi.mock('@/hooks/queries/use-infinite-published-artists-query', () => ({
   useInfinitePublishedArtistsQuery: vi.fn(),
 }));
@@ -23,7 +25,10 @@ vi.mock('@/hooks/use-debounce', () => ({
   useDebounce: <T,>(value: T) => value,
 }));
 
-vi.mock('./artist-list-card', () => ({
+// Stub the card but keep its real exports (the skeleton reads the shared
+// photo-frame class from the same module).
+vi.mock('./artist-list-card', async (importOriginal) => ({
+  ...(await importOriginal<typeof ArtistListCardModule>()),
   ArtistListCard: ({ artist }: { artist: { id: string; displayName: string } }) => (
     <div data-testid="artist-card">{artist.displayName}</div>
   ),
@@ -258,8 +263,31 @@ describe('ArtistsContent list', () => {
     render(<ArtistsContent />);
 
     const list = screen.getByRole('list');
-    expect(list).toHaveClass('flex', 'flex-col', 'gap-4');
+    expect(list).toHaveClass('flex', 'flex-col');
     expect(list).not.toHaveClass('lg:grid-cols-2');
+  });
+
+  it('spaces the rows 32px apart from the list alone', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    render(<ArtistsContent />);
+
+    const list = screen.getByRole('list');
+    expect(list).toHaveClass('gap-8');
+    expect(list).not.toHaveClass('gap-4');
+  });
+
+  it('gives the toolbar 32px of air above the list', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    expect(container.firstElementChild).toHaveClass('gap-8');
+    expect(container.firstElementChild).not.toHaveClass('gap-6');
   });
 
   it('runs the cards the full width of the panel', () => {
@@ -319,6 +347,65 @@ describe('ArtistsContent list', () => {
     expect(search).not.toHaveClass('sm:max-w-xs');
   });
 
+  it('counts the roster at the toolbar’s right edge', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({
+        pages: [{ rows: [row('a', 'Alpha'), row('b', 'Bravo')], nextSkip: null }],
+      }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    const count = container.querySelector('[data-slot="artists-count"]');
+    expect(count).toHaveTextContent('2 artists');
+    expect(count).toHaveClass('sm:ml-auto');
+    expect(container.querySelector('[data-slot="artists-toolbar"]')).toContainElement(
+      count as HTMLElement
+    );
+  });
+
+  it('counts a single artist in the singular', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    expect(container.querySelector('[data-slot="artists-count"]')).toHaveTextContent('1 artist');
+  });
+
+  it('counts the matches, not the roster, while a search narrows the list', async () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+    await userEvent.type(await openSearch(), 'alp');
+
+    expect(container.querySelector('[data-slot="artists-count"]')).toHaveTextContent(
+      '1 match for “alp”'
+    );
+  });
+
+  it('says how many are showing when more pages remain, since the total is unknown', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({
+        pages: [{ rows: [row('a', 'Alpha'), row('b', 'Bravo')], nextSkip: 24 }],
+        hasNextPage: true,
+      }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    expect(container.querySelector('[data-slot="artists-count"]')).toHaveTextContent('Showing 2');
+  });
+
+  it('shows no count alongside the empty state', () => {
+    const { container } = render(<ArtistsContent />);
+
+    expect(container.querySelector('[data-slot="artists-count"]')).not.toBeInTheDocument();
+  });
+
   it('wires the infinite-scroll sentinel to the paging state', () => {
     const fetchNextPage = vi.fn();
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
@@ -365,6 +452,20 @@ describe('ArtistsContent states', () => {
     const list = container.querySelector('[data-slot="artists-skeleton-list"]');
     expect(list).toHaveClass('w-full');
     expect(list).not.toHaveClass('lg:w-3/4');
+  });
+
+  it('mirrors the card’s photo frame and row spacing in the skeleton so nothing jumps', () => {
+    vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
+      toInfiniteResult({ isPending: true, data: undefined }) as never
+    );
+
+    const { container } = render(<ArtistsContent />);
+
+    const list = container.querySelector('[data-slot="artists-skeleton-list"]');
+    const frame = container.querySelector('[data-slot="artists-skeleton-photo"]');
+    expect(list).toHaveClass('gap-8');
+    expect(frame).toHaveClass('size-32', 'sm:size-44', 'xl:size-48');
+    expect(frame?.parentElement).toHaveClass('sm:flex-row', 'p-5', 'sm:p-6');
   });
 
   it('renders an error state with a retry action', async () => {

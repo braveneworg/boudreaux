@@ -15,10 +15,11 @@ import { useInfinitePublishedArtistsQuery } from '@/hooks/queries/use-infinite-p
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { ArtistListingRow, ArtistListingSort } from '@/lib/types/domain/artist';
+import { cn } from '@/lib/utils';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { ARTIST_LISTING_SORTS } from '@/lib/validation/artist-listing-query-schema';
 
-import { ArtistListCard } from './artist-list-card';
+import { ARTIST_PHOTO_FRAME_CLASS, ArtistListCard } from './artist-list-card';
 import { ArtistSearchCombobox } from './artist-search-combobox';
 
 /** How many rows the search dropdown suggests at most. */
@@ -38,13 +39,24 @@ const isArtistListingSort = (value: string): value is ArtistListingSort =>
   (ARTIST_LISTING_SORTS as readonly string[]).includes(value);
 
 /**
+ * The roster count that sits at the toolbar's right edge. While a search
+ * narrows the list it counts matches, not the roster; while more pages remain
+ * the total is unknown, so it says how many are showing instead.
+ */
+const formatArtistCount = (count: number, search: string, hasNextPage: boolean): string => {
+  if (hasNextPage) return `Showing ${count}`;
+  if (search) return `${count} ${count === 1 ? 'match' : 'matches'} for “${search}”`;
+  return `${count} ${count === 1 ? 'artist' : 'artists'}`;
+};
+
+/**
  * Initial-load skeleton mirroring the real layout — the full-width search/sort
- * toolbar and four image-left/details-right card placeholders in the
- * three-quarter-width single column — so nothing jumps when the first page
+ * toolbar and four photo-left/text-right card placeholders at the card's own
+ * frame size, inset, and row spacing — so nothing jumps when the first page
  * lands.
  */
 const ArtistsSkeleton = (): ReactElement => (
-  <div className="flex flex-col gap-6 py-4" aria-busy="true">
+  <div className="flex flex-col gap-8 py-4" aria-busy="true">
     <p role="status" className="sr-only">
       Loading artists…
     </p>
@@ -52,15 +64,19 @@ const ArtistsSkeleton = (): ReactElement => (
       <Skeleton className="h-9 w-48 shrink-0" />
       <Skeleton className="h-9 w-full sm:max-w-md" />
     </div>
-    <div data-slot="artists-skeleton-list" className="flex w-full flex-col gap-4">
+    <div data-slot="artists-skeleton-list" className="flex w-full flex-col gap-8">
       {[0, 1, 2, 3].map((key) => (
-        <div key={key} className="flex flex-col gap-4 bg-white p-4 sm:flex-row">
-          <Skeleton className="size-20 shrink-0 sm:size-24" />
+        <div key={key} className="flex flex-col gap-4 bg-white p-5 sm:flex-row sm:gap-6 sm:p-6">
+          <Skeleton
+            data-slot="artists-skeleton-photo"
+            className={cn('my-0 shrink-0', ARTIST_PHOTO_FRAME_CLASS)}
+          />
           <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <Skeleton className="h-6 w-2/3" />
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="my-0 h-7 w-1/2" />
+            <Skeleton className="my-0 h-4 w-1/3" />
+            <Skeleton className="my-0 h-4 w-1/4" />
+            <Skeleton className="my-0 h-4 w-full max-w-prose" />
+            <Skeleton className="my-0 h-4 w-2/3" />
           </div>
         </div>
       ))}
@@ -101,10 +117,12 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * so the list narrows to them; the card itself is the way into the artist page.
  *
  * The page reads as a browsable feed: one card per row, each running the full
- * width of the zine panel, so the card's own full-width short bio carries the
- * measure. Sort sits left of search in a toolbar at that same full width, the
- * two grouped at the left edge rather than pushed to opposite ends, and the
- * search field is capped at `sm:max-w-md` so it does not swallow the row.
+ * width of the zine panel, with 32px between rows supplied by the list alone
+ * (the card zeroes the `Card` primitive's own margin). Sort sits left of
+ * search in a toolbar at that same full width, the two grouped at the left
+ * edge rather than pushed to opposite ends, the search field capped at
+ * `sm:max-w-md` so it does not swallow the row, and the roster count parked
+ * at the toolbar's right edge where the row was otherwise empty.
  */
 export const ArtistsContent = (): ReactElement => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
@@ -143,7 +161,7 @@ export const ArtistsContent = (): ReactElement => {
   const artists = data?.pages.flatMap((page) => page.rows) ?? [];
 
   return (
-    <div className="flex flex-col gap-6 py-4">
+    <div className="flex flex-col gap-8 py-4">
       <div data-slot="artists-toolbar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <ZineToggleGroup
           type="single"
@@ -174,12 +192,22 @@ export const ArtistsContent = (): ReactElement => {
           onSelect={handleSuggestionSelect}
           className="sm:max-w-md"
         />
+
+        {artists.length > 0 && (
+          <p
+            data-slot="artists-count"
+            className="text-sm text-zinc-600 tabular-nums sm:ml-auto"
+            aria-live="polite"
+          >
+            {formatArtistCount(artists.length, search, hasNextPage)}
+          </p>
+        )}
       </div>
 
       {artists.length === 0 ? (
         <ArtistsEmpty search={search} />
       ) : (
-        <ul className="flex w-full flex-col gap-4">
+        <ul className="flex w-full flex-col gap-8">
           {artists.map((artist) => (
             <li key={artist.id}>
               <ArtistListCard artist={artist} />

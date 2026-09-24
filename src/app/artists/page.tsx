@@ -61,11 +61,15 @@ export default async function ArtistsIndexPage() {
       <PageContainer>
         <ContentContainer>
           <ZinePanel chat accent="hot-pink" breadcrumbs={breadcrumbItems}>
+            {/* `mb-4`, not the heading's default `mb-1.5`: the wordmark sat
+                22px off the toolbar. Set here so the /videos and /releases
+                headings, which share `ImageHeading`, do not move. */}
             <ImageHeading
               src="/media/headings/ARTISTS.webp"
               alt="artists"
               imageHeight={480}
               priority
+              className="mb-4"
             />
             <ArtistsContent />
           </ZinePanel>

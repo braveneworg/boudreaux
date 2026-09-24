@@ -140,6 +140,15 @@ describe('ArtistsIndexPage', () => {
     expect(headingImage).toHaveAttribute('alt', 'artists');
   });
 
+  it('gives the wordmark 16px of air above the toolbar, without moving sibling pages', async () => {
+    const Page = await ArtistsIndexPage();
+    render(Page);
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveClass('mb-4');
+    expect(heading).not.toHaveClass('mb-1.5');
+  });
+
   it('should wrap the heading and content in a hot-pink zine panel', async () => {
     const Page = await ArtistsIndexPage();
     const { container } = render(Page);
