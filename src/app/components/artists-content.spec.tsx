@@ -301,12 +301,14 @@ describe('ArtistsContent list', () => {
     expect(group).toHaveClass('shadow-zine-ink', 'border-2', 'border-black');
   });
 
-  it('fills the selected sort with the zine accent', () => {
+  it('fills the selected sort with the full hot-pink accent, not the soft shade', () => {
     render(<ArtistsContent />);
 
-    expect(screen.getByRole('radio', { name: 'A–Z' })).toHaveClass(
-      'data-[state=on]:bg-[var(--card-accent)]'
-    );
+    // The soft hot-pink (pink-200) is 2.17:1 against the zinc-50 unselected
+    // fill — under WCAG 1.4.11's 3:1 — so /artists overrides to the full accent.
+    const selected = screen.getByRole('radio', { name: 'A–Z' });
+    expect(selected).toHaveClass('data-[state=on]:bg-(--card-accent)');
+    expect(selected).not.toHaveClass('data-[state=on]:bg-(--card-accent-soft)');
   });
 
   it('gives the search field a wider cap than the old narrow default', () => {

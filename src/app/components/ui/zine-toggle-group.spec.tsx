@@ -80,16 +80,19 @@ describe('ZineToggleGroupItem', () => {
     );
   });
 
-  it("fills the selected item with the page's zine accent, not a fixed color", () => {
+  it("fills the selected item with a lighter shade of the page's zine accent", () => {
     renderPair();
 
     expect(screen.getByRole('radio', { name: 'First' })).toHaveClass(
-      'data-[state=on]:bg-[var(--card-accent)]',
+      'data-[state=on]:bg-(--card-accent-soft)',
       'data-[state=on]:text-black'
     );
     expect(screen.getByRole('radio', { name: 'First' })).toHaveAttribute('data-state', 'on');
     expect(screen.getByRole('radio', { name: 'First' })).not.toHaveClass(
       'data-[state=on]:bg-menu-item-pink-300'
+    );
+    expect(screen.getByRole('radio', { name: 'First' })).not.toHaveClass(
+      'data-[state=on]:bg-(--card-accent)'
     );
   });
 

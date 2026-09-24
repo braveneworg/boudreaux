@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils';
  * Not the `outline` variant: that draws a per-item hairline border and a soft
  * shadow, neither of which is the zine look. One hard black frame with an ink
  * offset wraps the items, and the divider rides on every item after the first.
- * The selected item fills with `--card-accent`, so it matches whichever
- * `zine-accent-*` the surrounding page panel sets.
+ * The selected item fills with `--card-accent-soft`, the lighter shade of
+ * whichever `zine-accent-*` the surrounding page panel sets.
  */
 const ZineToggleGroup = ({
   className,
@@ -39,7 +39,7 @@ const ZineToggleGroupItem = ({
 }: React.ComponentProps<typeof ToggleGroupItem>): React.ReactElement => (
   <ToggleGroupItem
     className={cn(
-      'h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:bg-[var(--card-accent)] data-[state=on]:text-black',
+      'h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:bg-(--card-accent-soft) data-[state=on]:text-black',
       className
     )}
     {...props}

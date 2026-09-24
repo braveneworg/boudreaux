@@ -152,8 +152,15 @@ export const ArtistsContent = (): ReactElement => {
           aria-label="Sort artists"
           className="shrink-0"
         >
+          {/* Full accent, not the toggle's default soft shade: soft hot-pink
+              (pink-200) is under 3:1 against the unselected fill, and the fill
+              is the only selected-state cue (WCAG 1.4.11). */}
           {ARTIST_SORT_OPTIONS.map(({ value, label }) => (
-            <ZineToggleGroupItem key={value} value={value}>
+            <ZineToggleGroupItem
+              key={value}
+              value={value}
+              className="data-[state=on]:bg-(--card-accent)"
+            >
               {label}
             </ZineToggleGroupItem>
           ))}
