@@ -10,12 +10,13 @@ import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
+import { ZineToggleGroup, ZineToggleGroupItem } from '@/app/components/ui/zine-toggle-group';
 import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
 import { useInfinitePublishedVideosQuery } from '@/hooks/queries/use-infinite-published-videos-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
+import { cn } from '@/lib/utils';
 import { resolveStreamUrl } from '@/lib/utils/cdn-url';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
@@ -24,6 +25,13 @@ import { VideoSearchCombobox } from './video-search-combobox';
 
 /** How many rows the search dropdown suggests at most. */
 const MAX_SUGGESTIONS = 8;
+
+/**
+ * Toolbar grid — mirrors `VideoCard`'s poster/details column template and
+ * gap, so the search lines up with the poster images below it.
+ */
+const TOOLBAR_GRID_CLASS =
+  'sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center sm:gap-6';
 
 /** Release-date sort directions offered by the listing toggle. */
 type VideoSort = 'asc' | 'desc';
@@ -38,9 +46,9 @@ const VideosSkeleton = (): ReactElement => (
     <p role="status" className="sr-only">
       Loading videos…
     </p>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Skeleton className="h-9 w-full sm:max-w-xs" />
-      <Skeleton className="h-9 w-56" />
+    <div className={cn('flex flex-col gap-3', TOOLBAR_GRID_CLASS)}>
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-56 sm:justify-self-end" />
     </div>
     {[0, 1, 2].map((key) => (
       <div
@@ -163,27 +171,27 @@ export const VideosContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-6 py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Same column template as `VideoCard`, so the search spans exactly the
+          poster column and the sort toggle sits over the details column. */}
+      <div data-slot="videos-toolbar" className={cn('flex flex-col gap-3', TOOLBAR_GRID_CLASS)}>
         <VideoSearchCombobox
           search={searchInput}
           onSearchChange={setSearchInput}
           results={videos.slice(0, MAX_SUGGESTIONS)}
           isFetching={isFetching}
           onSelect={handleSuggestionSelect}
-          className="sm:max-w-xs"
         />
 
-        <ToggleGroup
+        <ZineToggleGroup
           type="single"
           value={sort}
           onValueChange={handleSortChange}
-          variant="outline"
           aria-label="Sort videos by release date"
-          className="shrink-0"
+          className="shrink-0 sm:justify-self-end"
         >
-          <ToggleGroupItem value="desc">Newest first</ToggleGroupItem>
-          <ToggleGroupItem value="asc">Oldest first</ToggleGroupItem>
-        </ToggleGroup>
+          <ZineToggleGroupItem value="desc">Newest first</ZineToggleGroupItem>
+          <ZineToggleGroupItem value="asc">Oldest first</ZineToggleGroupItem>
+        </ZineToggleGroup>
       </div>
 
       {videos.length === 0 ? (

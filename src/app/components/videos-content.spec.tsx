@@ -128,6 +128,22 @@ describe('VideosContent sorting', () => {
 
     expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
   });
+
+  it('dresses the sort toggle in the punk-zine frame', () => {
+    render(<VideosContent />);
+
+    const group = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+    expect(group).toHaveClass('shadow-zine-ink', 'border-2', 'border-black');
+    expect(group).not.toHaveAttribute('data-variant', 'outline');
+  });
+
+  it('fills the selected sort with the zine accent', () => {
+    render(<VideosContent />);
+
+    const newest = screen.getByRole('radio', { name: /newest first/i });
+    expect(newest).toHaveClass('data-[state=on]:bg-(--card-accent-soft)', 'uppercase');
+    expect(newest).toHaveAttribute('data-state', 'on');
+  });
 });
 
 /** Open the search combobox and return its typing input. */
@@ -150,6 +166,33 @@ describe('VideosContent search', () => {
     const toggle = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
 
     expect(search.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('lays the toolbar on the video card grid so the search spans the poster column', () => {
+    render(<VideosContent />);
+
+    const toggle = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+    const toolbar = toggle.parentElement;
+    expect(toolbar).toHaveAttribute('data-slot', 'videos-toolbar');
+    expect(toolbar).toHaveClass(
+      'sm:grid',
+      'sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]',
+      'sm:gap-6'
+    );
+  });
+
+  it('lets the search fill the poster column instead of a fixed cap', () => {
+    render(<VideosContent />);
+
+    expect(screen.getByRole('button', { name: 'Search videos' })).not.toHaveClass('sm:max-w-xs');
+  });
+
+  it('pushes the sort toggle to the right edge of the details column', () => {
+    render(<VideosContent />);
+
+    expect(screen.getByRole('radiogroup', { name: /sort videos by release date/i })).toHaveClass(
+      'sm:justify-self-end'
+    );
   });
 
   it('forwards the typed search term to the query', async () => {
