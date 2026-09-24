@@ -168,6 +168,33 @@ describe('VideosContent search', () => {
     expect(search.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('lays the toolbar on the video card grid so the search spans the poster column', () => {
+    render(<VideosContent />);
+
+    const toggle = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+    const toolbar = toggle.parentElement;
+    expect(toolbar).toHaveAttribute('data-slot', 'videos-toolbar');
+    expect(toolbar).toHaveClass(
+      'sm:grid',
+      'sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]',
+      'sm:gap-6'
+    );
+  });
+
+  it('lets the search fill the poster column instead of a fixed cap', () => {
+    render(<VideosContent />);
+
+    expect(screen.getByRole('button', { name: 'Search videos' })).not.toHaveClass('sm:max-w-xs');
+  });
+
+  it('pushes the sort toggle to the right edge of the details column', () => {
+    render(<VideosContent />);
+
+    expect(screen.getByRole('radiogroup', { name: /sort videos by release date/i })).toHaveClass(
+      'sm:justify-self-end'
+    );
+  });
+
   it('forwards the typed search term to the query', async () => {
     render(<VideosContent />);
 
