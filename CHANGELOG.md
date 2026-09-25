@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.351.0] - 2026-09-25
+
+### Changed
+
+- style(artists): 🎨 photo-forward card, more air (#771)
+
 ## [4.350.0] - 2026-09-24
 
 ### Added
