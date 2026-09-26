@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { readUrl, searchArtistSources } from './jina.js';
+import { readUrl, readUrlOutcome, searchArtistSources } from './jina.js';
 
 const jinaSearchResponse = (data: unknown[]): Response =>
   new Response(JSON.stringify({ data }), {
@@ -15,6 +15,23 @@ const jinaReaderResponse = (content: string, images?: Record<string, string>): R
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+
+/** A reader payload with the extra fields Jina sets on a rendered page (title, warning). */
+const jinaReaderPayload = (data: Record<string, unknown>): Response =>
+  new Response(JSON.stringify({ data: { url: 'https://x', ...data } }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+/** What Jina hands back when the site served it Cloudflare's "Just a moment..." challenge. */
+const CHALLENGE_PAGE = {
+  title: 'Just a moment...',
+  content:
+    '![Image 1: Icon for imginn.com](https://imginn.com/favicon.ico)\n\n## imginn.com\n\n## Performing security verification\n\nThis website uses a security service to protect against malicious bots.',
+  images: { 'Image 1: Icon for imginn.com': 'https://imginn.com/favicon.ico' },
+  warning:
+    'This page maybe requiring CAPTCHA, please make sure you are authorized to access this page.',
+};
 
 /** No-op sleep so retries never wait in tests. */
 const noSleep = async (): Promise<void> => {};
@@ -424,6 +441,115 @@ describe('readUrl', () => {
 
     expect(result).toBeNull();
     expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe('readUrlOutcome', () => {
+  it('reports a readable page as read, with its content and images', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(
+        jinaReaderResponse('Press page.', { 'Image 1: Band': 'https://cdn.example.com/band.jpg' })
+      );
+
+    const outcome = await readUrlOutcome('https://example.com/press', 'k', fetchFn);
+
+    expect(outcome).toEqual({
+      kind: 'read',
+      result: {
+        content: 'Press page.',
+        images: [
+          {
+            url: 'https://cdn.example.com/band.jpg',
+            alt: 'Band',
+            sourceUrl: 'https://example.com/press',
+          },
+        ],
+      },
+    });
+  });
+
+  it('reports a bot-challenge page as blocked and logs it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(jinaReaderPayload(CHALLENGE_PAGE));
+
+    const outcome = await readUrlOutcome('https://imginn.com/davideramos/', 'k', fetchFn);
+
+    expect(outcome).toEqual({ kind: 'blocked' });
+    expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+      expect.stringContaining('jina_read_blocked'),
+    ]);
+    warn.mockRestore();
+  });
+
+  it('recognizes the challenge from the title alone (no Jina warning)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jinaReaderPayload({ title: 'Just a moment...', content: 'Loading' }));
+
+    expect(await readUrlOutcome('https://x', 'k', fetchFn)).toEqual({ kind: 'blocked' });
+    warn.mockRestore();
+  });
+
+  it('recognizes the challenge from the page text alone', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaReaderPayload({
+        title: 'imginn.com',
+        content:
+          'Checking your browser before accessing the site. Enable JavaScript and cookies to continue.',
+      })
+    );
+
+    expect(await readUrlOutcome('https://x', 'k', fetchFn)).toEqual({ kind: 'blocked' });
+    warn.mockRestore();
+  });
+
+  it('does not mistake an article that mentions a captcha for a challenge page', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jinaReaderPayload({
+        title: 'How CAPTCHA works',
+        content: 'A long explainer about CAPTCHA and bot detection, with photos of the band.',
+        images: { 'Image 1: Band': 'https://cdn.example.com/band.jpg' },
+      })
+    );
+
+    const outcome = await readUrlOutcome('https://x', 'k', fetchFn);
+
+    expect(outcome.kind).toBe('read');
+  });
+
+  it('reports a non-OK reader response as unreadable', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(new Response('nope', { status: 404 }));
+
+    expect(await readUrlOutcome('https://x', 'k', fetchFn, { sleep: noSleep })).toEqual({
+      kind: 'unreadable',
+    });
+    warn.mockRestore();
+  });
+
+  it('reports a thrown request as unreadable', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockRejectedValue(new Error('network'));
+
+    expect(await readUrlOutcome('https://x', 'k', fetchFn)).toEqual({ kind: 'unreadable' });
+    warn.mockRestore();
+  });
+
+  it('reports an empty page as unreadable', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jinaReaderResponse('   '));
+
+    expect(await readUrlOutcome('https://x', 'k', fetchFn)).toEqual({ kind: 'unreadable' });
+  });
+
+  it('readUrl hands back null for a blocked page so challenge text never grounds a bio', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn().mockResolvedValue(jinaReaderPayload(CHALLENGE_PAGE));
+
+    expect(await readUrl('https://imginn.com/davideramos/', 'k', fetchFn)).toBeNull();
     warn.mockRestore();
   });
 });
