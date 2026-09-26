@@ -95,7 +95,28 @@
     },
     {
       "datasource": { "type": "loki", "uid": "-- Grafana --" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 17 },
+      "description": "nginx limit_req / limit_conn rejections from the access log, bucketed by /api/<resource> (get-session on its own) or the first path segment. The app-side 429 series above counts only withRateLimit rejections, never nginx. Budgets: docs/adr/0013.",
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 17 },
+      "id": 6,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki" },
+          "expr": "sum by (prefix) (count_over_time({container=\"nginx\"} |~ `\" 429 ` | regexp `\"[A-Z]+ (?P<prefix>/api/auth/get-session|/api/[^/ ?\"]+|/[^/ ?\"]*)` [5m]))",
+          "legendFormat": "{{prefix}}",
+          "refId": "A"
+        }
+      ],
+      "title": "nginx 429s by path prefix (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "-- Grafana --" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 26 },
       "id": 5,
       "options": {
         "dedupStrategy": "none",
