@@ -1,6 +1,6 @@
 # ADR-0008: Display images are chosen by humans and survive regeneration
 
-- **Status**: Accepted
+- **Status**: Accepted; amended 2026-09-26 (see the addendum, #767)
 - **Date**: 2026-09-17
 
 ## Context
@@ -75,3 +75,55 @@ artist and release forms always offered nothing.
   fallback until an admin chooses.
 - The legacy artist `Image` path (actions, service methods, repository
   finders, includes, and `Artist.images`) is removed in a separate PR.
+
+## Addendum (2026-09-26, #767): the fallback tiers require alt text
+
+### Context
+
+Alt text was required only to _choose_ an image. The two fallback tiers had
+no such rule, so on an artist with nothing chosen and nothing suggested, a
+fresh upload without alt went straight onto the public page with a made-up
+alt (`title`, else "<name> image"). The admin could not have chosen that
+image, and the manager said nothing was shown: its badges came from the
+chosen tier only. The job does not guarantee alt on its suggestions either:
+`applyImageRanking` in the bio Lambda flags primaries by index (or every
+image when the vision pass ranks none), and the job contract's `alt` is
+optional.
+
+### Decision
+
+- **Both fallback tiers take only rows that pass `isDisplayEligible`.**
+  Resolution is now: chosen rows by position → suggested rows with alt →
+  the first pool rows with alt, capped. A row without an `alt` field counts
+  as having none, so a projection that forgets to select it fails closed.
+  Chosen rows are not re-checked. The set-display-images service already
+  guards them.
+- **The admin sees the tier the page uses.** `resolveDisplayImageSet`
+  returns `{ tier, images }` and `resolveDisplayImages` delegates to it, so
+  there is still one resolver. While nothing is chosen, the manager badges
+  the tiles the page shows as "Shown (suggested)" or "Shown (first in pool)"
+  in place of "Suggested". A suggestion the page skips keeps "Suggested". The
+  strip's empty-state copy mentions the alt rule and points at the badges.
+
+### Alternatives rejected
+
+- **Drop the pool tier entirely** (issue option C). This changes today's
+  pages for every artist with a pool and no suggestions, and we cannot count
+  them without a production query. Filtering the tier removes the
+  accessibility hole without that blast radius.
+- **Filtering only the pool tier.** An alt-less suggestion is the same
+  hole, because the job does not guarantee alt.
+
+### Consequences
+
+- Alt-less suggestions stop rendering in production until someone adds alt
+  or chooses an image. Where every suggestion lacks alt, the detail page
+  falls through to pool images with alt, or shows no header images.
+- The index card never had a pool tier: the listing select reads only
+  chosen or suggested rows. An artist whose suggestions all lack alt now
+  shows no image on its index card while the detail page may show pool
+  images. This divergence predates the change (no suggestions → the same
+  split) and is left as it is.
+- Still open: clearing alt on an already-chosen row is not guarded, and the
+  detail page's biography gallery lists every pool row the header does not
+  show, alt or not.
