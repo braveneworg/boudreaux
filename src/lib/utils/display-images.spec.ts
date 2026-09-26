@@ -7,6 +7,7 @@ import {
   isDisplayEligible,
   orderBioImagesForPicker,
   resolveDisplayImages,
+  resolveDisplayImageSet,
 } from './display-images';
 
 interface Row {
@@ -94,10 +95,64 @@ describe('resolveDisplayImages', () => {
     expect(resolveDisplayImages([])).toEqual([]);
   });
 
+  it('skips a suggested row without alt text', () => {
+    const rows = [
+      row('s1', { isPrimary: true, alt: null }),
+      row('s2', { isPrimary: true }),
+      row('x'),
+    ];
+
+    expect(ids(resolveDisplayImages(rows))).toEqual(['s2']);
+  });
+
+  it('falls through to the pool when every suggested row lacks alt text', () => {
+    const rows = [
+      row('s1', { isPrimary: true, alt: null }),
+      row('x'),
+      row('s2', { isPrimary: true, alt: '  ' }),
+      row('y'),
+    ];
+
+    expect(ids(resolveDisplayImages(rows))).toEqual(['x', 'y']);
+  });
+
+  it('skips pool rows without alt text (an alt-less upload renders nowhere)', () => {
+    const rows = [row('upload', { alt: null }), row('x'), row('blank', { alt: ' ' }), row('y')];
+
+    expect(ids(resolveDisplayImages(rows))).toEqual(['x', 'y']);
+  });
+
+  it('caps the pool fallback after skipping rows without alt text', () => {
+    const rows = [row('a', { alt: null }), row('w'), row('x'), row('y'), row('z')];
+
+    expect(ids(resolveDisplayImages(rows))).toEqual(['w', 'x', 'y']);
+  });
+
+  it('shows nothing when no unchosen row has alt text', () => {
+    const rows = [row('s', { isPrimary: true, alt: null }), row('x', { alt: null })];
+
+    expect(resolveDisplayImages(rows)).toEqual([]);
+  });
+
+  it('treats a row without an alt field as ineligible for the fallback tiers', () => {
+    const rows = [
+      { id: 'no-alt-key', isPrimary: true },
+      { id: 'pool', isPrimary: false },
+    ];
+
+    expect(resolveDisplayImages(rows)).toEqual([]);
+  });
+
+  it('keeps a chosen row even without alt text (choosing is guarded by the service)', () => {
+    const rows = [row('chosen', { displayOrder: 0, alt: null }), row('s', { isPrimary: true })];
+
+    expect(ids(resolveDisplayImages(rows))).toEqual(['chosen']);
+  });
+
   it('treats an absent position as not chosen (rows serialised before the field existed)', () => {
     const rows = [
-      { id: 'legacy', isPrimary: true, alt: null },
-      { id: 'chosen', isPrimary: false, alt: null, displayOrder: 0 },
+      { id: 'legacy', isPrimary: true, alt: 'alt' },
+      { id: 'chosen', isPrimary: false, alt: 'alt', displayOrder: 0 },
     ];
 
     expect(resolveDisplayImages(rows).map(({ id }) => id)).toEqual(['chosen']);
@@ -110,6 +165,41 @@ describe('resolveDisplayImages', () => {
     resolveDisplayImages(rows);
 
     expect(rows).toEqual(snapshot);
+  });
+});
+
+describe('resolveDisplayImageSet', () => {
+  it('reports the chosen tier while a human has chosen', () => {
+    const rows = [row('s', { isPrimary: true }), row('h', { displayOrder: 0 })];
+
+    expect(resolveDisplayImageSet(rows)).toEqual({ tier: 'chosen', images: [rows[1]] });
+  });
+
+  it('reports the suggested tier while an eligible suggestion exists', () => {
+    const rows = [row('x'), row('s', { isPrimary: true })];
+
+    expect(resolveDisplayImageSet(rows)).toEqual({ tier: 'suggested', images: [rows[1]] });
+  });
+
+  it('reports the pool tier when no suggestion has alt text', () => {
+    const rows = [row('s', { isPrimary: true, alt: null }), row('x')];
+
+    expect(resolveDisplayImageSet(rows)).toEqual({ tier: 'pool', images: [rows[1]] });
+  });
+
+  it('reports the pool tier with no images when nothing is eligible', () => {
+    expect(resolveDisplayImageSet([row('x', { alt: null })])).toEqual({ tier: 'pool', images: [] });
+  });
+
+  it('resolves the same images as resolveDisplayImages', () => {
+    const rows = [
+      row('s1', { isPrimary: true, alt: null }),
+      row('x'),
+      row('s2', { isPrimary: true }),
+      row('y', { alt: null }),
+    ];
+
+    expect(resolveDisplayImageSet(rows).images).toEqual(resolveDisplayImages(rows));
   });
 });
 

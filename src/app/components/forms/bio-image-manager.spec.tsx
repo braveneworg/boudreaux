@@ -86,6 +86,21 @@ const renderManager = (overrides: Partial<BioImageManagerProps> = {}) => {
 const useButton = (name: string) =>
   screen.getByRole('button', { name: `Use ${name} as display image` });
 
+/** The pool tile whose preview button names the given image. */
+const tileFor = (name: string): HTMLElement => {
+  const tiles = within(screen.getByRole('group', { name: 'Image pool' })).getAllByRole('listitem');
+  const [tile] = tiles.filter(
+    (candidate) => within(candidate).queryByRole('button', { name: `Preview ${name}` }) !== null
+  );
+  return tile;
+};
+
+/** Every "Shown …" badge text on one tile. */
+const shownBadgesOn = (name: string): string[] =>
+  within(tileFor(name))
+    .queryAllByText(/^Shown/)
+    .map((badge) => badge.textContent ?? '');
+
 beforeEach(() => {
   uploadedRecord.current = null;
 });
@@ -148,6 +163,84 @@ describe('BioImageManager', () => {
     expect(within(pool).getByText('Display 1')).toBeInTheDocument();
     expect(within(pool).getByText('Display 2')).toBeInTheDocument();
     expect(within(pool).getByText('Suggested')).toBeInTheDocument();
+  });
+
+  // While nothing is chosen the page shows a fallback tier (ADR-0008
+  // addendum); the tiles it takes are marked so the admin sees what the public
+  // sees.
+  it('marks the suggested images the page shows while nothing is chosen', () => {
+    renderManager({
+      images: [
+        image('rest'),
+        image('shown', { isPrimary: true }),
+        image('no-alt', { isPrimary: true, alt: null }),
+      ],
+    });
+
+    expect(shownBadgesOn('shown')).toEqual(['Shown (suggested)']);
+  });
+
+  it('drops the Suggested badge from a suggested image the page shows', () => {
+    renderManager({ images: [image('shown', { isPrimary: true })] });
+
+    expect(within(tileFor('shown')).queryByText('Suggested')).not.toBeInTheDocument();
+  });
+
+  it('keeps an alt-less suggestion Suggested and unmarked, since the page skips it', () => {
+    renderManager({
+      images: [
+        image('shown', { isPrimary: true }),
+        image('no-alt', { isPrimary: true, alt: null }),
+      ],
+    });
+
+    expect(within(tileFor('no-alt')).getByText('Suggested')).toBeInTheDocument();
+    expect(shownBadgesOn('no-alt')).toEqual([]);
+  });
+
+  it('does not mark unsuggested pool images while a suggestion is shown', () => {
+    renderManager({ images: [image('rest'), image('shown', { isPrimary: true })] });
+
+    expect(shownBadgesOn('rest')).toEqual([]);
+  });
+
+  it('keeps a suggestion beyond the cap Suggested and unmarked', () => {
+    renderManager({
+      images: ['s1', 's2', 's3', 's4'].map((id) => image(id, { isPrimary: true })),
+    });
+
+    expect(within(tileFor('s4')).getByText('Suggested')).toBeInTheDocument();
+    expect(shownBadgesOn('s4')).toEqual([]);
+  });
+
+  it('marks the first pool images with alt text when no suggestion has alt text', () => {
+    renderManager({
+      images: [
+        image('no-alt-suggestion', { isPrimary: true, alt: null }),
+        image('a'),
+        image('bare', { alt: null }),
+        image('b'),
+        image('c'),
+        image('d'),
+      ],
+    });
+
+    expect(['a', 'b', 'c', 'd', 'bare', 'no-alt-suggestion'].map(shownBadgesOn)).toEqual([
+      ['Shown (first in pool)'],
+      ['Shown (first in pool)'],
+      ['Shown (first in pool)'],
+      [],
+      [],
+      [],
+    ]);
+  });
+
+  it('marks nothing as shown once a human has chosen', () => {
+    renderManager();
+
+    expect(
+      within(screen.getByRole('group', { name: 'Image pool' })).queryAllByText(/^Shown/)
+    ).toEqual([]);
   });
 
   it('shows the pool count', () => {
