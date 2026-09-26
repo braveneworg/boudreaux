@@ -33,3 +33,7 @@ Rules:
   directly. `nginx/nginx.conf.spec.ts` guards the burst value; the effect is
   proven only by a prod smoke (open → back → open, then two fast reloads,
   Network tab open).
+- A call that every page load makes (the session read) does not belong in
+  the interaction zone: on a shared IP, a room's page loads would drain the
+  budget its searches need. It has its own `session` zone, and better-auth's
+  own limit for that path is raised to match (`docs/adr/0013`).
