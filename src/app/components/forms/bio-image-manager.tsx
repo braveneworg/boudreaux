@@ -23,6 +23,7 @@ import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 import { BioImageTile, resolveImageLabels } from './bio-image-tile';
 import { BioImageUploadZone } from './bio-image-upload-zone';
 import { DisplayImageStrip } from './display-image-strip';
+import { ImageSourceLinksSection } from './image-source-links-section';
 
 export interface BioImageManagerProps {
   artistId: string;
@@ -215,6 +216,8 @@ export const BioImageManager = ({
           </>
         )}
       </div>
+
+      <ImageSourceLinksSection artistId={artistId} disabled={disabled} />
     </section>
   );
 };

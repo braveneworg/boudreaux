@@ -6,6 +6,7 @@ import { getCoverArtImages } from './caa.js';
 import { postBioCallback } from './callback.js';
 import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
+import { isImageLinksTask, runImageLinksLambda } from './image-links.js';
 import { readUrl, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey, getSerperApiKey } from './lib/secrets.js';
@@ -19,6 +20,7 @@ import {
   isReleaseDescriptionLookupTask,
   runReleaseDescriptionLookupLambda,
 } from './release-description-lookup.js';
+import { toScrapedBioImage } from './scraped-image.js';
 import { searchSerperImages } from './serper.js';
 import {
   bioGenerationInputSchema,
@@ -42,6 +44,7 @@ import type {
   BioGenerationResult,
   BioImage,
   BioLink,
+  ImageLinksResult,
   ProgressStage,
   ReleaseDateLookupResult,
   ReleaseDescriptionLookupResult,
@@ -547,29 +550,6 @@ const followKnownLinksForImages = async (
   }
 };
 
-/** The registrable host of a scraped image's source page, for attribution. */
-const attributionHost = (sourceUrl: string): string => {
-  try {
-    return new URL(sourceUrl).hostname.replace(/^www\./, '');
-  } catch {
-    return 'web';
-  }
-};
-
-/** Maps a scraped page image onto the {@link BioImage} shape Commons images use. */
-const toScrapedBioImage = (image: ScrapedImage): BioImage => ({
-  url: image.url,
-  thumbnailUrl: null,
-  title: image.alt,
-  attribution: attributionHost(image.sourceUrl),
-  license: null,
-  licenseUrl: null,
-  sourceUrl: image.sourceUrl,
-  width: null,
-  height: null,
-  isPrimary: false,
-});
-
 /** Year prefix of an ISO date, or null when absent/malformed. */
 const yearOf = (isoDate: string | null | undefined): string | null => {
   const year = isoDate?.slice(0, 4);
@@ -926,6 +906,7 @@ export const runLambda = async (
 ): Promise<
   | BioGenerationResult
   | VideoEnrichmentResult
+  | ImageLinksResult
   | ReleaseDateLookupResult
   | ReleaseDescriptionLookupResult
 > => {
@@ -940,6 +921,11 @@ export const runLambda = async (
   }
   if (isVideoEnrichmentTask(event)) {
     return runVideoEnrichmentLambda(event);
+  }
+  // The images-from-links task shares the bio path's reader, Rekognition and
+  // callback collaborators, so the same deps bag is the seam for both.
+  if (isImageLinksTask(event)) {
+    return runImageLinksLambda(event, deps);
   }
 
   const parsed = bioGenerationInputSchema.safeParse(event);
@@ -988,6 +974,7 @@ export const lambdaHandler = async (
 ): Promise<
   | BioGenerationResult
   | VideoEnrichmentResult
+  | ImageLinksResult
   | ReleaseDateLookupResult
   | ReleaseDescriptionLookupResult
 > => runLambda(event);

@@ -191,6 +191,11 @@ export const BioImageTile = ({
           Custom
         </Badge>
       )}
+      {image.origin === 'linked' && (
+        <Badge variant="outline" className="bg-background/80 absolute top-1 right-1 text-[10px]">
+          Linked
+        </Badge>
+      )}
       <Image
         src={thumbSrc}
         alt={alt}

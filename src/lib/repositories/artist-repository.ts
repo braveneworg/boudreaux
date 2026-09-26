@@ -24,8 +24,10 @@ import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { getArtistDisplayName, type ArtistNameFields } from '@/lib/utils/get-artist-display-name';
 import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
+import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { runQuery } from './_internal/map-prisma-error';
+import { referenceLinkWhere } from './artist-bio-link-repository';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -102,6 +104,16 @@ export interface BioGenerationStateRecord {
     kind: string | null;
     origin: string | null;
   }>;
+}
+
+/** Projection returned by {@link ArtistRepository.getImageLinksJobState}. */
+export interface ImageLinksJobStateRecord {
+  slug: string;
+  imageLinksStatus: string | null;
+  imageLinksError: string | null;
+  imageLinksStartedAt: Date | null;
+  imageLinksJobToken: string | null;
+  imageLinksAddedCount: number | null;
 }
 
 // =============================================================================
@@ -221,7 +233,7 @@ const artistWithReleaseGraphInclude = {
   labels: true,
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
-  bioLinks: { orderBy: { sortOrder: 'asc' } },
+  bioLinks: { where: referenceLinkWhere, orderBy: { sortOrder: 'asc' } },
   members: { include: { member: true } },
   releases: artistReleaseRowsInclude,
   memberOf: { include: { artist: { include: { releases: artistReleaseRowsInclude } } } },
@@ -766,11 +778,11 @@ export class ArtistRepository {
     await runQuery(() =>
       prisma.$transaction(
         async (tx) => {
-          // (a) Read surviving custom rows so their URLs can shield matching
-          // generated rows from re-insertion.
+          // (a) Read surviving custom (and, for images, linked) rows so their
+          // URLs can shield matching generated rows from re-insertion.
           const [customImages, customLinks] = await Promise.all([
             tx.artistBioImage.findMany({
-              where: { artistId, origin: 'custom' },
+              where: { artistId, origin: { in: ['custom', 'linked'] } },
               select: { url: true },
             }),
             tx.artistBioLink.findMany({
@@ -879,6 +891,73 @@ export class ArtistRepository {
   }
 
   /**
+   * Update the async images-from-links lifecycle fields (independent of the bio
+   * job's columns so both can run at once). `error`/`startedAt`/`addedCount`
+   * are only written when explicitly provided; marking a run `pending` clears
+   * the previous run's `imageLinksAddedCount` so a stale count never toasts.
+   */
+  static async setImageLinksStatus(
+    artistId: string,
+    status: AsyncJobStatus,
+    opts: { error?: string | null; startedAt?: Date | null; addedCount?: number | null } = {}
+  ): Promise<void> {
+    await runQuery(() =>
+      prisma.artist.update({
+        where: { id: artistId },
+        data: {
+          imageLinksStatus: status,
+          ...(opts.error !== undefined ? { imageLinksError: opts.error } : {}),
+          ...(opts.startedAt !== undefined ? { imageLinksStartedAt: opts.startedAt } : {}),
+          ...(opts.addedCount !== undefined ? { imageLinksAddedCount: opts.addedCount } : {}),
+          ...(status === 'pending' && opts.addedCount === undefined
+            ? { imageLinksAddedCount: null }
+            : {}),
+        },
+      })
+    );
+  }
+
+  /** Set (or clear, with null) the per-job callback token of the images-from-links job. */
+  static async setImageLinksJobToken(artistId: string, token: string | null): Promise<void> {
+    await runQuery(() =>
+      prisma.artist.update({ where: { id: artistId }, data: { imageLinksJobToken: token } })
+    );
+  }
+
+  /**
+   * Atomically claim the images-from-links job iff the stored token matches AND
+   * the job is still processing, clearing the token so only ONE concurrent
+   * callback wins. Returns true iff THIS caller claimed it.
+   */
+  static async claimImageLinksJobToken(artistId: string, token: string): Promise<boolean> {
+    const result = await runQuery(() =>
+      prisma.artist.updateMany({
+        where: { id: artistId, imageLinksJobToken: token, imageLinksStatus: 'processing' },
+        data: { imageLinksJobToken: null },
+      })
+    );
+    return result.count === 1;
+  }
+
+  /** Reads the images-from-links job columns (plus slug, for revalidation).
+   *  Returns `null` when the artist does not exist. */
+  static async getImageLinksJobState(artistId: string): Promise<ImageLinksJobStateRecord | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({
+        where: { id: artistId },
+        select: {
+          slug: true,
+          imageLinksStatus: true,
+          imageLinksError: true,
+          imageLinksStartedAt: true,
+          imageLinksJobToken: true,
+          imageLinksAddedCount: true,
+        },
+      })
+    );
+  }
+
+  /**
    * Reads the async bio-generation state plus the persisted bio content, so the
    * status endpoint can report progress and hand back the finished bio for the
    * admin form to populate. Returns `null` when the artist does not exist.
@@ -924,6 +1003,7 @@ export class ArtistRepository {
             },
           },
           bioLinks: {
+            where: referenceLinkWhere,
             orderBy: { sortOrder: 'asc' },
             select: { id: true, label: true, url: true, kind: true, origin: true },
           },

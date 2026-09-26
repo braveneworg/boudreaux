@@ -41,6 +41,12 @@ vi.mock('./bio-image-upload-zone', () => ({
   ),
 }));
 
+vi.mock('./image-source-links-section', () => ({
+  ImageSourceLinksSection: ({ artistId, disabled }: { artistId: string; disabled?: boolean }) => (
+    <div data-testid="image-sources-stub" data-artist-id={artistId} data-disabled={disabled} />
+  ),
+}));
+
 const image = (id: string, overrides: Partial<BioStatusImage> = {}): BioStatusImage => ({
   id,
   url: `https://cdn.example/${id}.webp`,
@@ -94,6 +100,16 @@ describe('BioImageManager', () => {
       'artist-1'
     );
     expect(within(region).getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
+  });
+
+  it('renders the image-sources editor below the pool, passing artist id and disabled', () => {
+    renderManager({ disabled: true });
+    const region = screen.getByRole('region', { name: 'Bio images' });
+    const stub = within(region).getByTestId('image-sources-stub');
+    expect(stub).toHaveAttribute('data-artist-id', 'artist-1');
+    expect(stub).toHaveAttribute('data-disabled', 'true');
+    const pool = within(region).getByRole('group', { name: 'Image pool' });
+    expect(pool.compareDocumentPosition(stub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('derives the chosen strip from the pool in display order', () => {

@@ -49,6 +49,13 @@ export type ArtistScalars = {
   bioStartedAt: Date | null;
   bioJobToken: string | null;
   bioProgress: Json | null;
+  /** Async images-from-links job state (`pending`/`processing`/`succeeded`/`failed`); `null` = never run. */
+  imageLinksStatus: string | null;
+  imageLinksError: string | null;
+  imageLinksStartedAt: Date | null;
+  imageLinksJobToken: string | null;
+  /** Images the last succeeded images-from-links job added to the pool. */
+  imageLinksAddedCount: number | null;
   slug: string;
   genres: string | null;
   bornOn: Date | null;
@@ -111,7 +118,7 @@ export interface ArtistBioImageRecord {
   hasFace: boolean | null;
   /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
   faceScore: number | null;
-  /** Provenance: `'generated'` (owned by the job) or `'custom'` (owned by a human); `null`/missing on legacy rows, read as generated. */
+  /** Provenance: `'generated'` (owned by the job), `'custom'` (owned by a human) or `'linked'` (scraped from an admin-supplied page); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
   /** Human-chosen display position (0-based) among the artist's display images; `null` = not chosen. Never written by regeneration. */
@@ -135,8 +142,12 @@ export interface CreateArtistBioImageData {
   isPrimary?: boolean;
   kind?: string | null;
   alt?: string | null;
-  /** Always `'custom'` for this manual-upload path; the repository stamps it when absent. */
-  origin?: 'custom';
+  /** Rekognition face signal; only the images-from-links path supplies it. */
+  hasFace?: boolean | null;
+  /** Rekognition face-match confidence 0–100; only the images-from-links path supplies it. */
+  faceScore?: number | null;
+  /** `'custom'` for the manual-upload path (stamped when absent); `'linked'` for images scraped from admin-supplied pages. */
+  origin?: 'custom' | 'linked';
 }
 
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
@@ -149,6 +160,10 @@ export interface ArtistBioLinkRecord {
   /** Provenance: `'generated'` (AI discovery) or `'custom'` (admin-authored); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
+  /** Bio reference link role (palette, bio payload, public links); `null`/missing on legacy rows, read as `true`. */
+  reference: boolean | null;
+  /** Image-source role (read for photos by the images-from-links job); `null`/missing on legacy rows, read as `false`. */
+  imageSource: boolean | null;
 }
 
 /** Fields for creating one bio link row (admin-authored custom link). */
@@ -159,6 +174,10 @@ export interface CreateArtistBioLinkData {
   kind?: string | null;
   /** Always `'custom'` for this admin-authored path; the repository stamps it when absent. */
   origin?: 'custom';
+  /** Bio reference role; defaults to `true` (the reference-links path). */
+  reference?: boolean;
+  /** Image-source role; defaults to `false` (the reference-links path). */
+  imageSource?: boolean;
 }
 
 /**

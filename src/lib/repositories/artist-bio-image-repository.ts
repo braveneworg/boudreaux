@@ -67,6 +67,66 @@ export class ArtistBioImageRepository {
     }) as Promise<ArtistBioImageRecord>;
   }
 
+  /**
+   * Inserts a batch of bio image rows (the images-from-links job's survivors)
+   * after the artist's current highest `sortOrder`, preserving batch order. A
+   * single `createMany` rather than concurrent `create`s — see
+   * `docs/lessons/prisma-mongo/concurrent-create-readback-race.md`. Returns the
+   * number of rows inserted; an empty batch is a no-op.
+   */
+  static async createMany(rows: CreateArtistBioImageData[]): Promise<number> {
+    if (rows.length === 0) return 0;
+    const [{ artistId }] = rows;
+    return runQuery(async () => {
+      const { _max } = await prisma.artistBioImage.aggregate({
+        where: { artistId },
+        _max: { sortOrder: true },
+      });
+      const base = (_max.sortOrder ?? -1) + 1;
+      const { count } = await prisma.artistBioImage.createMany({
+        data: rows.map((data, index) => ({
+          artistId: data.artistId,
+          url: data.url,
+          thumbnailUrl: data.thumbnailUrl,
+          title: data.title,
+          attribution: data.attribution,
+          license: data.license,
+          licenseUrl: data.licenseUrl,
+          sourceUrl: data.sourceUrl,
+          originalUrl: data.originalUrl,
+          width: data.width,
+          height: data.height,
+          isPrimary: data.isPrimary ?? false,
+          kind: data.kind,
+          alt: data.alt,
+          hasFace: data.hasFace ?? null,
+          faceScore: data.faceScore ?? null,
+          origin: data.origin ?? 'custom',
+          sortOrder: base + index,
+        })),
+      });
+      return count;
+    });
+  }
+
+  /** The set of every URL the artist's pool already holds — stored CDN URLs
+   *  and the external `originalUrl`s they were re-hosted from — so a scrape can
+   *  skip images that are already in the pool before re-hosting them. */
+  static async findExistingUrls(artistId: string): Promise<Set<string>> {
+    const rows = await runQuery(() =>
+      prisma.artistBioImage.findMany({
+        where: { artistId },
+        select: { url: true, originalUrl: true },
+      })
+    );
+    const urls = new Set<string>();
+    for (const { url, originalUrl } of rows) {
+      urls.add(url);
+      if (originalUrl) urls.add(originalUrl);
+    }
+    return urls;
+  }
+
   /** Deletes a single discovered bio image row (palette X) and returns its
    *  stored URLs so the caller can clean up the CDN thumbnail. */
   static async delete(imageId: string): Promise<{ url: string; thumbnailUrl: string | null }> {

@@ -168,6 +168,22 @@ export {
   type VideoEnrichmentResult,
 } from '@fakefour/job-contract';
 
+/**
+ * Images-from-links wire shapes — the task discriminator, the per-job link cap,
+ * the invoke input and the result envelope — are single-sourced in
+ * `@fakefour/job-contract` and re-exported here so `image-links.ts` /
+ * `callback.ts` import from the same module as every other task.
+ */
+export {
+  IMAGE_LINKS_TASK,
+  MAX_IMAGE_LINKS,
+  imageLinksInputSchema,
+  imageLinksResultSchema,
+  type ImageLinksInput,
+  type ImageLinksData,
+  type ImageLinksResult,
+} from '@fakefour/job-contract';
+
 export const releaseDateLookupInputSchema = z.object({
   task: z.literal('release-date-lookup'),
   title: z.string().min(1),

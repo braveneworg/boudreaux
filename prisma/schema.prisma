@@ -286,6 +286,11 @@ model Artist {
   bioStartedAt          DateTime? // When the current/last bio generation job started (for stale-job detection)
   bioJobToken           String? // Opaque per-job token for the async callback; set at dispatch, cleared on completion (guards stale/overtaken writes)
   bioProgress           Json? // Latest async-generation progress checkpoint { stage, detail?, counts?, at }; cleared when a new run is marked pending
+  imageLinksStatus      String? // Async images-from-links job state: pending | processing | succeeded | failed (null = never run); independent of bioStatus so both jobs can run at once
+  imageLinksError       String? // Error message from the last failed images-from-links job, if any
+  imageLinksStartedAt   DateTime? // When the current/last images-from-links job started (for stale-job detection)
+  imageLinksJobToken    String? // Opaque per-job token for the images-from-links callback; set at dispatch, cleared on completion
+  imageLinksAddedCount  Int? // Images the last succeeded images-from-links job added to the pool (drives the admin toast)
   slug                  String                 @unique // Prepopulate or choose a URL-friendly dasherized unique identifier; the artists page will be at /artists/{slug}
   genres                String? // Comma-joined, split into an array on retrieval. Source of truth (the Genre collection has no reader); normalised lowercase-dasherized and human-owned — see ADR-0009
   bornOn                DateTime? // Always feature artist on their birthday if known
@@ -437,9 +442,10 @@ model ArtistBioImage {
   alt          String? // Accessible description written by the vision pass
   hasFace      Boolean? // Rekognition face signal; null = not analyzed
   faceScore    Float? // Rekognition face-match confidence 0–100; null = not analyzed
-  /// Provenance: "generated" (AI discovery) or "custom" (admin upload). Nullable
-  /// because MongoDB documents predating this field are missing it — a null/missing
-  /// value is treated as generated, so regeneration deletes it like a generated row.
+  /// Provenance: "generated" (owned by the bio job — pruned on regeneration), "custom"
+  /// (chosen/uploaded by a human — survives and seeds face references) or "linked"
+  /// (scraped by the images-from-links job — survives regeneration). Nullable because
+  /// MongoDB documents predating this field are missing it — null/missing reads as generated.
   origin       String?
   sortOrder    Int      @default(0)
   /// Human-chosen display position (0-based, capped by DISPLAY_IMAGE_CAP) among
@@ -456,16 +462,22 @@ model ArtistBioImage {
 // official site, MusicBrainz, socials). Kept separate from the curated `urls`/
 // `artistUrls` relations so regeneration never clobbers hand-entered links.
 model ArtistBioLink {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  artist    Artist  @relation(fields: [artistId], references: [id])
-  artistId  String  @db.ObjectId
-  label     String // Display label, e.g. "Wikipedia"
-  url       String
-  kind      String? // wikipedia | official | musicbrainz | social | other
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist      Artist   @relation(fields: [artistId], references: [id])
+  artistId    String   @db.ObjectId
+  label       String // Display label, e.g. "Wikipedia"
+  url         String
+  kind        String? // wikipedia | official | musicbrainz | social | other
   /// Provenance: "generated" (AI discovery) or "custom" (admin-authored). Nullable
   /// so legacy rows without the field read as generated and regeneration prunes them.
-  origin    String?
-  sortOrder Int     @default(0)
+  origin      String?
+  sortOrder   Int      @default(0)
+  /// Roles a row plays (a URL may play both — the (artistId, url) index allows one row per URL):
+  /// `reference` = bio reference link (palette, bio payload, public links); `imageSource` =
+  /// admin-supplied page the images-from-links job reads for photos. Nullable so legacy docs
+  /// missing the field read as reference-only (`reference` null → true, `imageSource` null → false).
+  reference   Boolean? @default(true)
+  imageSource Boolean? @default(false)
 
   // One row per (artist, url): the admin add-link paths dedupe by URL in the
   // service, and this index is the DB backstop so a concurrent double-add can

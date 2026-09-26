@@ -15,6 +15,7 @@ import {
 } from './handler.js';
 
 import type { BioGeneratorDeps } from './handler.js';
+import type * as ImageLinksModule from './image-links.js';
 import type * as ReleaseDateLookupModule from './release-date-lookup.js';
 import type * as ReleaseDescriptionLookupModule from './release-description-lookup.js';
 import type { ArtistFacts, BioImage } from './types.js';
@@ -34,6 +35,14 @@ vi.mock('./video-enrichment.js', async (importOriginal) => {
   return {
     ...actual,
     runVideoEnrichmentLambda: vi.fn().mockResolvedValue({ ok: false, error: 'stubbed' }),
+  };
+});
+
+vi.mock('./image-links.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof ImageLinksModule>();
+  return {
+    ...actual,
+    runImageLinksLambda: vi.fn().mockResolvedValue({ ok: true, data: { images: [] } }),
   };
 });
 
@@ -2135,6 +2144,41 @@ describe('runLambda task routing', () => {
 
     expect(result).toEqual({ ok: false, error: expect.stringMatching(/Invalid input/) });
     expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
+  });
+
+  it('routes an images-from-links event to the image-links task with the deps seam', async () => {
+    const { runImageLinksLambda } = await import('./image-links.js');
+    const { runVideoEnrichmentLambda } = await import('./video-enrichment.js');
+    const event = { task: 'images-from-links', artistId: 'a1', links: ['https://x/1'] };
+
+    const result = await runLambda(event);
+
+    expect(vi.mocked(runImageLinksLambda).mock.calls).toEqual([
+      [
+        event,
+        expect.objectContaining({
+          readUrl: expect.any(Function),
+          getScrapeApiKey: expect.any(Function),
+          fetchReferenceBytes: expect.any(Function),
+          annotateFaces: expect.any(Function),
+          postCallback: expect.any(Function),
+        }),
+      ],
+    ]);
+    expect(vi.mocked(runVideoEnrichmentLambda)).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, data: { images: [] } });
+  });
+
+  it('keeps an images-from-links event off the bio path', async () => {
+    const deps = makeDeps();
+
+    await runLambda(
+      { task: 'images-from-links', callbackUrl: 'https://x/cb', jobToken: 't' },
+      deps
+    );
+
+    expect(deps.lookupArtist).not.toHaveBeenCalled();
+    expect(deps.postCallback).not.toHaveBeenCalled();
   });
 
   it('routes a release-description-lookup event to its lookup task', async () => {

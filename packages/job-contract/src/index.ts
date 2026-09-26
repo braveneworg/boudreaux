@@ -61,3 +61,17 @@ export {
   type VideoEnrichmentCallback,
   type VideoEnrichmentProgressPost,
 } from './video-enrichment';
+
+export {
+  IMAGE_LINKS_TASK,
+  MAX_IMAGE_LINKS,
+  MAX_IMAGE_LINK_REFERENCES,
+  imageLinksInputSchema,
+  imageLinksDataSchema,
+  imageLinksResultSchema,
+  imageLinksCallbackSchema,
+  type ImageLinksInput,
+  type ImageLinksData,
+  type ImageLinksResult,
+  type ImageLinksCallback,
+} from './image-links';

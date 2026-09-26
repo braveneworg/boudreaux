@@ -55,6 +55,12 @@ vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
   }),
 }));
 
+// The image-sources editor owns its own queries/mutations (covered by its own
+// spec); stub it so the wrapper renders without a QueryClient.
+vi.mock('./image-source-links-section', () => ({
+  ImageSourceLinksSection: () => <div data-testid="image-sources-stub" />,
+}));
+
 // The upload zone owns the presign pipeline; stub it with a button that
 // reports a row so the wrapper's refetch wiring can be exercised.
 vi.mock('./bio-image-upload-zone', () => ({

@@ -67,7 +67,13 @@ interface BatchVerdictResult {
   dropped: number;
 }
 
-interface FetchedCandidate {
+/**
+ * One candidate whose bytes were fetched: the input image plus the inline
+ * payload the vision batch (or, for the images-from-links task, Rekognition
+ * directly) consumes. Structurally identical to {@link VerifiedScrapedImage},
+ * which is the same entry after a verdict enriched its `image`.
+ */
+export interface FetchedCandidate {
   image: BioImage;
   mimeType: string;
   base64: string;
@@ -114,8 +120,12 @@ const fetchCandidate = async (
   }
 };
 
-/** Pool-limited candidate fetching, preserving input order of survivors. */
-const fetchCandidates = async (
+/**
+ * Pool-limited candidate fetching, preserving input order of survivors. Exported
+ * so the images-from-links task can reuse the exact fetch policy (timeout, byte
+ * cap, image-only content-type) without the Gemini vision gate.
+ */
+export const fetchCandidates = async (
   candidates: BioImage[],
   fetchFn: typeof fetch
 ): Promise<FetchedCandidate[]> => {

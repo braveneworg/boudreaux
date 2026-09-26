@@ -1,0 +1,66 @@
+# ADR-0010: Image-source links feed the pool without a vision gate
+
+- **Status**: Accepted
+- **Date**: 2026-09-25
+
+## Context
+
+The only ways into an artist's image pool were the bio-generation job's own
+discovery (MusicBrainz → Commons, Jina web search, Serper, a Bandcamp/Discogs
+link-follow) and a manual upload. An admin who knows exactly where the good
+photos live — a press kit, a photographer's gallery, a direct image file —
+had no way to point the job at that page. The "Reference links" input on the
+bio-generation section looked like it might do this, but the Lambda only
+appends those links to the output link list after every image stage has run,
+so a reference link never yields an image.
+
+Two constraints shaped the design. `ArtistBioLink` has a unique
+`(artistId, url)` index, so a URL can only be stored once per artist. And
+`ArtistRepository.replaceBioContent` deletes every image row that is not
+`origin: 'custom'`, while `custom` also means "a human chose this for
+display" and seeds the next run's Rekognition face references (ADR-0008).
+
+## Decision
+
+**Image sources are `ArtistBioLink` rows that play a separate role, read by
+their own async Lambda task, whose images land in the pool as
+`origin: 'linked'`.**
+
+- A link row carries two nullable role flags: `reference` (default `true`)
+  and `imageSource` (default `false`). A URL added in the image-sources
+  section is an image-only custom row (`reference: false`); a URL that
+  already exists as a reference link simply gains `imageSource: true`. Every
+  reader of reference links — the status endpoint that feeds the palette and
+  the reference list, and the public artist include — filters on the
+  reference role (`referenceLinkWhere`), so image-only rows never reach the
+  bio payload, the palette, or the public page. Legacy documents without the
+  fields read as reference-only.
+- The scrape is a new `images-from-links` task in the bio-generator Lambda,
+  dispatched as a fire-and-forget `Event` invoke with its own callback route
+  and its own lifecycle columns on `Artist` (`imageLinks*`), so it can run
+  while a bio generation runs. Each link is HEAD-probed first: an `image/*`
+  response is a single candidate; anything else is read through Jina, whose
+  URL/alt heuristics already drop icons and junk. Survivors are face-scored
+  with Rekognition against the artist's custom display images, but the
+  Gemini vision gate is skipped — the admin chose the page, so the cheap
+  filters plus a human's later curation are the gate.
+- Scraped images are re-hosted and inserted with `origin: 'linked'`. The
+  regeneration delete targets only `generated`/unset rows, so linked images
+  survive a bio regeneration like custom ones do; unlike custom rows they are
+  not human-chosen, so they never seed face references and carry no
+  `displayOrder` until an admin picks them. Candidates whose URL already
+  exists in the pool (`url` or `originalUrl`) are skipped before re-hosting.
+- Progress is status-only: the section polls the job status and toasts the
+  number of images added. No per-stage progress channel.
+
+## Consequences
+
+- Two more nullable booleans on `ArtistBioLink` and five job columns on
+  `Artist` need a manual production `prisma db push` (#751) before the deploy
+  that reads them.
+- `bioOriginSchema` gains `linked`; the image tile shows a "Linked" badge.
+- The Lambda's `fetchCandidates` (bytes for Rekognition) is now exported from
+  `vision.ts`, and `toScrapedBioImage` lives in `scraped-image.ts` so the task
+  module does not import the orchestrator.
+- The bio job's own Jina/Serper/link-follow image discovery is unchanged;
+  admin image sources are additive.
