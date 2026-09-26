@@ -37,7 +37,7 @@ const expectedSignature = (body: string, t: number): string =>
   `t=${t},v1=${createHmac('sha256', SIGNING_KEY).update(`${t}.${body}`).digest('hex')}`;
 
 const sentHeaders = (fetchFn: ReturnType<typeof vi.fn>, call = 0): Record<string, string> =>
-  (fetchFn.mock.calls[call] as [string, RequestInit])[1].headers as Record<string, string>;
+  (fetchFn.mock.calls.at(call) as [string, RequestInit])[1].headers as Record<string, string>;
 
 describe('postBioCallback signing', () => {
   beforeEach(() => {
