@@ -62,6 +62,7 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   const filters = artistListingQuerySchema.parse({
     search: searchParams.get('search') ?? undefined,
     sort: searchParams.get('sort') ?? undefined,
+    roster: searchParams.get('roster') ?? undefined,
     skip: searchParams.get('skip') ?? undefined,
     take: searchParams.get('take') ?? undefined,
   });
@@ -125,7 +126,8 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  * Query params:
  *   listing   – When "published", returns one page of listed artists for any
  *               visitor via `ArtistService.listPublishedArtists` (ADR-0007);
- *               honors `skip`, `take`, `sort` (`alpha` | `newest`), and a
+ *               honors `skip`, `take`, `sort` (`alpha` | `newest`),
+ *               `roster` (`current` default | `alumni` | `all`), and a
  *               name/aka/genre/release-title `search`.
  *   skip, take, search, published, deleted – Pagination/filter params for the
  *               admin listing mode (requires the admin role; `skip` default 0,

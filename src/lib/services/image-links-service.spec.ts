@@ -24,6 +24,7 @@ const upsertImageSourceMock = vi.hoisted(() => vi.fn());
 const removeImageSourceMock = vi.hoisted(() => vi.fn());
 const findCustomUrlsMock = vi.hoisted(() => vi.fn());
 const findExistingUrlsMock = vi.hoisted(() => vi.fn());
+const findFingerprintsMock = vi.hoisted(() => vi.fn());
 const createManyMock = vi.hoisted(() => vi.fn());
 const rehostImagesMock = vi.hoisted(() => vi.fn());
 
@@ -66,14 +67,18 @@ vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
   ArtistBioImageRepository: {
     findCustomUrls: (id: string) => findCustomUrlsMock(id),
     findExistingUrls: (id: string) => findExistingUrlsMock(id),
+    findFingerprints: (id: string, origins?: string[]) => findFingerprintsMock(id, origins),
     createMany: (rows: unknown[]) => createManyMock(rows),
   },
 }));
 
 vi.mock('./bio-image-service', () => ({
   BioImageService: {
-    rehostImages: (images: ReadonlyArray<{ url: string; index: number }>, artistId: string) =>
-      rehostImagesMock(images, artistId),
+    rehostImages: (
+      images: ReadonlyArray<{ url: string; index: number }>,
+      artistId: string,
+      knownImages: unknown
+    ) => rehostImagesMock(images, artistId, knownImages),
   },
 }));
 
@@ -94,7 +99,6 @@ const artist = {
   surname: 'R',
   isPseudonymous: true,
   slug: 'ceschi',
-  images: [{ src: 'https://cdn/artist-1.jpg' }],
 };
 
 const sourceLinks = [
@@ -116,6 +120,7 @@ beforeEach(() => {
   findImageSourcesMock.mockResolvedValue(sourceLinks);
   findCustomUrlsMock.mockResolvedValue(['https://cdn/custom-1.jpg']);
   findExistingUrlsMock.mockResolvedValue(new Set<string>());
+  findFingerprintsMock.mockResolvedValue([]);
   createManyMock.mockResolvedValue(0);
   sendMock.mockResolvedValue({});
   rehostImagesMock.mockResolvedValue({ results: [], duplicateAliases: new Map() });
@@ -233,7 +238,7 @@ describe('ImageLinksService.runJob', () => {
       artistId: 'a1',
       displayName: 'Ceschi',
       links: ['https://press.test/kit', 'https://photos.test/a.jpg'],
-      referenceImageUrls: ['https://cdn/artist-1.jpg', 'https://cdn/custom-1.jpg'],
+      referenceImageUrls: ['https://cdn/custom-1.jpg'],
       callbackUrl: 'https://app.test/api/artists/a1/image-links/callback',
       jobToken: token,
     });
@@ -302,12 +307,12 @@ describe('ImageLinksService.runJob', () => {
     expect((decodePayload(lastCommand()).links as string[]).length).toBe(20);
   });
 
-  it('degrades to artist images only when the custom-image lookup fails', async () => {
+  it('omits reference images when the custom-image lookup fails', async () => {
     findCustomUrlsMock.mockRejectedValueOnce(new Error('db'));
 
     await ImageLinksService.runJob('a1');
 
-    expect(decodePayload(lastCommand()).referenceImageUrls).toEqual(['https://cdn/artist-1.jpg']);
+    expect(decodePayload(lastCommand()).referenceImageUrls).toBeUndefined();
     expect(mockLoggerWarn).toHaveBeenCalled();
   });
 
@@ -491,6 +496,7 @@ describe('ImageLinksService.completeCallback', () => {
           { url: 'https://press.test/new-2.jpg', index: 1 },
         ],
         'a1',
+        [],
       ],
     ]);
     expect(createManyMock.mock.calls).toEqual([
@@ -516,6 +522,74 @@ describe('ImageLinksService.completeCallback', () => {
     ]);
     expect(setImageLinksStatusMock.mock.calls).toEqual([
       ['a1', 'succeeded', { error: null, addedCount: 1 }],
+    ]);
+  });
+
+  it("seeds the re-host dedupe with every pool image's hashes, whatever its origin", async () => {
+    const fingerprints = [
+      { url: 'https://cdn/commons.webp', contentHash: 'sha-commons', perceptualHash: null },
+      { url: 'https://cdn/custom.webp', contentHash: null, perceptualHash: '00000000000000ff' },
+    ];
+    findFingerprintsMock.mockResolvedValueOnce(fingerprints);
+
+    await ImageLinksService.completeCallback('a1', {
+      ok: true,
+      data: { images: [image('https://band.test/same-photo.jpg')] },
+    });
+
+    expect(findFingerprintsMock.mock.calls).toEqual([['a1', undefined]]);
+    expect(rehostImagesMock.mock.calls).toEqual([
+      [[{ url: 'https://band.test/same-photo.jpg', index: 0 }], 'a1', fingerprints],
+    ]);
+  });
+
+  it('adds nothing when the only candidate matches a pool image by content', async () => {
+    rehostImagesMock.mockResolvedValueOnce({
+      results: [null],
+      duplicateAliases: new Map([[0, 'https://cdn/commons.webp']]),
+    });
+
+    await ImageLinksService.completeCallback('a1', {
+      ok: true,
+      data: { images: [image('https://band.test/same-photo.jpg')] },
+    });
+
+    expect(createManyMock.mock.calls).toEqual([[[]]]);
+    expect(setImageLinksStatusMock.mock.calls).toEqual([
+      ['a1', 'succeeded', { error: null, addedCount: 0 }],
+    ]);
+  });
+
+  it("stores each new linked row's content and perceptual hashes", async () => {
+    rehostImagesMock.mockResolvedValueOnce({
+      results: [
+        {
+          url: 'https://cdn/new-1.webp',
+          width: 800,
+          height: 600,
+          contentHash: 'sha-new-1',
+          perceptualHash: '0000000000000abc',
+        },
+      ],
+      duplicateAliases: new Map(),
+    });
+    createManyMock.mockResolvedValueOnce(1);
+
+    await ImageLinksService.completeCallback('a1', {
+      ok: true,
+      data: { images: [image('https://press.test/new-1.jpg')] },
+    });
+
+    expect(createManyMock.mock.calls).toEqual([
+      [
+        [
+          expect.objectContaining({
+            url: 'https://cdn/new-1.webp',
+            contentHash: 'sha-new-1',
+            perceptualHash: '0000000000000abc',
+          }),
+        ],
+      ],
     ]);
   });
 

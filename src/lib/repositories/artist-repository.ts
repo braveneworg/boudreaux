@@ -10,8 +10,10 @@ import type {
   ArtistDetail,
   ArtistListFilters,
   ArtistListingFilters,
+  ArtistListingRoster,
   ArtistListingRecord,
   ArtistNameRecord,
+  ArtistPublicScalars,
   ArtistScalars,
   ArtistSearchMatch,
   ArtistVocabularyField,
@@ -26,6 +28,7 @@ import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
+import { artistPublicSelect } from './_internal/artist-public-select';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
@@ -120,17 +123,11 @@ export interface ImageLinksJobStateRecord {
 // Query shapes (single source of truth for both the query and the drift check)
 // =============================================================================
 
-/** Admin listing include — release scalars, capped images, labels, urls. */
+/** Admin listing include — release scalars, labels, urls. */
 const artistAdminInclude = {
-  images: { orderBy: { sortOrder: 'asc' }, take: 3 },
   labels: true,
   urls: true,
   releases: { include: { release: true } },
-} as const satisfies Prisma.ArtistInclude;
-
-/** By-id include — ordered images only (the `GET /api/artists/[id]` shape). */
-const artistDetailInclude = {
-  images: { orderBy: { sortOrder: 'asc' } },
 } as const satisfies Prisma.ArtistInclude;
 
 /** Name projection of a related artist (band member / band) on a listing row. */
@@ -143,6 +140,16 @@ const artistListingNameSelect = {
   title: true,
   suffix: true,
 } as const satisfies Prisma.ArtistSelect;
+
+/**
+ * Display-image candidates: the human's chosen rows (`displayOrder: { gte: 0 }`
+ * matches only numbers — null and absent both fail) or the job's suggested
+ * rows. No DB-level take: Mongo sorts nulls first, so a cap here would return
+ * unchosen rows; the service resolves and caps after the read.
+ */
+const displayImageCandidateWhere = {
+  OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }],
+} as const satisfies Prisma.ArtistBioImageWhereInput;
 
 /**
  * Public artists-index select — the identifying scalars only (this payload
@@ -167,12 +174,8 @@ const artistListingSelect = {
   bornOn: true,
   diedOn: true,
   formedOn: true,
-  // Display-image candidates: the human's chosen rows (`displayOrder: { gte:
-  // 0 }` matches only numbers — null and absent both fail) or the job's
-  // suggested rows. No DB-level take: Mongo sorts nulls first, so a cap here
-  // would return unchosen rows; the service resolves and caps after the read.
   bioImages: {
-    where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
+    where: displayImageCandidateWhere,
     orderBy: { sortOrder: 'asc' },
     select: {
       id: true,
@@ -199,10 +202,15 @@ const artistListingSelect = {
   },
 } as const satisfies Prisma.ArtistSelect;
 
-/** Public-search include — first image plus release joins carrying the narrow
- * release projection the search consumes. */
+/** Public-search include — the display-image candidates behind the dropdown
+ * thumbnail plus release joins carrying the narrow release projection the
+ * search consumes. */
 const artistSearchInclude = {
-  images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+  bioImages: {
+    where: displayImageCandidateWhere,
+    orderBy: { sortOrder: 'asc' },
+    select: { url: true, thumbnailUrl: true, isPrimary: true, displayOrder: true },
+  },
   releases: {
     include: {
       release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
@@ -210,10 +218,13 @@ const artistSearchInclude = {
   },
 } as const satisfies Prisma.ArtistInclude;
 
-/** The full media `Release` graph loaded behind every artist-detail release join. */
+/**
+ * The media `Release` graph loaded behind every artist-detail release join,
+ * with each credited artist read through {@link artistPublicSelect} (#765).
+ */
 const releaseGraphInclude = {
   images: true,
-  artistReleases: { include: { artist: true } },
+  artistReleases: { include: { artist: { select: artistPublicSelect } } },
   digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
   releaseUrls: { include: { url: true } },
 } as const satisfies Prisma.ReleaseInclude;
@@ -224,20 +235,24 @@ const artistReleaseRowsInclude = {
 } as const satisfies Prisma.Artist$releasesArgs;
 
 /**
- * Public artist-detail include — full nested release + bio graph, plus the
- * same release graph for every band the artist is a member of so the page can
- * list band releases beside the artist's own.
+ * Public artist-detail select — the public scalars plus the full nested
+ * release + bio graph, and the same release graph for every band the artist is
+ * a member of so the page can list band releases beside the artist's own. A
+ * `select` (not an `include`) so no artist on the graph — the artist, members,
+ * bands, or release credits — carries a private scalar.
  */
-const artistWithReleaseGraphInclude = {
-  images: true,
+const artistWithReleaseGraphSelect = {
+  ...artistPublicSelect,
   labels: true,
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
   bioLinks: { where: referenceLinkWhere, orderBy: { sortOrder: 'asc' } },
-  members: { include: { member: true } },
+  members: { include: { member: { select: artistPublicSelect } } },
   releases: artistReleaseRowsInclude,
-  memberOf: { include: { artist: { include: { releases: artistReleaseRowsInclude } } } },
-} as const satisfies Prisma.ArtistInclude;
+  memberOf: {
+    include: { artist: { select: { ...artistPublicSelect, releases: artistReleaseRowsInclude } } },
+  },
+} as const satisfies Prisma.ArtistSelect;
 
 // Compile-time drift guards: fail `pnpm run typecheck` if a hand-written domain
 // type diverges from the Prisma payload its query actually returns.
@@ -245,17 +260,14 @@ type _ArtistDrift = AssertExact<
   Artist,
   Prisma.ArtistGetPayload<{ include: typeof artistAdminInclude }>
 >;
-type _ArtistDetailDrift = AssertExact<
-  ArtistDetail,
-  Prisma.ArtistGetPayload<{ include: typeof artistDetailInclude }>
->;
+type _ArtistDetailDrift = AssertExact<ArtistDetail, Prisma.ArtistGetPayload<object>>;
 type _ArtistListingRecordDrift = AssertExact<
   ArtistListingRecord,
   Prisma.ArtistGetPayload<{ select: typeof artistListingSelect }>
 >;
 type _ArtistWithReleaseGraphDrift = AssertExact<
   ArtistWithReleaseGraph,
-  Prisma.ArtistGetPayload<{ include: typeof artistWithReleaseGraphInclude }>
+  Prisma.ArtistGetPayload<{ select: typeof artistWithReleaseGraphSelect }>
 >;
 type _ArtistSearchMatchDrift = AssertExact<
   ArtistSearchMatch,
@@ -273,17 +285,9 @@ const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
 /** Build a Prisma create payload from domain create data. */
 const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
-  const { images, urls, ...scalars } = data;
+  const { urls, ...scalars } = data;
   return {
     ...scalars,
-    ...(images && {
-      images: {
-        connectOrCreate: images.map((image) => ({
-          where: { id: image.id },
-          create: { id: image.id, src: image.src, altText: image.altText, caption: image.caption },
-        })),
-      },
-    }),
     ...(urls && {
       urls: {
         connectOrCreate: urls.map((url) => ({
@@ -392,19 +396,63 @@ const listedReleaseWhere = {
   OR: [...notDeletedOr],
 } as const satisfies Prisma.ReleaseWhereInput;
 
+/** A current artist: still on the label (`isActive`, which defaults to true). */
+const currentArtistWhere = { isActive: true } as const satisfies Prisma.ArtistWhereInput;
+
+/**
+ * An alumnus: deactivated AND carrying a recorded departure date
+ * (`deactivatedAt` — "left the label"). An inactive artist with no departure
+ * date was hidden for some other reason and stays hidden everywhere public.
+ * `{ not: null }` excludes an unset field as well as an explicit null, the
+ * same guard the `publishedOn` gate relies on. `reactivatedAt` plays no part:
+ * re-signing sets `isActive` back to true, which makes the artist current.
+ */
+const alumniArtistWhere = {
+  isActive: false,
+  deactivatedAt: { not: null },
+} as const satisfies Prisma.ArtistWhereInput;
+
+/** Either a current artist or an alumnus — everyone the public may see. */
+const currentOrAlumniWhere = {
+  OR: [currentArtistWhere, alumniArtistWhere],
+} as const satisfies Prisma.ArtistWhereInput;
+
+/**
+ * The roster half of a listed artist's `where`, as `AND` members: current and
+ * alumni are single field matches, "all" is either of the two. Returned as a
+ * list so it composes with the token search's own `AND` without clobbering
+ * the top-level `OR` the soft-delete guard owns.
+ */
+const rosterWhere = (
+  roster: ArtistListingRoster
+): { fields: Prisma.ArtistWhereInput; and: Prisma.ArtistWhereInput[] } => {
+  switch (roster) {
+    case 'current':
+      return { fields: currentArtistWhere, and: [] };
+    case 'alumni':
+      return { fields: alumniArtistWhere, and: [] };
+    case 'all':
+      return { fields: {}, and: [currentOrAlumniWhere] };
+  }
+};
+
 /**
  * Build the `where` shared by the public artists index and the public artist
- * search: an active, non-deleted artist holding a DIRECT credit on at least
- * one listed release (a member credit alone never qualifies — ADR-0007), with
- * an optional case-insensitive token search — every word must match one of
- * the name fields, aka names, genres, or the titles of their listed releases.
+ * search: a non-deleted artist in the requested roster (current by default)
+ * holding a DIRECT credit on at least one listed release (a member credit
+ * alone never qualifies — ADR-0007), with an optional case-insensitive token
+ * search — every word must match one of the name fields, aka names, genres,
+ * or the titles of their listed releases.
  *
  * `requirePublished` adds the artist-level `publishedOn` gate the index uses;
  * the playlist "By artist" search deliberately keeps today's rule without it.
  */
 const buildListedWhere = (
   search: string | undefined,
-  { requirePublished }: { requirePublished: boolean }
+  {
+    requirePublished,
+    roster = 'current',
+  }: { requirePublished: boolean; roster?: ArtistListingRoster }
 ): Prisma.ArtistWhereInput => {
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
@@ -418,12 +466,14 @@ const buildListedWhere = (
         },
       ])
     : [];
+  const { fields, and: rosterAnd } = rosterWhere(roster);
+  const and = [...rosterAnd, ...tokenSearch];
   return {
-    isActive: true,
+    ...fields,
     ...(requirePublished && { publishedOn: { not: null } }),
     OR: [...notDeletedOr],
     releases: { some: { release: listedReleaseWhere } },
-    ...(tokenSearch.length > 0 && { AND: tokenSearch }),
+    ...(and.length > 0 && { AND: and }),
   };
 };
 
@@ -518,31 +568,29 @@ export class ArtistRepository {
   }
 
   /**
-   * Find an artist by id, including images ordered by sortOrder. The query pulls
-   * only `artistDetailInclude` (scalars + images), so the honest return is
-   * `ArtistDetail` — not the admin `Artist`, which also carries labels/urls/
-   * releases the by-id shape omits.
+   * Find an artist by id (scalars only). The honest return is `ArtistDetail` —
+   * not the admin `Artist`, which also carries labels/urls/releases the by-id
+   * shape omits.
    */
   static async findById(id: string): Promise<ArtistDetail | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({
-        where: { id },
-        include: artistDetailInclude,
-      })
-    );
-  }
-
-  /** Find an artist by slug (no relations). */
-  static async findBySlug(slug: string): Promise<ArtistScalars | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({ where: { slug } })
-    ) as Promise<ArtistScalars | null>;
+    return runQuery(() => prisma.artist.findUnique({ where: { id } }));
   }
 
   /**
-   * List one page of listed artists for the public `/artists` index — active,
-   * published, non-deleted, and directly credited on a listed release — with
-   * the narrow {@link artistListingSelect} projection and an optional search.
+   * Find an artist by slug (no relations), projected to the public scalars —
+   * this backs the public `GET /api/artists/slug/[slug]`.
+   */
+  static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({ where: { slug }, select: artistPublicSelect })
+    );
+  }
+
+  /**
+   * List one page of listed artists for the public `/artists` index — in the
+   * requested roster (current, alumni, or both), published, non-deleted, and
+   * directly credited on a listed release — with the narrow
+   * {@link artistListingSelect} projection and an optional search.
    *
    * Neither order can be sorted in the database: `alpha` ranks by the name an
    * artist is displayed under, which is composed from the name parts when no
@@ -555,10 +603,11 @@ export class ArtistRepository {
   static async listListed({
     search,
     sort,
+    roster,
     skip,
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
-    const where = buildListedWhere(search, { requirePublished: true });
+    const where = buildListedWhere(search, { requirePublished: true, roster });
     const records = await runQuery(() =>
       prisma.artist.findMany({ where, select: artistListingSelect })
     );
@@ -626,7 +675,6 @@ export class ArtistRepository {
         await tx.artistBioImage.deleteMany({ where: { artistId: id } });
         await tx.artistBioLink.deleteMany({ where: { artistId: id } });
         await tx.videoArtist.deleteMany({ where: { artistId: id } });
-        await tx.image.deleteMany({ where: { artistId: id } });
         await tx.url.deleteMany({ where: { artistId: id } });
         return tx.artist.delete({ where: { id } });
       })
@@ -670,8 +718,10 @@ export class ArtistRepository {
   }
 
   /**
-   * Find a single active, published, non-deleted artist by slug with the full
-   * nested release + bio include used on the public detail page, including
+   * Find a single current-or-alumni, non-deleted artist by slug with the
+   * public scalars and the full nested release + bio graph used on the public
+   * detail page (every artist on it projected public; the index links alumni
+   * cards here too, so an alumnus must resolve), including
    * the releases of every band the artist belongs to. The service folds the
    * band releases in and post-filters to published, non-deleted.
    */
@@ -682,10 +732,10 @@ export class ArtistRepository {
       prisma.artist.findFirst({
         where: {
           slug,
-          isActive: true,
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          AND: [currentOrAlumniWhere],
         },
-        include: artistWithReleaseGraphInclude,
+        select: artistWithReleaseGraphSelect,
       })
     );
   }
@@ -770,6 +820,8 @@ export class ArtistRepository {
         alt: string | null;
         hasFace: boolean | null;
         faceScore: number | null;
+        contentHash?: string | null;
+        perceptualHash?: string | null;
         sortOrder: number;
       }>;
       links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;
