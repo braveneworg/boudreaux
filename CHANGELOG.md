@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.361.0] - 2026-09-26
+
+### Changed
+
+- style(ui): 🎨 cutout face skips Jost heading rules (#784)
+
 ## [4.360.0] - 2026-09-26
 
 ### Fixed
