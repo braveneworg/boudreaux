@@ -186,10 +186,15 @@ describe('ArtistsIndexPage', () => {
     );
   });
 
-  it('should read the artist service directly for the first page', async () => {
+  it('should read the artist service directly for the first page of current artists', async () => {
     await ArtistsIndexPage();
 
-    expect(mockListPublishedArtists).toHaveBeenCalledWith({ sort: 'alpha', skip: 0, take: 24 });
+    expect(mockListPublishedArtists).toHaveBeenCalledWith({
+      sort: 'alpha',
+      roster: 'current',
+      skip: 0,
+      take: 24,
+    });
   });
 
   it('should shape the prefetched first page exactly like the listing route', async () => {
