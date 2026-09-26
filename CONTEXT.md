@@ -76,7 +76,9 @@ _Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
 Artist on the public artist page and index cards. Chosen and ordered only by a
 human; a bio generation job may **suggest** images but never chooses or
 displaces a human's choice. While no human has chosen, the page shows the
-suggested images. See
+suggested images that have alt text, or else the first pool images that have
+alt text; the admin marks those tiles **Shown**. An image without alt text is
+never shown unless a human chose it. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: primary images, hero image, featured images (featured is a release
 credit).

@@ -15,8 +15,10 @@ import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import {
   chosenDisplayImageIds,
   DISPLAY_IMAGE_CAP,
+  type DisplayImageTier,
   isDisplayEligible,
   orderBioImagesForPicker,
+  resolveDisplayImageSet,
 } from '@/lib/utils/display-images';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
@@ -67,6 +69,46 @@ const REASON_COPY = new Map<'chosen' | 'cap' | 'alt', string>([
   ['alt', 'Add alt text before using this image'],
 ]);
 
+/**
+ * Badge copy for a tile the public page shows from a fallback tier — only
+ * while nothing is chosen, so the chosen tier has none (its tiles carry
+ * "Display n").
+ */
+const SHOWN_COPY = new Map<Exclude<DisplayImageTier, 'chosen'>, string>([
+  ['suggested', 'Shown (suggested)'],
+  ['pool', 'Shown (first in pool)'],
+]);
+
+interface PoolTileBadgeProps {
+  /** 0-based chosen position, or -1 when the tile is not chosen. */
+  position: number;
+  /** The "Shown …" copy when the page shows this tile from a fallback tier. */
+  shownLabel?: string;
+  /** The job suggested this image (`isPrimary`). */
+  isSuggested: boolean;
+}
+
+/**
+ * A pool tile's display-state badge, by precedence: its chosen position, else
+ * that the page shows it from a fallback tier, else that the job suggested it.
+ */
+const PoolTileBadge = ({
+  position,
+  shownLabel,
+  isSuggested,
+}: PoolTileBadgeProps): JSX.Element | null => {
+  let label: string | null = null;
+  if (position !== -1) label = `Display ${position + 1}`;
+  else if (shownLabel) label = shownLabel;
+  else if (isSuggested) label = 'Suggested';
+  if (!label) return null;
+  return (
+    <Badge variant="outline" className="bg-background/80 text-[10px]">
+      {label}
+    </Badge>
+  );
+};
+
 const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
   (image.title ?? '').toLowerCase().includes(lower) ||
   (image.attribution ?? '').toLowerCase().includes(lower) ||
@@ -81,8 +123,10 @@ const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
  * "use as display image" affordance whose disabled reason is spelled out.
  *
  * Mounts even with an empty pool, because uploading is its job too. Chosen
- * rows and the picker order are derived from the pool through the shared
- * display-image rules so this view never disagrees with the public page.
+ * rows, the picker order, and the "Shown" badges on the images the page falls
+ * back to while nothing is chosen are all derived from the pool through the
+ * shared display-image rules, so this view never disagrees with the public
+ * page.
  */
 export const BioImageManager = ({
   artistId,
@@ -102,6 +146,11 @@ export const BioImageManager = ({
   const [filter, setFilter] = useState('');
 
   const chosenIds = chosenDisplayImageIds(images);
+  // What the public page shows right now; the fallback tiers are marked on the
+  // tiles so the admin sees the same images the public does.
+  const { tier, images: shownImages } = resolveDisplayImageSet(images);
+  const shownCopy = tier === 'chosen' ? undefined : SHOWN_COPY.get(tier);
+  const shownIds = new Set(shownImages.map(({ id }) => id));
   const chosen = chosenIds.flatMap((id) => images.filter((image) => image.id === id));
   const lower = filter.trim().toLowerCase();
   const pool = orderBioImagesForPicker(images).filter(
@@ -176,18 +225,11 @@ export const BioImageManager = ({
                     onEditAlt={onEditAlt}
                     disabled={disabled}
                     badges={
-                      <>
-                        {position !== -1 && (
-                          <Badge variant="outline" className="bg-background/80 text-[10px]">
-                            Display {position + 1}
-                          </Badge>
-                        )}
-                        {position === -1 && image.isPrimary && (
-                          <Badge variant="outline" className="bg-background/80 text-[10px]">
-                            Suggested
-                          </Badge>
-                        )}
-                      </>
+                      <PoolTileBadge
+                        position={position}
+                        shownLabel={shownIds.has(image.id) ? shownCopy : undefined}
+                        isSuggested={image.isPrimary}
+                      />
                     }
                     actions={
                       <>
