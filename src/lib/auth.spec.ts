@@ -367,4 +367,38 @@ describe('src/lib/auth — rate limiter scoping', () => {
     // relying on better-auth's NODE_ENV-driven default there.
     expect(config.rateLimit).toMatchObject({ enabled: true });
   });
+
+  it('gives /get-session 300 per 10 s, matching the nginx session zone', async () => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+
+    const config = await loadConfig();
+
+    // better-auth's default (100 per 10 s per IP + path) would answer a
+    // shared IP's 101st page load with its own 429, well under the nginx
+    // session zone (30 r/s). Keep the two ceilings equal (ADR-0013).
+    expect(config.rateLimit).toMatchObject({
+      customRules: { '/get-session': { window: 10, max: 300 } },
+    });
+  });
+
+  it('leaves every other auth path on better-auth defaults', async () => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('SKIP_ENV_VALIDATION', '');
+    vi.stubEnv('AUTH_SECRET', FAKE_TEST_SECRET);
+
+    const config = await loadConfig();
+    const rateLimit = config.rateLimit as Record<string, unknown>;
+
+    // A custom rule on /sign-in* or a global window/max would loosen the
+    // built-in 3-per-10 s brute-force caps; only the session read is widened.
+    expect(Object.keys(rateLimit.customRules as Record<string, unknown>)).toEqual(['/get-session']);
+    expect(rateLimit).not.toHaveProperty('window');
+    expect(rateLimit).not.toHaveProperty('max');
+  });
 });
