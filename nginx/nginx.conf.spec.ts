@@ -142,6 +142,22 @@ const appLocations = parseLocations(readAppServerBlock(CONFIG));
 
 const OAUTH_CALLBACK_PATHS = ['/api/auth/callback/google', '/api/auth/callback/apple'] as const;
 
+const SESSION_PATH = '/api/auth/get-session';
+
+/** Non-comment directive lines of a location body, trimmed. */
+const directives = (location: LocationBlock | undefined): string[] =>
+  (location?.body ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'));
+
+const limitReqLines = (location: LocationBlock | undefined): string[] =>
+  directives(location).filter((line) => line.startsWith('limit_req '));
+
+/** Every directive except the rate limit — what the two locations must share. */
+const proxyDirectives = (location: LocationBlock | undefined): string[] =>
+  directives(location).filter((line) => !line.startsWith('limit_req '));
+
 describe('nginx.conf rate-limit zones', () => {
   it('defines no strict `auth` zone', () => {
     expect(CONFIG).not.toMatch(/zone=auth[\s:]/);
@@ -160,6 +176,50 @@ describe('nginx.conf rate-limit zones', () => {
 
     expect(burst).toBeGreaterThanOrEqual(50);
   });
+
+  // ADR-0013: 10 r/s sustained, burst 50 per IP is the anonymous AND admin
+  // /api/ budget — a decision, not an accident. Change it on purpose.
+  it('pins the /api/ budget at 10 r/s, burst 50', () => {
+    const location = resolveLocation(appLocations, '/api/artists/search');
+
+    expect(CONFIG).toMatch(/limit_req_zone \$binary_remote_addr zone=api:10m rate=10r\/s;/);
+    expect(limitReqLines(location)).toEqual(['limit_req zone=api burst=50 nodelay;']);
+  });
+
+  it('defines a per-IP session zone at 30 r/s', () => {
+    expect(CONFIG).toMatch(/limit_req_zone \$binary_remote_addr zone=session:10m rate=30r\/s;/);
+  });
+});
+
+describe('nginx.conf session-read routing', () => {
+  it('serves /api/auth/get-session from its own exact-match location', () => {
+    const location = resolveLocation(appLocations, SESSION_PATH);
+
+    expect(location).toMatchObject({ modifier: '=', pattern: SESSION_PATH });
+  });
+
+  it('limits /api/auth/get-session by the session zone only', () => {
+    const location = resolveLocation(appLocations, SESSION_PATH);
+
+    expect(limitReqLines(location)).toEqual(['limit_req zone=session burst=150 nodelay;']);
+  });
+
+  it('proxies /api/auth/get-session exactly like the /api/ location', () => {
+    const session = resolveLocation(appLocations, SESSION_PATH);
+    const api = resolveLocation(appLocations, '/api/artists/search');
+
+    expect(proxyDirectives(session)).toEqual(proxyDirectives(api));
+    expect(proxyDirectives(session).length).toBeGreaterThan(0);
+  });
+
+  it.each(['/api/auth/sign-in/social', '/api/auth/sign-out', `${SESSION_PATH}/x`])(
+    '%s stays in the general /api/ location',
+    (path) => {
+      const location = resolveLocation(appLocations, path);
+
+      expect(location).toMatchObject({ modifier: '', pattern: '/api/' });
+    }
+  );
 });
 
 describe('nginx.conf OAuth callback routing', () => {
