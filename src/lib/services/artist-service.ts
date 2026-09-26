@@ -890,7 +890,9 @@ export class ArtistService {
    * List one page of listed artists for the public `/artists` index and its
    * search combobox (ADR-0007). This is the single projection behind both the
    * `/api/artists?listing=published` route and the page's SSR prefetch, so the
-   * hydrated first page and every fetched page share one shape.
+   * hydrated first page and every fetched page share one shape. `roster`
+   * picks current artists, alumni, or both; the listed-artist rule applies to
+   * every roster alike.
    */
   static async listPublishedArtists(
     filters: ArtistListingFilters

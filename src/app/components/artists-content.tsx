@@ -14,10 +14,17 @@ import { ZineToggleGroup, ZineToggleGroupItem } from '@/app/components/ui/zine-t
 import { useInfinitePublishedArtistsQuery } from '@/hooks/queries/use-infinite-published-artists-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
-import type { ArtistListingRow, ArtistListingSort } from '@/lib/types/domain/artist';
+import type {
+  ArtistListingRoster,
+  ArtistListingRow,
+  ArtistListingSort,
+} from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
-import { ARTIST_LISTING_SORTS } from '@/lib/validation/artist-listing-query-schema';
+import {
+  ARTIST_LISTING_ROSTERS,
+  ARTIST_LISTING_SORTS,
+} from '@/lib/validation/artist-listing-query-schema';
 
 import { ARTIST_PHOTO_FRAME_CLASS, ArtistListCard } from './artist-list-card';
 import { ArtistSearchCombobox } from './artist-search-combobox';
@@ -38,6 +45,24 @@ const ARTIST_SORT_OPTIONS: ReadonlyArray<{ value: ArtistListingSort; label: stri
 const isArtistListingSort = (value: string): value is ArtistListingSort =>
   (ARTIST_LISTING_SORTS as readonly string[]).includes(value);
 
+/** The roster toggle's options, in the order they read left to right. */
+const ARTIST_ROSTER_OPTIONS: ReadonlyArray<{ value: ArtistListingRoster; label: string }> = [
+  { value: 'current', label: 'Current' },
+  { value: 'alumni', label: 'Alumni' },
+  { value: 'all', label: 'All' },
+];
+
+/** Whether a toggle value is one of the listing's rosters. */
+const isArtistListingRoster = (value: string): value is ArtistListingRoster =>
+  (ARTIST_LISTING_ROSTERS as readonly string[]).includes(value);
+
+/**
+ * Full accent, not the toggle's default soft shade: soft hot-pink (pink-200)
+ * is under 3:1 against the unselected fill, and the fill is the only
+ * selected-state cue (WCAG 1.4.11). Shared by both toolbar toggles.
+ */
+const TOGGLE_ITEM_ACCENT_CLASS = 'data-[state=on]:bg-(--card-accent)';
+
 /**
  * The roster count that sits at the toolbar's right edge. While a search
  * narrows the list it counts matches, not the roster; while more pages remain
@@ -50,8 +75,8 @@ const formatArtistCount = (count: number, search: string, hasNextPage: boolean):
 };
 
 /**
- * Initial-load skeleton mirroring the real layout — the full-width search/sort
- * toolbar and four photo-left/text-right card placeholders at the card's own
+ * Initial-load skeleton mirroring the real layout — the full-width
+ * roster/sort/search toolbar and four photo-left/text-right card placeholders at the card's own
  * frame size, inset, and row spacing — so nothing jumps when the first page
  * lands.
  */
@@ -60,8 +85,9 @@ const ArtistsSkeleton = (): ReactElement => (
     <p role="status" className="sr-only">
       Loading artists…
     </p>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <Skeleton className="h-9 w-48 shrink-0" />
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <Skeleton data-slot="artists-skeleton-toggle" className="h-9 w-56 shrink-0" />
+      <Skeleton data-slot="artists-skeleton-toggle" className="h-9 w-48 shrink-0" />
       <Skeleton className="h-9 w-full sm:max-w-md" />
     </div>
     <div data-slot="artists-skeleton-list" className="flex w-full flex-col gap-8">
@@ -94,13 +120,24 @@ const ArtistsError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
   </div>
 );
 
+/** What the empty state says: a search miss, an empty alumni roster, or nothing listed at all. */
+const emptyMessage = (search: string, roster: ArtistListingRoster): string => {
+  if (search) return `No artists match “${search}”.`;
+  if (roster === 'alumni') return 'No alumni yet.';
+  return 'No artists have been published yet.';
+};
+
 /** Empty state for no listed artists at all, or none matching the search. */
-const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
+const ArtistsEmpty = ({
+  search,
+  roster,
+}: {
+  search: string;
+  roster: ArtistListingRoster;
+}): ReactElement => (
   <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 border-2 border-dashed p-8 text-center">
     <Users className="text-muted-foreground size-8" aria-hidden />
-    <p className="text-muted-foreground">
-      {search ? `No artists match “${search}”.` : 'No artists have been published yet.'}
-    </p>
+    <p className="text-muted-foreground">{emptyMessage(search, roster)}</p>
   </div>
 );
 
@@ -108,23 +145,25 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * Client content island for the public `/artists` index.
  *
  * Pages through listed artists (ADR-0007) with infinite scroll; the first page
- * is hydrated from the SSR prefetch. A toolbar pairs a debounced search
- * combobox — whose dropdown prepopulates with the first matches of the same
- * query that feeds the list — with an A–Z / newest-release sort toggle. The
- * query and sort are part of the query key, so changing either resets
- * pagination while `keepPreviousData` keeps the current cards on screen during
- * the transition. Picking a suggestion fills the field with the artist's name
+ * is hydrated from the SSR prefetch (current artists, A–Z). A toolbar carries
+ * a Current / Alumni / All roster toggle, an A–Z / newest-release sort toggle,
+ * and a debounced search combobox — whose dropdown prepopulates with the first
+ * matches of the same query that feeds the list. Roster, sort, and query are
+ * all part of the query key, so changing any of them resets pagination while
+ * `keepPreviousData` keeps the current cards on screen during the transition. Picking a suggestion fills the field with the artist's name
  * so the list narrows to them; the card itself is the way into the artist page.
  *
  * The page reads as a browsable feed: one card per row, each running the full
  * width of the zine panel, with 32px between rows supplied by the list alone
- * (the card zeroes the `Card` primitive's own margin). Sort sits left of
- * search in a toolbar at that same full width, the two grouped at the left
+ * (the card zeroes the `Card` primitive's own margin). Roster, then sort, sit
+ * left of search in a toolbar at that same full width, grouped at the left
  * edge rather than pushed to opposite ends, the search field capped at
  * `sm:max-w-md` so it does not swallow the row, and the roster count parked
- * at the toolbar's right edge where the row was otherwise empty.
+ * at the toolbar's right edge where the row was otherwise empty. The toolbar
+ * wraps from `sm` up, so three controls never overflow a narrow row.
  */
 export const ArtistsContent = (): ReactElement => {
+  const [roster, setRoster] = useState<ArtistListingRoster>('current');
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, SEARCH_DEBOUNCE_MS).trim();
@@ -137,13 +176,17 @@ export const ArtistsContent = (): ReactElement => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfinitePublishedArtistsQuery(sort, search);
+  } = useInfinitePublishedArtistsQuery(sort, search, roster);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
   const handleSortChange = (value: string): void => {
     if (isArtistListingSort(value)) setSort(value);
+  };
+
+  const handleRosterChange = (value: string): void => {
+    if (isArtistListingRoster(value)) setRoster(value);
   };
 
   const handleSuggestionSelect = (artist: ArtistListingRow): void => {
@@ -162,7 +205,24 @@ export const ArtistsContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-8 py-4">
-      <div data-slot="artists-toolbar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div
+        data-slot="artists-toolbar"
+        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
+      >
+        <ZineToggleGroup
+          type="single"
+          value={roster}
+          onValueChange={handleRosterChange}
+          aria-label="Artist roster"
+          className="shrink-0"
+        >
+          {ARTIST_ROSTER_OPTIONS.map(({ value, label }) => (
+            <ZineToggleGroupItem key={value} value={value} className={TOGGLE_ITEM_ACCENT_CLASS}>
+              {label}
+            </ZineToggleGroupItem>
+          ))}
+        </ZineToggleGroup>
+
         <ZineToggleGroup
           type="single"
           value={sort}
@@ -170,15 +230,8 @@ export const ArtistsContent = (): ReactElement => {
           aria-label="Sort artists"
           className="shrink-0"
         >
-          {/* Full accent, not the toggle's default soft shade: soft hot-pink
-              (pink-200) is under 3:1 against the unselected fill, and the fill
-              is the only selected-state cue (WCAG 1.4.11). */}
           {ARTIST_SORT_OPTIONS.map(({ value, label }) => (
-            <ZineToggleGroupItem
-              key={value}
-              value={value}
-              className="data-[state=on]:bg-(--card-accent)"
-            >
+            <ZineToggleGroupItem key={value} value={value} className={TOGGLE_ITEM_ACCENT_CLASS}>
               {label}
             </ZineToggleGroupItem>
           ))}
@@ -205,7 +258,7 @@ export const ArtistsContent = (): ReactElement => {
       </div>
 
       {artists.length === 0 ? (
-        <ArtistsEmpty search={search} />
+        <ArtistsEmpty search={search} roster={roster} />
       ) : (
         <ul className="flex w-full flex-col gap-8">
           {artists.map((artist) => (
