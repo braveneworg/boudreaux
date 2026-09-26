@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { bioImageSchema } from './bio-generation';
 import { httpUrl } from './http-url';
+import { jobSigningKey } from './job-signing-key';
 
 /** The `task` discriminator the Lambda routes an images-from-links event on. */
 export const IMAGE_LINKS_TASK = 'images-from-links' as const;
@@ -35,6 +36,7 @@ export const imageLinksInputSchema = z.object({
   referenceImageUrls: z.array(httpUrl).max(MAX_IMAGE_LINK_REFERENCES).optional(),
   callbackUrl: httpUrl,
   jobToken: z.string().min(1),
+  signingKey: jobSigningKey.optional(),
 });
 
 export type ImageLinksInput = z.infer<typeof imageLinksInputSchema>;
