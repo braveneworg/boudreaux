@@ -3,10 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
-import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
-import { NodeHttpHandler } from '@smithy/node-http-handler';
+import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { z } from 'zod';
 
 import {
@@ -51,29 +50,15 @@ import {
   toAsyncJobStatus,
 } from '@/utils/async-job-lifecycle';
 
+import { getLambdaClient, resolveFakeDelayMs, sleep, tokensMatch } from './lambda-dispatch';
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
 import type { VideoEnrichmentCategory } from '@fakefour/job-contract';
 
 const logger = loggers.media;
 
-let lambdaClient: LambdaClient | null = null;
-
-/** Short timeout: the Event invoke returns 202 immediately (see bio service). */
-const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
 /** Hard cap mirrored by the Lambda's input schema (`artists: 1..10`). */
 const MAX_LAMBDA_ARTISTS = 10;
-
-const getLambdaClient = (): LambdaClient => {
-  if (!lambdaClient) {
-    lambdaClient = new LambdaClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      requestHandler: new NodeHttpHandler({ requestTimeout: INVOKE_REQUEST_TIMEOUT_MS }),
-    });
-  }
-  return lambdaClient;
-};
 
 /** Invoke payload for the bio-generator Lambda's `video-enrichment` task. */
 export interface VideoEnrichmentLambdaInput {
@@ -109,13 +94,6 @@ export interface VideoEnrichmentLambdaInput {
 /** YYYY-MM-DD for wire dates, or undefined. */
 const toIsoDate = (value: Date | null | undefined): string | undefined =>
   value ? value.toISOString().slice(0, 10) : undefined;
-
-/** Constant-time token comparison (see BioGenerationService.tokensMatch). */
-const tokensMatch = (a: string, b: string): boolean => {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-};
 
 /** Map join rows onto the Lambda's `artists` payload, dropping empty knowns. */
 const toLambdaArtists = (rows: VideoArtistWithArtist[]): VideoEnrichmentLambdaInput['artists'] =>
@@ -488,16 +466,6 @@ const buildPendingRows = ({
  */
 const DEFAULT_FAKE_ENRICHMENT_DELAY_MS = 4000;
 
-/** Resolve the fake-path dwell from the env, falling back to the default. */
-const resolveFakeDelayMs = (): number => {
-  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
-  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_FAKE_ENRICHMENT_DELAY_MS;
-};
-
-/** Resolve after `ms`; short-circuits to an already-resolved promise for `ms <= 0`. */
-const sleep = (ms: number): Promise<void> =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
-
 /**
  * Fake/E2E path: one synthetic checkpoint (the first stage the real Lambda
  * posts for the category — `web-search` for INFORMATIONAL, which skips the
@@ -514,7 +482,7 @@ const runFakeEnrichment = async (
     at: new Date().toISOString(),
   });
   // Dwell while `processing` so the polling client can render the in-flight chip.
-  await sleep(resolveFakeDelayMs());
+  await sleep(resolveFakeDelayMs(DEFAULT_FAKE_ENRICHMENT_DELAY_MS));
   const data = videoEnrichmentFixture({
     artists: rows.map(({ artistId }) => ({ artistId })),
     category: state.category,
