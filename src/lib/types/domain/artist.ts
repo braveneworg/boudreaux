@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ImageRecord } from './image';
 import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
@@ -81,6 +80,57 @@ export type ArtistScalars = {
   featuredArtistId: string | null;
 };
 
+/**
+ * The artist scalars that must never leave the server on a public surface:
+ * contact PII, internal notes, the audit actor ids, and the async-job
+ * internals — above all the per-job callback tokens (`bioJobToken`,
+ * `imageLinksJobToken`), which the public job callbacks accept as their only
+ * credential. Keyed as a `true` mask so it can feed both a Zod `.omit()` and a
+ * key check; the public projections are allow-lists drift-checked against
+ * {@link ArtistPublicScalars}, so a new column stays private until someone
+ * classifies it.
+ */
+export const ARTIST_PRIVATE_FIELD_MASK = {
+  phone: true,
+  email: true,
+  address1: true,
+  address2: true,
+  city: true,
+  state: true,
+  postalCode: true,
+  country: true,
+  notes: true,
+  createdBy: true,
+  updatedBy: true,
+  publishedBy: true,
+  deletedBy: true,
+  deactivatedBy: true,
+  reactivatedBy: true,
+  bioError: true,
+  bioStartedAt: true,
+  bioJobToken: true,
+  bioProgress: true,
+  imageLinksStatus: true,
+  imageLinksError: true,
+  imageLinksStartedAt: true,
+  imageLinksJobToken: true,
+  imageLinksAddedCount: true,
+} as const satisfies Partial<Record<keyof ArtistScalars, true>>;
+
+/** A private artist scalar — see {@link ARTIST_PRIVATE_FIELD_MASK}. */
+export type ArtistPrivateField = keyof typeof ARTIST_PRIVATE_FIELD_MASK;
+
+/** Every private artist scalar, in mask order. */
+export const ARTIST_PRIVATE_FIELDS = Object.keys(
+  ARTIST_PRIVATE_FIELD_MASK
+) as readonly ArtistPrivateField[];
+
+/**
+ * The artist scalars a public surface may serialise: {@link ArtistScalars}
+ * minus every {@link ArtistPrivateField}.
+ */
+export type ArtistPublicScalars = Omit<ArtistScalars, ArtistPrivateField>;
+
 /** Scalar fields of the Prisma `ArtistLabel` join model (`labels: true`). */
 export interface ArtistLabelRecord {
   id: string;
@@ -118,6 +168,10 @@ export interface ArtistBioImageRecord {
   hasFace: boolean | null;
   /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
   faceScore: number | null;
+  /** SHA-256 (hex) of the source bytes, stamped at re-host; `null` on legacy rows and manual uploads. */
+  contentHash: string | null;
+  /** 64-bit dHash of the source as 16 hex digits, stamped with `contentHash`. */
+  perceptualHash: string | null;
   /** Provenance: `'generated'` (owned by the job), `'custom'` (owned by a human) or `'linked'` (scraped from an admin-supplied page); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
@@ -148,6 +202,24 @@ export interface CreateArtistBioImageData {
   faceScore?: number | null;
   /** `'custom'` for the manual-upload path (stamped when absent); `'linked'` for images scraped from admin-supplied pages. */
   origin?: 'custom' | 'linked';
+  /** SHA-256 (hex) of the source bytes; only re-hosted images carry it. */
+  contentHash?: string | null;
+  /** 64-bit dHash of the source as 16 hex digits; only re-hosted images carry it. */
+  perceptualHash?: string | null;
+}
+
+/**
+ * A pool image's content fingerprint — what the re-host dedupe compares new
+ * candidates against so a copy served under another URL is still skipped.
+ * Rows re-hosted before the hashes were stored carry neither (ADR-0010
+ * addendum); the repository omits those.
+ */
+export interface BioImageFingerprint {
+  url: string;
+  /** SHA-256 (hex) of the source bytes the row was re-hosted from. */
+  contentHash: string | null;
+  /** 64-bit dHash of that source as 16 hex digits. */
+  perceptualHash: string | null;
 }
 
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
@@ -181,36 +253,43 @@ export interface CreateArtistBioLinkData {
 }
 
 /**
- * Admin artist payload: scalars plus capped images, label joins, release joins
+ * Admin artist payload: scalars plus label joins, release joins
  * (with release scalars), and platform URLs. Matches the default media `Artist`.
  */
 export type Artist = ArtistScalars & {
-  images: ImageRecord[];
   labels: ArtistLabelRecord[];
   releases: Array<ArtistReleaseScalars & { release: ReleaseScalars }>;
   urls: UrlRecord[];
 };
 
-/** An `ArtistRelease` join row carrying the full media `Release` graph. */
-export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: Release };
+/**
+ * The media `Release` graph as the public artist-detail page loads it: every
+ * credited artist on the release carries only its {@link ArtistPublicScalars}.
+ */
+export type PublicArtistRelease = Omit<Release, 'artistReleases'> & {
+  artistReleases: Array<ArtistReleaseScalars & { artist: ArtistPublicScalars }>;
+};
+
+/** An `ArtistRelease` join row carrying the public media release graph. */
+export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArtistRelease };
 
 /**
- * Repository payload behind the public artist-detail page: scalars plus
- * images, labels, urls, bio images/links, band members (with member scalars),
- * the artist's own release joins, and — via `memberOf` — the release joins of
- * every band the artist belongs to, all carrying the full media `Release`
- * graph. The service flattens this into {@link ArtistWithPublishedReleases}.
+ * Repository payload behind the public artist-detail page: public scalars plus
+ * labels, urls, bio images/links, band members (with member public
+ * scalars), the artist's own release joins, and — via `memberOf` — the release
+ * joins of every band the artist belongs to, all carrying the public media
+ * release graph. No artist anywhere in it carries an {@link ArtistPrivateField}.
+ * The service flattens this into {@link ArtistWithPublishedReleases}.
  */
-export interface ArtistWithReleaseGraph extends ArtistScalars {
-  images: ImageRecord[];
+export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
   labels: ArtistLabelRecord[];
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
   bioLinks: ArtistBioLinkRecord[];
-  members: Array<ArtistMemberScalars & { member: ArtistScalars }>;
+  members: Array<ArtistMemberScalars & { member: ArtistPublicScalars }>;
   releases: ArtistReleaseGraphRow[];
   memberOf: Array<
-    ArtistMemberScalars & { artist: ArtistScalars & { releases: ArtistReleaseGraphRow[] } }
+    ArtistMemberScalars & { artist: ArtistPublicScalars & { releases: ArtistReleaseGraphRow[] } }
   >;
 }
 
@@ -339,13 +418,11 @@ export interface ArtistListingRow extends Omit<
 }
 
 /**
- * By-id artist payload: scalars plus ordered images only — the shape
- * `ArtistRepository.findById` fetches and `GET /api/artists/[id]` returns
- * (narrower than the admin `Artist`, which also carries labels/urls/releases).
+ * By-id artist payload: scalars only — the shape `ArtistRepository.findById`
+ * fetches and `GET /api/artists/[id]` returns (narrower than the admin
+ * `Artist`, which also carries labels/urls/releases).
  */
-export interface ArtistDetail extends ArtistScalars {
-  images: ImageRecord[];
-}
+export type ArtistDetail = ArtistScalars;
 
 /** Narrow release projection loaded for public artist-search matches. */
 export interface ArtistSearchReleaseRecord {
@@ -356,11 +433,20 @@ export interface ArtistSearchReleaseRecord {
 }
 
 /**
- * Public artist-search match: scalars plus the first image and release joins
- * carrying the narrow release projection the search consumes.
+ * The display-image candidates a search match carries — just enough to resolve
+ * the artist's first display image for the search dropdown thumbnail.
+ */
+export type ArtistSearchBioImage = Pick<
+  ArtistListingBioImage,
+  'url' | 'thumbnailUrl' | 'alt' | 'isPrimary' | 'displayOrder'
+>;
+
+/**
+ * Public artist-search match: scalars plus the display-image candidates and
+ * release joins carrying the narrow release projection the search consumes.
  */
 export interface ArtistSearchMatch extends ArtistScalars {
-  images: ImageRecord[];
+  bioImages: ArtistSearchBioImage[];
   releases: Array<ArtistReleaseScalars & { release: ArtistSearchReleaseRecord }>;
 }
 
@@ -375,14 +461,6 @@ export interface ArtistNameRecord {
 // =============================================================================
 // Input types
 // =============================================================================
-
-/** A nested image to connect-or-create when writing an artist. */
-export interface ArtistImageInput {
-  id: string;
-  src: string;
-  altText?: string | null;
-  caption?: string | null;
-}
 
 /** A nested platform URL to connect-or-create when writing an artist. */
 export interface ArtistUrlInput {
@@ -423,7 +501,6 @@ export interface CreateArtistData extends ArtistWritableData {
   firstName: string;
   surname: string;
   slug: string;
-  images?: ArtistImageInput[];
   urls?: ArtistUrlInput[];
 }
 

@@ -465,7 +465,7 @@ const eslintConfig = [
   // escape), so code doing real file I/O on runtime-computed paths cannot satisfy it:
   // CLI/build scripts, the os-tmpdir upload temp file, and the ffmpeg sibling temp file.
   // These paths are all server-generated, never user input. Every other rule is satisfied
-  // in code repo-wide, except the nginx config guard below.
+  // in code repo-wide, except the nginx and Grafana dashboard config guards below.
   {
     files: [
       'scripts/**/*.{ts,tsx}',
@@ -485,11 +485,13 @@ const eslintConfig = [
     },
   },
   // The nginx config guard resolves request paths the way nginx does, which means
-  // compiling the `location ~ …` patterns read from the repo's own nginx.conf.
+  // compiling the `location ~ …` patterns read from the repo's own nginx.conf; the
+  // Grafana dashboard guard likewise compiles its panels' LogQL line filters and
+  // `regexp` stages to run them against sample access-log lines.
   // `detect-non-literal-regexp` is likewise purely syntactic; the patterns are
   // committed config, never user input.
   {
-    files: ['nginx/nginx.conf.spec.ts'],
+    files: ['nginx/nginx.conf.spec.ts', 'observability/grafana/dashboards/app-logs.spec.ts'],
     rules: {
       'security/detect-non-literal-regexp': 'off',
     },

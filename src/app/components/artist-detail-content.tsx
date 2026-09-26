@@ -150,7 +150,8 @@ export const ArtistDetailContent = ({ slug, initialReleaseId }: ArtistDetailCont
   const genres = splitList(artist.genres);
 
   // The artist's display images beside the short bio: the human's chosen rows,
-  // else the job's suggested rows, else the first discovered ones (ADR-0008).
+  // else the job's suggested rows with alt text, else the first pool rows with
+  // alt text (ADR-0008 and its addendum).
   const detailImages = resolveDisplayImages(artist.bioImages);
   // The biography gallery shows what the header does not, so no portrait
   // renders twice now that both sit on one page.

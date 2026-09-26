@@ -4,7 +4,9 @@
 import sharp from 'sharp';
 
 import {
+  formatPerceptualHash,
   hammingDistance,
+  parsePerceptualHash,
   perceptualDHash,
   NEAR_DUPLICATE_MAX_DISTANCE,
   laplacianVarianceSharpness,
@@ -56,6 +58,35 @@ describe('hammingDistance', () => {
   it('counts all 64 bits differing', () => {
     const allOnes = (1n << 64n) - 1n;
     expect(hammingDistance(allOnes, 0n)).toBe(64);
+  });
+});
+
+describe('formatPerceptualHash', () => {
+  it('writes a dHash as 16 zero-padded lowercase hex digits', () => {
+    expect(formatPerceptualHash(0xabcn)).toBe('0000000000000abc');
+  });
+
+  it('writes an all-ones 64-bit dHash without overflow', () => {
+    expect(formatPerceptualHash((1n << 64n) - 1n)).toBe('ffffffffffffffff');
+  });
+});
+
+describe('parsePerceptualHash', () => {
+  it('round-trips a formatted dHash', () => {
+    const hash = 0x8000_0000_0000_0001n;
+    expect(parsePerceptualHash(formatPerceptualHash(hash))).toBe(hash);
+  });
+
+  it('reads a missing hash as null', () => {
+    expect(parsePerceptualHash(null)).toBeNull();
+  });
+
+  it('reads a malformed stored value as null rather than throwing', () => {
+    expect(parsePerceptualHash('not-a-hash')).toBeNull();
+  });
+
+  it('rejects a value longer than 64 bits', () => {
+    expect(parsePerceptualHash('1ffffffffffffffff')).toBeNull();
   });
 });
 

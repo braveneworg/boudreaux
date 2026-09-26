@@ -15,18 +15,12 @@ export const createArtistAction = async (artist: Artist): Promise<ServiceRespons
   try {
     await requireRole('admin');
 
-    const { images, urls, labels: _labels, releases: _releases, ...scalars } = artist;
+    const { urls, labels: _labels, releases: _releases, ...scalars } = artist;
 
     // The repository owns the nested connectOrCreate translation; the action
-    // forwards plain image/url inputs alongside the writable scalar fields.
+    // forwards plain url inputs alongside the writable scalar fields.
     const data: CreateArtistData = {
       ...scalars,
-      images: images.map(({ id, src, altText, caption }) => ({
-        id,
-        src: src ?? '',
-        altText,
-        caption,
-      })),
       urls: urls.map(({ id, platform, url }) => ({ id, platform, url })),
     };
 

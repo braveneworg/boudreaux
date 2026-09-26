@@ -81,7 +81,15 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [{ src: 'https://example.com/thumb.jpg' }],
+        bioImages: [
+          {
+            url: 'https://example.com/full.jpg',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+            isPrimary: true,
+            alt: 'John Doe on stage',
+            displayOrder: null,
+          },
+        ],
         releases: [
           {
             release: {
@@ -121,7 +129,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [
           {
             release: {
@@ -164,7 +172,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [
           {
             release: {
@@ -199,7 +207,7 @@ describe('GET /api/artists/search', () => {
     expect(body.results[0].releases[0].title).toBe('Active Album');
   });
 
-  it('should use null for thumbnail when artist has no images', async () => {
+  it('should use null for thumbnail when artist has no display images', async () => {
     const mockArtists = [
       {
         id: 'artist-1',
@@ -207,7 +215,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [],
       },
     ];
@@ -222,6 +230,123 @@ describe('GET /api/artists/search', () => {
     const body = await response.json();
 
     expect(body.results[0].thumbnailSrc).toBeNull();
+  });
+
+  // An unchosen image without alt text is never a display image (ADR-0008,
+  // addendum for #767), so the projection must carry `alt` for the fallback
+  // tiers to find one.
+  it('should skip a suggested image that has no alt text', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        bioImages: [
+          {
+            url: 'https://example.com/no-alt.jpg',
+            thumbnailUrl: 'https://example.com/no-alt_thumb.jpg',
+            isPrimary: true,
+            displayOrder: null,
+            alt: null,
+          },
+          {
+            url: 'https://example.com/with-alt.jpg',
+            thumbnailUrl: 'https://example.com/with-alt_thumb.jpg',
+            isPrimary: false,
+            displayOrder: null,
+            alt: 'John Doe at the mic',
+          },
+        ],
+        releases: [],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValueOnce({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const response = await GET(createRequest('john'), dummyContext);
+    const body = await response.json();
+
+    expect(body.results[0].thumbnailSrc).toBe('https://example.com/with-alt_thumb.jpg');
+  });
+
+  it("should use the human-chosen display image over the job's suggestion", async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        bioImages: [
+          {
+            url: 'https://example.com/suggested.jpg',
+            thumbnailUrl: 'https://example.com/suggested_thumb.jpg',
+            isPrimary: true,
+            displayOrder: null,
+          },
+          {
+            url: 'https://example.com/second.jpg',
+            thumbnailUrl: 'https://example.com/second_thumb.jpg',
+            isPrimary: false,
+            displayOrder: 1,
+          },
+          {
+            url: 'https://example.com/chosen.jpg',
+            thumbnailUrl: 'https://example.com/chosen_thumb.jpg',
+            isPrimary: false,
+            displayOrder: 0,
+          },
+        ],
+        releases: [],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValueOnce({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const response = await GET(createRequest('john'), dummyContext);
+    const body = await response.json();
+
+    expect(body.results[0].thumbnailSrc).toBe('https://example.com/chosen_thumb.jpg');
+  });
+
+  it('should fall back to the full image url when the display image has no thumbnail', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-2',
+        firstName: 'Jane',
+        surname: 'Smith',
+        displayName: 'Jane Smith',
+        slug: 'jane-smith',
+        bioImages: [
+          {
+            url: 'https://example.com/jane.jpg',
+            thumbnailUrl: null,
+            isPrimary: true,
+            alt: 'Jane Smith portrait',
+            displayOrder: null,
+          },
+        ],
+        releases: [],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValueOnce({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const response = await GET(createRequest('jane'), dummyContext);
+    const body = await response.json();
+
+    expect(body.results[0].thumbnailSrc).toBe('https://example.com/jane.jpg');
   });
 
   it('should return 500 when service returns an error', async () => {
@@ -275,7 +400,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [],
       },
       {
@@ -284,7 +409,15 @@ describe('GET /api/artists/search', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane-smith',
-        images: [{ src: 'https://example.com/jane.jpg' }],
+        bioImages: [
+          {
+            url: 'https://example.com/jane.jpg',
+            thumbnailUrl: null,
+            isPrimary: true,
+            alt: 'Jane Smith portrait',
+            displayOrder: null,
+          },
+        ],
         releases: [],
       },
     ];
@@ -311,7 +444,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [
           {
             release: {
@@ -354,7 +487,7 @@ describe('GET /api/artists/search', () => {
         surname: 'Doe',
         displayName: 'John Doe',
         slug: 'john-doe',
-        images: [],
+        bioImages: [],
         releases: [
           {
             release: {

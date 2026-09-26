@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { ArtistScalars } from '@/lib/types/domain/artist';
+import type { ArtistPublicScalars, ArtistScalars } from '@/lib/types/domain/artist';
 
 import { deriveArtistDisplayName, getArtistDisplayNameForTour } from './artist-display-name';
 
@@ -172,6 +172,25 @@ describe('getArtistDisplayNameForTour', () => {
       };
 
       expect(getArtistDisplayNameForTour(artist)).toBe('John Doe');
+    });
+  });
+
+  describe('Public projection', () => {
+    it('should name a public-projection artist that carries no private fields', () => {
+      const publicArtist: ArtistPublicScalars = {
+        ...baseArtist,
+        displayName: null,
+        firstName: 'Kate',
+        surname: 'Bush',
+      };
+
+      expect(getArtistDisplayNameForTour(publicArtist)).toBe('Kate Bush');
+    });
+
+    it('should accept bare name parts', () => {
+      expect(
+        getArtistDisplayNameForTour({ displayName: ' Ceschi ', firstName: '', surname: '' })
+      ).toBe('Ceschi');
     });
   });
 });
