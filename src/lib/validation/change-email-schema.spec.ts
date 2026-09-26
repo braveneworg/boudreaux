@@ -1,7 +1,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { changeEmailSchema, type ChangeEmailFormData } from './change-email-schema';
+import {
+  changeEmailActionSchema,
+  changeEmailSchema,
+  type ChangeEmailFormData,
+} from './change-email-schema';
 
 describe('changeEmailSchema', () => {
   describe('valid data', () => {
@@ -117,5 +121,31 @@ describe('changeEmailSchema', () => {
       });
       expect(result.success).toBe(true);
     });
+  });
+});
+
+// The action reads FormData, where the opt-in switch arrives as a string (#790).
+describe('changeEmailActionSchema', () => {
+  it.each([
+    ['true', true],
+    ['on', true],
+    ['false', false],
+    ['off', false],
+  ])('reads a submitted allowEmailNotifications %j as %j', (value, expected) => {
+    const result = changeEmailActionSchema.safeParse({
+      email: 'test@example.com',
+      confirmEmail: 'test@example.com',
+      allowEmailNotifications: value,
+    });
+    expect(result.data?.allowEmailNotifications).toBe(expected);
+  });
+
+  it('still requires the two addresses to match', () => {
+    const result = changeEmailActionSchema.safeParse({
+      email: 'a@example.com',
+      confirmEmail: 'b@example.com',
+      allowEmailNotifications: 'true',
+    });
+    expect(result.error?.issues.map(({ path }) => path)).toEqual([['confirmEmail']]);
   });
 });

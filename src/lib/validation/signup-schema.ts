@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { isValidEmailFormat } from '@/lib/utils/auth/auth-utils';
+import { formBoolean } from '@/lib/validation/form-boolean';
 
 const termsAndConditionsMessage = 'You must accept the terms and conditions';
 
@@ -24,3 +25,17 @@ export const signupSchema = z.object({
 });
 
 export type FormSchemaType = z.infer<typeof signupSchema>;
+
+/**
+ * {@link signupSchema} as `signupAction` reads it from `FormData`, where the
+ * switches arrive as `'true'`/`'false'` (or `'on'`/`'off'`). The client schema
+ * keeps plain `z.boolean()` because React Hook Form holds real booleans (#790).
+ */
+export const signupActionSchema = signupSchema.extend({
+  termsAndConditions: formBoolean({ message: termsAndConditionsMessage }).refine(
+    (val) => val === true,
+    { message: termsAndConditionsMessage }
+  ),
+  allowSmsNotifications: formBoolean().optional(),
+  allowEmailNotifications: formBoolean().optional(),
+});
