@@ -12,7 +12,8 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
-import type { CreateArtistBioImageData } from '@/lib/types/domain/artist';
+import type { ArtistBioLinkRecord, CreateArtistBioImageData } from '@/lib/types/domain/artist';
+import { DataError } from '@/lib/types/domain/errors';
 import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
@@ -145,16 +146,66 @@ const toLinkedRow = (artistId: string, image: RehostedImage): CreateArtistBioIma
   origin: 'linked',
 });
 
+/** Outcome of flagging a URL as one of an artist's image sources. */
+export type AddSourceLinkResult =
+  { status: 'added'; link: ImageSourceLink } | { status: 'not-found' } | { status: 'limit' };
+
+/**
+ * Upserts the image-source row. A concurrent add that loses the unique
+ * `(artistId, url)` index surfaces as `DUPLICATE`; one retry then finds the
+ * winner's row and simply flags it.
+ */
+const upsertImageSourceRow = async (
+  artistId: string,
+  url: string
+): Promise<ArtistBioLinkRecord> => {
+  const label = deriveBioLinkLabel(url);
+  try {
+    return await ArtistBioLinkRepository.upsertImageSource(artistId, url, label);
+  } catch (error) {
+    if (error instanceof DataError && error.code === 'DUPLICATE') {
+      return ArtistBioLinkRepository.upsertImageSource(artistId, url, label);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Writes a terminal job status. A failed write is logged, never thrown, so
+ * the `after()`-scheduled paths keep their never-throws contract; the stale
+ * sweep then coerces the stuck `processing` row on the next read.
+ */
+const writeTerminalStatus = async (
+  artistId: string,
+  status: 'failed' | 'succeeded',
+  opts: { error: string | null; addedCount?: number }
+): Promise<void> => {
+  try {
+    await ArtistRepository.setImageLinksStatus(artistId, status, opts);
+  } catch (error) {
+    loggers.media.error('image_links_status_write_failed', {
+      artistId,
+      status,
+      error: String(error),
+    });
+  }
+};
+
 /**
  * Re-hosts the callback's images that are not already in the pool and inserts
- * the survivors as `linked` rows. Returns how many rows were added.
+ * the survivors as `linked` rows. Returns how many rows were added. Pool URLs
+ * are compared case-insensitively, matching the Lambda's own dedupe.
  */
 const persistLinkedImages = async (
   artistId: string,
   images: Extract<ImageLinksResult, { ok: true }>['data']['images']
 ): Promise<number> => {
-  const existing = await ArtistBioImageRepository.findExistingUrls(artistId);
-  const fresh = images.filter((image) => !existing.has(image.url));
+  const existing = new Set(
+    Array.from(await ArtistBioImageRepository.findExistingUrls(artistId), (url) =>
+      url.toLowerCase()
+    )
+  );
+  const fresh = images.filter((image) => !existing.has(image.url.toLowerCase()));
   if (fresh.length === 0) return 0;
 
   const { results } = await BioImageService.rehostImages(
@@ -179,17 +230,18 @@ export class ImageLinksService {
   /**
    * Flags a URL as one of the artist's image sources (creating an image-only
    * custom link row, or adding the role to an existing reference-link row).
-   * Returns `null` when the artist does not exist.
+   * Refuses a new URL once the artist already has `MAX_IMAGE_LINKS` sources —
+   * the most the job reads — so nothing is stored that would never be
+   * scraped; re-adding a URL that is already a source stays idempotent.
    */
-  static async addSourceLink(artistId: string, url: string): Promise<ImageSourceLink | null> {
-    if (!(await ArtistRepository.existsById(artistId))) return null;
+  static async addSourceLink(artistId: string, url: string): Promise<AddSourceLinkResult> {
+    if (!(await ArtistRepository.existsById(artistId))) return { status: 'not-found' };
     const safeUrl = sanitizeUrl(url);
-    const row = await ArtistBioLinkRepository.upsertImageSource(
-      artistId,
-      safeUrl,
-      deriveBioLinkLabel(safeUrl)
-    );
-    return { id: row.id, label: row.label, url: row.url };
+    const sources = await ArtistBioLinkRepository.findImageSources(artistId);
+    const alreadySource = sources.some((source) => source.url === safeUrl);
+    if (!alreadySource && sources.length >= MAX_IMAGE_LINKS) return { status: 'limit' };
+    const row = await upsertImageSourceRow(artistId, safeUrl);
+    return { status: 'added', link: { id: row.id, label: row.label, url: row.url } };
   }
 
   /** Drops the image-source role from one of the artist's links; `false` when no such row. */
@@ -206,8 +258,8 @@ export class ImageLinksService {
    * @param artistId - The artist whose image-source links to read.
    */
   static async runJob(artistId: string): Promise<RunImageLinksJobResult> {
-    await ArtistRepository.setImageLinksStatus(artistId, 'processing');
     try {
+      await ArtistRepository.setImageLinksStatus(artistId, 'processing');
       const fail = async (error: string): Promise<RunImageLinksJobResult> => {
         await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error });
         return { status: 'failed', error };
@@ -219,6 +271,8 @@ export class ImageLinksService {
       const displayName = deriveDisplayName(artist);
       if (!displayName) return fail('Artist has no name to match faces against.');
 
+      // `addSourceLink` enforces the cap; the slice only bounds rows that
+      // predate it so the payload always satisfies the Lambda's schema.
       const sources = await ArtistBioLinkRepository.findImageSources(artistId);
       const links = sources.slice(0, MAX_IMAGE_LINKS).map((link) => link.url);
       if (links.length === 0) return fail('Add at least one link first.');
@@ -259,7 +313,7 @@ export class ImageLinksService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Image generation failed unexpectedly.';
-      await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error: message });
+      await writeTerminalStatus(artistId, 'failed', { error: message });
       return { status: 'failed', error: message };
     }
   }
@@ -315,18 +369,15 @@ export class ImageLinksService {
    */
   static async completeCallback(artistId: string, result: ImageLinksResult): Promise<void> {
     if (!result.ok) {
-      await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error: result.error });
+      await writeTerminalStatus(artistId, 'failed', { error: result.error });
       return;
     }
     try {
       const addedCount = await persistLinkedImages(artistId, result.data.images);
-      await ArtistRepository.setImageLinksStatus(artistId, 'succeeded', {
-        error: null,
-        addedCount,
-      });
+      await writeTerminalStatus(artistId, 'succeeded', { error: null, addedCount });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Image persistence failed.';
-      await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error: message });
+      await writeTerminalStatus(artistId, 'failed', { error: message });
     }
   }
 }

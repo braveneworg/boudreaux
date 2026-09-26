@@ -94,8 +94,9 @@ vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
 vi.mock('@/lib/repositories/artist-bio-link-repository', () => ({
   ArtistBioLinkRepository: {
     create: vi.fn(),
-    delete: vi.fn(),
     findByUrl: vi.fn(),
+    removeReference: vi.fn(),
+    restoreReference: vi.fn(),
   },
 }));
 
@@ -2558,12 +2559,12 @@ describe('ArtistService', () => {
   });
 
   describe('deleteBioLink', () => {
-    it('delegates to the repository without returning a value', async () => {
-      vi.mocked(ArtistBioLinkRepository.delete).mockResolvedValue(undefined as never);
+    it('drops only the reference role so a shared image-source row survives', async () => {
+      vi.mocked(ArtistBioLinkRepository.removeReference).mockResolvedValue(undefined as never);
 
       await ArtistService.deleteBioLink('link-1');
 
-      expect(ArtistBioLinkRepository.delete).toHaveBeenCalledWith('link-1');
+      expect(ArtistBioLinkRepository.removeReference).toHaveBeenCalledWith('link-1');
     });
   });
 
@@ -2675,6 +2676,34 @@ describe('ArtistService', () => {
       });
 
       expect(result).toBe(existing);
+      expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
+      expect(ArtistBioLinkRepository.restoreReference).not.toHaveBeenCalled();
+    });
+
+    it('grants the reference role when the URL exists as an image-source-only row', async () => {
+      const imageOnly = {
+        id: 'link-img',
+        artistId: 'a1',
+        label: 'press.test',
+        url: 'https://cdn/x',
+        kind: 'other',
+        origin: 'custom',
+        sortOrder: 2,
+        reference: false,
+        imageSource: true,
+      };
+      const restored = { ...imageOnly, reference: true };
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(imageOnly);
+      vi.mocked(ArtistBioLinkRepository.restoreReference).mockResolvedValue(restored);
+
+      const result = await ArtistService.createBioLink({
+        artistId: 'a1',
+        label: 'Press kit',
+        url: 'https://cdn/x',
+      });
+
+      expect(result).toBe(restored);
+      expect(ArtistBioLinkRepository.restoreReference).toHaveBeenCalledWith('link-img');
       expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
 

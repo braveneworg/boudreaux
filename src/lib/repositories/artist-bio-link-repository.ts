@@ -56,9 +56,29 @@ export class ArtistBioLinkRepository {
     }) as Promise<ArtistBioLinkRecord>;
   }
 
-  /** Deletes a single discovered bio link row (palette X). */
-  static async delete(linkId: string): Promise<void> {
-    await prisma.artistBioLink.delete({ where: { id: linkId } });
+  /**
+   * Drops the reference role from one link row (palette X). A row that also
+   * serves as an image source keeps that role and merely loses the flag;
+   * any other row is deleted. An unknown id is a no-op.
+   */
+  static async removeReference(linkId: string): Promise<void> {
+    await runQuery(async () => {
+      const row = await prisma.artistBioLink.findUnique({ where: { id: linkId } });
+      if (!row) return;
+      if (row.imageSource) {
+        await prisma.artistBioLink.update({ where: { id: linkId }, data: { reference: false } });
+      } else {
+        await prisma.artistBioLink.delete({ where: { id: linkId } });
+      }
+    });
+  }
+
+  /** Grants the reference role back to a row that was image-source only, so
+   *  the URL reappears in the palette, the bio payload and the public links. */
+  static async restoreReference(linkId: string): Promise<ArtistBioLinkRecord> {
+    return runQuery(() =>
+      prisma.artistBioLink.update({ where: { id: linkId }, data: { reference: true } })
+    ) as Promise<ArtistBioLinkRecord>;
   }
 
   /** Lists the artist's image-source links (rows flagged `imageSource`) in
@@ -76,8 +96,10 @@ export class ArtistBioLinkRepository {
    * Flags a URL as an image source for the artist. The `(artistId, url)` index
    * allows one row per URL, so a URL already stored as a reference link gets
    * its `imageSource` flag set (keeping its reference role) rather than a
-   * second row; a new URL becomes an image-only custom row (`reference: false`)
-   * so it stays out of the palette, the bio payload and the public links.
+   * second row — and is promoted to `origin: 'custom'`, since a human chose it
+   * and `replaceBioContent` deletes every generated row on regeneration. A new
+   * URL becomes an image-only custom row (`reference: false`) so it stays out
+   * of the palette, the bio payload and the public links.
    */
   static async upsertImageSource(
     artistId: string,
@@ -90,7 +112,7 @@ export class ArtistBioLinkRepository {
         if (existing.imageSource) return existing;
         return prisma.artistBioLink.update({
           where: { id: existing.id },
-          data: { imageSource: true },
+          data: { imageSource: true, origin: 'custom' },
         });
       }
       const { _max } = await prisma.artistBioLink.aggregate({

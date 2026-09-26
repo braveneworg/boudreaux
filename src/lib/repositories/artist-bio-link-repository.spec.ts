@@ -11,6 +11,7 @@ vi.mock('@/lib/prisma', () => ({
     artistBioLink: {
       delete: vi.fn(),
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       aggregate: vi.fn(),
       findMany: vi.fn(),
@@ -105,10 +106,59 @@ describe('ArtistBioLinkRepository', () => {
     });
   });
 
-  describe('delete', () => {
-    it('deletes the link row by id', async () => {
-      await ArtistBioLinkRepository.delete('link-1');
+  describe('removeReference', () => {
+    it('deletes a row that plays no image-source role', async () => {
+      vi.mocked(prisma.artistBioLink.findUnique).mockResolvedValue({
+        id: 'link-1',
+        imageSource: null,
+      } as never);
+
+      await ArtistBioLinkRepository.removeReference('link-1');
+
       expect(prisma.artistBioLink.delete).toHaveBeenCalledWith({ where: { id: 'link-1' } });
+      expect(prisma.artistBioLink.update).not.toHaveBeenCalled();
+    });
+
+    it('only clears the reference flag on a row that is also an image source', async () => {
+      vi.mocked(prisma.artistBioLink.findUnique).mockResolvedValue({
+        id: 'link-1',
+        imageSource: true,
+      } as never);
+
+      await ArtistBioLinkRepository.removeReference('link-1');
+
+      expect(prisma.artistBioLink.update).toHaveBeenCalledWith({
+        where: { id: 'link-1' },
+        data: { reference: false },
+      });
+      expect(prisma.artistBioLink.delete).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op for an unknown id', async () => {
+      vi.mocked(prisma.artistBioLink.findUnique).mockResolvedValue(null);
+
+      await ArtistBioLinkRepository.removeReference('missing');
+
+      expect(prisma.artistBioLink.delete).not.toHaveBeenCalled();
+      expect(prisma.artistBioLink.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restoreReference', () => {
+    it('grants the reference role back to an image-only row and returns it', async () => {
+      vi.mocked(prisma.artistBioLink.update).mockResolvedValue({
+        id: 'link-1',
+        reference: true,
+        imageSource: true,
+      } as never);
+
+      const row = await ArtistBioLinkRepository.restoreReference('link-1');
+
+      expect(prisma.artistBioLink.update).toHaveBeenCalledWith({
+        where: { id: 'link-1' },
+        data: { reference: true },
+      });
+      expect(row).toEqual({ id: 'link-1', reference: true, imageSource: true });
     });
   });
 
@@ -175,9 +225,10 @@ describe('ArtistBioLinkRepository', () => {
       });
     });
 
-    it('upsertImageSource flips the flag on an existing row instead of creating a duplicate', async () => {
+    it('upsertImageSource flags an existing row and promotes it to custom so regeneration keeps it', async () => {
       vi.mocked(prisma.artistBioLink.findFirst).mockResolvedValue({
         id: 'l1',
+        origin: 'generated',
         imageSource: false,
       } as never);
       vi.mocked(prisma.artistBioLink.update).mockResolvedValue({
@@ -195,7 +246,7 @@ describe('ArtistBioLinkRepository', () => {
       expect(prisma.artistBioLink.create).not.toHaveBeenCalled();
       expect(prisma.artistBioLink.update).toHaveBeenCalledWith({
         where: { id: 'l1' },
-        data: { imageSource: true },
+        data: { imageSource: true, origin: 'custom' },
       });
     });
 

@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { ImageLinksService } from '@/lib/services/image-links-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { MAX_IMAGE_LINKS } from '@/lib/validation/image-links-schema';
 
 import { addArtistImageSourceLinkAction } from './add-artist-image-source-link-action';
 
@@ -24,7 +25,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(requireRole).mockResolvedValue(mockSession as never);
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ImageLinksService.addSourceLink).mockResolvedValue(link);
+  vi.mocked(ImageLinksService.addSourceLink).mockResolvedValue({ status: 'added', link });
 });
 
 describe('addArtistImageSourceLinkAction', () => {
@@ -45,11 +46,23 @@ describe('addArtistImageSourceLinkAction', () => {
   });
 
   it('returns Artist not found when the service reports no artist', async () => {
-    vi.mocked(ImageLinksService.addSourceLink).mockResolvedValue(null);
+    vi.mocked(ImageLinksService.addSourceLink).mockResolvedValue({ status: 'not-found' });
 
     const result = await addArtistImageSourceLinkAction({ artistId, url: link.url });
 
     expect(result).toEqual({ success: false, error: 'Artist not found' });
+  });
+
+  it('returns the per-artist limit copy when the service refuses a new source', async () => {
+    vi.mocked(ImageLinksService.addSourceLink).mockResolvedValue({ status: 'limit' });
+
+    const result = await addArtistImageSourceLinkAction({ artistId, url: link.url });
+
+    expect(result).toEqual({
+      success: false,
+      error: `Up to ${MAX_IMAGE_LINKS} image sources per artist`,
+    });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
   });
 
   it('stores the link, audits it and revalidates the admin list', async () => {

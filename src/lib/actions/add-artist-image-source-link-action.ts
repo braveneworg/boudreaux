@@ -14,6 +14,7 @@ import { loggers } from '@/lib/utils/logger';
 import {
   addImageSourceLinkInputSchema,
   type ImageSourceLink,
+  MAX_IMAGE_LINKS,
 } from '@/lib/validation/image-links-schema';
 
 /** Result of flagging one URL as an artist image source. */
@@ -45,10 +46,14 @@ export const addArtistImageSourceLinkAction = async (
   }
 
   try {
-    const link = await ImageLinksService.addSourceLink(parsed.data.artistId, parsed.data.url);
-    if (!link) {
+    const result = await ImageLinksService.addSourceLink(parsed.data.artistId, parsed.data.url);
+    if (result.status === 'not-found') {
       return { success: false, error: 'Artist not found' };
     }
+    if (result.status === 'limit') {
+      return { success: false, error: `Up to ${MAX_IMAGE_LINKS} image sources per artist` };
+    }
+    const { link } = result;
 
     logSecurityEvent({
       event: 'media.artist_bio_link.created',

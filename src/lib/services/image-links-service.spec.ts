@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { DataError } from '@/lib/types/domain/errors';
+import { MAX_IMAGE_LINKS } from '@/lib/validation/image-links-schema';
 import { STALE_JOB_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
 import { ImageLinksService } from './image-links-service';
@@ -128,10 +130,18 @@ afterEach(() => {
 });
 
 describe('ImageLinksService.addSourceLink / removeSourceLink', () => {
-  it('returns null when the artist does not exist', async () => {
+  const atCap = Array.from({ length: MAX_IMAGE_LINKS }, (_, index) => ({
+    id: `l${index}`,
+    url: `https://press.test/${index}`,
+    label: 'press.test',
+  }));
+
+  it('reports not-found when the artist does not exist', async () => {
     existsByIdMock.mockResolvedValueOnce(false);
 
-    expect(await ImageLinksService.addSourceLink('a1', 'https://x.test/p')).toBeNull();
+    expect(await ImageLinksService.addSourceLink('a1', 'https://x.test/p')).toEqual({
+      status: 'not-found',
+    });
     expect(upsertImageSourceMock).not.toHaveBeenCalled();
   });
 
@@ -144,10 +154,59 @@ describe('ImageLinksService.addSourceLink / removeSourceLink', () => {
       kind: 'other',
     });
 
-    const link = await ImageLinksService.addSourceLink('a1', 'https://x.test/p ');
+    const result = await ImageLinksService.addSourceLink('a1', 'https://x.test/p ');
 
     expect(upsertImageSourceMock.mock.calls).toEqual([['a1', 'https://x.test/p', 'x.test']]);
-    expect(link).toEqual({ id: 'l1', label: 'x.test', url: 'https://x.test/p' });
+    expect(result).toEqual({
+      status: 'added',
+      link: { id: 'l1', label: 'x.test', url: 'https://x.test/p' },
+    });
+  });
+
+  it('refuses a new URL once the artist already has MAX_IMAGE_LINKS sources', async () => {
+    existsByIdMock.mockResolvedValueOnce(true);
+    findImageSourcesMock.mockResolvedValueOnce(atCap);
+
+    expect(await ImageLinksService.addSourceLink('a1', 'https://x.test/new')).toEqual({
+      status: 'limit',
+    });
+    expect(upsertImageSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a URL that is already one of the sources at the cap (idempotent)', async () => {
+    existsByIdMock.mockResolvedValueOnce(true);
+    findImageSourcesMock.mockResolvedValueOnce(atCap);
+    upsertImageSourceMock.mockResolvedValueOnce(atCap[0]);
+
+    expect(await ImageLinksService.addSourceLink('a1', atCap[0].url)).toEqual({
+      status: 'added',
+      link: atCap[0],
+    });
+  });
+
+  it('retries the upsert once when a concurrent add loses the unique index', async () => {
+    existsByIdMock.mockResolvedValueOnce(true);
+    upsertImageSourceMock
+      .mockRejectedValueOnce(new DataError('DUPLICATE', 'Unique constraint failed'))
+      .mockResolvedValueOnce({ id: 'l1', label: 'x.test', url: 'https://x.test/p' });
+
+    const result = await ImageLinksService.addSourceLink('a1', 'https://x.test/p');
+
+    expect(upsertImageSourceMock).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      status: 'added',
+      link: { id: 'l1', label: 'x.test', url: 'https://x.test/p' },
+    });
+  });
+
+  it('rethrows a non-duplicate repository error from the upsert', async () => {
+    existsByIdMock.mockResolvedValueOnce(true);
+    upsertImageSourceMock.mockRejectedValueOnce(new DataError('UNAVAILABLE', 'Connection failed'));
+
+    await expect(ImageLinksService.addSourceLink('a1', 'https://x.test/p')).rejects.toThrow(
+      'Connection failed'
+    );
+    expect(upsertImageSourceMock).toHaveBeenCalledTimes(1);
   });
 
   it('removeSourceLink delegates to the repository', async () => {
@@ -274,6 +333,23 @@ describe('ImageLinksService.runJob', () => {
     const result = await ImageLinksService.runJob('a1');
 
     expect(result).toEqual({ status: 'failed', error: 'boom' });
+  });
+
+  it('never throws even when recording the failure itself fails', async () => {
+    findImageSourcesMock.mockRejectedValueOnce(new Error('boom'));
+    // First call flips to processing; the second (failed) write is the one that breaks.
+    setImageLinksStatusMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('mongo down'));
+
+    await expect(ImageLinksService.runJob('a1')).resolves.toEqual({
+      status: 'failed',
+      error: 'boom',
+    });
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'image_links_status_write_failed',
+      expect.objectContaining({ artistId: 'a1', status: 'failed' })
+    );
   });
 });
 
@@ -443,6 +519,20 @@ describe('ImageLinksService.completeCallback', () => {
     ]);
   });
 
+  it('treats pool URLs as case-insensitive when skipping images', async () => {
+    findExistingUrlsMock.mockResolvedValueOnce(new Set(['https://press.test/OLD.jpg']));
+
+    await ImageLinksService.completeCallback('a1', {
+      ok: true,
+      data: { images: [image('https://press.test/old.jpg')] },
+    });
+
+    expect(rehostImagesMock).not.toHaveBeenCalled();
+    expect(setImageLinksStatusMock.mock.calls).toEqual([
+      ['a1', 'succeeded', { error: null, addedCount: 0 }],
+    ]);
+  });
+
   it('succeeds with a zero count when every image was already in the pool', async () => {
     findExistingUrlsMock.mockResolvedValueOnce(new Set(['https://press.test/old.jpg']));
 
@@ -467,5 +557,17 @@ describe('ImageLinksService.completeCallback', () => {
     });
 
     expect(setImageLinksStatusMock.mock.calls).toEqual([['a1', 'failed', { error: 'S3 down' }]]);
+  });
+
+  it('never throws when recording a Lambda failure itself fails', async () => {
+    setImageLinksStatusMock.mockRejectedValueOnce(new Error('mongo down'));
+
+    await expect(
+      ImageLinksService.completeCallback('a1', { ok: false, error: 'Jina down' })
+    ).resolves.toBeUndefined();
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'image_links_status_write_failed',
+      expect.objectContaining({ artistId: 'a1', status: 'failed' })
+    );
   });
 });

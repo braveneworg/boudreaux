@@ -102,6 +102,9 @@ const useImageLinksJob = (artistId: string): ImageLinksJob => {
       toast.error(response.error);
       return;
     }
+    // The cached status may still hold the previous run's terminal state;
+    // re-read it before tracking so that outcome is never surfaced as this run's.
+    await status.refetch();
     setActive(true);
   };
 

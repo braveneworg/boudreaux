@@ -441,6 +441,12 @@ const buildArtistCreateData = ({
   ...middleNameSpread(trimDetail(details?.middleName)),
 });
 
+/** Returns the row as a reference link, granting the role back to one that was
+ *  image-source only (`reference: false`) so the URL shows in the palette and
+ *  the bio payload again. Rows already carrying the role are returned as-is. */
+const adoptAsReference = async (row: ArtistBioLinkRecord): Promise<ArtistBioLinkRecord> =>
+  row.reference === false ? ArtistBioLinkRepository.restoreReference(row.id) : row;
+
 export class ArtistService {
   /**
    * Create a new artist
@@ -1029,9 +1035,10 @@ export class ArtistService {
     await ArtistRepository.connectToRelease(artistId, releaseId);
   }
 
-  /** Deletes a single discovered bio link row (admin palette X). */
+  /** Removes a bio link from the reference list (admin palette X). A row that
+   *  also serves as an image source keeps that role; otherwise it is deleted. */
   static async deleteBioLink(linkId: string): Promise<void> {
-    await ArtistBioLinkRepository.delete(linkId);
+    await ArtistBioLinkRepository.removeReference(linkId);
   }
 
   /** Deletes a single discovered bio image row (admin palette X) and performs
@@ -1130,14 +1137,15 @@ export class ArtistService {
   /** Persists one admin-authored bio link and returns the created row.
    *  Dedupes by URL: if the artist already has a link with this URL (custom or
    *  generated), returns that existing row instead of creating a duplicate, so
-   *  the reference-links input and the Add-link editor stay idempotent. A
+   *  the reference-links input and the Add-link editor stay idempotent — an
+   *  existing row that was image-source only regains the reference role. A
    *  concurrent add can slip between the check and the insert; the DB's
    *  `@@unique([artistId, url])` index then rejects the loser, so a `DUPLICATE`
    *  is recovered by re-reading and returning the row the winner persisted. */
   static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
     const existing = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
     if (existing) {
-      return existing;
+      return adoptAsReference(existing);
     }
     try {
       return await ArtistBioLinkRepository.create(input);
@@ -1145,7 +1153,7 @@ export class ArtistService {
       if (error instanceof DataError && error.code === 'DUPLICATE') {
         const raced = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
         if (raced) {
-          return raced;
+          return adoptAsReference(raced);
         }
       }
       throw error;

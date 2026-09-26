@@ -28,12 +28,13 @@ vi.mock('./_hooks/mutations/use-image-source-link-mutations', () => ({
 }));
 
 const statusData = vi.hoisted(() => ({ current: null as ImageLinksStatusResponse | null }));
+const refetchStatus = vi.hoisted(() => vi.fn());
 vi.mock('./_hooks/use-artist-image-links-query', () => ({
   useArtistImageLinksQuery: () => ({
     isPending: false,
     error: Error('none'),
     data: statusData.current,
-    refetch: vi.fn(),
+    refetch: refetchStatus,
   }),
 }));
 
@@ -67,6 +68,7 @@ const renderSection = (props: { disabled?: boolean } = {}) =>
 beforeEach(() => {
   statusData.current = idle();
   generateImagesFromLinksAsync.mockResolvedValue({ success: true, status: 'pending' });
+  refetchStatus.mockResolvedValue(undefined);
 });
 
 describe('ImageSourceLinksSection', () => {
@@ -197,6 +199,24 @@ describe('ImageSourceLinksSection', () => {
     rerender(<ImageSourceLinksSection artistId="artist-1" />);
 
     expect(toastError).toHaveBeenCalledWith('Jina down');
+    expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('waits for fresh status before tracking a run so a previous outcome never re-toasts', async () => {
+    const user = userEvent.setup();
+    statusData.current = idle({ status: 'succeeded', addedCount: 3, links: twoLinks });
+    refetchStatus.mockImplementation(async () => {
+      statusData.current = idle({ status: 'pending', links: twoLinks });
+    });
+    renderSection();
+
+    await user.click(screen.getByRole('button', { name: 'Generate images' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generating images…' })).toBeDisabled()
+    );
+    expect(refetchStatus).toHaveBeenCalledTimes(1);
+    expect(toastSuccess).not.toHaveBeenCalled();
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
