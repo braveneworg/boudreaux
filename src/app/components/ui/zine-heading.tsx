@@ -19,7 +19,7 @@ export const ZineHeading = ({
   ...props
 }: HeadingProps): React.ReactElement => (
   <Heading level={level} className={cn('mt-1 mb-4 h-auto', className)} {...props}>
-    {/* Explicit `uppercase` deliberately beats the base `h1 { text-transform: capitalize }`. */}
+    {/* Explicit `uppercase` / `tracking-wide` sort after the `font-fake-four-cutout` resets. */}
     <span
       data-slot="zine-heading"
       className="font-fake-four-cutout relative inline-block w-full px-3 py-1 text-3xl tracking-wide text-black uppercase sm:w-auto sm:text-4xl"

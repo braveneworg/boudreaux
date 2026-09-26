@@ -243,6 +243,20 @@
   }
 }
 
+/* The cutout face opts out of the Jost heading rules in `@layer base`: it
+   ships a single weight (400), so the h1/h2 600 was faux-bolded by the
+   browser, and it carries its own spacing and casing, so the 0.2rem tracking
+   and `capitalize` distorted it. These merge into the theme-generated
+   font-family rule in the utilities layer, which beats base; single-property
+   utilities (`tracking-wide`, `uppercase`, `font-semibold`) sort after it, so
+   call-site overrides still win. `text-decoration` is left alone on purpose:
+   the base anchor underline stays as the link cue (#770). */
+@utility font-fake-four-cutout {
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 /* Zine page accents — one utility per heading-strip paper color. Setting one
    on a page (or card) recolors the whole subtree: `--card-accent` drives the
    offset shadows + focus rings, and the soft shade backs chips/strips. */
