@@ -119,6 +119,8 @@ export const queryKeys = {
       [...queryKeys.artists.all, 'bioGeneration', artistId] as const,
     /** An artist's bio image pool in picker order (`useArtistBioImagesQuery`). */
     bioImages: (artistId: string) => [...queryKeys.artists.all, 'bioImages', artistId] as const,
+    /** An artist's image-source links + images-from-links job status (`useArtistImageLinksQuery`). */
+    imageLinks: (artistId: string) => [...queryKeys.artists.all, 'imageLinks', artistId] as const,
     /** Home-page artist typeahead (`useArtistNavSearchQuery`). */
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
     /** Public artists index — one shared infinite query feeds the grid and the search dropdown. */

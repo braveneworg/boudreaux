@@ -209,6 +209,12 @@ describe('BioImageTile', () => {
     expect(screen.queryByText('Custom')).not.toBeInTheDocument();
   });
 
+  it('shows a Linked badge on rows scraped from an image-source page', () => {
+    renderTile({ image: { ...TITLED, origin: 'linked' } });
+    expect(screen.getByText('Linked')).toBeInTheDocument();
+    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
+  });
+
   it('disables delete, insert, and edit when disabled', () => {
     renderTile({ disabled: true });
     expect(screen.getByRole('button', { name: 'Delete image Ceschi Ramos' })).toBeDisabled();
