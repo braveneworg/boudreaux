@@ -354,7 +354,6 @@ export default defineConfig((): ViteUserConfig => {
           '**/lib/actions/presigned-upload-actions.ts',
 
           // Image actions that require S3 integration testing
-          '**/lib/actions/artist-image-actions.ts',
           '**/lib/actions/group-image-actions.ts',
           '**/lib/actions/register-image-actions.ts',
 
