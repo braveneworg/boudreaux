@@ -475,6 +475,8 @@ const eslintConfig = [
       'src/lib/audio-metadata/ffmpeg.ts',
       // Reads the adjacent SAM template (compile-time constant URL) to lint its wiring.
       'bio-generator/src/template.spec.ts',
+      // Reads the spec files named in SHELL_SCRIPT_SPECS to check they spawn a shell.
+      'vitest.config.spec.ts',
     ],
     rules: {
       'security/detect-non-literal-fs-filename': 'off',
