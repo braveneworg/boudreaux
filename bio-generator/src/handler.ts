@@ -7,7 +7,7 @@ import { postBioCallback } from './callback.js';
 import { runQualityPasses } from './factcheck.js';
 import { critiqueProse, draftAndSynthesizeProse, reviseProse } from './gemini.js';
 import { isImageLinksTask, runImageLinksLambda } from './image-links.js';
-import { readUrl, searchArtistSources } from './jina.js';
+import { readUrl, readUrlOutcome, searchArtistSources } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getGeminiApiKey, getScrapeApiKey, getSerperApiKey } from './lib/secrets.js';
 import { classifyReferenceKind, deriveLinkLabel } from './link-labels.js';
@@ -68,6 +68,8 @@ export interface BioGeneratorDeps {
   searchArtistSources: typeof searchArtistSources;
   searchSerperImages: typeof searchSerperImages;
   readUrl: typeof readUrl;
+  /** Outcome-shaped reader for the images-from-links task (bot wall vs. dead link). */
+  readPage: typeof readUrlOutcome;
   listReleaseGroups: typeof listReleaseGroups;
   getCoverArtImages: typeof getCoverArtImages;
   getCommonsCategoryImages: typeof getCommonsCategoryImages;
@@ -96,6 +98,7 @@ const defaultDeps: BioGeneratorDeps = {
   searchArtistSources,
   searchSerperImages,
   readUrl,
+  readPage: readUrlOutcome,
   listReleaseGroups,
   getCoverArtImages,
   getCommonsCategoryImages,

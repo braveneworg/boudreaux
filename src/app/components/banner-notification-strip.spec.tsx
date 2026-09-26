@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
@@ -133,8 +133,9 @@ describe('BannerNotificationStrip', () => {
     );
 
     // The outer container is always present so toggling a notification never
-    // shifts layout; the default size reserves 2.5rem.
-    expect(container.firstChild).toHaveStyle({ minHeight: '2.5rem' });
+    // shifts layout; the default size reserves 2.5rem. Assert the inline style
+    // the component sets: happy-dom's computed style converts rem to px.
+    expect((container.firstChild as HTMLElement).style.minHeight).toBe('2.5rem');
   });
 
   it('uses the taller, larger-font body for the lg (desktop) size', () => {
@@ -142,7 +143,7 @@ describe('BannerNotificationStrip', () => {
       <BannerNotificationStrip {...baseProps} active={makeNotification()} size="lg" />
     );
 
-    expect(container.firstChild).toHaveStyle({ minHeight: '3.25rem' });
+    expect((container.firstChild as HTMLElement).style.minHeight).toBe('3.25rem');
     const body = container.querySelector('.text-base');
     expect(body).toBeInTheDocument();
     expect(body).toHaveClass('py-3', 'px-6');
@@ -153,7 +154,7 @@ describe('BannerNotificationStrip', () => {
       <BannerNotificationStrip {...baseProps} active={makeNotification()} />
     );
 
-    expect(container.firstChild).toHaveStyle({ minHeight: '2.5rem' });
+    expect((container.firstChild as HTMLElement).style.minHeight).toBe('2.5rem');
     expect(container.querySelector('.text-sm')).toBeInTheDocument();
   });
 
@@ -167,7 +168,7 @@ describe('BannerNotificationStrip', () => {
       />
     );
 
-    expect(container.firstChild).toHaveStyle({ minHeight: '2.5rem' });
+    expect((container.firstChild as HTMLElement).style.minHeight).toBe('2.5rem');
     expect(container.querySelector('.text-sm')).toBeInTheDocument();
   });
 

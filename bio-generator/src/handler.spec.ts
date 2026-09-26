@@ -132,6 +132,7 @@ const makeDeps = (overrides: Partial<BioGeneratorDeps> = {}): BioGeneratorDeps =
   searchArtistSources: vi.fn().mockResolvedValue(null),
   searchSerperImages: vi.fn().mockResolvedValue(null),
   readUrl: vi.fn().mockResolvedValue(null),
+  readPage: vi.fn().mockResolvedValue({ kind: 'unreadable' }),
   listReleaseGroups: vi.fn().mockResolvedValue([]),
   getCoverArtImages: vi.fn().mockResolvedValue([]),
   getCommonsCategoryImages: vi.fn().mockResolvedValue([]),

@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
 import type * as videoDescriptionEditor from '@/app/components/forms/videos/enrichment/video-description-editor';
+import { RELEASE_DATE_LOOKUP_DEBOUNCE_MS } from '@/app/components/forms/videos/use-release-date-auto-lookup';
 import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
 import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
@@ -604,6 +605,26 @@ describe('VideoForm — metadata prefill (only-empty)', () => {
 });
 
 describe('VideoForm — release date', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * The automatic lookup debounces the probed title/artist for 400ms. Fake the
+   * clock (with real-time advancement so `waitFor` still polls) and fire that
+   * timer explicitly instead of waiting it out.
+   */
+  const setupWithFakeClock = (): ReturnType<typeof userEvent.setup> => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    return userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+  };
+
+  const settleReleaseDateLookup = async (): Promise<void> => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RELEASE_DATE_LOOKUP_DEBOUNCE_MS);
+    });
+  };
+
   it('normalises a picked ISO datetime to the local YYYY-MM-DD day', () => {
     render(<VideoForm />);
     const localMidnight = new Date(2024, 4, 1, 0, 0, 0);
@@ -618,10 +639,11 @@ describe('VideoForm — release date', () => {
   it('starts the automatic lookup as soon as the upload starts', async () => {
     mocks.extractVideoTags.mockResolvedValue({ title: 'Tag Title', artist: 'Tag Artist' });
     mocks.uploadVideoMultipart.mockImplementation(() => new Promise(() => undefined));
-    const user = setup();
+    const user = setupWithFakeClock();
     render(<VideoForm />);
 
     await uploadVideoFile(user);
+    await settleReleaseDateLookup();
 
     await waitFor(() => expect(mocks.releaseDateRefetch).toHaveBeenCalled(), { timeout: 3000 });
   });
@@ -631,10 +653,11 @@ describe('VideoForm — release date', () => {
     mocks.releaseDateRefetch.mockResolvedValue({
       data: { releasedOn: '2019-08-04', confidence: 'high', sources: [] },
     });
-    const user = setup();
+    const user = setupWithFakeClock();
     render(<VideoForm />);
 
     await uploadVideoFile(user);
+    await settleReleaseDateLookup();
 
     await waitFor(() => expect(screen.getByLabelText('Release date')).toHaveValue('2019-08-04'), {
       timeout: 3000,

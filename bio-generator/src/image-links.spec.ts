@@ -11,7 +11,7 @@ import {
 import { IMAGE_LINKS_TASK } from './types.js';
 
 import type { ImageLinksDeps } from './image-links.js';
-import type { ScrapedImage } from './jina.js';
+import type { ReadUrlOutcome, ScrapedImage } from './jina.js';
 import type { ImageLinksInput } from './types.js';
 
 const PAGE_LINK = 'https://example.com/press';
@@ -73,7 +73,7 @@ const fetchRouter = ({ head, getProbe, bytes }: RouterResponses = {}): typeof fe
   });
 
 const buildDeps = (overrides: Partial<ImageLinksDeps> = {}): ImageLinksDeps => ({
-  readUrl: vi.fn().mockResolvedValue(null),
+  readPage: vi.fn().mockResolvedValue({ kind: 'unreadable' }),
   getScrapeApiKey: vi.fn().mockResolvedValue('scrape-key'),
   fetchReferenceBytes: vi.fn().mockResolvedValue([]),
   annotateFaces: vi.fn(async (candidates) =>
@@ -93,11 +93,16 @@ const baseInput: ImageLinksInput = {
   jobToken: JOB_TOKEN,
 };
 
-/** A read result whose only interesting part is its images. */
-const readResult = (images: ScrapedImage[]): { content: string; images: ScrapedImage[] } => ({
-  content: 'page text',
-  images,
+/** A successful read whose only interesting part is its images. */
+const readResult = (images: ScrapedImage[]): ReadUrlOutcome => ({
+  kind: 'read',
+  result: { content: 'page text', images },
 });
+
+/** The reader's verdict when the site served a bot challenge instead of the page. */
+const BLOCKED: ReadUrlOutcome = { kind: 'blocked' };
+/** The reader's verdict when the page could not be read at all (non-OK, threw, empty). */
+const UNREADABLE: ReadUrlOutcome = { kind: 'unreadable' };
 
 describe('isImageLinksTask', () => {
   it('recognizes the task discriminator', () => {
@@ -130,7 +135,7 @@ describe('runImageLinksLambda input validation', () => {
     expect(vi.mocked(deps.postCallback).mock.calls).toEqual([
       [{ url: CALLBACK_URL, jobToken: JOB_TOKEN, result }],
     ]);
-    expect(deps.readUrl).not.toHaveBeenCalled();
+    expect(deps.readPage).not.toHaveBeenCalled();
   });
 
   it('returns ok:false without a callback when the malformed event has no callback plumbing', async () => {
@@ -146,7 +151,7 @@ describe('runImageLinksLambda input validation', () => {
 describe('runImageLinksLambda page links', () => {
   it('reads a page link through the reader and ships its images as photos with provenance', async () => {
     const deps = buildDeps({
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(
           readResult([scraped('https://cdn.example.com/band.jpg', { alt: 'Band on stage' })])
@@ -177,12 +182,12 @@ describe('runImageLinksLambda page links', () => {
         ],
       },
     });
-    expect(vi.mocked(deps.readUrl).mock.calls).toEqual([[PAGE_LINK, 'scrape-key']]);
+    expect(vi.mocked(deps.readPage).mock.calls).toEqual([[PAGE_LINK, 'scrape-key']]);
   });
 
   it('posts the callback exactly once with the success payload', async () => {
     const deps = buildDeps({
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/band.jpg')])),
     });
@@ -209,16 +214,16 @@ describe('runImageLinksLambda page links', () => {
   it('passes a keyless read through when no scrape key is configured', async () => {
     const deps = buildDeps({
       getScrapeApiKey: vi.fn().mockResolvedValueOnce(null),
-      readUrl: vi.fn().mockResolvedValueOnce(readResult([])),
+      readPage: vi.fn().mockResolvedValueOnce(readResult([])),
     });
 
     await runImageLinksLambda(baseInput, deps);
 
-    expect(vi.mocked(deps.readUrl).mock.calls).toEqual([[PAGE_LINK, null]]);
+    expect(vi.mocked(deps.readPage).mock.calls).toEqual([[PAGE_LINK, null]]);
   });
 
-  it('contributes nothing from a link the reader could not read', async () => {
-    const deps = buildDeps({ readUrl: vi.fn().mockResolvedValueOnce(null) });
+  it('succeeds with no images when a readable page simply has none', async () => {
+    const deps = buildDeps({ readPage: vi.fn().mockResolvedValueOnce(readResult([])) });
 
     const result = await runImageLinksLambda(baseInput, deps);
 
@@ -228,9 +233,91 @@ describe('runImageLinksLambda page links', () => {
     ]);
   });
 
+  it('fails the job, naming the host, when the only link was blocked by a bot check', async () => {
+    const deps = buildDeps({ readPage: vi.fn().mockResolvedValueOnce(BLOCKED) });
+
+    const result = await runImageLinksLambda(
+      { ...baseInput, links: ['https://imginn.com/davideramos/'] },
+      deps
+    );
+
+    const expected = {
+      ok: false,
+      error: 'No images could be pulled: imginn.com blocked automated access (bot check).',
+    };
+    expect(result).toEqual(expected);
+    expect(vi.mocked(deps.postCallback).mock.calls).toEqual([
+      [{ url: CALLBACK_URL, jobToken: JOB_TOKEN, result: expected }],
+    ]);
+  });
+
+  it('fails the job when the only link could not be read', async () => {
+    const deps = buildDeps({ readPage: vi.fn().mockResolvedValueOnce(UNREADABLE) });
+
+    const result = await runImageLinksLambda(baseInput, deps);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'No images could be pulled: example.com could not be read.',
+    });
+  });
+
+  it('lists blocked and unreadable hosts once each, without a www prefix', async () => {
+    const deps = buildDeps({
+      readPage: vi
+        .fn()
+        .mockResolvedValueOnce(BLOCKED)
+        .mockResolvedValueOnce(BLOCKED)
+        .mockResolvedValueOnce(UNREADABLE)
+        .mockResolvedValueOnce(readResult([])),
+    });
+
+    const result = await runImageLinksLambda(
+      {
+        ...baseInput,
+        links: [
+          'https://www.imginn.com/davideramos/',
+          'https://imginn.com/davideramos/reels/',
+          'https://gone.example.com/press',
+          PAGE_LINK,
+        ],
+      },
+      deps
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        'No images could be pulled: imginn.com blocked automated access (bot check); gone.example.com could not be read.',
+    });
+  });
+
+  it('still succeeds with the images it found when only some links were blocked, and logs the block', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const deps = buildDeps({
+      readPage: vi
+        .fn()
+        .mockResolvedValueOnce(BLOCKED)
+        .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/band.jpg')])),
+    });
+
+    const result = await runImageLinksLambda(
+      { ...baseInput, links: ['https://imginn.com/davideramos/', PAGE_LINK] },
+      deps
+    );
+
+    expect(result.ok && result.data.images.map((image) => image.url)).toEqual([
+      'https://cdn.example.com/band.jpg',
+    ]);
+    expect(warn.mock.calls.map(([line]) => String(line))).toEqual([
+      expect.stringContaining('image_links_links_skipped'),
+    ]);
+    warn.mockRestore();
+  });
+
   it('does not GET-probe a link whose HEAD already answered with a non-image type', async () => {
     const fetchFn = fetchRouter();
-    const deps = buildDeps({ fetchFn, readUrl: vi.fn().mockResolvedValueOnce(readResult([])) });
+    const deps = buildDeps({ fetchFn, readPage: vi.fn().mockResolvedValueOnce(readResult([])) });
 
     await runImageLinksLambda(baseInput, deps);
 
@@ -264,7 +351,7 @@ describe('runImageLinksLambda direct image links', () => {
         ],
       },
     });
-    expect(deps.readUrl).not.toHaveBeenCalled();
+    expect(deps.readPage).not.toHaveBeenCalled();
   });
 
   it('falls back to a GET probe with Accept image/* when HEAD throws', async () => {
@@ -281,7 +368,7 @@ describe('runImageLinksLambda direct image links', () => {
     expect(result.ok && result.data.images.map((image) => image.url)).toEqual([IMAGE_LINK]);
     const probes = vi.mocked(fetchFn).mock.calls.map(([, init]) => probeKind(init));
     expect(probes).toEqual(['head', 'get-probe', 'bytes']);
-    expect(deps.readUrl).not.toHaveBeenCalled();
+    expect(deps.readPage).not.toHaveBeenCalled();
   });
 
   it('falls back to a GET probe when HEAD answers 405', async () => {
@@ -294,7 +381,7 @@ describe('runImageLinksLambda direct image links', () => {
     const result = await runImageLinksLambda({ ...baseInput, links: [IMAGE_LINK] }, deps);
 
     expect(result.ok && result.data.images.map((image) => image.url)).toEqual([IMAGE_LINK]);
-    expect(deps.readUrl).not.toHaveBeenCalled();
+    expect(deps.readPage).not.toHaveBeenCalled();
   });
 
   it('bounds every probe with the link timeout', async () => {
@@ -326,14 +413,14 @@ describe('runImageLinksLambda direct image links', () => {
     });
     const deps = buildDeps({
       fetchFn,
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/x.jpg')])),
     });
 
     const result = await runImageLinksLambda({ ...baseInput, links: [IMAGE_LINK] }, deps);
 
-    expect(vi.mocked(deps.readUrl).mock.calls).toEqual([[IMAGE_LINK, 'scrape-key']]);
+    expect(vi.mocked(deps.readPage).mock.calls).toEqual([[IMAGE_LINK, 'scrape-key']]);
     expect(result.ok && result.data.images.map((image) => image.url)).toEqual([
       'https://cdn.example.com/x.jpg',
     ]);
@@ -344,7 +431,7 @@ describe('runImageLinksLambda dedupe and cap', () => {
   it('dedupes candidates by URL across links, keeping the first occurrence', async () => {
     const second = 'https://example.com/interview';
     const deps = buildDeps({
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(
           readResult([scraped('https://cdn.example.com/a.jpg', { alt: 'first' })])
@@ -372,7 +459,7 @@ describe('runImageLinksLambda dedupe and cap', () => {
     const order: string[] = [];
     const second = 'https://example.com/interview';
     const deps = buildDeps({
-      readUrl: vi.fn(async (url: string) => {
+      readPage: vi.fn(async (url: string) => {
         order.push(url);
         return readResult([]);
       }),
@@ -388,7 +475,7 @@ describe('runImageLinksLambda dedupe and cap', () => {
       scraped(`https://cdn.example.com/${i}.jpg`)
     );
     const deps = buildDeps({
-      readUrl: vi.fn().mockResolvedValueOnce(readResult(many)),
+      readPage: vi.fn().mockResolvedValueOnce(readResult(many)),
     });
 
     const result = await runImageLinksLambda(
@@ -397,7 +484,7 @@ describe('runImageLinksLambda dedupe and cap', () => {
     );
 
     expect(result.ok && result.data.images).toHaveLength(MAX_LINK_IMAGES);
-    expect(vi.mocked(deps.readUrl).mock.calls).toEqual([[PAGE_LINK, 'scrape-key']]);
+    expect(vi.mocked(deps.readPage).mock.calls).toEqual([[PAGE_LINK, 'scrape-key']]);
   });
 });
 
@@ -409,7 +496,7 @@ describe('runImageLinksLambda face scoring', () => {
       fetchFn: fetchRouter({
         bytes: (url) => (url.endsWith('gone.jpg') ? probeResponse(null, 404) : imageBytes()),
       }),
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(
           readResult([
@@ -434,7 +521,7 @@ describe('runImageLinksLambda face scoring', () => {
         { hasFace: true, faceScore: 93.5 },
         { hasFace: false, faceScore: null },
       ]),
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(
           readResult([
@@ -475,7 +562,7 @@ describe('runImageLinksLambda face scoring', () => {
 
   it('skips the reference fetch and still runs face detection when no references are supplied', async () => {
     const deps = buildDeps({
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/a.jpg')])),
     });
@@ -491,7 +578,7 @@ describe('runImageLinksLambda face scoring', () => {
   it('makes no Rekognition call when nothing could be fetched', async () => {
     const deps = buildDeps({
       fetchFn: fetchRouter({ bytes: () => probeResponse(null, 500) }),
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/a.jpg')])),
     });
@@ -506,7 +593,7 @@ describe('runImageLinksLambda face scoring', () => {
   it('degrades a Rekognition failure to null face signals instead of failing the job', async () => {
     const deps = buildDeps({
       annotateFaces: vi.fn().mockRejectedValueOnce(new Error('rekognition down')),
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/a.jpg')])),
     });
@@ -530,7 +617,7 @@ describe('runImageLinksLambda face scoring', () => {
   it('degrades a reference fetch failure to null face signals instead of failing the job', async () => {
     const deps = buildDeps({
       fetchReferenceBytes: vi.fn().mockRejectedValueOnce(new Error('refs unreachable')),
-      readUrl: vi
+      readPage: vi
         .fn()
         .mockResolvedValueOnce(readResult([scraped('https://cdn.example.com/a.jpg')])),
     });
@@ -547,7 +634,7 @@ describe('runImageLinksLambda face scoring', () => {
 describe('runImageLinksLambda failure envelope', () => {
   it('converts a thrown run into an ok:false callback posted exactly once', async () => {
     const deps = buildDeps({
-      readUrl: vi.fn().mockRejectedValueOnce(new Error('reader exploded')),
+      readPage: vi.fn().mockRejectedValueOnce(new Error('reader exploded')),
     });
 
     const result = await runImageLinksLambda(baseInput, deps);

@@ -31,9 +31,22 @@ const HTML_PARSER_SPECS = ['**/bio-html.spec.tsx', '**/rich-text-editor.spec.tsx
 // addons. Keep this list tight — every other `.spec.ts` stays on `vmThreads`.
 const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.spec.ts'];
 
+// Specs that drive a shell script through a synchronous child process. Each
+// `spawnSync` blocks its worker for 300–800ms (the scripts shell out to
+// `node`/`pnpm`/stubbed `docker`), so the two heaviest files alone hold two of
+// the ~10 workers for ~9s of an otherwise ~14s run. They guard CI-only shell
+// scripts, so they run under the `shell-scripts` project in CI (and on demand
+// via `pnpm run test:shell`) and stay out of the default local run.
+export const SHELL_SCRIPT_SPECS = [
+  'scripts/ci/nginx-config-test.spec.ts',
+  'scripts/assert-toolchain.spec.ts',
+  'scripts/check-toolchain-pins.spec.ts',
+];
+
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {
   const withCoverage = process.argv.includes('--coverage');
+  const withShellScripts = Boolean(process.env.CI) || process.env.VITEST_SHELL_SPECS === '1';
 
   return {
     server: {
@@ -51,14 +64,19 @@ export default defineConfig((): ViteUserConfig => {
 
     test: {
       root: import.meta.dirname,
+      // Persist transformed modules under node_modules/.vitest-cache so reruns and
+      // separate Vitest processes (watch, coverage, shards) skip the transform
+      // step; the cache lives inside node_modules so a reinstall invalidates it.
+      fsModuleCache: true,
       silent: withCoverage ? false : 'passed-only', // Silence test output when not collecting coverage
       name: packageJson.name,
-      environment: 'jsdom',
+      environment: 'happy-dom',
       // Use Vitest projects to split .spec.ts (node) and .spec.tsx
       // (happy-dom). Pure TypeScript spec files run in the lightweight Node
       // environment; skipping DOM init saves 1–3s wall clock. The .spec.ts files
-      // that DO need DOM opt back in via a `// @vitest-environment jsdom` comment
-      // at the top (jsdom is retained for those explicit opt-ins).
+      // that DO need DOM opt back in via a `// @vitest-environment happy-dom`
+      // comment at the top. happy-dom is the ONLY DOM environment — jsdom is not
+      // installed, so a `jsdom` pragma would fail to resolve.
       projects: [
         {
           extends: true,
@@ -74,6 +92,7 @@ export default defineConfig((): ViteUserConfig => {
               'bio-generator/**',
               'stripe-webhook/**',
               ...NATIVE_ADDON_SPECS,
+              ...SHELL_SCRIPT_SPECS,
             ],
           },
         },
@@ -88,6 +107,7 @@ export default defineConfig((): ViteUserConfig => {
               'bio-generator/**',
               'stripe-webhook/**',
               ...HTML_PARSER_SPECS,
+              ...SHELL_SCRIPT_SPECS,
             ],
           },
         },
@@ -101,7 +121,12 @@ export default defineConfig((): ViteUserConfig => {
             environment: 'happy-dom',
             pool: 'forks',
             include: HTML_PARSER_SPECS,
-            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+            exclude: [
+              '**/node_modules/**',
+              'bio-generator/**',
+              'stripe-webhook/**',
+              ...SHELL_SCRIPT_SPECS,
+            ],
           },
         },
         {
@@ -113,9 +138,29 @@ export default defineConfig((): ViteUserConfig => {
             environment: 'node',
             pool: 'forks',
             include: NATIVE_ADDON_SPECS,
-            exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+            exclude: [
+              '**/node_modules/**',
+              'bio-generator/**',
+              'stripe-webhook/**',
+              ...SHELL_SCRIPT_SPECS,
+            ],
           },
         },
+        // Shell-script specs: CI, or `VITEST_SHELL_SPECS=1` locally. See
+        // SHELL_SCRIPT_SPECS.
+        ...(withShellScripts
+          ? [
+              {
+                extends: true,
+                test: {
+                  name: 'shell-scripts',
+                  environment: 'node',
+                  include: SHELL_SCRIPT_SPECS,
+                  exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+                },
+              },
+            ]
+          : []),
       ],
 
       // Inline the html-react-parser CJS chain so Vite transforms every

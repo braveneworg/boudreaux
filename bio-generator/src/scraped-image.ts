@@ -5,7 +5,7 @@ import type { ScrapedImage } from './jina.js';
 import type { BioImage } from './types.js';
 
 /** The registrable host of a scraped image's source page, for attribution. */
-const attributionHost = (sourceUrl: string): string => {
+export const attributionHost = (sourceUrl: string): string => {
   try {
     return new URL(sourceUrl).hostname.replace(/^www\./, '');
   } catch {

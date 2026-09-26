@@ -3,23 +3,26 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { postBioCallback } from './callback.js';
-import { readUrl } from './jina.js';
+import { readUrlOutcome } from './jina.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 import { getScrapeApiKey } from './lib/secrets.js';
 import { annotateFaces, fetchReferenceBytes } from './rekognition.js';
-import { toScrapedBioImage } from './scraped-image.js';
+import { attributionHost, toScrapedBioImage } from './scraped-image.js';
 import { callbackTargetSchema, IMAGE_LINKS_TASK, imageLinksInputSchema } from './types.js';
 import { fetchCandidates } from './vision.js';
 
 import type { ScrapedImage } from './jina.js';
 import type { FaceAnnotation } from './rekognition.js';
-import type { BioImage, ImageLinksData, ImageLinksInput, ImageLinksResult } from './types.js';
+import type { BioImage, ImageLinksInput, ImageLinksResult } from './types.js';
 import type { FetchedCandidate } from './vision.js';
 
 /** Injectable collaborators so the orchestration can be unit-tested in full. */
 export interface ImageLinksDeps {
-  /** Jina reader: page content plus the plausible photos scraped from it. */
-  readUrl: typeof readUrl;
+  /**
+   * Jina reader, outcome-shaped: the page's plausible photos, or why there is
+   * no page (a bot wall vs. an unreadable link) — the admin is told which.
+   */
+  readPage: typeof readUrlOutcome;
   getScrapeApiKey: typeof getScrapeApiKey;
   /** Fetches admin reference image bytes for the CompareFaces stage. */
   fetchReferenceBytes: typeof fetchReferenceBytes;
@@ -32,7 +35,7 @@ export interface ImageLinksDeps {
 }
 
 const defaultDeps: ImageLinksDeps = {
-  readUrl,
+  readPage: readUrlOutcome,
   getScrapeApiKey,
   fetchReferenceBytes,
   annotateFaces,
@@ -97,40 +100,88 @@ interface LinkReadContext {
   fetchFn: typeof fetch;
 }
 
+/** What one link contributed: its photos, or the reason it contributed none. */
+type LinkOutcome =
+  { kind: 'read'; images: ScrapedImage[] } | { kind: 'blocked' } | { kind: 'unreadable' };
+
 /**
  * The scraped candidates one link contributes: the link itself when it is a
  * direct image, else whatever the reader scraped from the page (already
- * filtered to plausible photos). A null read contributes nothing.
+ * filtered to plausible photos) — or why the page gave nothing.
  */
 const candidatesForLink = async (
   link: string,
   { scrapeKey, deps, fetchFn }: LinkReadContext
-): Promise<ScrapedImage[]> => {
-  if (await probeDirectImage(link, fetchFn)) return [{ url: link, alt: null, sourceUrl: link }];
-  const result = await deps.readUrl(link, scrapeKey);
-  return result?.images ?? [];
+): Promise<LinkOutcome> => {
+  if (await probeDirectImage(link, fetchFn)) {
+    return { kind: 'read', images: [{ url: link, alt: null, sourceUrl: link }] };
+  }
+  const outcome = await deps.readPage(link, scrapeKey);
+  return outcome.kind === 'read' ? { kind: 'read', images: outcome.result.images } : outcome;
+};
+
+/** Hosts (deduped, `www.` stripped) of the links that yielded no page, by reason. */
+interface SkippedHosts {
+  blocked: string[];
+  unreadable: string[];
+}
+
+/** The candidates gathered across every link, plus the links that gave nothing. */
+interface CollectedCandidates {
+  candidates: BioImage[];
+  skipped: SkippedHosts;
+}
+
+/** Adds the link's host to the list once, in first-seen order. */
+const noteHost = (hosts: string[], link: string): void => {
+  const host = attributionHost(link);
+  if (!hosts.includes(host)) hosts.push(host);
 };
 
 /**
  * Reads every link sequentially (never recursively), deduping by URL across
  * links and stopping — without reading further links — once the cap is hit.
+ * Links that produced no page are recorded by host and reason.
  */
 const collectCandidates = async (
   links: readonly string[],
   context: LinkReadContext
-): Promise<BioImage[]> => {
+): Promise<CollectedCandidates> => {
   const seen = new Set<string>();
   const candidates: BioImage[] = [];
+  const skipped: SkippedHosts = { blocked: [], unreadable: [] };
   for (const link of links) {
     if (candidates.length >= MAX_LINK_IMAGES) break;
-    for (const scraped of await candidatesForLink(link, context)) {
+    const outcome = await candidatesForLink(link, context);
+    if (outcome.kind !== 'read') {
+      noteHost(skipped[outcome.kind], link);
+      continue;
+    }
+    for (const scraped of outcome.images) {
       const key = scraped.url.toLowerCase();
       if (seen.has(key) || candidates.length >= MAX_LINK_IMAGES) continue;
       seen.add(key);
       candidates.push({ ...toScrapedBioImage(scraped), kind: 'photo', isPrimary: false });
     }
   }
-  return candidates;
+  return { candidates, skipped };
+};
+
+/** True when at least one link produced no page. */
+const anySkipped = ({ blocked, unreadable }: SkippedHosts): boolean =>
+  blocked.length > 0 || unreadable.length > 0;
+
+/**
+ * The admin-facing reason nothing was pulled, naming each host once. A bot
+ * wall and a dead link call for different fixes (open it in a browser and
+ * save the photos vs. check the URL), so the two are spelled out separately.
+ */
+export const noImagesMessage = ({ blocked, unreadable }: SkippedHosts): string => {
+  const reasons = [
+    blocked.length ? `${blocked.join(', ')} blocked automated access (bot check)` : null,
+    unreadable.length ? `${unreadable.join(', ')} could not be read` : null,
+  ].filter((reason): reason is string => reason !== null);
+  return `No images could be pulled: ${reasons.join('; ')}.`;
 };
 
 /**
@@ -182,12 +233,14 @@ const annotateCandidates = async (
  * Orchestrates one images-from-links run: probe/read each admin-supplied link
  * for photos, dedupe and cap, then fetch bytes and face-score them against the
  * artist's reference images. Sequential and bounded — no crawl beyond the
- * links given.
+ * links given. When nothing was pulled *because* links were blocked or
+ * unreadable, the run fails with a message naming those hosts; a readable page
+ * that simply has no photos still succeeds with an empty list.
  */
 export const runImageLinks = async (
   input: ImageLinksInput,
   deps: ImageLinksDeps = defaultDeps
-): Promise<ImageLinksData> => {
+): Promise<ImageLinksResult> => {
   const fetchFn = deps.fetchFn ?? fetch;
   // Jina works keyless (lower rate limit); the key only raises the limit.
   const scrapeKey = await deps.getScrapeApiKey();
@@ -196,10 +249,21 @@ export const runImageLinks = async (
     links: input.links.length,
     jinaKey: Boolean(scrapeKey),
   });
-  const candidates = await collectCandidates(input.links, { scrapeKey, deps, fetchFn });
+  const { candidates, skipped } = await collectCandidates(input.links, {
+    scrapeKey,
+    deps,
+    fetchFn,
+  });
+  if (!candidates.length && anySkipped(skipped)) {
+    logEvent('info', 'image_links_nothing_readable', { artistId: input.artistId, ...skipped });
+    return { ok: false, error: noImagesMessage(skipped) };
+  }
+  if (anySkipped(skipped)) {
+    logEvent('warn', 'image_links_links_skipped', { artistId: input.artistId, ...skipped });
+  }
   const images = await annotateCandidates(candidates, input, deps, fetchFn);
   logEvent('info', 'image_links_done', { artistId: input.artistId, images: images.length });
-  return { images };
+  return { ok: true, data: { images } };
 };
 
 /**
@@ -232,7 +296,7 @@ export const runImageLinksLambda = async (
 
   let result: ImageLinksResult;
   try {
-    result = { ok: true, data: await runImageLinks(parsed.data, deps) };
+    result = await runImageLinks(parsed.data, deps);
   } catch (err) {
     logEvent('warn', 'image_links_failed', { error: toErrorMessage(err) });
     result = { ok: false, error: toErrorMessage(err) };
