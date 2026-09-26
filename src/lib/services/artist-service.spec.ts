@@ -50,6 +50,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     delete: vi.fn(),
     archive: vi.fn(),
     existsById: vi.fn(),
+    findNameById: vi.fn(),
     connectToRelease: vi.fn(),
     updateEnrichedField: vi.fn(),
   },
@@ -1505,6 +1506,24 @@ describe('ArtistService', () => {
       const result = await ArtistService.existsById('missing-id');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('findNameById', () => {
+    it('returns the name projection from the repository', async () => {
+      const row = { id: 'artist-1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(row);
+
+      const result = await ArtistService.findNameById('artist-1');
+
+      expect(result).toEqual(row);
+      expect(ArtistRepository.findNameById).toHaveBeenCalledWith('artist-1');
+    });
+
+    it('returns null when the artist does not exist', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(null);
+
+      await expect(ArtistService.findNameById('missing-id')).resolves.toBeNull();
     });
   });
 

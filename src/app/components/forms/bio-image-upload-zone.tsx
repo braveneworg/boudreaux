@@ -32,7 +32,8 @@ export interface BioImageUploadZoneProps {
 /**
  * Upload one image into the artist's bio image pool: alt text and attribution
  * are collected up front (alt is what makes the upload eligible as a display
- * image; attribution is optional for the label's own photos), then the shared
+ * image and defaults to the artist's name server-side when left blank;
+ * attribution is optional for the label's own photos), then the shared
  * presign → S3 → register → variants pipeline runs. Errors stay inline.
  */
 export const BioImageUploadZone = ({
@@ -125,7 +126,7 @@ export const BioImageUploadZone = ({
       </div>
       {altMissing && (
         <p className="text-muted-foreground text-xs">
-          Add alt text to use this upload as a display image.
+          Left blank, the artist&apos;s name is used as the alt text.
         </p>
       )}
       <UploaderDropZone

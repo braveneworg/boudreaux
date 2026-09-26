@@ -401,6 +401,27 @@ describe('ArtistRepository', () => {
     });
   });
 
+  describe('findNameById', () => {
+    it('selects only the name projection', async () => {
+      const row = { id: 'a', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(row as never);
+
+      const result = await ArtistRepository.findNameById('a');
+
+      expect(result).toEqual(row);
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
+        where: { id: 'a' },
+        select: { id: true, displayName: true, firstName: true, surname: true },
+      });
+    });
+
+    it('returns null when no artist has the id', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+
+      await expect(ArtistRepository.findNameById('missing')).resolves.toBeNull();
+    });
+  });
+
   describe('searchPublished', () => {
     it('builds the public-search where with the lightweight include', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);

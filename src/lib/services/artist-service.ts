@@ -845,6 +845,15 @@ export class ArtistService {
   }
 
   /**
+   * The artist's name projection (id + the parts a display name derives
+   * from), or null when no artist has the id. For callers that must both
+   * validate an artistId and name the artist before a follow-up write.
+   */
+  static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
+    return ArtistRepository.findNameById(artistId);
+  }
+
+  /**
    * Applies one admin-approved enrichment suggestion to the artist record
    * through the field whitelist. Throws on a repository failure — the calling
    * action maps that to a typed error.

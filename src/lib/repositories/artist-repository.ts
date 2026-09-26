@@ -695,6 +695,13 @@ export class ArtistRepository {
     );
   }
 
+  /** Find an artist by id returning only the name projection (or null). */
+  static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
+    return runQuery(() =>
+      prisma.artist.findUnique({ where: { id: artistId }, select: nameSelect })
+    ) as Promise<ArtistNameRecord | null>;
+  }
+
   /**
    * Search active, non-deleted artists that hold a direct credit on a listed
    * release (the playlist "By artist" search), with the lightweight
