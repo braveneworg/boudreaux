@@ -148,6 +148,20 @@ describe('useUpdateReleaseMutation', () => {
     expect(vi.mocked(updateReleaseAction).mock.calls[0]?.[0]).toBe('r1');
   });
 
+  it('keeps emptied fields in the FormData so the action can clear them', async () => {
+    vi.mocked(updateReleaseAction).mockResolvedValue(okState);
+    const opts = getOptions<{ id: string; values: ReleaseFormData }>(useUpdateReleaseMutation);
+
+    await opts.mutationFn({
+      id: 'r1',
+      values: { title: 'Album', catalogNumber: '', description: '' } as ReleaseFormData,
+    });
+
+    const formData = vi.mocked(updateReleaseAction).mock.calls[0]?.[2];
+    expect(formData?.get('catalogNumber')).toBe('');
+    expect(formData?.get('description')).toBe('');
+  });
+
   it('invalidates release and artist caches on success', async () => {
     const opts = getOptions(useUpdateReleaseMutation);
 

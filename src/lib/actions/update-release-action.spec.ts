@@ -305,6 +305,62 @@ describe('updateReleaseAction', () => {
       expect(result.data?.releaseId).toBe(mockReleaseId);
     });
 
+    describe('clearable optional text fields (#759)', () => {
+      const CLEARABLE_FIELDS = ['catalogNumber', 'description', 'featuredDescription'] as const;
+
+      const runWith = async (extra: Record<string, string>): Promise<Record<string, unknown>> => {
+        vi.mocked(getActionState).mockReturnValue({
+          formState: { fields: {}, success: false },
+          parsed: {
+            success: true,
+            data: {
+              title: 'Updated Album',
+              releasedOn: '2024-01-15',
+              coverArt: 'https://example.com/cover.jpg',
+              formats: ['DIGITAL'],
+              ...extra,
+            },
+          },
+        } as never);
+        vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+          success: true,
+          data: { id: mockReleaseId },
+        } as never);
+
+        await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+        expect(vi.mocked(ReleaseService.updateRelease).mock.calls).toHaveLength(1);
+        return vi.mocked(ReleaseService.updateRelease).mock.calls[0][1] as Record<string, unknown>;
+      };
+
+      it.each(CLEARABLE_FIELDS)('writes null for %s when it is submitted empty', async (field) => {
+        const payload = await runWith({ [field]: '' });
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: null }));
+      });
+
+      it.each(CLEARABLE_FIELDS)(
+        'writes null for %s when it is submitted whitespace-only',
+        async (field) => {
+          const payload = await runWith({ [field]: '  ' });
+
+          expect(payload).toEqual(expect.objectContaining({ [field]: null }));
+        }
+      );
+
+      it.each(CLEARABLE_FIELDS)('leaves %s undefined when it is absent', async (field) => {
+        const payload = await runWith({});
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: undefined }));
+      });
+
+      it.each(CLEARABLE_FIELDS)('passes a non-empty %s through unchanged', async (field) => {
+        const payload = await runWith({ [field]: 'Kept value' });
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: 'Kept value' }));
+      });
+    });
+
     it('should keep a comma-bearing note as a single paragraph', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
