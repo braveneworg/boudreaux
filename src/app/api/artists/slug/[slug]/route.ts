@@ -11,6 +11,8 @@ import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
+import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
+import { artistPublicScalarSchema } from '@/lib/validation/media/shared-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,10 +61,18 @@ export const GET = withRateLimit<{ slug: string }>(
       return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
+    // Response guard (#765): the repository already projects every artist on
+    // the graph to its public scalars, and parsing through the public wire
+    // schema — whose objects strip unknown keys — drops anything a future
+    // include/select re-adds (contact PII, notes, audit actors, job tokens)
+    // before it can be serialised. Stream URLs are attached after the parse,
+    // which would otherwise strip them too.
     const responseData = withReleases
-      ? attachStreamUrls(serializeForResponse(result.data))
-      : serializeForResponse(result.data);
+      ? attachStreamUrls(serializeForResponse(artistWithPublishedReleasesSchema.parse(result.data)))
+      : serializeForResponse(artistPublicScalarSchema.parse(result.data));
 
+    // The projected payload carries nothing private, so it may stay
+    // shared-cacheable.
     return NextResponse.json(responseData, {
       headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });

@@ -92,6 +92,42 @@ export const artistScalar = {
   featuredArtistId: null,
 };
 
+/**
+ * Every private artist scalar, populated — the values a public payload must
+ * never carry (#765). Spread over {@link artistScalar} to build a leaky row.
+ */
+export const artistPrivateValues = {
+  phone: '555-0100',
+  email: 'artist@example.com',
+  address1: '1 Main St',
+  address2: 'Apt 2',
+  city: 'Springfield',
+  state: 'IL',
+  postalCode: '62701',
+  country: 'US',
+  notes: ['internal note'],
+  createdBy: 'admin-1',
+  updatedBy: 'admin-2',
+  publishedBy: 'admin-3',
+  deletedBy: 'admin-4',
+  deactivatedBy: 'admin-5',
+  reactivatedBy: 'admin-6',
+  bioError: 'upstream timeout',
+  bioStartedAt: ISO,
+  bioJobToken: 'bio-job-token',
+  bioProgress: { stage: 'search' },
+  imageLinksStatus: 'processing',
+  imageLinksError: 'scrape failed',
+  imageLinksStartedAt: ISO,
+  imageLinksJobToken: 'image-links-job-token',
+  imageLinksAddedCount: 3,
+};
+
+/** {@link artistScalar} with every private field removed — the public wire shape. */
+export const artistPublicScalar = Object.fromEntries(
+  Object.entries(artistScalar).filter(([key]) => !(key in artistPrivateValues))
+);
+
 /** All `Release` scalars, including a `Json[]` `extendedData` that exercises
  * every member of the recursive json value union. */
 export const releaseScalar = {
