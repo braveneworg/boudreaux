@@ -4,7 +4,7 @@
 import { render, screen } from '@testing-library/react';
 
 import type {
-  ArtistScalars as Artist,
+  ArtistPublicScalars as Artist,
   TourDateHeadlinerScalars as TourDateHeadliner,
   TourDateScalars as TourDate,
   TourImageScalars as TourImage,

@@ -12,7 +12,7 @@ import { GetTicketsLink } from '@/app/components/ui/get-tickets-link';
 import { Separator } from '@/app/components/ui/separator';
 import { VenueDirectionsLink } from '@/app/components/ui/venue-directions-link';
 import type {
-  ArtistScalars as Artist,
+  ArtistPublicScalars as Artist,
   TourDateHeadlinerScalars as TourDateHeadliner,
   TourDateScalars as TourDate,
   TourImageScalars as TourImage,

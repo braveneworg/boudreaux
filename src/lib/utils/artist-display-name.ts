@@ -4,7 +4,7 @@
 
 import type { ArtistScalars } from '@/lib/types/domain/artist';
 
-/** The name parts the video display-name derivation reads. */
+/** The name parts the video and tour display-name derivations read. */
 export type ArtistNameParts = Pick<ArtistScalars, 'displayName' | 'firstName' | 'surname'>;
 
 /**
@@ -27,7 +27,8 @@ export const deriveArtistDisplayName = ({
  * 2. Fall back to firstName + " " + surname
  * 3. Fall back to null
  *
- * @param artist - Artist scalars (vendor-neutral mirror of the Prisma model)
+ * @param artist - Any artist shape carrying the name parts — the full row or
+ *   the public projection (`ArtistPublicScalars`) tours are served with
  * @returns The computed display name string
  *
  * @example
@@ -43,7 +44,7 @@ const buildNameFromParts = (firstName: string, surname: string): string | null =
   return firstName || surname || null;
 };
 
-export const getArtistDisplayNameForTour = (artist: ArtistScalars | null): string | null => {
+export const getArtistDisplayNameForTour = (artist: ArtistNameParts | null): string | null => {
   if (!artist) {
     return null;
   }

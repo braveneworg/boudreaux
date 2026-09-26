@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type {
-  ArtistScalars as Artist,
+  ArtistPublicScalars as Artist,
   TourDateHeadlinerScalars as TourDateHeadliner,
   TourDateScalars as TourDate,
   TourImageScalars as TourImage,

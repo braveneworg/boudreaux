@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type {
-  ArtistScalars as Artist,
+  ArtistPublicScalars as Artist,
   TourDateHeadlinerScalars as TourDateHeadliner,
   TourDateScalars as TourDate,
   TourImageScalars as TourImage,

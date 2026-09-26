@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { TourDateRepository } from './tour-date-repository';
 
@@ -55,6 +56,51 @@ const mockTourDate = {
 };
 
 describe('TourDateRepository', () => {
+  // ─── headliner artist projection ─────────────────────────────────────────────
+
+  // Tour dates are served publicly (`/api/tours/[tourId]/dates`), so each
+  // headliner artist carries only its public scalars (#765).
+  describe('headliner artist projection', () => {
+    type HeadlinerArtistArg = {
+      include: { headliners: { include: { artist: { select: object } } } };
+    };
+    const headlinerArtistSelect = (arg: unknown): object =>
+      (arg as HeadlinerArtistArg).include.headliners.include.artist.select;
+
+    it.each(ARTIST_PRIVATE_FIELDS)(
+      'findByTourId never selects the private field %s',
+      async (field) => {
+        vi.mocked(prisma.tourDate.findMany).mockResolvedValueOnce([] as never);
+
+        await TourDateRepository.findByTourId(validObjectId2);
+
+        expect(
+          headlinerArtistSelect(vi.mocked(prisma.tourDate.findMany).mock.calls[0][0])
+        ).not.toHaveProperty(field);
+      }
+    );
+
+    it.each(ARTIST_PRIVATE_FIELDS)('findById never selects the private field %s', async (field) => {
+      vi.mocked(prisma.tourDate.findUnique).mockResolvedValueOnce(null);
+
+      await TourDateRepository.findById(validObjectId);
+
+      expect(
+        headlinerArtistSelect(vi.mocked(prisma.tourDate.findUnique).mock.calls[0][0])
+      ).not.toHaveProperty(field);
+    });
+
+    it('selects the public identity of each headliner artist', async () => {
+      vi.mocked(prisma.tourDate.findUnique).mockResolvedValueOnce(null);
+
+      await TourDateRepository.findById(validObjectId);
+
+      expect(headlinerArtistSelect(vi.mocked(prisma.tourDate.findUnique).mock.calls[0][0])).toEqual(
+        expect.objectContaining({ id: true, slug: true, displayName: true })
+      );
+    });
+  });
+
   // ─── findByTourId ────────────────────────────────────────────────────────────
 
   describe('findByTourId', () => {

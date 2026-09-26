@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import type { TourScalars, TourWithRelations } from '@/lib/types/tours';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
+import { artistPublicSelect } from '../_internal/artist-public-select';
 import { runQuery } from '../_internal/map-prisma-error';
 
 import type { AssertExact } from '../_internal/drift';
@@ -53,8 +54,9 @@ const tourInclude = {
     include: {
       venue: true,
       headliners: {
+        // Public payload: headliners carry public scalars only (#765).
         include: {
-          artist: true,
+          artist: { select: artistPublicSelect },
         },
         orderBy: { sortOrder: 'asc' as const },
       },
