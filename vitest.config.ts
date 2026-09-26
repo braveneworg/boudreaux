@@ -51,6 +51,10 @@ export default defineConfig((): ViteUserConfig => {
 
     test: {
       root: import.meta.dirname,
+      // Persist transformed modules under node_modules/.vitest-cache so reruns and
+      // separate Vitest processes (watch, coverage, shards) skip the transform
+      // step; the cache lives inside node_modules so a reinstall invalidates it.
+      fsModuleCache: true,
       silent: withCoverage ? false : 'passed-only', // Silence test output when not collecting coverage
       name: packageJson.name,
       environment: 'happy-dom',

@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+// setupTests.ts mocks '@/lib/auth' globally (see the note there); this spec
+// exercises the real module, so lift that mock for this file.
+vi.unmock('./auth');
 vi.mock('server-only', () => ({}));
 vi.mock('better-auth', () => ({ betterAuth: vi.fn(() => ({})) }));
 vi.mock('better-auth/adapters/prisma', () => ({ prismaAdapter: vi.fn(() => ({})) }));
