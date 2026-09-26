@@ -30,6 +30,33 @@ vi.mock('@/lib/prisma', () => ({
   prisma: new Proxy({}, { get: (_target, prop) => (prop === 'then' ? undefined : vi.fn()) }),
 }));
 
+// Global safety-net mock for the better-auth server instance. `src/lib/auth.ts`
+// calls `betterAuth({...})` at module load, which pulls in the whole better-auth
+// graph — measured at up to ~700ms of import time per spec file, paid by every
+// spec whose imports reach it through a server action's `requireRole` (form
+// components, data views, most action specs). No unit test may hit a real auth
+// API, so the default is an inert `auth.api` whose every method is a fresh
+// `vi.fn()` returning undefined (no session). Specs needing behaviour supply
+// their own `vi.mock('@/lib/auth', ...)`, which overrides this; the two specs
+// that exercise the real module (`src/lib/auth.spec.ts`,
+// `src/lib/auth-schema-validation.spec.ts`) lift it with `vi.unmock('./auth')`.
+vi.mock('@/lib/auth', () => ({
+  auth: {
+    api: new Proxy({}, { get: (_target, prop) => (prop === 'then' ? undefined : vi.fn()) }),
+  },
+}));
+
+// Serve `lucide-react` icons lazily. The real barrel defines ~1,600 icon
+// components at import time and vmThreads re-evaluates it in every spec file
+// that reaches it (~33ms × ~180 files). The shim renders identical SVG, builds
+// each icon on first use, and reports non-icon exports absent — see
+// `src/test-utils/lazy-lucide-react.ts`. A spec's own `vi.mock('lucide-react',
+// ...)` still overrides this.
+vi.mock('lucide-react', async () => {
+  const { createLazyLucideReact } = await import('@/test-utils/lazy-lucide-react');
+  return createLazyLucideReact();
+});
+
 // Pure stub for next/server — extends the native Node.js Request so route handlers get a
 // fully-functional headers/json()/text() API without loading any real Next.js module.
 vi.mock('next/server', () => {

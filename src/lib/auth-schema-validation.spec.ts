@@ -21,6 +21,9 @@ const { toRuntimeDataModel } = vi.hoisted(() => ({
   }),
 }));
 
+// setupTests.ts mocks '@/lib/auth' globally (see the note there); this spec
+// exercises the real module, so lift that mock for this file.
+vi.unmock('./auth');
 vi.mock('server-only', () => ({}));
 // Expose only the generated data model — no client is instantiated or connected.
 vi.mock('@/lib/prisma', async () => {

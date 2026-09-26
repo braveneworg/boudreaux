@@ -188,6 +188,13 @@ that component's spec** (`vi.mock('./bio-html', …)`) so the spec stays on `vmT
 otherwise it crashes at import with an opaque `domhandler` ESM error. See the two
 existing examples: `artist-bio-content.spec.tsx`, `artist-detail-content.spec.tsx`.
 
+**Shell-script specs:** the specs that drive a shell script through `spawnSync`
+(`SHELL_SCRIPT_SPECS` in `vitest.config.ts`: the nginx config gate, the toolchain
+asserts) block a worker for several seconds each, so a plain `pnpm run test:run` skips
+them. CI runs them under the `shell-scripts` project automatically (`CI` is set); run
+them locally with `pnpm run test:shell`. Add any new spec of that kind to the list —
+`vitest.config.spec.ts` checks every entry exists and spawns a child process.
+
 ---
 
 ## 7. Git hooks — what blocks a commit / push

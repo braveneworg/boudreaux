@@ -13,7 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/pop
 import { useArtistNavSearchQuery } from '@/hooks/queries/use-artist-nav-search-query';
 import { useDebounce } from '@/hooks/use-debounce';
 
-const DEBOUNCE_DELAY = 400;
+/** Idle time after the last keystroke before the search query fires. */
+export const ARTIST_NAV_SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_PLACEHOLDER = 'Search artists & releases';
 
 /** Reserves the panel's resting footprint so the popover doesn't jump when the chunk lands. */
@@ -39,7 +40,7 @@ export const ArtistNavSearchCombobox = (): ReactElement => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, DEBOUNCE_DELAY);
+  const debouncedQuery = useDebounce(query, ARTIST_NAV_SEARCH_DEBOUNCE_MS);
   const { isPending, error, data } = useArtistNavSearchQuery(debouncedQuery);
 
   const isDebouncing = debouncedQuery !== query;
