@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-
 import {
   ArtistBioImageRepository,
   type BioImageRehostRow,
@@ -14,7 +12,6 @@ import {
   ArtistRepository,
   type EnrichedArtistFieldUpdate,
 } from '@/lib/repositories/artist-repository';
-import { ImageRepository } from '@/lib/repositories/image-repository';
 import type {
   Artist,
   ArtistBioImageRecord,
@@ -35,7 +32,6 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
-import type { ImageRecord } from '@/lib/types/domain/image';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
@@ -48,8 +44,8 @@ import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
-import { deleteS3Object, getS3Client } from '@/lib/utils/s3-client';
-import { buildMediaS3Key, extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+import { deleteS3Object } from '@/lib/utils/s3-client';
+import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import {
   sanitizeBioHtml,
   sanitizeBioHtmlNoImages,
@@ -65,106 +61,6 @@ import { BioImageService } from './bio-image-service';
 import type { ServiceResponse } from './service.types';
 
 const logger = loggers.media;
-
-/**
- * Input data for uploading an image
- */
-export interface ImageUploadInput {
-  file: Buffer;
-  fileName: string;
-  contentType: string;
-  caption?: string;
-  altText?: string;
-}
-
-/**
- * Result of an image upload operation
- */
-export interface ImageUploadResult {
-  id: string;
-  src: string;
-  caption?: string;
-  altText?: string;
-  sortOrder: number;
-}
-
-/**
- * Generate a unique file key for S3
- */
-const generateS3Key = (artistId: string, fileName: string): string =>
-  buildMediaS3Key({ entityType: 'artists', entityId: artistId, fileName });
-
-/**
- * Map a persisted image row to the public {@link ImageUploadResult} shape,
- * applying the same `src`/`sortOrder` fallbacks the service has always used.
- */
-const toImageUploadResult = (
-  image: ImageRecord,
-  fallbacks?: { src?: string; sortOrder?: number }
-): ImageUploadResult => ({
-  id: image.id,
-  src: image.src || (fallbacks?.src ?? ''),
-  caption: image.caption || undefined,
-  altText: image.altText || undefined,
-  sortOrder: image.sortOrder ?? fallbacks?.sortOrder ?? 0,
-});
-
-/**
- * Upload an image buffer to S3 under `s3Key` and return the public URL for it
- * (CDN domain when configured, otherwise the direct S3 URL). The artist id and
- * original file name are stamped into the object metadata.
- */
-const uploadImageToS3 = async (
-  s3Bucket: string,
-  s3Key: string,
-  artistId: string,
-  imageData: ImageUploadInput
-): Promise<string> => {
-  const s3Client = getS3Client();
-
-  // Use provided content type or fallback to application/octet-stream
-  const contentType = imageData.contentType || 'application/octet-stream';
-
-  const putCommand = new PutObjectCommand({
-    Bucket: s3Bucket,
-    Key: s3Key,
-    Body: imageData.file,
-    ContentType: contentType,
-    CacheControl: 'public, max-age=31536000, immutable',
-    Metadata: {
-      artistId,
-      originalFileName: imageData.fileName,
-      uploadedAt: new Date().toISOString(),
-    },
-  });
-
-  await s3Client.send(putCommand);
-
-  // Construct the CDN URL (strip any protocol already on CDN_DOMAIN).
-  const cdnDomain = process.env.CDN_DOMAIN?.replace(/^https?:\/\//, '');
-  const awsRegion = process.env.AWS_REGION || 'us-east-1';
-  const s3DirectUrl = `https://${s3Bucket}.s3.${awsRegion}.amazonaws.com/${s3Key}`;
-  return cdnDomain ? `https://${cdnDomain}/${s3Key}` : s3DirectUrl;
-};
-
-/**
- * Best-effort delete of a single S3 object for an artist image. Logs and
- * swallows any S3 failure so the caller can continue with the DB delete — the
- * orphaned object is reclaimed by lifecycle rules.
- */
-const deleteImageFromS3 = async (s3Bucket: string, s3Key: string): Promise<void> => {
-  try {
-    const s3Client = getS3Client();
-    const deleteCommand = new DeleteObjectCommand({
-      Bucket: s3Bucket,
-      Key: s3Key,
-    });
-    await s3Client.send(deleteCommand);
-  } catch (s3Error) {
-    logger.error('S3 delete error (continuing with DB delete)', s3Error);
-    // Continue with database deletion even if S3 fails
-  }
-};
 
 /**
  * Sanitizes the rich-text bio fields (`bio`, `shortBio`, `altBio`) before they
@@ -549,25 +445,11 @@ export class ArtistService {
 
   /**
    * Delete an artist by ID (hard delete). The repository cascade removes the
-   * artist row and everything referencing it in one transaction; gallery-image
-   * S3 keys are collected before that cascade deletes the Image rows, then
-   * cleaned up best-effort (fire-and-forget) — an S3 or lookup failure never
-   * blocks the delete.
+   * artist row and everything referencing it in one transaction.
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
-      const images = await ImageRepository.findManyByArtist(id).catch((): ImageRecord[] => []);
-
       const artist = await ArtistRepository.delete(id);
-
-      const s3Bucket = process.env.S3_BUCKET;
-      if (s3Bucket) {
-        const keys = images
-          .map((image) => (image.src ? extractS3KeyFromUrl(image.src) : null))
-          .filter((key): key is string => key !== null);
-        void Promise.allSettled(keys.map((key) => deleteImageFromS3(s3Bucket, key)));
-      }
-
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -619,225 +501,6 @@ export class ArtistService {
         NOT_FOUND: 'Artist not found',
         UNKNOWN: 'Failed to restore artist',
       });
-    }
-  }
-
-  /**
-   * Upload a single image to S3 and create the Image record in the database
-   */
-  static async uploadArtistImage(
-    artistId: string,
-    imageData: ImageUploadInput
-  ): Promise<ServiceResponse<ImageUploadResult>> {
-    try {
-      // Verify artist exists
-      const artistExists = await ArtistRepository.existsById(artistId);
-
-      if (!artistExists) {
-        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
-      }
-
-      const s3Bucket = process.env.S3_BUCKET;
-
-      if (!s3Bucket) {
-        return { success: false, error: 'S3 bucket not configured', code: 'UNKNOWN' };
-      }
-
-      // Generate unique S3 key, upload the buffer, and derive its public URL.
-      const s3Key = generateS3Key(artistId, imageData.fileName);
-      const imageUrl = await uploadImageToS3(s3Bucket, s3Key, artistId, imageData);
-
-      // Get the next sort order for this artist
-      const existingImages = await ImageRepository.findManyByOwner({ artistId });
-      const nextSortOrder = existingImages.length;
-
-      // Create Image record in database with sortOrder
-      const image = await ImageRepository.create({
-        src: imageUrl,
-        caption: imageData.caption,
-        altText: imageData.altText,
-        artistId,
-        sortOrder: nextSortOrder,
-      });
-
-      return {
-        success: true,
-        data: toImageUploadResult(image, { src: imageUrl, sortOrder: nextSortOrder }),
-      };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to upload image' });
-    }
-  }
-
-  /**
-   * Upload multiple images for an artist
-   */
-  static async uploadArtistImages(
-    artistId: string,
-    images: ImageUploadInput[]
-  ): Promise<ServiceResponse<ImageUploadResult[]>> {
-    try {
-      // Verify artist exists
-      const artistExists = await ArtistRepository.existsById(artistId);
-
-      if (!artistExists) {
-        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
-      }
-
-      const results: ImageUploadResult[] = [];
-      const errors: string[] = [];
-
-      // Upload images sequentially to avoid overwhelming S3
-      for (const imageData of images) {
-        const result = await this.uploadArtistImage(artistId, imageData);
-        if (result.success) {
-          results.push(result.data);
-        } else {
-          errors.push(`${imageData.fileName}: ${result.error}`);
-        }
-      }
-
-      if (results.length === 0 && errors.length > 0) {
-        return { success: false, error: errors.join('; '), code: 'UNKNOWN' };
-      }
-
-      return { success: true, data: results };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to upload images' });
-    }
-  }
-
-  /**
-   * Delete an artist image from S3 and the database
-   */
-  static async deleteArtistImage(imageId: string): Promise<ServiceResponse<{ id: string }>> {
-    try {
-      // Get the image record to get the S3 key
-      const image = await ImageRepository.findUniqueById(imageId);
-
-      if (!image) {
-        return { success: false, error: 'Image not found', code: 'NOT_FOUND' };
-      }
-
-      // Extract S3 key from URL (CDN/S3 styles, honouring CDN_DOMAIN).
-      const s3Bucket = process.env.S3_BUCKET;
-
-      if (image.src && s3Bucket) {
-        const s3Key = extractS3KeyFromUrl(image.src);
-
-        // Delete from S3 if we have the key (best-effort; DB delete always runs).
-        if (s3Key) {
-          await deleteImageFromS3(s3Bucket, s3Key);
-        }
-      }
-
-      // Delete from database
-      await ImageRepository.delete(imageId);
-
-      return { success: true, data: { id: imageId } };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Image not found',
-        UNKNOWN: 'Failed to delete image',
-      });
-    }
-  }
-
-  /**
-   * Get all images for an artist
-   */
-  static async getArtistImages(artistId: string): Promise<ServiceResponse<ImageUploadResult[]>> {
-    try {
-      const images = await ImageRepository.findManyByArtist(artistId);
-
-      return {
-        success: true,
-        data: images.map((img) => ({
-          id: img.id,
-          src: img.src || '',
-          caption: img.caption || undefined,
-          altText: img.altText || undefined,
-          sortOrder: img.sortOrder ?? 0,
-        })),
-      };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist images' });
-    }
-  }
-
-  /**
-   * Update image metadata (caption, altText)
-   */
-  static async updateArtistImage(
-    imageId: string,
-    data: { caption?: string; altText?: string }
-  ): Promise<ServiceResponse<ImageUploadResult>> {
-    try {
-      const image = await ImageRepository.update(imageId, {
-        caption: data.caption,
-        altText: data.altText,
-      });
-
-      return {
-        success: true,
-        data: {
-          id: image.id,
-          src: image.src || '',
-          caption: image.caption || undefined,
-          altText: image.altText || undefined,
-          sortOrder: image.sortOrder ?? 0,
-        },
-      };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Image not found',
-        UNKNOWN: 'Failed to update image',
-      });
-    }
-  }
-
-  /**
-   * Reorder images for an artist
-   * @param imageIds - Array of image IDs in the desired order
-   */
-  static async reorderArtistImages(
-    artistId: string,
-    imageIds: string[]
-  ): Promise<ServiceResponse<ImageUploadResult[]>> {
-    try {
-      // Verify all images belong to the artist
-      const existingImages = await ImageRepository.findManyByArtistAndIds(artistId, imageIds);
-
-      if (existingImages.length !== imageIds.length) {
-        return {
-          success: false,
-          error: 'Some images not found or do not belong to this artist',
-          code: 'NOT_FOUND',
-        };
-      }
-
-      // Update sort order for each image
-      const updatePromises = imageIds.map((id, index) =>
-        ImageRepository.updateSortOrder(id, index)
-      );
-
-      await Promise.all(updatePromises);
-
-      // Fetch updated images in new order
-      const updatedImages = await ImageRepository.findManyByArtist(artistId);
-
-      return {
-        success: true,
-        data: updatedImages.map((img) => ({
-          id: img.id,
-          src: img.src || '',
-          caption: img.caption || undefined,
-          altText: img.altText || undefined,
-          sortOrder: img.sortOrder ?? 0,
-        })),
-      };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to reorder images' });
     }
   }
 

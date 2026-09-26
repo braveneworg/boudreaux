@@ -517,19 +517,16 @@ type GenerationPrep = {
 const MAX_REFERENCE_IMAGES = 3;
 
 /**
- * Build the Lambda's `referenceImageUrls`: the artist's own image sources first,
- * then admin-uploaded custom bio image URLs, keeping only absolute http(s) URLs,
- * deduped case-insensitively, capped at {@link MAX_REFERENCE_IMAGES}. Order is
- * preserved so the artist's canonical images take priority when the cap trims.
+ * Build the Lambda's `referenceImageUrls` from the artist's custom (human-owned)
+ * bio image URLs, keeping only absolute http(s) URLs, deduped
+ * case-insensitively, capped at {@link MAX_REFERENCE_IMAGES}. Order is
+ * preserved so the first pool rows take priority when the cap trims.
  */
-export const buildReferenceImageUrls = (
-  artistImageSrcs: Array<string | null>,
-  customBioImageUrls: string[]
-): string[] => {
+export const buildReferenceImageUrls = (customBioImageUrls: string[]): string[] => {
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const candidate of [...artistImageSrcs, ...customBioImageUrls]) {
-    const url = sanitizeUrl(candidate ?? '');
+  for (const candidate of customBioImageUrls) {
+    const url = sanitizeUrl(candidate);
     if (!url) continue;
     const key = url.toLowerCase();
     if (seen.has(key)) continue;
@@ -572,8 +569,8 @@ const prepareGeneration = async (
     }
   );
 
-  // Admin-uploaded custom bio images round out the artist's own images as face
-  // references. A lookup failure degrades to artist images only (never fatal).
+  // Custom (human-owned) bio images are the face references. A lookup failure
+  // degrades to no references (never fatal).
   const customBioImageUrls = await ArtistBioImageRepository.findCustomUrls(artist.id).catch(
     (error) => {
       loggers.media.warn('bio_custom_reference_images_failed', {
@@ -584,10 +581,7 @@ const prepareGeneration = async (
     }
   );
 
-  const referenceImageUrls = buildReferenceImageUrls(
-    artist.images.map((image) => image.src),
-    customBioImageUrls
-  );
+  const referenceImageUrls = buildReferenceImageUrls(customBioImageUrls);
 
   const input: BioGenerationLambdaInput = {
     artistId: artist.id,

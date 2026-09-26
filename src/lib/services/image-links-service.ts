@@ -255,8 +255,8 @@ export class ImageLinksService {
       const base = resolveEnrichmentBaseUrl();
       if (!base) return fail('Bio generator callback URL is not configured');
 
-      // Custom (human-chosen) pool images round out the artist's own images as
-      // face references; a lookup failure degrades to artist images only.
+      // Custom (human-chosen) pool images are the face references; a lookup
+      // failure degrades to no references.
       const customUrls = await ArtistBioImageRepository.findCustomUrls(artistId).catch((error) => {
         loggers.media.warn('image_links_reference_images_failed', {
           artistId,
@@ -264,10 +264,7 @@ export class ImageLinksService {
         });
         return [] as string[];
       });
-      const referenceImageUrls = buildReferenceImageUrls(
-        artist.images.map((image) => image.src),
-        customUrls
-      );
+      const referenceImageUrls = buildReferenceImageUrls(customUrls);
 
       const jobToken = randomUUID();
       await ArtistRepository.setImageLinksJobToken(artistId, jobToken);

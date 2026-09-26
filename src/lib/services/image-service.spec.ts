@@ -15,10 +15,10 @@ vi.mock('@/lib/repositories/image-repository', () => ({
   },
 }));
 
-describe('ImageService.registerForArtist', () => {
+describe('ImageService.registerForRelease', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('seeds sortOrder from existing-row count and writes artistId on each row', async () => {
+  it('seeds sortOrder from existing-row count and writes releaseId on each row', async () => {
     vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([
       { id: 'a' },
       { id: 'b' },
@@ -39,24 +39,24 @@ describe('ImageService.registerForArtist', () => {
         sortOrder: 3,
       } as never);
 
-    const result = await ImageService.registerForArtist('artist-1', [
+    const result = await ImageService.registerForRelease('release-1', [
       { cdnUrl: 'https://cdn.example.com/1', caption: 'cap', altText: 'alt' },
       { cdnUrl: 'https://cdn.example.com/2' },
     ]);
 
-    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith({ artistId: 'artist-1' });
+    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith({ releaseId: 'release-1' });
     expect(ImageRepository.create).toHaveBeenNthCalledWith(1, {
       src: 'https://cdn.example.com/1',
       caption: 'cap',
       altText: 'alt',
-      artistId: 'artist-1',
+      releaseId: 'release-1',
       sortOrder: 2,
     });
     expect(ImageRepository.create).toHaveBeenNthCalledWith(2, {
       src: 'https://cdn.example.com/2',
       caption: undefined,
       altText: undefined,
-      artistId: 'artist-1',
+      releaseId: 'release-1',
       sortOrder: 3,
     });
     expect(result).toEqual([
@@ -87,7 +87,7 @@ describe('ImageService.registerForArtist', () => {
       sortOrder: null,
     } as never);
 
-    const result = await ImageService.registerForArtist('artist-1', [
+    const result = await ImageService.registerForRelease('release-1', [
       { cdnUrl: 'https://cdn.example.com/1' },
     ]);
 
@@ -105,35 +105,9 @@ describe('ImageService.registerForArtist', () => {
   it('returns [] when no images are supplied (and skips create entirely)', async () => {
     vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([] as never);
 
-    const result = await ImageService.registerForArtist('artist-1', []);
+    const result = await ImageService.registerForRelease('release-1', []);
 
     expect(result).toEqual([]);
     expect(ImageRepository.create).not.toHaveBeenCalled();
-  });
-});
-
-describe('ImageService.registerForRelease', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('uses releaseId for both the existing-count query and the create call', async () => {
-    vi.mocked(ImageRepository.findManyByOwner).mockResolvedValue([] as never);
-    vi.mocked(ImageRepository.create).mockResolvedValue({
-      id: 'img-1',
-      src: 'https://cdn.example.com/1',
-      caption: null,
-      altText: null,
-      sortOrder: 0,
-    } as never);
-
-    await ImageService.registerForRelease('release-1', [{ cdnUrl: 'https://cdn.example.com/1' }]);
-
-    expect(ImageRepository.findManyByOwner).toHaveBeenCalledWith({ releaseId: 'release-1' });
-    expect(ImageRepository.create).toHaveBeenCalledWith({
-      src: 'https://cdn.example.com/1',
-      caption: undefined,
-      altText: undefined,
-      releaseId: 'release-1',
-      sortOrder: 0,
-    });
   });
 });

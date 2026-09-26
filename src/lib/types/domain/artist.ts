@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ImageRecord } from './image';
 import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
@@ -181,11 +180,10 @@ export interface CreateArtistBioLinkData {
 }
 
 /**
- * Admin artist payload: scalars plus capped images, label joins, release joins
+ * Admin artist payload: scalars plus label joins, release joins
  * (with release scalars), and platform URLs. Matches the default media `Artist`.
  */
 export type Artist = ArtistScalars & {
-  images: ImageRecord[];
   labels: ArtistLabelRecord[];
   releases: Array<ArtistReleaseScalars & { release: ReleaseScalars }>;
   urls: UrlRecord[];
@@ -196,13 +194,12 @@ export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: Release };
 
 /**
  * Repository payload behind the public artist-detail page: scalars plus
- * images, labels, urls, bio images/links, band members (with member scalars),
+ * labels, urls, bio images/links, band members (with member scalars),
  * the artist's own release joins, and — via `memberOf` — the release joins of
  * every band the artist belongs to, all carrying the full media `Release`
  * graph. The service flattens this into {@link ArtistWithPublishedReleases}.
  */
 export interface ArtistWithReleaseGraph extends ArtistScalars {
-  images: ImageRecord[];
   labels: ArtistLabelRecord[];
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
@@ -330,13 +327,11 @@ export interface ArtistListingRow extends Omit<
 }
 
 /**
- * By-id artist payload: scalars plus ordered images only — the shape
- * `ArtistRepository.findById` fetches and `GET /api/artists/[id]` returns
- * (narrower than the admin `Artist`, which also carries labels/urls/releases).
+ * By-id artist payload: scalars only — the shape `ArtistRepository.findById`
+ * fetches and `GET /api/artists/[id]` returns (narrower than the admin
+ * `Artist`, which also carries labels/urls/releases).
  */
-export interface ArtistDetail extends ArtistScalars {
-  images: ImageRecord[];
-}
+export type ArtistDetail = ArtistScalars;
 
 /** Narrow release projection loaded for public artist-search matches. */
 export interface ArtistSearchReleaseRecord {
@@ -347,11 +342,20 @@ export interface ArtistSearchReleaseRecord {
 }
 
 /**
- * Public artist-search match: scalars plus the first image and release joins
- * carrying the narrow release projection the search consumes.
+ * The display-image candidates a search match carries — just enough to resolve
+ * the artist's first display image for the search dropdown thumbnail.
+ */
+export type ArtistSearchBioImage = Pick<
+  ArtistListingBioImage,
+  'url' | 'thumbnailUrl' | 'isPrimary' | 'displayOrder'
+>;
+
+/**
+ * Public artist-search match: scalars plus the display-image candidates and
+ * release joins carrying the narrow release projection the search consumes.
  */
 export interface ArtistSearchMatch extends ArtistScalars {
-  images: ImageRecord[];
+  bioImages: ArtistSearchBioImage[];
   releases: Array<ArtistReleaseScalars & { release: ArtistSearchReleaseRecord }>;
 }
 
@@ -366,14 +370,6 @@ export interface ArtistNameRecord {
 // =============================================================================
 // Input types
 // =============================================================================
-
-/** A nested image to connect-or-create when writing an artist. */
-export interface ArtistImageInput {
-  id: string;
-  src: string;
-  altText?: string | null;
-  caption?: string | null;
-}
 
 /** A nested platform URL to connect-or-create when writing an artist. */
 export interface ArtistUrlInput {
@@ -414,7 +410,6 @@ export interface CreateArtistData extends ArtistWritableData {
   firstName: string;
   surname: string;
   slug: string;
-  images?: ArtistImageInput[];
   urls?: ArtistUrlInput[];
 }
 

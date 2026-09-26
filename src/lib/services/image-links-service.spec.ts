@@ -94,7 +94,6 @@ const artist = {
   surname: 'R',
   isPseudonymous: true,
   slug: 'ceschi',
-  images: [{ src: 'https://cdn/artist-1.jpg' }],
 };
 
 const sourceLinks = [
@@ -233,7 +232,7 @@ describe('ImageLinksService.runJob', () => {
       artistId: 'a1',
       displayName: 'Ceschi',
       links: ['https://press.test/kit', 'https://photos.test/a.jpg'],
-      referenceImageUrls: ['https://cdn/artist-1.jpg', 'https://cdn/custom-1.jpg'],
+      referenceImageUrls: ['https://cdn/custom-1.jpg'],
       callbackUrl: 'https://app.test/api/artists/a1/image-links/callback',
       jobToken: token,
     });
@@ -302,12 +301,12 @@ describe('ImageLinksService.runJob', () => {
     expect((decodePayload(lastCommand()).links as string[]).length).toBe(20);
   });
 
-  it('degrades to artist images only when the custom-image lookup fails', async () => {
+  it('omits reference images when the custom-image lookup fails', async () => {
     findCustomUrlsMock.mockRejectedValueOnce(new Error('db'));
 
     await ImageLinksService.runJob('a1');
 
-    expect(decodePayload(lastCommand()).referenceImageUrls).toEqual(['https://cdn/artist-1.jpg']);
+    expect(decodePayload(lastCommand()).referenceImageUrls).toBeUndefined();
     expect(mockLoggerWarn).toHaveBeenCalled();
   });
 

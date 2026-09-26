@@ -28,67 +28,39 @@ export interface RegisteredImage {
  */
 export const ImageService = {
   /**
-   * Register pre-uploaded artist images. The caller is expected to have
-   * already verified that the artist exists.
-   */
-  registerForArtist: async (
-    artistId: string,
-    images: RegisterImageInput[]
-  ): Promise<RegisteredImage[]> =>
-    registerImages({ ownerKey: 'artistId', ownerId: artistId, images }),
-
-  /**
    * Register pre-uploaded release images. The caller is expected to have
-   * already verified that the release exists.
+   * already verified that the release exists. The sortOrder seed counts the
+   * release's existing rows and increments per insert.
    */
   registerForRelease: async (
     releaseId: string,
     images: RegisterImageInput[]
-  ): Promise<RegisteredImage[]> =>
-    registerImages({ ownerKey: 'releaseId', ownerId: releaseId, images }),
-};
+  ): Promise<RegisteredImage[]> => {
+    const existing = await ImageRepository.findManyByOwner({ releaseId });
+    const baseSortOrder = existing.length;
 
-/**
- * Shared implementation for both artist and release image registration.
- * The sortOrder seed counts existing rows for the owner and increments per
- * insert; this matches the prior in-action behavior.
- */
-const registerImages = async ({
-  ownerKey,
-  ownerId,
-  images,
-}: {
-  ownerKey: 'artistId' | 'releaseId';
-  ownerId: string;
-  images: RegisterImageInput[];
-}): Promise<RegisteredImage[]> => {
-  const ownerData = ownerKey === 'artistId' ? { artistId: ownerId } : { releaseId: ownerId };
-  const existing = await ImageRepository.findManyByOwner(ownerData);
-  const baseSortOrder = existing.length;
+    // Inserts are independent — sortOrder is derived deterministically from the
+    // existing-row count plus the input index, so the creates run concurrently
+    // and Promise.all preserves input order in the returned array.
+    return Promise.all(
+      images.map(async ({ cdnUrl, caption, altText }, index) => {
+        const sortOrder = baseSortOrder + index;
+        const dbImage = await ImageRepository.create({
+          src: cdnUrl,
+          caption,
+          altText,
+          releaseId,
+          sortOrder,
+        });
 
-  // Inserts are independent — sortOrder is derived deterministically from the
-  // existing-row count plus the input index, so the creates run concurrently
-  // and Promise.all preserves input order in the returned array.
-  const results = await Promise.all(
-    images.map(async (image, index) => {
-      const sortOrder = baseSortOrder + index;
-      const dbImage = await ImageRepository.create({
-        src: image.cdnUrl,
-        caption: image.caption,
-        altText: image.altText,
-        ...ownerData,
-        sortOrder,
-      });
-
-      return {
-        id: dbImage.id,
-        src: dbImage.src ?? '',
-        caption: dbImage.caption ?? undefined,
-        altText: dbImage.altText ?? undefined,
-        sortOrder: dbImage.sortOrder ?? sortOrder,
-      };
-    })
-  );
-
-  return results;
+        return {
+          id: dbImage.id,
+          src: dbImage.src ?? '',
+          caption: dbImage.caption ?? undefined,
+          altText: dbImage.altText ?? undefined,
+          sortOrder: dbImage.sortOrder ?? sortOrder,
+        };
+      })
+    );
+  },
 };

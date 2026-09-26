@@ -9,7 +9,6 @@
 export interface ImageRecord {
   id: string;
   caption: string | null;
-  artistId: string | null;
   releaseId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -19,24 +18,17 @@ export interface ImageRecord {
   urlId: string | null;
 }
 
-/** Owner scoping for an image — exactly one of artistId/releaseId is provided. */
-export type ImageOwnerWhere = { artistId: string } | { releaseId: string };
+/** Owner scoping for an image — releases are the only owner of `Image` rows. */
+export interface ImageOwnerWhere {
+  releaseId: string;
+}
 
 /** Data accepted by the repository to create an image row. */
 export interface CreateImageData {
   src?: string | null;
   caption?: string | null;
   altText?: string | null;
-  artistId?: string | null;
   releaseId?: string | null;
   urlId?: string | null;
-  sortOrder?: number;
-}
-
-/** Data accepted by the repository to update an image row. */
-export interface UpdateImageData {
-  src?: string | null;
-  caption?: string | null;
-  altText?: string | null;
   sortOrder?: number;
 }
