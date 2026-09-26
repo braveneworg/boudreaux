@@ -78,3 +78,43 @@ their own async Lambda task, whose images land in the pool as
   (imginn's own "Download All"/"Download" buttons work there) and adds them
   through the pool uploader. Revisit only if walled hosts turn out to be most
   of what admins paste.
+
+## Addendum (2026-09-26): pool dedupe is by content, not only URL (#773)
+
+The URL check above misses the common case of the same photo served under a
+second URL (a Commons image re-hosted on the band's press page), and the bio
+job's byte/perceptual dedupe only ever compared a batch with itself. Both jobs
+now dedupe new candidates against the images already in the pool.
+
+- **Hashes are persisted, not recomputed.** Every image re-hosted by
+  `BioImageService.rehostImages` stores `contentHash` (SHA-256 of the source
+  bytes) and `perceptualHash` (the 64-bit dHash as 16 hex digits — MongoDB has
+  no unsigned 64-bit integer) on its `ArtistBioImage` row. `rehostImages`
+  takes the pool's fingerprints as a seed, so a byte- or near-identical
+  candidate is dropped and aliased to the pool copy's URL exactly like an
+  in-batch duplicate; the pool copy always wins.
+- **Which rows seed the dedupe differs per job.** The links job deletes
+  nothing, so it seeds with every hashed row. The bio job seeds only with
+  `custom` and `linked` rows: `generated` rows are about to be replaced, and
+  deduping against them would drop a rediscovered photo and then delete its
+  only copy. A bio-job fingerprint lookup failure degrades to the old
+  batch-only dedupe; the links job fails the run, as it already did when the
+  URL lookup failed.
+- **Legacy rows without hashes are skipped, not backfilled.** A lazy
+  backfill mostly cannot recover the byte hash from our own copy: a row
+  re-hosted at generation time points at a 384px webp thumbnail, whose
+  SHA-256 never equals the source's (only rows upgraded at save time hold the
+  original bytes). Recovering it would mean re-fetching each row's external
+  `originalUrl` — third-party traffic and callback latency on every run until
+  backfilled, for sources that may be gone or changed.
+  Legacy rows age out on their own: `generated` rows are rewritten with hashes
+  on the next regeneration, and promotion to `custom` (display picks) keeps a
+  row's hashes. URL dedupe still covers them in the links job.
+
+### Consequences
+
+- Two nullable strings on `ArtistBioImage`, no index — no `prisma db push` is
+  needed before the deploy (documents without them read as `null`).
+- Manual uploads (`ArtistBioImageRepository.create`) are not hashed, so a
+  scraped copy of an uploaded photo is still re-hosted. Hashing uploads would
+  close that gap if it shows up in practice.

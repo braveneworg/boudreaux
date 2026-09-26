@@ -118,6 +118,8 @@ const toLinkedRow = (artistId: string, image: RehostedImage): CreateArtistBioIma
   alt: image.alt,
   hasFace: image.hasFace,
   faceScore: image.faceScore,
+  contentHash: image.contentHash,
+  perceptualHash: image.perceptualHash,
   origin: 'linked',
 });
 
@@ -169,7 +171,9 @@ const writeTerminalStatus = async (
 /**
  * Re-hosts the callback's images that are not already in the pool and inserts
  * the survivors as `linked` rows. Returns how many rows were added. Pool URLs
- * are compared case-insensitively, matching the Lambda's own dedupe.
+ * are compared case-insensitively, matching the Lambda's own dedupe; the
+ * re-host then also skips a candidate whose bytes (or perceptual hash) match
+ * any hashed pool image, whatever its origin, since this job deletes nothing.
  */
 const persistLinkedImages = async (
   artistId: string,
@@ -183,9 +187,11 @@ const persistLinkedImages = async (
   const fresh = images.filter((image) => !existing.has(image.url.toLowerCase()));
   if (fresh.length === 0) return 0;
 
+  const knownImages = await ArtistBioImageRepository.findFingerprints(artistId);
   const { results } = await BioImageService.rehostImages(
     fresh.map((image, index) => ({ url: image.url, index })),
-    artistId
+    artistId,
+    knownImages
   );
   const rows = fresh.flatMap((image, index) => {
     const result = results.at(index);

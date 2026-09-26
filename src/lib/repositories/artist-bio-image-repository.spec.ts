@@ -409,6 +409,34 @@ describe('ArtistBioImageRepository', () => {
       });
     });
 
+    it('stamps each row with its content and perceptual hashes', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: null },
+      } as never);
+      vi.mocked(prisma.artistBioImage.createMany).mockResolvedValue({ count: 2 } as never);
+
+      await ArtistBioImageRepository.createMany([
+        {
+          artistId: 'a1',
+          url: 'https://cdn/1',
+          origin: 'linked',
+          contentHash: 'sha-1',
+          perceptualHash: '00000000000000ff',
+        },
+        { artistId: 'a1', url: 'https://cdn/2', origin: 'linked' },
+      ]);
+
+      const [[{ data }]] = vi.mocked(prisma.artistBioImage.createMany).mock.calls as unknown as [
+        [{ data: Array<Record<string, unknown>> }],
+      ];
+      expect(
+        data.map(({ contentHash, perceptualHash }) => ({ contentHash, perceptualHash }))
+      ).toEqual([
+        { contentHash: 'sha-1', perceptualHash: '00000000000000ff' },
+        { contentHash: null, perceptualHash: null },
+      ]);
+    });
+
     it('returns 0 without touching the database for an empty batch', async () => {
       const count = await ArtistBioImageRepository.createMany([]);
 
@@ -431,6 +459,50 @@ describe('ArtistBioImageRepository', () => {
         select: { url: true, originalUrl: true },
       });
       expect([...urls].sort()).toEqual(['https://cdn/a', 'https://cdn/b', 'https://src/a']);
+    });
+  });
+
+  describe('findFingerprints', () => {
+    it('returns the url and hashes of every pool row that carries a hash', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([
+        { url: 'https://cdn/a', contentHash: 'sha-a', perceptualHash: '000000000000000a' },
+        { url: 'https://cdn/b', contentHash: null, perceptualHash: '000000000000000b' },
+        { url: 'https://cdn/legacy', contentHash: null, perceptualHash: null },
+      ] as never);
+
+      const fingerprints = await ArtistBioImageRepository.findFingerprints('a1');
+
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        select: { url: true, contentHash: true, perceptualHash: true },
+      });
+      expect(fingerprints).toEqual([
+        { url: 'https://cdn/a', contentHash: 'sha-a', perceptualHash: '000000000000000a' },
+        { url: 'https://cdn/b', contentHash: null, perceptualHash: '000000000000000b' },
+      ]);
+    });
+
+    it('reads a hash field missing from a legacy document as null', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([
+        { url: 'https://cdn/a', contentHash: 'sha-a' },
+      ] as never);
+
+      const fingerprints = await ArtistBioImageRepository.findFingerprints('a1');
+
+      expect(fingerprints).toEqual([
+        { url: 'https://cdn/a', contentHash: 'sha-a', perceptualHash: null },
+      ]);
+    });
+
+    it('limits the rows to the given origins', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([] as never);
+
+      await ArtistBioImageRepository.findFingerprints('a1', ['custom', 'linked']);
+
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', origin: { in: ['custom', 'linked'] } },
+        select: { url: true, contentHash: true, perceptualHash: true },
+      });
     });
   });
 });

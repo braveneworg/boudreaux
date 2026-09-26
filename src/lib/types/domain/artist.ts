@@ -118,6 +118,10 @@ export interface ArtistBioImageRecord {
   hasFace: boolean | null;
   /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
   faceScore: number | null;
+  /** SHA-256 (hex) of the source bytes, stamped at re-host; `null` on legacy rows and manual uploads. */
+  contentHash: string | null;
+  /** 64-bit dHash of the source as 16 hex digits, stamped with `contentHash`. */
+  perceptualHash: string | null;
   /** Provenance: `'generated'` (owned by the job), `'custom'` (owned by a human) or `'linked'` (scraped from an admin-supplied page); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
@@ -148,6 +152,24 @@ export interface CreateArtistBioImageData {
   faceScore?: number | null;
   /** `'custom'` for the manual-upload path (stamped when absent); `'linked'` for images scraped from admin-supplied pages. */
   origin?: 'custom' | 'linked';
+  /** SHA-256 (hex) of the source bytes; only re-hosted images carry it. */
+  contentHash?: string | null;
+  /** 64-bit dHash of the source as 16 hex digits; only re-hosted images carry it. */
+  perceptualHash?: string | null;
+}
+
+/**
+ * A pool image's content fingerprint — what the re-host dedupe compares new
+ * candidates against so a copy served under another URL is still skipped.
+ * Rows re-hosted before the hashes were stored carry neither (ADR-0010
+ * addendum); the repository omits those.
+ */
+export interface BioImageFingerprint {
+  url: string;
+  /** SHA-256 (hex) of the source bytes the row was re-hosted from. */
+  contentHash: string | null;
+  /** 64-bit dHash of that source as 16 hex digits. */
+  perceptualHash: string | null;
 }
 
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
