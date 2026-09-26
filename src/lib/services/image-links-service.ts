@@ -3,11 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
-import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
+import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { IMAGE_LINKS_TASK, MAX_IMAGE_LINKS, type ImageLinksInput } from '@fakefour/job-contract';
-import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
@@ -32,38 +31,15 @@ import {
   type RehostedImage,
 } from './bio-generation-service';
 import { BioImageService } from './bio-image-service';
-
-/** Fire-and-forget invoke: the HTTP client only covers the dispatch round-trip. */
-const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
-let lambdaClient: LambdaClient | null = null;
-
-const getLambdaClient = (): LambdaClient => {
-  if (!lambdaClient) {
-    lambdaClient = new LambdaClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      requestHandler: new NodeHttpHandler({ requestTimeout: INVOKE_REQUEST_TIMEOUT_MS }),
-    });
-  }
-  return lambdaClient;
-};
+import { getLambdaClient, resolveFakeDelayMs, sleep, tokensMatch } from './lambda-dispatch';
 
 /** Outcome of {@link ImageLinksService.runJob}: dispatched across the seam, or failed early. */
 export type RunImageLinksJobResult = { status: 'dispatched' } | { status: 'failed'; error: string };
 
 type InvokeAck = { ok: true } | { ok: false; error: string };
 
-/** Constant-time token comparison (fixed-length UUIDs, so the length check leaks nothing). */
-const tokensMatch = (a: string, b: string): boolean => {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-};
-
-const resolveFakeDelayMs = (): number => {
-  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
-  return Number.isFinite(raw) && raw >= 0 ? raw : 0;
-};
+/** Fake-path dwell when `BIO_GENERATOR_FAKE_DELAY_MS` is unset: none. */
+const DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS = 0;
 
 /**
  * Local stand-in for the Lambda under `BIO_GENERATOR_FAKE=true` (dev, E2E): it
@@ -72,8 +48,7 @@ const resolveFakeDelayMs = (): number => {
  */
 const dispatchImageLinksLocally = async (input: ImageLinksInput): Promise<InvokeAck> => {
   try {
-    const delay = resolveFakeDelayMs();
-    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    await sleep(resolveFakeDelayMs(DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS));
     const response = await fetch(input.callbackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

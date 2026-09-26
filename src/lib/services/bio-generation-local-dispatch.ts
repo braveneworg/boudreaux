@@ -6,6 +6,7 @@ import 'server-only';
 import { loggers } from '@/lib/utils/logger';
 
 import { fakeBioGeneration, type BioGenerationLambdaInput } from './bio-generation-fixture';
+import { resolveFakeDelayMs, sleep } from './lambda-dispatch';
 
 /**
  * Observable in-flight window for the local adapter. The real Lambda takes
@@ -15,14 +16,6 @@ import { fakeBioGeneration, type BioGenerationLambdaInput } from './bio-generati
  * `BIO_GENERATOR_FAKE_DELAY_MS`; unit tests set `0`.
  */
 export const DEFAULT_LOCAL_DISPATCH_DELAY_MS = 4000;
-
-const resolveDelayMs = (): number => {
-  const raw = Number(process.env.BIO_GENERATOR_FAKE_DELAY_MS);
-  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_LOCAL_DISPATCH_DELAY_MS;
-};
-
-const sleep = (ms: number): Promise<void> =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 
 const postJson = async (url: string, body: unknown): Promise<void> => {
   const response = await fetch(url, {
@@ -76,7 +69,7 @@ export const dispatchBioGenerationLocally = async (
       });
     }
 
-    await sleep(resolveDelayMs());
+    await sleep(resolveFakeDelayMs(DEFAULT_LOCAL_DISPATCH_DELAY_MS));
 
     await postJson(callbackUrl, { jobToken, result: fakeBioGeneration(input) });
     return { ok: true };

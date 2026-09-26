@@ -13,3 +13,9 @@ variation selector = 0):
 ```bash
 python3 -c "import sys,unicodedata;h=sys.argv[1];print(sum(2 if unicodedata.category(c)=='So' else 0 if c=='️' or unicodedata.category(c)=='Mn' else 1 for c in h))" "feat(ui): ✨ subject"
 ```
+
+Counting is only half of it: on 2026-09-26 the counter printed `51` for
+`refactor(job-contract): ♻️ share one httpUrl schema` and the commit went
+out anyway, and commitlint rejected it. Treat any count over 50 as a stop.
+Shorten the header (a shorter scope, e.g. `contract`, usually fixes it)
+and count again before running `git commit`.

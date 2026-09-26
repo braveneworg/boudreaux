@@ -2489,11 +2489,3 @@ describe('BioGenerationService.completeCallback', () => {
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
   });
 });
-
-describe('INVOKE_REQUEST_TIMEOUT_MS', () => {
-  it('is a short dispatch timeout — the Event invoke returns 202 immediately', async () => {
-    const { INVOKE_REQUEST_TIMEOUT_MS } = await import('./bio-generation-service');
-
-    expect(INVOKE_REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
-  });
-});

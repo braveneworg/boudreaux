@@ -4,23 +4,7 @@
 import { z } from 'zod';
 
 import { bioImageSchema } from './bio-generation';
-
-/**
- * Whether `value` is a well-formed absolute http(s) URL. Uses the URL parser
- * (not a prefix regex) so it rejects schemes like `javascript:`/`data:` and
- * requires a host. Mirrors the video-enrichment contract's validator so the
- * boundary check is the stricter of the web/Lambda checks.
- */
-const isHttpUrl = (value: string): boolean => {
-  try {
-    const { protocol, host } = new URL(value.trim());
-    return host.length > 0 && (protocol === 'http:' || protocol === 'https:');
-  } catch {
-    return false;
-  }
-};
-
-const httpUrl = z.string().refine(isHttpUrl, 'Must be an http(s) URL');
+import { httpUrl } from './http-url';
 
 /** The `task` discriminator the Lambda routes an images-from-links event on. */
 export const IMAGE_LINKS_TASK = 'images-from-links' as const;

@@ -3,11 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
-import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
+import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { MAX_LAMBDA_RELEASES } from '@fakefour/job-contract';
-import { NodeHttpHandler } from '@smithy/node-http-handler';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
@@ -46,23 +45,7 @@ import {
 import { type BioGenerationLambdaInput } from './bio-generation-fixture';
 import { dispatchBioGenerationLocally } from './bio-generation-local-dispatch';
 import { BioImageService } from './bio-image-service';
-
-let lambdaClient: LambdaClient | null = null;
-
-// Bio generation now fires a fire-and-forget `Event` invoke: the Lambda returns
-// 202 immediately (then POSTs its result to the callback route), so the HTTP
-// client only needs a short timeout to cover the dispatch round-trip.
-export const INVOKE_REQUEST_TIMEOUT_MS = 30 * 1000;
-
-const getLambdaClient = (): LambdaClient => {
-  if (!lambdaClient) {
-    lambdaClient = new LambdaClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      requestHandler: new NodeHttpHandler({ requestTimeout: INVOKE_REQUEST_TIMEOUT_MS }),
-    });
-  }
-  return lambdaClient;
-};
+import { getLambdaClient, tokensMatch } from './lambda-dispatch';
 
 /** Derive a public real name for the metadata lookup (skip if pseudonymous). */
 const deriveRealName = (artist: {
@@ -656,17 +639,6 @@ const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJo
   }
 
   return { status: 'dispatched' };
-};
-
-/**
- * Constant-time comparison of two token strings. Compares equal-length `Buffer`s
- * via {@link timingSafeEqual}; the length pre-check leaks nothing meaningful
- * because the job token is a fixed-length random UUID.
- */
-const tokensMatch = (a: string, b: string): boolean => {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 };
 
 /**
