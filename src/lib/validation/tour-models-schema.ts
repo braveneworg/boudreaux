@@ -4,7 +4,7 @@
 import { z } from 'zod';
 
 import type { TourWithRelations } from '@/lib/repositories/tours/tour-repository';
-import { artistScalarSchema } from '@/lib/validation/media/shared-schema';
+import { artistPublicScalarSchema } from '@/lib/validation/media/shared-schema';
 
 /**
  * Strict Zod schema mirroring the serialized `TourWithRelations` row returned
@@ -66,7 +66,7 @@ const venueSchema = z.object({
   updatedBy: nullableString,
 });
 
-/** `TourDateHeadliner` with its optional artist (`headliners.artist: true`). */
+/** `TourDateHeadliner` with its optional artist, public scalars only (#765). */
 const tourDateHeadlinerSchema = z.object({
   id: z.string(),
   tourDateId: z.string(),
@@ -74,7 +74,7 @@ const tourDateHeadlinerSchema = z.object({
   sortOrder: z.number(),
   setTime: nullableDate,
   createdAt: date,
-  artist: artistScalarSchema.nullable(),
+  artist: artistPublicScalarSchema.nullable(),
 });
 
 /** `TourDate` with its venue and headliners. */

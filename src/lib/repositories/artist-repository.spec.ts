@@ -5,7 +5,7 @@
 import { Prisma } from '@prisma/client';
 
 import type { AssertExact } from '@/lib/types/assert';
-import type { ArtistDetail } from '@/lib/types/domain/artist';
+import { ARTIST_PRIVATE_FIELDS, type ArtistDetail } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 
 import { ArtistRepository } from './artist-repository';
@@ -142,13 +142,24 @@ describe('ArtistRepository', () => {
   });
 
   describe('findBySlug', () => {
-    it('finds an artist by slug', async () => {
+    it('finds an artist by slug with a select projection', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findBySlug('john-doe');
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({ where: { slug: 'john-doe' } });
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg.where).toEqual({ slug: 'john-doe' });
+      expect(arg.select).toEqual(expect.objectContaining({ id: true, slug: true, bio: true }));
+    });
+
+    it.each(ARTIST_PRIVATE_FIELDS)('never selects the private field %s', async (field) => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+
+      await ArtistRepository.findBySlug('john-doe');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg.select).not.toHaveProperty(field);
     });
   });
 
@@ -835,8 +846,9 @@ describe('ArtistRepository', () => {
         isActive: true,
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
       });
-      expect(arg?.include?.releases).toBeDefined();
-      expect(arg?.include?.bioImages).toBeDefined();
+      expect(arg?.include).toBeUndefined();
+      expect(arg?.select?.releases).toBeDefined();
+      expect(arg?.select?.bioImages).toBeDefined();
     });
 
     it('loads the releases of every band the artist is a member of with the same release graph', async () => {
@@ -845,11 +857,58 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
 
       const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      const include = arg?.include as Record<string, unknown> | undefined;
-      const memberOf = include?.memberOf as {
-        include: { artist: { include: { releases: unknown } } };
+      const select = arg?.select as Record<string, unknown> | undefined;
+      const memberOf = select?.memberOf as {
+        include: { artist: { select: { releases: unknown } } };
       };
-      expect(memberOf.include.artist.include.releases).toEqual(include?.releases);
+      expect(memberOf.include.artist.select.releases).toEqual(select?.releases);
+    });
+
+    describe('selects no private artist field anywhere in the graph', () => {
+      /** Every artist-level `select` in the query: the artist, its band members,
+       * its bands, and each credited artist on every loaded release. */
+      const artistSelects = async (): Promise<Array<[string, Record<string, unknown>]>> => {
+        vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+        await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+        const select = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select as Record<
+          string,
+          never
+        >;
+        const releaseArtistSelect = (releases: {
+          include: { release: { include: { artistReleases: { include: { artist: never } } } } };
+        }) => releases.include.release.include.artistReleases.include.artist;
+        const memberOf = select.memberOf as {
+          include: { artist: { select: Record<string, unknown> } };
+        };
+        return [
+          ['artist', select],
+          ['members.member', (select.members as { include: { member: never } }).include.member],
+          ['memberOf.artist', memberOf.include.artist.select],
+          ['releases.release.artistReleases.artist', releaseArtistSelect(select.releases)],
+          [
+            'memberOf.artist.releases.release.artistReleases.artist',
+            releaseArtistSelect(memberOf.include.artist.select.releases as never),
+          ],
+        ].map(([path, value]) => [
+          path as string,
+          ((value as { select?: Record<string, unknown> }).select ?? value) as Record<
+            string,
+            unknown
+          >,
+        ]);
+      };
+
+      it.each(ARTIST_PRIVATE_FIELDS)('omits %s at every artist level', async (field) => {
+        const selects = await artistSelects();
+
+        expect(selects.filter(([, select]) => field in select).map(([path]) => path)).toEqual([]);
+      });
+
+      it('projects every artist level through an explicit select', async () => {
+        const selects = await artistSelects();
+
+        expect(selects.map(([, select]) => select.slug)).toEqual([true, true, true, true, true]);
+      });
     });
   });
 

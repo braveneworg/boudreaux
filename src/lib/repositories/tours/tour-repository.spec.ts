@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { TourRepository } from './tour-repository';
 
@@ -37,6 +38,38 @@ describe('TourRepository', () => {
     images: [],
     tourDates: [],
   };
+  // The tour payload is public (`/api/tours`, the tours pages' dehydrated
+  // state), so each headliner artist carries only its public scalars (#765).
+  describe('headliner artist projection', () => {
+    type HeadlinerArtistArg = {
+      include: {
+        tourDates: { include: { headliners: { include: { artist: { select: object } } } } };
+      };
+    };
+    const headlinerArtistSelect = (arg: unknown): object =>
+      (arg as HeadlinerArtistArg).include.tourDates.include.headliners.include.artist.select;
+
+    it.each(ARTIST_PRIVATE_FIELDS)('findAll never selects the private field %s', async (field) => {
+      vi.mocked(prisma.tour.findMany).mockResolvedValueOnce([] as never);
+
+      await TourRepository.findAll();
+
+      expect(
+        headlinerArtistSelect(vi.mocked(prisma.tour.findMany).mock.calls[0][0])
+      ).not.toHaveProperty(field);
+    });
+
+    it.each(ARTIST_PRIVATE_FIELDS)('findById never selects the private field %s', async (field) => {
+      vi.mocked(prisma.tour.findUnique).mockResolvedValueOnce(null);
+
+      await TourRepository.findById('507f1f77bcf86cd799439011');
+
+      expect(
+        headlinerArtistSelect(vi.mocked(prisma.tour.findUnique).mock.calls[0][0])
+      ).not.toHaveProperty(field);
+    });
+  });
+
   describe('findAll', () => {
     it('returns tours sorted by createdAt descending with nested relations', async () => {
       vi.mocked(prisma.tour.findMany).mockResolvedValue([mockTour] as never);
@@ -55,7 +88,7 @@ describe('TourRepository', () => {
               venue: true,
               headliners: {
                 include: {
-                  artist: true,
+                  artist: { select: expect.objectContaining({ id: true, slug: true }) },
                 },
                 orderBy: { sortOrder: 'asc' },
               },

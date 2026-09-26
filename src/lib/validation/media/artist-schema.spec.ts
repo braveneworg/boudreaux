@@ -1,8 +1,17 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+
 import { artistSchema, artistWithPublishedReleasesSchema } from './artist-schema';
-import { artist, artistWithPublishedReleases } from './schema-fixtures';
+import {
+  artist,
+  artistPrivateValues,
+  artistPublicScalar,
+  artistScalar,
+  artistWithPublishedReleases,
+  release,
+} from './schema-fixtures';
 
 describe('artistSchema', () => {
   it('parses an artist with all relations', () => {
@@ -79,5 +88,61 @@ describe('artistWithPublishedReleasesSchema', () => {
   it('accepts a null displayOrder on a bio image row', () => {
     const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
     expect(parsed.bioImages[0].displayOrder).toBeNull();
+  });
+});
+
+describe('artistWithPublishedReleasesSchema — public projection (#765)', () => {
+  const leakyArtist = { ...artistScalar, ...artistPrivateValues };
+  const leakyPayload = {
+    ...artistWithPublishedReleases,
+    ...artistPrivateValues,
+    members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...leakyArtist, id: 'a2' } }],
+    releases: [
+      {
+        id: 'ar1',
+        artistId: 'a1',
+        releaseId: 'r1',
+        credit: 'primary' as const,
+        release: {
+          ...release,
+          artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: leakyArtist }],
+        },
+      },
+    ],
+  };
+
+  it('parses a payload whose artists carry no private field', () => {
+    const publicPayload = {
+      ...artistWithPublishedReleases,
+      ...artistPublicScalar,
+      members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: artistPublicScalar }],
+      releases: [
+        {
+          ...leakyPayload.releases[0],
+          release: {
+            ...release,
+            artistReleases: [
+              { id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistPublicScalar },
+            ],
+          },
+        },
+      ],
+    };
+    for (const field of ARTIST_PRIVATE_FIELDS) {
+      Reflect.deleteProperty(publicPayload, field);
+    }
+
+    expect(() => artistWithPublishedReleasesSchema.parse(publicPayload)).not.toThrow();
+  });
+
+  it.each(ARTIST_PRIVATE_FIELDS)('strips %s from every artist on the graph', (field) => {
+    const parsed = artistWithPublishedReleasesSchema.parse(leakyPayload);
+    const artists = [
+      parsed,
+      ...parsed.members.map(({ member }) => member),
+      ...parsed.releases.flatMap(({ release: row }) => row.artistReleases.map((ar) => ar.artist)),
+    ];
+
+    expect(artists.filter((entry) => field in entry)).toEqual([]);
   });
 });

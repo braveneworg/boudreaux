@@ -5,7 +5,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type {
-  ArtistScalars as Artist,
+  ArtistPublicScalars as Artist,
   TourDateHeadlinerScalars as TourDateHeadliner,
   TourDateScalars as TourDate,
   TourImageScalars as TourImage,
