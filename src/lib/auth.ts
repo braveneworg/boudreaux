@@ -32,6 +32,11 @@ const MAGIC_LINK_EXPIRES_IN_SECONDS = 60 * 5;
 // server-side in `withAdmin`), long enough to avoid a DB hit on every request.
 const SESSION_COOKIE_CACHE_MAX_AGE_SECONDS = 60 * 5;
 
+// better-auth's limiter budget for GET /get-session per (IP, path): 300 per
+// 10 s = 30 r/s, the same sustained rate as nginx's `session` zone.
+const GET_SESSION_RATE_LIMIT_WINDOW_SECONDS = 10;
+const GET_SESSION_RATE_LIMIT_MAX = 300;
+
 // In production we want secure (httpOnly + secure) cookies, except under E2E
 // where the standalone server runs over plain HTTP.
 const isProductionRuntime =
@@ -171,6 +176,18 @@ export const auth = betterAuth({
     // and signed-in UI intermittently renders signed-out. Scope the limiter
     // to REAL production; E2E keeps it off. Defaults (window/max) unchanged.
     enabled: isProductionRuntime,
+    // Every page load reads the session once (/playlists twice), and the
+    // key is the client IP — a venue's Wi-Fi or a carrier's CGNAT fronts
+    // many browsers as one address. The default 100 per 10 s would 429 that
+    // room's 101st page load, below nginx's session zone (30 r/s). Keep the
+    // two ceilings equal; see docs/adr/0013. The read is cheap: the cookie
+    // cache answers signed-in users, anonymous ones get null without a DB hit.
+    customRules: {
+      '/get-session': {
+        window: GET_SESSION_RATE_LIMIT_WINDOW_SECONDS,
+        max: GET_SESSION_RATE_LIMIT_MAX,
+      },
+    },
   },
   hooks: {
     // Turnstile gate: browser POSTs to /sign-in/social and /sign-in/magic-link
