@@ -11,7 +11,7 @@ import { UserRepository } from '@/lib/repositories/user-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { changeEmailSchema } from '@/lib/validation/change-email-schema';
+import { changeEmailActionSchema } from '@/lib/validation/change-email-schema';
 
 import { applyChangeEmailError } from './change-email-action-helpers';
 import { setGeneralFormError } from './form-state-helpers';
@@ -26,7 +26,11 @@ export const changeEmailAction = async (
     'previousEmail',
     'allowEmailNotifications',
   ] as const;
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, changeEmailSchema);
+  const { formState, parsed } = getActionState(
+    payload,
+    permittedFieldNames,
+    changeEmailActionSchema
+  );
 
   if (parsed.success) {
     try {

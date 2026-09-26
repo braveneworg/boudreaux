@@ -13,7 +13,7 @@ import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { profileSchema } from '@/lib/validation/profile-schema';
+import { profileActionSchema } from '@/lib/validation/profile-schema';
 
 import { setGeneralFormError } from './form-state-helpers';
 
@@ -35,7 +35,7 @@ export const updateProfileAction = async (
     'allowEmailNotifications',
   ] as const;
 
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, profileSchema);
+  const { formState, parsed } = getActionState(payload, permittedFieldNames, profileActionSchema);
 
   if (parsed.success) {
     try {
