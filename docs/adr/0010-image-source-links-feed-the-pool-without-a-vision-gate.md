@@ -64,3 +64,17 @@ their own async Lambda task, whose images land in the pool as
   module does not import the orchestrator.
 - The bio job's own Jina/Serper/link-follow image discovery is unchanged;
   admin image sources are additive.
+- Jina renders whatever a site serves it and never bypasses anti-bot walls,
+  so a Cloudflare-challenged link (imginn.com, 2026-09-26) comes back as a
+  200 "Just a moment..." page with no photos. `readUrlOutcome` classifies
+  such reads as `blocked`; when every link was blocked or unreadable the job
+  fails with the hosts named ("imginn.com blocked automated access (bot
+  check)") instead of reporting an empty page, and a blocked link beside a
+  productive one is logged (`image_links_links_skipped`) while the job still
+  succeeds. Pulling images from such hosts needs a different fetch path, not a
+  Jina header — see `docs/lessons/ops/jina-reader-returns-bot-walls-as-pages.md`.
+  Decided 2026-09-26: no paid anti-bot scraping provider. Walled hosts are
+  out of scope for the job; the admin saves the photos from their own browser
+  (imginn's own "Download All"/"Download" buttons work there) and adds them
+  through the pool uploader. Revisit only if walled hosts turn out to be most
+  of what admins paste.
