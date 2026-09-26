@@ -84,7 +84,7 @@ const toIsoDate = (value: Date | null | undefined): string | undefined =>
   value ? value.toISOString().slice(0, 10) : undefined;
 
 /** Resolve the best display name to ground the generation on. */
-const deriveDisplayName = (artist: {
+export const deriveDisplayName = (artist: {
   firstName: string;
   surname: string;
   displayName: string | null;
@@ -96,7 +96,8 @@ const deriveDisplayName = (artist: {
   '';
 
 /** Re-hosted image record before `sortOrder` is assigned; width/height may be null. */
-type RehostedImage = {
+/** A discovered image after the cheap thumbnail re-host, ready to persist (sanitized). */
+export type RehostedImage = {
   url: string;
   thumbnailUrl: string | null;
   title: string | null;
@@ -126,7 +127,7 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 // ---------------------------------------------------------------------------
 
 /** Raw re-host result from {@link BioImageService.rehostImages}. */
-type RehostResult = { url: string; width: number | null; height: number | null };
+export type RehostResult = { url: string; width: number | null; height: number | null };
 
 /** Structured output of the private {@link rehostImages} helper. */
 type RehostedBatch = {
@@ -152,7 +153,7 @@ const sanitizeHref = (url: string | null | undefined): string | null =>
  * the original image metadata returned by the Lambda. Extracted to keep
  * {@link rehostImages} under the cyclomatic-complexity limit.
  */
-const buildRehostedRecord = (
+export const buildRehostedRecord = (
   result: RehostResult,
   image: BioGenerationData['images'][number]
 ): RehostedImage => ({
@@ -538,7 +539,7 @@ const MAX_REFERENCE_IMAGES = 3;
  * deduped case-insensitively, capped at {@link MAX_REFERENCE_IMAGES}. Order is
  * preserved so the artist's canonical images take priority when the cap trims.
  */
-const buildReferenceImageUrls = (
+export const buildReferenceImageUrls = (
   artistImageSrcs: Array<string | null>,
   customBioImageUrls: string[]
 ): string[] => {
