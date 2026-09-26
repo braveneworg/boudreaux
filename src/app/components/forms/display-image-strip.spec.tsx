@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
 import { DisplayImageStrip, type DisplayImageStripProps } from './display-image-strip';
@@ -33,11 +34,37 @@ const renderStrip = (overrides: Partial<DisplayImageStripProps> = {}) => {
     images: IMAGES,
     onReorder: vi.fn(),
     onRemove: vi.fn(),
+    onDropPoolImage: vi.fn(),
+    onDropFile: vi.fn(),
     ...overrides,
   };
   render(<DisplayImageStrip {...props} />);
   return props;
 };
+
+const dropTarget = () => screen.getByRole('group', { name: 'Add a display image' });
+
+/** A pool tile's drag payload, as `BioImageTile` sets it. */
+const poolPayload = (id: string): string =>
+  JSON.stringify({
+    id,
+    url: `https://cdn.example/${id}.webp`,
+    thumbnailUrl: null,
+    title: id,
+    attribution: null,
+    alt: `${id} described`,
+    width: null,
+    height: null,
+  });
+
+/** A DataTransfer stand-in carrying either a pool payload or files. */
+const transfer = ({ payload, files = [] }: { payload?: string; files?: File[] }) => ({
+  types: [...(payload ? [BIO_IMAGE_DRAG_MIME] : []), ...(files.length ? ['Files'] : [])],
+  getData: (type: string) => (type === BIO_IMAGE_DRAG_MIME ? (payload ?? '') : ''),
+  files,
+});
+
+const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
 
 describe('DisplayImageStrip', () => {
   it('renders the chosen images in order with their positions', () => {
@@ -141,6 +168,98 @@ describe('DisplayImageStrip', () => {
     expect(screen.getByRole('button', { name: 'Move Alpha later' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Move Bravo earlier' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Remove Alpha from display images' })).toBeDisabled();
+  });
+
+  describe('drop target', () => {
+    it('invites a pool image or an image file while there is room', () => {
+      renderStrip({ images: IMAGES.slice(0, 2) });
+      expect(dropTarget()).toHaveTextContent(/Drop a pool image or an image file here/);
+    });
+
+    it('adds a dropped pool image by its id', () => {
+      const { onDropPoolImage, onDropFile } = renderStrip({ images: IMAGES.slice(0, 2) });
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload: poolPayload('d') }) });
+
+      expect(vi.mocked(onDropPoolImage).mock.calls).toEqual([['d']]);
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('hands over the first dropped image file', () => {
+      const png = new File(['y'], 'other.png', { type: 'image/png' });
+      const { onDropPoolImage, onDropFile } = renderStrip({ images: IMAGES.slice(0, 2) });
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg, png] }) });
+
+      expect(vi.mocked(onDropFile).mock.calls).toEqual([[jpeg]]);
+      expect(onDropPoolImage).not.toHaveBeenCalled();
+    });
+
+    it('ignores a pool payload without an id', () => {
+      const { onDropPoolImage, onDropFile } = renderStrip({ images: IMAGES.slice(0, 2) });
+      const payload = JSON.stringify({ ...JSON.parse(poolPayload('d')), id: undefined });
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload }) });
+
+      expect(onDropPoolImage).not.toHaveBeenCalled();
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('ignores a drop that carries neither a pool image nor a file', () => {
+      const { onDropPoolImage, onDropFile } = renderStrip({ images: IMAGES.slice(0, 2) });
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({}) });
+
+      expect(onDropPoolImage).not.toHaveBeenCalled();
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('highlights while something drags over it and clears on leave', () => {
+      renderStrip({ images: IMAGES.slice(0, 2) });
+
+      fireEvent.dragOver(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+      expect(dropTarget()).toHaveAttribute('data-drag-over', 'true');
+      fireEvent.dragLeave(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+      expect(dropTarget()).toHaveAttribute('data-drag-over', 'false');
+    });
+
+    it('explains the cap and refuses drops once the set is full', () => {
+      const { onDropPoolImage, onDropFile } = renderStrip();
+      expect(dropTarget()).toHaveTextContent(/Remove a display image first \(limit 3\)/);
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload: poolPayload('d') }) });
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+
+      expect(onDropPoolImage).not.toHaveBeenCalled();
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('refuses drops while disabled', () => {
+      const { onDropPoolImage, onDropFile } = renderStrip({
+        images: IMAGES.slice(0, 1),
+        disabled: true,
+      });
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload: poolPayload('d') }) });
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+
+      expect(onDropPoolImage).not.toHaveBeenCalled();
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('refuses a second file while one is still uploading, and says so', () => {
+      const { onDropFile } = renderStrip({ images: IMAGES.slice(0, 1), isUploading: true });
+      expect(screen.getByRole('status')).toHaveTextContent('Uploading');
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+
+      expect(onDropFile).not.toHaveBeenCalled();
+    });
+
+    it('shows the upload failure inline', () => {
+      renderStrip({ images: IMAGES.slice(0, 1), uploadError: 'S3 refused' });
+      expect(screen.getByRole('alert')).toHaveTextContent('S3 refused');
+    });
   });
 
   it('labels an untitled image "image"', () => {

@@ -139,6 +139,7 @@ describe('BioImageTile', () => {
     expect(setData).toHaveBeenCalledWith(
       BIO_IMAGE_DRAG_MIME,
       JSON.stringify({
+        id: 'i1',
         url: 'https://example.com/photo.jpg',
         thumbnailUrl: 'https://example.com/thumb.jpg',
         title: 'Ceschi Ramos',

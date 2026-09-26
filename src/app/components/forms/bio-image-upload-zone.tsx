@@ -14,13 +14,11 @@ import { UploaderDropZone } from '@/app/components/ui/uploader-drop-zone';
 import { useUploaderDrag } from '@/app/components/ui/use-uploader-drag';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 
-import { uploadBioImage } from './utils/upload-bio-image';
-
-/** Image types the presign step accepts for artist bio images. */
-export const BIO_IMAGE_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
-
-/** Presign rejects larger images; mirrored here so the hint is honest. */
-const MAX_IMAGE_SIZE_MB = 50;
+import {
+  BIO_IMAGE_UPLOAD_TYPES,
+  MAX_BIO_IMAGE_SIZE_MB,
+  useBioImageUpload,
+} from './use-bio-image-upload';
 
 export interface BioImageUploadZoneProps {
   artistId: string;
@@ -47,31 +45,26 @@ export const BioImageUploadZone = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [alt, setAlt] = useState('');
   const [attribution, setAttribution] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    upload: runUpload,
+    isUploading,
+    errorMessage,
+  } = useBioImageUpload({
+    artistId,
+    onUploaded,
+  });
 
   const upload = async (file: File): Promise<void> => {
-    if (!(BIO_IMAGE_UPLOAD_TYPES as readonly string[]).includes(file.type)) {
-      setErrorMessage('Choose a JPEG, PNG, or WebP image.');
-      return;
-    }
-    setErrorMessage(null);
-    setIsUploading(true);
     try {
-      const result = await uploadBioImage(file, {
-        artistId,
+      const ok = await runUpload(file, {
         attribution: attribution.trim(),
         alt: alt.trim() || null,
       });
-      if (!result.success || !result.data) {
-        setErrorMessage(result.error ?? 'Failed to upload image');
-        return;
+      if (ok) {
+        setAlt('');
+        setAttribution('');
       }
-      setAlt('');
-      setAttribution('');
-      onUploaded(result.data);
     } finally {
-      setIsUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -147,7 +140,7 @@ export const BioImageUploadZone = ({
         countUnit="image"
         icon={<ImageIcon className="mb-1 size-6 text-zinc-600" aria-hidden />}
         acceptedTypesLabel="jpeg, png, webp"
-        maxSizeMb={MAX_IMAGE_SIZE_MB}
+        maxSizeMb={MAX_BIO_IMAGE_SIZE_MB}
         maxReachedLabel="Upload in progress"
         containerClassName="min-h-24 p-3"
       />

@@ -110,6 +110,35 @@ describe('bioImageDragPayloadSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
+  it('carries the pool row id when the tile sets one (the display-image drop target reads it)', () => {
+    const parsed = bioImageDragPayloadSchema.safeParse({
+      id: '507f1f77bcf86cd799439011',
+      url: 'https://example.com/photo.jpg',
+      thumbnailUrl: null,
+      title: null,
+      attribution: null,
+      alt: 'Artist photo',
+      width: null,
+      height: null,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.id).toBe('507f1f77bcf86cd799439011');
+  });
+
+  it('rejects an empty id', () => {
+    const parsed = bioImageDragPayloadSchema.safeParse({
+      id: '',
+      url: 'https://example.com/photo.jpg',
+      thumbnailUrl: null,
+      title: null,
+      attribution: null,
+      alt: 'Artist photo',
+      width: null,
+      height: null,
+    });
+    expect(parsed.success).toBe(false);
+  });
+
   it('rejects a negative width', () => {
     const parsed = bioImageDragPayloadSchema.safeParse({
       url: 'https://example.com/photo.jpg',

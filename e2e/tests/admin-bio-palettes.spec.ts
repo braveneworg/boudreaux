@@ -119,17 +119,33 @@ test.describe('Admin bio palettes', () => {
     await expect(pool.getByText('E2E seeded attribution')).toBeVisible();
   });
 
-  test('an image without alt text cannot be chosen as a display image', async ({ adminPage }) => {
+  test('an image without alt text can be chosen; its alt becomes the artist name', async ({
+    adminPage,
+  }) => {
+    // A uniquely-titled, alt-less row per run (and per retry): choosing it
+    // backfills its alt server-side, so the shared seeded rows stay untouched.
+    const title = `E2E altless ${randomUUID().slice(0, 8)}`;
+    await createBioPaletteImageRow(title, '');
+
     await gotoArtistEdit(adminPage);
 
-    // The seeded portrait carries no alt text, so the service would refuse
-    // it; the manager disables the affordance up front and says why.
-    const use = adminPage.getByRole('button', {
-      name: 'Use E2E palette portrait as display image',
-    });
+    const use = adminPage.getByRole('button', { name: `Use ${title} as display image` });
     await expect(use).toHaveCount(1, { timeout: 15_000 });
-    await expect(use).toBeDisabled();
-    await expect(use).toHaveAccessibleDescription(/alt text/i);
+    await expect(use).toBeEnabled();
+    await use.click();
+
+    const strip = adminPage.getByRole('list', { name: 'Display images' });
+    const chosen = strip.getByRole('listitem', { name: `${title}, display image` });
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+
+    // The set action wrote the artist's name as the alt; the strip thumbnail
+    // renders it once the status refetch lands.
+    await adminPage.reload();
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+    await expect(chosen.getByRole('img')).toHaveAttribute('alt', 'E2E Palette Artist');
+
+    await adminPage.getByRole('button', { name: `Remove ${title} from display images` }).click();
+    await expect(chosen).toHaveCount(0, { timeout: 15_000 });
   });
 
   test('choosing a display image fills the strip and survives reload', async ({ adminPage }) => {

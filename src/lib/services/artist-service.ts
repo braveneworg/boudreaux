@@ -33,6 +33,7 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
@@ -730,9 +731,12 @@ export class ArtistService {
    * Replace an artist's display images with `imageIds`, in display order. The
    * rules of the set live here: at most {@link DISPLAY_IMAGE_CAP}, each id once,
    * every id one of the artist's own bio images, and every chosen image with
-   * alt text (the public page renders them as content). The repository write
-   * promotes the chosen rows to `origin: 'custom'` so a regeneration keeps a
-   * human's choice; the AI's `isPrimary` suggestion is never touched.
+   * alt text (the public page renders them as content) — a blank alt is
+   * backfilled with the artist's display name, the same default an upload
+   * gets, so only an artist with no name at all can be refused. The
+   * repository write promotes the chosen rows to `origin: 'custom'` so a
+   * regeneration keeps a human's choice; the AI's `isPrimary` suggestion is
+   * never touched.
    *
    * @returns The artist's slug on success, so the caller can revalidate the
    *   public artist page.
@@ -770,12 +774,17 @@ export class ArtistService {
           code: 'NOT_FOUND',
         };
       }
-      if (rows.some((row) => !isDisplayEligible(row))) {
+      const altless = rows.filter((row) => !isDisplayEligible(row));
+      const fallbackAlt = deriveArtistDisplayName(artist);
+      if (altless.length > 0 && !fallbackAlt) {
         return {
           success: false,
           error: 'Add alt text before using an image as a display image',
           code: 'VALIDATION',
         };
+      }
+      for (const row of altless) {
+        await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
       }
 
       await ArtistBioImageRepository.setDisplayOrder(artistId, imageIds);

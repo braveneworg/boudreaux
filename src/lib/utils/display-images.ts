@@ -68,9 +68,10 @@ export const chosenDisplayImageIds = <T extends DisplayImageCandidate & { id: st
 ): string[] => chosenInOrder(rows).map(({ id }) => id);
 
 /**
- * Whether a bio image may be chosen as a display image: it needs alt text,
- * because the public page renders it as content, not decoration. The service
- * enforces this; the UI uses it to disable the "use" affordance with a hint.
+ * Whether a bio image already carries alt text, which every display image
+ * needs because the public page renders it as content, not decoration. The
+ * set-display-images service backfills a missing alt with the artist's name
+ * and reads this to find the rows that need it.
  */
 export const isDisplayEligible = (row: { alt?: string | null }): boolean =>
   Boolean(row.alt?.trim());
