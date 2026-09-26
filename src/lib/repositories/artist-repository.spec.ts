@@ -437,7 +437,7 @@ describe('ArtistRepository', () => {
       expect(arg?.include?.bioImages).toEqual({
         where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
         orderBy: { sortOrder: 'asc' },
-        select: { url: true, thumbnailUrl: true, isPrimary: true, displayOrder: true },
+        select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
       });
     });
 

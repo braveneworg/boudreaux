@@ -46,8 +46,9 @@ export const useCreateArtistMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link updateArtistAction}. Empty fields are omitted (the
- * artist form does not clear values by submitting blanks). See
+ * Mutation hook wrapping {@link updateArtistAction}. Empty fields are KEPT in
+ * the `FormData` (`keepEmptyStrings`): a blank is how the admin clears an
+ * optional field, and the action maps it to `null` (#759). See
  * {@link useCreateArtistMutation} for the result/invalidation contract.
  */
 export const useUpdateArtistMutation = () => {
@@ -55,7 +56,12 @@ export const useUpdateArtistMutation = () => {
     FormState,
     { id: string; values: ArtistFormData }
   >(
-    ({ id, values }) => updateArtistAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
+    ({ id, values }) =>
+      updateArtistAction(
+        id,
+        EMPTY_FORM_STATE,
+        objectToFormData(values, { keepEmptyStrings: true })
+      ),
     invalidateArtistQueries
   );
 

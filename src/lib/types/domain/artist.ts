@@ -438,7 +438,7 @@ export interface ArtistSearchReleaseRecord {
  */
 export type ArtistSearchBioImage = Pick<
   ArtistListingBioImage,
-  'url' | 'thumbnailUrl' | 'isPrimary' | 'displayOrder'
+  'url' | 'thumbnailUrl' | 'alt' | 'isPrimary' | 'displayOrder'
 >;
 
 /**
