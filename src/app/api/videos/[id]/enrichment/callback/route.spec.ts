@@ -43,7 +43,8 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
 
 vi.mock('@/lib/services/video-enrichment-service', () => ({
   VideoEnrichmentService: {
-    verifyAndClaimCallback: (id: string, token: string) => verifyAndClaimCallbackMock(id, token),
+    verifyAndClaimCallback: (id: string, token: string, proof: unknown) =>
+      verifyAndClaimCallbackMock(id, token, proof),
     completeCallback: (id: string, result: unknown) => completeCallbackMock(id, result),
   },
 }));
@@ -81,15 +82,21 @@ const validBody = {
   },
 };
 
-const buildRequest = (body: string): NextRequest =>
+const SIGNATURE = 't=1790424000,v1=' + 'ab'.repeat(32);
+
+const buildRequest = (body: string, signature: string | null = SIGNATURE): NextRequest =>
   new NextRequest(`http://localhost:3000/api/videos/${VIDEO_ID}/enrichment/callback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-real-ip': '203.0.113.7' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-real-ip': '203.0.113.7',
+      ...(signature === null ? {} : { 'x-job-signature': signature }),
+    },
     body,
   });
 
-const callRoute = (body: string) =>
-  POST(buildRequest(body), { params: Promise.resolve({ id: VIDEO_ID }) });
+const callRoute = (body: string, signature: string | null = SIGNATURE) =>
+  POST(buildRequest(body, signature), { params: Promise.resolve({ id: VIDEO_ID }) });
 
 beforeEach(() => {
   limiterCheckMock.mockReset().mockResolvedValue(undefined);
@@ -164,5 +171,29 @@ describe('POST /api/videos/[id]/enrichment/callback', () => {
     const response = await callRoute(JSON.stringify(validBody));
 
     expect(response.status).toBe(429);
+  });
+
+  it('hands the service the signature header and the raw body as the callback proof', async () => {
+    verifyAndClaimCallbackMock.mockResolvedValue(false);
+    const body = JSON.stringify(validBody);
+
+    await callRoute(body);
+
+    expect(verifyAndClaimCallbackMock).toHaveBeenCalledWith(VIDEO_ID, 'stored-token', {
+      signature: SIGNATURE,
+      rawBody: body,
+    });
+  });
+
+  it('hands the service a null signature when the header is absent', async () => {
+    verifyAndClaimCallbackMock.mockResolvedValue(false);
+    const body = JSON.stringify(validBody);
+
+    await callRoute(body, null);
+
+    expect(verifyAndClaimCallbackMock).toHaveBeenCalledWith(VIDEO_ID, 'stored-token', {
+      signature: null,
+      rawBody: body,
+    });
   });
 });

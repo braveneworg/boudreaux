@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { deriveJobSigningKey, signJobBody } from '@fakefour/job-contract/signing';
+
 import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
@@ -118,7 +120,21 @@ const sentPayload = (): Record<string, unknown> => {
   return JSON.parse(Buffer.from(command.input.Payload).toString('utf8'));
 };
 
+const APP_SECRET = 'app-callback-secret-'.padEnd(40, 'x');
+const CALLBACK_BODY = '{"jobToken":"stored","result":{"ok":false,"error":"x"}}';
+
+/** The signing key the app derives for this video and `jobToken` (ADR-0014). */
+const keyFor = (jobToken: string): string =>
+  deriveJobSigningKey(APP_SECRET, { kind: 'video-enrichment', entityId: VIDEO_ID, jobToken });
+
+/** A callback proof signed the way the Lambda signs it, under the key for `storedToken`. */
+const proofFor = (storedToken: string, rawBody = CALLBACK_BODY) => ({
+  signature: signJobBody(keyFor(storedToken), rawBody, Date.now() / 1000),
+  rawBody,
+});
+
 beforeEach(() => {
+  vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
   vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'bio-fn');
   vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://example.com');
   vi.stubEnv('BIO_GENERATOR_FAKE', 'false');
@@ -438,6 +454,7 @@ describe('runEnrichmentJob', () => {
       releasedOn: '2021-04-09',
       callbackUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/callback`,
       progressUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/progress`,
+      signingKey: keyFor(storedToken as string),
       jobToken: storedToken,
     });
   });
@@ -960,7 +977,11 @@ describe('verifyAndClaimCallback', () => {
       baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
     );
 
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'forged');
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(
+      VIDEO_ID,
+      'forged',
+      proofFor('stored')
+    );
 
     expect(result).toBe(false);
     expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
@@ -972,7 +993,11 @@ describe('verifyAndClaimCallback', () => {
     );
     vi.mocked(VideoRepository.claimEnrichmentJobToken).mockResolvedValue(true);
 
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored');
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(
+      VIDEO_ID,
+      'stored',
+      proofFor('stored')
+    );
 
     expect(result).toBe(true);
     expect(VideoRepository.claimEnrichmentJobToken).toHaveBeenCalledWith(VIDEO_ID, 'stored');
@@ -981,7 +1006,11 @@ describe('verifyAndClaimCallback', () => {
   it('returns false without claiming when the video state is missing', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
 
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored');
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(
+      VIDEO_ID,
+      'stored',
+      proofFor('stored')
+    );
 
     expect(result).toBe(false);
     expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
@@ -992,7 +1021,40 @@ describe('verifyAndClaimCallback', () => {
       baseState({ enrichmentStatus: 'succeeded', enrichmentJobToken: 'stored' })
     );
 
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored');
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(
+      VIDEO_ID,
+      'stored',
+      proofFor('stored')
+    );
+
+    expect(result).toBe(false);
+    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
+  });
+
+  it('returns false and never claims on an unsigned callback, even with the right token', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
+    );
+
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored', {
+      signature: null,
+      rawBody: CALLBACK_BODY,
+    });
+
+    expect(result).toBe(false);
+    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
+  });
+
+  it('returns false and never claims when the signature was made under another token’s key', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
+    );
+
+    const result = await VideoEnrichmentService.verifyAndClaimCallback(
+      VIDEO_ID,
+      'stored',
+      proofFor('guess')
+    );
 
     expect(result).toBe(false);
     expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
@@ -1005,10 +1067,15 @@ describe('recordProgress', () => {
       baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
     );
 
-    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', {
-      stage: 'wikidata',
-      counts: { artists: 1 },
-    });
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      {
+        stage: 'wikidata',
+        counts: { artists: 1 },
+      },
+      proofFor('stored')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(VIDEO_ID, {
       stage: 'wikidata',
@@ -1022,7 +1089,12 @@ describe('recordProgress', () => {
       baseState({ enrichmentStatus: 'succeeded', enrichmentJobToken: 'stored' })
     );
 
-    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      { stage: 'wikidata' },
+      proofFor('stored')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });
@@ -1032,7 +1104,12 @@ describe('recordProgress', () => {
       baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
     );
 
-    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'forged', { stage: 'wikidata' });
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'forged',
+      { stage: 'wikidata' },
+      proofFor('stored')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });
@@ -1042,7 +1119,12 @@ describe('recordProgress', () => {
       baseState({ enrichmentStatus: 'processing', enrichmentJobToken: null })
     );
 
-    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      { stage: 'wikidata' },
+      proofFor('stored')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });
@@ -1050,7 +1132,12 @@ describe('recordProgress', () => {
   it('writes nothing when the video no longer exists', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
 
-    await VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' });
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      { stage: 'wikidata' },
+      proofFor('stored')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });
@@ -1059,8 +1146,43 @@ describe('recordProgress', () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
 
     await expect(
-      VideoEnrichmentService.recordProgress(VIDEO_ID, 'stored', { stage: 'wikidata' })
+      VideoEnrichmentService.recordProgress(
+        VIDEO_ID,
+        'stored',
+        { stage: 'wikidata' },
+        proofFor('stored')
+      )
     ).resolves.toBeUndefined();
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing on an unsigned checkpoint', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
+    );
+
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      { stage: 'wikidata' },
+      { signature: null, rawBody: CALLBACK_BODY }
+    );
+
+    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the signature was made under another token’s key', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
+    );
+
+    await VideoEnrichmentService.recordProgress(
+      VIDEO_ID,
+      'stored',
+      { stage: 'wikidata' },
+      proofFor('guess')
+    );
 
     expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
   });

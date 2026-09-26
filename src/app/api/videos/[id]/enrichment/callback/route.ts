@@ -4,6 +4,8 @@
 import { after, NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { JOB_SIGNATURE_HEADER } from '@fakefour/job-contract/signing';
+
 import {
   VIDEO_ENRICHMENT_CALLBACK_LIMIT,
   videoEnrichmentCallbackLimiter,
@@ -38,6 +40,9 @@ export const POST = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
+  // The Lambda signs the raw bytes it sent (ADR-0014); the service verifies
+  // them under the key derived from the stored token before trusting `json`.
+  const proof = { signature: request.headers.get(JOB_SIGNATURE_HEADER), rawBody };
   let json: unknown;
   try {
     json = JSON.parse(rawBody);
@@ -50,7 +55,11 @@ export const POST = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
   }
 
-  const claimed = await VideoEnrichmentService.verifyAndClaimCallback(id, parsed.data.jobToken);
+  const claimed = await VideoEnrichmentService.verifyAndClaimCallback(
+    id,
+    parsed.data.jobToken,
+    proof
+  );
   if (claimed) {
     // Suggestion filtering/persistence runs post-response; the admin poll
     // surfaces completion.

@@ -2,6 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import {
+  deriveJobSigningKey,
+  signJobBody,
+  verifyJobSignature,
+} from '@fakefour/job-contract/signing';
+
 import { DataError } from '@/lib/types/domain/errors';
 import { MAX_IMAGE_LINKS } from '@/lib/validation/image-links-schema';
 import { STALE_JOB_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
@@ -112,7 +118,21 @@ const fetchMock = vi.fn(async (): Promise<{ ok: boolean; status: number }> => ({
   status: 202,
 }));
 
+const APP_SECRET = 'app-callback-secret-'.padEnd(40, 'x');
+const CALLBACK_BODY = '{"jobToken":"tok","result":{"ok":true,"data":{"images":[]}}}';
+
+/** The signing key the app derives for artist `a1` and `jobToken` (ADR-0014). */
+const keyFor = (jobToken: string): string =>
+  deriveJobSigningKey(APP_SECRET, { kind: 'image-links', entityId: 'a1', jobToken });
+
+/** A callback proof signed the way the Lambda signs it, under the key for `storedToken`. */
+const proofFor = (storedToken: string, rawBody = CALLBACK_BODY) => ({
+  signature: signJobBody(keyFor(storedToken), rawBody, Date.now() / 1000),
+  rawBody,
+});
+
 beforeEach(() => {
+  vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
   vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://app.test');
   vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
   vi.stubEnv('BIO_GENERATOR_FAKE', 'false');
@@ -242,7 +262,21 @@ describe('ImageLinksService.runJob', () => {
       referenceImageUrls: ['https://cdn/artist-1.jpg', 'https://cdn/custom-1.jpg'],
       callbackUrl: 'https://app.test/api/artists/a1/image-links/callback',
       jobToken: token,
+      signingKey: keyFor(token),
     });
+  });
+
+  it('records failed without storing a token or invoking when JOB_CALLBACK_SECRET is unset', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
+
+    const result = await ImageLinksService.runJob('a1');
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('JOB_CALLBACK_SECRET'),
+    });
+    expect(setImageLinksJobTokenMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('fails without invoking when the artist has no image-source links', async () => {
@@ -333,6 +367,26 @@ describe('ImageLinksService.runJob', () => {
     });
   });
 
+  it('under BIO_GENERATOR_FAKE signs the callback with the per-job key, like the Lambda does', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+
+    await ImageLinksService.runJob('a1');
+
+    const token = setImageLinksJobTokenMock.mock.calls[0][1] as string;
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { body: string; headers: Record<string, string> },
+    ];
+    expect(
+      verifyJobSignature({
+        header: init.headers['x-job-signature'],
+        rawBody: init.body,
+        signingKey: keyFor(token),
+        nowSeconds: Date.now() / 1000,
+      })
+    ).toEqual({ ok: true });
+  });
+
   it('never throws: an unexpected repository error records failed', async () => {
     findImageSourcesMock.mockRejectedValueOnce(new Error('boom'));
 
@@ -420,14 +474,18 @@ describe('ImageLinksService.verifyAndClaimCallback', () => {
     getImageLinksJobStateMock.mockResolvedValueOnce(processing);
     claimImageLinksJobTokenMock.mockResolvedValueOnce(true);
 
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok')).toEqual({ slug: 'ceschi' });
+    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toEqual({
+      slug: 'ceschi',
+    });
     expect(claimImageLinksJobTokenMock.mock.calls).toEqual([['a1', 'tok']]);
   });
 
   it('never attempts the claim on a mismatched token', async () => {
     getImageLinksJobStateMock.mockResolvedValueOnce(processing);
 
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'nope')).toBeNull();
+    expect(
+      await ImageLinksService.verifyAndClaimCallback('a1', 'nope', proofFor('tok'))
+    ).toBeNull();
     expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
   });
 
@@ -437,14 +495,35 @@ describe('ImageLinksService.verifyAndClaimCallback', () => {
       imageLinksStatus: 'succeeded',
     });
 
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok')).toBeNull();
+    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toBeNull();
   });
 
   it('returns null when a concurrent callback already won the claim', async () => {
     getImageLinksJobStateMock.mockResolvedValueOnce(processing);
     claimImageLinksJobTokenMock.mockResolvedValueOnce(false);
 
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok')).toBeNull();
+    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toBeNull();
+  });
+
+  it('never attempts the claim on an unsigned callback, even with the right token', async () => {
+    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
+
+    const result = await ImageLinksService.verifyAndClaimCallback('a1', 'tok', {
+      signature: null,
+      rawBody: CALLBACK_BODY,
+    });
+
+    expect(result).toBeNull();
+    expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
+  });
+
+  it('never attempts the claim when the signature was made under another token’s key', async () => {
+    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
+
+    const result = await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('guess'));
+
+    expect(result).toBeNull();
+    expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
   });
 });
 

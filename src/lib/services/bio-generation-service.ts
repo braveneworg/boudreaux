@@ -46,7 +46,13 @@ import {
 import { type BioGenerationLambdaInput } from './bio-generation-fixture';
 import { dispatchBioGenerationLocally } from './bio-generation-local-dispatch';
 import { BioImageService } from './bio-image-service';
-import { getLambdaClient, tokensMatch } from './lambda-dispatch';
+import {
+  getLambdaClient,
+  signingKeyForJob,
+  tokensMatch,
+  verifyJobCallback,
+  type CallbackProof,
+} from './lambda-dispatch';
 
 /** Derive a public real name for the metadata lookup (skip if pseudonymous). */
 const deriveRealName = (artist: {
@@ -676,6 +682,13 @@ const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJo
 
   const callbackUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/callback`;
   const progressUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/progress`;
+  // Derived before the token is stored, so a missing secret fails the job
+  // (via runGenerationJob's catch) without leaving a claimable token behind.
+  const signingKey = signingKeyForJob({
+    kind: 'bio-generation',
+    entityId: prep.artist.id,
+    jobToken,
+  });
 
   await ArtistRepository.setBioJobToken(prep.artist.id, jobToken);
   const ack = await BioGenerationService.generate({
@@ -683,6 +696,7 @@ const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJo
     callbackUrl,
     progressUrl,
     jobToken,
+    signingKey,
   });
   if (!ack.ok) {
     await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error: ack.error });
@@ -846,19 +860,31 @@ export class BioGenerationService {
    * atomic `claimBioJobToken` (a conditional `updateMany` that clears the
    * single-use token as it matches). Returns `null` — without touching the token —
    * when the artist is missing, the job is not in flight, no token is stored, the
-   * token mismatches (so a forged callback can neither DoS a real one nor attempt
+   * body's signature does not verify under the key derived from the STORED token
+   * (ADR-0014 — a leaked token alone can't forge a callback), the token
+   * mismatches (so a forged callback can neither DoS a real one nor attempt
    * the claim), or another concurrent callback already claimed the job.
    *
    * @param artistId - The artist whose in-flight job the callback targets.
    * @param jobToken - The per-job token the callback presents.
+   * @param proof - The request's signature header and raw body.
    */
   static async verifyAndClaimCallback(
     artistId: string,
-    jobToken: string
+    jobToken: string,
+    proof: CallbackProof
   ): Promise<{ slug: string } | null> {
     const state = await ArtistRepository.getBioGenerationState(artistId);
     if (!state || state.bioStatus !== 'processing' || !state.bioJobToken) {
       return null;
+    }
+    const identity = {
+      kind: 'bio-generation',
+      entityId: artistId,
+      jobToken: state.bioJobToken,
+    } as const;
+    if (!verifyJobCallback(identity, proof)) {
+      return null; // unsigned or mis-signed — never reach the token compare or the claim
     }
     if (!tokensMatch(state.bioJobToken, jobToken)) {
       return null; // do NOT attempt the claim on a mismatched/forged callback
@@ -885,17 +911,27 @@ export class BioGenerationService {
    * @param artistId - The artist whose in-flight job the checkpoint targets.
    * @param jobToken - The per-job token presented by the checkpoint (verified, not claimed).
    * @param payload - The stage/detail/counts checkpoint; the server stamps `at`.
+   * @param proof - The request's signature header and raw body (ADR-0014).
    * @returns `true` iff the checkpoint was persisted.
    */
   static async recordProgress(
     artistId: string,
     jobToken: string,
-    payload: BioProgressPayload
+    payload: BioProgressPayload,
+    proof: CallbackProof
   ): Promise<boolean> {
     try {
       const state = await ArtistRepository.getBioGenerationState(artistId);
       if (!state || !state.bioJobToken) {
         return false;
+      }
+      const identity = {
+        kind: 'bio-generation',
+        entityId: artistId,
+        jobToken: state.bioJobToken,
+      } as const;
+      if (!verifyJobCallback(identity, proof)) {
+        return false; // unsigned or mis-signed — records nothing
       }
       if (!tokensMatch(state.bioJobToken, jobToken)) {
         return false; // verify only — a mismatched token records nothing
