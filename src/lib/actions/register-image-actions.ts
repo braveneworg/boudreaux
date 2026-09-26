@@ -8,7 +8,6 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
-import { ArtistService } from '@/lib/services/artist-service';
 import { ImageService } from '@/lib/services/image-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
@@ -44,54 +43,6 @@ export interface RegisterImageActionResult {
   data?: RegisterImageResult[];
   error?: string;
 }
-
-/**
- * Server action to register images after direct S3 upload
- * This creates the database records for images that were uploaded directly to S3
- */
-export const registerArtistImagesAction = async (
-  artistId: string,
-  images: RegisterImageInput[]
-): Promise<RegisterImageActionResult> => {
-  await requireRole('admin');
-
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return { success: false, error: 'Unauthorized' };
-    }
-
-    if (!(await ArtistService.existsById(artistId))) {
-      return { success: false, error: 'Artist not found' };
-    }
-
-    const results = await ImageService.registerForArtist(
-      artistId,
-      images.map(({ cdnUrl, caption, altText }) => ({ cdnUrl, caption, altText }))
-    );
-
-    // Log image registration for security audit
-    logSecurityEvent({
-      event: 'media.artist.images.uploaded',
-      userId: session.user.id,
-      metadata: {
-        artistId,
-        fileCount: images.length,
-        success: true,
-      },
-    });
-
-    // Revalidate artist page
-    revalidatePath(`/artists/[slug]`, 'page');
-    revalidatePath('/admin/artists');
-
-    return { success: true, data: results };
-  } catch (error) {
-    loggers.s3.error('Register artist images action error', error);
-    return { success: false, error: 'Failed to register images' };
-  }
-};
 
 /**
  * Server action to register images after direct S3 upload for releases

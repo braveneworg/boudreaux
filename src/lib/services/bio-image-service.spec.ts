@@ -5,6 +5,7 @@
 import { createHash } from 'crypto';
 
 import type * as ImageQualityModule from '@/lib/utils/image-quality';
+import { formatPerceptualHash } from '@/lib/utils/image-quality';
 import { loggers } from '@/lib/utils/logger';
 
 import { BioImageService } from './bio-image-service';
@@ -773,5 +774,145 @@ describe('BioImageService.rehostImages', () => {
       })
     );
     infoSpy.mockRestore();
+  });
+});
+
+describe('BioImageService.rehostImages against the existing pool', () => {
+  const sha256 = (bytes: number[]): string =>
+    createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+
+  const jpeg = (bytes: number[]): Response =>
+    new Response(new Uint8Array(bytes), {
+      status: 200,
+      headers: { 'Content-Type': 'image/jpeg' },
+    });
+
+  beforeEach(() => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', '');
+    vi.stubEnv('E2E_MODE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+  });
+
+  it("returns each survivor's content and perceptual hashes", async () => {
+    assessImageQualityMock.mockResolvedValueOnce({
+      width: 800,
+      height: 600,
+      sharpness: 500,
+      dHash: 0xabcn,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jpeg([1, 2, 3])));
+
+    const { results } = await BioImageService.rehostImages(
+      [{ url: 'https://x/a.jpg', index: 0 }],
+      'artist-1'
+    );
+
+    expect(results[0]).toMatchObject({
+      contentHash: sha256([1, 2, 3]),
+      perceptualHash: '0000000000000abc',
+    });
+  });
+
+  it('drops an image byte-identical to a pool image and aliases it to the pool url', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jpeg([9, 8, 7])));
+    const infoSpy = vi.spyOn(loggers.media, 'info');
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [{ url: 'https://press.test/same-photo.jpg', index: 0 }],
+      'artist-1',
+      [{ url: 'https://cdn/pool.webp', contentHash: sha256([9, 8, 7]), perceptualHash: null }]
+    );
+
+    expect(results).toEqual([null]);
+    expect([...duplicateAliases]).toEqual([[0, 'https://cdn/pool.webp']]);
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({ input: 1, known: 1, accepted: 0, exactDuplicate: 1 })
+    );
+    infoSpy.mockRestore();
+  });
+
+  it('drops a perceptual near-duplicate of a pool image and aliases it to the pool url', async () => {
+    assessImageQualityMock.mockResolvedValueOnce({
+      width: 800,
+      height: 600,
+      sharpness: 500,
+      dHash: 0b1011n,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jpeg([4, 4, 4])));
+    const infoSpy = vi.spyOn(loggers.media, 'info');
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [{ url: 'https://press.test/resized.jpg', index: 0 }],
+      'artist-1',
+      [
+        {
+          url: 'https://cdn/pool.webp',
+          contentHash: sha256([1, 1, 1]),
+          perceptualHash: formatPerceptualHash(0b1010n),
+        },
+      ]
+    );
+
+    expect(results).toEqual([null]);
+    expect([...duplicateAliases]).toEqual([[0, 'https://cdn/pool.webp']]);
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith(
+      'bio_image_rehost_summary',
+      expect.objectContaining({ accepted: 0, exactDuplicate: 0, nearDuplicate: 1 })
+    );
+    infoSpy.mockRestore();
+  });
+
+  it('keeps an image when the only pool row has no stored hashes (legacy row)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jpeg([9, 8, 7])));
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [{ url: 'https://press.test/a.jpg', index: 0 }],
+      'artist-1',
+      [{ url: 'https://cdn/legacy.webp', contentHash: null, perceptualHash: null }]
+    );
+
+    expect(results[0]).not.toBeNull();
+    expect(duplicateAliases.size).toBe(0);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a malformed stored perceptual hash instead of failing the image', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jpeg([9, 8, 7])));
+
+    const { results } = await BioImageService.rehostImages(
+      [{ url: 'https://press.test/a.jpg', index: 0 }],
+      'artist-1',
+      [{ url: 'https://cdn/pool.webp', contentHash: null, perceptualHash: 'garbage' }]
+    );
+
+    expect(results[0]).not.toBeNull();
+  });
+
+  it('prefers the pool copy over an earlier in-batch copy of the same bytes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(jpeg([9, 8, 7]))
+        .mockResolvedValueOnce(jpeg([9, 8, 7]))
+    );
+
+    const { results, duplicateAliases } = await BioImageService.rehostImages(
+      [
+        { url: 'https://press.test/a.jpg', index: 0 },
+        { url: 'https://press.test/b.jpg', index: 1 },
+      ],
+      'artist-1',
+      [{ url: 'https://cdn/pool.webp', contentHash: sha256([9, 8, 7]), perceptualHash: null }]
+    );
+
+    expect(results).toEqual([null, null]);
+    expect([...duplicateAliases]).toEqual([
+      [0, 'https://cdn/pool.webp'],
+      [1, 'https://cdn/pool.webp'],
+    ]);
   });
 });

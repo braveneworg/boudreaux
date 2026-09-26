@@ -6,7 +6,7 @@
 import { renderHook } from '@testing-library/react';
 
 import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
-import type { ArtistListingSort } from '@/lib/types/domain/artist';
+import type { ArtistListingRoster, ArtistListingSort } from '@/lib/types/domain/artist';
 
 import {
   PUBLISHED_ARTISTS_PAGE_SIZE,
@@ -60,10 +60,11 @@ const artistRowResponse = {
 const getOptions = (
   sort: ArtistListingSort = 'alpha',
   search = '',
+  roster: ArtistListingRoster = 'current',
   overrides: InfiniteQueryOptionsOverride<PublishedArtistsPaginatedResponse> = {}
 ): PublishedArtistsQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useInfinitePublishedArtistsQuery(sort, search, overrides));
+  renderHook(() => useInfinitePublishedArtistsQuery(sort, search, roster, overrides));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as PublishedArtistsQueryOptions;
 };
 
@@ -79,19 +80,25 @@ describe('useInfinitePublishedArtistsQuery', () => {
   it('keys the query by the published-infinite sort', () => {
     const opts = getOptions('newest');
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'newest', '']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'newest', 'current', '']);
   });
 
-  it('defaults the sort to A–Z', () => {
+  it('defaults to the A–Z sort of current artists', () => {
     const opts = getOptions();
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', '']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'current', '']);
+  });
+
+  it('keys the query by the roster so switching it resets pagination', () => {
+    const opts = getOptions('alpha', '', 'alumni');
+
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'alumni', '']);
   });
 
   it('keys the query by the normalized search term', () => {
     const opts = getOptions('alpha', '  Punk  ');
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'punk']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'current', 'punk']);
   });
 
   it('starts pagination at skip 0', () => {
@@ -124,7 +131,7 @@ describe('useInfinitePublishedArtistsQuery', () => {
     await opts.queryFn({ pageParam: 24, signal });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/artists?listing=published&skip=24&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=newest`,
+      `/api/artists?listing=published&skip=24&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=newest&roster=current`,
       { signal }
     );
   });
@@ -141,9 +148,27 @@ describe('useInfinitePublishedArtistsQuery', () => {
     await opts.queryFn({ pageParam: 0, signal });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&search=Punk`,
+      `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&roster=current&search=Punk`,
       { signal }
     );
+  });
+
+  it('requests the chosen roster', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ rows: [artistRowResponse], nextSkip: null }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions('alpha', '', 'all');
+
+    await opts.queryFn({ pageParam: 0 });
+
+    expect(fetchMock.mock.calls).toEqual([
+      [
+        `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&roster=all`,
+        { signal: undefined },
+      ],
+    ]);
   });
 
   it('parses the wire row back into coerced Date fields', async () => {
@@ -169,7 +194,7 @@ describe('useInfinitePublishedArtistsQuery', () => {
   });
 
   it('lets a caller override enabled via the trailing options', () => {
-    const opts = getOptions('alpha', '', { enabled: false });
+    const opts = getOptions('alpha', '', 'current', { enabled: false });
 
     expect(opts.enabled).toBe(false);
   });

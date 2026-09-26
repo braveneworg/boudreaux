@@ -21,41 +21,67 @@ import { updateReleaseSchema } from '@/lib/validation/update-schemas';
 
 export const dynamic = 'force-dynamic';
 
+type ReleaseRouteContext = { params: Promise<{ id: string }> };
+
+const PUBLIC_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+
 /**
- * GET /api/releases/[id]
- * Get a single release by ID.
- *
- * Query params:
- *   withTracks – When "true", returns the release with tracks via `getReleaseWithTracks()`.
+ * The admin by-id read (no `withTracks`): the full release graph the edit form
+ * loads — unpublished releases included, and every credited artist's full row
+ * (contact PII, notes, job tokens). Admin only and never shared-cached (#765).
  */
-export const GET = withRateLimit<{ id: string }>(
-  publicLimiter,
-  PUBLIC_LIMIT
-)(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-  try {
+const getAdminRelease = withAdmin(
+  async (_request: NextRequest, { params }: ReleaseRouteContext) => {
     const { id } = await params;
-
-    if (!isValidObjectId(id)) {
-      return NextResponse.json({ error: 'Invalid release ID' }, { status: 400 });
-    }
-
-    const withTracks = request.nextUrl.searchParams.get('withTracks') === 'true';
-
-    const result = withTracks
-      ? await ReleaseService.getReleaseWithTracks(id)
-      : await ReleaseService.getReleaseById(id);
+    const result = await ReleaseService.getReleaseById(id);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
     }
 
-    const responseData = withTracks
-      ? attachStreamUrls(serializeForResponse(result.data))
-      : serializeForResponse(result.data);
-
-    return NextResponse.json(responseData, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
+    return NextResponse.json(serializeForResponse(result.data), {
+      headers: { 'Cache-Control': 'private, no-store' },
     });
+  }
+);
+
+/** The public by-id read (`withTracks=true`): the published, narrow-projected player payload. */
+const getPublishedRelease = async (id: string): Promise<NextResponse> => {
+  const result = await ReleaseService.getReleaseWithTracks(id);
+
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
+  }
+
+  return NextResponse.json(attachStreamUrls(serializeForResponse(result.data)), {
+    headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL },
+  });
+};
+
+/**
+ * GET /api/releases/[id]
+ * Get a single release by ID.
+ *
+ * Query params:
+ *   withTracks – When "true", returns the public published release with tracks
+ *                via `getReleaseWithTracks()`. Without it the full admin graph
+ *                is returned via `getReleaseById()`, which requires the admin
+ *                role.
+ */
+export const GET = withRateLimit<{ id: string }>(
+  publicLimiter,
+  PUBLIC_LIMIT
+)(async (request: NextRequest, context: ReleaseRouteContext) => {
+  try {
+    const { id } = await context.params;
+
+    if (!isValidObjectId(id)) {
+      return NextResponse.json({ error: 'Invalid release ID' }, { status: 400 });
+    }
+
+    return request.nextUrl.searchParams.get('withTracks') === 'true'
+      ? await getPublishedRelease(id)
+      : await getAdminRelease(request, context);
   } catch (error) {
     loggers.media.error('Release GET by ID error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

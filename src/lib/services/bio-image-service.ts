@@ -9,12 +9,15 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import mime from 'mime';
 import sharp from 'sharp';
 
+import type { BioImageFingerprint } from '@/lib/types/domain/artist';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
   assessImageQuality,
+  formatPerceptualHash,
   hammingDistance,
   isBelowQualityFloor,
   NEAR_DUPLICATE_MAX_DISTANCE,
+  parsePerceptualHash,
 } from '@/lib/utils/image-quality';
 import { generateVariantsFromBuffer } from '@/lib/utils/image-variants';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
@@ -34,15 +37,28 @@ export interface RehostedImage {
 }
 
 /**
+ * A batch re-host survivor with the fingerprints of its SOURCE bytes, which
+ * callers persist so later runs can dedupe against the pool by content. Both
+ * are absent in skip-rehost mode, where no bytes are fetched.
+ */
+export interface RehostedThumbnail extends RehostedImage {
+  /** SHA-256 (hex) of the fetched source bytes. */
+  contentHash?: string;
+  /** 64-bit dHash of the source, as 16 hex digits ({@link formatPerceptualHash}). */
+  perceptualHash?: string;
+}
+
+/**
  * Return value of {@link BioImageService.rehostImages}. Carries both the
  * position-preserving results array and a map of any duplicate indices so
  * callers can alias `image:N` placeholders to the surviving copy's URL.
  */
 export interface RehostImagesResult {
-  /** Position-preserving array: `RehostedImage` on success, `null` on failure or duplicate. */
-  results: Array<RehostedImage | null>;
+  /** Position-preserving array: `RehostedThumbnail` on success, `null` on failure or duplicate. */
+  results: Array<RehostedThumbnail | null>;
   /**
-   * Maps each duplicate's original input index to the surviving copy's CDN URL.
+   * Maps each duplicate's original input index to the surviving copy's CDN URL
+   * — a pool image's URL when the duplicate matched one of the known images.
    * Allows callers to resolve `image:N` placeholders even when index N was deduped.
    */
   duplicateAliases: Map<number, string>;
@@ -165,7 +181,7 @@ const rehostOne = async (
   artistId: string,
   index: number,
   state: RehostBatchState
-): Promise<RehostedImage | null> => {
+): Promise<RehostedThumbnail | null> => {
   try {
     const hash = createHash('sha256').update(buffer).digest('hex');
     const survivorUrl = state.seenHashes.get(hash);
@@ -202,12 +218,38 @@ const rehostOne = async (
     state.seenHashes.set(hash, rehosted.url);
     state.seenPerceptualHashes.push({ hash: assessment.dHash, url: rehosted.url });
     state.counts.accepted += 1;
-    return rehosted;
+    return {
+      ...rehosted,
+      contentHash: hash,
+      perceptualHash: formatPerceptualHash(assessment.dHash),
+    };
   } catch (error) {
     logger.warn('Bio image fetch or upload failed', { error });
     state.counts.fetchFailed += 1;
     return null;
   }
+};
+
+/**
+ * Builds a batch's dedupe state pre-seeded with the pool's known images, so a
+ * candidate matching one — byte-identical or perceptually near-identical — is
+ * dropped and aliased to the pool copy's URL exactly like an in-batch
+ * duplicate. A known image without a usable hash simply seeds nothing.
+ */
+const seedBatchState = (knownImages: ReadonlyArray<BioImageFingerprint>): RehostBatchState => {
+  const seenHashes = new Map<string, string>();
+  const seenPerceptualHashes: RehostBatchState['seenPerceptualHashes'] = [];
+  for (const { url, contentHash, perceptualHash } of knownImages) {
+    if (contentHash && !seenHashes.has(contentHash)) seenHashes.set(contentHash, url);
+    const dHash = parsePerceptualHash(perceptualHash);
+    if (dHash !== null) seenPerceptualHashes.push({ hash: dHash, url });
+  }
+  return {
+    seenHashes,
+    seenPerceptualHashes,
+    duplicateAliases: new Map(),
+    counts: { accepted: 0, fetchFailed: 0, exactDuplicate: 0, lowQuality: 0, nearDuplicate: 0 },
+  };
 };
 
 /**
@@ -266,13 +308,20 @@ export class BioImageService {
    * mode there are no buffers to hash, so every image passes through as-is
    * with an empty `duplicateAliases` map.
    *
+   * `knownImages` seeds the dedupe with images already in the artist's pool,
+   * so a candidate whose bytes (or perceptual hash) match one is skipped and
+   * aliased to the pool copy's URL regardless of the URL it was found under.
+   * Each survivor carries its source's hashes for the caller to persist.
+   *
    * @param images - Source URLs paired with their original indices.
    * @param artistId - The owning artist id (for the S3 key namespace).
+   * @param knownImages - Fingerprints of pool images new candidates must not duplicate.
    * @returns Position-preserving results and a duplicate-alias map.
    */
   static async rehostImages(
     images: ReadonlyArray<{ url: string; index: number }>,
-    artistId: string
+    artistId: string,
+    knownImages: ReadonlyArray<BioImageFingerprint> = []
   ): Promise<RehostImagesResult> {
     if (shouldSkipRehost()) {
       return {
@@ -287,14 +336,10 @@ export class BioImageService {
     const settled = await pooledMap(images, REHOST_CONCURRENCY, ({ url }) => fetchImageBuffer(url));
 
     // Phase 2: hash-check and upload sequentially in INPUT INDEX ORDER so the
-    // lowest-index copy of each distinct hash always survives the dedupe.
-    const state: RehostBatchState = {
-      seenHashes: new Map(),
-      seenPerceptualHashes: [],
-      duplicateAliases: new Map(),
-      counts: { accepted: 0, fetchFailed: 0, exactDuplicate: 0, lowQuality: 0, nearDuplicate: 0 },
-    };
-    const results: Array<RehostedImage | null> = [];
+    // lowest-index copy of each distinct hash always survives the dedupe —
+    // unless the pool already holds that image, in which case none does.
+    const state = seedBatchState(knownImages);
+    const results: Array<RehostedThumbnail | null> = [];
 
     for (const [i, result] of settled.entries()) {
       // images and settled always share the same length; the guard is for TS.
@@ -314,7 +359,11 @@ export class BioImageService {
       results.push(await rehostOne(result.value.buffer, artistId, image.index, state));
     }
 
-    logger.info('bio_image_rehost_summary', { input: images.length, ...state.counts });
+    logger.info('bio_image_rehost_summary', {
+      input: images.length,
+      known: knownImages.length,
+      ...state.counts,
+    });
 
     return { results, duplicateAliases: state.duplicateAliases };
   }

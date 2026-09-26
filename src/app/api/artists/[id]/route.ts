@@ -6,9 +6,7 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
-import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
@@ -21,33 +19,38 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/artist/[id]
- * Get a single artist by ID
+ * Get a single artist by ID — admin only. The by-id payload is the full admin
+ * row the edit form loads (contact PII, notes, audit actors, and the live job
+ * callback tokens), so it is never public and never shared-cached (#765).
+ * Public surfaces read artists by slug through the public projection.
  */
-export const GET = withRateLimit<{ id: string }>(
-  publicLimiter,
-  PUBLIC_LIMIT
-)(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-  try {
-    const { id } = await params;
+export const GET = withAdmin(
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
 
-    if (!isValidObjectId(id)) {
-      return NextResponse.json({ error: 'Invalid artist ID' }, { status: 400 });
+      if (!isValidObjectId(id)) {
+        return NextResponse.json({ error: 'Invalid artist ID' }, { status: 400 });
+      }
+
+      const result = await ArtistService.getArtistById(id);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
+      }
+
+      return NextResponse.json(result.data, {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    } catch (error) {
+      loggers.media.error('Artist GET by ID error', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    const result = await ArtistService.getArtistById(id);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(result.data, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
-    });
-  } catch (error) {
-    loggers.media.error('Artist GET by ID error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-});
+);
 
 /**
  * PUT /api/artist/[id]

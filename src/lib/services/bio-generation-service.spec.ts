@@ -29,6 +29,18 @@ const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
 const setBioProgressMock = vi.hoisted(() => vi.fn());
 const getBioGenerationStateMock = vi.hoisted(() => vi.fn());
 const findCustomBioImageUrlsMock = vi.hoisted(() => vi.fn());
+// Baked-in empty pool: `mockReset()` restores it, so only the pool-dedupe
+// tests opt in to stored fingerprints.
+const findFingerprintsMock = vi.hoisted(() =>
+  vi.fn(
+    async (
+      _artistId: string,
+      _origins?: string[]
+    ): Promise<
+      Array<{ url: string; contentHash: string | null; perceptualHash: string | null }>
+    > => []
+  )
+);
 const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
 const fakeBioGenerationMock = vi.hoisted(() => vi.fn());
 
@@ -60,6 +72,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
 vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
   ArtistBioImageRepository: {
     findCustomUrls: (id: string) => findCustomBioImageUrlsMock(id),
+    findFingerprints: (id: string, origins?: string[]) => findFingerprintsMock(id, origins),
   },
 }));
 
@@ -79,8 +92,11 @@ vi.mock('./bio-image-service', () => ({
   BioImageService: {
     rehostWithVariants: (url: string, artistId: string, index: number) =>
       rehostWithVariantsMock(url, artistId, index),
-    rehostImages: (images: ReadonlyArray<{ url: string; index: number }>, artistId: string) =>
-      rehostImagesMock(images, artistId),
+    rehostImages: (
+      images: ReadonlyArray<{ url: string; index: number }>,
+      artistId: string,
+      knownImages: unknown
+    ) => rehostImagesMock(images, artistId, knownImages),
   },
 }));
 
@@ -314,7 +330,8 @@ describe('persistGeneratedBio', () => {
 
     expect(rehostImagesMock).toHaveBeenCalledWith(
       [{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }],
-      artistId
+      artistId,
+      []
     );
     expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -338,9 +355,84 @@ describe('persistGeneratedBio', () => {
 
     expect(rehostImagesMock).toHaveBeenCalledWith(
       [{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }],
-      artistId
+      artistId,
+      []
     );
     expect(rehostWithVariantsMock).not.toHaveBeenCalled();
+  });
+
+  it('seeds the re-host dedupe with the hashes of the rows a regeneration keeps', async () => {
+    const survivors = [
+      { url: 'https://cdn/linked.webp', contentHash: 'sha-linked', perceptualHash: null },
+    ];
+    findFingerprintsMock.mockResolvedValueOnce(survivors);
+
+    await persistGeneratedBio(artistId, baseData, []);
+
+    // Generated rows are about to be replaced, so only custom + linked rows
+    // may shadow a newly discovered image.
+    expect(findFingerprintsMock.mock.calls).toEqual([[artistId, ['custom', 'linked']]]);
+    expect(rehostImagesMock.mock.calls).toEqual([
+      [[{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }], artistId, survivors],
+    ]);
+  });
+
+  it('re-hosts without a pool seed when the fingerprint lookup fails', async () => {
+    findFingerprintsMock.mockRejectedValueOnce(new Error('db down'));
+
+    await persistGeneratedBio(artistId, baseData, []);
+
+    expect(rehostImagesMock.mock.calls).toEqual([
+      [[{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }], artistId, []],
+    ]);
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'bio_pool_fingerprints_failed',
+      expect.objectContaining({ artistId })
+    );
+    expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves the placeholder of an image already in the pool to the pool copy', async () => {
+    rehostImagesMock.mockResolvedValueOnce({
+      results: [null],
+      duplicateAliases: new Map([[0, 'https://cdn/linked.webp']]),
+    });
+
+    const content = await persistGeneratedBio(
+      artistId,
+      withData({ altBio: '<p>Promo <img src="image:0" alt="x"></p>' }),
+      []
+    );
+
+    expect(content.altBio).toContain('src="https://cdn/linked.webp"');
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    expect(persisted.images).toEqual([]);
+  });
+
+  it("stores each re-hosted image's content and perceptual hashes", async () => {
+    rehostImagesMock.mockResolvedValueOnce({
+      results: [
+        {
+          url: 'https://cdn.example.com/media/artists/a/bio/0-abcd1234.jpg',
+          width: 1200,
+          height: 800,
+          contentHash: 'sha-a',
+          perceptualHash: '0000000000000abc',
+        },
+      ],
+      duplicateAliases: new Map(),
+    });
+
+    const content = await persistGeneratedBio(artistId, baseData, []);
+
+    const [, persisted] = replaceBioContentMock.mock.calls[0];
+    expect(persisted.images[0]).toMatchObject({
+      contentHash: 'sha-a',
+      perceptualHash: '0000000000000abc',
+    });
+    // Hashes are storage-only: the admin preview payload never carries them.
+    expect(content.images[0]).not.toHaveProperty('contentHash');
+    expect(content.images[0]).not.toHaveProperty('perceptualHash');
   });
 
   it('rewrites inline image:N placeholders to the re-hosted CDN url', async () => {
@@ -1231,7 +1323,6 @@ describe('BioGenerationService.runGenerationJob', () => {
     bornOn: null as Date | null,
     diedOn: null as Date | null,
     formedOn: null as Date | null,
-    images: [] as Array<{ src: string | null }>,
   };
 
   const fakeOk: BioGenerationResult = {
@@ -1625,34 +1716,27 @@ describe('BioGenerationService.runGenerationJob', () => {
       );
     });
 
-    it('builds referenceImageUrls from artist images first, then custom bio images', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/artist/a.jpg' }],
-      });
-      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/custom/b.jpg']);
+    it('builds referenceImageUrls from the custom bio images', async () => {
+      findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/custom/a.jpg',
+        'https://cdn.fakefour.com/custom/b.jpg',
+      ]);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
       const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
       expect(input.referenceImageUrls).toEqual([
-        'https://cdn.fakefour.com/artist/a.jpg',
+        'https://cdn.fakefour.com/custom/a.jpg',
         'https://cdn.fakefour.com/custom/b.jpg',
       ]);
     });
 
     it('keeps only absolute http(s) reference URLs and caps the list at three', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [
-          { src: 'https://cdn.fakefour.com/1.jpg' },
-          { src: '/relative/2.jpg' },
-          { src: null },
-          { src: 'javascript:alert(1)' },
-          { src: 'https://cdn.fakefour.com/3.jpg' },
-        ],
-      });
       findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/1.jpg',
+        '/relative/2.jpg',
+        'javascript:alert(1)',
+        'https://cdn.fakefour.com/3.jpg',
         'https://cdn.fakefour.com/4.jpg',
         'https://cdn.fakefour.com/5.jpg',
       ]);
@@ -1668,11 +1752,10 @@ describe('BioGenerationService.runGenerationJob', () => {
     });
 
     it('dedupes reference URLs case-insensitively', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/A.jpg' }],
-      });
-      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/a.jpg']);
+      findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/A.jpg',
+        'https://cdn.fakefour.com/a.jpg',
+      ]);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
@@ -1681,8 +1764,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     });
 
     it('omits referenceImageUrls entirely when no absolute URLs are available', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, images: [{ src: null }] });
-      findCustomBioImageUrlsMock.mockResolvedValue([]);
+      findCustomBioImageUrlsMock.mockResolvedValue(['/relative/only.jpg']);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
@@ -1690,17 +1772,13 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(input.referenceImageUrls).toBeUndefined();
     });
 
-    it('degrades to artist images only and warns when the custom-image lookup fails', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/artist.jpg' }],
-      });
+    it('omits referenceImageUrls and warns when the custom-image lookup fails', async () => {
       findCustomBioImageUrlsMock.mockRejectedValue(new Error('db down'));
 
       await BioGenerationService.runGenerationJob(artist.id);
 
       const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toEqual(['https://cdn.fakefour.com/artist.jpg']);
+      expect(input.referenceImageUrls).toBeUndefined();
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         'bio_custom_reference_images_failed',
         expect.objectContaining({ artistId: artist.id })

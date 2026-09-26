@@ -11,10 +11,19 @@ import { GET, PUT, PATCH } from './route';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
-// Mock withAdmin decorator to bypass auth in tests
-vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: () => unknown) => handler,
-}));
+// Model withAdmin: pass through for an admin, 401 otherwise.
+const authState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/lib/decorators/with-auth', async () => {
+  const { NextResponse: Response } = await import('next/server');
+  return {
+    withAdmin:
+      (handler: (...args: unknown[]) => unknown) =>
+      (...args: unknown[]) =>
+        authState.isAdmin
+          ? handler(...args)
+          : Response.json({ error: 'Unauthorized' }, { status: 401 }),
+  };
+});
 
 vi.mock('@/lib/services/artist-service', () => ({
   ArtistService: {
@@ -53,6 +62,34 @@ describe('Artist by ID API Routes', () => {
     params: Promise.resolve({ id }),
   });
   describe('GET /api/artists/[id]', () => {
+    beforeEach(() => {
+      authState.isAdmin = true;
+    });
+
+    // The by-id payload is the full admin row — contact PII, notes, audit
+    // actors, and the live job callback tokens (#765) — so it is admin-only.
+    it('rejects a non-admin request without reading the artist', async () => {
+      authState.isAdmin = false;
+
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.status).toBe(401);
+      expect(ArtistService.getArtistById).not.toHaveBeenCalled();
+    });
+
+    it('never lets a shared cache store the admin payload', async () => {
+      vi.mocked(ArtistService.getArtistById).mockResolvedValueOnce({
+        success: true,
+        data: mockArtist as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/artists/507f1f77bcf86cd799439011');
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    });
+
     it('should return an artist by ID', async () => {
       vi.mocked(ArtistService.getArtistById).mockResolvedValue({
         success: true,
