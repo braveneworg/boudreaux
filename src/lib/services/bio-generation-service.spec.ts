@@ -1323,7 +1323,6 @@ describe('BioGenerationService.runGenerationJob', () => {
     bornOn: null as Date | null,
     diedOn: null as Date | null,
     formedOn: null as Date | null,
-    images: [] as Array<{ src: string | null }>,
   };
 
   const fakeOk: BioGenerationResult = {
@@ -1717,34 +1716,27 @@ describe('BioGenerationService.runGenerationJob', () => {
       );
     });
 
-    it('builds referenceImageUrls from artist images first, then custom bio images', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/artist/a.jpg' }],
-      });
-      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/custom/b.jpg']);
+    it('builds referenceImageUrls from the custom bio images', async () => {
+      findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/custom/a.jpg',
+        'https://cdn.fakefour.com/custom/b.jpg',
+      ]);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
       const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
       expect(input.referenceImageUrls).toEqual([
-        'https://cdn.fakefour.com/artist/a.jpg',
+        'https://cdn.fakefour.com/custom/a.jpg',
         'https://cdn.fakefour.com/custom/b.jpg',
       ]);
     });
 
     it('keeps only absolute http(s) reference URLs and caps the list at three', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [
-          { src: 'https://cdn.fakefour.com/1.jpg' },
-          { src: '/relative/2.jpg' },
-          { src: null },
-          { src: 'javascript:alert(1)' },
-          { src: 'https://cdn.fakefour.com/3.jpg' },
-        ],
-      });
       findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/1.jpg',
+        '/relative/2.jpg',
+        'javascript:alert(1)',
+        'https://cdn.fakefour.com/3.jpg',
         'https://cdn.fakefour.com/4.jpg',
         'https://cdn.fakefour.com/5.jpg',
       ]);
@@ -1760,11 +1752,10 @@ describe('BioGenerationService.runGenerationJob', () => {
     });
 
     it('dedupes reference URLs case-insensitively', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/A.jpg' }],
-      });
-      findCustomBioImageUrlsMock.mockResolvedValue(['https://cdn.fakefour.com/a.jpg']);
+      findCustomBioImageUrlsMock.mockResolvedValue([
+        'https://cdn.fakefour.com/A.jpg',
+        'https://cdn.fakefour.com/a.jpg',
+      ]);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
@@ -1773,8 +1764,7 @@ describe('BioGenerationService.runGenerationJob', () => {
     });
 
     it('omits referenceImageUrls entirely when no absolute URLs are available', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, images: [{ src: null }] });
-      findCustomBioImageUrlsMock.mockResolvedValue([]);
+      findCustomBioImageUrlsMock.mockResolvedValue(['/relative/only.jpg']);
 
       await BioGenerationService.runGenerationJob(artist.id);
 
@@ -1782,17 +1772,13 @@ describe('BioGenerationService.runGenerationJob', () => {
       expect(input.referenceImageUrls).toBeUndefined();
     });
 
-    it('degrades to artist images only and warns when the custom-image lookup fails', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        images: [{ src: 'https://cdn.fakefour.com/artist.jpg' }],
-      });
+    it('omits referenceImageUrls and warns when the custom-image lookup fails', async () => {
       findCustomBioImageUrlsMock.mockRejectedValue(new Error('db down'));
 
       await BioGenerationService.runGenerationJob(artist.id);
 
       const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toEqual(['https://cdn.fakefour.com/artist.jpg']);
+      expect(input.referenceImageUrls).toBeUndefined();
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         'bio_custom_reference_images_failed',
         expect.objectContaining({ artistId: artist.id })

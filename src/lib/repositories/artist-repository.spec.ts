@@ -12,8 +12,8 @@ import { ArtistRepository } from './artist-repository';
 
 vi.mock('server-only', () => ({}));
 
-// Type honesty (#661): findById fetches only `artistDetailInclude` (scalars +
-// ordered images), so its non-null return must be exactly `ArtistDetail` — never
+// Type honesty (#661): findById fetches scalars only, so its non-null return
+// must be exactly `ArtistDetail` — never
 // the admin `Artist` with phantom `labels`/`urls`/`releases`. If the return type
 // ever re-widens to `Artist`, this exact-match assertion fails `pnpm run
 // typecheck`, catching any caller that would trust relations the query omits.
@@ -59,7 +59,6 @@ vi.mock('@/lib/prisma', () => ({
 const { prisma } = await import('@/lib/prisma');
 
 const adminInclude = {
-  images: { orderBy: { sortOrder: 'asc' }, take: 3 },
   labels: true,
   urls: true,
   releases: { include: { release: true } },
@@ -81,26 +80,17 @@ describe('ArtistRepository', () => {
       expect(prisma.artist.create).toHaveBeenCalledWith({ data, include: adminInclude });
     });
 
-    it('builds connectOrCreate for nested images and urls', async () => {
+    it('builds connectOrCreate for nested urls', async () => {
       vi.mocked(prisma.artist.create).mockResolvedValue({ id: 'a' } as never);
 
       await ArtistRepository.create({
         firstName: 'John',
         surname: 'Doe',
         slug: 'john-doe',
-        images: [{ id: 'i1', src: 's1' }],
         urls: [{ id: 'u1', platform: 'SPOTIFY', url: 'https://x' }],
       });
 
       const arg = vi.mocked(prisma.artist.create).mock.calls[0][0];
-      expect(arg?.data?.images).toEqual({
-        connectOrCreate: [
-          {
-            where: { id: 'i1' },
-            create: { id: 'i1', src: 's1', altText: undefined, caption: undefined },
-          },
-        ],
-      });
       expect(arg?.data?.urls).toEqual({
         connectOrCreate: [
           { where: { id: 'u1' }, create: { id: 'u1', platform: 'SPOTIFY', url: 'https://x' } },
@@ -110,7 +100,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('findById', () => {
-    it('finds an artist by id including images ordered by sortOrder', async () => {
+    it('finds an artist by id with no relations included', async () => {
       vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findById('a');
@@ -118,7 +108,6 @@ describe('ArtistRepository', () => {
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.findUnique).toHaveBeenCalledWith({
         where: { id: 'a' },
-        include: { images: { orderBy: { sortOrder: 'asc' } } },
       });
     });
 
@@ -298,7 +287,6 @@ describe('ArtistRepository', () => {
       artistBioImage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       artistBioLink: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       videoArtist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-      image: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       url: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       artist: { delete: vi.fn().mockResolvedValue({ id: 'a' }) },
     });
@@ -341,14 +329,13 @@ describe('ArtistRepository', () => {
       });
     });
 
-    it('deletes artist-scoped gallery images and urls', async () => {
+    it('deletes artist-scoped urls', async () => {
       const tx = buildDeleteTx();
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
 
       await ArtistRepository.delete('a');
 
       const byArtist = { where: { artistId: 'a' } };
-      expect(tx.image.deleteMany).toHaveBeenCalledWith(byArtist);
       expect(tx.url.deleteMany).toHaveBeenCalledWith(byArtist);
     });
 
@@ -368,11 +355,10 @@ describe('ArtistRepository', () => {
         tx.artistBioImage.deleteMany,
         tx.artistBioLink.deleteMany,
         tx.videoArtist.deleteMany,
-        tx.image.deleteMany,
         tx.url.deleteMany,
       ].map((mock) => mock.mock.invocationCallOrder[0]);
       expect(relatedOrders.map((order) => order < artistOrder)).toEqual(
-        Array.from({ length: 10 }, () => true)
+        Array.from({ length: 9 }, () => true)
       );
     });
   });
@@ -424,7 +410,11 @@ describe('ArtistRepository', () => {
           },
         },
       });
-      expect(arg?.include?.images).toEqual({ orderBy: { sortOrder: 'asc' }, take: 1 });
+      expect(arg?.include?.bioImages).toEqual({
+        where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
+        orderBy: { sortOrder: 'asc' },
+        select: { url: true, thumbnailUrl: true, isPrimary: true, displayOrder: true },
+      });
     });
 
     it('fetches every match instead of ordering and paging in the database', async () => {
