@@ -13,7 +13,7 @@ import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 /** Entity buckets that own uploadable images (mirrors the presigned-action union). */
 export type ImageUploadEntityType = 'artists' | 'releases';
 
-/** Register action shared shape — `registerReleaseImagesAction` / `registerArtistImagesAction`. */
+/** Register action shared shape — `registerReleaseImagesAction`. */
 export type RegisterImagesAction = (
   targetId: string,
   images: RegisterImageInput[]

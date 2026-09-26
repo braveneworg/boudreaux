@@ -15,7 +15,7 @@ import { VideoRepository } from '@/lib/repositories/video-repository';
 import type { VideoSummary } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
-import type { Artist } from '@/lib/types/domain/artist';
+import type { ArtistSearchMatch } from '@/lib/types/domain/artist';
 import type { PlaylistItemRecord, PlaylistRecord } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail, PublishedReleaseListing } from '@/lib/types/domain/release';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
@@ -264,13 +264,14 @@ const makeArtist = (
   displayName: string | null,
   releases: Array<{ id: string; title: string; publishedAt: Date | null; deletedOn: Date | null }>,
   names: { firstName?: string; surname?: string } = {}
-): Artist =>
+): ArtistSearchMatch =>
   ({
     displayName,
     firstName: names.firstName ?? 'Kill',
     surname: names.surname ?? 'Trakz',
+    bioImages: [],
     releases: releases.map((release) => ({ release })),
-  }) as unknown as Artist;
+  }) as unknown as ArtistSearchMatch;
 
 // ---------------------------------------------------------------------------
 // Suite

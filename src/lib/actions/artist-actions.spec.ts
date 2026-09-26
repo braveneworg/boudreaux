@@ -21,7 +21,6 @@ const baseArtist = {
   firstName: 'Jane',
   surname: 'Doe',
   slug: 'jane-doe',
-  images: [],
   urls: [],
   labels: [],
   releases: [],
@@ -52,17 +51,15 @@ describe('createArtistAction', () => {
     expect(createArtistMock).toHaveBeenCalledTimes(1);
   });
 
-  it('forwards image and url inputs to the service (repo builds connectOrCreate)', async () => {
+  it('forwards url inputs to the service (repo builds connectOrCreate)', async () => {
     requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
     createArtistMock.mockResolvedValue({ success: true, data: { id: 'a1' } });
     await createArtistAction({
       ...baseArtist,
-      images: [{ id: 'img1', src: 'x', altText: null, caption: null }],
       urls: [{ id: 'url1', platform: 'SPOTIFY', url: 'https://example.com' }],
     } as never);
 
     const arg = createArtistMock.mock.calls[0][0];
-    expect(arg.images).toEqual([{ id: 'img1', src: 'x', altText: null, caption: null }]);
     expect(arg.urls).toEqual([{ id: 'url1', platform: 'SPOTIFY', url: 'https://example.com' }]);
   });
 

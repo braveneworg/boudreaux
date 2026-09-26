@@ -120,17 +120,11 @@ export interface ImageLinksJobStateRecord {
 // Query shapes (single source of truth for both the query and the drift check)
 // =============================================================================
 
-/** Admin listing include — release scalars, capped images, labels, urls. */
+/** Admin listing include — release scalars, labels, urls. */
 const artistAdminInclude = {
-  images: { orderBy: { sortOrder: 'asc' }, take: 3 },
   labels: true,
   urls: true,
   releases: { include: { release: true } },
-} as const satisfies Prisma.ArtistInclude;
-
-/** By-id include — ordered images only (the `GET /api/artists/[id]` shape). */
-const artistDetailInclude = {
-  images: { orderBy: { sortOrder: 'asc' } },
 } as const satisfies Prisma.ArtistInclude;
 
 /** Name projection of a related artist (band member / band) on a listing row. */
@@ -143,6 +137,16 @@ const artistListingNameSelect = {
   title: true,
   suffix: true,
 } as const satisfies Prisma.ArtistSelect;
+
+/**
+ * Display-image candidates: the human's chosen rows (`displayOrder: { gte: 0 }`
+ * matches only numbers — null and absent both fail) or the job's suggested
+ * rows. No DB-level take: Mongo sorts nulls first, so a cap here would return
+ * unchosen rows; the service resolves and caps after the read.
+ */
+const displayImageCandidateWhere = {
+  OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }],
+} as const satisfies Prisma.ArtistBioImageWhereInput;
 
 /**
  * Public artists-index select — the identifying scalars only (this payload
@@ -167,12 +171,8 @@ const artistListingSelect = {
   bornOn: true,
   diedOn: true,
   formedOn: true,
-  // Display-image candidates: the human's chosen rows (`displayOrder: { gte:
-  // 0 }` matches only numbers — null and absent both fail) or the job's
-  // suggested rows. No DB-level take: Mongo sorts nulls first, so a cap here
-  // would return unchosen rows; the service resolves and caps after the read.
   bioImages: {
-    where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
+    where: displayImageCandidateWhere,
     orderBy: { sortOrder: 'asc' },
     select: {
       id: true,
@@ -199,10 +199,15 @@ const artistListingSelect = {
   },
 } as const satisfies Prisma.ArtistSelect;
 
-/** Public-search include — first image plus release joins carrying the narrow
- * release projection the search consumes. */
+/** Public-search include — the display-image candidates behind the dropdown
+ * thumbnail plus release joins carrying the narrow release projection the
+ * search consumes. */
 const artistSearchInclude = {
-  images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+  bioImages: {
+    where: displayImageCandidateWhere,
+    orderBy: { sortOrder: 'asc' },
+    select: { url: true, thumbnailUrl: true, isPrimary: true, displayOrder: true },
+  },
   releases: {
     include: {
       release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
@@ -229,7 +234,6 @@ const artistReleaseRowsInclude = {
  * list band releases beside the artist's own.
  */
 const artistWithReleaseGraphInclude = {
-  images: true,
   labels: true,
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
@@ -245,10 +249,7 @@ type _ArtistDrift = AssertExact<
   Artist,
   Prisma.ArtistGetPayload<{ include: typeof artistAdminInclude }>
 >;
-type _ArtistDetailDrift = AssertExact<
-  ArtistDetail,
-  Prisma.ArtistGetPayload<{ include: typeof artistDetailInclude }>
->;
+type _ArtistDetailDrift = AssertExact<ArtistDetail, Prisma.ArtistGetPayload<object>>;
 type _ArtistListingRecordDrift = AssertExact<
   ArtistListingRecord,
   Prisma.ArtistGetPayload<{ select: typeof artistListingSelect }>
@@ -273,17 +274,9 @@ const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
 /** Build a Prisma create payload from domain create data. */
 const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
-  const { images, urls, ...scalars } = data;
+  const { urls, ...scalars } = data;
   return {
     ...scalars,
-    ...(images && {
-      images: {
-        connectOrCreate: images.map((image) => ({
-          where: { id: image.id },
-          create: { id: image.id, src: image.src, altText: image.altText, caption: image.caption },
-        })),
-      },
-    }),
     ...(urls && {
       urls: {
         connectOrCreate: urls.map((url) => ({
@@ -518,18 +511,12 @@ export class ArtistRepository {
   }
 
   /**
-   * Find an artist by id, including images ordered by sortOrder. The query pulls
-   * only `artistDetailInclude` (scalars + images), so the honest return is
-   * `ArtistDetail` — not the admin `Artist`, which also carries labels/urls/
-   * releases the by-id shape omits.
+   * Find an artist by id (scalars only). The honest return is `ArtistDetail` —
+   * not the admin `Artist`, which also carries labels/urls/releases the by-id
+   * shape omits.
    */
   static async findById(id: string): Promise<ArtistDetail | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({
-        where: { id },
-        include: artistDetailInclude,
-      })
-    );
+    return runQuery(() => prisma.artist.findUnique({ where: { id } }));
   }
 
   /** Find an artist by slug (no relations). */
@@ -626,7 +613,6 @@ export class ArtistRepository {
         await tx.artistBioImage.deleteMany({ where: { artistId: id } });
         await tx.artistBioLink.deleteMany({ where: { artistId: id } });
         await tx.videoArtist.deleteMany({ where: { artistId: id } });
-        await tx.image.deleteMany({ where: { artistId: id } });
         await tx.url.deleteMany({ where: { artistId: id } });
         return tx.artist.delete({ where: { id } });
       })

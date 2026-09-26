@@ -397,7 +397,6 @@ describe('ArtistPlayer', () => {
     surname: 'Doe',
     displayName: 'John Doe',
     slug: 'john-doe',
-    images: [],
     labels: [],
     urls: [],
   };
