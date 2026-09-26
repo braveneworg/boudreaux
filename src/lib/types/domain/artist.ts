@@ -81,6 +81,57 @@ export type ArtistScalars = {
   featuredArtistId: string | null;
 };
 
+/**
+ * The artist scalars that must never leave the server on a public surface:
+ * contact PII, internal notes, the audit actor ids, and the async-job
+ * internals — above all the per-job callback tokens (`bioJobToken`,
+ * `imageLinksJobToken`), which the public job callbacks accept as their only
+ * credential. Keyed as a `true` mask so it can feed both a Zod `.omit()` and a
+ * key check; the public projections are allow-lists drift-checked against
+ * {@link ArtistPublicScalars}, so a new column stays private until someone
+ * classifies it.
+ */
+export const ARTIST_PRIVATE_FIELD_MASK = {
+  phone: true,
+  email: true,
+  address1: true,
+  address2: true,
+  city: true,
+  state: true,
+  postalCode: true,
+  country: true,
+  notes: true,
+  createdBy: true,
+  updatedBy: true,
+  publishedBy: true,
+  deletedBy: true,
+  deactivatedBy: true,
+  reactivatedBy: true,
+  bioError: true,
+  bioStartedAt: true,
+  bioJobToken: true,
+  bioProgress: true,
+  imageLinksStatus: true,
+  imageLinksError: true,
+  imageLinksStartedAt: true,
+  imageLinksJobToken: true,
+  imageLinksAddedCount: true,
+} as const satisfies Partial<Record<keyof ArtistScalars, true>>;
+
+/** A private artist scalar — see {@link ARTIST_PRIVATE_FIELD_MASK}. */
+export type ArtistPrivateField = keyof typeof ARTIST_PRIVATE_FIELD_MASK;
+
+/** Every private artist scalar, in mask order. */
+export const ARTIST_PRIVATE_FIELDS = Object.keys(
+  ARTIST_PRIVATE_FIELD_MASK
+) as readonly ArtistPrivateField[];
+
+/**
+ * The artist scalars a public surface may serialise: {@link ArtistScalars}
+ * minus every {@link ArtistPrivateField}.
+ */
+export type ArtistPublicScalars = Omit<ArtistScalars, ArtistPrivateField>;
+
 /** Scalar fields of the Prisma `ArtistLabel` join model (`labels: true`). */
 export interface ArtistLabelRecord {
   id: string;
@@ -191,26 +242,35 @@ export type Artist = ArtistScalars & {
   urls: UrlRecord[];
 };
 
-/** An `ArtistRelease` join row carrying the full media `Release` graph. */
-export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: Release };
+/**
+ * The media `Release` graph as the public artist-detail page loads it: every
+ * credited artist on the release carries only its {@link ArtistPublicScalars}.
+ */
+export type PublicArtistRelease = Omit<Release, 'artistReleases'> & {
+  artistReleases: Array<ArtistReleaseScalars & { artist: ArtistPublicScalars }>;
+};
+
+/** An `ArtistRelease` join row carrying the public media release graph. */
+export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArtistRelease };
 
 /**
- * Repository payload behind the public artist-detail page: scalars plus
- * images, labels, urls, bio images/links, band members (with member scalars),
- * the artist's own release joins, and — via `memberOf` — the release joins of
- * every band the artist belongs to, all carrying the full media `Release`
- * graph. The service flattens this into {@link ArtistWithPublishedReleases}.
+ * Repository payload behind the public artist-detail page: public scalars plus
+ * images, labels, urls, bio images/links, band members (with member public
+ * scalars), the artist's own release joins, and — via `memberOf` — the release
+ * joins of every band the artist belongs to, all carrying the public media
+ * release graph. No artist anywhere in it carries an {@link ArtistPrivateField}.
+ * The service flattens this into {@link ArtistWithPublishedReleases}.
  */
-export interface ArtistWithReleaseGraph extends ArtistScalars {
+export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
   images: ImageRecord[];
   labels: ArtistLabelRecord[];
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
   bioLinks: ArtistBioLinkRecord[];
-  members: Array<ArtistMemberScalars & { member: ArtistScalars }>;
+  members: Array<ArtistMemberScalars & { member: ArtistPublicScalars }>;
   releases: ArtistReleaseGraphRow[];
   memberOf: Array<
-    ArtistMemberScalars & { artist: ArtistScalars & { releases: ArtistReleaseGraphRow[] } }
+    ArtistMemberScalars & { artist: ArtistPublicScalars & { releases: ArtistReleaseGraphRow[] } }
   >;
 }
 

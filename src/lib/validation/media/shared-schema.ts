@@ -3,7 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistScalars } from '@/lib/types/domain/artist';
+import {
+  ARTIST_PRIVATE_FIELD_MASK,
+  type ArtistPublicScalars,
+  type ArtistScalars,
+} from '@/lib/types/domain/artist';
 import type { Format, Platform } from '@/lib/types/media-models';
 import { FORMATS } from '@/lib/types/media-models';
 import { jsonValueSchema } from '@/lib/validation/json-schema';
@@ -133,6 +137,16 @@ export const artistScalarSchema = z.object({
   instruments: nullableString,
   featuredArtistId: nullableString,
 }) satisfies z.ZodType<ArtistScalars>;
+
+/**
+ * The artist scalars a public payload may carry — {@link artistScalarSchema}
+ * without any private field. Zod objects strip unknown keys, so parsing a full
+ * row through this drops contact PII, notes, audit actors, and job tokens
+ * (#765) rather than rejecting it.
+ */
+export const artistPublicScalarSchema = artistScalarSchema.omit(
+  ARTIST_PRIVATE_FIELD_MASK
+) satisfies z.ZodType<ArtistPublicScalars>;
 
 /** All scalar fields of the `Release` model (no relations included). */
 export const releaseScalarSchema = z.object({

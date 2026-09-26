@@ -20,6 +20,7 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
+import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
 
 import type { Metadata } from 'next';
 
@@ -73,10 +74,14 @@ export default async function ArtistDetailPage({ params, searchParams }: ArtistD
     notFound();
   }
 
-  // Round-trip through JSON to normalize Date → string and BigInt → Number
-  // (matches API response shape that the client query consumer expects).
+  // The dehydrated query state is serialised into the HTML, so it passes the
+  // same public-schema guard as the API route (#765) — anything private a
+  // future query re-selects is stripped here. Then round-trip through JSON to
+  // normalize Date → string and BigInt → Number (matches the API response
+  // shape that the client query consumer expects).
+  const publicArtist = artistWithPublishedReleasesSchema.parse(result.data);
   const artistData = JSON.parse(
-    JSON.stringify(result.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
+    JSON.stringify(publicArtist, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
   );
   queryClient.setQueryData(queryKeys.artists.bySlug(slug), artistData);
 

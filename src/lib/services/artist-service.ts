@@ -26,6 +26,7 @@ import type {
   ArtistListingRecord,
   ArtistListingRow,
   ArtistNameRecord,
+  ArtistPublicScalars,
   ArtistScalars,
   ArtistSearchMatch,
   ArtistWithPublishedReleases,
@@ -490,9 +491,10 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug
+   * Get an artist by slug, projected to the public scalars (no contact PII,
+   * notes, audit actors, or job internals) — it backs a public route.
    */
-  static async getArtistBySlug(slug: string): Promise<ServiceResponse<ArtistScalars>> {
+  static async getArtistBySlug(slug: string): Promise<ServiceResponse<ArtistPublicScalars>> {
     try {
       const artist = await ArtistRepository.findBySlug(slug);
 
