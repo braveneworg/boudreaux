@@ -75,7 +75,6 @@ export const ArtistDataView = () => {
       entity={ENTITIES.artist}
       data={{ artists: rows }}
       fieldsToShow={fieldsToShow}
-      imageField="images"
       canCreate={false}
       mutations={{
         publish: (id) => publishArtistAsync({ artistId: id }),
