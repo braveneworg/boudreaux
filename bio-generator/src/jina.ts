@@ -50,7 +50,14 @@ interface JinaSearchResponse {
 
 /** Subset of the Jina reader response we read (`r.jina.ai`, JSON mode). */
 interface JinaReaderResponse {
-  data?: { title?: string; url?: string; content?: string; images?: JinaImagesSummary };
+  data?: {
+    title?: string;
+    url?: string;
+    content?: string;
+    images?: JinaImagesSummary;
+    /** Set by Jina when the page it rendered looked like a CAPTCHA / bot wall. */
+    warning?: string;
+  };
 }
 
 /** An image scraped from a grounding page, kept with its provenance. */
@@ -78,6 +85,48 @@ export interface ReadUrlResult {
   content: string;
   images: ScrapedImage[];
 }
+
+/**
+ * How a reader call ended. `blocked` means the site answered with an anti-bot
+ * interstitial (Cloudflare's "Just a moment…", a CAPTCHA wall) instead of the
+ * page — Jina renders what it is served and, by policy, never bypasses those.
+ * `unreadable` covers everything else that yields no page: a non-OK response,
+ * a thrown request, an empty body.
+ */
+export type ReadUrlOutcome =
+  { kind: 'read'; result: ReadUrlResult } | { kind: 'blocked' } | { kind: 'unreadable' };
+
+/** Jina's own flag: it saw a CAPTCHA-like interstitial while rendering. */
+const CHALLENGE_WARNING_PATTERN = /captcha/i;
+/** Titles the common bot-challenge interstitials render under. */
+const CHALLENGE_TITLE_PATTERN =
+  /^(just a moment|attention required|access denied|security verification|verifying you are human|one more step)/i;
+/** Body copy of those interstitials. */
+const CHALLENGE_CONTENT_PATTERN =
+  /performing security verification|verify(ing)? (that )?you are (not a bot|human)|checking your browser|enable javascript and cookies to continue/i;
+/**
+ * An interstitial says almost nothing; a real article that happens to mention
+ * a browser check runs far longer. Body copy is only decisive under this size.
+ */
+const MAX_CHALLENGE_PAGE_CHARS = 1_500;
+
+/** What the challenge detector reads from a rendered reader payload. */
+interface ReaderPageSignals {
+  title?: string;
+  warning?: string;
+  content: string;
+}
+
+/**
+ * True when the reader rendered an anti-bot interstitial rather than the page.
+ * Jina's warning and the page title are decisive on their own; body copy only
+ * counts on a short page, so an article about CAPTCHAs still reads as a page.
+ */
+export const isBotChallengePage = ({ title, warning, content }: ReaderPageSignals): boolean => {
+  if (warning && CHALLENGE_WARNING_PATTERN.test(warning)) return true;
+  if (title && CHALLENGE_TITLE_PATTERN.test(title.trim())) return true;
+  return content.length <= MAX_CHALLENGE_PAGE_CHARS && CHALLENGE_CONTENT_PATTERN.test(content);
+};
 
 /**
  * JSON Accept + optional bearer auth (Jina works keyless at a lower rate limit).
@@ -241,21 +290,22 @@ export const searchArtistSources = async (
 };
 
 /**
- * Reads a single URL into clean markdown via Jina AI Reader (`r.jina.ai`). Used
- * to pull high-signal grounding from a known page (e.g. the artist's official
- * site) that search may rank poorly. Best-effort: returns `null` on any failure.
+ * Reads a single URL into clean markdown via Jina AI Reader (`r.jina.ai`) and
+ * says how the read ended — see {@link ReadUrlOutcome}. Callers that must tell
+ * an admin *why* a page yielded nothing (a bot wall vs. a dead link) use this;
+ * grounding callers use {@link readUrl}, which folds both failures into `null`.
  *
  * @param url - The page to read.
  * @param apiKey - Optional Jina API key (resolved from SSM); higher rate limit.
  * @param fetchFn - Injectable fetch (defaults to global) for testability.
- * @returns The cleaned content (capped) plus scraped page images, or `null`.
+ * @returns The read page (content capped, images filtered), or why there is none.
  */
-export const readUrl = async (
+export const readUrlOutcome = async (
   url: string,
   apiKey?: string | null,
   fetchFn: FetchFn = fetch,
   options: FetchRetryOptions = {}
-): Promise<ReadUrlResult | null> => {
+): Promise<ReadUrlOutcome> => {
   try {
     const response = await fetchWithRetry(
       `${JINA_READER_ENDPOINT}${url}`,
@@ -268,18 +318,50 @@ export const readUrl = async (
         status: response.status,
         keyed: Boolean(apiKey),
       });
-      return null;
+      return { kind: 'unreadable' };
     }
-
-    const body = (await response.json()) as JinaReaderResponse;
-    const content = body.data?.content?.trim();
-    if (!content) return null;
-    return {
-      content: content.slice(0, MAX_READER_CHARS),
-      images: dedupeScrapedImages(collectPageImages(body.data?.images, url)),
-    };
+    return outcomeFromReaderBody((await response.json()) as JinaReaderResponse, url);
   } catch (err) {
     logEvent('warn', 'jina_read_error', { url, error: toErrorMessage(err) });
-    return null;
+    return { kind: 'unreadable' };
   }
+};
+
+/** Classifies an OK reader payload: empty → unreadable, interstitial → blocked, else read. */
+const outcomeFromReaderBody = (body: JinaReaderResponse, url: string): ReadUrlOutcome => {
+  const { title, warning, images } = body.data ?? {};
+  const content = body.data?.content?.trim();
+  if (!content) return { kind: 'unreadable' };
+  if (isBotChallengePage({ title, warning, content })) {
+    logEvent('warn', 'jina_read_blocked', { url, title: title ?? null });
+    return { kind: 'blocked' };
+  }
+  return {
+    kind: 'read',
+    result: {
+      content: content.slice(0, MAX_READER_CHARS),
+      images: dedupeScrapedImages(collectPageImages(images, url)),
+    },
+  };
+};
+
+/**
+ * Reads a single URL into clean markdown via Jina AI Reader (`r.jina.ai`). Used
+ * to pull high-signal grounding from a known page (e.g. the artist's official
+ * site) that search may rank poorly. Best-effort: returns `null` on any failure,
+ * including a bot-challenge interstitial, so challenge copy never grounds prose.
+ *
+ * @param url - The page to read.
+ * @param apiKey - Optional Jina API key (resolved from SSM); higher rate limit.
+ * @param fetchFn - Injectable fetch (defaults to global) for testability.
+ * @returns The cleaned content (capped) plus scraped page images, or `null`.
+ */
+export const readUrl = async (
+  url: string,
+  apiKey?: string | null,
+  fetchFn: FetchFn = fetch,
+  options: FetchRetryOptions = {}
+): Promise<ReadUrlResult | null> => {
+  const outcome = await readUrlOutcome(url, apiKey, fetchFn, options);
+  return outcome.kind === 'read' ? outcome.result : null;
 };
