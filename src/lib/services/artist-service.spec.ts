@@ -2402,7 +2402,7 @@ describe('ArtistService', () => {
       ],
     };
 
-    const filters = { sort: 'alpha' as const, skip: 0, take: 24 };
+    const filters = { sort: 'alpha' as const, roster: 'current' as const, skip: 0, take: 24 };
 
     const listOne = async () => {
       vi.mocked(ArtistRepository.listListed).mockResolvedValue([listingRecord] as never);
@@ -2420,6 +2420,16 @@ describe('ArtistService', () => {
         search: 'punk',
         sort: 'newest',
       });
+    });
+
+    it('forwards the alumni roster filter to the repository', async () => {
+      vi.mocked(ArtistRepository.listListed).mockResolvedValue([] as never);
+
+      await ArtistService.listPublishedArtists({ ...filters, roster: 'alumni' });
+
+      expect(vi.mocked(ArtistRepository.listListed).mock.calls).toEqual([
+        [{ ...filters, roster: 'alumni' }],
+      ]);
     });
 
     it('strips markup from the short bio (plain-text sanitization)', async () => {

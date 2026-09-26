@@ -295,6 +295,46 @@ test.describe('Artist Page', () => {
       await expect(cards(page).last()).toContainText('Tokensmith');
     });
 
+    test('lists current artists by default and alumni on demand', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
+
+      // E2E Alumnus is deactivated with a departure date: never on the
+      // default (Current) roster.
+      await expect(page.getByRole('radio', { name: 'Current' })).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
+      await expect(page.getByRole('link', { name: 'E2E Alumnus', exact: true })).toHaveCount(0);
+
+      await page.getByRole('radio', { name: 'Alumni' }).click();
+
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      await expect(cards(page).first()).toContainText('E2E Alumnus');
+    });
+
+    test('lists alumni alongside current artists under All', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
+
+      await page.getByRole('radio', { name: 'All', exact: true }).click();
+
+      // A–Z: "E2E Alumnus" files just ahead of "E2E Artist".
+      await expect(cards(page).first()).toContainText('E2E Alumnus', { timeout: 10_000 });
+      await expect(cards(page).nth(1)).toContainText('E2E Artist');
+    });
+
+    test('an alumni card links through to the artist page', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await page.getByRole('radio', { name: 'Alumni' }).click();
+      await page.getByRole('link', { name: 'E2E Alumnus', exact: true }).click();
+
+      await expect(page).toHaveURL(/\/artists\/e2e-alumnus$/);
+      await expect(page.getByText('E2E Alumnus').first()).toBeVisible({ timeout: 15_000 });
+    });
+
     test('redirects the retired search page to the index', async ({ page }) => {
       await page.goto('/artists/search');
 

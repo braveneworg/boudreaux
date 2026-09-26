@@ -229,11 +229,20 @@ export interface ArtistWithPublishedReleases extends Omit<
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';
 
-/** Pagination, search, and sort for the public artists index. */
+/**
+ * Which part of the label's roster the public artists index shows:
+ * **current** artists (`isActive`), **alumni** (deactivated with a recorded
+ * `deactivatedAt` — they left the label), or **all** of both. An inactive
+ * artist with no departure date is neither and stays hidden.
+ */
+export type ArtistListingRoster = 'current' | 'alumni' | 'all';
+
+/** Pagination, search, sort, and roster for the public artists index. */
 export interface ArtistListingFilters {
   /** Case-insensitive term matched against names, aka names, genres, and release titles. */
   search?: string;
   sort: ArtistListingSort;
+  roster: ArtistListingRoster;
   skip: number;
   take: number;
 }

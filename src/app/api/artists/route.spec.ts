@@ -407,33 +407,36 @@ describe('Artist API Routes', () => {
       expect(auth).not.toHaveBeenCalled();
     });
 
-    it('calls the listing service with the default A–Z page', async () => {
+    it('calls the listing service with the default A–Z page of current artists', async () => {
       await callPublished();
 
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         sort: 'alpha',
+        roster: 'current',
         skip: 0,
         take: 24,
       });
     });
 
-    it('forwards a trimmed search term, the sort, and the pagination', async () => {
-      await callPublished('&search=%20punk%20&sort=newest&skip=24&take=12');
+    it('forwards a trimmed search term, the sort, the roster, and the pagination', async () => {
+      await callPublished('&search=%20punk%20&sort=newest&roster=alumni&skip=24&take=12');
 
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         search: 'punk',
         sort: 'newest',
+        roster: 'alumni',
         skip: 24,
         take: 12,
       });
     });
 
     it('degrades a malformed listing query to defaults instead of a 400', async () => {
-      const response = await callPublished('&sort=sideways&skip=nope&take=500');
+      const response = await callPublished('&sort=sideways&roster=retired&skip=nope&take=500');
 
       expect(response.status).toBe(200);
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         sort: 'alpha',
+        roster: 'current',
         skip: 0,
         take: 100,
       });

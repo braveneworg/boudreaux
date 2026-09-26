@@ -22,6 +22,9 @@ a thinner row than the index (no bio, no genres).
 **The artists index lists a listed artist: active, published, not deleted,
 and holding a direct credit (primary or featured) on at least one published,
 non-deleted release. A member credit alone does not list an artist.**
+(Amended by [ADR-0011](0011-alumni-are-deactivated-artists-with-a-departure-date.md):
+"active" is now the index's default roster, and alumni can be listed on
+request under the same rule.)
 
 - One `where` builder (`buildListedWhere`) defines "holds a listed direct
   release" for both the index and the playlist "By artist" search. Only the
