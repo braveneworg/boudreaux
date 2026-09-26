@@ -1,12 +1,14 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { notifyIfStaleServerAction } from '@/app/components/stale-page-toast';
 import { type ImageItem } from '@/app/components/ui/image-uploader';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import type { PresignedUrlResult } from '@/lib/actions/presigned-upload-actions';
 import type { RegisterImageResult } from '@/lib/actions/register-image-actions';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
 import type { DirectUploadResult } from '@/lib/utils/direct-upload';
+import { STALE_PAGE_MESSAGE } from '@/lib/utils/stale-server-action';
 
 import {
   markImagesUploadError,
@@ -18,6 +20,9 @@ import {
 
 vi.mock('@/lib/actions/presigned-upload-actions', () => ({
   getPresignedUploadUrlsAction: vi.fn(),
+}));
+vi.mock('@/app/components/stale-page-toast', () => ({
+  notifyIfStaleServerAction: vi.fn(),
 }));
 vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFilesToS3: vi.fn(),
@@ -154,6 +159,64 @@ describe('uploadAndRegisterImages', () => {
   beforeEach(() => {
     getPresignedMock.mockReset();
     uploadFilesMock.mockReset();
+    vi.mocked(notifyIfStaleServerAction).mockReset();
+  });
+
+  describe('stale server action (tab older than the deployed build)', () => {
+    const staleError = (): Error => {
+      const error = new Error('Server Action "abc" was not found on the server.');
+      error.name = 'UnrecognizedActionError';
+      return error;
+    };
+
+    it('presign rejects: notifies and throws the reload message', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(true);
+      const error = staleError();
+      getPresignedMock.mockRejectedValue(error);
+      const registerSpy = vi.fn();
+
+      await expect(
+        uploadAndRegisterImages([makeImage({ id: 't', file: makeFile('1.png') })], {
+          entityType: 'artists',
+          targetId: 'art-1',
+          register: registerSpy,
+        })
+      ).rejects.toThrow(STALE_PAGE_MESSAGE);
+      expect(vi.mocked(notifyIfStaleServerAction).mock.calls).toEqual([[error]]);
+      expect(uploadFilesMock).not.toHaveBeenCalled();
+      expect(registerSpy).not.toHaveBeenCalled();
+    });
+
+    it('register rejects after the S3 upload: notifies and throws the reload message', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(true);
+      getPresignedMock.mockResolvedValue({
+        success: true,
+        data: [presigned('artists/art-1/1.png', 'https://cdn/1.png')],
+      });
+      uploadFilesMock.mockResolvedValue([okUpload('artists/art-1/1.png', 'https://cdn/1.png')]);
+      const registerSpy = vi.fn().mockRejectedValue(staleError());
+
+      await expect(
+        uploadAndRegisterImages([makeImage({ id: 't', file: makeFile('1.png') })], {
+          entityType: 'artists',
+          targetId: 'art-1',
+          register: registerSpy,
+        })
+      ).rejects.toThrow(STALE_PAGE_MESSAGE);
+    });
+
+    it('rethrows any other rejection untouched', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(false);
+      getPresignedMock.mockRejectedValue(new Error('network down'));
+
+      await expect(
+        uploadAndRegisterImages([makeImage({ id: 't', file: makeFile('1.png') })], {
+          entityType: 'artists',
+          targetId: 'art-1',
+          register: vi.fn(),
+        })
+      ).rejects.toThrow('network down');
+    });
   });
 
   it('calls the presigned action with the entity type, target id, and file infos', async () => {

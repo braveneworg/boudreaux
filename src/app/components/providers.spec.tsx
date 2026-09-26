@@ -3,14 +3,19 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import { queryRetryDelay, shouldRetryQuery } from '@/lib/utils/query-retry';
 
 import { Providers } from './providers';
+import { notifyIfStaleServerAction } from './stale-page-toast';
 
 import type { DefaultOptions } from '@tanstack/react-query';
+
+vi.mock('./stale-page-toast', () => ({ notifyIfStaleServerAction: vi.fn() }));
 
 /** Captures the provided client's query defaults so the wiring can be asserted. */
 const captured: { queries?: DefaultOptions['queries'] } = {};
@@ -19,7 +24,30 @@ const CaptureQueryDefaults = () => {
   return null;
 };
 
+/** Fires one mutation that rejects with `error` as soon as it mounts. */
+const FailingMutation = ({ error }: { error: Error }) => {
+  const { mutate, isError } = useMutation({ mutationFn: () => Promise.reject(error) });
+  useEffect(() => mutate(), [mutate]);
+  return isError ? <div>failed</div> : null;
+};
+
 describe('Providers', () => {
+  // Every merge deploys a new build; an admin tab left open calls action ids
+  // the new server never had. The mutation cache is the one place every
+  // TanStack mutation's rejection passes through (2026-09-26).
+  it('routes every mutation rejection through the stale-server-action notifier', async () => {
+    const error = new Error('Server Action "abc" was not found on the server.');
+
+    render(
+      <Providers>
+        <FailingMutation error={error} />
+      </Providers>
+    );
+
+    await waitFor(() => expect(screen.getByText('failed')).toBeInTheDocument());
+    expect(vi.mocked(notifyIfStaleServerAction).mock.calls).toEqual([[error]]);
+  });
+
   it('renders its children', () => {
     render(
       <Providers>
