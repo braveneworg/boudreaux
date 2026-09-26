@@ -158,17 +158,32 @@ describe('venue-schema', () => {
       expectFailureIssuePath(result, 'capacity');
     });
 
-    it('should coerce numeric postalCode to string via preprocess', () => {
-      const venue = {
+    it('should keep a submitted leading-zero postalCode verbatim (#790)', () => {
+      const result = venueCreateSchema.safeParse({
+        name: 'Club Passim',
+        city: 'Cambridge',
+        postalCode: '02138',
+      });
+      expect(result.data?.postalCode).toBe('02138');
+    });
+
+    it('should read a submitted capacity string as a number (#790)', () => {
+      const result = venueCreateSchema.safeParse({
         name: 'Ryman Auditorium',
         city: 'Nashville',
-        postalCode: 37219,
-      };
+        capacity: '2362',
+      });
+      expect(result.data?.capacity).toBe(2362);
+    });
 
-      const result = venueCreateSchema.safeParse(venue);
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.data.postalCode).toBe('37219');
+    it.each(['', 'lots', '12.5'])('should reject the submitted capacity %j', (capacity) => {
+      const result = venueCreateSchema.safeParse({
+        name: 'Ryman Auditorium',
+        city: 'Nashville',
+        capacity,
+      });
+      expect(result.success).toBe(false);
+      expectFailureIssuePath(result, 'capacity');
     });
 
     it('should accept null or undefined for optional fields', () => {
@@ -288,13 +303,14 @@ describe('venue-schema', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should coerce numeric postalCode to string via preprocess', () => {
-      const update = { postalCode: 70116 };
+    it('should keep a submitted leading-zero postalCode verbatim (#790)', () => {
+      const result = venueUpdateSchema.safeParse({ postalCode: '07030' });
+      expect(result.data?.postalCode).toBe('07030');
+    });
 
-      const result = venueUpdateSchema.safeParse(update);
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.data.postalCode).toBe('70116');
+    it('should read a submitted capacity string as a number (#790)', () => {
+      const result = venueUpdateSchema.safeParse({ capacity: '850' });
+      expect(result.data?.capacity).toBe(850);
     });
   });
 

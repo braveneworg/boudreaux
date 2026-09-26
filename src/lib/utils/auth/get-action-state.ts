@@ -5,20 +5,10 @@ import type { FormState } from '@/lib/types/form-state';
 
 import type { ZodType } from 'zod';
 
-type ParsedFormValue = FormDataEntryValue | boolean | number | unknown[];
+type ParsedFormValue = FormDataEntryValue | unknown[];
 
 /** Working copy of the form data, keyed by field name. */
 type FormDataMap = Map<string, ParsedFormValue>;
-
-/**
- * Coerce a checkbox/switch string to a boolean, leaving every other string as
- * its original value. `'true'`/`'on'` → `true`; `'false'`/`'off'` → `false`.
- */
-const coerceBooleanString = (stringValue: string): boolean | string => {
-  if (stringValue === 'true' || stringValue === 'on') return true;
-  if (stringValue === 'false' || stringValue === 'off') return false;
-  return stringValue;
-};
 
 /**
  * Parse a JSON-stringified array (e.g. '["a","b"]') into a real array. Returns
@@ -35,24 +25,20 @@ const parseJsonArray = (val: string): unknown[] | null => {
   }
 };
 
-/** Whether a string should be coerced to a number for Zod `z.number()` fields. */
-const isNumericString = (val: string): boolean =>
-  val !== '' && !isNaN(Number(val)) && isFinite(Number(val));
-
 /**
- * Convert a single post-boolean string value to its richer form for schema
- * validation: a JSON array, a number, or the unchanged value. Non-string
- * values pass through untouched.
+ * Decode a JSON-stringified array back into a real array; every other value
+ * passes through untouched.
+ *
+ * Deliberately nothing more. Numbers and booleans are NOT converted here: a
+ * blanket conversion cannot know the schema, so it turned string fields that
+ * merely look numeric ('1999', '001', '7.99') into numbers and failed them
+ * (#790). Each numeric or boolean field converts for itself instead —
+ * `z.coerce.number()`, or `formBoolean()` from
+ * `@/lib/validation/form-boolean` for switches.
  */
-const coerceValueForSchema = (val: ParsedFormValue): ParsedFormValue => {
-  if (typeof val !== 'string') return val;
-  if (val.startsWith('[')) {
-    return parseJsonArray(val) ?? val;
-  }
-  // Convert numeric strings to numbers so Zod z.number() fields validate correctly.
-  // Non-numeric fields (URLs, dates, ObjectIds) contain non-numeric characters
-  // and won't match this check.
-  return isNumericString(val) ? Number(val) : val;
+const decodeFormValue = (val: ParsedFormValue): ParsedFormValue => {
+  if (typeof val !== 'string' || !val.startsWith('[')) return val;
+  return parseJsonArray(val) ?? val;
 };
 
 /**
@@ -76,7 +62,7 @@ const getActionState = <TForm>(
   formSchema: ZodType<TForm>
 ) => {
   // Preserve the values entered into the fields
-  const fields = new Map<string, boolean | string>();
+  const fields = new Map<string, string>();
   // Working copy of the form data, keyed by field name. A Map keeps dynamic
   // string keys off of a plain object (avoids object-injection sinks).
   const formData: FormDataMap = new Map(Object.entries(Object.fromEntries(data)));
@@ -92,24 +78,13 @@ const getActionState = <TForm>(
     }
   }
 
-  // Populate the formState fields with form data
+  // Populate the formState fields with the submitted strings, and decode the
+  // JSON-stringified arrays the client sends (`objectToFormData`) so array
+  // fields validate against real arrays.
   for (const [key, rawValue] of formData) {
     if (rawValue === undefined || rawValue === null) continue;
-    const stringValue = rawValue.toString();
-
-    // Store original string values in fields for form state
-    fields.set(key, stringValue);
-
-    // Update formData with converted boolean values for schema validation
-    formData.set(key, coerceBooleanString(stringValue));
-  }
-
-  // Parse JSON-stringified arrays back to actual arrays before validation.
-  // The client serializes arrays via JSON.stringify() when appending to FormData,
-  // so they arrive as strings like '["value1","value2"]'. Zod expects real arrays.
-  // Also coerce numeric strings to numbers (FormData sends all values as strings).
-  for (const [key, val] of formData) {
-    formData.set(key, coerceValueForSchema(val));
+    fields.set(key, rawValue.toString());
+    formData.set(key, decodeFormValue(rawValue));
   }
 
   // Every form in this application should follow this formState initial state

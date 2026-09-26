@@ -3,18 +3,28 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { changeEmailActionSchema } from '@/lib/validation/change-email-schema';
+import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
+import { contactSchema } from '@/lib/validation/contact-schema';
+import { createVideoSchema } from '@/lib/validation/create-video-schema';
+import { formBoolean } from '@/lib/validation/form-boolean';
+import { profileActionSchema } from '@/lib/validation/profile-schema';
+import { signupActionSchema } from '@/lib/validation/signup-schema';
+import { tourDateCreateSchema } from '@/lib/validation/tours/tour-date-schema';
+import { venueCreateSchema, venueUpdateSchema } from '@/lib/validation/tours/venue-schema';
+
 import { getActionState } from './get-action-state';
 
 describe('get-action-state', () => {
   const mockSchema = z.object({
     email: z.string().email(),
-    termsAndConditions: z.boolean(),
+    termsAndConditions: formBoolean(),
     username: z.string().optional(),
   });
 
-  // Schema for testing boolean conversion in isolation
+  // Schema for testing a switch field in isolation
   const booleanTestSchema = z.object({
-    termsAndConditions: z.boolean(),
+    termsAndConditions: formBoolean(),
   });
 
   // Schema for testing mixed field conversion
@@ -56,7 +66,9 @@ describe('get-action-state', () => {
     });
   });
 
-  describe('boolean conversion', () => {
+  // getActionState passes switch strings through; `formBoolean()` in the
+  // schema converts them (#790).
+  describe('switch fields with formBoolean()', () => {
     it('should convert "on" to true', () => {
       formData.append('termsAndConditions', 'on');
 
@@ -257,36 +269,262 @@ describe('get-action-state', () => {
     });
   });
 
-  describe('numeric coercion', () => {
-    it('should coerce numeric strings to numbers', () => {
-      const numberSchema = z.object({ duration: z.number(), position: z.number() });
-      formData.append('duration', '180');
-      formData.append('position', '3');
+  describe('string fields are never coerced (#790)', () => {
+    const stringSchema = z.object({ value: z.string() });
 
-      const permittedFields = ['duration', 'position'] as const;
-      const { parsed } = getActionState(formData, permittedFields, numberSchema);
+    it.each(['1999', '001', '7.99', '5.00', '1349', '0', '-3', '1e3', ' 42 '])(
+      'passes the numeric-looking string %j to a z.string() field unchanged',
+      (value) => {
+        formData.append('value', value);
 
-      expect(parsed.success).toBe(true);
-      const successParsed = parsed as {
-        success: true;
-        data: { duration: number; position: number };
-      };
-      expect(successParsed.data.duration).toBe(180);
-      expect(successParsed.data.position).toBe(3);
+        const { parsed } = getActionState(formData, ['value'] as const, stringSchema);
+
+        expect(parsed).toEqual({ success: true, data: { value } });
+      }
+    );
+
+    it.each(['true', 'false', 'on', 'off'])(
+      'passes the boolean-looking string %j to a z.string() field unchanged',
+      (value) => {
+        formData.append('value', value);
+
+        const { parsed } = getActionState(formData, ['value'] as const, stringSchema);
+
+        expect(parsed).toEqual({ success: true, data: { value } });
+      }
+    );
+
+    it('leaves a z.number() field uncoerced, so the schema must opt in', () => {
+      formData.append('value', '180');
+
+      const { parsed } = getActionState(
+        formData,
+        ['value'] as const,
+        z.object({ value: z.number() })
+      );
+
+      expect(parsed.success).toBe(false);
     });
 
-    it('should coerce decimal numeric strings', () => {
-      const numberSchema = z.object({ fontSize: z.number() });
-      formData.append('fontSize', '2.5');
+    it('keeps the raw submitted strings in formState.fields', () => {
+      formData.append('title', '1999');
+      formData.append('agree', 'on');
+      formData.append('tags', '["a","b"]');
 
-      const permittedFields = ['fontSize'] as const;
-      const { parsed } = getActionState(formData, permittedFields, numberSchema);
+      const { formState } = getActionState(
+        formData,
+        ['title', 'agree', 'tags'] as const,
+        z.object({ title: z.string(), agree: z.string(), tags: z.array(z.string()) })
+      );
 
-      expect(parsed.success).toBe(true);
-      const successParsed = parsed as { success: true; data: { fontSize: number } };
-      expect(successParsed.data.fontSize).toBe(2.5);
+      expect(formState.fields).toEqual({ title: '1999', agree: 'on', tags: '["a","b"]' });
+    });
+  });
+
+  // The action schemas themselves own every string → number/boolean
+  // conversion, so these run the REAL schemas against FormData as the
+  // clients submit it (#790).
+  describe('with the real action schemas', () => {
+    const toFormData = (entries: Record<string, string>): FormData => {
+      const payload = new FormData();
+      for (const [key, value] of Object.entries(entries)) payload.append(key, value);
+      return payload;
+    };
+
+    it.each([
+      ['true', true],
+      ['on', true],
+    ])('signup: accepts termsAndConditions %j as %j', (submitted, expected) => {
+      const { parsed } = getActionState(
+        toFormData({ email: 'fan@example.com', termsAndConditions: submitted }),
+        ['email', 'termsAndConditions'] as const,
+        signupActionSchema
+      );
+
+      expect(parsed.data?.termsAndConditions).toBe(expected);
     });
 
+    it('signup: rejects termsAndConditions "false"', () => {
+      const { parsed } = getActionState(
+        toFormData({ email: 'fan@example.com', termsAndConditions: 'false' }),
+        ['email', 'termsAndConditions'] as const,
+        signupActionSchema
+      );
+
+      expect(parsed.error?.issues.map(({ path }) => path)).toEqual([['termsAndConditions']]);
+    });
+
+    it('signup: reads the opt-in switches as booleans', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          email: 'fan@example.com',
+          termsAndConditions: 'true',
+          allowSmsNotifications: 'false',
+          allowEmailNotifications: 'true',
+        }),
+        [
+          'email',
+          'termsAndConditions',
+          'allowSmsNotifications',
+          'allowEmailNotifications',
+        ] as const,
+        signupActionSchema
+      );
+
+      expect(parsed.data).toMatchObject({
+        allowSmsNotifications: false,
+        allowEmailNotifications: true,
+      });
+    });
+
+    it('change email: reads allowEmailNotifications "false" as false', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          email: 'new@example.com',
+          confirmEmail: 'new@example.com',
+          previousEmail: 'old@example.com',
+          allowEmailNotifications: 'false',
+        }),
+        ['email', 'confirmEmail', 'previousEmail', 'allowEmailNotifications'] as const,
+        changeEmailActionSchema
+      );
+
+      expect(parsed.data?.allowEmailNotifications).toBe(false);
+    });
+
+    it('profile: keeps a numeric ZIP code and phone as strings and reads the switches', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          firstName: '1349',
+          phone: '5551234567',
+          zipCode: '02139',
+          allowSmsNotifications: 'true',
+          allowEmailNotifications: 'off',
+        }),
+        [
+          'firstName',
+          'phone',
+          'zipCode',
+          'allowSmsNotifications',
+          'allowEmailNotifications',
+        ] as const,
+        profileActionSchema
+      );
+
+      expect(parsed.data).toEqual({
+        firstName: '1349',
+        phone: '5551234567',
+        zipCode: '02139',
+        allowSmsNotifications: true,
+        allowEmailNotifications: false,
+      });
+    });
+
+    it('change username: accepts an all-digit username', () => {
+      const { parsed } = getActionState(
+        toFormData({ username: '1349', confirmUsername: '1349' }),
+        ['username', 'confirmUsername'] as const,
+        changeUsernameSchema
+      );
+
+      expect(parsed.success).toBe(true);
+    });
+
+    it('contact: accepts an all-digit phone number', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          reason: 'question',
+          firstName: 'Ann',
+          lastName: 'Lee',
+          email: 'ann@example.com',
+          phone: '5551234567',
+          message: 'A question about the 1999 reissue.',
+        }),
+        ['reason', 'firstName', 'lastName', 'email', 'phone', 'message'] as const,
+        contactSchema
+      );
+
+      expect(parsed.data?.phone).toBe('5551234567');
+    });
+
+    it('venue: keeps a leading-zero postal code and reads capacity as a number', () => {
+      const { parsed } = getActionState(
+        toFormData({ name: '930', city: 'Boston', postalCode: '02139', capacity: '500' }),
+        ['name', 'city', 'postalCode', 'capacity'] as const,
+        venueCreateSchema
+      );
+
+      expect(parsed.data).toMatchObject({ name: '930', postalCode: '02139', capacity: 500 });
+    });
+
+    it('venue update: reads capacity as a number', () => {
+      const { parsed } = getActionState(
+        toFormData({ capacity: '1200' }),
+        ['capacity'] as const,
+        venueUpdateSchema
+      );
+
+      expect(parsed.data?.capacity).toBe(1200);
+    });
+
+    it('tour date: keeps a bare ticket price as a string and reads utcOffset as a number', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          tourId: 'tour-1',
+          startDate: '2026-10-01',
+          showStartTime: '2026-10-01T20:00:00.000Z',
+          venueId: 'venue-1',
+          headlinerIds: '["artist-1"]',
+          ticketPrices: '25',
+          utcOffset: '-300',
+        }),
+        [
+          'tourId',
+          'startDate',
+          'showStartTime',
+          'venueId',
+          'headlinerIds',
+          'ticketPrices',
+          'utcOffset',
+        ] as const,
+        tourDateCreateSchema
+      );
+
+      expect(parsed.data).toMatchObject({ ticketPrices: '25', utcOffset: -300 });
+    });
+
+    it('video: keeps a numeric title and accepts numeric duration and size strings', () => {
+      const { parsed } = getActionState(
+        toFormData({
+          title: '1999',
+          artist: '311',
+          category: 'MUSIC',
+          releasedOn: '1999-01-01',
+          durationSeconds: '180',
+          s3Key: 'videos/1999.mp4',
+          fileName: '1999.mp4',
+          fileSize: '1048576',
+          mimeType: 'video/mp4',
+        }),
+        [
+          'title',
+          'artist',
+          'category',
+          'releasedOn',
+          'durationSeconds',
+          's3Key',
+          'fileName',
+          'fileSize',
+          'mimeType',
+        ] as const,
+        createVideoSchema
+      );
+
+      expect(parsed.data).toMatchObject({ title: '1999', artist: '311' });
+    });
+  });
+
+  describe('numeric-looking values', () => {
     it('should not coerce empty strings to numbers', () => {
       const optionalSchema = z.object({ value: z.string().optional() });
       formData.append('value', '');
