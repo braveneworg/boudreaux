@@ -80,4 +80,26 @@ describe('artistWithPublishedReleasesSchema', () => {
     const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
     expect(parsed.bioImages[0].displayOrder).toBeNull();
   });
+
+  it('retains stored bio image content hashes through the scalar mirror', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse({
+      ...artistWithPublishedReleases,
+      bioImages: [
+        {
+          ...artistWithPublishedReleases.bioImages[0],
+          contentHash: 'sha-a',
+          perceptualHash: '0000000000000abc',
+        },
+      ],
+    });
+    expect(parsed.bioImages[0]).toMatchObject({
+      contentHash: 'sha-a',
+      perceptualHash: '0000000000000abc',
+    });
+  });
+
+  it('reads bio image hashes absent from a legacy payload as null', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
+    expect(parsed.bioImages[0]).toMatchObject({ contentHash: null, perceptualHash: null });
+  });
 });

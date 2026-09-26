@@ -3,7 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistListingFilters, ArtistListingSort } from '@/lib/types/domain/artist';
+import type {
+  ArtistListingFilters,
+  ArtistListingRoster,
+  ArtistListingSort,
+} from '@/lib/types/domain/artist';
 
 /** Page size the index requests and the SSR prefetch reads (kept in sync with the hook). */
 export const ARTIST_LISTING_DEFAULT_TAKE = 24;
@@ -17,6 +21,13 @@ export const ARTIST_LISTING_SORTS = [
   'alpha',
   'newest',
 ] as const satisfies readonly ArtistListingSort[];
+
+/** Roster filters the index offers, in the order the toggle presents them. */
+export const ARTIST_LISTING_ROSTERS = [
+  'current',
+  'alumni',
+  'all',
+] as const satisfies readonly ArtistListingRoster[];
 
 /**
  * A query-string integer that is clamped rather than rejected: a missing or
@@ -45,6 +56,7 @@ export const artistListingQuerySchema = z
         return trimmed ? trimmed : undefined;
       }),
     sort: z.enum(ARTIST_LISTING_SORTS).catch('alpha'),
+    roster: z.enum(ARTIST_LISTING_ROSTERS).catch('current'),
     skip: clampedInt(0, Number.MAX_SAFE_INTEGER, 0),
     take: clampedInt(1, ARTIST_LISTING_MAX_TAKE, ARTIST_LISTING_DEFAULT_TAKE),
   })

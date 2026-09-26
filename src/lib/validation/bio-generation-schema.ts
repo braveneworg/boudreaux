@@ -52,11 +52,20 @@ export { bioGenerationImageSchema, bioGenerationLinkSchema };
  * the Lambda contract must carry — everything except DB bookkeeping (`id`,
  * `artistId`, `sortOrder`, `createdAt`), repository-stamped provenance
  * (`origin`), the human-owned display position (`displayOrder`), and the
- * rehost-only `originalUrl`, none of which the Lambda produces.
+ * rehost-only `originalUrl` and content hashes, none of which the Lambda
+ * produces.
  */
 type BioImageContentField = keyof Omit<
   ArtistBioImageRecord,
-  'artistId' | 'createdAt' | 'displayOrder' | 'id' | 'origin' | 'originalUrl' | 'sortOrder'
+  | 'artistId'
+  | 'contentHash'
+  | 'createdAt'
+  | 'displayOrder'
+  | 'id'
+  | 'origin'
+  | 'originalUrl'
+  | 'perceptualHash'
+  | 'sortOrder'
 >;
 
 // Coverage ties the shared wire image schema to the domain bio-image row: a
