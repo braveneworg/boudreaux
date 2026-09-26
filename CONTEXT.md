@@ -111,11 +111,21 @@ See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
 
 **listed artist** — an Artist shown on the public artists index and found by
-its search: active, published, not deleted, and directly credited (primary or
+its search: published, not deleted, and directly credited (primary or
 featured) on at least one published Release. A member credit alone does not
-list an Artist. See
+list an Artist. The index shows **current artists** by default and
+**alumni** on request. See
 [ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md).
 _Avoid_: visible artist, public artist.
+
+**current artist** — an Artist still on the label: `isActive` is true.
+
+**alumni** — Artists who left the label: `isActive` is false AND a departure
+date (`deactivatedAt`) is recorded. An inactive Artist with no departure date
+is neither current nor alumni and is hidden from every public surface.
+`reactivatedAt` plays no part — re-signing sets `isActive` back to true. See
+[ADR-0011](docs/adr/0011-alumni-are-deactivated-artists-with-a-departure-date.md).
+_Avoid_: inactive artist, former artist, past artist.
 
 **Video** — an uploaded video asset with **probe** metadata (technical fields
 extracted by ffprobe), a **description**, and **enrichment** (externally

@@ -363,10 +363,52 @@ jobs:
 
           echo "✓ CloudFront invalidation created successfully"
 
+  # Applies prisma/schema.prisma to the production database when it changed
+  # since the last deployed commit (ADR-0012). Runs after the images and
+  # assets are built, so a failed build never touches the database, and
+  # before the container roll (`deploy` needs this job), so new code never
+  # runs against a stale index set. A failed push fails the deploy.
+  schema-push:
+    name: Apply Prisma schema (gated)
+    runs-on: ubuntu-latest
+    needs: [build-images, build-nginx, sync-to-s3]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # The commit CI built and this run deploys, not main's current tip.
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # Full history plus origin/main for the Deployed-Sha marker lookup.
+          fetch-depth: 0
+
+      - name: Decide whether the schema changed
+        id: gate
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Assign first so a gate failure fails the step.
+          decision=$(bash scripts/ci/schema-push-gate.sh "$HEAD_SHA" origin/main)
+          echo "decision=$decision" >> "$GITHUB_OUTPUT"
+          echo "Schema push decision: $decision"
+
+      - name: Setup environment
+        if: steps.gate.outputs.decision == 'push'
+        uses: ./.github/actions/setup
+
+      # No --accept-data-loss: a destructive change errors out here and
+      # stops the deploy, to be applied by hand (see the deploy runbook).
+      - name: Push Prisma schema
+        if: steps.gate.outputs.decision == 'push'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm exec prisma db push --skip-generate
+
   deploy:
     name: Deploy to EC2 via SSH with temporary IP allow
     runs-on: ubuntu-latest
-    needs: [build-images, build-nginx, sync-to-s3]
+    needs: [build-images, build-nginx, sync-to-s3, schema-push]
     permissions:
       contents: read
       id-token: write
@@ -780,12 +822,16 @@ jobs:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           NEW_VERSION: ${{ steps.version.outputs.new }}
           NEW_TAG: ${{ steps.version.outputs.tag }}
+          # The commit this run deployed. main may have moved past it, so the
+          # release commit records it for the next deploy's schema gate
+          # (scripts/ci/schema-push-gate.sh, ADR-0012).
+          DEPLOYED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add package.json pnpm-lock.yaml CHANGELOG.md
-          git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
+          git commit -m "chore(release): v${NEW_VERSION} [skip ci]" -m "Deployed-Sha: ${DEPLOYED_SHA}"
 
           max_retries=3
           attempt=1
