@@ -154,6 +154,11 @@ describe('ArtistService', () => {
     bioStartedAt: null,
     bioJobToken: null,
     bioProgress: null,
+    imageLinksStatus: null,
+    imageLinksError: null,
+    imageLinksStartedAt: null,
+    imageLinksJobToken: null,
+    imageLinksAddedCount: null,
     slug: 'john-doe',
     genres: null,
     bornOn: null,
@@ -2658,6 +2663,8 @@ describe('ArtistService', () => {
         kind: null,
         origin: 'custom',
         sortOrder: 2,
+        reference: true,
+        imageSource: false,
       };
       vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(existing);
 
@@ -2680,6 +2687,8 @@ describe('ArtistService', () => {
         kind: null,
         origin: 'custom',
         sortOrder: 3,
+        reference: true,
+        imageSource: false,
       };
       vi.mocked(ArtistBioLinkRepository.findByUrl)
         .mockResolvedValueOnce(null)

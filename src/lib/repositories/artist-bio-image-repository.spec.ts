@@ -15,6 +15,7 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
       aggregate: vi.fn(),
     },
   },
@@ -376,6 +377,60 @@ describe('ArtistBioImageRepository', () => {
           name: 'DataError',
         }
       );
+    });
+  });
+
+  describe('createMany', () => {
+    it('inserts the rows after the current max sortOrder, in order', async () => {
+      vi.mocked(prisma.artistBioImage.aggregate).mockResolvedValue({
+        _max: { sortOrder: 4 },
+      } as never);
+      vi.mocked(prisma.artistBioImage.createMany).mockResolvedValue({ count: 2 } as never);
+
+      const count = await ArtistBioImageRepository.createMany([
+        { artistId: 'a1', url: 'https://cdn/1', origin: 'linked', hasFace: true, faceScore: 91 },
+        { artistId: 'a1', url: 'https://cdn/2', origin: 'linked' },
+      ]);
+
+      expect(count).toBe(2);
+      expect(prisma.artistBioImage.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            artistId: 'a1',
+            url: 'https://cdn/1',
+            origin: 'linked',
+            hasFace: true,
+            faceScore: 91,
+            isPrimary: false,
+            sortOrder: 5,
+          }),
+          expect.objectContaining({ url: 'https://cdn/2', sortOrder: 6 }),
+        ],
+      });
+    });
+
+    it('returns 0 without touching the database for an empty batch', async () => {
+      const count = await ArtistBioImageRepository.createMany([]);
+
+      expect(count).toBe(0);
+      expect(prisma.artistBioImage.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findExistingUrls', () => {
+    it('returns the set of stored and original URLs for the artist', async () => {
+      vi.mocked(prisma.artistBioImage.findMany).mockResolvedValue([
+        { url: 'https://cdn/a', originalUrl: 'https://src/a' },
+        { url: 'https://cdn/b', originalUrl: null },
+      ] as never);
+
+      const urls = await ArtistBioImageRepository.findExistingUrls('a1');
+
+      expect(prisma.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1' },
+        select: { url: true, originalUrl: true },
+      });
+      expect([...urls].sort()).toEqual(['https://cdn/a', 'https://cdn/b', 'https://src/a']);
     });
   });
 });

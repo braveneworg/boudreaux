@@ -83,8 +83,8 @@ export const bioStatusLinkUrlSchema = z
     { message: 'Must be an http(s) URL or a site-relative path' }
   );
 
-/** Row provenance: AI-discovered (`generated`) or admin-authored (`custom`). */
-export const bioOriginSchema = z.enum(['generated', 'custom']).nullable().optional();
+/** Row provenance: AI-discovered (`generated`), admin-authored (`custom`) or scraped from an admin-supplied page (`linked`). */
+export const bioOriginSchema = z.enum(['generated', 'custom', 'linked']).nullable().optional();
 
 /**
  * Human-chosen display position on the status wire: a non-negative integer

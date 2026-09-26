@@ -1114,7 +1114,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.replaceBioContent('a1', content);
 
       expect(tx.artistBioImage.findMany).toHaveBeenCalledWith({
-        where: { artistId: 'a1', origin: 'custom' },
+        where: { artistId: 'a1', origin: { in: ['custom', 'linked'] } },
         select: { url: true },
       });
       expect(tx.artistBioLink.findMany).toHaveBeenCalledWith({
@@ -1460,6 +1460,143 @@ describe('ArtistRepository', () => {
       expect(prisma.artist.update).toHaveBeenCalledWith({
         where: { id: 'a'.repeat(24) },
         data: { bornOn: new Date('1985-03-15T00:00:00.000Z'), updatedBy: 'admin-1' },
+      });
+    });
+  });
+
+  describe('image-links job lifecycle', () => {
+    it('setImageLinksStatus writes the status and only the provided fields', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.setImageLinksStatus('a1', 'processing');
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { imageLinksStatus: 'processing' },
+      });
+    });
+
+    it('setImageLinksStatus writes error, startedAt and addedCount when provided', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
+      const startedAt = new Date('2026-09-25T00:00:00Z');
+
+      await ArtistRepository.setImageLinksStatus('a1', 'succeeded', {
+        error: null,
+        startedAt,
+        addedCount: 4,
+      });
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: {
+          imageLinksStatus: 'succeeded',
+          imageLinksError: null,
+          imageLinksStartedAt: startedAt,
+          imageLinksAddedCount: 4,
+        },
+      });
+    });
+
+    it('setImageLinksStatus clears the previous addedCount when a run is marked pending', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.setImageLinksStatus('a1', 'pending');
+
+      expect(prisma.artist.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { imageLinksStatus: 'pending', imageLinksAddedCount: null },
+      });
+    });
+
+    it('setImageLinksJobToken sets and clears the token', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
+
+      await ArtistRepository.setImageLinksJobToken('a1', 'tok');
+      await ArtistRepository.setImageLinksJobToken('a1', null);
+
+      expect(vi.mocked(prisma.artist.update).mock.calls).toEqual([
+        [{ where: { id: 'a1' }, data: { imageLinksJobToken: 'tok' } }],
+        [{ where: { id: 'a1' }, data: { imageLinksJobToken: null } }],
+      ]);
+    });
+
+    it('claimImageLinksJobToken claims only the processing row with a matching token', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      const claimed = await ArtistRepository.claimImageLinksJobToken('a1', 'tok');
+
+      expect(claimed).toBe(true);
+      expect(prisma.artist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', imageLinksJobToken: 'tok', imageLinksStatus: 'processing' },
+        data: { imageLinksJobToken: null },
+      });
+    });
+
+    it('claimImageLinksJobToken returns false when nothing matched', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      expect(await ArtistRepository.claimImageLinksJobToken('a1', 'tok')).toBe(false);
+    });
+
+    it('getImageLinksJobState selects the job columns plus slug', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ slug: 'x' } as never);
+
+      const state = await ArtistRepository.getImageLinksJobState('a1');
+
+      expect(state).toEqual({ slug: 'x' });
+      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        select: {
+          slug: true,
+          imageLinksStatus: true,
+          imageLinksError: true,
+          imageLinksStartedAt: true,
+          imageLinksJobToken: true,
+          imageLinksAddedCount: true,
+        },
+      });
+    });
+  });
+
+  describe('reference-role link filtering', () => {
+    it('getBioGenerationState only selects links that play the reference role', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ bioStatus: 'succeeded' } as never);
+
+      await ArtistRepository.getBioGenerationState('a1');
+
+      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
+      expect(arg?.select?.bioLinks).toMatchObject({
+        where: { OR: [{ reference: true }, { reference: null }, { reference: { isSet: false } }] },
+      });
+    });
+
+    it('replaceBioContent shields custom AND linked images from re-insertion', async () => {
+      const tx = {
+        artistBioImage: {
+          findMany: vi.fn().mockResolvedValue([]),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        artistBioLink: {
+          findMany: vi.fn().mockResolvedValue([]),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+        artist: { update: vi.fn().mockResolvedValue({ id: 'a1' }) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', {
+        shortBio: '',
+        bio: '',
+        altBio: '',
+        genres: null,
+        bioModel: 'm',
+        images: [],
+        links: [],
+      });
+
+      expect(tx.artistBioImage.findMany).toHaveBeenCalledWith({
+        where: { artistId: 'a1', origin: { in: ['custom', 'linked'] } },
+        select: { url: true },
       });
     });
   });

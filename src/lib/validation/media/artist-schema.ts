@@ -51,6 +51,8 @@ const artistBioLinkSchema = z.object({
   kind: nullableString,
   origin: nullableString,
   sortOrder: z.number(),
+  reference: z.boolean().nullable(),
+  imageSource: z.boolean().nullable(),
 });
 
 /** `ArtistLabel` join-row scalars (the shape produced by `labels: true`). */
