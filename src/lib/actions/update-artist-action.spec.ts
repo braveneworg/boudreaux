@@ -341,22 +341,63 @@ describe('updateArtistAction', () => {
       expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].genres).toBe('indie-rock');
     });
 
-    it('leaves an empty non-vocabulary field as undefined, not null', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
+    describe('clearable optional text fields (#759)', () => {
+      const CLEARABLE_FIELDS = [
+        'middleName',
+        'displayName',
+        'title',
+        'suffix',
+        'akaNames',
+        'bio',
+        'shortBio',
+        'altBio',
+      ] as const;
+
+      const runWith = async (extra: Record<string, string>): Promise<Record<string, unknown>> => {
+        vi.mocked(getActionState).mockReturnValue({
+          formState: { fields: {}, success: false },
+          parsed: {
+            success: true,
+            data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', ...extra },
+          },
+        } as never);
+        vi.mocked(ArtistService.updateArtist).mockResolvedValue({
           success: true,
-          data: { firstName: 'John', surname: 'Doe', slug: 'john-doe', displayName: '' },
-        },
-      } as never);
-      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
-        success: true,
-        data: { id: 'artist-123' },
-      } as never);
+          data: { id: 'artist-123' },
+        } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+        await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
-      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].displayName).toBeUndefined();
+        expect(vi.mocked(ArtistService.updateArtist).mock.calls).toHaveLength(1);
+        return vi.mocked(ArtistService.updateArtist).mock.calls[0][1] as Record<string, unknown>;
+      };
+
+      it.each(CLEARABLE_FIELDS)('writes null for %s when it is submitted empty', async (field) => {
+        const payload = await runWith({ [field]: '' });
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: null }));
+      });
+
+      it.each(CLEARABLE_FIELDS)(
+        'writes null for %s when it is submitted whitespace-only',
+        async (field) => {
+          const payload = await runWith({ [field]: '   ' });
+
+          expect(payload).toEqual(expect.objectContaining({ [field]: null }));
+        }
+      );
+
+      it.each(CLEARABLE_FIELDS)('leaves %s undefined when it is absent', async (field) => {
+        const payload = await runWith({});
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: undefined }));
+      });
+
+      it.each(CLEARABLE_FIELDS)('passes a non-empty %s through unchanged', async (field) => {
+        const payload = await runWith({ [field]: 'Kept value' });
+
+        expect(payload).toEqual(expect.objectContaining({ [field]: 'Kept value' }));
+      });
     });
 
     it('should handle artist update failure from service', async () => {

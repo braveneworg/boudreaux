@@ -14,6 +14,7 @@ import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
@@ -43,39 +44,18 @@ type ParsedArtistData = ReturnType<typeof createArtistSchema.parse>;
 const toOptionalDate = (value: string | undefined): Date | undefined =>
   value ? new Date(value) : undefined;
 
-const toOptionalString = (value: string | null | undefined): string | undefined =>
-  value || undefined;
-
-/**
- * Like {@link toOptionalString}, but a SUBMITTED blank clears the column
- * instead of vanishing. `toOptionalString` turns `''` into `undefined` and
- * Prisma omits `undefined`, so a field emptied in the form silently kept its
- * old value — which is why clearing genres, the documented escape hatch from
- * ADR-0009's "regeneration never refreshes a non-empty field", did nothing.
- *
- * An ABSENT field still yields `undefined`: only a value that was actually
- * submitted and is blank means "clear this".
- *
- * Every other optional column has the same defect; fixing them all is issue
- * #759, because each needs its own check that a blank is really meant to clear.
- */
-const toClearableString = (value: string | null | undefined): string | null | undefined => {
-  if (value === undefined) return undefined;
-  return value?.trim() ? value : null;
-};
-
 const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({
   firstName: data.firstName || '',
   surname: data.surname || '',
   slug: data.slug,
-  middleName: toOptionalString(data.middleName),
-  displayName: toOptionalString(data.displayName),
-  title: toOptionalString(data.title),
-  suffix: toOptionalString(data.suffix),
-  akaNames: toOptionalString(data.akaNames),
-  bio: toOptionalString(data.bio),
-  shortBio: toOptionalString(data.shortBio),
-  altBio: toOptionalString(data.altBio),
+  middleName: toClearableString(data.middleName),
+  displayName: toClearableString(data.displayName),
+  title: toClearableString(data.title),
+  suffix: toClearableString(data.suffix),
+  akaNames: toClearableString(data.akaNames),
+  bio: toClearableString(data.bio),
+  shortBio: toClearableString(data.shortBio),
+  altBio: toClearableString(data.altBio),
   genres: toClearableString(data.genres),
   tags: toClearableString(data.tags),
   bornOn: toOptionalDate(data.bornOn),
