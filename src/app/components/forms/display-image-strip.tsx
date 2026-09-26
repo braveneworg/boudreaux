@@ -86,8 +86,8 @@ export const DisplayImageStrip = ({
       </p>
       {images.length === 0 ? (
         <p className="text-muted-foreground text-xs">
-          No display images chosen — the artist page shows the suggested images, or the first pool
-          images when nothing is suggested.
+          No display images chosen — the artist page shows the suggested images that have alt text,
+          or else the first pool images that have alt text. They are marked Shown in the pool below.
         </p>
       ) : (
         <ol aria-label="Display images" className="flex flex-wrap gap-2">
