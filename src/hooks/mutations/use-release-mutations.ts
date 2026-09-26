@@ -51,7 +51,9 @@ export const useCreateReleaseMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link updateReleaseAction}. See
+ * Mutation hook wrapping {@link updateReleaseAction}. Empty fields are KEPT in
+ * the `FormData` (`keepEmptyStrings`): a blank is how the admin clears an
+ * optional field, and the action maps it to `null` (#759). See
  * {@link useCreateReleaseMutation} for the result/invalidation contract.
  */
 export const useUpdateReleaseMutation = () => {
@@ -59,7 +61,12 @@ export const useUpdateReleaseMutation = () => {
     FormState,
     { id: string; values: ReleaseFormData }
   >(
-    ({ id, values }) => updateReleaseAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
+    ({ id, values }) =>
+      updateReleaseAction(
+        id,
+        EMPTY_FORM_STATE,
+        objectToFormData(values, { keepEmptyStrings: true })
+      ),
     invalidateReleaseQueries
   );
 

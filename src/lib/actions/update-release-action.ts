@@ -17,6 +17,7 @@ import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
@@ -102,8 +103,8 @@ const buildReleaseUpdateInput = (data: {
     coverArt: data.coverArt,
     formats: (data.formats || ['DIGITAL']) as Format[],
     labels: parseToArray(data.labels),
-    catalogNumber: data.catalogNumber || undefined,
-    description: data.description || undefined,
+    catalogNumber: toClearableString(data.catalogNumber),
+    description: toClearableString(data.description),
     notes: parseToParagraphs(data.notes),
     executiveProducedBy: parseToArray(data.executiveProducedBy),
     coProducedBy: parseToArray(data.coProducedBy),
@@ -117,7 +118,7 @@ const buildReleaseUpdateInput = (data: {
     publishedAt: data.publishedAt ? new Date(data.publishedAt) : undefined,
     featuredOn: data.featuredOn ? new Date(data.featuredOn) : undefined,
     featuredUntil: data.featuredUntil ? new Date(data.featuredUntil) : undefined,
-    featuredDescription: data.featuredDescription || undefined,
+    featuredDescription: toClearableString(data.featuredDescription),
     suggestedPrice: suggestedPriceCents,
   };
 };
