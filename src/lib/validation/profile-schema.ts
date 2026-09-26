@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { formBoolean } from '@/lib/validation/form-boolean';
 import { COUNTRIES } from '@/utils/countries';
 import { US_STATES } from '@/utils/states';
 
@@ -69,3 +70,13 @@ export const profileSchema = z.object({
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
+
+/**
+ * {@link profileSchema} as `updateProfileAction` reads it from `FormData`,
+ * where the opt-in switches arrive as `'true'`/`'false'`. The client schema
+ * keeps plain `z.boolean()` because React Hook Form holds real booleans (#790).
+ */
+export const profileActionSchema = profileSchema.extend({
+  allowSmsNotifications: formBoolean().optional(),
+  allowEmailNotifications: formBoolean().optional(),
+});
