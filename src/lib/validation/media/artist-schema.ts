@@ -12,7 +12,6 @@ import {
   artistPublicScalarSchema,
   artistScalarSchema,
   date,
-  imageSchema,
   nullableString,
   releaseScalarSchema,
   urlSchema,
@@ -37,6 +36,9 @@ const artistBioImageSchema = z.object({
   alt: nullableString,
   hasFace: z.boolean().nullable(),
   faceScore: z.number().nullable(),
+  // Absent from payloads serialized before the hashes existed — read as null.
+  contentHash: nullableString.default(null),
+  perceptualHash: nullableString.default(null),
   origin: nullableString,
   sortOrder: z.number(),
   displayOrder: z.number().int().nullable(),
@@ -76,7 +78,6 @@ const artistMemberSchema = z.object({
 
 /** `Artist` with the relations selected by the `Artist` domain type. */
 export const artistSchema = artistScalarSchema.extend({
-  images: z.array(imageSchema),
   labels: z.array(artistLabelSchema),
   releases: z.array(
     z.object({
@@ -90,13 +91,11 @@ export const artistSchema = artistScalarSchema.extend({
 }) satisfies z.ZodType<Artist>;
 
 /**
- * `Artist` as returned by `GET /api/artists/[id]` — scalars plus the ordered
- * `images` relation only (see `ArtistRepository.findById`). Narrower than
- * `artistSchema`, which also pulls labels/urls/releases the by-id route omits.
+ * `Artist` as returned by `GET /api/artists/[id]` — scalars only (see
+ * `ArtistRepository.findById`). Narrower than `artistSchema`, which also pulls
+ * labels/urls/releases the by-id route omits.
  */
-export const artistDetailSchema = artistScalarSchema.extend({
-  images: z.array(imageSchema),
-}) satisfies z.ZodType<ArtistDetail>;
+export const artistDetailSchema = artistScalarSchema satisfies z.ZodType<ArtistDetail>;
 
 /**
  * Artist with full published release data, for the public artist detail page.
@@ -110,7 +109,6 @@ export const artistDetailSchema = artistScalarSchema.extend({
  * field a future query re-selects is dropped before it is serialised.
  */
 export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend({
-  images: z.array(imageSchema),
   labels: z.array(artistLabelSchema),
   urls: z.array(urlSchema),
   bioImages: z.array(artistBioImageSchema),

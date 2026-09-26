@@ -171,6 +171,14 @@ describe('ArtistDataView', () => {
     expect(screen.getByTestId('data-view')).toBeInTheDocument();
   });
 
+  it('passes no legacy image field, since artists no longer carry images', () => {
+    mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+
+    render(<ArtistDataView />);
+
+    expect(screen.getByTestId('data-view')).toHaveAttribute('data-image-field', 'undefined');
+  });
+
   it('prioritizes error state over pending state', () => {
     mockUseArtistsQuery.mockReturnValue({
       ...baseInfiniteResult,
