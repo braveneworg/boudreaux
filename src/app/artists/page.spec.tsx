@@ -180,7 +180,7 @@ describe('ArtistsIndexPage', () => {
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['artists', 'publishedInfinite', 'alpha', ''],
+        queryKey: ['artists', 'publishedInfinite', 'alpha', 'current', ''],
         initialPageParam: 0,
       })
     );

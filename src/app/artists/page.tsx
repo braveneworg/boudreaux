@@ -43,7 +43,7 @@ export default async function ArtistsIndexPage() {
   // under load on the standalone server. A service failure degrades to an empty
   // first page (the client refetches) rather than crashing the page.
   await queryClient.prefetchInfiniteQuery({
-    queryKey: queryKeys.artists.publishedInfinite('alpha', ''),
+    queryKey: queryKeys.artists.publishedInfinite('alpha', '', 'current'),
     initialPageParam: 0,
     queryFn: async () => {
       const result = await ArtistService.listPublishedArtists({
