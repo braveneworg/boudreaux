@@ -123,9 +123,23 @@ export const queryKeys = {
     imageLinks: (artistId: string) => [...queryKeys.artists.all, 'imageLinks', artistId] as const,
     /** Home-page artist typeahead (`useArtistNavSearchQuery`). */
     search: (query: string) => [...queryKeys.artists.all, 'search', query] as const,
-    /** Public artists index — one shared infinite query feeds the grid and the search dropdown. */
-    publishedInfinite: (sort: 'alpha' | 'newest', search = '') =>
-      [...queryKeys.artists.all, 'publishedInfinite', sort, search.trim().toLowerCase()] as const,
+    /**
+     * Public artists index — one shared infinite query feeds the grid and the
+     * search dropdown. Sort, roster, and search are all key segments, so
+     * changing any of them starts pagination over.
+     */
+    publishedInfinite: (
+      sort: 'alpha' | 'newest',
+      search = '',
+      roster: 'current' | 'alumni' | 'all' = 'current'
+    ) =>
+      [
+        ...queryKeys.artists.all,
+        'publishedInfinite',
+        sort,
+        roster,
+        search.trim().toLowerCase(),
+      ] as const,
     filteredList: (params: { search?: string; take?: number }) =>
       [
         ...queryKeys.artists.all,

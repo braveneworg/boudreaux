@@ -422,37 +422,44 @@ model ArtistUrl {
 // images appear beside the short bio on listings and the detail page (the
 // suggestion is only shown while no human has chosen).
 model ArtistBioImage {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  artist       Artist   @relation(fields: [artistId], references: [id])
-  artistId     String   @db.ObjectId
-  url          String // Re-hosted full-resolution CDN image URL
-  thumbnailUrl String? // Optional smaller variant for grids/thumbnails
-  title        String? // Human-readable image title/caption
-  attribution  String? // Optional source attribution (unused for re-hosted images)
-  license      String? // e.g. "CC BY-SA 4.0"
-  licenseUrl   String? // Machine-readable license page from Commons, when known
-  sourceUrl    String? // Original page the image came from
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  artist         Artist   @relation(fields: [artistId], references: [id])
+  artistId       String   @db.ObjectId
+  url            String // Re-hosted full-resolution CDN image URL
+  thumbnailUrl   String? // Optional smaller variant for grids/thumbnails
+  title          String? // Human-readable image title/caption
+  attribution    String? // Optional source attribution (unused for re-hosted images)
+  license        String? // e.g. "CC BY-SA 4.0"
+  licenseUrl     String? // Machine-readable license page from Commons, when known
+  sourceUrl      String? // Original page the image came from
   /// Original external image URL, kept so save-time re-hosting can fetch the
   /// full-resolution source after the generation-time thumbnail pass.
-  originalUrl  String?
-  width        Int?
-  height       Int?
-  isPrimary    Boolean  @default(false) // One of the 2–3 best identifying images
-  kind         String? // photo | cover — subject classification from discovery
-  alt          String? // Accessible description written by the vision pass
-  hasFace      Boolean? // Rekognition face signal; null = not analyzed
-  faceScore    Float? // Rekognition face-match confidence 0–100; null = not analyzed
+  originalUrl    String?
+  width          Int?
+  height         Int?
+  isPrimary      Boolean  @default(false) // One of the 2–3 best identifying images
+  kind           String? // photo | cover — subject classification from discovery
+  alt            String? // Accessible description written by the vision pass
+  hasFace        Boolean? // Rekognition face signal; null = not analyzed
+  faceScore      Float? // Rekognition face-match confidence 0–100; null = not analyzed
+  /// SHA-256 (hex) of the source image bytes, stamped when the image is re-hosted so
+  /// later bio and image-link runs skip byte-identical copies under another URL.
+  /// Null on rows that predate it and on manual uploads (not hash-deduped).
+  contentHash    String?
+  /// 64-bit perceptual dHash of the source image as 16 hex digits, stamped with
+  /// `contentHash`, so later runs also skip near-identical (resized/re-encoded) copies.
+  perceptualHash String?
   /// Provenance: "generated" (owned by the bio job — pruned on regeneration), "custom"
   /// (chosen/uploaded by a human — survives and seeds face references) or "linked"
   /// (scraped by the images-from-links job — survives regeneration). Nullable because
   /// MongoDB documents predating this field are missing it — null/missing reads as generated.
-  origin       String?
-  sortOrder    Int      @default(0)
+  origin         String?
+  sortOrder      Int      @default(0)
   /// Human-chosen display position (0-based, capped by DISPLAY_IMAGE_CAP) among
   /// the artist's display images; null = not chosen. Written only by an admin,
   /// never by regeneration — the AI's opinion stays in `isPrimary`.
-  displayOrder Int?
-  createdAt    DateTime @default(now())
+  displayOrder   Int?
+  createdAt      DateTime @default(now())
 
   @@index([artistId])
   @@index([sortOrder])

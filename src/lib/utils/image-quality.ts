@@ -27,6 +27,22 @@ export const hammingDistance = (a: bigint, b: bigint): number => {
   return distance;
 };
 
+/** A stored dHash: exactly 64 bits written as 16 lowercase hex digits. */
+const PERCEPTUAL_HASH_PATTERN = /^[0-9a-f]{16}$/;
+
+/**
+ * Serialize a 64-bit dHash for storage. MongoDB has no unsigned 64-bit
+ * integer, so the hash is persisted as 16 zero-padded lowercase hex digits.
+ */
+export const formatPerceptualHash = (hash: bigint): string => hash.toString(16).padStart(16, '0');
+
+/**
+ * Read a stored dHash back into a bigint. A missing value (legacy row) or a
+ * malformed one reads as `null` so a bad document can never fail a re-host.
+ */
+export const parsePerceptualHash = (stored: string | null): bigint | null =>
+  stored !== null && PERCEPTUAL_HASH_PATTERN.test(stored) ? BigInt(`0x${stored}`) : null;
+
 /**
  * Compute a 64-bit difference hash (dHash). The image is reduced to a 9x8
  * greyscale grid; each of the 8 rows contributes 8 bits, one per

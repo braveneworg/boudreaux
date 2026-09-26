@@ -36,6 +36,9 @@ const artistBioImageSchema = z.object({
   alt: nullableString,
   hasFace: z.boolean().nullable(),
   faceScore: z.number().nullable(),
+  // Absent from payloads serialized before the hashes existed — read as null.
+  contentHash: nullableString.default(null),
+  perceptualHash: nullableString.default(null),
   origin: nullableString,
   sortOrder: z.number(),
   displayOrder: z.number().int().nullable(),

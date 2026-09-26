@@ -61,6 +61,8 @@ const makeBioImageRecord = (): ArtistBioImageRecord => ({
   alt: null,
   hasFace: null,
   faceScore: null,
+  contentHash: null,
+  perceptualHash: null,
   origin: 'custom',
   sortOrder: 0,
   createdAt: new Date(),
