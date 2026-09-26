@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 
 import { createElement } from 'react';
 
@@ -727,12 +727,14 @@ describe('CollectionDownloadDialog', () => {
 
     expect(screen.getByRole('button', { name: /preparing/i })).toBeDisabled();
 
-    // Pointer-down outside the dialog content fires Radix onInteractOutside;
-    // while downloading the handler preventDefaults so the dialog stays open.
-    // (Radix sets pointer-events:none on body, so dispatch the event directly
-    // rather than via userEvent's pointer pipeline.)
+    // A full outside interaction fires Radix onInteractOutside; while downloading
+    // the handler preventDefaults so the dialog stays open. Radix Dialog defers
+    // a primary-button pointer-down outside until the matching click, so all
+    // three events are needed. (Radix sets pointer-events:none on body, so
+    // dispatch the events directly rather than via userEvent's pointer pipeline.)
     fireEvent.pointerDown(document.body, { button: 0 });
     fireEvent.pointerUp(document.body, { button: 0 });
+    fireEvent.click(document.body, { button: 0 });
 
     expect(screen.getByRole('button', { name: /preparing/i })).toBeInTheDocument();
   });
@@ -749,8 +751,10 @@ describe('CollectionDownloadDialog', () => {
 
     // Idle (not downloading) outside interaction — onInteractOutside runs with
     // isDownloading false, so it does NOT preventDefault and the dialog closes.
+    // Radix Dialog defers the dismiss until the click that follows pointer-down.
     fireEvent.pointerDown(document.body, { button: 0 });
     fireEvent.pointerUp(document.body, { button: 0 });
+    fireEvent.click(document.body, { button: 0 });
 
     await waitFor(() => {
       expect(screen.queryByText('Select formats for')).not.toBeInTheDocument();

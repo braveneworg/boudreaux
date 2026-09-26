@@ -53,12 +53,13 @@ export default defineConfig((): ViteUserConfig => {
       root: import.meta.dirname,
       silent: withCoverage ? false : 'passed-only', // Silence test output when not collecting coverage
       name: packageJson.name,
-      environment: 'jsdom',
+      environment: 'happy-dom',
       // Use Vitest projects to split .spec.ts (node) and .spec.tsx
       // (happy-dom). Pure TypeScript spec files run in the lightweight Node
       // environment; skipping DOM init saves 1–3s wall clock. The .spec.ts files
-      // that DO need DOM opt back in via a `// @vitest-environment jsdom` comment
-      // at the top (jsdom is retained for those explicit opt-ins).
+      // that DO need DOM opt back in via a `// @vitest-environment happy-dom`
+      // comment at the top. happy-dom is the ONLY DOM environment — jsdom is not
+      // installed, so a `jsdom` pragma would fail to resolve.
       projects: [
         {
           extends: true,
