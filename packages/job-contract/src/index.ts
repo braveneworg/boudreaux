@@ -12,6 +12,8 @@
 // transpilePackages, the Lambda via sam/esbuild), and webpack resolves `.ts`
 // here but not a literal `.js` that has no on-disk counterpart. tsc (bundler),
 // esbuild, and vitest all resolve extensionless too.
+export { httpUrl } from './http-url';
+
 export {
   BIO_PROGRESS_STAGES,
   bioProgressPostSchema,
