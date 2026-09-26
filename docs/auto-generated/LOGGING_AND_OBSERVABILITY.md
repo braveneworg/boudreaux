@@ -1,6 +1,6 @@
 # Logging & Observability
 
-Last updated: 2026-06-10
+Last updated: 2026-09-26
 
 Structured server-side logging (Winston) shipped to a self-hosted Grafana
 Loki + Alloy + Grafana stack running alongside the app on the production EC2
@@ -71,6 +71,18 @@ mint their own UUID. To reconstruct one request end to end:
 {container="website"} |= "Rate limit exceeded"                # 429s
 {container="website", module="PAYMENTS"}                      # checkout flow
 sum by (module) (count_over_time({container="website", level="error"}[5m]))
+```
+
+`|= "Rate limit exceeded"` counts only the app's own `withRateLimit`
+rejections. nginx answers its `limit_req` / `limit_conn` overruns itself, so
+those 429s appear only in the access log. The dashboard panel "nginx 429s by
+path prefix (5m)" charts them, keeping `/api/auth/get-session` (its own
+`session` zone) apart from the rest of `/api/<resource>`. Before changing a
+zone's budget, check this panel (see `docs/adr/0013`):
+
+```logql
+sum by (prefix) (count_over_time({container="nginx"} |~ `" 429 `
+  | regexp `"[A-Z]+ (?P<prefix>/api/auth/get-session|/api/[^/ ?"]+|/[^/ ?"]*)` [5m]))
 ```
 
 ## Alerting

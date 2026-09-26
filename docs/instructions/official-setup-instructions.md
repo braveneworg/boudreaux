@@ -241,33 +241,44 @@ Three workflows are relevant:
 
 - Injects `BIO_GENERATOR_LAMBDA_NAME=${{ vars.BIO_GENERATOR_LAMBDA_NAME || 'fakefour-bio-generator' }}`
   into the production environment. Set the repo **variable** if your function name differs.
-- **Does _not_ run `prisma db push`.** The deploy only builds/runs the app image (the
-  Docker build runs `prisma generate` for the client, not a schema push). See
+- **Runs `prisma db push` when the schema changed** (ADR-0012). The `schema-push` job
+  pushes `prisma/schema.prisma` to production before the container roll, and only when it
+  differs from the last deployed commit. See
   [Database schema changes](#database-schema-changes-prisma-db-push) below.
 
 ### Database schema changes (`prisma db push`)
 
-Schema changes are **not** applied automatically by the deploy — `prisma db push` is a
-deliberate, manual step. MongoDB is schemaless, so most edits need nothing in prod:
+The deploy applies schema changes itself; there is no manual post-merge push. MongoDB is
+schemaless, so optional scalar fields need nothing in prod either way, but index changes
+(`@@index`, `@unique`, `@@unique`) and new indexed collections only exist once pushed.
 
-- **Adding/removing optional scalar fields** (e.g. `Artist.bioStatus`): no push required.
-  Existing documents simply read the new field as `null` until it is written.
-- **Index changes** (`@@index`, `@unique`, `@@unique`) and new collections/relations
-  with indexes: **do** require a push, or the new indexes/constraints won't exist in prod.
+How the `schema-push` job in `deploy.yml` decides
+(`scripts/ci/schema-push-gate.sh`):
 
-When a push is needed, run it once from a machine that can reach the **production** Mongo
-(the external `DATABASE_URL`), with that URL scoped to the command — never committed, never
-left in your shell:
+- Each release commit (`chore(release): v…`) carries a `Deployed-Sha: <sha>` trailer naming
+  the commit that deploy shipped. The gate reads the newest one on `origin/main` and compares
+  `prisma/schema.prisma` there against the commit being deployed. Different → push; same →
+  skip.
+- No release commit has a marker yet (before the first release that writes one) → skip.
+- The marker names a commit the runner can't find → push (an extra push is harmless).
+- The push runs after the images build and before the roll. If it fails, the deploy stops and
+  the old containers keep serving.
+
+Destructive changes are still manual. The job never passes `--accept-data-loss`, so a change
+that would lose data fails the deploy. Apply it by hand from a machine that can reach the
+**production** Mongo, with the URL scoped to the command (never committed, never left in your
+shell), then re-run the deploy:
 
 ```bash
 # Replace with the production connection string (treat as a secret).
 DATABASE_URL='<prod-mongodb-uri>' pnpm exec prisma db push
 ```
 
-> Review the printed plan before confirming. `prisma db push` can drop indexes to match the
-> schema (it prompts for `--accept-data-loss` on destructive changes) — never pass that flag
-> blindly against prod. This is intentionally manual so an index drop can't ride in on a
-> routine app deploy.
+> Review the printed plan before confirming. `prisma db push` makes indexes match the schema,
+> so it can drop a production-only index. Never pass `--accept-data-loss` blindly against prod.
+
+The runner connects from a GitHub-hosted IP, so the production database's network access list
+must admit GitHub Actions runners.
 
 **`.github/workflows/deploy-bio-generator.yml`** — deploys the Lambda (new).
 

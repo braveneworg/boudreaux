@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ImageRecord } from './image';
 import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
@@ -169,6 +168,10 @@ export interface ArtistBioImageRecord {
   hasFace: boolean | null;
   /** Rekognition face-match confidence 0–100, `null` when not analyzed. */
   faceScore: number | null;
+  /** SHA-256 (hex) of the source bytes, stamped at re-host; `null` on legacy rows and manual uploads. */
+  contentHash: string | null;
+  /** 64-bit dHash of the source as 16 hex digits, stamped with `contentHash`. */
+  perceptualHash: string | null;
   /** Provenance: `'generated'` (owned by the job), `'custom'` (owned by a human) or `'linked'` (scraped from an admin-supplied page); `null`/missing on legacy rows, read as generated. */
   origin: string | null;
   sortOrder: number;
@@ -199,6 +202,24 @@ export interface CreateArtistBioImageData {
   faceScore?: number | null;
   /** `'custom'` for the manual-upload path (stamped when absent); `'linked'` for images scraped from admin-supplied pages. */
   origin?: 'custom' | 'linked';
+  /** SHA-256 (hex) of the source bytes; only re-hosted images carry it. */
+  contentHash?: string | null;
+  /** 64-bit dHash of the source as 16 hex digits; only re-hosted images carry it. */
+  perceptualHash?: string | null;
+}
+
+/**
+ * A pool image's content fingerprint — what the re-host dedupe compares new
+ * candidates against so a copy served under another URL is still skipped.
+ * Rows re-hosted before the hashes were stored carry neither (ADR-0010
+ * addendum); the repository omits those.
+ */
+export interface BioImageFingerprint {
+  url: string;
+  /** SHA-256 (hex) of the source bytes the row was re-hosted from. */
+  contentHash: string | null;
+  /** 64-bit dHash of that source as 16 hex digits. */
+  perceptualHash: string | null;
 }
 
 /** Scalar fields of the Prisma `ArtistBioLink` model. */
@@ -232,11 +253,10 @@ export interface CreateArtistBioLinkData {
 }
 
 /**
- * Admin artist payload: scalars plus capped images, label joins, release joins
+ * Admin artist payload: scalars plus label joins, release joins
  * (with release scalars), and platform URLs. Matches the default media `Artist`.
  */
 export type Artist = ArtistScalars & {
-  images: ImageRecord[];
   labels: ArtistLabelRecord[];
   releases: Array<ArtistReleaseScalars & { release: ReleaseScalars }>;
   urls: UrlRecord[];
@@ -255,14 +275,13 @@ export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArti
 
 /**
  * Repository payload behind the public artist-detail page: public scalars plus
- * images, labels, urls, bio images/links, band members (with member public
+ * labels, urls, bio images/links, band members (with member public
  * scalars), the artist's own release joins, and — via `memberOf` — the release
  * joins of every band the artist belongs to, all carrying the public media
  * release graph. No artist anywhere in it carries an {@link ArtistPrivateField}.
  * The service flattens this into {@link ArtistWithPublishedReleases}.
  */
 export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
-  images: ImageRecord[];
   labels: ArtistLabelRecord[];
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
@@ -289,11 +308,20 @@ export interface ArtistWithPublishedReleases extends Omit<
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';
 
-/** Pagination, search, and sort for the public artists index. */
+/**
+ * Which part of the label's roster the public artists index shows:
+ * **current** artists (`isActive`), **alumni** (deactivated with a recorded
+ * `deactivatedAt` — they left the label), or **all** of both. An inactive
+ * artist with no departure date is neither and stays hidden.
+ */
+export type ArtistListingRoster = 'current' | 'alumni' | 'all';
+
+/** Pagination, search, sort, and roster for the public artists index. */
 export interface ArtistListingFilters {
   /** Case-insensitive term matched against names, aka names, genres, and release titles. */
   search?: string;
   sort: ArtistListingSort;
+  roster: ArtistListingRoster;
   skip: number;
   take: number;
 }
@@ -390,13 +418,11 @@ export interface ArtistListingRow extends Omit<
 }
 
 /**
- * By-id artist payload: scalars plus ordered images only — the shape
- * `ArtistRepository.findById` fetches and `GET /api/artists/[id]` returns
- * (narrower than the admin `Artist`, which also carries labels/urls/releases).
+ * By-id artist payload: scalars only — the shape `ArtistRepository.findById`
+ * fetches and `GET /api/artists/[id]` returns (narrower than the admin
+ * `Artist`, which also carries labels/urls/releases).
  */
-export interface ArtistDetail extends ArtistScalars {
-  images: ImageRecord[];
-}
+export type ArtistDetail = ArtistScalars;
 
 /** Narrow release projection loaded for public artist-search matches. */
 export interface ArtistSearchReleaseRecord {
@@ -407,11 +433,20 @@ export interface ArtistSearchReleaseRecord {
 }
 
 /**
- * Public artist-search match: scalars plus the first image and release joins
- * carrying the narrow release projection the search consumes.
+ * The display-image candidates a search match carries — just enough to resolve
+ * the artist's first display image for the search dropdown thumbnail.
+ */
+export type ArtistSearchBioImage = Pick<
+  ArtistListingBioImage,
+  'url' | 'thumbnailUrl' | 'isPrimary' | 'displayOrder'
+>;
+
+/**
+ * Public artist-search match: scalars plus the display-image candidates and
+ * release joins carrying the narrow release projection the search consumes.
  */
 export interface ArtistSearchMatch extends ArtistScalars {
-  images: ImageRecord[];
+  bioImages: ArtistSearchBioImage[];
   releases: Array<ArtistReleaseScalars & { release: ArtistSearchReleaseRecord }>;
 }
 
@@ -426,14 +461,6 @@ export interface ArtistNameRecord {
 // =============================================================================
 // Input types
 // =============================================================================
-
-/** A nested image to connect-or-create when writing an artist. */
-export interface ArtistImageInput {
-  id: string;
-  src: string;
-  altText?: string | null;
-  caption?: string | null;
-}
 
 /** A nested platform URL to connect-or-create when writing an artist. */
 export interface ArtistUrlInput {
@@ -474,7 +501,6 @@ export interface CreateArtistData extends ArtistWritableData {
   firstName: string;
   surname: string;
   slug: string;
-  images?: ArtistImageInput[];
   urls?: ArtistUrlInput[];
 }
 
