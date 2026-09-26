@@ -57,7 +57,6 @@ export const formatSchema = z.enum(FORMATS) satisfies z.ZodType<Format>;
 export const imageSchema = z.object({
   id: z.string(),
   caption: nullableString,
-  artistId: nullableString,
   releaseId: nullableString,
   createdAt: date,
   updatedAt: date,

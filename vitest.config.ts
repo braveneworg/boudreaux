@@ -39,6 +39,7 @@ const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.s
 // via `pnpm run test:shell`) and stay out of the default local run.
 export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/nginx-config-test.spec.ts',
+  'scripts/ci/schema-push-gate.spec.ts',
   'scripts/assert-toolchain.spec.ts',
   'scripts/check-toolchain-pins.spec.ts',
 ];
@@ -354,7 +355,6 @@ export default defineConfig((): ViteUserConfig => {
           '**/lib/actions/presigned-upload-actions.ts',
 
           // Image actions that require S3 integration testing
-          '**/lib/actions/artist-image-actions.ts',
           '**/lib/actions/group-image-actions.ts',
           '**/lib/actions/register-image-actions.ts',
 

@@ -14,9 +14,6 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/actions/presigned-upload-actions', () => ({
   getPresignedUploadUrlsAction: vi.fn(),
 }));
-vi.mock('@/lib/actions/artist-image-actions', () => ({
-  getArtistImagesAction: vi.fn(),
-}));
 vi.mock('@/lib/utils/direct-upload', () => ({
   uploadFileToS3: vi.fn(),
 }));

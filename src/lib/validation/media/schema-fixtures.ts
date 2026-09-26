@@ -165,7 +165,6 @@ export const digitalFormat = {
 
 export const artist = {
   ...artistScalar,
-  images: [image],
   labels: [{ id: 'al1', artistId: 'a1', labelId: 'l1' }],
   releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release: releaseScalar }],
   urls: [url],
@@ -243,7 +242,6 @@ export const publishedReleaseDetail = {
 /** `ArtistWithPublishedReleases` wire shape — the artist detail page payload. */
 export const artistWithPublishedReleases = {
   ...artistScalar,
-  images: [image],
   labels: [{ id: 'al1', artistId: 'a1', labelId: 'l1' }],
   urls: [url],
   bioImages: [
