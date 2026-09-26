@@ -1497,6 +1497,7 @@ describe('ArtistService', () => {
   describe('getArtistBySlugWithReleases', () => {
     const mockArtistWithReleases = {
       ...mockArtist,
+      members: [],
       memberOf: [],
       releases: [
         {
@@ -1575,6 +1576,24 @@ describe('ArtistService', () => {
       digitalFormats: [],
     });
 
+    /** The visibility fields a joined-artist fixture may override (#786). */
+    interface JoinedArtistOverrides {
+      isActive?: boolean;
+      publishedOn?: Date | null;
+      deletedOn?: Date | null;
+    }
+
+    /** A joined artist (band member or band) as the public select projects it. */
+    const joinedArtist = (id: string, overrides: JoinedArtistOverrides = {}) => ({
+      ...mockArtist,
+      id,
+      slug: id,
+      isActive: true,
+      publishedOn: new Date('2024-01-01'),
+      deletedOn: null,
+      ...overrides,
+    });
+
     const joinRow = (artistId: string, release: PublishedReleaseRow) => ({
       id: `${artistId}-${release.id}`,
       artistId,
@@ -1598,13 +1617,14 @@ describe('ArtistService', () => {
       const bandLp = publishedRelease('band-lp', ['band-1'], '2025-01-01');
       vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
         ...mockArtist,
+        members: [],
         releases: [joinRow(mockArtist.id, guest), joinRow(mockArtist.id, own)],
         memberOf: [
           {
             id: 'am-1',
             artistId: 'band-1',
             memberId: mockArtist.id,
-            artist: { id: 'band-1', releases: [joinRow('band-1', bandLp)] },
+            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', bandLp)] },
           },
         ],
       } as never);
@@ -1622,13 +1642,14 @@ describe('ArtistService', () => {
       const draft = { ...publishedRelease('draft', ['band-1'], '2025-01-01'), publishedAt: null };
       vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
         ...mockArtist,
+        members: [],
         releases: [],
         memberOf: [
           {
             id: 'am-1',
             artistId: 'band-1',
             memberId: mockArtist.id,
-            artist: { id: 'band-1', releases: [joinRow('band-1', draft)] },
+            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', draft)] },
           },
         ],
       } as never);
@@ -1636,6 +1657,66 @@ describe('ArtistService', () => {
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(readReleases(result)).toEqual([]);
+    });
+
+    it('omits unpublished, deactivated, and deleted members from the public payload (#786)', async () => {
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
+        ...mockArtistWithReleases,
+        members: [
+          { id: 'm-1', artistId: mockArtist.id, memberId: 'pub', member: joinedArtist('pub') },
+          {
+            id: 'm-2',
+            artistId: mockArtist.id,
+            memberId: 'draft',
+            member: joinedArtist('draft', { publishedOn: null }),
+          },
+          {
+            id: 'm-3',
+            artistId: mockArtist.id,
+            memberId: 'inactive',
+            member: joinedArtist('inactive', { isActive: false }),
+          },
+          {
+            id: 'm-4',
+            artistId: mockArtist.id,
+            memberId: 'gone',
+            member: joinedArtist('gone', { deletedOn: new Date('2024-06-01') }),
+          },
+        ],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      const data = (result as { success: true; data: { members: Array<{ memberId: string }> } })
+        .data;
+      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub']);
+    });
+
+    it('drops the releases of an unpublished, deactivated, or deleted band (#786)', async () => {
+      const bandRow = (id: string, overrides: JoinedArtistOverrides = {}) => ({
+        id: `am-${id}`,
+        artistId: id,
+        memberId: mockArtist.id,
+        artist: {
+          ...joinedArtist(id, overrides),
+          releases: [joinRow(id, publishedRelease(`${id}-lp`, [id], '2025-01-01'))],
+        },
+      });
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
+        ...mockArtist,
+        members: [],
+        releases: [],
+        memberOf: [
+          bandRow('pub-band'),
+          bandRow('draft-band', { publishedOn: null }),
+          bandRow('inactive-band', { isActive: false }),
+          bandRow('gone-band', { deletedOn: new Date('2024-06-01') }),
+        ],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(readReleases(result).map(({ releaseId }) => releaseId)).toEqual(['pub-band-lp']);
     });
 
     it('does not expose the band graph on the public payload', async () => {
@@ -1720,6 +1801,7 @@ describe('ArtistService', () => {
     it('should return empty releases array when all releases are filtered out', async () => {
       const artistWithOnlyUnpublished = {
         ...mockArtist,
+        members: [],
         memberOf: [],
         releases: [
           {
@@ -1748,6 +1830,7 @@ describe('ArtistService', () => {
     it('should filter out releases with undefined publishedAt (missing MongoDB field)', async () => {
       const artistWithMissingPublishedAt = {
         ...mockArtist,
+        members: [],
         memberOf: [],
         releases: [
           {
@@ -2532,6 +2615,7 @@ describe('ArtistService', () => {
         ...mockArtist,
         bio: null,
         shortBio: null,
+        members: [],
         releases: [],
         memberOf: [],
       } as never);
@@ -2547,6 +2631,7 @@ describe('ArtistService', () => {
         ...mockArtist,
         bio: '<p>Hi</p><script>alert(1)</script>',
         shortBio: '<p>Short</p><script>alert(2)</script>',
+        members: [],
         releases: [],
         memberOf: [],
       } as never);

@@ -365,6 +365,18 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
 /** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
 const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
 
+/**
+ * The gate every public artist read by slug applies (#786): active, published,
+ * and not soft-deleted. `publishedOn: { not: null }` alone matches documents
+ * where the field is ABSENT on Mongo, so it is paired with `isSet: true`; the
+ * in-memory twin for junction-joined artists is `isVisibleArtist`.
+ */
+const publicArtistWhere = {
+  isActive: true,
+  AND: [{ publishedOn: { isSet: true } }, { publishedOn: { not: null } }],
+  OR: [...notDeletedOr],
+} as const satisfies Prisma.ArtistWhereInput;
+
 /** A row of the vocabulary source read — only ever the one selected column. */
 type VocabularyRow = { genres?: string | null; tags?: string | null };
 
@@ -543,12 +555,14 @@ export class ArtistRepository {
   }
 
   /**
-   * Find an artist by slug (no relations), projected to the public scalars —
-   * this backs the public `GET /api/artists/slug/[slug]`.
+   * Find an active, published, non-deleted artist by slug (no relations),
+   * projected to the public scalars — this backs the public
+   * `GET /api/artists/slug/[slug]`. A draft, deactivated, or deleted artist
+   * reads as absent (#786).
    */
   static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
     return runQuery(() =>
-      prisma.artist.findUnique({ where: { slug }, select: artistPublicSelect })
+      prisma.artist.findFirst({ where: { slug, ...publicArtistWhere }, select: artistPublicSelect })
     );
   }
 
@@ -686,19 +700,17 @@ export class ArtistRepository {
    * Find a single active, published, non-deleted artist by slug with the
    * public scalars and the full nested release + bio graph used on the public
    * detail page (every artist on it projected public), including
-   * the releases of every band the artist belongs to. The service folds the
-   * band releases in and post-filters to published, non-deleted.
+   * the releases of every band the artist belongs to. A draft, deactivated,
+   * or deleted artist reads as absent (#786). The service folds the band
+   * releases in and post-filters members, bands, and releases to published,
+   * non-deleted.
    */
   static async findPublishedBySlugWithReleases(
     slug: string
   ): Promise<ArtistWithReleaseGraph | null> {
     return runQuery(() =>
       prisma.artist.findFirst({
-        where: {
-          slug,
-          isActive: true,
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
+        where: { slug, ...publicArtistWhere },
         select: artistWithReleaseGraphSelect,
       })
     );
