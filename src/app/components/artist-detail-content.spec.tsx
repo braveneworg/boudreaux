@@ -48,6 +48,7 @@ const artist = {
       url: 'https://x/a.jpg',
       thumbnailUrl: null,
       title: 'Portrait',
+      alt: 'The artist on stage',
       attribution: 'Commons',
       license: null,
       sourceUrl: null,
@@ -184,12 +185,54 @@ describe('ArtistDetailContent', () => {
     expect(screen.getByText('Please try again later.')).toBeInTheDocument();
   });
 
-  it('renders a detail thumbnail with its title as the alt text', () => {
+  it('renders a detail thumbnail with its alt text', () => {
     useArtistBySlugQueryMock.mockReturnValue({ isPending: false, data: artist });
 
     render(<ArtistDetailContent slug="test-artist" />);
 
+    expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'The artist on stage');
+  });
+
+  // Only a chosen row can reach the header without alt text (the fallback
+  // tiers skip alt-less rows, ADR-0008 addendum), e.g. when alt was cleared
+  // after it was chosen.
+  it('uses the title as the alt text for a chosen image without alt', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [{ ...artist.bioImages[0], alt: null, displayOrder: 0 }],
+      },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
     expect(screen.getByTestId('thumb')).toHaveAttribute('data-alt', 'Portrait');
+  });
+
+  it('keeps an unchosen image without alt text out of the header', () => {
+    useArtistBySlugQueryMock.mockReturnValue({
+      isPending: false,
+      data: {
+        ...artist,
+        bioImages: [
+          { ...artist.bioImages[0], id: 'no-alt', title: 'Upload', alt: null, isPrimary: true },
+          {
+            ...artist.bioImages[0],
+            id: 'pool',
+            title: 'Pool',
+            alt: 'Pool photo',
+            isPrimary: false,
+          },
+        ],
+      },
+    });
+
+    render(<ArtistDetailContent slug="test-artist" />);
+
+    expect(screen.getAllByTestId('thumb').map((thumb) => thumb.getAttribute('data-alt'))).toEqual([
+      'Pool photo',
+    ]);
   });
 
   it('prefers the image alt text over its title', () => {
@@ -219,6 +262,7 @@ describe('ArtistDetailContent', () => {
             ...artist.bioImages[0],
             id: 'c2',
             title: 'Chosen second',
+            alt: 'Chosen second',
             isPrimary: false,
             displayOrder: 1,
           },
@@ -226,6 +270,7 @@ describe('ArtistDetailContent', () => {
             ...artist.bioImages[0],
             id: 'c1',
             title: 'Chosen first',
+            alt: 'Chosen first',
             isPrimary: false,
             displayOrder: 0,
           },
@@ -241,7 +286,7 @@ describe('ArtistDetailContent', () => {
     ]);
   });
 
-  it('falls back to non-primary images and the display name alt when none are primary or titled', () => {
+  it('falls back to the display name alt for a chosen image with no alt or title', () => {
     useArtistBySlugQueryMock.mockReturnValue({
       isPending: false,
       data: {
@@ -256,6 +301,7 @@ describe('ArtistDetailContent', () => {
             license: null,
             sourceUrl: null,
             isPrimary: false,
+            displayOrder: 0,
           },
         ],
       },
