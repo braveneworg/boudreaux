@@ -209,7 +209,7 @@ const artistSearchInclude = {
   bioImages: {
     where: displayImageCandidateWhere,
     orderBy: { sortOrder: 'asc' },
-    select: { url: true, thumbnailUrl: true, isPrimary: true, displayOrder: true },
+    select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
   },
   releases: {
     include: {
