@@ -11,10 +11,19 @@ import { GET, PATCH, DELETE } from './route';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
-// Mock withAdmin decorator to bypass auth in tests
-vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: () => unknown) => handler,
-}));
+// Model withAdmin: pass through for an admin, 401 otherwise.
+const authState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/lib/decorators/with-auth', async () => {
+  const { NextResponse: Response } = await import('next/server');
+  return {
+    withAdmin:
+      (handler: (...args: unknown[]) => unknown) =>
+      (...args: unknown[]) =>
+        authState.isAdmin
+          ? handler(...args)
+          : Response.json({ error: 'Unauthorized' }, { status: 401 }),
+  };
+});
 
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
@@ -68,6 +77,57 @@ describe('Release by ID API Routes', () => {
     params: Promise.resolve({ id }),
   });
   describe('GET /api/releases/[id]', () => {
+    beforeEach(() => {
+      authState.isAdmin = true;
+    });
+
+    // Without `withTracks` the payload is the full admin release graph — every
+    // credited artist's full row (contact PII, notes, job tokens) and
+    // unpublished releases — so only the edit form may read it (#765).
+    it('rejects a non-admin request for the admin payload without reading it', async () => {
+      authState.isAdmin = false;
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.status).toBe(401);
+      expect(ReleaseService.getReleaseById).not.toHaveBeenCalled();
+    });
+
+    it('never lets a shared cache store the admin payload', async () => {
+      vi.mocked(ReleaseService.getReleaseById).mockResolvedValueOnce({
+        success: true,
+        data: mockRelease as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    });
+
+    it('serves the public withTracks payload to a non-admin, shared-cacheable', async () => {
+      authState.isAdmin = false;
+      vi.mocked(ReleaseService.getReleaseWithTracks).mockResolvedValueOnce({
+        success: true,
+        data: mockRelease as never,
+      });
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/releases/507f1f77bcf86cd799439011?withTracks=true'
+      );
+      const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe(
+        'public, s-maxage=60, stale-while-revalidate=300'
+      );
+    });
+
     it('should return a release by ID', async () => {
       vi.mocked(ReleaseService.getReleaseById).mockResolvedValue({
         success: true,
