@@ -46,6 +46,17 @@ vi.mock('@/lib/auth', () => ({
   },
 }));
 
+// Serve `lucide-react` icons lazily. The real barrel defines ~1,600 icon
+// components at import time and vmThreads re-evaluates it in every spec file
+// that reaches it (~33ms × ~180 files). The shim renders identical SVG, builds
+// each icon on first use, and reports non-icon exports absent — see
+// `src/test-utils/lazy-lucide-react.ts`. A spec's own `vi.mock('lucide-react',
+// ...)` still overrides this.
+vi.mock('lucide-react', async () => {
+  const { createLazyLucideReact } = await import('@/test-utils/lazy-lucide-react');
+  return createLazyLucideReact();
+});
+
 // Pure stub for next/server — extends the native Node.js Request so route handlers get a
 // fully-functional headers/json()/text() API without loading any real Next.js module.
 vi.mock('next/server', () => {
