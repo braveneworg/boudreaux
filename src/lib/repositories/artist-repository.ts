@@ -770,6 +770,8 @@ export class ArtistRepository {
         alt: string | null;
         hasFace: boolean | null;
         faceScore: number | null;
+        contentHash?: string | null;
+        perceptualHash?: string | null;
         sortOrder: number;
       }>;
       links: Array<{ label: string; url: string; kind: string | null; sortOrder: number }>;

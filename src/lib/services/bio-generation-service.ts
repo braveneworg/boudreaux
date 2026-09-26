@@ -11,6 +11,7 @@ import { MAX_LAMBDA_RELEASES } from '@fakefour/job-contract';
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import type { BioImageFingerprint } from '@/lib/types/domain/artist';
 import type { ReleaseCoverSource } from '@/lib/types/domain/release';
 import type { Json } from '@/lib/types/domain/shared';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
@@ -96,6 +97,10 @@ export type RehostedImage = {
   alt: string | null;
   hasFace: boolean | null;
   faceScore: number | null;
+  /** SHA-256 of the source bytes — stored so later runs dedupe by content, not URL. */
+  contentHash: string | null;
+  /** 64-bit dHash of the source as 16 hex digits — stored for near-duplicate checks. */
+  perceptualHash: string | null;
 };
 
 /** Re-hosted image with its final sort position for persistence. */
@@ -110,7 +115,13 @@ type PersistedLink = { label: string; url: string; kind: string | null; sortOrde
 // ---------------------------------------------------------------------------
 
 /** Raw re-host result from {@link BioImageService.rehostImages}. */
-export type RehostResult = { url: string; width: number | null; height: number | null };
+export type RehostResult = {
+  url: string;
+  width: number | null;
+  height: number | null;
+  contentHash?: string;
+  perceptualHash?: string;
+};
 
 /** Structured output of the private {@link rehostImages} helper. */
 type RehostedBatch = {
@@ -130,6 +141,15 @@ const sanitizeOptional = (text: string | null | undefined): string | null =>
  */
 const sanitizeHref = (url: string | null | undefined): string | null =>
   url ? sanitizeUrl(url) || null : null;
+
+/** The re-host's source fingerprints as nullable columns (absent in skip-rehost mode). */
+const toStoredHashes = ({
+  contentHash,
+  perceptualHash,
+}: RehostResult): Pick<RehostedImage, 'contentHash' | 'perceptualHash'> => ({
+  contentHash: contentHash ?? null,
+  perceptualHash: perceptualHash ?? null,
+});
 
 /**
  * Builds the rich {@link RehostedImage} record from a raw re-host result and
@@ -158,24 +178,46 @@ export const buildRehostedRecord = (
   // through unchanged (no href/text sanitizer applies).
   hasFace: image.hasFace ?? null,
   faceScore: image.faceScore ?? null,
+  ...toStoredHashes(result),
 });
+
+/**
+ * Pool rows a regeneration keeps — the only ones a new image may duplicate.
+ * Generated rows are about to be replaced, so seeding with them would drop a
+ * rediscovered photo and then delete its only copy.
+ */
+const SURVIVING_POOL_ORIGINS = ['custom', 'linked'] as const;
+
+/**
+ * Reads the fingerprints of the pool rows that survive regeneration. A lookup
+ * failure degrades to URL-only dedupe (logged), never a failed generation.
+ */
+const findSurvivingFingerprints = async (artistId: string): Promise<BioImageFingerprint[]> =>
+  ArtistBioImageRepository.findFingerprints(artistId, SURVIVING_POOL_ORIGINS).catch((error) => {
+    loggers.media.warn('bio_pool_fingerprints_failed', { artistId, error: String(error) });
+    return [];
+  });
 
 /**
  * Re-hosts each discovered image into S3 via a cheap single-thumbnail pass,
  * deduplicating by content hash so the same photo appearing under different
- * URLs is only uploaded once. Attribution metadata is kept through re-host
- * (PR #547). Failures and duplicates are returned as `null` — best-effort.
- * `duplicateAliases` carries each dropped index → survivor URL so callers
- * can alias `image:N` placeholders rather than silently dropping them.
+ * URLs is only uploaded once — including against the custom and linked images
+ * already in the pool (ADR-0010 addendum). Attribution metadata is kept
+ * through re-host (PR #547). Failures and duplicates are returned as `null` —
+ * best-effort. `duplicateAliases` carries each dropped index → survivor URL
+ * (a pool image's URL for a pool match) so callers can alias `image:N`
+ * placeholders rather than silently dropping them.
  */
 const rehostImages = async (
   images: BioGenerationData['images'],
   artistId: string
 ): Promise<RehostedBatch> => {
   const urlsWithIndices = images.map((img, index) => ({ url: img.url, index }));
+  const knownImages = await findSurvivingFingerprints(artistId);
   const { results, duplicateAliases } = await BioImageService.rehostImages(
     urlsWithIndices,
-    artistId
+    artistId,
+    knownImages
   );
   // Use .at(i) rather than [i] so the ESLint security rule does not flag the
   // correlated array lookup as a potential object-injection sink.
@@ -358,6 +400,8 @@ const appendInternalCoverImages = (
       alt: `${release.title} album cover`,
       hasFace: null,
       faceScore: null,
+      contentHash: null,
+      perceptualHash: null,
       sortOrder: result.length,
     });
   }
@@ -399,8 +443,16 @@ const assembleContent = ({
   ),
   altBio: sanitizeBioHtml(replaceBioImagePlaceholders(data.altBio, imageUrlByIndex)),
   genres,
+  // Dimensions, order and content hashes are storage-only — not preview data.
   images: persistedImages.map(
-    ({ width: _width, height: _height, sortOrder: _sortOrder, ...rest }) => rest
+    ({
+      width: _width,
+      height: _height,
+      sortOrder: _sortOrder,
+      contentHash: _contentHash,
+      perceptualHash: _perceptualHash,
+      ...rest
+    }) => rest
   ),
   links: persistedLinks.map(({ sortOrder: _sortOrder, ...rest }) => rest),
   model: data.model,

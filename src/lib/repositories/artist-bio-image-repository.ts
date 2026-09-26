@@ -5,7 +5,11 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
-import type { ArtistBioImageRecord, CreateArtistBioImageData } from '@/lib/types/domain/artist';
+import type {
+  ArtistBioImageRecord,
+  BioImageFingerprint,
+  CreateArtistBioImageData,
+} from '@/lib/types/domain/artist';
 
 import { runQuery } from './_internal/map-prisma-error';
 
@@ -101,6 +105,8 @@ export class ArtistBioImageRepository {
           alt: data.alt,
           hasFace: data.hasFace ?? null,
           faceScore: data.faceScore ?? null,
+          contentHash: data.contentHash ?? null,
+          perceptualHash: data.perceptualHash ?? null,
           origin: data.origin ?? 'custom',
           sortOrder: base + index,
         })),
@@ -125,6 +131,31 @@ export class ArtistBioImageRepository {
       if (originalUrl) urls.add(originalUrl);
     }
     return urls;
+  }
+
+  /**
+   * The content fingerprints of the artist's pool images, optionally limited
+   * to `origins`, so a re-host can skip a byte- or near-identical copy served
+   * under a new URL. Rows without either hash (re-hosted before hashes were
+   * stored, or manual uploads) are left out. Filtered in memory rather than
+   * with a `{ not: null }` query: MongoDB documents that predate the fields
+   * lack them entirely, and the pool is small.
+   */
+  static async findFingerprints(
+    artistId: string,
+    origins?: ReadonlyArray<'custom' | 'linked'>
+  ): Promise<BioImageFingerprint[]> {
+    const rows = await runQuery(() =>
+      prisma.artistBioImage.findMany({
+        where: origins ? { artistId, origin: { in: [...origins] } } : { artistId },
+        select: { url: true, contentHash: true, perceptualHash: true },
+      })
+    );
+    return rows.flatMap(({ url, contentHash, perceptualHash }) =>
+      contentHash || perceptualHash
+        ? [{ url, contentHash: contentHash ?? null, perceptualHash: perceptualHash ?? null }]
+        : []
+    );
   }
 
   /** Deletes a single discovered bio image row (palette X) and returns its
