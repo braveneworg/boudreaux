@@ -177,6 +177,41 @@ test.describe('Artist Page', () => {
       await expect(photo).toBeFocused();
     });
 
+    test('scrolling under a resting cursor never zooms the photo', async ({ page }) => {
+      await page.goto('/artists');
+      const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
+      const photo = card.getByRole('button', {
+        name: 'Expand image: E2E Artist chosen portrait',
+      });
+      await expect(photo).toBeVisible({ timeout: 15_000 });
+      await photo.scrollIntoViewIfNeeded();
+      const box = await photo.boundingBox();
+      if (!box) throw new Error('The artist photo has no layout box');
+      const restX = box.x + box.width / 2;
+      const restY = box.y + box.height / 2;
+
+      // A real move onto the photo zooms it.
+      await page.mouse.move(restX - 5, restY);
+      await page.mouse.move(restX, restY);
+      await expect(photo).toHaveAttribute('data-hovered', '');
+
+      // The page scrolls a little under the resting cursor: the photo is still
+      // beneath it, and CSS :hover would keep it zoomed.
+      await page.mouse.wheel(0, 40);
+      await expect(page.locator('[data-hovered]')).toHaveCount(0);
+      await expect(photo.getByRole('img')).toHaveCSS('transform', 'none');
+
+      // Only moving the pointer again brings the zoom back. Moves made while
+      // the wheel scroll is still settling are ignored by design, so keep
+      // nudging the pointer the way a hand would until one lands after it.
+      let nudge = 0;
+      await expect(async () => {
+        nudge += 1;
+        await page.mouse.move(restX + nudge, restY);
+        await expect(photo).toHaveAttribute('data-hovered', '', { timeout: 250 });
+      }).toPass({ timeout: 5_000 });
+    });
+
     test('the enlarged photo links through to the artist page', async ({ page }) => {
       await page.goto('/artists');
       const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
