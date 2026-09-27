@@ -19,8 +19,8 @@ export interface ArtistVisibilityFields {
  * artist `where`, for artists reached through a junction include (band
  * members, bands) where Prisma + MongoDB can't apply a nested `where`. An
  * absent `publishedOn`, `deletedOn`, or `deactivatedAt` (legacy documents)
- * counts as unpublished / not deleted / no departure, matching the Mongo
- * `isSet` handling in the query.
+ * counts as unpublished / not deleted / no departure, matching how the query
+ * treats an absent field.
  */
 export const isVisibleArtist = ({
   isActive,

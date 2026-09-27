@@ -75,11 +75,8 @@ const nameSelect = { id: true, displayName: true, firstName: true, surname: true
  * alumni, published, not soft-deleted.
  */
 const PUBLIC_ARTIST_WHERE = {
-  AND: [
-    { OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] },
-    { publishedOn: { isSet: true } },
-    { publishedOn: { not: null } },
-  ],
+  AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+  publishedOn: { not: null },
   OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
 };
 

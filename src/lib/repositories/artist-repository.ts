@@ -423,13 +423,14 @@ const currentOrAlumniWhere = {
 
 /**
  * The gate every public artist read by slug applies (#786): current or
- * alumni, published, and not soft-deleted. `publishedOn: { not: null }` alone
- * matches documents where the field is ABSENT on Mongo, so it is paired with
- * `isSet: true`; the in-memory twin for junction-joined artists is
- * `isVisibleArtist`.
+ * alumni, published, and not soft-deleted. `publishedOn: { not: null }`
+ * excludes an absent field as well as an explicit null, as the `alumni`
+ * `deactivatedAt` guard above notes; the in-memory twin for junction-joined
+ * artists is `isVisibleArtist`.
  */
 const publicArtistWhere = {
-  AND: [currentOrAlumniWhere, { publishedOn: { isSet: true } }, { publishedOn: { not: null } }],
+  AND: [currentOrAlumniWhere],
+  publishedOn: { not: null },
   OR: [...notDeletedOr],
 } as const satisfies Prisma.ArtistWhereInput;
 
