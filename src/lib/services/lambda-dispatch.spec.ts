@@ -2,8 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type * as LambdaDispatch from './lambda-dispatch';
+import type { JobSigningIdentity } from '@fakefour/job-contract/signing';
 
 vi.mock('server-only', () => ({}));
+
+const loggerWarnMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/utils/logger', () => ({
+  loggers: { media: { warn: loggerWarnMock, error: vi.fn() } },
+}));
 
 const lambdaClientConfigs = vi.hoisted((): unknown[] => []);
 const handlerConfigs = vi.hoisted((): unknown[] => []);
@@ -116,6 +123,121 @@ describe('tokensMatch', () => {
 
     // Same character count, different UTF-8 byte lengths.
     expect(tokensMatch('é', 'e')).toBe(false);
+  });
+});
+
+const APP_SECRET = 's'.repeat(40);
+const JOB: JobSigningIdentity = { kind: 'bio-generation', entityId: 'a1', jobToken: 'tok-1' };
+const BODY = '{"jobToken":"tok-1","result":{"ok":true}}';
+
+describe('signingKeyForJob', () => {
+  it('derives the key from JOB_CALLBACK_SECRET and the job identity', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { signingKeyForJob } = await loadFresh();
+    const { deriveJobSigningKey } = await import('@fakefour/job-contract/signing');
+
+    expect(signingKeyForJob(JOB)).toBe(deriveJobSigningKey(APP_SECRET, JOB));
+  });
+
+  it('throws a clear error when JOB_CALLBACK_SECRET is unset', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
+    const { signingKeyForJob } = await loadFresh();
+
+    expect(() => signingKeyForJob(JOB)).toThrow('JOB_CALLBACK_SECRET');
+  });
+
+  it('throws when JOB_CALLBACK_SECRET is shorter than 32 characters', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', 'short');
+    const { signingKeyForJob } = await loadFresh();
+
+    expect(() => signingKeyForJob(JOB)).toThrow('JOB_CALLBACK_SECRET');
+  });
+});
+
+describe('signCallbackBody', () => {
+  it('signs with the same per-job key the verifier re-derives', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { signCallbackBody, verifyJobCallback } = await loadFresh();
+
+    const signature = signCallbackBody(JOB, BODY);
+
+    expect(verifyJobCallback(JOB, { signature, rawBody: BODY })).toBe(true);
+  });
+});
+
+describe('verifyJobCallback', () => {
+  const signedBy = async (secret: string, identity = JOB, body = BODY): Promise<string> => {
+    const { deriveJobSigningKey, signJobBody } = await import('@fakefour/job-contract/signing');
+    return signJobBody(deriveJobSigningKey(secret, identity), body, Date.now() / 1000);
+  };
+
+  beforeEach(() => {
+    loggerWarnMock.mockReset();
+  });
+
+  it('accepts a signature made with the key derived from the same secret and identity', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { verifyJobCallback } = await loadFresh();
+
+    const ok = verifyJobCallback(JOB, { signature: await signedBy(APP_SECRET), rawBody: BODY });
+
+    expect(ok).toBe(true);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unsigned callback and logs the reason', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { verifyJobCallback } = await loadFresh();
+
+    expect(verifyJobCallback(JOB, { signature: null, rawBody: BODY })).toBe(false);
+    expect(loggerWarnMock).toHaveBeenCalledWith('job_callback_signature_rejected', {
+      kind: 'bio-generation',
+      entityId: 'a1',
+      reason: 'missing',
+    });
+  });
+
+  it('rejects a signature made under a key for another token', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { verifyJobCallback } = await loadFresh();
+    const forged = await signedBy(APP_SECRET, { ...JOB, jobToken: 'forged' });
+
+    expect(verifyJobCallback(JOB, { signature: forged, rawBody: BODY })).toBe(false);
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'job_callback_signature_rejected',
+      expect.objectContaining({ reason: 'mismatch' })
+    );
+  });
+
+  it('rejects a signature over a different body', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { verifyJobCallback } = await loadFresh();
+    const signature = await signedBy(APP_SECRET);
+
+    expect(verifyJobCallback(JOB, { signature, rawBody: `${BODY} ` })).toBe(false);
+  });
+
+  it('fails closed when JOB_CALLBACK_SECRET is unset, without throwing', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
+    const { verifyJobCallback } = await loadFresh();
+
+    expect(verifyJobCallback(JOB, { signature: await signedBy(APP_SECRET), rawBody: BODY })).toBe(
+      false
+    );
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'job_callback_signature_rejected',
+      expect.objectContaining({ reason: 'unconfigured' })
+    );
+  });
+
+  it('never logs the signature or the key', async () => {
+    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
+    const { verifyJobCallback } = await loadFresh();
+    const signature = await signedBy(APP_SECRET, { ...JOB, jobToken: 'forged' });
+
+    verifyJobCallback(JOB, { signature, rawBody: BODY });
+
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain(signature.slice(-20));
   });
 });
 

@@ -4,6 +4,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { JOB_SIGNATURE_HEADER } from '@fakefour/job-contract/signing';
+
 import {
   VIDEO_ENRICHMENT_PROGRESS_LIMIT,
   videoEnrichmentProgressLimiter,
@@ -40,6 +42,9 @@ export const POST = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
+  // The Lambda signs the raw bytes it sent (ADR-0014); the service verifies
+  // them under the key derived from the stored token before trusting `json`.
+  const proof = { signature: request.headers.get(JOB_SIGNATURE_HEADER), rawBody };
   let json: unknown;
   try {
     json = JSON.parse(rawBody);
@@ -53,10 +58,12 @@ export const POST = withRateLimit<{ id: string }>(
     const { jobToken, stage, counts } = parsed.data;
     // recordProgress verifies the token and no-ops on any gate failure; it
     // never throws, never claims the job, and stamps `at` server-side.
-    await VideoEnrichmentService.recordProgress(id, jobToken, {
-      stage,
-      ...(counts ? { counts } : {}),
-    });
+    await VideoEnrichmentService.recordProgress(
+      id,
+      jobToken,
+      { stage, ...(counts ? { counts } : {}) },
+      proof
+    );
   } else {
     // Log the Zod issue summary (code + path + message only — never the raw
     // body) so drifted Lambda payloads surface without leaking input data.

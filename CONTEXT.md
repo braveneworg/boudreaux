@@ -187,6 +187,16 @@ writing; the **client poll deadline** (`CLIENT_POLL_DEADLINE_MS`) exceeds the
 stale window so the server's coercion resolves the UI first.
 _Defined in_ `src/lib/utils/async-job-lifecycle.ts`.
 
+**signed callback** — a Lambda → app callback or progress POST whose raw body
+is HMAC-signed in the `x-job-signature` header with a **job signing key**: a
+per-job key the app derives at dispatch from the app-only `JOB_CALLBACK_SECRET`
+and the job token, hands to the Lambda inside the invoke payload, and never
+stores. The route re-derives the key from the stored token and verifies before
+the token compare, so a leaked job token alone can't forge a callback.
+See [ADR-0014](docs/adr/0014-lambda-callbacks-are-hmac-signed.md).
+_Defined in_ `packages/job-contract/src/signing.ts` and
+`src/lib/services/lambda-dispatch.ts`.
+
 **bio generation job** — an asynchronous run that produces an Artist's bio via
 the `bio-generator` Lambda, following the **async job lifecycle** and reporting
 intermediate **progress stages**.

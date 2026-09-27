@@ -135,6 +135,21 @@ describe('sanitizeBioHtml', () => {
     expect(result).not.toContain('position');
   });
 
+  it('neutralises the markup a forged callback would try (#787)', () => {
+    const forged =
+      '<p>bio</p>' +
+      '<img src="https://cdn.example.com/x.jpg" onerror="fetch(\'https://evil.test\')" srcset="https://evil.test/1x 1x">' +
+      '<span style="background: url(https://evil.test/beacon)">x</span>' +
+      '<iframe src="https://evil.test"></iframe>' +
+      '<a href="data:text/html,<script>alert(1)</script>">d</a>' +
+      '<img src="data:image/svg+xml,<svg onload=alert(1)>">';
+
+    const result = sanitizeBioHtml(forged);
+
+    expect(result).not.toMatch(/onerror|srcset|evil\.test|iframe|data:|onload|<script/);
+    expect(result).toContain('<p>bio</p>');
+  });
+
   it('strips event-handler attributes', () => {
     const result = sanitizeBioHtml('<p onclick="evil()">text</p>');
 

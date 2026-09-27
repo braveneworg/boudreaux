@@ -35,6 +35,7 @@ import type {
 import { DataError } from '@/lib/types/domain/errors';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
+import { isVisibleArtist } from '@/lib/utils/artist-visibility';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
   DISPLAY_IMAGE_CAP,
@@ -588,11 +589,12 @@ export class ArtistService {
       }
 
       // The band graph is folded into `releases` and not exposed; the
-      // published/non-deleted filter runs here because Prisma MongoDB doesn't
-      // support a nested where on junction-table includes. Bio prose is
-      // sanitized on read so redisplay is safe regardless of how it was
-      // authored (generated bios are also sanitized at write time).
-      const { memberOf: _bands, ...publicArtist } = artist;
+      // published/non-deleted filter on releases, members, and bands runs
+      // here because Prisma MongoDB doesn't support a nested where on
+      // junction-table includes (#786). Bio prose is sanitized on read so
+      // redisplay is safe regardless of how it was authored (generated bios
+      // are also sanitized at write time).
+      const { memberOf, members, ...publicArtist } = artist;
       const filteredArtist: ArtistWithPublishedReleases = {
         ...publicArtist,
         bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
@@ -600,7 +602,11 @@ export class ArtistService {
         // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        releases: collectArtistReleases(artist),
+        members: members.filter(({ member }) => isVisibleArtist(member)),
+        releases: collectArtistReleases({
+          ...artist,
+          memberOf: memberOf.filter(({ artist: band }) => isVisibleArtist(band)),
+        }),
       };
 
       return { success: true, data: filteredArtist };

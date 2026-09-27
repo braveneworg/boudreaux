@@ -66,6 +66,19 @@ const adminInclude = {
 
 const nameSelect = { id: true, displayName: true, firstName: true, surname: true };
 
+/**
+ * The public artist gate every public slug read applies (#786): current or
+ * alumni, published, not soft-deleted.
+ */
+const PUBLIC_ARTIST_WHERE = {
+  AND: [
+    { OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] },
+    { publishedOn: { isSet: true } },
+    { publishedOn: { not: null } },
+  ],
+  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+};
+
 describe('ArtistRepository', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -131,24 +144,24 @@ describe('ArtistRepository', () => {
   });
 
   describe('findBySlug', () => {
-    it('finds an artist by slug with a select projection', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
+    it('finds a current or alumni, published, non-deleted artist by slug with a select projection', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findBySlug('john-doe');
 
       expect(result).toEqual({ id: 'a' });
-      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
-      expect(arg.where).toEqual({ slug: 'john-doe' });
-      expect(arg.select).toEqual(expect.objectContaining({ id: true, slug: true, bio: true }));
+      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
+      expect(arg?.where).toEqual({ slug: 'john-doe', ...PUBLIC_ARTIST_WHERE });
+      expect(arg?.select).toEqual(expect.objectContaining({ id: true, slug: true, bio: true }));
     });
 
     it.each(ARTIST_PRIVATE_FIELDS)('never selects the private field %s', async (field) => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
 
       await ArtistRepository.findBySlug('john-doe');
 
-      const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
-      expect(arg.select).not.toHaveProperty(field);
+      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
+      expect(arg?.select).not.toHaveProperty(field);
     });
   });
 
@@ -959,18 +972,14 @@ describe('ArtistRepository', () => {
   describe('findPublishedBySlugWithReleases', () => {
     // The index links every card — alumni included — to this page, so it
     // resolves the same roster the index's "All" filter lists.
-    it('finds a current or alumni, non-deleted artist by slug with the detail include', async () => {
+    it('finds a current or alumni, published, non-deleted artist by slug with the detail select', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
 
       expect(result).toEqual({ id: 'a' });
       const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        slug: 'john-doe',
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
-      });
+      expect(arg?.where).toEqual({ slug: 'john-doe', ...PUBLIC_ARTIST_WHERE });
       expect(arg?.include).toBeUndefined();
       expect(arg?.select?.releases).toBeDefined();
       expect(arg?.select?.bioImages).toBeDefined();

@@ -418,6 +418,18 @@ const currentOrAlumniWhere = {
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
+ * The gate every public artist read by slug applies (#786): current or
+ * alumni, published, and not soft-deleted. `publishedOn: { not: null }` alone
+ * matches documents where the field is ABSENT on Mongo, so it is paired with
+ * `isSet: true`; the in-memory twin for junction-joined artists is
+ * `isVisibleArtist`.
+ */
+const publicArtistWhere = {
+  AND: [currentOrAlumniWhere, { publishedOn: { isSet: true } }, { publishedOn: { not: null } }],
+  OR: [...notDeletedOr],
+} as const satisfies Prisma.ArtistWhereInput;
+
+/**
  * The roster half of a listed artist's `where`, as `AND` members: current and
  * alumni are single field matches, "all" is either of the two. Returned as a
  * list so it composes with the token search's own `AND` without clobbering
@@ -577,12 +589,14 @@ export class ArtistRepository {
   }
 
   /**
-   * Find an artist by slug (no relations), projected to the public scalars —
-   * this backs the public `GET /api/artists/slug/[slug]`.
+   * Find a current or alumni, published, non-deleted artist by slug (no
+   * relations), projected to the public scalars — this backs the public
+   * `GET /api/artists/slug/[slug]`. A draft, deleted, or deactivated
+   * non-alumnus artist reads as absent (#786).
    */
   static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
     return runQuery(() =>
-      prisma.artist.findUnique({ where: { slug }, select: artistPublicSelect })
+      prisma.artist.findFirst({ where: { slug, ...publicArtistWhere }, select: artistPublicSelect })
     );
   }
 
@@ -725,23 +739,21 @@ export class ArtistRepository {
   }
 
   /**
-   * Find a single current-or-alumni, non-deleted artist by slug with the
-   * public scalars and the full nested release + bio graph used on the public
-   * detail page (every artist on it projected public; the index links alumni
-   * cards here too, so an alumnus must resolve), including
-   * the releases of every band the artist belongs to. The service folds the
-   * band releases in and post-filters to published, non-deleted.
+   * Find a single current-or-alumni, published, non-deleted artist by slug
+   * with the public scalars and the full nested release + bio graph used on the
+   * public detail page (every artist on it projected public; the index links
+   * alumni cards here too, so an alumnus must resolve), including the releases
+   * of every band the artist belongs to. A draft, deleted, or deactivated
+   * non-alumnus artist reads as absent (#786). The service folds the band
+   * releases in and post-filters members, bands, and releases to published,
+   * non-deleted.
    */
   static async findPublishedBySlugWithReleases(
     slug: string
   ): Promise<ArtistWithReleaseGraph | null> {
     return runQuery(() =>
       prisma.artist.findFirst({
-        where: {
-          slug,
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-          AND: [currentOrAlumniWhere],
-        },
+        where: { slug, ...publicArtistWhere },
         select: artistWithReleaseGraphSelect,
       })
     );

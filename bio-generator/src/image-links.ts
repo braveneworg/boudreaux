@@ -288,6 +288,7 @@ export const runImageLinksLambda = async (
       await deps.postCallback({
         url: target.data.callbackUrl,
         jobToken: target.data.jobToken,
+        signingKey: target.data.signingKey,
         result,
       });
     }
@@ -302,7 +303,7 @@ export const runImageLinksLambda = async (
     result = { ok: false, error: toErrorMessage(err) };
   }
 
-  const { callbackUrl, jobToken } = parsed.data;
-  await deps.postCallback({ url: callbackUrl, jobToken, result });
+  const { callbackUrl, jobToken, signingKey } = parsed.data;
+  await deps.postCallback({ url: callbackUrl, jobToken, signingKey, result });
   return result;
 };

@@ -328,11 +328,11 @@ const safeWikidata = async (
 type VideoReport = (stage: VideoProgressStage, counts?: Record<string, number>) => Promise<void>;
 
 const buildVideoReport = (input: VideoEnrichmentInput, deps: VideoEnrichmentDeps): VideoReport => {
-  const { progressUrl, jobToken } = input;
+  const { progressUrl, jobToken, signingKey } = input;
   if (!progressUrl || !jobToken) return () => Promise.resolve();
   return async (stage, counts) => {
     try {
-      await deps.postProgress({ progressUrl, jobToken, stage, counts });
+      await deps.postProgress({ progressUrl, jobToken, signingKey, stage, counts });
     } catch {
       // Progress is a pure side channel — never let a checkpoint failure surface.
     }
@@ -835,9 +835,9 @@ export const runVideoEnrichmentLambda = async (
     };
   }
 
-  const { callbackUrl, jobToken } = parsed.data;
+  const { callbackUrl, jobToken, signingKey } = parsed.data;
   if (callbackUrl && jobToken) {
-    await deps.postCallback({ url: callbackUrl, jobToken, result });
+    await deps.postCallback({ url: callbackUrl, jobToken, signingKey, result });
   }
   return result;
 };

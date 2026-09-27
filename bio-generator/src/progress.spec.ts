@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { createHmac } from 'node:crypto';
+
 import { postBioProgress } from './progress.js';
 
 const logEventMock = vi.hoisted(() => vi.fn());
@@ -17,6 +19,39 @@ const baseArgs = () => ({
   progressUrl: 'https://app.example/progress',
   jobToken: 'tok-1',
   stage: 'musicbrainz' as const,
+});
+
+const SIGNING_KEY = 'k'.repeat(64);
+
+describe('postBioProgress signing', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-26T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('signs the exact body it sends with the per-job key in x-job-signature', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(okResponse());
+
+    await postBioProgress({ ...baseArgs(), signingKey: SIGNING_KEY }, fetchFn);
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    const t = Math.floor(Date.now() / 1000);
+    const digest = createHmac('sha256', SIGNING_KEY).update(`${t}.${init.body}`).digest('hex');
+    expect((init.headers as Record<string, string>)['x-job-signature']).toBe(`t=${t},v1=${digest}`);
+  });
+
+  it('sends no signature header when the event carried no signing key', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(okResponse());
+
+    await postBioProgress(baseArgs(), fetchFn);
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).not.toHaveProperty('x-job-signature');
+  });
 });
 
 describe('postBioProgress', () => {

@@ -4,6 +4,8 @@
 import { after, NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+import { JOB_SIGNATURE_HEADER } from '@fakefour/job-contract/signing';
+
 import { revalidateArtistBioPaths } from '@/lib/actions/generate-artist-bio-action-helpers';
 import { BIO_CALLBACK_LIMIT, bioCallbackLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
@@ -33,6 +35,9 @@ export const POST = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
+  // The Lambda signs the raw bytes it sent (ADR-0014); the service verifies
+  // them under the key derived from the stored token before trusting `json`.
+  const proof = { signature: request.headers.get(JOB_SIGNATURE_HEADER), rawBody };
   let json: unknown;
   try {
     json = JSON.parse(rawBody);
@@ -45,7 +50,7 @@ export const POST = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
   }
 
-  const claim = await ImageLinksService.verifyAndClaimCallback(id, parsed.data.jobToken);
+  const claim = await ImageLinksService.verifyAndClaimCallback(id, parsed.data.jobToken, proof);
   if (claim) {
     after(async () => {
       await ImageLinksService.completeCallback(id, parsed.data.result);
