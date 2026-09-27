@@ -8,7 +8,8 @@ import { NextResponse } from 'next/server';
 import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { ArtistSearchMatch } from '@/lib/types/domain/artist';
+import type { ArtistSearchBioImage, ArtistSearchMatch } from '@/lib/types/domain/artist';
+import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
@@ -28,6 +29,12 @@ interface ArtistSearchResult {
 
 const CACHE_HEADER = 'public, s-maxage=60, stale-while-revalidate=300';
 
+/** The thumbnail (or, lacking one, the full image) of the artist's first display image. */
+const firstDisplayImageSrc = (bioImages: ArtistSearchBioImage[]): string | null => {
+  const [first] = resolveDisplayImages(bioImages);
+  return first ? (first.thumbnailUrl ?? first.url) : null;
+};
+
 const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResult => {
   const releases = artist.releases
     .map(({ release }) => release)
@@ -35,7 +42,7 @@ const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResul
   return {
     artistSlug: artist.slug,
     artistName: getArtistDisplayName(artist),
-    thumbnailSrc: artist.images[0]?.src ?? null,
+    thumbnailSrc: firstDisplayImageSrc(artist.bioImages),
     releases: releases.map((r) => ({ id: r.id, title: r.title })),
   };
 };

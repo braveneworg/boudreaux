@@ -132,6 +132,23 @@ test.describe('Admin bio palettes', () => {
     await expect(use).toHaveAccessibleDescription(/alt text/i);
   });
 
+  // #767: with nothing chosen the page falls back to suggested, then pool
+  // images — but only ones with alt text (ADR-0008 addendum). The seeded
+  // portrait is suggested and has no alt, so the page must skip it, and the
+  // manager marks only what the page shows. Holds whether or not a concurrent
+  // test has chosen an image: a chosen tier marks nothing as Shown either.
+  test('the suggested portrait without alt text is not marked as shown', async ({ adminPage }) => {
+    await gotoArtistEdit(adminPage);
+
+    const pool = adminPage.getByRole('group', { name: 'Image pool' });
+    const portrait = pool.getByRole('listitem').filter({
+      has: adminPage.getByRole('button', { name: 'Preview E2E palette portrait', exact: true }),
+    });
+    await expect(portrait).toHaveCount(1, { timeout: 15_000 });
+    await expect(portrait.getByText('Suggested', { exact: true })).toBeVisible();
+    await expect(portrait.getByText(/^Shown/)).toHaveCount(0);
+  });
+
   test('choosing a display image fills the strip and survives reload', async ({ adminPage }) => {
     // A uniquely-titled, alt-bearing row per run (and per retry) so choosing
     // and un-choosing it never touches the shared seeded rows.

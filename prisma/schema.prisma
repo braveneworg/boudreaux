@@ -156,8 +156,6 @@ model Authenticator {
 model Image {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   caption   String?
-  artist    Artist?  @relation(fields: [artistId], references: [id])
-  artistId  String?  @db.ObjectId
   release   Release? @relation(fields: [releaseId], references: [id])
   releaseId String?  @db.ObjectId
   createdAt DateTime @default(now())
@@ -168,7 +166,6 @@ model Image {
   url       Url?     @relation(fields: [urlId], references: [id])
   urlId     String?  @db.ObjectId
 
-  @@index([artistId])
   @@index([releaseId])
   @@index([urlId])
   @@index([sortOrder])
@@ -309,7 +306,6 @@ model Artist {
   reactivatedAt         DateTime? // Date when the artist was reactivated; ie. re-signed with the label
   reactivatedBy         String? // User ID of the admin who reactivated the artist entry
   notes                 String[] // internal only notes about the artist not meant for public display; markdown support post-MVP
-  images                Image[]
   labels                ArtistLabel[] // All labels the artist is/was associated with
   members               ArtistMember[]         @relation("ArtistMembers") // Artists who are members of this band
   memberOf              ArtistMember[]         @relation("MemberOf") // Bands this artist belongs to

@@ -5,6 +5,12 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
+import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import {
+  artistPrivateValues,
+  artistWithPublishedReleases,
+} from '@/lib/validation/media/schema-fixtures';
+
 import ArtistDetailPage, { generateMetadata } from './page';
 
 vi.mock('server-only', () => ({}));
@@ -85,13 +91,10 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe('ArtistDetailPage', () => {
+  /** The public artist-detail wire shape, as the page dehydrates it. */
   const mockArtistData = {
-    id: 'artist-1',
-    firstName: 'John',
-    surname: 'Doe',
-    displayName: null,
+    ...artistWithPublishedReleases,
     shortBio: 'A talented musician',
-    slug: 'john-doe',
   };
 
   const defaultParams = Promise.resolve({ slug: 'john-doe' });
@@ -139,9 +142,26 @@ describe('ArtistDetailPage', () => {
 
     expect(mockSetQueryData).toHaveBeenCalledWith(
       ['artists', 'bySlug', 'john-doe'],
-      mockArtistData
+      expect.objectContaining({ id: mockArtistData.id, slug: mockArtistData.slug })
     );
   });
+
+  // The dehydrated query state is serialised into the HTML, so it is as public
+  // as the API response (#765).
+  it.each(ARTIST_PRIVATE_FIELDS)(
+    'never dehydrates the private field %s, even when the service returns it',
+    async (field) => {
+      mockGetArtistBySlugWithReleases.mockResolvedValueOnce({
+        success: true,
+        data: { ...mockArtistData, ...artistPrivateValues },
+      });
+
+      await ArtistDetailPage({ params: defaultParams, searchParams: defaultSearchParams });
+
+      const [[, dehydrated]] = mockSetQueryData.mock.calls;
+      expect(dehydrated).not.toHaveProperty(field);
+    }
+  );
 
   it('should call notFound when artist service returns failure', async () => {
     mockGetArtistBySlugWithReleases.mockResolvedValue({

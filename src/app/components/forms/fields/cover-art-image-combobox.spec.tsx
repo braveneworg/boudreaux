@@ -94,7 +94,6 @@ const buildArtist = (overrides: {
     isActive: true,
     instruments: null,
     featuredArtistId: null,
-    images: [],
   });
 
 /** Builds one bio image pool row as the picker query returns it. */

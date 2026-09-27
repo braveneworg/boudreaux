@@ -68,7 +68,6 @@ const artistResponse = {
   isActive: true,
   instruments: null,
   featuredArtistId: null,
-  images: [],
 };
 
 describe('useArtistQuery', () => {
