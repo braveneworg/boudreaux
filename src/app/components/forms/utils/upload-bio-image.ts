@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { notifyIfStaleServerAction } from '@/app/components/stale-page-toast';
 import { createArtistBioImageAction } from '@/lib/actions/create-artist-bio-image-action';
 import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
 import {
@@ -10,6 +11,7 @@ import {
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { warn } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { STALE_PAGE_MESSAGE } from '@/lib/utils/stale-server-action';
 
 export interface UploadBioImageParams {
   artistId: string;
@@ -60,9 +62,25 @@ const stepUploadToS3 = async (
  * register ArtistBioImage → fire-and-forget variant generation.
  *
  * Returns a typed result rather than throwing so callers can handle failures
- * without try/catch boilerplate.
+ * without try/catch boilerplate. A Server Action rejected because the tab
+ * predates the deployed build is the one throw the pipeline absorbs: it
+ * shows the reload toast and resolves with {@link STALE_PAGE_MESSAGE}.
  */
 export const uploadBioImage = async (
+  file: File,
+  params: UploadBioImageParams
+): Promise<UploadBioImageResult> => {
+  try {
+    return await runBioImagePipeline(file, params);
+  } catch (error) {
+    if (notifyIfStaleServerAction(error)) {
+      return { success: false, error: STALE_PAGE_MESSAGE };
+    }
+    throw error;
+  }
+};
+
+const runBioImagePipeline = async (
   file: File,
   { artistId, attribution, title = null, alt = null }: UploadBioImageParams
 ): Promise<UploadBioImageResult> => {

@@ -5,11 +5,13 @@
 
 import { useState } from 'react';
 
-import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { reportResponseValidationError } from '@/lib/query-error-reporter';
 import { queryRetryDelay, shouldRetryQuery } from '@/lib/utils/query-retry';
+
+import { notifyIfStaleServerAction } from './stale-page-toast';
 
 import type { ThemeProviderProps } from 'next-themes';
 
@@ -26,6 +28,12 @@ export const Providers = ({ children }: { children: React.ReactNode }) => {
         // Report only API contract drift (response-validation failures); transient
         // network/abort/HTTP errors are filtered out inside the handler.
         queryCache: new QueryCache({ onError: reportResponseValidationError }),
+        // Every mutation hook calls a Server Action; a tab left open across a
+        // deploy calls action ids the new build never had. One reload toast
+        // here beats a catch in each hook.
+        mutationCache: new MutationCache({
+          onError: (error) => notifyIfStaleServerAction(error),
+        }),
         defaultOptions: {
           queries: {
             staleTime: disableCache ? 0 : 5 * 60 * 1000,

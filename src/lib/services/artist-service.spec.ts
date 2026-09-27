@@ -50,6 +50,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     delete: vi.fn(),
     archive: vi.fn(),
     existsById: vi.fn(),
+    findNameById: vi.fn(),
     connectToRelease: vi.fn(),
     updateEnrichedField: vi.fn(),
   },
@@ -1605,6 +1606,24 @@ describe('ArtistService', () => {
     });
   });
 
+  describe('findNameById', () => {
+    it('returns the name projection from the repository', async () => {
+      const row = { id: 'artist-1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(row);
+
+      const result = await ArtistService.findNameById('artist-1');
+
+      expect(result).toEqual(row);
+      expect(ArtistRepository.findNameById).toHaveBeenCalledWith('artist-1');
+    });
+
+    it('returns null when the artist does not exist', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(null);
+
+      await expect(ArtistService.findNameById('missing-id')).resolves.toBeNull();
+    });
+  });
+
   describe('updateArtist shortBio sanitization', () => {
     it('sanitizes a string shortBio before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
@@ -2072,8 +2091,12 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.findById).mockResolvedValue({
         id: 'a1',
         slug: 'ceschi',
+        displayName: 'Ceschi',
+        firstName: 'David',
+        surname: 'Ramos',
       } as never);
       vi.mocked(ArtistBioImageRepository.setDisplayOrder).mockResolvedValue(undefined);
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValue(undefined);
     });
 
     // Persistent implementations and unconsumed one-shots leak across the
@@ -2082,6 +2105,7 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.findById).mockReset();
       vi.mocked(ArtistBioImageRepository.findManyByIds).mockReset();
       vi.mocked(ArtistBioImageRepository.setDisplayOrder).mockReset();
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockReset();
     });
 
     it('writes the ordered ids and returns the artist slug for revalidation', async () => {
@@ -2138,7 +2162,60 @@ describe('ArtistService', () => {
       expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
     });
 
-    it('refuses to choose an image without alt text', async () => {
+    it("backfills a blank alt with the artist's name before choosing the image", async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([
+        eligible('img-1'),
+        { id: 'img-2', alt: '  ', origin: 'custom' },
+        { id: 'img-3', alt: null, origin: 'generated' },
+      ]);
+
+      const result = await ArtistService.setDisplayImages('a1', ['img-1', 'img-2', 'img-3']);
+
+      expect(result).toEqual({ success: true, data: { slug: 'ceschi' } });
+      expect(vi.mocked(ArtistBioImageRepository.updateAlt).mock.calls).toEqual([
+        ['img-2', 'Ceschi'],
+        ['img-3', 'Ceschi'],
+      ]);
+      expect(ArtistBioImageRepository.setDisplayOrder).toHaveBeenCalledWith('a1', [
+        'img-1',
+        'img-2',
+        'img-3',
+      ]);
+    });
+
+    it('derives the backfilled alt from first name and surname when displayName is blank', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce({
+        id: 'a1',
+        slug: 'ceschi',
+        displayName: null,
+        firstName: 'David',
+        surname: 'Ramos',
+      } as never);
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([
+        { id: 'img-2', alt: null, origin: 'custom' },
+      ]);
+
+      await ArtistService.setDisplayImages('a1', ['img-2']);
+
+      expect(ArtistBioImageRepository.updateAlt).toHaveBeenCalledWith('img-2', 'David Ramos');
+    });
+
+    it('leaves an existing alt alone', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([eligible('img-1')]);
+
+      await ArtistService.setDisplayImages('a1', ['img-1']);
+
+      expect(ArtistBioImageRepository.updateAlt).not.toHaveBeenCalled();
+    });
+
+    it('refuses an image without alt text when the artist has no name to fall back on', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce({
+        id: 'a1',
+        slug: 'ceschi',
+        displayName: null,
+        firstName: '',
+        surname: '',
+      } as never);
       vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce([
         eligible('img-1'),
         { id: 'img-2', alt: '  ', origin: 'custom' },
@@ -2151,6 +2228,7 @@ describe('ArtistService', () => {
         code: 'VALIDATION',
         error: expect.stringContaining('alt text'),
       });
+      expect(ArtistBioImageRepository.updateAlt).not.toHaveBeenCalled();
       expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
     });
 

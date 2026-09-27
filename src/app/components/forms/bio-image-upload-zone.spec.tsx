@@ -34,11 +34,11 @@ describe('BioImageUploadZone', () => {
     expect(screen.getByLabelText('Attribution (optional)')).toBeInTheDocument();
   });
 
-  it('hints that alt text is needed for a display image while it is blank', async () => {
+  it("hints that blank alt text defaults to the artist's name while it is blank", async () => {
     renderZone();
-    expect(screen.getByText(/Add alt text to use this upload/)).toBeInTheDocument();
+    expect(screen.getByText(/Left blank, the artist's name is used/)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Alt text'), 'Ceschi on stage');
-    expect(screen.queryByText(/Add alt text to use this upload/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Left blank, the artist's name is used/)).not.toBeInTheDocument();
   });
 
   it('runs the upload pipeline with the trimmed fields and reports the row', async () => {

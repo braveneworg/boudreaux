@@ -25,6 +25,8 @@ export const bioLinkDragPayloadSchema = z.object({
 export type BioLinkDragPayload = z.infer<typeof bioLinkDragPayloadSchema>;
 
 export const bioImageDragPayloadSchema = z.object({
+  /** The pool row id, set by the tile so the display-image drop target can choose it. */
+  id: z.string().min(1).optional(),
   url: z.string().refine(isHttpUrl, 'Must be an http(s) URL'),
   thumbnailUrl: z.string().nullable(),
   title: z.string().nullable(),

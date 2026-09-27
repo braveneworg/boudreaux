@@ -1,12 +1,14 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { notifyIfStaleServerAction } from '@/app/components/stale-page-toast';
 import { createArtistBioImageAction } from '@/lib/actions/create-artist-bio-image-action';
 import { generateImageVariantsAction } from '@/lib/actions/generate-image-variants-action';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { warn } from '@/lib/utils/console-logger';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { STALE_PAGE_MESSAGE } from '@/lib/utils/stale-server-action';
 
 import { uploadBioImage } from './upload-bio-image';
 
@@ -25,6 +27,9 @@ vi.mock('@/lib/actions/generate-image-variants-action', () => ({
 vi.mock('@/lib/utils/console-logger', () => ({
   warn: vi.fn(),
   error: vi.fn(),
+}));
+vi.mock('@/app/components/stale-page-toast', () => ({
+  notifyIfStaleServerAction: vi.fn(),
 }));
 
 const getPresignedMock = vi.mocked(getPresignedUploadUrlsAction);
@@ -74,6 +79,61 @@ describe('uploadBioImage', () => {
     uploadFilesMock.mockReset();
     createBioImageMock.mockReset();
     generateVariantsMock.mockReset();
+    vi.mocked(notifyIfStaleServerAction).mockReset();
+  });
+
+  describe('stale server action (tab older than the deployed build)', () => {
+    const staleError = (): Error => {
+      const error = new Error('Server Action "abc" was not found on the server.');
+      error.name = 'UnrecognizedActionError';
+      return error;
+    };
+
+    it('presign rejects: notifies, returns the reload message, skips the rest', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(true);
+      const error = staleError();
+      getPresignedMock.mockRejectedValue(error);
+
+      const result = await uploadBioImage(makeFile('p.jpg', 'image/jpeg', 10), {
+        artistId: ARTIST_ID,
+        attribution: ATTRIBUTION,
+      });
+
+      expect(result).toEqual({ success: false, error: STALE_PAGE_MESSAGE });
+      expect(vi.mocked(notifyIfStaleServerAction).mock.calls).toEqual([[error]]);
+      expect(uploadFilesMock).not.toHaveBeenCalled();
+      expect(createBioImageMock).not.toHaveBeenCalled();
+    });
+
+    it('register rejects after the S3 upload: notifies and returns the reload message', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(true);
+      getPresignedMock.mockResolvedValue({
+        success: true,
+        data: [{ uploadUrl: 'https://s3.example.com/upload', s3Key: S3_KEY, cdnUrl: CDN_URL }],
+      });
+      uploadFilesMock.mockResolvedValue([{ success: true, s3Key: S3_KEY, cdnUrl: CDN_URL }]);
+      createBioImageMock.mockRejectedValue(staleError());
+
+      const result = await uploadBioImage(makeFile('p.jpg', 'image/jpeg', 10), {
+        artistId: ARTIST_ID,
+        attribution: ATTRIBUTION,
+      });
+
+      expect(result).toEqual({ success: false, error: STALE_PAGE_MESSAGE });
+      expect(generateVariantsMock).not.toHaveBeenCalled();
+    });
+
+    it('rethrows any other rejection untouched', async () => {
+      vi.mocked(notifyIfStaleServerAction).mockReturnValue(false);
+      getPresignedMock.mockRejectedValue(new Error('network down'));
+
+      await expect(
+        uploadBioImage(makeFile('p.jpg', 'image/jpeg', 10), {
+          artistId: ARTIST_ID,
+          attribution: ATTRIBUTION,
+        })
+      ).rejects.toThrow('network down');
+    });
   });
 
   it('happy path: returns success with created record and fires all pipeline steps', async () => {

@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { notifyIfStaleServerAction } from '@/app/components/stale-page-toast';
 import { type ImageItem } from '@/app/components/ui/image-uploader';
 import { getPresignedUploadUrlsAction } from '@/lib/actions/presigned-upload-actions';
 import {
@@ -9,6 +10,7 @@ import {
   type RegisterImageResult,
 } from '@/lib/actions/register-image-actions';
 import { uploadFilesToS3 } from '@/lib/utils/direct-upload';
+import { STALE_PAGE_MESSAGE } from '@/lib/utils/stale-server-action';
 
 /** Entity buckets that own uploadable images (mirrors the presigned-action union). */
 export type ImageUploadEntityType = 'artists' | 'releases';
@@ -37,9 +39,25 @@ const hasFile = (img: ImageItem): img is ImageWithFile => img.file instanceof Fi
  * presigned URLs, PUT the files to S3, then register the uploaded objects in the
  * database. Throws an `Error` on any step failure (no presigned URLs, a failed
  * S3 PUT) so the caller's `try`/`catch` can surface it; otherwise resolves with
- * the register action's result for the caller to merge into form state.
+ * the register action's result for the caller to merge into form state. A
+ * Server Action rejected because the tab predates the deployed build shows
+ * the reload toast and throws {@link STALE_PAGE_MESSAGE} in its place.
  */
 export const uploadAndRegisterImages = async (
+  imagesToUpload: ImageItem[],
+  options: UploadAndRegisterOptions
+): Promise<RegisterImageActionResult> => {
+  try {
+    return await runUploadAndRegister(imagesToUpload, options);
+  } catch (error) {
+    if (notifyIfStaleServerAction(error)) {
+      throw Error(STALE_PAGE_MESSAGE, { cause: error });
+    }
+    throw error;
+  }
+};
+
+const runUploadAndRegister = async (
   imagesToUpload: ImageItem[],
   { entityType, targetId, register }: UploadAndRegisterOptions
 ): Promise<RegisterImageActionResult> => {

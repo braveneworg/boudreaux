@@ -55,10 +55,11 @@ const chosenInOrder = <T extends DisplayImageCandidate>(rows: readonly T[]): T[]
   rows.filter(isChosen).sort((a, b) => a.displayOrder - b.displayOrder);
 
 /**
- * Whether a bio image may be chosen as a display image: it needs alt text,
- * because the public page renders it as content, not decoration. The service
- * enforces this; the UI uses it to disable the "use" affordance with a hint,
- * and the fallback tiers of {@link resolveDisplayImageSet} apply it too.
+ * Whether a bio image already carries alt text, which every display image
+ * needs because the public page renders it as content, not decoration. The
+ * fallback tiers of {@link resolveDisplayImageSet} take only rows that have
+ * it; the set-display-images service backfills a missing alt with the
+ * artist's name and reads this to find the rows that need it.
  */
 export const isDisplayEligible = (row: { alt?: string | null }): boolean =>
   Boolean(row.alt?.trim());
@@ -72,7 +73,8 @@ export const isDisplayEligible = (row: { alt?: string | null }): boolean =>
  * that have alt text → the first pool rows that have alt text. Each tier is
  * sliced to {@link DISPLAY_IMAGE_CAP}; a gap left by a deleted chosen row
  * keeps the remaining relative order. Chosen rows are not re-checked for alt:
- * the set-display-images service refuses them without it.
+ * the set-display-images service backfills a missing one with the artist's
+ * name before it saves the choice.
  *
  * @param rows - The artist's bio images in pool order.
  * @returns The tier and its display images (never more than the cap); the
