@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { ArrowRight, User } from 'lucide-react';
@@ -15,6 +14,7 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
+import { ArtistCardPhoto } from './artist-card-photo';
 import { BioHtml } from './bio-html';
 
 interface ArtistListCardProps {
@@ -38,9 +38,6 @@ const MAX_CARD_IMAGES = 1;
  * cannot drift apart: 128px on phones, 176px from `sm`, 192px from `xl`.
  */
 export const ARTIST_PHOTO_FRAME_CLASS = 'size-32 sm:size-44 xl:size-48';
-
-/** Intrinsic size requested from the CDN loader: 2× the widest 192px frame. */
-const THUMBNAIL_SOURCE_PX = 384;
 
 /**
  * Formation year and instruments joined by a middle dot; `null` when neither is
@@ -77,35 +74,25 @@ interface ArtistThumbnailsProps {
 }
 
 /**
- * The card's identifying photo, as a link into the artist page. It is a way
- * in, not a lightbox — the card navigates rather than opening a dialog. The
- * placeholder sits inside the link too, so an artist with no images still has
- * a clickable photo slot, and `aria-label` names the link for that case, where
- * there is no `alt` to name it. The placeholder wears the same black frame as
- * a photo so an empty slot keeps the paste-up edge. Takes a list rather than a
- * single row so the caller owns how many it shows (see `MAX_CARD_IMAGES`).
+ * The card's identifying photo. It is a lightbox, not a way in: clicking the
+ * photo enlarges it in place (see `ArtistCardPhoto`) and the name carries the
+ * navigation. With no photo the slot holds an inert placeholder — there is
+ * nothing to enlarge, so it is neither a link nor a button — wearing the same
+ * black frame as a photo so an empty slot keeps the paste-up edge. Takes a
+ * list rather than a single row so the caller owns how many it shows (see
+ * `MAX_CARD_IMAGES`).
  */
 const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) => (
-  <Link
-    data-slot="artist-thumbnails"
-    href={`/artists/${slug}`}
-    aria-label={`${displayName} artist page`}
-    className="focus-visible:ring-primary flex shrink-0 gap-2 focus-visible:ring-2 focus-visible:outline-none"
-  >
+  <div data-slot="artist-thumbnails" className="flex shrink-0 gap-2">
     {images.length > 0 ? (
       images.map((image) => (
-        <span
+        <ArtistCardPhoto
           key={image.id}
-          className={cn('block overflow-hidden border-2 border-black', ARTIST_PHOTO_FRAME_CLASS)}
-        >
-          <Image
-            src={image.thumbnailUrl ?? image.url}
-            alt={image.alt ?? image.title ?? `${displayName} image`}
-            width={THUMBNAIL_SOURCE_PX}
-            height={THUMBNAIL_SOURCE_PX}
-            className="size-full object-cover transition-transform duration-300 hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
-          />
-        </span>
+          slug={slug}
+          displayName={displayName}
+          image={image}
+          className={ARTIST_PHOTO_FRAME_CLASS}
+        />
       ))
     ) : (
       <span
@@ -118,7 +105,7 @@ const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) 
         <User className="text-muted-foreground size-10" aria-hidden />
       </span>
     )}
-  </Link>
+  </div>
 );
 
 /**
@@ -132,13 +119,13 @@ const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) 
  * nor its roster appears here; both live on the artist page.
  *
  * The card body itself is inert — no stretched link over the whole surface.
- * Three destinations, four explicit targets, carry the navigation instead:
- * the photo and the name both open the artist page, the latest-release title
- * opens that release, and the closing link opens the biography on that same
- * artist page. There is no separate "all releases" link — it opened the same
- * page — so the release count rides on the latest line. Clicking anywhere
- * else does nothing, so a reader can select the bio text without being
- * navigated away.
+ * Three explicit links carry the navigation instead: the name opens the
+ * artist page, the latest-release title opens that release, and the closing
+ * link opens the biography on that same artist page. The photo does not
+ * navigate — it enlarges in place, and the enlarged view links to the artist
+ * page. There is no separate "all releases" link — it opened the same page —
+ * so the release count rides on the latest line. Clicking anywhere else does
+ * nothing, so a reader can select the bio text without being navigated away.
  *
  * Spacing: the `Card` primitive's own margin and padding are zeroed here so
  * the list owns the distance between rows and the card content owns one

@@ -2,14 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ReleaseCoverModal } from './release-cover-modal';
 
+const useIsMobileMock = vi.hoisted(() => vi.fn<() => boolean>());
+
+vi.mock('@/hooks/use-mobile', () => ({
+  useIsMobile: () => useIsMobileMock(),
+}));
+
 vi.mock('next/image', () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <span data-testid="next-image" data-src={src} data-alt={alt} />
+  default: ({ src, alt, className }: { src: string; alt: string; className?: string }) => (
+    <span data-testid="next-image" data-src={src} data-alt={alt} className={className} />
   ),
 }));
 
@@ -33,6 +39,37 @@ describe('ReleaseCoverModal', () => {
     // Local constructor keeps the formatted date timezone-stable across CI.
     releasedOn: new Date(2024, 0, 2),
   };
+
+  beforeEach(() => {
+    useIsMobileMock.mockReturnValue(false);
+  });
+
+  it('should never style the cover from CSS hover, which fires as the page scrolls', () => {
+    const { container } = render(<ReleaseCoverModal {...defaultProps} />);
+
+    expect(container.innerHTML).not.toMatch(/(^|[\s"])(group-)?hover:/);
+  });
+
+  it('should zoom the cover once the mouse really moves onto it', () => {
+    render(<ReleaseCoverModal {...defaultProps} />);
+    const trigger = screen.getByRole('button', { name: /expand cover art for midnight serenade/i });
+
+    fireEvent.pointerMove(trigger, { clientX: 9, clientY: 9, pointerType: 'mouse' });
+
+    expect(trigger).toHaveAttribute('data-hovered');
+    expect(screen.getByTestId('next-image')).toHaveClass('group-data-[hovered]:scale-110');
+  });
+
+  it('should open a bottom drawer on a narrow viewport', async () => {
+    useIsMobileMock.mockReturnValue(true);
+    render(<ReleaseCoverModal {...defaultProps} />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /expand cover art for midnight serenade/i })
+    );
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-vaul-drawer-direction', 'bottom');
+  });
 
   it('should render the cover art as a zoom trigger button', () => {
     render(<ReleaseCoverModal {...defaultProps} />);
