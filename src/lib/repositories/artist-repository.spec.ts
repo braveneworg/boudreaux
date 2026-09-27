@@ -66,6 +66,9 @@ const adminInclude = {
 
 const nameSelect = { id: true, displayName: true, firstName: true, surname: true };
 
+/** The Mongo null-safe soft-delete guard: an absent field counts as not deleted. */
+const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
+
 /**
  * The public artist gate every public slug read applies (#786): current or
  * alumni, published, not soft-deleted.
@@ -1047,16 +1050,15 @@ describe('ArtistRepository', () => {
   });
 
   describe('findUniqueBySlug', () => {
-    it('finds an artist by slug with the name projection', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
+    it('finds a non-deleted artist by slug with the name projection', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce({ id: 'a' } as never);
 
       const result = await ArtistRepository.findUniqueBySlug('ceschi');
 
       expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findUnique).toHaveBeenCalledWith({
-        where: { slug: 'ceschi' },
-        select: nameSelect,
-      });
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([
+        [{ where: { slug: 'ceschi', OR: NOT_DELETED_OR }, select: nameSelect }],
+      ]);
     });
   });
 
@@ -1068,7 +1070,7 @@ describe('ArtistRepository', () => {
 
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: { displayName: { equals: 'Ceschi', mode: 'insensitive' } },
+        where: { displayName: { equals: 'Ceschi', mode: 'insensitive' }, OR: NOT_DELETED_OR },
         select: nameSelect,
       });
     });
@@ -1087,6 +1089,7 @@ describe('ArtistRepository', () => {
             { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
             { surname: { equals: 'Ramos', mode: 'insensitive' } },
           ],
+          OR: NOT_DELETED_OR,
         },
         select: nameSelect,
       });

@@ -255,20 +255,50 @@ const findArtistByName = async (lookup: ArtistNameLookup): Promise<ArtistNameRec
   return null;
 };
 
+/** How many numbered slugs (`name-2`, `name-3`, …) a create tries before giving up. */
+const NUMBERED_SLUG_ATTEMPTS = 5;
+
+/** The first number appended to a taken slug: `name` is 1, so the next is `name-2`. */
+const FIRST_SLUG_NUMBER = 2;
+
 /**
- * Recover from a slug-collision (`DUPLICATE`) raised while creating an artist by
- * re-reading the artist that now owns the slug. Returns a failure when the row
- * still cannot be found.
+ * Create the artist under the first free numbered slug. Reached only when the
+ * plain slug is taken by an artist the name lookup cannot return — a
+ * soft-deleted one — so the new artist needs a slug of its own.
+ */
+const createUnderNumberedSlug = async (
+  createData: CreateArtistData,
+  attempt = 0
+): Promise<ServiceResponse<ArtistNameRecord>> => {
+  if (attempt >= NUMBERED_SLUG_ATTEMPTS) {
+    return { success: false, error: 'Artist with this slug already exists', code: 'DUPLICATE' };
+  }
+  try {
+    const slug = `${createData.slug}-${attempt + FIRST_SLUG_NUMBER}`;
+    const created = await ArtistRepository.createWithSelect({ ...createData, slug });
+    return { success: true, data: created };
+  } catch (error) {
+    if (error instanceof DataError && error.code === 'DUPLICATE') {
+      return createUnderNumberedSlug(createData, attempt + 1);
+    }
+    return failFromError(error, { UNKNOWN: 'Failed to find or create artist' });
+  }
+};
+
+/**
+ * Recover from a slug-collision (`DUPLICATE`) raised while creating an artist.
+ * A non-deleted owner of the slug won a concurrent create and is returned.
+ * With none, the owner is soft-deleted and must not be credited, so the artist
+ * is created under a numbered slug instead.
  */
 const recoverArtistFromDuplicate = async (
-  trimmed: string
+  createData: CreateArtistData
 ): Promise<ServiceResponse<ArtistNameRecord>> => {
-  const slug = generateSlug(trimmed);
-  const existing = await ArtistRepository.findUniqueBySlug(slug);
+  const existing = await ArtistRepository.findUniqueBySlug(createData.slug);
   if (existing) {
     return { success: true, data: existing };
   }
-  return { success: false, error: 'Artist with this slug already exists', code: 'DUPLICATE' };
+  return createUnderNumberedSlug(createData);
 };
 
 /** The artist fields a video-enrichment suggestion may apply. */
@@ -675,24 +705,26 @@ export class ArtistService {
       return { success: false, error: 'Artist name is empty', code: 'INVALID_INPUT' };
     }
 
-    try {
-      const slug = generateSlug(trimmed);
-      const { firstName, lastName } = splitFullName(trimmed);
+    const slug = generateSlug(trimmed);
+    const { firstName, lastName } = splitFullName(trimmed);
+    // Admin detail values override naïve fallbacks per field.
+    const createData = buildArtistCreateData({ firstName, lastName, trimmed, slug, details });
 
+    try {
       // 1–3. Try slug, then displayName, then firstName + surname matches.
+      // Soft-deleted artists never match.
       const found = await findArtistByName({ trimmed, slug, firstName, lastName });
       if (found) {
         return { success: true, data: found };
       }
 
-      // 4. Create new artist — admin detail values override naïve fallbacks per field.
-      const createData = buildArtistCreateData({ firstName, lastName, trimmed, slug, details });
+      // 4. Create new artist.
       const newArtist = await ArtistRepository.createWithSelect(createData);
       return { success: true, data: newArtist };
     } catch (error) {
       if (error instanceof DataError && error.code === 'DUPLICATE') {
-        // Slug collision — try to find the existing artist instead.
-        return recoverArtistFromDuplicate(trimmed);
+        // Slug collision — return its non-deleted owner, else take a numbered slug.
+        return recoverArtistFromDuplicate(createData);
       }
 
       return failFromError(error, { UNKNOWN: 'Failed to find or create artist' });

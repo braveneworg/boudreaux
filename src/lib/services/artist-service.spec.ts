@@ -1359,6 +1359,57 @@ describe('ArtistService', () => {
       expect(result.success).toBe(true);
     });
 
+    describe('when a soft-deleted artist owns the slug', () => {
+      const duplicate = new DataError('DUPLICATE', 'Unique constraint failed');
+      const created = { id: 'artist-new', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' };
+
+      beforeEach(() => {
+        // The finders skip soft-deleted rows, so every lookup misses.
+        vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
+        vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
+        vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      });
+
+      afterEach(() => {
+        vi.mocked(ArtistRepository.createWithSelect).mockReset();
+      });
+
+      it('creates a new artist under the next free slug', async () => {
+        vi.mocked(ArtistRepository.createWithSelect)
+          .mockRejectedValueOnce(duplicate)
+          .mockResolvedValueOnce(created as never);
+
+        const result = await ArtistService.findOrCreateByName('Ceschi');
+
+        expect(result).toEqual({ success: true, data: created });
+      });
+
+      it('retries the create with a numbered slug', async () => {
+        vi.mocked(ArtistRepository.createWithSelect)
+          .mockRejectedValueOnce(duplicate)
+          .mockRejectedValueOnce(duplicate)
+          .mockResolvedValueOnce(created as never);
+
+        await ArtistService.findOrCreateByName('Ceschi');
+
+        expect(
+          vi.mocked(ArtistRepository.createWithSelect).mock.calls.map(([{ slug }]) => slug)
+        ).toEqual(['ceschi', 'ceschi-2', 'ceschi-3']);
+      });
+
+      it('fails with DUPLICATE once the numbered slugs run out', async () => {
+        vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(duplicate);
+
+        const result = await ArtistService.findOrCreateByName('Ceschi');
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Artist with this slug already exists',
+          code: 'DUPLICATE',
+        });
+      });
+    });
+
     it('should return error when database is unavailable', async () => {
       const initError = new DataError('UNAVAILABLE', 'Connection refused');
 

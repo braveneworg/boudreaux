@@ -736,24 +736,31 @@ export class ArtistRepository {
     );
   }
 
-  /** Find an artist by slug returning the name projection (find-or-create flow). */
+  /**
+   * Find the non-deleted artist that owns a slug, returning the name
+   * projection (find-or-create flow). A soft-deleted owner is not a match: a
+   * name lookup must never hand back an artist that stays hidden (ADR-0015).
+   */
   static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
     return runQuery(() =>
-      prisma.artist.findUnique({ where: { slug }, select: nameSelect })
+      prisma.artist.findFirst({ where: { slug, OR: [...notDeletedOr] }, select: nameSelect })
     ) as Promise<ArtistNameRecord | null>;
   }
 
-  /** Case-insensitive displayName lookup returning the name projection. */
+  /** Case-insensitive displayName lookup over non-deleted artists (name projection). */
   static async findFirstByDisplayName(displayName: string): Promise<ArtistNameRecord | null> {
     return runQuery(() =>
       prisma.artist.findFirst({
-        where: { displayName: { equals: displayName, mode: 'insensitive' } },
+        where: {
+          displayName: { equals: displayName, mode: 'insensitive' },
+          OR: [...notDeletedOr],
+        },
         select: nameSelect,
       })
     ) as Promise<ArtistNameRecord | null>;
   }
 
-  /** Case-insensitive firstName + surname lookup returning the name projection. */
+  /** Case-insensitive firstName + surname lookup over non-deleted artists (name projection). */
   static async findFirstByName(
     firstName: string,
     surname: string
@@ -765,6 +772,7 @@ export class ArtistRepository {
             { firstName: { equals: firstName, mode: 'insensitive' } },
             { surname: { equals: surname, mode: 'insensitive' } },
           ],
+          OR: [...notDeletedOr],
         },
         select: nameSelect,
       })
