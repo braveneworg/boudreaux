@@ -29,6 +29,13 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistPublicSelect } from './_internal/artist-public-select';
+import {
+  alumniArtistWhere,
+  currentArtistWhere,
+  currentOrAlumniWhere,
+  listedReleaseWhere,
+  notDeletedOr,
+} from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
@@ -356,9 +363,6 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
   return and.length > 0 ? { AND: and } : {};
 };
 
-/** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
-const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
-
 /** A row of the vocabulary source read — only ever the one selected column. */
 type VocabularyRow = { genres?: string | null; tags?: string | null };
 
@@ -389,33 +393,6 @@ const readVocabularyColumn = (
       return row.tags;
   }
 };
-
-/** A release that the public may see: published and not soft-deleted. */
-const listedReleaseWhere = {
-  publishedAt: { not: null },
-  OR: [...notDeletedOr],
-} as const satisfies Prisma.ReleaseWhereInput;
-
-/** A current artist: still on the label (`isActive`, which defaults to true). */
-const currentArtistWhere = { isActive: true } as const satisfies Prisma.ArtistWhereInput;
-
-/**
- * An alumnus: deactivated AND carrying a recorded departure date
- * (`deactivatedAt` — "left the label"). An inactive artist with no departure
- * date was hidden for some other reason and stays hidden everywhere public.
- * `{ not: null }` excludes an unset field as well as an explicit null, the
- * same guard the `publishedOn` gate relies on. `reactivatedAt` plays no part:
- * re-signing sets `isActive` back to true, which makes the artist current.
- */
-const alumniArtistWhere = {
-  isActive: false,
-  deactivatedAt: { not: null },
-} as const satisfies Prisma.ArtistWhereInput;
-
-/** Either a current artist or an alumnus — everyone the public may see. */
-const currentOrAlumniWhere = {
-  OR: [currentArtistWhere, alumniArtistWhere],
-} as const satisfies Prisma.ArtistWhereInput;
 
 /**
  * The gate every public artist read by slug applies (#786): current or
