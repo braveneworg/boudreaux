@@ -145,11 +145,71 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('heading', { name: 'Artists', level: 1 })).toBeVisible({
         timeout: 15_000,
       });
-      // The card's images link to the artist page rather than opening a
-      // dialog, so the chosen row is asserted through the rendered <img>.
+      // The chosen row is asserted through the thumbnail's <img>; the
+      // enlarged copy only mounts once the photo is opened.
       const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
       await expect(card.getByRole('img', { name: 'E2E Artist chosen portrait' })).toBeVisible();
       await expect(card.getByRole('img', { name: 'E2E Artist portrait' })).toHaveCount(0);
+    });
+
+    test('clicking the photo enlarges it in a dialog without leaving the index', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+      const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
+      const photo = card.getByRole('button', {
+        name: 'Expand image: E2E Artist chosen portrait',
+      });
+      await expect(photo).toBeVisible({ timeout: 15_000 });
+
+      await photo.click();
+
+      const dialog = page.getByRole('dialog', { name: 'E2E Artist' });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAttribute('data-slot', 'dialog-content');
+      await expect(dialog.getByRole('img', { name: 'E2E Artist chosen portrait' })).toBeVisible();
+      await expect(page).toHaveURL(/\/artists$/);
+
+      // Closing hands focus back to the photo — the check that catches a
+      // duplicated Radix focus scope (see radix-duplicate-packages.md).
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(photo).toBeFocused();
+    });
+
+    test('the enlarged photo links through to the artist page', async ({ page }) => {
+      await page.goto('/artists');
+      const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
+      await card
+        .getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
+        .click({ timeout: 15_000 });
+
+      await page.getByRole('dialog').getByRole('link', { name: 'View artist' }).click();
+
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
+    });
+
+    test.describe('on a phone-width viewport', () => {
+      test.use({ viewport: { width: 390, height: 844 } });
+
+      test('tapping the photo slides a drawer up from the bottom', async ({ page }) => {
+        await page.goto('/artists');
+        const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
+        await card
+          .getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
+          .click({ timeout: 15_000 });
+
+        const drawer = page.getByRole('dialog', { name: 'E2E Artist' });
+        await expect(drawer).toBeVisible();
+        await expect(drawer).toHaveAttribute('data-vaul-drawer-direction', 'bottom');
+        await expect(drawer.getByRole('link', { name: 'View artist' })).toBeInViewport();
+
+        // The drawer, and the image in it, never run wider than the device.
+        const overflows = await drawer.evaluate(
+          (element) => element.scrollWidth > element.clientWidth
+        );
+        expect(overflows).toBe(false);
+      });
     });
 
     test('prepopulates the search dropdown with the first eight artists', async ({ page }) => {
@@ -284,9 +344,8 @@ test.describe('Artist Page', () => {
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
       // "Prof. Quillon M. Tokensmith Jr." sorts under P — after every E2E row,
-      // so it arrives with the last page and closes the grid. Matched exactly:
-      // the card's image link is labelled "<name> artist page", so a loose
-      // /Tokensmith/ resolves to two links and trips strict mode.
+      // so it arrives with the last page and closes the grid. Matched exactly
+      // so the locator stays on the name link however the card is labelled.
       await scrollToLoad(
         page,
         page.getByRole('link', { name: 'Prof. Quillon M. Tokensmith Jr.', exact: true })
