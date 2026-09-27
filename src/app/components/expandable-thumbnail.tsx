@@ -3,20 +3,22 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import type { ReactElement } from 'react';
+
 import Image from 'next/image';
 
-import { Expand } from 'lucide-react';
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from '@/app/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+import {
+  LIGHTBOX_ZOOM_CLASS,
+  LightboxImage,
+  LightboxTrigger,
+  ResponsiveLightbox,
+} from './responsive-lightbox';
 import { ThumbnailCaption } from './thumbnail-caption';
+
+/** Intrinsic size requested for the collapsed thumbnail. */
+const THUMBNAIL_SOURCE_PX = 240;
 
 interface ExpandableThumbnailProps {
   src: string;
@@ -30,9 +32,11 @@ interface ExpandableThumbnailProps {
 }
 
 /**
- * A bio image thumbnail that expands to a full-size view. On desktop the
- * thumbnail scales up on hover; on any device, tapping/clicking opens a dialog
- * with the full image. Mobile-first.
+ * A bio image thumbnail that expands to a full-size view. The thumbnail zooms
+ * when a mouse moves onto it or the keyboard focuses it — never from CSS
+ * hover, which fires as the page scrolls past a resting cursor. Tapping or
+ * clicking opens the full image with its credit: a dialog on wide viewports,
+ * a drawer from the bottom on narrow ones. Mobile-first.
  *
  * Bio images are re-hosted on our CDN with `_w{width}` variants, so they render
  * through the custom next/image loader (no `unoptimized`).
@@ -46,51 +50,32 @@ export const ExpandableThumbnail = ({
   license,
   sourceUrl,
   className,
-}: ExpandableThumbnailProps) => (
-  <Dialog>
-    <DialogTrigger asChild>
-      <button
-        type="button"
-        aria-label={`Expand image: ${alt}`}
-        className={cn(
-          'group relative block overflow-hidden border-2 border-black',
-          'focus-visible:ring-primary focus-visible:ring-2 focus-visible:outline-none',
-          className
-        )}
-      >
+}: ExpandableThumbnailProps): ReactElement => (
+  <ResponsiveLightbox
+    trigger={
+      <LightboxTrigger label={`Expand image: ${alt}`} className={className}>
         <Image
           src={thumbnailSrc ?? src}
           alt={alt}
-          width={240}
-          height={240}
-          className="size-full object-cover transition-transform duration-300 group-hover:scale-110"
+          width={THUMBNAIL_SOURCE_PX}
+          height={THUMBNAIL_SOURCE_PX}
+          className={cn('size-full object-cover', LIGHTBOX_ZOOM_CLASS)}
         />
-        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
-          <Expand
-            className="size-5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-            aria-hidden
-          />
-        </span>
-      </button>
-    </DialogTrigger>
-    <DialogContent className="max-w-3xl">
-      <DialogTitle className="sr-only">{alt}</DialogTitle>
-      <DialogDescription className="sr-only">{caption ?? alt}</DialogDescription>
-      <div className="space-y-3">
-        <Image
-          src={src}
-          alt={alt}
-          width={1200}
-          height={900}
-          className="h-auto w-full object-contain"
-        />
-        <ThumbnailCaption
-          caption={caption}
-          attribution={attribution}
-          license={license}
-          sourceUrl={sourceUrl}
-        />
-      </div>
-    </DialogContent>
-  </Dialog>
+      </LightboxTrigger>
+    }
+    title={alt}
+    titleClassName="sr-only"
+    description={caption ?? alt}
+    descriptionClassName="sr-only"
+  >
+    <figure className="flex flex-col gap-3">
+      <LightboxImage src={src} alt={alt} />
+      <ThumbnailCaption
+        caption={caption}
+        attribution={attribution}
+        license={license}
+        sourceUrl={sourceUrl}
+      />
+    </figure>
+  </ResponsiveLightbox>
 );
