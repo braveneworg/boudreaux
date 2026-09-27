@@ -20,6 +20,10 @@ import type {
   ReleaseListItem,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
+import {
+  invalidatePublicNameCaches,
+  PUBLISHED_RELEASES_CACHE_PREFIX,
+} from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 import { cache, withCache } from '@/utils/simple-cache';
@@ -35,13 +39,6 @@ import type { ServiceResponse } from './service.types';
  * (kept as a separate constant because this module is `server-only`).
  */
 const PUBLISHED_RELEASES_PAGE_SIZE = 24;
-
-/**
- * Cache-key prefix for the cached public published-releases listing pages.
- * Shared between {@link ReleaseService.getPublishedReleases} (which writes the
- * entries) and {@link ReleaseService.invalidateCache} (which clears them).
- */
-const PUBLISHED_RELEASES_CACHE_PREFIX = 'published-releases:';
 
 const digitalFormatRepository = new ReleaseDigitalFormatRepository();
 const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
@@ -246,6 +243,8 @@ export class ReleaseService {
   static async publishRelease(id: string): Promise<ServiceResponse<Release>> {
     try {
       const release = await ReleaseRepository.update(id, { publishedAt: new Date() });
+      // A newly listed release changes the public listings and their bylines.
+      invalidatePublicNameCaches();
 
       return { success: true, data: release };
     } catch (error) {

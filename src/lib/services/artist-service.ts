@@ -47,6 +47,7 @@ import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
+import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import {
@@ -467,6 +468,8 @@ export class ArtistService {
       const artist = await ArtistRepository.update(id, finalized);
       // Edited genres/tags change the suggestion counts this process serves.
       ArtistVocabularyService.invalidate();
+      // An edit can rename the artist or change whether it is public.
+      invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -484,6 +487,7 @@ export class ArtistService {
   static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
       const artist = await ArtistRepository.delete(id);
+      invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -499,6 +503,7 @@ export class ArtistService {
   static async archiveArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
       const artist = await ArtistRepository.archive(id);
+      invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -514,6 +519,7 @@ export class ArtistService {
   static async publishArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
       const artist = await ArtistRepository.update(id, { publishedOn: new Date() });
+      invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -529,6 +535,7 @@ export class ArtistService {
   static async restoreArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
       const artist = await ArtistRepository.update(id, { deletedOn: null });
+      invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {

@@ -8,6 +8,7 @@ import type { AssertExact } from '@/lib/types/assert';
 import type { ArtistDetail, CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
+import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 
 import { ArtistService } from './artist-service';
@@ -84,6 +85,10 @@ vi.mock('@/lib/utils/ip-guard', () => ({
   isPubliclyRoutableUrl: vi.fn(),
 }));
 
+vi.mock('@/lib/utils/public-name-caches', () => ({
+  invalidatePublicNameCaches: vi.fn(),
+}));
+
 vi.mock('./artist-vocabulary-service', () => ({
   ArtistVocabularyService: { invalidate: vi.fn() },
 }));
@@ -95,6 +100,62 @@ vi.mock('./bio-image-service', () => ({
 }));
 
 describe('ArtistService', () => {
+  describe('public name caches', () => {
+    const artist = { id: 'artist-123' };
+
+    beforeEach(() => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(artist as never);
+      vi.mocked(ArtistRepository.archive).mockResolvedValue(artist as never);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(artist as never);
+    });
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.update).mockReset();
+      vi.mocked(ArtistRepository.archive).mockReset();
+      vi.mocked(ArtistRepository.delete).mockReset();
+    });
+
+    it('are cleared when an artist is published', async () => {
+      await ArtistService.publishArtist('artist-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('are cleared when an artist is archived', async () => {
+      await ArtistService.archiveArtist('artist-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('are cleared when an artist is deleted', async () => {
+      await ArtistService.deleteArtist('artist-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('are cleared when an artist is restored', async () => {
+      await ArtistService.restoreArtist('artist-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('are cleared when an artist is updated', async () => {
+      await ArtistService.updateArtist('artist-123', { displayName: 'New Name' });
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('are left alone when the write fails', async () => {
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(
+        new DataError('NOT_FOUND', 'Record not found')
+      );
+
+      await ArtistService.publishArtist('artist-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([]);
+    });
+  });
+
   const mockArtist = {
     id: 'artist-123',
     firstName: 'John',
