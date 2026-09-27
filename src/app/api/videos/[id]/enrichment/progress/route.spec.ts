@@ -35,8 +35,8 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
 
 vi.mock('@/lib/services/video-enrichment-service', () => ({
   VideoEnrichmentService: {
-    recordProgress: (id: string, token: string, checkpoint: unknown) =>
-      recordProgressMock(id, token, checkpoint),
+    recordProgress: (id: string, token: string, checkpoint: unknown, proof: unknown) =>
+      recordProgressMock(id, token, checkpoint, proof),
   },
 }));
 
@@ -49,15 +49,21 @@ vi.mock('@/lib/utils/logger', () => ({
 
 const VIDEO_ID = 'f'.repeat(24);
 
-const buildRequest = (body: string): NextRequest =>
+const SIGNATURE = 't=1790424000,v1=' + 'ab'.repeat(32);
+
+const buildRequest = (body: string, signature: string | null = SIGNATURE): NextRequest =>
   new NextRequest(`http://localhost:3000/api/videos/${VIDEO_ID}/enrichment/progress`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-real-ip': '203.0.113.7' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-real-ip': '203.0.113.7',
+      ...(signature === null ? {} : { 'x-job-signature': signature }),
+    },
     body,
   });
 
-const callRoute = (body: string) =>
-  POST(buildRequest(body), { params: Promise.resolve({ id: VIDEO_ID }) });
+const callRoute = (body: string, signature: string | null = SIGNATURE) =>
+  POST(buildRequest(body, signature), { params: Promise.resolve({ id: VIDEO_ID }) });
 
 beforeEach(() => {
   limiterCheckMock.mockReset().mockResolvedValue(undefined);
@@ -71,17 +77,24 @@ describe('POST /api/videos/[id]/enrichment/progress', () => {
     );
 
     expect(response.status).toBe(202);
-    expect(recordProgressMock).toHaveBeenCalledWith(VIDEO_ID, 't', {
-      stage: 'wikidata',
-      counts: { artists: 1 },
-    });
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      VIDEO_ID,
+      't',
+      { stage: 'wikidata', counts: { artists: 1 } },
+      expect.anything()
+    );
   });
 
   it('records a checkpoint with no counts as a bare stage', async () => {
     const response = await callRoute(JSON.stringify({ jobToken: 't', stage: 'finalizing' }));
 
     expect(response.status).toBe(202);
-    expect(recordProgressMock).toHaveBeenCalledWith(VIDEO_ID, 't', { stage: 'finalizing' });
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      VIDEO_ID,
+      't',
+      { stage: 'finalizing' },
+      expect.anything()
+    );
   });
 
   it('silently accepts malformed JSON with 202 (anti-enumeration)', async () => {
@@ -111,5 +124,31 @@ describe('POST /api/videos/[id]/enrichment/progress', () => {
     const response = await callRoute(JSON.stringify({ jobToken: 't', stage: 'wikidata' }));
 
     expect(response.status).toBe(429);
+  });
+
+  it('hands the service the signature header and the raw body as the callback proof', async () => {
+    const body = JSON.stringify({ jobToken: 't', stage: 'wikidata' });
+
+    await callRoute(body);
+
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      VIDEO_ID,
+      't',
+      { stage: 'wikidata' },
+      { signature: SIGNATURE, rawBody: body }
+    );
+  });
+
+  it('hands the service a null signature when the header is absent', async () => {
+    const body = JSON.stringify({ jobToken: 't', stage: 'wikidata' });
+
+    await callRoute(body, null);
+
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      VIDEO_ID,
+      't',
+      { stage: 'wikidata' },
+      { signature: null, rawBody: body }
+    );
   });
 });

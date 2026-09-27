@@ -41,8 +41,8 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
 
 vi.mock('@/lib/services/bio-generation-service', () => ({
   BioGenerationService: {
-    recordProgress: (id: string, token: string, payload: unknown) =>
-      recordProgressMock(id, token, payload),
+    recordProgress: (id: string, token: string, payload: unknown, proof: unknown) =>
+      recordProgressMock(id, token, payload, proof),
   },
 }));
 
@@ -60,15 +60,21 @@ const validBody: BioProgressPost = {
   counts: { images: 3 },
 };
 
-const buildRequest = (body: string): NextRequest =>
+const SIGNATURE = 't=1790424000,v1=' + 'ab'.repeat(32);
+
+const buildRequest = (body: string, signature: string | null = SIGNATURE): NextRequest =>
   new NextRequest(`http://localhost:3000/api/artists/${ARTIST_ID}/bio-generation/progress`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-real-ip': '203.0.113.7' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-real-ip': '203.0.113.7',
+      ...(signature === null ? {} : { 'x-job-signature': signature }),
+    },
     body,
   });
 
-const callRoute = (body: string) =>
-  POST(buildRequest(body), { params: Promise.resolve({ id: ARTIST_ID }) });
+const callRoute = (body: string, signature: string | null = SIGNATURE) =>
+  POST(buildRequest(body, signature), { params: Promise.resolve({ id: ARTIST_ID }) });
 
 beforeEach(() => {
   limiterCheckMock.mockReset().mockResolvedValue(undefined);
@@ -85,11 +91,12 @@ describe('POST /api/artists/[id]/bio-generation/progress', () => {
   it('records the parsed checkpoint payload (minus jobToken) for the artist', async () => {
     await callRoute(JSON.stringify(validBody));
 
-    expect(recordProgressMock).toHaveBeenCalledWith(ARTIST_ID, 'stored-token', {
-      stage: 'drafting',
-      detail: 'Writing the long bio',
-      counts: { images: 3 },
-    });
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      ARTIST_ID,
+      'stored-token',
+      { stage: 'drafting', detail: 'Writing the long bio', counts: { images: 3 } },
+      expect.anything()
+    );
   });
 
   it('rejects an oversized body with 413', async () => {
@@ -165,5 +172,31 @@ describe('POST /api/artists/[id]/bio-generation/progress', () => {
     await callRoute(JSON.stringify(validBody));
 
     expect(recordProgressMock).not.toHaveBeenCalled();
+  });
+
+  it('hands the service the signature header and the raw body as the callback proof', async () => {
+    const body = JSON.stringify(validBody);
+
+    await callRoute(body);
+
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      ARTIST_ID,
+      'stored-token',
+      expect.objectContaining({ stage: 'drafting' }),
+      { signature: SIGNATURE, rawBody: body }
+    );
+  });
+
+  it('hands the service a null signature when the header is absent', async () => {
+    const body = JSON.stringify(validBody);
+
+    await callRoute(body, null);
+
+    expect(recordProgressMock).toHaveBeenCalledWith(
+      ARTIST_ID,
+      'stored-token',
+      expect.objectContaining({ stage: 'drafting' }),
+      { signature: null, rawBody: body }
+    );
   });
 });

@@ -282,11 +282,11 @@ interface MetadataAccumulator {
  * the generation it merely reports on.
  */
 const buildReport = (input: BioGenerationInput, deps: BioGeneratorDeps): Report => {
-  const { progressUrl, jobToken } = input;
+  const { progressUrl, jobToken, signingKey } = input;
   if (!progressUrl || !jobToken) return () => Promise.resolve();
   return async (stage, counts) => {
     try {
-      await deps.postProgress({ progressUrl, jobToken, stage, counts });
+      await deps.postProgress({ progressUrl, jobToken, signingKey, stage, counts });
     } catch {
       // Progress is a pure side channel — never let a checkpoint failure surface.
     }
@@ -947,6 +947,7 @@ export const runLambda = async (
       await deps.postCallback({
         url: callback.data.callbackUrl,
         jobToken: callback.data.jobToken,
+        signingKey: callback.data.signingKey,
         result,
       });
     }
@@ -955,9 +956,9 @@ export const runLambda = async (
 
   const result = await runToResult(parsed.data, deps);
 
-  const { callbackUrl, jobToken } = parsed.data;
+  const { callbackUrl, jobToken, signingKey } = parsed.data;
   if (callbackUrl && jobToken) {
-    await deps.postCallback({ url: callbackUrl, jobToken, result });
+    await deps.postCallback({ url: callbackUrl, jobToken, signingKey, result });
   }
   return result;
 };

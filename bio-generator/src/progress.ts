@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { withJobSignature } from './callback.js';
 import { logEvent, toErrorMessage } from './lib/log.js';
 
 import type { ProgressStage, VideoProgressStage } from './types.js';
@@ -24,6 +25,8 @@ export interface BioProgressArgs {
   detail?: string;
   /** Optional non-negative counters for the stage (e.g. `{ candidates: 42 }`). */
   counts?: Record<string, number>;
+  /** Per-job HMAC key from the invoke event; when present the POST is signed (ADR-0014). */
+  signingKey?: string;
 }
 
 /**
@@ -39,11 +42,12 @@ export interface BioProgressArgs {
  * @param fetchFn - Injectable fetch (defaults to the nodejs24 global `fetch`).
  */
 export const postBioProgress = async (
-  { progressUrl, jobToken, stage, detail, counts }: BioProgressArgs,
+  { progressUrl, jobToken, stage, detail, counts, signingKey }: BioProgressArgs,
   fetchFn: typeof fetch = fetch
 ): Promise<void> => {
   try {
-    const res = await fetchFn(progressUrl, {
+    const post = signingKey ? withJobSignature(fetchFn, signingKey) : fetchFn;
+    const res = await post(progressUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ jobToken, stage, detail, counts }),

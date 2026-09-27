@@ -26,10 +26,10 @@ const assertRequiredPresent = (required: string[]): void => {
   }
 };
 
-/** Throw if AUTH_SECRET is set but too short to be secure. */
-const assertAuthSecretStrength = (): void => {
-  if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
-    throw Error('AUTH_SECRET must be at least 32 characters for security');
+/** Throw if a secret is set but too short to be secure. */
+const assertSecretStrength = (name: string, value: string | undefined): void => {
+  if (value && value.length < 32) {
+    throw Error(`${name} must be at least 32 characters for security`);
   }
 };
 
@@ -72,12 +72,15 @@ export const validateEnvironment = () => {
     'UPSTASH_REDIS_REST_TOKEN',
     // Name of the deployed bio-generator Lambda the app invokes for AI bios.
     'BIO_GENERATOR_LAMBDA_NAME',
+    // App-only secret every per-job callback signing key derives from (ADR-0014).
+    'JOB_CALLBACK_SECRET',
   ];
 
   assertRequiredPresent(required);
 
-  // Validate AUTH_SECRET length
-  assertAuthSecretStrength();
+  // Validate secret lengths
+  assertSecretStrength('AUTH_SECRET', process.env.AUTH_SECRET);
+  assertSecretStrength('JOB_CALLBACK_SECRET', process.env.JOB_CALLBACK_SECRET);
 
   // Validate DATABASE_URL format (basic check)
   warnOnNonMongoDatabaseUrl();
