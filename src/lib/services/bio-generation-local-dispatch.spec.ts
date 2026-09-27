@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { verifyJobSignature } from '@fakefour/job-contract/signing';
+
 import { fakeBioGeneration } from './bio-generation-fixture';
 import {
   DEFAULT_LOCAL_DISPATCH_DELAY_MS,
@@ -36,12 +38,28 @@ const fetchMock = vi.fn(
   })
 );
 
+const SIGNING_KEY = 'a'.repeat(64);
+
 const baseInput: BioGenerationLambdaInput = {
   artistId: 'a1',
   displayName: 'Radiohead',
   callbackUrl: CALLBACK_URL,
   progressUrl: PROGRESS_URL,
   jobToken: 'tok-123',
+  signingKey: SIGNING_KEY,
+};
+
+/** Whether the POST to `url` carries a signature that verifies over its own body under `key`. */
+const postIsSignedWith = (url: string, key: string): boolean => {
+  const init = postedInit(url);
+  return (
+    verifyJobSignature({
+      header: init?.headers['x-job-signature'] ?? null,
+      rawBody: init?.body ?? '',
+      signingKey: key,
+      nowSeconds: Date.now() / 1000,
+    }).ok === true
+  );
 };
 
 const withInput = (overrides: Partial<BioGenerationLambdaInput>): BioGenerationLambdaInput => ({
@@ -160,6 +178,27 @@ describe('dispatchBioGenerationLocally — completion callback', () => {
     const result = await dispatchBioGenerationLocally(baseInput);
 
     expect(result).toEqual({ ok: true });
+  });
+});
+
+describe('dispatchBioGenerationLocally — signing (ADR-0014)', () => {
+  it('signs the progress checkpoint with the per-job key, like the Lambda does', async () => {
+    await dispatchBioGenerationLocally(baseInput);
+
+    expect(postIsSignedWith(PROGRESS_URL, SIGNING_KEY)).toBe(true);
+  });
+
+  it('signs the completion callback with the per-job key, like the Lambda does', async () => {
+    await dispatchBioGenerationLocally(baseInput);
+
+    expect(postIsSignedWith(CALLBACK_URL, SIGNING_KEY)).toBe(true);
+  });
+
+  it('posts unsigned when the input carries no signing key', async () => {
+    await dispatchBioGenerationLocally(withInput({ signingKey: undefined }));
+
+    expect(postedInit(CALLBACK_URL)?.headers).not.toHaveProperty('x-job-signature');
+    expect(postedInit(PROGRESS_URL)?.headers).not.toHaveProperty('x-job-signature');
   });
 });
 

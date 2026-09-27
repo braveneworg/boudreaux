@@ -77,6 +77,9 @@ export default defineConfig({
       // AWS Lambda / Gemini during E2E so the admin "Generate bios" flow is
       // offline and reproducible.
       BIO_GENERATOR_FAKE: 'true',
+      // Fake-mode callbacks are signed like the Lambda's (ADR-0014); this
+      // dummy value only has to satisfy the length floor. Not a secret.
+      JOB_CALLBACK_SECRET: 'e2e-job-callback-secret-not-a-secret-00',
       NEXT_PUBLIC_CLOUDFLARE_SITE_KEY: '1x00000000000000000000AA',
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,

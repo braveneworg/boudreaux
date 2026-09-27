@@ -15,8 +15,9 @@ import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import {
   chosenDisplayImageIds,
   DISPLAY_IMAGE_CAP,
-  isDisplayEligible,
+  type DisplayImageTier,
   orderBioImagesForPicker,
+  resolveDisplayImageSet,
 } from '@/lib/utils/display-images';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
@@ -24,6 +25,7 @@ import { BioImageTile, resolveImageLabels } from './bio-image-tile';
 import { BioImageUploadZone } from './bio-image-upload-zone';
 import { DisplayImageStrip } from './display-image-strip';
 import { ImageSourceLinksSection } from './image-source-links-section';
+import { useBioImageUpload } from './use-bio-image-upload';
 
 export interface BioImageManagerProps {
   artistId: string;
@@ -50,22 +52,61 @@ export interface BioImageManagerProps {
   disabled?: boolean;
 }
 
-/** Why a tile's "use" affordance is disabled, or `null` when it is usable. */
-const disabledReasonFor = (
-  image: BioStatusImage,
-  chosenIds: string[]
-): 'chosen' | 'cap' | 'alt' | null => {
+/**
+ * Why a tile's "use" affordance is disabled, or `null` when it is usable. A
+ * missing alt is not a reason: the set action backfills it with the artist's
+ * name, the same default an upload gets.
+ */
+const disabledReasonFor = (image: BioStatusImage, chosenIds: string[]): 'chosen' | 'cap' | null => {
   if (chosenIds.includes(image.id)) return 'chosen';
   if (chosenIds.length >= DISPLAY_IMAGE_CAP) return 'cap';
-  if (!isDisplayEligible(image)) return 'alt';
   return null;
 };
 
-const REASON_COPY = new Map<'chosen' | 'cap' | 'alt', string>([
+const REASON_COPY = new Map<'chosen' | 'cap', string>([
   ['chosen', 'Already a display image'],
   ['cap', `Remove a display image first (limit ${DISPLAY_IMAGE_CAP})`],
-  ['alt', 'Add alt text before using this image'],
 ]);
+
+/**
+ * Badge copy for a tile the public page shows from a fallback tier — only
+ * while nothing is chosen, so the chosen tier has none (its tiles carry
+ * "Display n").
+ */
+const SHOWN_COPY = new Map<Exclude<DisplayImageTier, 'chosen'>, string>([
+  ['suggested', 'Shown (suggested)'],
+  ['pool', 'Shown (first in pool)'],
+]);
+
+interface PoolTileBadgeProps {
+  /** 0-based chosen position, or -1 when the tile is not chosen. */
+  position: number;
+  /** The "Shown …" copy when the page shows this tile from a fallback tier. */
+  shownLabel?: string;
+  /** The job suggested this image (`isPrimary`). */
+  isSuggested: boolean;
+}
+
+/**
+ * A pool tile's display-state badge, by precedence: its chosen position, else
+ * that the page shows it from a fallback tier, else that the job suggested it.
+ */
+const PoolTileBadge = ({
+  position,
+  shownLabel,
+  isSuggested,
+}: PoolTileBadgeProps): JSX.Element | null => {
+  let label: string | null = null;
+  if (position !== -1) label = `Display ${position + 1}`;
+  else if (shownLabel) label = shownLabel;
+  else if (isSuggested) label = 'Suggested';
+  if (!label) return null;
+  return (
+    <Badge variant="outline" className="bg-background/80 text-[10px]">
+      {label}
+    </Badge>
+  );
+};
 
 const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
   (image.title ?? '').toLowerCase().includes(lower) ||
@@ -74,15 +115,18 @@ const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
   (image.kind ?? '').toLowerCase().includes(lower);
 
 /**
- * The one place an admin manages an artist's bio images: the chosen display
- * images (ordered strip), an upload zone into the pool, and the pool itself as
- * a filterable grid of tiles that still drag into the bio editors, insert at
- * the cursor, preview, delete, and edit attribution — plus alt editing and a
- * "use as display image" affordance whose disabled reason is spelled out.
+ * The one place an admin manages an artist's bio images: an upload zone into
+ * the pool, the chosen display images (ordered strip with a drop target that
+ * takes a pool tile or a desktop file), and the pool itself as a filterable
+ * grid of tiles that still drag into the bio editors, insert at the cursor,
+ * preview, delete, and edit attribution — plus alt editing and a "use as
+ * display image" affordance whose disabled reason is spelled out.
  *
  * Mounts even with an empty pool, because uploading is its job too. Chosen
- * rows and the picker order are derived from the pool through the shared
- * display-image rules so this view never disagrees with the public page.
+ * rows, the picker order, and the "Shown" badges on the images the page falls
+ * back to while nothing is chosen are all derived from the pool through the
+ * shared display-image rules, so this view never disagrees with the public
+ * page.
  */
 export const BioImageManager = ({
   artistId,
@@ -102,33 +146,56 @@ export const BioImageManager = ({
   const [filter, setFilter] = useState('');
 
   const chosenIds = chosenDisplayImageIds(images);
+  // What the public page shows right now; the fallback tiers are marked on the
+  // tiles so the admin sees the same images the public does.
+  const { tier, images: shownImages } = resolveDisplayImageSet(images);
+  const shownCopy = tier === 'chosen' ? undefined : SHOWN_COPY.get(tier);
+  const shownIds = new Set(shownImages.map(({ id }) => id));
   const chosen = chosenIds.flatMap((id) => images.filter((image) => image.id === id));
   const lower = filter.trim().toLowerCase();
   const pool = orderBioImagesForPicker(images).filter(
     (image) => !lower || matchesFilter(image, lower)
   );
 
-  const use = (image: BioStatusImage): void => {
+  const chooseImage = (image: BioStatusImage): void => {
     onSetDisplayImages([...chosenIds, image.id]);
   };
 
+  // A fresh upload joins the set while there is room; a blank alt is
+  // backfilled with the artist's name by the set action.
   const handleUploaded = (record: ArtistBioImageRecord): void => {
     onUploaded(record);
-    if (chosenIds.length < DISPLAY_IMAGE_CAP && isDisplayEligible(record)) {
+    if (chosenIds.length < DISPLAY_IMAGE_CAP) {
       onSetDisplayImages([...chosenIds, record.id]);
     }
   };
 
+  const dropUpload = useBioImageUpload({ artistId, onUploaded: handleUploaded });
+
+  const handleDropPoolImage = (imageId: string): void => {
+    if (chosenIds.includes(imageId) || chosenIds.length >= DISPLAY_IMAGE_CAP) return;
+    const image = images.find((candidate) => candidate.id === imageId);
+    if (image) chooseImage(image);
+  };
+
+  const handleDropFile = (file: File): void => {
+    void dropUpload.upload(file, { alt: null, attribution: '' });
+  };
+
   return (
     <section aria-label="Bio images" className="space-y-4">
+      <BioImageUploadZone artistId={artistId} onUploaded={handleUploaded} disabled={disabled} />
+
       <DisplayImageStrip
         images={chosen}
         onReorder={onSetDisplayImages}
         onRemove={(id) => onSetDisplayImages(chosenIds.filter((chosenId) => chosenId !== id))}
+        onDropPoolImage={handleDropPoolImage}
+        onDropFile={handleDropFile}
+        isUploading={dropUpload.isUploading}
+        uploadError={dropUpload.errorMessage}
         disabled={disabled}
       />
-
-      <BioImageUploadZone artistId={artistId} onUploaded={handleUploaded} disabled={disabled} />
 
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">Image pool ({images.length})</h3>
@@ -145,7 +212,8 @@ export const BioImageManager = ({
           </div>
         ) : images.length === 0 ? (
           <p className="text-muted-foreground text-xs">
-            No images yet — upload one above or generate the bio to discover some.
+            No images yet — upload one above, drop one on the display images, or generate the bio to
+            discover some.
           </p>
         ) : (
           <>
@@ -176,25 +244,18 @@ export const BioImageManager = ({
                     onEditAlt={onEditAlt}
                     disabled={disabled}
                     badges={
-                      <>
-                        {position !== -1 && (
-                          <Badge variant="outline" className="bg-background/80 text-[10px]">
-                            Display {position + 1}
-                          </Badge>
-                        )}
-                        {position === -1 && image.isPrimary && (
-                          <Badge variant="outline" className="bg-background/80 text-[10px]">
-                            Suggested
-                          </Badge>
-                        )}
-                      </>
+                      <PoolTileBadge
+                        position={position}
+                        shownLabel={shownIds.has(image.id) ? shownCopy : undefined}
+                        isSuggested={image.isPrimary}
+                      />
                     }
                     actions={
                       <>
                         <button
                           type="button"
                           disabled={disabled || reason !== null}
-                          onClick={() => use(image)}
+                          onClick={() => chooseImage(image)}
                           aria-label={`Use ${previewLabel} as display image`}
                           aria-describedby={reason ? hintId : undefined}
                           title={reason ? REASON_COPY.get(reason) : 'Add to display images'}

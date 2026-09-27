@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { JOB_SIGNATURE_HEADER, signJobBody } from '@fakefour/job-contract/signing';
+
 import { loggers } from '@/lib/utils/logger';
 
 import { fakeBioGeneration, type BioGenerationLambdaInput } from './bio-generation-fixture';
@@ -17,11 +19,19 @@ import { resolveFakeDelayMs, sleep } from './lambda-dispatch';
  */
 export const DEFAULT_LOCAL_DISPATCH_DELAY_MS = 4000;
 
-const postJson = async (url: string, body: unknown): Promise<void> => {
+const postJson = async (url: string, body: unknown, signingKey?: string): Promise<void> => {
+  const rawBody = JSON.stringify(body);
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+      // Signed exactly as the Lambda signs (ADR-0014), so the routes verify
+      // the fake path with the same code as the real one.
+      ...(signingKey && {
+        [JOB_SIGNATURE_HEADER]: signJobBody(signingKey, rawBody, Date.now() / 1000),
+      }),
+    },
+    body: rawBody,
     cache: 'no-store',
   });
 
@@ -54,7 +64,7 @@ const postJson = async (url: string, body: unknown): Promise<void> => {
 export const dispatchBioGenerationLocally = async (
   input: BioGenerationLambdaInput
 ): Promise<{ ok: true } | { ok: false; error: string }> => {
-  const { callbackUrl, progressUrl, jobToken } = input;
+  const { callbackUrl, progressUrl, jobToken, signingKey } = input;
 
   if (!callbackUrl || !jobToken) {
     return { ok: false, error: 'Local bio dispatch requires a callback URL and job token' };
@@ -62,16 +72,16 @@ export const dispatchBioGenerationLocally = async (
 
   try {
     if (progressUrl) {
-      await postJson(progressUrl, {
-        jobToken,
-        stage: 'vision-gating',
-        counts: { candidates: 3 },
-      });
+      await postJson(
+        progressUrl,
+        { jobToken, stage: 'vision-gating', counts: { candidates: 3 } },
+        signingKey
+      );
     }
 
     await sleep(resolveFakeDelayMs(DEFAULT_LOCAL_DISPATCH_DELAY_MS));
 
-    await postJson(callbackUrl, { jobToken, result: fakeBioGeneration(input) });
+    await postJson(callbackUrl, { jobToken, result: fakeBioGeneration(input) }, signingKey);
     return { ok: true };
   } catch (error) {
     loggers.media.error('Local bio dispatch failed', error);

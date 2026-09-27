@@ -261,9 +261,9 @@ export interface ReleaseWritableData {
   title?: string;
   labels?: string[];
   releasedOn?: Date;
-  catalogNumber?: string;
+  catalogNumber?: string | null;
   coverArt?: string;
-  description?: string;
+  description?: string | null;
   downloadUrls?: string[];
   formats?: Format[];
   notes?: string[];
@@ -279,7 +279,7 @@ export interface ReleaseWritableData {
   publishedAt?: Date | null;
   featuredOn?: Date | null;
   featuredUntil?: Date | null;
-  featuredDescription?: string;
+  featuredDescription?: string | null;
   suggestedPrice?: number | null;
   deletedOn?: Date | null;
 }

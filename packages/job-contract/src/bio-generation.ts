@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { jobSigningKey } from './job-signing-key';
+
 /**
  * Max releases the web sends to the Lambda in one bio-generation invoke, and the
  * cap the Lambda enforces on the `releases` array. Single-sourced so the two
@@ -33,6 +35,7 @@ export const bioGenerationInputSchema = z.object({
   callbackUrl: z.string().url().optional(),
   jobToken: z.string().min(1).optional(),
   progressUrl: z.string().url().optional(),
+  signingKey: jobSigningKey.optional(),
   releases: z
     .array(
       z.object({

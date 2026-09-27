@@ -50,7 +50,15 @@ import {
   toAsyncJobStatus,
 } from '@/utils/async-job-lifecycle';
 
-import { getLambdaClient, resolveFakeDelayMs, sleep, tokensMatch } from './lambda-dispatch';
+import {
+  getLambdaClient,
+  resolveFakeDelayMs,
+  signingKeyForJob,
+  sleep,
+  tokensMatch,
+  verifyJobCallback,
+  type CallbackProof,
+} from './lambda-dispatch';
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
 import type { VideoEnrichmentCategory } from '@fakefour/job-contract';
@@ -89,6 +97,8 @@ export interface VideoEnrichmentLambdaInput {
   callbackUrl?: string;
   progressUrl?: string;
   jobToken?: string;
+  /** Per-job HMAC key the Lambda signs its callbacks with (ADR-0014). */
+  signingKey?: string;
 }
 
 /** YYYY-MM-DD for wire dates, or undefined. */
@@ -517,6 +527,9 @@ const dispatchEnrichment = async (
   }
 
   const jobToken = randomUUID();
+  // Derived before the token is stored, so a missing secret fails the job
+  // (via runEnrichmentJob's catch) without leaving a claimable token behind.
+  const signingKey = signingKeyForJob({ kind: 'video-enrichment', entityId: state.id, jobToken });
   await VideoRepository.setEnrichmentJobToken(state.id, jobToken);
   const input: VideoEnrichmentLambdaInput = {
     task: 'video-enrichment',
@@ -529,6 +542,7 @@ const dispatchEnrichment = async (
     callbackUrl: `${base}/api/videos/${state.id}/enrichment/callback`,
     progressUrl: `${base}/api/videos/${state.id}/enrichment/progress`,
     jobToken,
+    signingKey,
   };
   try {
     const command = new InvokeCommand({
@@ -669,14 +683,28 @@ export class VideoEnrichmentService {
 
   /**
    * Verify an async completion callback and atomically claim the single-use
-   * job token (constant-time compare, then a conditional updateMany that
+   * job token (signature check under the key derived from the STORED token
+   * (ADR-0014), constant-time compare, then a conditional updateMany that
    * clears the token). Returns false — without touching the token — when the
    * video is missing, the job is not processing, no token is stored, the
-   * token mismatches, or another callback already claimed it.
+   * signature is absent or wrong, the token mismatches, or another callback
+   * already claimed it.
    */
-  static async verifyAndClaimCallback(videoId: string, jobToken: string): Promise<boolean> {
+  static async verifyAndClaimCallback(
+    videoId: string,
+    jobToken: string,
+    proof: CallbackProof
+  ): Promise<boolean> {
     const state = await VideoRepository.getEnrichmentState(videoId);
     if (!state || state.enrichmentStatus !== 'processing' || !state.enrichmentJobToken) {
+      return false;
+    }
+    const identity = {
+      kind: 'video-enrichment',
+      entityId: videoId,
+      jobToken: state.enrichmentJobToken,
+    } as const;
+    if (!verifyJobCallback(identity, proof)) {
       return false;
     }
     if (!tokensMatch(state.enrichmentJobToken, jobToken)) {
@@ -694,11 +722,18 @@ export class VideoEnrichmentService {
   static async recordProgress(
     videoId: string,
     jobToken: string,
-    checkpoint: { stage: VideoProgressStage; counts?: Record<string, number> }
+    checkpoint: { stage: VideoProgressStage; counts?: Record<string, number> },
+    proof: CallbackProof
   ): Promise<void> {
     try {
       const state = await VideoRepository.getEnrichmentState(videoId);
       if (!state?.enrichmentJobToken) return;
+      const identity = {
+        kind: 'video-enrichment',
+        entityId: videoId,
+        jobToken: state.enrichmentJobToken,
+      } as const;
+      if (!verifyJobCallback(identity, proof)) return;
       if (!tokensMatch(state.enrichmentJobToken, jobToken)) return;
       if (state.enrichmentStatus !== 'processing') return;
       await VideoRepository.setEnrichmentProgress(videoId, {

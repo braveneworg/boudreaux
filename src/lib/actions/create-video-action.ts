@@ -149,9 +149,8 @@ export const createVideoAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
-  // Read the pre-generated ObjectId before getActionState (which strips
-  // non-permitted fields). Read raw — not via the schema — so an all-numeric
-  // ObjectId is not mangled by getActionState's numeric-string coercion.
+  // Read the pre-generated ObjectId before getActionState, which strips
+  // non-permitted fields.
   const rawPreGeneratedId = payload.get('preGeneratedId');
   const preGeneratedId =
     typeof rawPreGeneratedId === 'string' && isValidObjectId(rawPreGeneratedId)

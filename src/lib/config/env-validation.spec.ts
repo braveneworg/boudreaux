@@ -29,6 +29,7 @@ describe('Environment Validation', () => {
       UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
       UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
       BIO_GENERATOR_LAMBDA_NAME: 'fakefour-bio-generator',
+      JOB_CALLBACK_SECRET: 'j'.repeat(32),
     };
   });
 
@@ -85,6 +86,34 @@ describe('Environment Validation', () => {
 
       expect(() => validateEnvironment()).toThrow(
         'Missing required environment variables: DATABASE_URL, AUTH_SECRET'
+      );
+    });
+
+    it('should throw error when JOB_CALLBACK_SECRET is missing', () => {
+      process.env = {
+        ...process.env,
+        DATABASE_URL: 'mongodb://localhost:27017/test',
+        AUTH_SECRET: 'a'.repeat(32),
+        EMAIL_FROM: 'noreply@example.com',
+        JOB_CALLBACK_SECRET: undefined,
+      };
+
+      expect(() => validateEnvironment()).toThrow(
+        'Missing required environment variables: JOB_CALLBACK_SECRET'
+      );
+    });
+
+    it('should throw error when JOB_CALLBACK_SECRET is too short', () => {
+      process.env = {
+        ...process.env,
+        DATABASE_URL: 'mongodb://localhost:27017/test',
+        AUTH_SECRET: 'a'.repeat(32),
+        EMAIL_FROM: 'noreply@example.com',
+        JOB_CALLBACK_SECRET: 'short',
+      };
+
+      expect(() => validateEnvironment()).toThrow(
+        'JOB_CALLBACK_SECRET must be at least 32 characters for security'
       );
     });
 
@@ -234,6 +263,7 @@ describe('Environment Validation', () => {
         UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
         UPSTASH_REDIS_REST_TOKEN: 'test-upstash-token',
         BIO_GENERATOR_LAMBDA_NAME: 'fakefour-bio-generator',
+        JOB_CALLBACK_SECRET: 'j'.repeat(32),
       };
 
       // Dynamic import forces module-level code to run with NODE_ENV='production'

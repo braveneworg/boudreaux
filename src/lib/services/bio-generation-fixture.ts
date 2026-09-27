@@ -22,6 +22,8 @@ export interface BioGenerationLambdaInput {
   /** Absolute URL the Lambda POSTs per-stage progress checkpoints to (verify-only, never claims). */
   progressUrl?: string;
   jobToken?: string;
+  /** Per-job HMAC key the Lambda (or the local fake) signs its callbacks with (ADR-0014). */
+  signingKey?: string;
 }
 
 /**

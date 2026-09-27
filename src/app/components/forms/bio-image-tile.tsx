@@ -130,9 +130,10 @@ const EditableTextRow = ({
 
 /**
  * Single draggable bio image tile with preview, insert, delete, and
- * attribution-edit controls. Drags into the bio editors as an
- * `application/x-bio-image` payload; the Plus button inserts at the focused
- * editor's cursor (touch/keyboard path). The thumbnail is `unoptimized`
+ * attribution-edit controls. Drags into the bio editors and onto the
+ * display-image drop target as an `application/x-bio-image` payload (the
+ * row id is what the drop target reads); the Plus button inserts at the
+ * focused editor's cursor (touch/keyboard path). The thumbnail is `unoptimized`
  * because a fresh upload's srcset variants are generated asynchronously and a
  * missing variant 403s on the CDN.
  */
@@ -153,6 +154,7 @@ export const BioImageTile = ({
     event.dataTransfer.setData(
       BIO_IMAGE_DRAG_MIME,
       JSON.stringify({
+        id: image.id,
         url: image.url,
         thumbnailUrl: image.thumbnailUrl ?? null,
         title,

@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { IMAGE_LINKS_TASK, MAX_IMAGE_LINKS, type ImageLinksInput } from '@fakefour/job-contract';
+import { JOB_SIGNATURE_HEADER, signJobBody } from '@fakefour/job-contract/signing';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
@@ -31,7 +32,15 @@ import {
   type RehostedImage,
 } from './bio-generation-service';
 import { BioImageService } from './bio-image-service';
-import { getLambdaClient, resolveFakeDelayMs, sleep, tokensMatch } from './lambda-dispatch';
+import {
+  getLambdaClient,
+  resolveFakeDelayMs,
+  signingKeyForJob,
+  sleep,
+  tokensMatch,
+  verifyJobCallback,
+  type CallbackProof,
+} from './lambda-dispatch';
 
 /** Outcome of {@link ImageLinksService.runJob}: dispatched across the seam, or failed early. */
 export type RunImageLinksJobResult = { status: 'dispatched' } | { status: 'failed'; error: string };
@@ -49,13 +58,20 @@ const DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS = 0;
 const dispatchImageLinksLocally = async (input: ImageLinksInput): Promise<InvokeAck> => {
   try {
     await sleep(resolveFakeDelayMs(DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS));
+    const rawBody = JSON.stringify({
+      jobToken: input.jobToken,
+      result: { ok: true, data: { images: [] } },
+    });
     const response = await fetch(input.callbackUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobToken: input.jobToken,
-        result: { ok: true, data: { images: [] } },
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        // Signed exactly as the Lambda signs (ADR-0014).
+        ...(input.signingKey && {
+          [JOB_SIGNATURE_HEADER]: signJobBody(input.signingKey, rawBody, Date.now() / 1000),
+        }),
+      },
+      body: rawBody,
       cache: 'no-store',
     });
     if (!response.ok) {
@@ -273,6 +289,9 @@ export class ImageLinksService {
       const referenceImageUrls = buildReferenceImageUrls(customUrls);
 
       const jobToken = randomUUID();
+      // Derived before the token is stored, so a missing secret records
+      // `failed` (via the catch below) without leaving a claimable token.
+      const signingKey = signingKeyForJob({ kind: 'image-links', entityId: artistId, jobToken });
       await ArtistRepository.setImageLinksJobToken(artistId, jobToken);
       const ack = await invoke({
         task: IMAGE_LINKS_TASK,
@@ -282,6 +301,7 @@ export class ImageLinksService {
         referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
         callbackUrl: `${base}/api/artists/${artistId}/image-links/callback`,
         jobToken,
+        signingKey,
       });
       if (!ack.ok) {
         await ArtistRepository.setImageLinksJobToken(artistId, null);
@@ -322,15 +342,26 @@ export class ImageLinksService {
   /**
    * Verifies a completion callback and atomically claims the job so it can only
    * complete once. Returns the artist slug (for revalidation) only when the job
-   * is `processing`, the token constant-time-matches, AND this caller wins the
-   * claim; a mismatched token never attempts the claim.
+   * is `processing`, the body's signature verifies under the key derived from
+   * the STORED token (ADR-0014), the token constant-time-matches, AND this
+   * caller wins the claim; an unsigned, mis-signed, or mismatched callback
+   * never attempts the claim.
    */
   static async verifyAndClaimCallback(
     artistId: string,
-    jobToken: string
+    jobToken: string,
+    proof: CallbackProof
   ): Promise<{ slug: string } | null> {
     const state = await ArtistRepository.getImageLinksJobState(artistId);
     if (!state || state.imageLinksStatus !== 'processing' || !state.imageLinksJobToken) {
+      return null;
+    }
+    const identity = {
+      kind: 'image-links',
+      entityId: artistId,
+      jobToken: state.imageLinksJobToken,
+    } as const;
+    if (!verifyJobCallback(identity, proof)) {
       return null;
     }
     if (!tokensMatch(state.imageLinksJobToken, jobToken)) {

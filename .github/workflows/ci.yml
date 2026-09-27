@@ -406,6 +406,9 @@ jobs:
           # AWS Lambda / Gemini, so the admin "Generate bios" flow is offline and
           # reproducible in CI.
           BIO_GENERATOR_FAKE: "true"
+          # Fake-mode callbacks are signed like the Lambda's (ADR-0014); this
+          # dummy value only has to satisfy the length floor. Not a secret.
+          JOB_CALLBACK_SECRET: "e2e-job-callback-secret-not-a-secret-00"
           # Real AWS credentials so the pre-built standalone server can reach
           # production S3 at runtime — the bundle-download route lazily calls
           # getS3Client()/getS3BucketName() per request, and without these the

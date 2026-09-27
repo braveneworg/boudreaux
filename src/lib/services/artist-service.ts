@@ -33,7 +33,9 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
+import { isVisibleArtist } from '@/lib/utils/artist-visibility';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
   DISPLAY_IMAGE_CAP,
@@ -587,11 +589,12 @@ export class ArtistService {
       }
 
       // The band graph is folded into `releases` and not exposed; the
-      // published/non-deleted filter runs here because Prisma MongoDB doesn't
-      // support a nested where on junction-table includes. Bio prose is
-      // sanitized on read so redisplay is safe regardless of how it was
-      // authored (generated bios are also sanitized at write time).
-      const { memberOf: _bands, ...publicArtist } = artist;
+      // published/non-deleted filter on releases, members, and bands runs
+      // here because Prisma MongoDB doesn't support a nested where on
+      // junction-table includes (#786). Bio prose is sanitized on read so
+      // redisplay is safe regardless of how it was authored (generated bios
+      // are also sanitized at write time).
+      const { memberOf, members, ...publicArtist } = artist;
       const filteredArtist: ArtistWithPublishedReleases = {
         ...publicArtist,
         bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
@@ -599,7 +602,11 @@ export class ArtistService {
         // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        releases: collectArtistReleases(artist),
+        members: members.filter(({ member }) => isVisibleArtist(member)),
+        releases: collectArtistReleases({
+          ...artist,
+          memberOf: memberOf.filter(({ artist: band }) => isVisibleArtist(band)),
+        }),
       };
 
       return { success: true, data: filteredArtist };
@@ -730,9 +737,12 @@ export class ArtistService {
    * Replace an artist's display images with `imageIds`, in display order. The
    * rules of the set live here: at most {@link DISPLAY_IMAGE_CAP}, each id once,
    * every id one of the artist's own bio images, and every chosen image with
-   * alt text (the public page renders them as content). The repository write
-   * promotes the chosen rows to `origin: 'custom'` so a regeneration keeps a
-   * human's choice; the AI's `isPrimary` suggestion is never touched.
+   * alt text (the public page renders them as content) — a blank alt is
+   * backfilled with the artist's display name, the same default an upload
+   * gets, so only an artist with no name at all can be refused. The
+   * repository write promotes the chosen rows to `origin: 'custom'` so a
+   * regeneration keeps a human's choice; the AI's `isPrimary` suggestion is
+   * never touched.
    *
    * @returns The artist's slug on success, so the caller can revalidate the
    *   public artist page.
@@ -770,12 +780,17 @@ export class ArtistService {
           code: 'NOT_FOUND',
         };
       }
-      if (rows.some((row) => !isDisplayEligible(row))) {
+      const altless = rows.filter((row) => !isDisplayEligible(row));
+      const fallbackAlt = deriveArtistDisplayName(artist);
+      if (altless.length > 0 && !fallbackAlt) {
         return {
           success: false,
           error: 'Add alt text before using an image as a display image',
           code: 'VALIDATION',
         };
+      }
+      for (const row of altless) {
+        await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
       }
 
       await ArtistBioImageRepository.setDisplayOrder(artistId, imageIds);
@@ -842,6 +857,15 @@ export class ArtistService {
   static async existsById(artistId: string): Promise<boolean> {
     const found = await ArtistRepository.existsById(artistId);
     return Boolean(found);
+  }
+
+  /**
+   * The artist's name projection (id + the parts a display name derives
+   * from), or null when no artist has the id. For callers that must both
+   * validate an artistId and name the artist before a follow-up write.
+   */
+  static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
+    return ArtistRepository.findNameById(artistId);
   }
 
   /**

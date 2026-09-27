@@ -76,7 +76,9 @@ _Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
 Artist on the public artist page and index cards. Chosen and ordered only by a
 human; a bio generation job may **suggest** images but never chooses or
 displaces a human's choice. While no human has chosen, the page shows the
-suggested images. See
+suggested images that have alt text, or else the first pool images that have
+alt text; the admin marks those tiles **Shown**. An image without alt text is
+never shown unless a human chose it. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: primary images, hero image, featured images (featured is a release
 credit).
@@ -184,6 +186,16 @@ above the Lambda's ceiling) is **stale-coerced** to `failed` on read, without
 writing; the **client poll deadline** (`CLIENT_POLL_DEADLINE_MS`) exceeds the
 stale window so the server's coercion resolves the UI first.
 _Defined in_ `src/lib/utils/async-job-lifecycle.ts`.
+
+**signed callback** — a Lambda → app callback or progress POST whose raw body
+is HMAC-signed in the `x-job-signature` header with a **job signing key**: a
+per-job key the app derives at dispatch from the app-only `JOB_CALLBACK_SECRET`
+and the job token, hands to the Lambda inside the invoke payload, and never
+stores. The route re-derives the key from the stored token and verifies before
+the token compare, so a leaked job token alone can't forge a callback.
+See [ADR-0014](docs/adr/0014-lambda-callbacks-are-hmac-signed.md).
+_Defined in_ `packages/job-contract/src/signing.ts` and
+`src/lib/services/lambda-dispatch.ts`.
 
 **bio generation job** — an asynchronous run that produces an Artist's bio via
 the `bio-generator` Lambda, following the **async job lifecycle** and reporting

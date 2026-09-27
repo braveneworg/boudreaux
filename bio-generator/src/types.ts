@@ -74,6 +74,7 @@ export {
 export const callbackTargetSchema = z.object({
   callbackUrl: z.string().url(),
   jobToken: z.string().min(1),
+  signingKey: z.string().min(1).optional(),
 });
 
 /** A single fact-check violation flagged by the critic pass. */

@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { httpUrl } from './http-url';
+import { jobSigningKey } from './job-signing-key';
 
 const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
@@ -92,6 +93,7 @@ export const videoEnrichmentInputSchema = z.object({
   callbackUrl: z.string().url().optional(),
   progressUrl: z.string().url().optional(),
   jobToken: z.string().min(1).max(200).optional(),
+  signingKey: jobSigningKey.optional(),
 });
 
 export type VideoEnrichmentInput = z.infer<typeof videoEnrichmentInputSchema>;

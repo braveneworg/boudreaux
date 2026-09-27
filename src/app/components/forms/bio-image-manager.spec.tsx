@@ -2,13 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
+import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
 import { BioImageManager, type BioImageManagerProps } from './bio-image-manager';
+import { uploadBioImage } from './utils/upload-bio-image';
+
+// The strip's file drop runs the real upload hook; stub the pipeline itself.
+vi.mock('./utils/upload-bio-image', () => ({ uploadBioImage: vi.fn() }));
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -86,8 +91,47 @@ const renderManager = (overrides: Partial<BioImageManagerProps> = {}) => {
 const useButton = (name: string) =>
   screen.getByRole('button', { name: `Use ${name} as display image` });
 
+const dropTarget = () => screen.getByRole('group', { name: 'Add a display image' });
+
+/** A DataTransfer stand-in carrying a pool tile's payload or files. */
+const transfer = ({ id, files = [] }: { id?: string; files?: File[] }) => ({
+  types: [...(id ? [BIO_IMAGE_DRAG_MIME] : []), ...(files.length ? ['Files'] : [])],
+  getData: (type: string) =>
+    type === BIO_IMAGE_DRAG_MIME && id
+      ? JSON.stringify({
+          id,
+          url: `https://cdn.example/${id}.webp`,
+          thumbnailUrl: null,
+          title: id,
+          attribution: null,
+          alt: `${id} described`,
+          width: null,
+          height: null,
+        })
+      : '',
+  files,
+});
+
+const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+
+/** The pool tile whose preview button names the given image. */
+const tileFor = (name: string): HTMLElement => {
+  const tiles = within(screen.getByRole('group', { name: 'Image pool' })).getAllByRole('listitem');
+  const [tile] = tiles.filter(
+    (candidate) => within(candidate).queryByRole('button', { name: `Preview ${name}` }) !== null
+  );
+  return tile;
+};
+
+/** Every "Shown …" badge text on one tile. */
+const shownBadgesOn = (name: string): string[] =>
+  within(tileFor(name))
+    .queryAllByText(/^Shown/)
+    .map((badge) => badge.textContent ?? '');
+
 beforeEach(() => {
   uploadedRecord.current = null;
+  vi.mocked(uploadBioImage).mockReset();
 });
 
 describe('BioImageManager', () => {
@@ -100,6 +144,16 @@ describe('BioImageManager', () => {
       'artist-1'
     );
     expect(within(region).getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
+  });
+
+  it('orders the sections: upload zone, then display images, then the pool', () => {
+    renderManager();
+    const region = screen.getByRole('region', { name: 'Bio images' });
+    const zone = within(region).getByTestId('upload-zone-stub');
+    const strip = within(region).getByRole('list', { name: 'Display images' });
+    const pool = within(region).getByRole('group', { name: 'Image pool' });
+    expect(zone.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(strip.compareDocumentPosition(pool) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders the image-sources editor below the pool, passing artist id and disabled', () => {
@@ -150,6 +204,84 @@ describe('BioImageManager', () => {
     expect(within(pool).getByText('Suggested')).toBeInTheDocument();
   });
 
+  // While nothing is chosen the page shows a fallback tier (ADR-0008
+  // addendum); the tiles it takes are marked so the admin sees what the public
+  // sees.
+  it('marks the suggested images the page shows while nothing is chosen', () => {
+    renderManager({
+      images: [
+        image('rest'),
+        image('shown', { isPrimary: true }),
+        image('no-alt', { isPrimary: true, alt: null }),
+      ],
+    });
+
+    expect(shownBadgesOn('shown')).toEqual(['Shown (suggested)']);
+  });
+
+  it('drops the Suggested badge from a suggested image the page shows', () => {
+    renderManager({ images: [image('shown', { isPrimary: true })] });
+
+    expect(within(tileFor('shown')).queryByText('Suggested')).not.toBeInTheDocument();
+  });
+
+  it('keeps an alt-less suggestion Suggested and unmarked, since the page skips it', () => {
+    renderManager({
+      images: [
+        image('shown', { isPrimary: true }),
+        image('no-alt', { isPrimary: true, alt: null }),
+      ],
+    });
+
+    expect(within(tileFor('no-alt')).getByText('Suggested')).toBeInTheDocument();
+    expect(shownBadgesOn('no-alt')).toEqual([]);
+  });
+
+  it('does not mark unsuggested pool images while a suggestion is shown', () => {
+    renderManager({ images: [image('rest'), image('shown', { isPrimary: true })] });
+
+    expect(shownBadgesOn('rest')).toEqual([]);
+  });
+
+  it('keeps a suggestion beyond the cap Suggested and unmarked', () => {
+    renderManager({
+      images: ['s1', 's2', 's3', 's4'].map((id) => image(id, { isPrimary: true })),
+    });
+
+    expect(within(tileFor('s4')).getByText('Suggested')).toBeInTheDocument();
+    expect(shownBadgesOn('s4')).toEqual([]);
+  });
+
+  it('marks the first pool images with alt text when no suggestion has alt text', () => {
+    renderManager({
+      images: [
+        image('no-alt-suggestion', { isPrimary: true, alt: null }),
+        image('a'),
+        image('bare', { alt: null }),
+        image('b'),
+        image('c'),
+        image('d'),
+      ],
+    });
+
+    expect(['a', 'b', 'c', 'd', 'bare', 'no-alt-suggestion'].map(shownBadgesOn)).toEqual([
+      ['Shown (first in pool)'],
+      ['Shown (first in pool)'],
+      ['Shown (first in pool)'],
+      [],
+      [],
+      [],
+    ]);
+  });
+
+  it('marks nothing as shown once a human has chosen', () => {
+    renderManager();
+
+    expect(
+      within(screen.getByRole('group', { name: 'Image pool' })).queryAllByText(/^Shown/)
+    ).toEqual([]);
+  });
+
   it('shows the pool count', () => {
     renderManager();
     expect(screen.getByRole('heading', { name: 'Image pool (5)' })).toBeInTheDocument();
@@ -164,7 +296,7 @@ describe('BioImageManager', () => {
   it('explains the "use" button on hover, and swaps the hover text for the reason when disabled', () => {
     renderManager();
     expect(useButton('suggested')).toHaveAttribute('title', 'Add to display images');
-    expect(useButton('bare')).toHaveAttribute('title', 'Add alt text before using this image');
+    expect(useButton('first')).toHaveAttribute('title', 'Already a display image');
   });
 
   it('disables "use" on a tile that is already chosen, with the reason', () => {
@@ -174,11 +306,14 @@ describe('BioImageManager', () => {
     expect(button).toHaveAccessibleDescription('Already a display image');
   });
 
-  it('disables "use" on a tile without alt text, with the reason', () => {
-    renderManager();
+  // The set action backfills a blank alt with the artist's name, so an
+  // alt-less upload is no longer stuck behind a disabled plus (2026-09-26).
+  it('lets a tile without alt text be used', async () => {
+    const { onSetDisplayImages } = renderManager();
     const button = useButton('bare');
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription('Add alt text before using this image');
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'bare']);
   });
 
   it('disables "use" everywhere once the cap is reached, with the reason', () => {
@@ -234,12 +369,74 @@ describe('BioImageManager', () => {
     expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
   });
 
-  it('reports an upload without selecting it when it has no alt text', async () => {
+  it('reports an upload and auto-selects it even without alt text', async () => {
     uploadedRecord.current = { id: 'new', alt: null } as ArtistBioImageRecord;
     const { onUploaded, onSetDisplayImages } = renderManager();
     await userEvent.click(screen.getByTestId('upload-zone-stub'));
     expect(onUploaded).toHaveBeenCalled();
-    expect(onSetDisplayImages).not.toHaveBeenCalled();
+    expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
+  });
+
+  describe('display image drop target', () => {
+    it('adds a pool image dropped on the strip', () => {
+      const { onSetDisplayImages } = renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ id: 'suggested' }) });
+
+      expect(vi.mocked(onSetDisplayImages).mock.calls).toEqual([
+        [['first', 'second', 'suggested']],
+      ]);
+    });
+
+    it('ignores a dropped pool image that is already chosen', () => {
+      const { onSetDisplayImages } = renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ id: 'first' }) });
+
+      expect(onSetDisplayImages).not.toHaveBeenCalled();
+    });
+
+    it('ignores a dropped id that is not in the pool', () => {
+      const { onSetDisplayImages } = renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ id: 'foreign' }) });
+
+      expect(onSetDisplayImages).not.toHaveBeenCalled();
+    });
+
+    it('uploads a dropped file into the pool and then adds it to the display images', async () => {
+      const record = { id: 'new', alt: null } as ArtistBioImageRecord;
+      vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: true, data: record });
+      const { onUploaded, onSetDisplayImages } = renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+
+      await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(record));
+      expect(vi.mocked(uploadBioImage).mock.calls).toEqual([
+        [jpeg, { artistId: 'artist-1', attribution: '', alt: null }],
+      ]);
+      expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
+    });
+
+    it('shows a dropped file upload failure inline without touching the set', async () => {
+      vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: false, error: 'S3 refused' });
+      const { onSetDisplayImages } = renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('S3 refused');
+      expect(onSetDisplayImages).not.toHaveBeenCalled();
+    });
+
+    it('rejects a dropped non-image file without starting the pipeline', async () => {
+      const text = new File(['x'], 'notes.txt', { type: 'text/plain' });
+      renderManager();
+
+      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [text] }) });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/JPEG, PNG, or WebP/);
+      expect(uploadBioImage).not.toHaveBeenCalled();
+    });
   });
 
   it('reports an upload without selecting it when the cap is reached', async () => {
