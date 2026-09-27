@@ -1,10 +1,17 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
-import { artistPrivateValues, artistPublicScalar, artistScalar } from './schema-fixtures';
 import {
+  artistBioValues,
+  artistCreditScalar,
+  artistPrivateValues,
+  artistPublicScalar,
+  artistScalar,
+} from './schema-fixtures';
+import {
+  artistCreditScalarSchema,
   artistPublicScalarSchema,
   artistScalarSchema,
   formatSchema,
@@ -54,5 +61,21 @@ describe('artistPublicScalarSchema', () => {
     const parsed = artistPublicScalarSchema.parse({ ...artistScalar, ...artistPrivateValues });
 
     expect(parsed).not.toHaveProperty(field);
+  });
+});
+
+describe('artistCreditScalarSchema', () => {
+  const leakyArtist = { ...artistScalar, ...artistPrivateValues, ...artistBioValues };
+
+  it('parses a nested artist carrying no private or bio field', () => {
+    expect(() => artistCreditScalarSchema.parse(artistCreditScalar)).not.toThrow();
+  });
+
+  it.each(ARTIST_BIO_FIELDS)('strips the bio field %s', (field) => {
+    expect(artistCreditScalarSchema.parse(leakyArtist)).not.toHaveProperty(field);
+  });
+
+  it.each(ARTIST_PRIVATE_FIELDS)('strips the private field %s', (field) => {
+    expect(artistCreditScalarSchema.parse(leakyArtist)).not.toHaveProperty(field);
   });
 });

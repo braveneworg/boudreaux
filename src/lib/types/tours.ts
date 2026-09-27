@@ -7,9 +7,9 @@
  * Adapted from contracts/tour-types.ts
  */
 
-import type { ArtistPublicScalars, ArtistScalars } from '@/lib/types/domain/artist';
+import type { ArtistCreditScalars, ArtistScalars } from '@/lib/types/domain/artist';
 
-export type { ArtistPublicScalars, ArtistScalars };
+export type { ArtistCreditScalars, ArtistScalars };
 
 // ============================================================================
 // Scalar mirrors of the Prisma tour models (Prisma-free)
@@ -147,7 +147,7 @@ export type TourImage = TourImageScalars & {
  */
 export type TourDateWithRelations = TourDateScalars & {
   venue: VenueScalars;
-  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistPublicScalars | null }>;
+  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistCreditScalars | null }>;
 };
 
 /**
@@ -169,7 +169,7 @@ export type TourWithRelations = TourScalars & {
 export type TourDateWithTourAndRelations = TourDateScalars & {
   venue: VenueScalars;
   tour: TourScalars;
-  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistPublicScalars | null }>;
+  headliners: Array<TourDateHeadlinerScalars & { artist: ArtistCreditScalars | null }>;
 };
 
 // ============================================================================
@@ -403,7 +403,7 @@ export interface ActionResult<T = void> {
  * 2. Fall back to firstName + " " + surname
  * 3. Fall back to null
  */
-export type GetArtistDisplayName = (artist: ArtistPublicScalars) => string | null;
+export type GetArtistDisplayName = (artist: ArtistCreditScalars) => string | null;
 
 // ============================================================================
 // Service Response Type (matching existing pattern)

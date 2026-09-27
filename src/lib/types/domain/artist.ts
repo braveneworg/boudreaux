@@ -131,6 +131,38 @@ export const ARTIST_PRIVATE_FIELDS = Object.keys(
  */
 export type ArtistPublicScalars = Omit<ArtistScalars, ArtistPrivateField>;
 
+/**
+ * The bio text and its generation metadata. Public, but only for an artist the
+ * public may see: a bio is released when its artist is published and not
+ * deleted, and it has no release state of its own. Only the gated page artist
+ * reads them; an artist reached through another record — a release credit, a
+ * band member or band, a tour headliner — is not gated on publication, so its
+ * projection leaves every one of these out. Keyed as a `true` mask like
+ * {@link ARTIST_PRIVATE_FIELD_MASK}.
+ */
+export const ARTIST_BIO_FIELD_MASK = {
+  bio: true,
+  shortBio: true,
+  altBio: true,
+  bioGeneratedAt: true,
+  bioModel: true,
+  bioStatus: true,
+} as const satisfies Partial<Record<keyof ArtistPublicScalars, true>>;
+
+/** A bio field — see {@link ARTIST_BIO_FIELD_MASK}. */
+export type ArtistBioField = keyof typeof ARTIST_BIO_FIELD_MASK;
+
+/** Every bio field, in mask order. */
+export const ARTIST_BIO_FIELDS = Object.keys(ARTIST_BIO_FIELD_MASK) as readonly ArtistBioField[];
+
+/**
+ * The scalars of an artist reached through another record (a release credit,
+ * a band member or band, a tour headliner): {@link ArtistPublicScalars} minus
+ * every {@link ArtistBioField}. It keeps the publication and roster fields,
+ * which the visibility filter needs.
+ */
+export type ArtistCreditScalars = Omit<ArtistPublicScalars, ArtistBioField>;
+
 /** Scalar fields of the Prisma `ArtistLabel` join model (`labels: true`). */
 export interface ArtistLabelRecord {
   id: string;
@@ -264,10 +296,10 @@ export type Artist = ArtistScalars & {
 
 /**
  * The media `Release` graph as the public artist-detail page loads it: every
- * credited artist on the release carries only its {@link ArtistPublicScalars}.
+ * credited artist on the release carries only its {@link ArtistCreditScalars}.
  */
 export type PublicArtistRelease = Omit<Release, 'artistReleases'> & {
-  artistReleases: Array<ArtistReleaseScalars & { artist: ArtistPublicScalars }>;
+  artistReleases: Array<ArtistReleaseScalars & { artist: ArtistCreditScalars }>;
 };
 
 /** An `ArtistRelease` join row carrying the public media release graph. */
@@ -275,10 +307,11 @@ export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArti
 
 /**
  * Repository payload behind the public artist-detail page: public scalars plus
- * labels, urls, bio images/links, band members (with member public
- * scalars), the artist's own release joins, and — via `memberOf` — the release
- * joins of every band the artist belongs to, all carrying the public media
- * release graph. No artist anywhere in it carries an {@link ArtistPrivateField}.
+ * labels, urls, bio images/links, band members (with member credit scalars),
+ * the artist's own release joins, and — via `memberOf` — the release joins of
+ * every band the artist belongs to, all carrying the public media release
+ * graph. No artist anywhere in it carries an {@link ArtistPrivateField}, and
+ * no nested artist carries an {@link ArtistBioField}.
  * The service flattens this into {@link ArtistWithPublishedReleases}.
  */
 export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
@@ -286,10 +319,10 @@ export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
   urls: UrlRecord[];
   bioImages: ArtistBioImageRecord[];
   bioLinks: ArtistBioLinkRecord[];
-  members: Array<ArtistMemberScalars & { member: ArtistPublicScalars }>;
+  members: Array<ArtistMemberScalars & { member: ArtistCreditScalars }>;
   releases: ArtistReleaseGraphRow[];
   memberOf: Array<
-    ArtistMemberScalars & { artist: ArtistPublicScalars & { releases: ArtistReleaseGraphRow[] } }
+    ArtistMemberScalars & { artist: ArtistCreditScalars & { releases: ArtistReleaseGraphRow[] } }
   >;
 }
 

@@ -128,6 +128,25 @@ export const artistPublicScalar = Object.fromEntries(
   Object.entries(artistScalar).filter(([key]) => !(key in artistPrivateValues))
 );
 
+/**
+ * Every bio field, populated — text a nested artist (a release credit, a band
+ * member, a tour headliner) must never carry, because nothing gates a nested
+ * artist on publication. Spread over a row to build one that leaks its bio.
+ */
+export const artistBioValues = {
+  bio: 'Unreleased long bio',
+  shortBio: 'Unreleased short bio',
+  altBio: 'Unreleased promo blurb',
+  bioGeneratedAt: ISO,
+  bioModel: 'gemini-2.5-pro',
+  bioStatus: 'succeeded',
+};
+
+/** {@link artistPublicScalar} with every bio field removed — a nested artist's wire shape. */
+export const artistCreditScalar = Object.fromEntries(
+  Object.entries(artistPublicScalar).filter(([key]) => !(key in artistBioValues))
+);
+
 /** All `Release` scalars, including a `Json[]` `extendedData` that exercises
  * every member of the recursive json value union. */
 export const releaseScalar = {
