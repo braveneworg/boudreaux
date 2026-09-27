@@ -23,7 +23,8 @@ export interface ObjectToFormDataOptions {
  * - arrays are `JSON.stringify`-ed (decoded by `getActionState`'s `[`-prefix
  *   branch) unless their key is in `repeatKeys`, in which case each item is
  *   appended individually (decoded server-side via `FormData.getAll`).
- * - numbers and booleans are stringified (`getActionState` coerces them back).
+ * - numbers and booleans are stringified; the action schema converts them back
+ *   (`z.coerce.number()`, `formBoolean()`), since `getActionState` does not.
  */
 /**
  * Append an array value: each item individually when the key is in

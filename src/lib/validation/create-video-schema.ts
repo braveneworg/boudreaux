@@ -11,10 +11,8 @@ import { videoProducerSchema } from '@/lib/validation/video-producer-schema';
 
 /**
  * Whether a numeric-ish form field holds a positive whole number. `undefined`
- * and `''` are tolerated (optional fields). Accepts both the raw string a form
- * submits and the number `getActionState` coerces numeric strings into before
- * validation, so pure-numeric fields survive that coercion (a plain `z.string()`
- * would not — the coerced number would fail the string check).
+ * and `''` are tolerated (optional fields). Accepts both the raw string the
+ * action receives through `FormData` and a number set directly in the form.
  */
 const isOptionalPositiveInteger = (value: string | number | undefined): boolean => {
   if (value === undefined || value === '') return true;

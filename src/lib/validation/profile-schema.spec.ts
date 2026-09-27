@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { profileSchema, type ProfileFormData } from './profile-schema';
+import { profileActionSchema, profileSchema, type ProfileFormData } from './profile-schema';
 
 describe('profile-schema', () => {
   describe('valid data', () => {
@@ -363,6 +363,30 @@ describe('profile-schema', () => {
         });
         expect(result.success).toBe(false);
       });
+    });
+  });
+
+  // The action reads FormData, where the switches arrive as strings (#790).
+  describe('profileActionSchema', () => {
+    it.each([
+      ['true', true],
+      ['on', true],
+      ['false', false],
+      ['off', false],
+    ])('reads the submitted opt-in switches %j as %j', (value, expected) => {
+      const result = profileActionSchema.safeParse({
+        allowSmsNotifications: value,
+        allowEmailNotifications: value,
+      });
+      expect(result.data).toEqual({
+        allowSmsNotifications: expected,
+        allowEmailNotifications: expected,
+      });
+    });
+
+    it('rejects an unknown opt-in string', () => {
+      const result = profileActionSchema.safeParse({ allowSmsNotifications: 'yes' });
+      expect(result.success).toBe(false);
     });
   });
 });

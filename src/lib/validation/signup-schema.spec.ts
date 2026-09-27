@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { signupSchema, type FormSchemaType } from './signup-schema';
+import { signupActionSchema, signupSchema, type FormSchemaType } from './signup-schema';
 
 describe('signup-schema', () => {
   describe('email validation', () => {
@@ -308,6 +308,57 @@ describe('signup-schema', () => {
       expect(typeof email).toBe('string');
       expect(typeof terms).toBe('boolean');
       expect(typeof general === 'string' || typeof general === 'undefined').toBe(true);
+    });
+  });
+
+  // The action reads FormData, where switches arrive as strings (#790).
+  describe('signupActionSchema', () => {
+    it.each(['true', 'on', true])('accepts termsAndConditions %j as true', (value) => {
+      const result = signupActionSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: value,
+      });
+      expect(result.data?.termsAndConditions).toBe(true);
+    });
+
+    it.each(['false', 'off', false, 'yes', undefined])(
+      'rejects termsAndConditions %j with the terms message',
+      (value) => {
+        const result = signupActionSchema.safeParse({
+          email: 'test@example.com',
+          termsAndConditions: value,
+        });
+        expect(result.error?.issues.map(({ path, message }) => [path, message])).toEqual([
+          [['termsAndConditions'], 'You must accept the terms and conditions'],
+        ]);
+      }
+    );
+
+    it.each([
+      ['true', true],
+      ['on', true],
+      ['false', false],
+      ['off', false],
+    ])('reads the submitted opt-in switches %j as %j', (value, expected) => {
+      const result = signupActionSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: 'true',
+        allowSmsNotifications: value,
+        allowEmailNotifications: value,
+      });
+      expect(result.data).toMatchObject({
+        allowSmsNotifications: expected,
+        allowEmailNotifications: expected,
+      });
+    });
+
+    it('rejects an unknown opt-in string', () => {
+      const result = signupActionSchema.safeParse({
+        email: 'test@example.com',
+        termsAndConditions: 'true',
+        allowSmsNotifications: 'yes',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

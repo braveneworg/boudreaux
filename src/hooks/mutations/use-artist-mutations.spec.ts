@@ -85,6 +85,15 @@ describe('useCreateArtistMutation', () => {
     expect(vi.mocked(createArtistAction).mock.calls[0][1].get('slug')).toBe('john-doe');
   });
 
+  it('omits empty fields from the FormData (create has nothing to clear)', async () => {
+    vi.mocked(createArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
+
+    await opts.mutationFn({ slug: 'john-doe', displayName: 'John', bio: '' });
+
+    expect(vi.mocked(createArtistAction).mock.calls[0][1].has('bio')).toBe(false);
+  });
+
   it('invalidates artist and release caches on success', async () => {
     const opts = getOptions(useCreateArtistMutation);
 
@@ -120,6 +129,17 @@ describe('useUpdateArtistMutation', () => {
     await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe' } });
 
     expect(vi.mocked(updateArtistAction).mock.calls[0][2].get('slug')).toBe('john-doe');
+  });
+
+  it('keeps emptied fields in the FormData so the action can clear them', async () => {
+    vi.mocked(updateArtistAction).mockResolvedValue(okState);
+    const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
+
+    await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe', displayName: '', bio: '' } });
+
+    const formData = vi.mocked(updateArtistAction).mock.calls[0][2];
+    expect(formData.get('displayName')).toBe('');
+    expect(formData.get('bio')).toBe('');
   });
 
   it('invalidates artist and release caches on success', async () => {

@@ -23,7 +23,7 @@ import { validateEmailSecurity } from '@/lib/utils/email-security';
 import { loggers } from '@/lib/utils/logger';
 import { checkPublicFormGuards } from '@/lib/utils/public-form-guards';
 import { rateLimit } from '@/lib/utils/rate-limit';
-import { signupSchema } from '@/lib/validation/signup-schema';
+import { signupActionSchema } from '@/lib/validation/signup-schema';
 
 // Rate limiter: 5 signup attempts per minute per IP
 const limiter = rateLimit({
@@ -103,7 +103,7 @@ export const signupAction = async (
     'allowSmsNotifications',
     'allowEmailNotifications',
   ] as const;
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, signupSchema);
+  const { formState, parsed } = getActionState(payload, permittedFieldNames, signupActionSchema);
 
   if (parsed.success) {
     // Validate email security (disposable email check)
