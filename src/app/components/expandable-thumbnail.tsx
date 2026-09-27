@@ -16,6 +16,8 @@ import {
 } from '@/app/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+import { ThumbnailCaption } from './thumbnail-caption';
+
 interface ExpandableThumbnailProps {
   src: string;
   thumbnailSrc?: string | null;
@@ -26,46 +28,6 @@ interface ExpandableThumbnailProps {
   sourceUrl?: string | null;
   className?: string;
 }
-
-interface ThumbnailCaptionProps {
-  caption?: string | null;
-  attribution?: string | null;
-  license?: string | null;
-  sourceUrl?: string | null;
-}
-
-/**
- * Optional figcaption for the expanded image: caption, attribution, license, and
- * a "source" link, separated by middots. Renders nothing when no metadata is set.
- */
-const ThumbnailCaption = ({ caption, attribution, license, sourceUrl }: ThumbnailCaptionProps) => {
-  if (!caption && !attribution && !license) return null;
-  return (
-    <figcaption className="text-muted-foreground text-xs">
-      {caption && <span className="text-foreground block font-medium">{caption}</span>}
-      {attribution && <span>{attribution}</span>}
-      {license && (
-        <span>
-          {attribution ? ' · ' : ''}
-          {license}
-        </span>
-      )}
-      {sourceUrl && (
-        <>
-          {' · '}
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="nofollow noopener noreferrer"
-            className="hover:text-foreground underline"
-          >
-            source
-          </a>
-        </>
-      )}
-    </figcaption>
-  );
-};
 
 /**
  * A bio image thumbnail that expands to a full-size view. On desktop the

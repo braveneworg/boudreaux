@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
 
@@ -91,13 +92,15 @@ describe('ArtistListCard', () => {
     expect(name).not.toHaveClass('after:inset-0');
   });
 
-  it('links the images to the artist detail page', () => {
-    render(<ArtistListCard artist={baseArtist} />);
-
-    expect(screen.getByRole('link', { name: /Test Artist artist page/i })).toHaveAttribute(
-      'href',
-      '/artists/test-artist'
+  it('makes the photo a button that enlarges it, not a link to the artist page', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bioImages: [bioImage('bi1', { alt: 'Portrait' })] }}
+      />
     );
+
+    expect(screen.getByRole('button', { name: 'Expand image: Portrait' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /artist page/i })).not.toBeInTheDocument();
   });
 
   it('no longer renders a separate View more link', () => {
@@ -106,11 +109,10 @@ describe('ArtistListCard', () => {
     expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
   });
 
-  it('carries the image, name, latest release, and full-bio links, in that order', () => {
+  it('carries the name, latest release, and full-bio links, in that order', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/artists/test-artist',
       '/artists/test-artist',
       '/releases/r3',
       '/artists/test-artist',
@@ -125,7 +127,7 @@ describe('ArtistListCard', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('carries only the image and name links when there is no release and no bio', () => {
+  it('carries only the name link when there is no release and no bio', () => {
     render(
       <ArtistListCard
         artist={{
@@ -138,7 +140,7 @@ describe('ArtistListCard', () => {
       />
     );
 
-    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
   it('steps the name up to text-2xl now that the photo beside it is larger', () => {
@@ -514,31 +516,80 @@ describe('ArtistListCard', () => {
     expect(screen.getByRole('img', { name: 'Test Artist on stage' })).toBeInTheDocument();
   });
 
-  it('no longer opens an image dialog from the card', () => {
+  it('opens the enlarged photo without leaving the artists page', async () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bioImages: [bioImage('bi1', { alt: 'Portrait' })] }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand image: Portrait' }));
+
+    expect(screen.getByRole('dialog', { name: 'Test Artist' })).toBeInTheDocument();
+  });
+
+  it('enlarges the full image, not the thumbnail', async () => {
     render(
       <ArtistListCard
         artist={{
           ...baseArtist,
           bioImages: [
-            {
-              id: 'bi1',
-              url: 'https://x/a.jpg',
-              thumbnailUrl: null,
-              title: 'Portrait',
-              attribution: null,
-              license: null,
-              licenseUrl: null,
-              sourceUrl: null,
-              alt: null,
-              isPrimary: false,
-              displayOrder: null,
-            },
+            bioImage('bi1', {
+              alt: 'Portrait',
+              url: 'https://x/full.jpg',
+              thumbnailUrl: 'https://x/thumb.jpg',
+            }),
           ],
         }}
       />
     );
 
-    expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Expand image: Portrait' }));
+
+    const enlarged = within(screen.getByRole('dialog')).getByRole('img', { name: 'Portrait' });
+    expect(enlarged.getAttribute('src')).toContain('full');
+  });
+
+  it('credits the photo in the enlarged view', async () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [
+            bioImage('bi1', {
+              alt: 'Portrait',
+              attribution: 'Jane Photog',
+              license: 'CC BY-SA 4.0',
+              sourceUrl: 'https://commons.wikimedia.org/wiki/File:a.jpg',
+            }),
+          ],
+        }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand image: Portrait' }));
+
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByText('Jane Photog')).toBeInTheDocument();
+    expect(dialog.getByText(/CC BY-SA 4\.0/)).toBeInTheDocument();
+    expect(dialog.getByRole('link', { name: 'source' })).toHaveAttribute(
+      'rel',
+      'nofollow noopener noreferrer'
+    );
+  });
+
+  it('links to the artist page from the enlarged view', async () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bioImages: [bioImage('bi1', { alt: 'Portrait' })] }}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand image: Portrait' }));
+
+    expect(
+      within(screen.getByRole('dialog')).getByRole('link', { name: /view artist/i })
+    ).toHaveAttribute('href', '/artists/test-artist');
   });
 
   it('shows one photo only, however many display images the row carries', () => {
@@ -600,7 +651,7 @@ describe('ArtistListCard', () => {
       />
     );
 
-    const frame = container.querySelector('[data-slot="artist-thumbnails"] > span');
+    const frame = container.querySelector('[data-slot="artist-thumbnails"] > button');
     expect(frame).toHaveClass('size-32', 'sm:size-44', 'xl:size-48');
     expect(frame).not.toHaveClass('sm:size-36');
   });
@@ -626,7 +677,35 @@ describe('ArtistListCard', () => {
 
     expect(screen.getByRole('img', { name: 'Portrait' })).toHaveClass(
       'motion-reduce:transition-none',
-      'motion-reduce:hover:scale-100'
+      'motion-reduce:group-data-[hovered]:scale-100'
+    );
+  });
+
+  it('never zooms the photo from CSS hover, which fires as the page scrolls past', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bioImages: [bioImage('bi1', { alt: 'Portrait' })] }}
+      />
+    );
+
+    expect(screen.getByRole('img', { name: 'Portrait' }).className).not.toMatch(
+      /(^|\s)(group-)?hover:/
+    );
+  });
+
+  it('zooms the photo once the mouse really moves onto it', () => {
+    render(
+      <ArtistListCard
+        artist={{ ...baseArtist, bioImages: [bioImage('bi1', { alt: 'Portrait' })] }}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'Expand image: Portrait' });
+
+    fireEvent.pointerMove(trigger, { clientX: 7, clientY: 7, pointerType: 'mouse' });
+
+    expect(trigger).toHaveAttribute('data-hovered');
+    expect(screen.getByRole('img', { name: 'Portrait' })).toHaveClass(
+      'group-data-[hovered]:scale-110'
     );
   });
 
@@ -636,13 +715,13 @@ describe('ArtistListCard', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('links the placeholder to the artist page too, so it is never a dead target', () => {
+  it('leaves the placeholder inert: there is no photo to enlarge', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     const placeholder = container.querySelector('[data-slot="artist-photo-placeholder"]');
-    const imageLink = screen.getByRole('link', { name: /Test Artist artist page/i });
 
-    expect(imageLink).toContainElement(placeholder as HTMLElement | null);
+    expect(placeholder?.closest('a, button')).toBeNull();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('frames the placeholder like a photo so an empty slot keeps the paste-up edge', () => {
