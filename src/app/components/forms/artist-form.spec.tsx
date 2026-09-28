@@ -40,6 +40,16 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
 }));
 
+const hidingWarning = vi.hoisted(() => ({
+  confirmHiding: vi.fn(() => Promise.resolve(true)),
+  work: null,
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@/hooks/use-hiding-warning', () => ({
+  useHidingWarning: () => hidingWarning,
+}));
+
 vi.mock('@/hooks/use-session', () => ({
   useSession: () => ({ data: { user: { id: 'admin-1', role: 'admin' } }, status: 'authenticated' }),
 }));
@@ -223,6 +233,33 @@ describe('ArtistForm', () => {
         expect(archiveArtistAction).toHaveBeenCalledWith(artistId);
       });
       expect(mockPush).toHaveBeenCalledWith('/admin/artists');
+    });
+
+    describe('hiding warning (ADR-0015)', () => {
+      afterEach(() => {
+        hidingWarning.confirmHiding.mockReset();
+        hidingWarning.confirmHiding.mockResolvedValue(true);
+      });
+
+      it('warns about the public work that will lose the name first', async () => {
+        render(<ArtistForm artistId={artistId} />);
+        const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+        await confirmDelete(user);
+
+        await waitFor(() => expect(hidingWarning.confirmHiding.mock.calls).toEqual([[artistId]]));
+      });
+
+      it('archives nothing when the admin cancels the warning', async () => {
+        hidingWarning.confirmHiding.mockResolvedValue(false);
+        render(<ArtistForm artistId={artistId} />);
+        const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+        await confirmDelete(user);
+        await waitFor(() => expect(hidingWarning.confirmHiding).toHaveBeenCalled());
+
+        expect(vi.mocked(archiveArtistAction).mock.calls).toEqual([]);
+      });
     });
 
     it('does not archive when the confirmation dialog is cancelled', async () => {

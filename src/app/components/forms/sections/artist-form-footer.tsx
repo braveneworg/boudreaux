@@ -13,7 +13,7 @@ interface ArtistFormFooterProps {
   isSubmitting: boolean;
   isDirty: boolean;
   onPublish: () => void;
-  onDelete: () => Promise<{ success: boolean; error?: string }>;
+  onDelete: () => Promise<{ success: boolean; error?: string; cancelled?: boolean }>;
 }
 
 const EditModeActions = ({

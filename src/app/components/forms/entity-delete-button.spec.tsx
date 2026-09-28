@@ -118,6 +118,38 @@ describe('EntityDeleteButton', () => {
     );
   });
 
+  describe('when the delete was cancelled before anything was written', () => {
+    const cancelAfterConfirm = async (): Promise<void> => {
+      const onDelete = vi.fn(() => Promise.resolve({ success: false, cancelled: true }));
+      render(<EntityDeleteButton {...baseProps} onDelete={onDelete} />);
+      const user = setup();
+      await user.click(screen.getByRole('button', { name: 'Delete Artist' }));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => expect(onDelete).toHaveBeenCalled());
+    };
+
+    it('shows no toast', async () => {
+      await cancelAfterConfirm();
+
+      expect({
+        errors: vi.mocked(toast.error).mock.calls,
+        successes: vi.mocked(toast.success).mock.calls,
+      }).toEqual({ errors: [], successes: [] });
+    });
+
+    it('stays on the page', async () => {
+      await cancelAfterConfirm();
+
+      expect(mockPush.mock.calls).toEqual([]);
+    });
+
+    it('closes the confirmation', async () => {
+      await cancelAfterConfirm();
+
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    });
+  });
+
   it('disables the trigger when disabled', () => {
     render(<EntityDeleteButton {...baseProps} onDelete={vi.fn()} disabled />);
 

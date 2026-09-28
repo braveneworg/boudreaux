@@ -158,9 +158,9 @@ describe('CreditConfirmationDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect({ confirms: onConfirm.mock.calls, cancels: onCancel.mock.calls.length }).toEqual({
+    expect({ confirms: onConfirm.mock.calls, cancels: onCancel.mock.calls }).toEqual({
       confirms: [],
-      cancels: 1,
+      cancels: [[]],
     });
   });
 

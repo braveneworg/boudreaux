@@ -153,6 +153,9 @@ const CreditConfirmationBody = ({
     });
   }, [awaiting, publishIds, onConfirm]);
 
+  // Called with no argument: the click event is not the caller's business.
+  const handleCancel = useCallback(() => onCancel(), [onCancel]);
+
   return (
     <>
       <DialogHeader>
@@ -191,7 +194,7 @@ const CreditConfirmationBody = ({
       )}
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={handleCancel}>
           Cancel
         </Button>
         <Button type="button" onClick={handleConfirm}>

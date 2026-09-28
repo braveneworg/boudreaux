@@ -40,6 +40,16 @@ vi.mock('./_hooks/use-infinite-artists-query', () => ({
 vi.mock('@/lib/actions/publish-artist-action', () => ({
   publishArtistAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
+const hidingWarning = vi.hoisted(() => ({
+  confirmHiding: vi.fn(() => Promise.resolve(true)),
+  work: null,
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@/hooks/use-hiding-warning', () => ({
+  useHidingWarning: () => hidingWarning,
+}));
+
 vi.mock('@/lib/actions/archive-artist-action', () => ({
   archiveArtistAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
@@ -216,6 +226,34 @@ describe('ArtistDataView', () => {
       expect(publishArtistAction).toHaveBeenCalledWith('artist-1');
       expect(archiveArtistAction).toHaveBeenCalledWith('artist-1');
       expect(restoreArtistAction).toHaveBeenCalledWith('artist-1');
+    });
+  });
+
+  describe('archiving an artist (ADR-0015)', () => {
+    afterEach(() => {
+      hidingWarning.confirmHiding.mockReset();
+      hidingWarning.confirmHiding.mockResolvedValue(true);
+      vi.mocked(archiveArtistAction).mockClear();
+    });
+
+    it('warns about the public work that will lose the name first', async () => {
+      mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+      render(<ArtistDataView />);
+
+      fireEvent.click(screen.getByTestId('invoke-delete'));
+
+      await waitFor(() => expect(hidingWarning.confirmHiding.mock.calls).toEqual([['artist-1']]));
+    });
+
+    it('archives nothing when the admin cancels', async () => {
+      hidingWarning.confirmHiding.mockResolvedValue(false);
+      mockUseArtistsQuery.mockReturnValue(baseInfiniteResult);
+      render(<ArtistDataView />);
+
+      fireEvent.click(screen.getByTestId('invoke-delete'));
+      await waitFor(() => expect(hidingWarning.confirmHiding).toHaveBeenCalled());
+
+      expect(vi.mocked(archiveArtistAction).mock.calls).toEqual([]);
     });
   });
 

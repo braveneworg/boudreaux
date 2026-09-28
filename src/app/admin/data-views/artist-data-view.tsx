@@ -5,13 +5,14 @@
 
 import { useMemo } from 'react';
 
+import { HidingWarningDialog } from '@/components/hiding-warning-dialog';
 import {
-  useArchiveArtistMutation,
   useDeleteArtistMutation,
   usePublishArtistMutation,
   useRestoreArtistMutation,
 } from '@/hooks/mutations/use-artist-mutations';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useGuardedArtistArchive } from '@/hooks/use-guarded-artist-archive';
 import { ENTITIES } from '@/lib/constants';
 import type { Artist } from '@/lib/types/media-models';
 
@@ -21,7 +22,8 @@ import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view
 
 export const ArtistDataView = () => {
   const { publishArtistAsync } = usePublishArtistMutation();
-  const { archiveArtistAsync } = useArchiveArtistMutation();
+  // Archiving hides the artist: warn which public work loses the name first.
+  const { archiveArtist, warning } = useGuardedArtistArchive();
   const { restoreArtistAsync } = useRestoreArtistMutation();
   const { deleteArtistAsync } = useDeleteArtistMutation();
   const fieldsToShow = [
@@ -71,32 +73,35 @@ export const ArtistDataView = () => {
   }
 
   return (
-    <DataView<Artist>
-      entity={ENTITIES.artist}
-      data={{ artists: rows }}
-      fieldsToShow={fieldsToShow}
-      canCreate={false}
-      mutations={{
-        publish: (id) => publishArtistAsync({ artistId: id }),
-        delete: (id) => archiveArtistAsync({ artistId: id }),
-        restore: (id) => restoreArtistAsync({ artistId: id }),
-        hardDelete: (id) => deleteArtistAsync({ artistId: id }),
-      }}
-      refetch={refetch}
-      isPending={isPending}
-      isFetching={isFetching}
-      error={null}
-      pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
-      filters={{
-        search,
-        onSearchChange: (value) => setFilters('artists', { search: value }),
-        showPublished,
-        onShowPublishedChange: (value) => setFilters('artists', { showPublished: value }),
-        showUnpublished,
-        onShowUnpublishedChange: (value) => setFilters('artists', { showUnpublished: value }),
-        showDeleted,
-        onShowDeletedChange: (value) => setFilters('artists', { showDeleted: value }),
-      }}
-    />
+    <>
+      <HidingWarningDialog {...warning} />
+      <DataView<Artist>
+        entity={ENTITIES.artist}
+        data={{ artists: rows }}
+        fieldsToShow={fieldsToShow}
+        canCreate={false}
+        mutations={{
+          publish: (id) => publishArtistAsync({ artistId: id }),
+          delete: archiveArtist,
+          restore: (id) => restoreArtistAsync({ artistId: id }),
+          hardDelete: (id) => deleteArtistAsync({ artistId: id }),
+        }}
+        refetch={refetch}
+        isPending={isPending}
+        isFetching={isFetching}
+        error={null}
+        pagination={{ hasNextPage, fetchNextPage, isFetchingNextPage }}
+        filters={{
+          search,
+          onSearchChange: (value) => setFilters('artists', { search: value }),
+          showPublished,
+          onShowPublishedChange: (value) => setFilters('artists', { showPublished: value }),
+          showUnpublished,
+          onShowUnpublishedChange: (value) => setFilters('artists', { showUnpublished: value }),
+          showDeleted,
+          onShowDeletedChange: (value) => setFilters('artists', { showDeleted: value }),
+        }}
+      />
+    </>
   );
 };
