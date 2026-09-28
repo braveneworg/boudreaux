@@ -236,8 +236,10 @@ const artistSearchInclude = {
 /**
  * The media `Release` graph loaded behind every artist-detail release join,
  * with each credited artist read through {@link artistCreditSelect}: public
- * scalars (#765) without the bio, since a credited artist is not gated on
- * publication.
+ * scalars (#765) without the bio, plus the fields `isPublicArtist` reads. The
+ * credits are read whole, hidden artists included: the service derives each
+ * release's credit from the full credit order and drops the hidden artists
+ * afterwards (ADR-0015).
  */
 const releaseGraphInclude = {
   images: true,

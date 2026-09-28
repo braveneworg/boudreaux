@@ -47,8 +47,13 @@ tagged with a derived release credit, and ordered own-releases-first.**
   site. That is the existing album-artist convention made load-bearing.
 - A release can appear on an artist's page without any row linking the two:
   the link runs through the band. Deleting the `ArtistMember` row removes it.
-- The published/non-deleted filter is applied in the service, not the query,
-  because Prisma MongoDB cannot put a `where` on a junction-table include.
+- The published/non-deleted filter is applied in the service, not the query.
+  The reason first recorded here, that Prisma MongoDB cannot put a `where` on
+  a junction-table include, was wrong: a probe on 2026-09-28 showed it can
+  (`docs/lessons/prisma-mongo/junction-include-where-works.md`). The filter
+  stays in the service for a different reason: a release's credit is derived
+  from its full credit order, so hidden artists must be read before they are
+  dropped ([ADR-0015](0015-a-release-publishes-its-credited-artists-only-by-confirmation.md)).
 
 ## Why this is hard to reverse
 

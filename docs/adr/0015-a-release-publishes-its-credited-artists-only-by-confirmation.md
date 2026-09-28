@@ -74,6 +74,27 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   `FeaturedArtist.displayName`, and the titles and descriptions of releases
   and tours are typed by an admin and are not gated.
 
+## How the public reads hide an artist
+
+- **Hidden artists are filtered in the query.** Every public read that joins
+  artists applies the public artist rule as a nested `where`: release
+  credits, band members and bands, featured rows, tour headliners, and the
+  name clauses of every search. Parent rows are filtered there too, so a
+  hidden tour or featured row never shortens a page.
+- **One read filters in memory.** The artist page derives each release's
+  credit from its full credit order, then drops the hidden artists. Each row
+  carries `albumArtist`, null when that artist is hidden, so a release is
+  never attributed to whoever is credited next.
+- **A record that names only hidden artists.** A release stays public with no
+  byline. A tour date is dropped, and a tour whose dates are all dropped
+  returns 404. A featured row is dropped. A record that names no artist at
+  all is unaffected: a tour date still to be announced, a tour with no
+  dates, a featured row carried by its own display name.
+- **Reads an admin needs unfiltered are admin-only.** The featured artist by
+  id, a tour's dates, and a tour with `?scope=admin` return every artist
+  whatever its state. They are never public and never shared-cached. The
+  filtered and unfiltered tour are different URLs and different query keys.
+
 ## Alternatives rejected
 
 - **All or nothing: the confirmed ids must equal the awaiting credits.** An
@@ -106,6 +127,9 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
 
 ## Consequences
 
+- Track titles already saved into a playlist keep the artist name they were
+  saved with. A playlist item stores its display strings, so a name saved
+  before the artist was hidden stays in that playlist.
 - An upload that credits a new artist takes two steps to publish. Today no
   screen sends `publish: true` with an upload, so this is a server rule with
   no dialog of its own.

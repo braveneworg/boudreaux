@@ -50,7 +50,7 @@ export const releaseSchema = releaseScalarSchema.extend({
 /**
  * {@link releaseSchema} as the public artist-detail page carries it: every
  * credited artist narrowed to its public scalars (#765) without its bio, since
- * a credited artist is not gated on publication.
+ * a bio is shown only on its artist's own page.
  */
 export const publicArtistReleaseSchema = releaseSchema.extend({
   artistReleases: z.array(

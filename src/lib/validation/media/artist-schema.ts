@@ -106,8 +106,8 @@ export const artistDetailSchema = artistScalarSchema satisfies z.ZodType<ArtistD
  * Public by construction: the page artist is parsed through
  * {@link artistPublicScalarSchema}, and every nested artist — its band members
  * and each credited artist on a release — through
- * {@link artistCreditScalarSchema}, which also drops the bio (nothing gates a
- * nested artist on publication). Zod strips unknown keys, so the server also
+ * {@link artistCreditScalarSchema}, which also drops the bio (a bio is shown
+ * only on its artist's own page). Zod strips unknown keys, so the server also
  * runs a payload through this as the response guard (#765): a private or
  * nested bio field a future query re-selects is dropped before it is
  * serialised.

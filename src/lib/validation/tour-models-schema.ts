@@ -68,7 +68,7 @@ const venueSchema = z.object({
 
 /**
  * `TourDateHeadliner` with its optional artist: public scalars only (#765), and
- * no bio, since a headliner is not gated on publication.
+ * no bio, since a bio is shown only on its artist's own page.
  */
 const tourDateHeadlinerSchema = z.object({
   id: z.string(),
