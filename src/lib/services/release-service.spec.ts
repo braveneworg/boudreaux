@@ -9,6 +9,7 @@ import type { Format } from '@/lib/types/media-models';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { cache } from '@/lib/utils/simple-cache';
 
+import { CreditConfirmationService } from './credit-confirmation-service';
 import { ReleaseService } from './release-service';
 
 // Mock server-only to prevent client component error in tests
@@ -68,6 +69,13 @@ vi.mock('@/lib/repositories/download-event-repository', () => ({
   },
 }));
 
+vi.mock('./credit-confirmation-service', () => ({
+  CreditConfirmationService: {
+    check: vi.fn(),
+    publishConfirmed: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/utils/public-name-caches', () => ({
   PUBLISHED_RELEASES_CACHE_PREFIX: 'published-releases:',
   invalidatePublicNameCaches: vi.fn(),
@@ -78,7 +86,172 @@ vi.mock('../utils/simple-cache', () => ({
   cache: { deleteByPrefix: vi.fn() },
 }));
 
+const UNDECIDED = {
+  success: false as const,
+  code: 'VALIDATION' as const,
+  error: 'Choose to publish or keep hidden: Bea',
+};
+const DECISIONS = { publishArtistIds: ['a'], keepHiddenArtistIds: ['b'] };
+const NO_DECISIONS = { publishArtistIds: [], keepHiddenArtistIds: [] };
+
 describe('ReleaseService', () => {
+  beforeEach(() => {
+    vi.mocked(CreditConfirmationService.check).mockResolvedValue({
+      success: true,
+      data: undefined,
+    });
+    vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValue({
+      success: true,
+      data: 0,
+    });
+  });
+
+  describe('credit confirmation (ADR-0015)', () => {
+    const published = { id: 'release-123', publishedAt: new Date('2026-09-27') };
+
+    beforeEach(() => {
+      vi.mocked(ReleaseRepository.update).mockResolvedValue(published as never);
+      vi.mocked(ReleaseRepository.create).mockResolvedValue(published as never);
+    });
+
+    afterEach(() => {
+      vi.mocked(ReleaseRepository.update).mockReset();
+      vi.mocked(ReleaseRepository.create).mockReset();
+    });
+
+    describe('createRelease', () => {
+      it('never stores a publication date', async () => {
+        await ReleaseService.createRelease({
+          title: 'Album',
+          releasedOn: new Date('2024-01-15'),
+          coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          publishedAt: new Date('2026-09-27'),
+        } as never);
+
+        expect(vi.mocked(ReleaseRepository.create).mock.calls[0][0]).not.toHaveProperty(
+          'publishedAt'
+        );
+      });
+    });
+
+    describe('publishRelease', () => {
+      it('checks the decisions against the stored credits', async () => {
+        await ReleaseService.publishRelease('release-123', {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+        });
+
+        expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
+          [{ releaseId: 'release-123' }, DECISIONS],
+        ]);
+      });
+
+      it('checks with no decisions when none are given', async () => {
+        await ReleaseService.publishRelease('release-123');
+
+        expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
+          [{ releaseId: 'release-123' }, NO_DECISIONS],
+        ]);
+      });
+
+      it('fails with VALIDATION and publishes nothing when a credit is undecided', async () => {
+        vi.mocked(CreditConfirmationService.check).mockResolvedValueOnce(UNDECIDED);
+
+        const result = await ReleaseService.publishRelease('release-123');
+
+        expect({ result, writes: vi.mocked(ReleaseRepository.update).mock.calls }).toEqual({
+          result: UNDECIDED,
+          writes: [],
+        });
+      });
+
+      it('publishes the confirmed artists once the release is published', async () => {
+        await ReleaseService.publishRelease('release-123', {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+        });
+
+        expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([
+          [{ releaseId: 'release-123', decisions: DECISIONS, publishedBy: 'admin-1' }],
+        ]);
+      });
+
+      it('fails when publishing the confirmed artists fails', async () => {
+        vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValueOnce(UNDECIDED);
+
+        const result = await ReleaseService.publishRelease('release-123');
+
+        expect(result).toEqual(UNDECIDED);
+      });
+    });
+
+    describe('updateRelease', () => {
+      const publishing = { title: 'Album', publishedAt: new Date('2026-09-27') };
+
+      it('skips the check for a write that leaves the release unpublished', async () => {
+        await ReleaseService.updateRelease('release-123', { title: 'Album' });
+
+        expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([]);
+      });
+
+      it('checks against the stored credits when it publishes', async () => {
+        await ReleaseService.updateRelease('release-123', publishing, {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+        });
+
+        expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
+          [{ releaseId: 'release-123' }, DECISIONS],
+        ]);
+      });
+
+      it('checks against the artists about to be credited when they are given', async () => {
+        await ReleaseService.updateRelease('release-123', publishing, {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+          creditArtistIds: ['a', 'b'],
+        });
+
+        expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
+          [{ artistIds: ['a', 'b'] }, DECISIONS],
+        ]);
+      });
+
+      it('fails with VALIDATION and writes nothing when a credit is undecided', async () => {
+        vi.mocked(CreditConfirmationService.check).mockResolvedValueOnce(UNDECIDED);
+
+        const result = await ReleaseService.updateRelease('release-123', publishing);
+
+        expect({ result, writes: vi.mocked(ReleaseRepository.update).mock.calls }).toEqual({
+          result: UNDECIDED,
+          writes: [],
+        });
+      });
+
+      it('publishes the confirmed artists when the credits are already stored', async () => {
+        await ReleaseService.updateRelease('release-123', publishing, {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+        });
+
+        expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([
+          [{ releaseId: 'release-123', decisions: DECISIONS, publishedBy: 'admin-1' }],
+        ]);
+      });
+
+      it('leaves publishing the artists to the caller that still has credits to store', async () => {
+        await ReleaseService.updateRelease('release-123', publishing, {
+          decisions: DECISIONS,
+          publishedBy: 'admin-1',
+          creditArtistIds: ['a', 'b'],
+        });
+
+        expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([]);
+      });
+    });
+  });
+
   const mockRelease = {
     id: 'release-123',
     title: 'Test Album',
@@ -943,45 +1116,15 @@ describe('ReleaseService', () => {
     });
   });
 
-  describe('applyFoundReleaseUpdate', () => {
-    it('clears deletedOn when undelete is true', async () => {
-      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
+  describe('restoreFoundRelease', () => {
+    it('clears deletedOn', async () => {
+      vi.mocked(ReleaseRepository.updateData).mockResolvedValueOnce(mockRelease as never);
 
-      await ReleaseService.applyFoundReleaseUpdate('release-123', { undelete: true });
+      await ReleaseService.restoreFoundRelease('release-123');
 
-      expect(ReleaseRepository.updateData).toHaveBeenCalledWith('release-123', {
-        deletedOn: null,
-      });
-    });
-
-    it('sets publishedAt when publish is true', async () => {
-      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
-
-      await ReleaseService.applyFoundReleaseUpdate('release-123', { publish: true });
-
-      const call = vi.mocked(ReleaseRepository.updateData).mock.calls.at(-1);
-      expect(call?.[0]).toBe('release-123');
-      expect(call?.[1]).toEqual({ publishedAt: expect.any(Date) });
-    });
-
-    it('combines both updates when both flags are set', async () => {
-      vi.mocked(ReleaseRepository.updateData).mockResolvedValue(mockRelease as never);
-
-      await ReleaseService.applyFoundReleaseUpdate('release-123', {
-        undelete: true,
-        publish: true,
-      });
-
-      const data = vi.mocked(ReleaseRepository.updateData).mock.calls.at(-1)?.[1];
-      expect(data).toMatchObject({ deletedOn: null, publishedAt: expect.any(Date) });
-    });
-
-    it('is a no-op when neither flag is set', async () => {
-      vi.mocked(ReleaseRepository.updateData).mockClear();
-
-      await ReleaseService.applyFoundReleaseUpdate('release-123', {});
-
-      expect(ReleaseRepository.updateData).not.toHaveBeenCalled();
+      expect(vi.mocked(ReleaseRepository.updateData).mock.calls).toEqual([
+        ['release-123', { deletedOn: null }],
+      ]);
     });
   });
 

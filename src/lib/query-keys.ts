@@ -49,6 +49,8 @@ export const queryKeys = {
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
     related: (id: string, artistId?: string | null) =>
       [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
+    /** A release's credits awaiting confirmation and staying hidden (ADR-0015). */
+    credits: (id: string) => [...queryKeys.releases.all, 'credits', id] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,
     digitalFormat: (id: string, formatType: string) =>
       [...queryKeys.releases.all, 'digitalFormat', id, formatType] as const,
@@ -114,6 +116,12 @@ export const queryKeys = {
         params.deleted,
       ] as const,
     bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
+    /** The credit confirmation for artists a release is about to credit; order-free. */
+    credits: (artistIds: string[]) =>
+      [...queryKeys.artists.all, 'credits', [...artistIds].sort().join(',')] as const,
+    /** The public work that carries an artist's name (`usePublishedWorkQuery`). */
+    publishedWork: (artistId: string) =>
+      [...queryKeys.artists.all, 'publishedWork', artistId] as const,
     detail: (id: string) => [...queryKeys.artists.all, 'detail', id] as const,
     bioGeneration: (artistId: string) =>
       [...queryKeys.artists.all, 'bioGeneration', artistId] as const,

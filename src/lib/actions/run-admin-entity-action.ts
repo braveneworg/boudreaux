@@ -20,8 +20,11 @@ export interface AdminActionResult {
   error?: string;
 }
 
-/** A service call that resolves to a success/error result (ServiceResponse-shaped). */
-type EntityServiceCall = (id: string) => Promise<AdminActionResult>;
+/**
+ * A service call that resolves to a success/error result (ServiceResponse-shaped).
+ * Receives the acting admin's id for writes that record who made them.
+ */
+type EntityServiceCall = (id: string, adminUserId: string) => Promise<AdminActionResult>;
 
 interface RunAdminEntityActionConfig {
   /** The target entity id (validated as a Mongo ObjectId). */
@@ -68,7 +71,7 @@ export const runAdminEntityAction = async ({
   }
 
   try {
-    const result = await perform(id);
+    const result = await perform(id, session.user.id);
 
     if (!result.success) {
       return { success: false, error: result.error };

@@ -127,7 +127,9 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/releases
- * Create a new release (admin only)
+ * Create a new release (admin only). The release is always created
+ * unpublished, whatever `publishedAt` the body carries: its credits are stored
+ * after it and must be confirmed before it is published (ADR-0015).
  */
 export const POST = withAdmin(async (request: NextRequest) => {
   try {

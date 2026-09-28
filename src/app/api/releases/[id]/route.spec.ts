@@ -20,7 +20,7 @@ vi.mock('@/lib/decorators/with-auth', async () => {
       (handler: (...args: unknown[]) => unknown) =>
       (...args: unknown[]) =>
         authState.isAdmin
-          ? handler(...args)
+          ? handler(args[0], args[1], { user: { id: 'admin-1', role: 'admin' } })
           : Response.json({ error: 'Unauthorized' }, { status: 401 }),
   };
 });
@@ -308,8 +308,84 @@ describe('Release by ID API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(updatedRelease);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
-        title: 'Updated Album',
+      expect(vi.mocked(ReleaseService.updateRelease).mock.calls).toEqual([
+        [
+          '507f1f77bcf86cd799439011',
+          { title: 'Updated Album' },
+          {
+            decisions: { publishArtistIds: [], keepHiddenArtistIds: [] },
+            publishedBy: 'admin-1',
+          },
+        ],
+      ]);
+    });
+
+    describe('credit confirmation (ADR-0015)', () => {
+      const artistId = '507f1f77bcf86cd799439013';
+      const patch = (body: unknown): Promise<Response> =>
+        PATCH(
+          new NextRequest('http://localhost:3000/api/releases/507f1f77bcf86cd799439011', {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+          }),
+          createParams('507f1f77bcf86cd799439011')
+        ) as Promise<Response>;
+
+      beforeEach(() => {
+        vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+          success: true,
+          data: mockRelease as never,
+        });
+      });
+
+      afterEach(() => {
+        vi.mocked(ReleaseService.updateRelease).mockReset();
+      });
+
+      it("passes the admin's decisions and id to the service", async () => {
+        const creditDecisions = { publishArtistIds: [artistId], keepHiddenArtistIds: [] };
+
+        await patch({ publishedAt: '2026-09-27T12:00:00.000Z', creditDecisions });
+
+        expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]).toEqual({
+          decisions: creditDecisions,
+          publishedBy: 'admin-1',
+        });
+      });
+
+      it('keeps the decisions out of the release data', async () => {
+        await patch({
+          title: 'Updated Album',
+          creditDecisions: { publishArtistIds: [artistId], keepHiddenArtistIds: [] },
+        });
+
+        expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][1]).toEqual({
+          title: 'Updated Album',
+        });
+      });
+
+      it('rejects malformed decisions with 400 and writes nothing', async () => {
+        const response = await patch({
+          title: 'Updated Album',
+          creditDecisions: { publishArtistIds: ['mc-example'] },
+        });
+
+        expect({
+          status: response.status,
+          calls: vi.mocked(ReleaseService.updateRelease).mock.calls,
+        }).toEqual({ status: 400, calls: [] });
+      });
+
+      it('returns the names of the undecided artists', async () => {
+        vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce({
+          success: false,
+          code: 'VALIDATION',
+          error: 'Choose to publish or keep hidden: Bea',
+        });
+
+        const response = await patch({ publishedAt: '2026-09-27T12:00:00.000Z' });
+
+        expect(await response.json()).toEqual({ error: 'Choose to publish or keep hidden: Bea' });
       });
     });
 
@@ -430,9 +506,13 @@ describe('Release by ID API Routes', () => {
       const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
-        description: 'Updated description',
-      });
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        '507f1f77bcf86cd799439011',
+        {
+          description: 'Updated description',
+        },
+        expect.anything()
+      );
     });
 
     it('should handle publishedAt update', async () => {
@@ -452,9 +532,13 @@ describe('Release by ID API Routes', () => {
       const response = await PATCH(request, createParams('507f1f77bcf86cd799439011'));
 
       expect(response.status).toBe(200);
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith('507f1f77bcf86cd799439011', {
-        publishedAt: publishDate,
-      });
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        '507f1f77bcf86cd799439011',
+        {
+          publishedAt: publishDate,
+        },
+        expect.anything()
+      );
     });
 
     it('should return 422 when the request body fails schema validation', async () => {

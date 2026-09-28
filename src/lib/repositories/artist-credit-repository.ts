@@ -14,13 +14,17 @@ import {
 } from '@/lib/utils/credit-confirmation';
 
 import {
+  awaitingConfirmationAmongWhere,
   creditAwaitingConfirmationWhere,
   creditConfirmationSelect,
   creditThatStaysHiddenWhere,
   hiddenCreditSelect,
   listedReleaseWhere,
+  staysHiddenAmongWhere,
 } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
+
+import type { Prisma } from '@prisma/client';
 
 /** What {@link ArtistCreditRepository.publishCredited} needs to publish credits. */
 export interface PublishCreditedInput {
@@ -35,6 +39,22 @@ export interface PublishCreditedInput {
 const byName = (a: { name: string }, b: { name: string }): number =>
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 
+const readAwaitingConfirmation = async (
+  where: Prisma.ArtistWhereInput
+): Promise<CreditAwaitingConfirmation[]> => {
+  const rows = await runQuery(() =>
+    prisma.artist.findMany({ where, select: creditConfirmationSelect })
+  );
+  return rows.map(toCreditAwaitingConfirmation).sort(byName);
+};
+
+const readThatStayHidden = async (
+  where: Prisma.ArtistWhereInput
+): Promise<CreditThatStaysHidden[]> => {
+  const rows = await runQuery(() => prisma.artist.findMany({ where, select: hiddenCreditSelect }));
+  return rows.map(toCreditThatStaysHidden).sort(byName);
+};
+
 /**
  * Reads and writes for a release's credited artists as publication sees them
  * (ADR-0015): which credits await an admin's confirmation, which stay hidden
@@ -42,18 +62,29 @@ const byName = (a: { name: string }, b: { name: string }): number =>
  */
 export class ArtistCreditRepository {
   /**
+   * Of the given artists, those that publishing would make public. For a
+   * write whose credits are not stored yet.
+   */
+  static async findAwaitingConfirmationAmong(
+    artistIds: string[]
+  ): Promise<CreditAwaitingConfirmation[]> {
+    return artistIds.length === 0
+      ? []
+      : readAwaitingConfirmation(awaitingConfirmationAmongWhere(artistIds));
+  }
+
+  /** Of the given artists, those that stay hidden even when published. */
+  static async findThatStayHiddenAmong(artistIds: string[]): Promise<CreditThatStaysHidden[]> {
+    return artistIds.length === 0 ? [] : readThatStayHidden(staysHiddenAmongWhere(artistIds));
+  }
+
+  /**
    * The artists credited on a release that publishing would make public,
    * each described by what would go live. The bio text itself is read only to
    * classify it and never leaves the repository.
    */
   static async findAwaitingConfirmation(releaseId: string): Promise<CreditAwaitingConfirmation[]> {
-    const rows = await runQuery(() =>
-      prisma.artist.findMany({
-        where: creditAwaitingConfirmationWhere({ releaseId }),
-        select: creditConfirmationSelect,
-      })
-    );
-    return rows.map(toCreditAwaitingConfirmation).sort(byName);
+    return readAwaitingConfirmation(creditAwaitingConfirmationWhere({ releaseId }));
   }
 
   /**
@@ -61,13 +92,7 @@ export class ArtistCreditRepository {
    * soft-deleted, or inactive with no departure date.
    */
   static async findThatStayHidden(releaseId: string): Promise<CreditThatStaysHidden[]> {
-    const rows = await runQuery(() =>
-      prisma.artist.findMany({
-        where: creditThatStaysHiddenWhere({ releaseId }),
-        select: hiddenCreditSelect,
-      })
-    );
-    return rows.map(toCreditThatStaysHidden).sort(byName);
+    return readThatStayHidden(creditThatStaysHiddenWhere({ releaseId }));
   }
 
   /**

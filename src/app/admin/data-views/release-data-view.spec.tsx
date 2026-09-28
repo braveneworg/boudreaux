@@ -7,6 +7,7 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { publishReleaseAction } from '@/lib/actions/publish-release-action';
@@ -27,6 +28,16 @@ vi.mock('@/lib/actions/delete-release-action', () => ({
 
 vi.mock('./_hooks/use-infinite-releases-query', () => ({
   useInfiniteReleasesQuery: vi.fn(),
+}));
+
+const creditDecisions = vi.hoisted(() => ({
+  requestDecisions: vi.fn(),
+  confirmation: null,
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@/hooks/use-credit-decisions', () => ({
+  useCreditDecisions: () => creditDecisions,
 }));
 
 // Mock next/navigation
@@ -389,16 +400,78 @@ describe('ReleaseDataView', () => {
     );
   });
 
-  it('publishes a row via the release publish action', async () => {
-    vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult(mockReleaseRows) as never);
+  describe('publishing a row (ADR-0015)', () => {
+    const decisions = { publishArtistIds: ['artist-1'], keepHiddenArtistIds: [] };
 
-    render(<ReleaseDataView />, { wrapper: createWrapper() });
+    const clickPublish = async (): Promise<void> => {
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(
+        toInfiniteResult(mockReleaseRows) as never
+      );
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getByRole('button', { name: 'Publish' }));
+      await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    };
 
-    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    await user.click(screen.getByRole('button', { name: 'Publish' }));
-    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    beforeEach(() => {
+      creditDecisions.requestDecisions.mockResolvedValue(decisions);
+    });
 
-    await waitFor(() => expect(publishReleaseAction).toHaveBeenCalledWith('release-123'));
+    afterEach(() => {
+      creditDecisions.requestDecisions.mockReset();
+      vi.mocked(publishReleaseAction).mockClear();
+      vi.mocked(toast.error).mockClear();
+    });
+
+    it("asks for decisions on the release's stored credits", async () => {
+      await clickPublish();
+
+      await waitFor(() =>
+        expect(creditDecisions.requestDecisions.mock.calls).toEqual([
+          [{ releaseId: 'release-123' }],
+        ])
+      );
+    });
+
+    it("publishes with the admin's decisions", async () => {
+      await clickPublish();
+
+      await waitFor(() =>
+        expect(vi.mocked(publishReleaseAction).mock.calls).toEqual([['release-123', decisions]])
+      );
+    });
+
+    it('publishes nothing when the admin cancels', async () => {
+      creditDecisions.requestDecisions.mockResolvedValue(null);
+
+      await clickPublish();
+      await waitFor(() => expect(creditDecisions.requestDecisions).toHaveBeenCalled());
+
+      expect(vi.mocked(publishReleaseAction).mock.calls).toEqual([]);
+    });
+
+    it('does not report a cancelled publish as a failure', async () => {
+      creditDecisions.requestDecisions.mockResolvedValue(null);
+
+      await clickPublish();
+      await waitFor(() => expect(creditDecisions.requestDecisions).toHaveBeenCalled());
+
+      expect(vi.mocked(toast.error).mock.calls).toEqual([]);
+    });
+
+    it('reports a failure to load the credits', async () => {
+      creditDecisions.requestDecisions.mockRejectedValue(
+        new Error('Failed to load the credited artists')
+      );
+
+      await clickPublish();
+
+      await waitFor(() =>
+        expect(vi.mocked(toast.error).mock.calls).toEqual([
+          [expect.stringContaining('Failed to load the credited artists')],
+        ])
+      );
+    });
   });
 
   it('hard-deletes a row via the release delete action', async () => {

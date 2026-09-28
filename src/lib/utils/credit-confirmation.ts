@@ -63,6 +63,31 @@ export interface CreditThatStaysHidden {
   reason: HiddenCreditReason;
 }
 
+/** A release's credits as publication sees them. */
+export interface CreditConfirmation {
+  awaiting: CreditAwaitingConfirmation[];
+  stayHidden: CreditThatStaysHidden[];
+}
+
+/**
+ * What an admin decided for each credit awaiting confirmation. Together the
+ * two lists must cover every awaiting credit: an artist is published or kept
+ * hidden by a decision, never by omission.
+ */
+export interface CreditDecisions {
+  publishArtistIds: string[];
+  keepHiddenArtistIds: string[];
+}
+
+/** The decisions of a write that names no artist. Passes only when nothing awaits. */
+export const NO_CREDIT_DECISIONS: CreditDecisions = {
+  publishArtistIds: [],
+  keepHiddenArtistIds: [],
+};
+
+/** The outcome of checking decisions against the credits awaiting confirmation. */
+export type CreditDecisionCheck = { ok: true } | { ok: false; error: string };
+
 /** The public work that carries an artist's name, listed before hiding it. */
 export interface PublishedWorkCreditedTo {
   releases: Array<{ id: string; title: string }>;
@@ -115,3 +140,50 @@ export const toCreditThatStaysHidden = (row: HiddenCreditRow): CreditThatStaysHi
   name: getArtistDisplayName(row),
   reason: row.deletedOn == null ? 'no-departure-date' : 'deleted',
 });
+
+/** Whether a publish must stop and ask: some credit awaits a decision. */
+export const needsCreditDecisions = ({ awaiting }: CreditConfirmation): boolean =>
+  awaiting.length > 0;
+
+const names = (credits: CreditAwaitingConfirmation[]): string =>
+  credits.map(({ name }) => name).join(', ');
+
+/**
+ * Check an admin's decisions against the credits awaiting confirmation.
+ *
+ * Fails when an artist is in both lists, when a published id does not await
+ * confirmation (it is not credited, already public, or stays hidden), or when
+ * an awaiting credit is in neither list. A keep-hidden id that no longer
+ * awaits confirmation is ignored: keeping it hidden writes nothing.
+ */
+export const checkCreditDecisions = (
+  awaiting: CreditAwaitingConfirmation[],
+  { publishArtistIds, keepHiddenArtistIds }: CreditDecisions
+): CreditDecisionCheck => {
+  const publish = new Set(publishArtistIds);
+  const keepHidden = new Set(keepHiddenArtistIds);
+  const awaitingIds = new Set(awaiting.map(({ id }) => id));
+
+  const both = awaiting.filter(({ id }) => publish.has(id) && keepHidden.has(id));
+  if (both.length > 0) {
+    return {
+      ok: false,
+      error: `An artist cannot be both published and kept hidden: ${names(both)}`,
+    };
+  }
+
+  const outside = publishArtistIds.filter((id) => !awaitingIds.has(id));
+  if (outside.length > 0) {
+    return {
+      ok: false,
+      error: `These artists cannot be published with this release: ${outside.join(', ')}`,
+    };
+  }
+
+  const undecided = awaiting.filter(({ id }) => !publish.has(id) && !keepHidden.has(id));
+  if (undecided.length > 0) {
+    return { ok: false, error: `Choose to publish or keep hidden: ${names(undecided)}` };
+  }
+
+  return { ok: true };
+};

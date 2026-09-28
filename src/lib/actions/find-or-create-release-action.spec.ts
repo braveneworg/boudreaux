@@ -4,6 +4,7 @@
 // Mock server-only first to prevent errors from imported modules
 import { auth } from '@/auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ReleaseScalars } from '@/lib/types/domain/release';
 import { requireRole } from '@/utils/auth/require-role';
@@ -26,6 +27,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/auth');
 vi.mock('../services/release-service');
 vi.mock('../services/artist-service');
+vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
@@ -41,7 +43,9 @@ const mockReleaseFindByTitle = vi.mocked(
     () => Promise<Pick<ReleaseScalars, 'id' | 'title' | 'publishedAt' | 'deletedOn'> | null>
   >
 >;
-const mockReleaseApplyFoundUpdate = vi.mocked(ReleaseService.applyFoundReleaseUpdate);
+const mockRestoreFound = vi.mocked(ReleaseService.restoreFoundRelease);
+const mockPublishRelease = vi.mocked(ReleaseService.publishRelease);
+const mockForRelease = vi.mocked(CreditConfirmationService.forRelease);
 const mockReleaseServiceCreate = vi.mocked(ReleaseService.createRelease);
 
 describe('findOrCreateReleaseAction', () => {
@@ -56,6 +60,8 @@ describe('findOrCreateReleaseAction', () => {
       },
       expires: new Date(Date.now() + 86400000).toISOString(),
     });
+
+    mockForRelease.mockResolvedValue({ success: true, data: { awaiting: [], stayHidden: [] } });
 
     mockRequireRole.mockResolvedValue({
       user: {
@@ -586,164 +592,212 @@ describe('findOrCreateReleaseAction', () => {
   });
 
   describe('soft-delete handling', () => {
-    it('should un-delete a soft-deleted release when found', async () => {
-      const softDeletedRelease = {
+    it('restores a soft-deleted release when found', async () => {
+      mockReleaseFindByTitle.mockResolvedValue({
         id: 'release-deleted',
         title: 'Deleted Album',
-        publishedAt: new Date('2024-01-01'),
-        deletedOn: new Date('2024-06-01'),
-      };
-
-      mockReleaseFindByTitle.mockResolvedValue(softDeletedRelease);
-
-      const metadata: ReleaseMetadata = {
-        album: 'Deleted Album',
-      };
-
-      const result = await findOrCreateReleaseAction(metadata);
-
-      expect(result).toEqual({
-        success: true,
-        releaseId: 'release-deleted',
-        releaseTitle: 'Deleted Album',
-        created: false,
-      });
-
-      // Should clear deletedOn
-      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-deleted', {
-        undelete: true,
-        publish: false,
-      });
-    });
-
-    it('should un-delete and publish a soft-deleted unpublished release when publish requested', async () => {
-      const softDeletedUnpublished = {
-        id: 'release-deleted-unpub',
-        title: 'Deleted Unpublished Album',
         publishedAt: null,
         deletedOn: new Date('2024-06-01'),
-      };
-
-      mockReleaseFindByTitle.mockResolvedValue(softDeletedUnpublished);
-
-      const metadata: ReleaseMetadata = {
-        album: 'Deleted Unpublished Album',
-      };
-
-      const result = await findOrCreateReleaseAction(metadata, { publish: true });
-
-      expect(result).toEqual({
-        success: true,
-        releaseId: 'release-deleted-unpub',
-        releaseTitle: 'Deleted Unpublished Album',
-        created: false,
       });
 
-      // Should clear deletedOn AND set publishedAt
-      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-deleted-unpub', {
-        undelete: true,
-        publish: true,
-      });
+      await findOrCreateReleaseAction({ album: 'Deleted Album' });
+
+      expect(mockRestoreFound.mock.calls).toEqual([['release-deleted']]);
     });
 
-    it('should not call update when release is active and already published', async () => {
-      const activePublished = {
+    it('leaves a release that is not deleted alone', async () => {
+      mockReleaseFindByTitle.mockResolvedValue({
         id: 'release-active',
         title: 'Active Album',
-        publishedAt: new Date('2024-01-01'),
-        deletedOn: null,
-      };
-
-      mockReleaseFindByTitle.mockResolvedValue(activePublished);
-
-      const metadata: ReleaseMetadata = {
-        album: 'Active Album',
-      };
-
-      await findOrCreateReleaseAction(metadata, { publish: true });
-
-      // No update needed — already published and not deleted
-      expect(mockReleaseApplyFoundUpdate).not.toHaveBeenCalled();
-    });
-
-    it('should not call update when release is active and publish is not requested', async () => {
-      const activeUnpublished = {
-        id: 'release-active-unpub',
-        title: 'Active Unpublished',
         publishedAt: null,
         deletedOn: null,
-      };
+      });
 
-      mockReleaseFindByTitle.mockResolvedValue(activeUnpublished);
+      await findOrCreateReleaseAction({ album: 'Active Album' });
 
-      const metadata: ReleaseMetadata = {
-        album: 'Active Unpublished',
-      };
-
-      await findOrCreateReleaseAction(metadata);
-
-      // No publish requested and not deleted, so no update
-      expect(mockReleaseApplyFoundUpdate).not.toHaveBeenCalled();
+      expect(mockRestoreFound.mock.calls).toEqual([]);
     });
   });
 
-  describe('publish option', () => {
-    it('should publish an unpublished active release when publish requested', async () => {
-      const unpublishedRelease = {
-        id: 'release-unpub',
-        title: 'Unpublished Album',
-        publishedAt: null,
-        deletedOn: null,
-      };
+  describe('publish option (ADR-0015)', () => {
+    const awaiting = {
+      id: 'artist-new',
+      slug: 'mc-example',
+      name: 'MC Example',
+      bioState: 'none' as const,
+      bioGeneratedAt: null,
+      displayImageCount: 0,
+    };
+    const unpublished = {
+      id: 'release-1',
+      title: 'Album',
+      publishedAt: null,
+      deletedOn: null,
+    };
+    const created = { id: 'release-new', title: 'New Album' };
 
-      mockReleaseFindByTitle.mockResolvedValue(unpublishedRelease);
-
-      const metadata: ReleaseMetadata = {
-        album: 'Unpublished Album',
-      };
-
-      await findOrCreateReleaseAction(metadata, { publish: true });
-
-      expect(mockReleaseApplyFoundUpdate).toHaveBeenCalledWith('release-unpub', {
-        undelete: false,
-        publish: true,
+    beforeEach(() => {
+      mockReleaseFindByTitle.mockResolvedValue(unpublished);
+      mockReleaseServiceCreate.mockResolvedValue({ success: true, data: created as never });
+      mockPublishRelease.mockResolvedValue({ success: true, data: created as never });
+      mockForRelease.mockResolvedValue({ success: true, data: { awaiting: [], stayHidden: [] } });
+      vi.mocked(ArtistService.findOrCreateByName).mockResolvedValue({
+        success: true,
+        data: { id: 'artist-new', displayName: 'MC Example', firstName: 'MC', surname: 'Example' },
       });
     });
 
-    it('should include publishedAt when creating a new release with publish option', async () => {
+    afterEach(() => {
+      mockReleaseFindByTitle.mockReset();
+      mockReleaseServiceCreate.mockReset();
+      mockPublishRelease.mockReset();
+      mockForRelease.mockReset();
+      vi.mocked(ArtistService.findOrCreateByName).mockReset();
+    });
+
+    it('publishes a found release when no credit awaits confirmation', async () => {
+      const result = await findOrCreateReleaseAction({ album: 'Album' }, { publish: true });
+
+      expect({ calls: mockPublishRelease.mock.calls, published: result.published }).toEqual({
+        calls: [['release-1']],
+        published: true,
+      });
+    });
+
+    it('credits the artist before it decides whether to publish', async () => {
+      const order: string[] = [];
+      vi.mocked(ArtistService.connectToRelease).mockImplementationOnce(async () => {
+        order.push('credit');
+      });
+      mockForRelease.mockImplementationOnce(async () => {
+        order.push('read credits');
+        return { success: true, data: { awaiting: [], stayHidden: [] } };
+      });
+
+      await findOrCreateReleaseAction(
+        { album: 'Album', albumArtist: 'MC Example' },
+        { publish: true }
+      );
+
+      expect(order).toEqual(['credit', 'read credits']);
+    });
+
+    it('leaves a found release unpublished when a credit awaits confirmation', async () => {
+      mockForRelease.mockResolvedValueOnce({
+        success: true,
+        data: { awaiting: [awaiting], stayHidden: [] },
+      });
+
+      await findOrCreateReleaseAction(
+        { album: 'Album', albumArtist: 'MC Example' },
+        { publish: true }
+      );
+
+      expect(mockPublishRelease.mock.calls).toEqual([]);
+    });
+
+    it('returns the credits awaiting confirmation instead of publishing', async () => {
+      const creditConfirmation = { awaiting: [awaiting], stayHidden: [] };
+      mockForRelease.mockResolvedValueOnce({ success: true, data: creditConfirmation });
+
+      const result = await findOrCreateReleaseAction(
+        { album: 'Album', albumArtist: 'MC Example' },
+        { publish: true }
+      );
+
+      expect(result).toEqual({
+        success: true,
+        releaseId: 'release-1',
+        releaseTitle: 'Album',
+        created: false,
+        artistId: 'artist-new',
+        published: false,
+        creditConfirmation,
+      });
+    });
+
+    it('creates a release unpublished and publishes it after its credits are stored', async () => {
       mockReleaseFindByTitle.mockResolvedValue(null);
 
-      const createdRelease = {
-        id: 'new-pub-release',
-        title: 'New Published Album',
-        formats: ['DIGITAL'],
-        labels: [],
-        releasedOn: new Date(),
-        coverArt: '',
-        publishedAt: new Date(),
-      };
+      const result = await findOrCreateReleaseAction({ album: 'New Album' }, { publish: true });
 
-      mockReleaseServiceCreate.mockResolvedValue({
-        success: true,
-        data: createdRelease as unknown as never,
+      expect({
+        createdWith: mockReleaseServiceCreate.mock.calls[0][0],
+        publishCalls: mockPublishRelease.mock.calls,
+        published: result.published,
+      }).toEqual({
+        createdWith: expect.not.objectContaining({ publishedAt: expect.anything() }),
+        publishCalls: [['release-new']],
+        published: true,
       });
-
-      const metadata: ReleaseMetadata = {
-        album: 'New Published Album',
-      };
-
-      const result = await findOrCreateReleaseAction(metadata, { publish: true });
-
-      expect(result.success).toBe(true);
-      expect(result.created).toBe(true);
-
-      expect(mockReleaseServiceCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          publishedAt: expect.any(Date),
-        })
-      );
     });
 
+    it('leaves a created release unpublished when a credit awaits confirmation', async () => {
+      mockReleaseFindByTitle.mockResolvedValue(null);
+      mockForRelease.mockResolvedValueOnce({
+        success: true,
+        data: { awaiting: [awaiting], stayHidden: [] },
+      });
+
+      const result = await findOrCreateReleaseAction(
+        { album: 'New Album', albumArtist: 'MC Example' },
+        { publish: true }
+      );
+
+      expect({ calls: mockPublishRelease.mock.calls, published: result.published }).toEqual({
+        calls: [],
+        published: false,
+      });
+    });
+
+    it('does not publish without the publish option', async () => {
+      await findOrCreateReleaseAction({ album: 'Album' });
+
+      expect(mockPublishRelease.mock.calls).toEqual([]);
+    });
+
+    it('reports credits awaiting confirmation on a release that is already published', async () => {
+      const creditConfirmation = { awaiting: [awaiting], stayHidden: [] };
+      mockReleaseFindByTitle.mockResolvedValue({
+        ...unpublished,
+        publishedAt: new Date('2024-01-01'),
+      });
+      mockForRelease.mockResolvedValueOnce({ success: true, data: creditConfirmation });
+
+      const result = await findOrCreateReleaseAction({
+        album: 'Album',
+        albumArtist: 'MC Example',
+      });
+
+      expect(result).toMatchObject({ published: true, creditConfirmation });
+    });
+
+    it('fails when the release cannot be published', async () => {
+      mockPublishRelease.mockResolvedValueOnce({
+        success: false,
+        code: 'NOT_FOUND',
+        error: 'Release not found',
+      });
+
+      const result = await findOrCreateReleaseAction({ album: 'Album' }, { publish: true });
+
+      expect(result).toEqual({ success: false, error: 'Release not found' });
+    });
+
+    it('fails when the credits cannot be read', async () => {
+      mockForRelease.mockResolvedValueOnce({
+        success: false,
+        code: 'UNAVAILABLE',
+        error: 'Database unavailable',
+      });
+
+      const result = await findOrCreateReleaseAction({ album: 'Album' }, { publish: true });
+
+      expect(result).toEqual({ success: false, error: 'Database unavailable' });
+    });
+  });
+
+  describe('create failures', () => {
     it('should return error with specific message when createRelease returns failure with error', async () => {
       mockReleaseFindByTitle.mockResolvedValue(null);
       mockReleaseServiceCreate.mockResolvedValue({
@@ -780,36 +834,6 @@ describe('findOrCreateReleaseAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to create release');
-    });
-
-    it('should not include publishedAt when creating a new release without publish option', async () => {
-      mockReleaseFindByTitle.mockResolvedValue(null);
-
-      const createdRelease = {
-        id: 'new-draft-release',
-        title: 'New Draft Album',
-        formats: ['DIGITAL'],
-        labels: [],
-        releasedOn: new Date(),
-        coverArt: '',
-      };
-
-      mockReleaseServiceCreate.mockResolvedValue({
-        success: true,
-        data: createdRelease as unknown as never,
-      });
-
-      const metadata: ReleaseMetadata = {
-        album: 'New Draft Album',
-      };
-
-      await findOrCreateReleaseAction(metadata);
-
-      expect(mockReleaseServiceCreate).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          publishedAt: expect.anything(),
-        })
-      );
     });
   });
 

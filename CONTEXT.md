@@ -146,6 +146,12 @@ admin confirmed that Artist, having been shown what goes live with it. See
 [ADR-0015](docs/adr/0015-a-release-publishes-its-credited-artists-only-by-confirmation.md).
 _Avoid_: pending artist, unconfirmed artist.
 
+**credit decision** — an admin's choice for one **credit awaiting
+confirmation**: publish the Artist with the Release, or keep it hidden.
+Publishing a Release needs a decision for every such credit; none is made by
+omission. The admin who decided is recorded on each Artist published.
+_Avoid_: confirmation (the whole step, not one artist's choice), approval.
+
 **credit that stays hidden** — a **hidden artist** credited on a Release whom
 publishing cannot make public: deleted, or inactive with no departure date.
 Reported to the admin with the reason; never blocks a publish and is never

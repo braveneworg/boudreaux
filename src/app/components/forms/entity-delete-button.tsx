@@ -24,8 +24,12 @@ import { Button } from '@/app/components/ui/button';
 import { error as logError } from '@/lib/utils/console-logger';
 
 interface EntityDeleteButtonProps {
-  /** Runs the delete; resolves to the action result the button maps to a toast. */
-  onDelete: () => Promise<{ success: boolean; error?: string }>;
+  /**
+   * Runs the delete; resolves to the action result the button maps to a toast.
+   * `cancelled` means the admin backed out at a later step and nothing was
+   * written: the button closes its confirmation and shows no toast.
+   */
+  onDelete: () => Promise<{ success: boolean; error?: string; cancelled?: boolean }>;
   /** Destructive trigger label, e.g. `'Delete Artist'`. */
   label: string;
   /** Confirmation dialog title. */
@@ -68,6 +72,11 @@ export const EntityDeleteButton = ({
     setIsDeleting(true);
     try {
       const result = await onDelete();
+      if (result.cancelled) {
+        setIsDeleting(false);
+        setOpen(false);
+        return;
+      }
       if (result.success) {
         toast.success(successMessage);
         router.push(redirectTo);

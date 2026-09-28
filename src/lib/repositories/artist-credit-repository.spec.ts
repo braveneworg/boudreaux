@@ -126,6 +126,75 @@ describe('ArtistCreditRepository', () => {
     });
   });
 
+  describe('findAwaitingConfirmationAmong', () => {
+    it('reads the given artists that only lack publishedOn', async () => {
+      await ArtistCreditRepository.findAwaitingConfirmationAmong(['artist-1', 'artist-2']);
+
+      expect(vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where).toEqual({
+        id: { in: ['artist-1', 'artist-2'] },
+        AND: AWAITING_GATE,
+      });
+    });
+
+    it('describes what goes live for each', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([
+        {
+          ...nameRow,
+          bio: null,
+          shortBio: null,
+          altBio: null,
+          bioGeneratedAt: null,
+          bioImages: [],
+        },
+      ] as never);
+
+      const credits = await ArtistCreditRepository.findAwaitingConfirmationAmong(['artist-1']);
+
+      expect(credits).toEqual([
+        {
+          id: 'artist-1',
+          slug: 'mc-example',
+          name: 'MC Example',
+          bioState: 'none',
+          bioGeneratedAt: null,
+          displayImageCount: 0,
+        },
+      ]);
+    });
+
+    it('reads nothing when no artist is given', async () => {
+      const credits = await ArtistCreditRepository.findAwaitingConfirmationAmong([]);
+
+      expect({ credits, calls: vi.mocked(prisma.artist.findMany).mock.calls }).toEqual({
+        credits: [],
+        calls: [],
+      });
+    });
+  });
+
+  describe('findThatStayHiddenAmong', () => {
+    it('reads the given artists that are deleted or off the roster', async () => {
+      await ArtistCreditRepository.findThatStayHiddenAmong(['artist-1']);
+
+      expect(vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where).toEqual({
+        id: { in: ['artist-1'] },
+        OR: [
+          { deletedOn: { not: null } },
+          { isActive: false, OR: [{ deactivatedAt: null }, { deactivatedAt: { isSet: false } }] },
+        ],
+      });
+    });
+
+    it('reads nothing when no artist is given', async () => {
+      const credits = await ArtistCreditRepository.findThatStayHiddenAmong([]);
+
+      expect({ credits, calls: vi.mocked(prisma.artist.findMany).mock.calls }).toEqual({
+        credits: [],
+        calls: [],
+      });
+    });
+  });
+
   describe('findThatStayHidden', () => {
     it('reads the credited artists that are deleted or off the roster', async () => {
       await ArtistCreditRepository.findThatStayHidden('release-1');

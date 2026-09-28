@@ -19,6 +19,7 @@ import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-fo
 import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
 import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
 import { uploadBioImage } from '@/app/components/forms/utils/upload-bio-image';
+import { HidingWarningDialog } from '@/app/components/hiding-warning-dialog';
 import { Form } from '@/app/components/ui/form';
 import type {
   RichTextEditorImage,
@@ -26,10 +27,10 @@ import type {
 } from '@/app/components/ui/rich-text-editor';
 import { Separator } from '@/app/components/ui/separator';
 import {
-  useArchiveArtistMutation,
   useCreateArtistMutation,
   useUpdateArtistMutation,
 } from '@/hooks/mutations/use-artist-mutations';
+import { useGuardedArtistArchive } from '@/hooks/use-guarded-artist-archive';
 import { useSession } from '@/hooks/use-session';
 import { queryKeys } from '@/lib/query-keys';
 import { type FormState } from '@/lib/types/form-state';
@@ -243,7 +244,8 @@ export const ArtistForm = ({
   const [isTransitionPending, startTransition] = useTransition();
   const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
-  const { archiveArtistAsync } = useArchiveArtistMutation();
+  // Archiving hides the artist: warn which public work loses the name first.
+  const { archiveArtist, warning } = useGuardedArtistArchive();
   // Freshly generated bio images offered in the rich-text editor's insert-image
   // picker, merged with the persisted bio library from the status endpoint.
   const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
@@ -530,11 +532,12 @@ export const ArtistForm = ({
               isSubmitting={isSubmitting}
               isDirty={isDirty}
               onPublish={handleClickPublishButton}
-              onDelete={() => archiveArtistAsync({ artistId: artistId ?? '' })}
+              onDelete={() => archiveArtist(artistId ?? '')}
             />
           </form>
         </Form>
       </div>
+      <HidingWarningDialog {...warning} />
     </ZinePanel>
   );
 };

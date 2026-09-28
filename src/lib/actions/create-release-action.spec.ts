@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -27,6 +28,7 @@ vi.mock('../prisma', () => ({
 vi.mock('next/cache');
 
 vi.mock('../services/release-service');
+vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
@@ -58,6 +60,160 @@ describe('createReleaseAction', () => {
   beforeEach(() => {
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
+  });
+
+  describe('Credit confirmation (ADR-0015)', () => {
+    const artistA = '507f1f77bcf86cd799439012';
+    const artistB = '507f1f77bcf86cd799439013';
+    const decisions = { publishArtistIds: [artistA], keepHiddenArtistIds: [artistB] };
+    const undecided = {
+      success: false as const,
+      code: 'VALIDATION' as const,
+      error: 'Choose to publish or keep hidden: Bea',
+    };
+
+    const payloadWith = (creditDecisions?: string): FormData => {
+      const payload = new FormData();
+      if (creditDecisions !== undefined) {
+        payload.append('creditDecisions', creditDecisions);
+      }
+      return payload;
+    };
+
+    const parsedWith = (data: Record<string, unknown>): void => {
+      vi.mocked(getActionState).mockReturnValueOnce({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            ...data,
+          },
+        },
+      } as never);
+    };
+
+    beforeEach(() => {
+      vi.mocked(CreditConfirmationService.check).mockResolvedValue({
+        success: true,
+        data: undefined,
+      });
+      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-new' },
+      } as never);
+      vi.mocked(ReleaseService.publishRelease).mockResolvedValue({
+        success: true,
+        data: { id: 'release-new' },
+      } as never);
+      vi.mocked(prisma.artistRelease.createMany).mockResolvedValue({ count: 2 });
+    });
+
+    afterEach(() => {
+      vi.mocked(CreditConfirmationService.check).mockReset();
+      vi.mocked(ReleaseService.createRelease).mockReset();
+      vi.mocked(ReleaseService.publishRelease).mockReset();
+      vi.mocked(prisma.artistRelease.createMany).mockReset();
+    });
+
+    it('checks the decisions against the artists the form credits before it writes', async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await createReleaseAction(initialFormState, payloadWith(JSON.stringify(decisions)));
+
+      expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
+        [{ artistIds: [artistA, artistB] }, decisions],
+      ]);
+    });
+
+    it('creates nothing and names the artists when a credit is undecided', async () => {
+      vi.mocked(CreditConfirmationService.check).mockResolvedValueOnce(undecided);
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      const result = await createReleaseAction(initialFormState, payloadWith());
+
+      expect({
+        success: result.success,
+        errors: result.errors,
+        created: vi.mocked(ReleaseService.createRelease).mock.calls,
+      }).toEqual({
+        success: false,
+        errors: { general: ['Choose to publish or keep hidden: Bea'] },
+        created: [],
+      });
+    });
+
+    it('publishes the release after its credits are stored', async () => {
+      const order: string[] = [];
+      vi.mocked(prisma.artistRelease.createMany).mockImplementationOnce((async () => {
+        order.push('store credits');
+        return { count: 2 };
+      }) as never);
+      vi.mocked(ReleaseService.publishRelease).mockImplementationOnce(async () => {
+        order.push('publish');
+        return { success: true, data: { id: 'release-new' } } as never;
+      });
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await createReleaseAction(initialFormState, payloadWith(JSON.stringify(decisions)));
+
+      expect(order).toEqual(['store credits', 'publish']);
+    });
+
+    it("publishes with the admin's decisions and id", async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await createReleaseAction(initialFormState, payloadWith(JSON.stringify(decisions)));
+
+      expect(vi.mocked(ReleaseService.publishRelease).mock.calls).toEqual([
+        ['release-new', { decisions, publishedBy: 'user-123' }],
+      ]);
+    });
+
+    it('skips the check and the publish for a release saved unpublished', async () => {
+      parsedWith({ artistIds: [artistA] });
+
+      await createReleaseAction(initialFormState, payloadWith());
+
+      expect({
+        checks: vi.mocked(CreditConfirmationService.check).mock.calls,
+        publishes: vi.mocked(ReleaseService.publishRelease).mock.calls,
+      }).toEqual({ checks: [], publishes: [] });
+    });
+
+    it('rejects malformed decisions before it writes', async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z' });
+
+      const result = await createReleaseAction(initialFormState, payloadWith('not json'));
+
+      expect({
+        success: result.success,
+        errors: result.errors,
+        created: vi.mocked(ReleaseService.createRelease).mock.calls,
+      }).toEqual({
+        success: false,
+        errors: { general: ['Invalid artist decisions'] },
+        created: [],
+      });
+    });
+
+    it('keeps the created release and reports a failed publish', async () => {
+      vi.mocked(ReleaseService.publishRelease).mockResolvedValueOnce(undecided);
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      const result = await createReleaseAction(
+        initialFormState,
+        payloadWith(JSON.stringify(decisions))
+      );
+
+      expect({ success: result.success, errors: result.errors, data: result.data }).toEqual({
+        success: false,
+        errors: { general: ['Choose to publish or keep hidden: Bea'] },
+        data: { releaseId: 'release-new' },
+      });
+    });
   });
 
   describe('Authorization', () => {

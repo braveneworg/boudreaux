@@ -3,8 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import {
+  checkCreditDecisions,
+  needsCreditDecisions,
   toCreditAwaitingConfirmation,
   toCreditThatStaysHidden,
+  type CreditAwaitingConfirmation,
   type CreditConfirmationRow,
   type HiddenCreditRow,
 } from './credit-confirmation';
@@ -43,7 +46,97 @@ const hiddenRow = (over: Partial<HiddenCreditRow> = {}): HiddenCreditRow => ({
   ...over,
 });
 
+const awaiting = (id: string, name: string): CreditAwaitingConfirmation => ({
+  id,
+  slug: id,
+  name,
+  bioState: 'none',
+  bioGeneratedAt: null,
+  displayImageCount: 0,
+});
+
 describe('credit-confirmation', () => {
+  describe('checkCreditDecisions', () => {
+    const credits = [awaiting('a', 'Abel'), awaiting('b', 'Bea')];
+
+    it('passes when every awaiting credit is published or kept hidden', () => {
+      const result = checkCreditDecisions(credits, {
+        publishArtistIds: ['a'],
+        keepHiddenArtistIds: ['b'],
+      });
+
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('passes with no decisions when nothing awaits confirmation', () => {
+      const result = checkCreditDecisions([], { publishArtistIds: [], keepHiddenArtistIds: [] });
+
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('names the awaiting credits nobody decided on', () => {
+      const result = checkCreditDecisions(credits, {
+        publishArtistIds: ['a'],
+        keepHiddenArtistIds: [],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'Choose to publish or keep hidden: Bea',
+      });
+    });
+
+    it('rejects publishing an artist that does not await confirmation', () => {
+      const result = checkCreditDecisions(credits, {
+        publishArtistIds: ['a', 'b', 'zzz'],
+        keepHiddenArtistIds: [],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'These artists cannot be published with this release: zzz',
+      });
+    });
+
+    it('rejects an artist that is both published and kept hidden', () => {
+      const result = checkCreditDecisions(credits, {
+        publishArtistIds: ['a', 'b'],
+        keepHiddenArtistIds: ['b'],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'An artist cannot be both published and kept hidden: Bea',
+      });
+    });
+
+    it('ignores a keep-hidden artist that no longer awaits confirmation', () => {
+      const result = checkCreditDecisions(credits, {
+        publishArtistIds: ['a', 'b'],
+        keepHiddenArtistIds: ['zzz'],
+      });
+
+      expect(result).toEqual({ ok: true });
+    });
+  });
+
+  describe('needsCreditDecisions', () => {
+    it('is true when a credit awaits confirmation', () => {
+      expect(needsCreditDecisions({ awaiting: [awaiting('a', 'Abel')], stayHidden: [] })).toBe(
+        true
+      );
+    });
+
+    it('is false when credits only stay hidden', () => {
+      expect(
+        needsCreditDecisions({
+          awaiting: [],
+          stayHidden: [{ id: 'x', slug: 'x', name: 'X', reason: 'deleted' }],
+        })
+      ).toBe(false);
+    });
+  });
+
   describe('toCreditAwaitingConfirmation', () => {
     it('carries the id, slug and displayed name', () => {
       const credit = toCreditAwaitingConfirmation(awaitingRow());

@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import type { FormState } from '@/lib/types/form-state';
@@ -16,7 +17,9 @@ import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
@@ -157,6 +160,95 @@ const syncArtistReleases = async (releaseId: string, artistIds: string[]): Promi
   await Promise.all(ops);
 };
 
+/**
+ * Put a credit-confirmation failure on the form. Its message names the artists
+ * that need a decision, so it is shown as written rather than replaced by the
+ * generic update failure.
+ */
+const applyCreditFailure = (formState: FormState, message: string): void => {
+  formState.success = false;
+  formState.errors = { ...formState.errors, general: [message] };
+};
+
+type ParsedRelease = Parameters<typeof buildReleaseUpdateInput>[0] & { artistIds?: string[] };
+
+interface ReleaseWrite {
+  releaseId: string;
+  data: ParsedRelease;
+  decisions: CreditDecisions;
+  adminUserId: string;
+}
+
+interface ReleaseWriteResult {
+  response: Awaited<ReturnType<typeof ReleaseService.updateRelease>>;
+  /** Set when the release was saved but publishing its artists failed. */
+  creditFailure?: string;
+}
+
+/**
+ * Save the release, store the form's credits, then publish the artists the
+ * admin chose to publish. The service checks the decisions against the
+ * artists the form credits before it writes; the artists are published last
+ * because that write is gated on the stored credits.
+ */
+const writeRelease = async ({
+  releaseId,
+  data,
+  decisions,
+  adminUserId,
+}: ReleaseWrite): Promise<ReleaseWriteResult> => {
+  const input = buildReleaseUpdateInput(data);
+  const response = await ReleaseService.updateRelease(releaseId, input, {
+    decisions,
+    publishedBy: adminUserId,
+    creditArtistIds: data.artistIds,
+  });
+  if (!response.success || !data.artistIds) {
+    return { response };
+  }
+
+  await syncArtistReleases(releaseId, data.artistIds);
+  if (!input.publishedAt) {
+    return { response };
+  }
+
+  const confirmed = await CreditConfirmationService.publishConfirmed({
+    releaseId,
+    decisions,
+    publishedBy: adminUserId,
+  });
+  return confirmed.success ? { response } : { response, creditFailure: confirmed.error };
+};
+
+/** Put the outcome of the write on the form and refresh the affected pages. */
+const applyWriteResult = (
+  formState: FormState,
+  releaseId: string,
+  { response, creditFailure }: ReleaseWriteResult
+): void => {
+  if (response.success) {
+    formState.errors = undefined;
+    formState.data = { releaseId };
+  } else {
+    formState.errors = formState.errors ?? {};
+    mapReleaseServiceError(response.error || 'Failed to update release', formState);
+  }
+  formState.success = response.success;
+
+  revalidatePath(`/admin/releases/${releaseId}`);
+  if (response.success) {
+    ReleaseService.invalidateCache();
+    revalidatePath('/releases');
+    revalidatePath(`/releases/${releaseId}`);
+    revalidatePath('/artists/[slug]', 'page');
+  }
+
+  // The release is saved; only publishing its artists failed.
+  if (creditFailure) {
+    applyCreditFailure(formState, creditFailure);
+  }
+};
+
 const mapReleaseServiceError = (errorMessage: string, formState: FormState): void => {
   const msg = errorMessage.toLowerCase();
   const isTitleError =
@@ -198,14 +290,23 @@ export const updateReleaseAction = async (
     return formState;
   }
 
-  try {
-    const response = await ReleaseService.updateRelease(
-      releaseId,
-      buildReleaseUpdateInput(parsed.data)
-    );
+  const credit = readCreditDecisions(payload);
+  if (!credit.ok) {
+    applyCreditFailure(formState, 'Invalid artist decisions');
+    return formState;
+  }
 
-    if (response.success && parsed.data.artistIds) {
-      await syncArtistReleases(releaseId, parsed.data.artistIds);
+  try {
+    const result = await writeRelease({
+      releaseId,
+      data: parsed.data,
+      decisions: credit.decisions,
+      adminUserId: session.user.id,
+    });
+
+    if (!result.response.success && result.response.code === 'VALIDATION') {
+      applyCreditFailure(formState, result.response.error);
+      return formState;
     }
 
     logSecurityEvent({
@@ -216,31 +317,11 @@ export const updateReleaseAction = async (
         updatedFields: Object.keys(parsed.data).filter(
           (key) => parsed.data[key as keyof typeof parsed.data] !== undefined
         ),
-        success: response.success,
+        success: result.response.success,
       },
     });
 
-    if (response.success) {
-      formState.errors = undefined;
-      formState.data = { releaseId };
-    } else {
-      if (!formState.errors) {
-        formState.errors = {};
-      }
-      const errorMessage = response.error || 'Failed to update release';
-      mapReleaseServiceError(errorMessage, formState);
-    }
-
-    formState.success = response.success;
-
-    revalidatePath(`/admin/releases/${releaseId}`);
-
-    if (response.success) {
-      ReleaseService.invalidateCache();
-      revalidatePath('/releases');
-      revalidatePath(`/releases/${releaseId}`);
-      revalidatePath('/artists/[slug]', 'page');
-    }
+    applyWriteResult(formState, releaseId, result);
   } catch {
     formState.success = false;
     setUnknownError(formState);
