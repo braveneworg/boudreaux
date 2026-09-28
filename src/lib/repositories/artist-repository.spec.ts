@@ -5,7 +5,11 @@
 import { Prisma } from '@prisma/client';
 
 import type { AssertExact } from '@/lib/types/assert';
-import { ARTIST_PRIVATE_FIELDS, type ArtistDetail } from '@/lib/types/domain/artist';
+import {
+  ARTIST_BIO_FIELDS,
+  ARTIST_PRIVATE_FIELDS,
+  type ArtistDetail,
+} from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 
 import { ArtistRepository } from './artist-repository';
@@ -71,11 +75,8 @@ const nameSelect = { id: true, displayName: true, firstName: true, surname: true
  * alumni, published, not soft-deleted.
  */
 const PUBLIC_ARTIST_WHERE = {
-  AND: [
-    { OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] },
-    { publishedOn: { isSet: true } },
-    { publishedOn: { not: null } },
-  ],
+  AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+  publishedOn: { not: null },
   OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
 };
 
@@ -1042,6 +1043,21 @@ describe('ArtistRepository', () => {
         const selects = await artistSelects();
 
         expect(selects.map(([, select]) => select.slug)).toEqual([true, true, true, true, true]);
+      });
+
+      // Nothing gates a nested artist on publication, so a draft artist
+      // credited on a release, or in the band, must not carry its bio.
+      it.each(ARTIST_BIO_FIELDS)('omits %s from every nested artist level', async (field) => {
+        const selects = await artistSelects();
+        const nested = selects.filter(([path]) => path !== 'artist');
+
+        expect(nested.filter(([, select]) => field in select).map(([path]) => path)).toEqual([]);
+      });
+
+      it('keeps the bio on the page artist itself', async () => {
+        const [[, pageArtist]] = await artistSelects();
+
+        expect(pageArtist).toMatchObject({ bio: true, shortBio: true, altBio: true });
       });
     });
   });

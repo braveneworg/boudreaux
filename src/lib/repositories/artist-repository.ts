@@ -28,7 +28,7 @@ import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
 import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-schema';
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
-import { artistPublicSelect } from './_internal/artist-public-select';
+import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
@@ -220,11 +220,13 @@ const artistSearchInclude = {
 
 /**
  * The media `Release` graph loaded behind every artist-detail release join,
- * with each credited artist read through {@link artistPublicSelect} (#765).
+ * with each credited artist read through {@link artistCreditSelect}: public
+ * scalars (#765) without the bio, since a credited artist is not gated on
+ * publication.
  */
 const releaseGraphInclude = {
   images: true,
-  artistReleases: { include: { artist: { select: artistPublicSelect } } },
+  artistReleases: { include: { artist: { select: artistCreditSelect } } },
   digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
   releaseUrls: { include: { url: true } },
 } as const satisfies Prisma.ReleaseInclude;
@@ -239,7 +241,9 @@ const artistReleaseRowsInclude = {
  * release + bio graph, and the same release graph for every band the artist is
  * a member of so the page can list band releases beside the artist's own. A
  * `select` (not an `include`) so no artist on the graph — the artist, members,
- * bands, or release credits — carries a private scalar.
+ * bands, or release credits — carries a private scalar. Only the page artist,
+ * which the slug read gates on publication, carries its bio; members and bands
+ * read through {@link artistCreditSelect}.
  */
 const artistWithReleaseGraphSelect = {
   ...artistPublicSelect,
@@ -247,10 +251,10 @@ const artistWithReleaseGraphSelect = {
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
   bioLinks: { where: referenceLinkWhere, orderBy: { sortOrder: 'asc' } },
-  members: { include: { member: { select: artistPublicSelect } } },
+  members: { include: { member: { select: artistCreditSelect } } },
   releases: artistReleaseRowsInclude,
   memberOf: {
-    include: { artist: { select: { ...artistPublicSelect, releases: artistReleaseRowsInclude } } },
+    include: { artist: { select: { ...artistCreditSelect, releases: artistReleaseRowsInclude } } },
   },
 } as const satisfies Prisma.ArtistSelect;
 
@@ -419,13 +423,14 @@ const currentOrAlumniWhere = {
 
 /**
  * The gate every public artist read by slug applies (#786): current or
- * alumni, published, and not soft-deleted. `publishedOn: { not: null }` alone
- * matches documents where the field is ABSENT on Mongo, so it is paired with
- * `isSet: true`; the in-memory twin for junction-joined artists is
- * `isVisibleArtist`.
+ * alumni, published, and not soft-deleted. `publishedOn: { not: null }`
+ * excludes an absent field as well as an explicit null, as the `alumni`
+ * `deactivatedAt` guard above notes; the in-memory twin for junction-joined
+ * artists is `isVisibleArtist`.
  */
 const publicArtistWhere = {
-  AND: [currentOrAlumniWhere, { publishedOn: { isSet: true } }, { publishedOn: { not: null } }],
+  AND: [currentOrAlumniWhere],
+  publishedOn: { not: null },
   OR: [...notDeletedOr],
 } as const satisfies Prisma.ArtistWhereInput;
 

@@ -5,8 +5,9 @@
 import { NextRequest } from 'next/server';
 
 import { ArtistService } from '@/lib/services/artist-service';
-import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 import {
+  artistBioValues,
   artistPrivateValues,
   artistPublicScalar,
   artistScalar,
@@ -212,6 +213,53 @@ describe('Artist by Slug API Route', () => {
         ];
 
         expect(artists.filter((artist) => field in artist)).toEqual([]);
+      }
+    );
+
+    it.each(ARTIST_BIO_FIELDS)(
+      'never serialises %s on a nested artist (member or release credit)',
+      async (field) => {
+        const bioArtist = { ...mockArtist, ...artistBioValues };
+        vi.mocked(ArtistService.getArtistBySlugWithReleases).mockResolvedValueOnce({
+          success: true,
+          data: {
+            ...mockArtistWithReleases,
+            members: [
+              { id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...bioArtist, id: 'a2' } },
+            ],
+            releases: [
+              {
+                ...mockArtistWithReleases.releases[0],
+                release: {
+                  ...mockArtistWithReleases.releases[0].release,
+                  artistReleases: [
+                    {
+                      id: 'ar2',
+                      artistId: 'a3',
+                      releaseId: 'r1',
+                      artist: { ...bioArtist, id: 'a3' },
+                    },
+                  ],
+                },
+              },
+            ],
+          } as never,
+        });
+        const request = new NextRequest(
+          'http://localhost:3000/api/artists/slug/john-doe?withReleases=true'
+        );
+        const data = (await (await GET(request, createParams('john-doe'))).json()) as {
+          members: Array<{ member: object }>;
+          releases: Array<{ release: { artistReleases: Array<{ artist: object }> } }>;
+        };
+        const nested = [
+          ...data.members.map(({ member }) => member),
+          ...data.releases.flatMap(({ release: row }) =>
+            row.artistReleases.map(({ artist }) => artist)
+          ),
+        ];
+
+        expect(nested.filter((artist) => field in artist)).toEqual([]);
       }
     );
 

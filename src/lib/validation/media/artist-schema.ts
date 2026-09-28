@@ -9,6 +9,7 @@ import { RELEASE_CREDITS } from '@/lib/utils/artist-release-credits';
 
 import { publicArtistReleaseSchema } from './release-schema';
 import {
+  artistCreditScalarSchema,
   artistPublicScalarSchema,
   artistScalarSchema,
   date,
@@ -73,7 +74,7 @@ const artistMemberSchema = z.object({
   id: z.string(),
   artistId: z.string(),
   memberId: z.string(),
-  member: artistPublicScalarSchema,
+  member: artistCreditScalarSchema,
 });
 
 /** `Artist` with the relations selected by the `Artist` domain type. */
@@ -102,11 +103,14 @@ export const artistDetailSchema = artistScalarSchema satisfies z.ZodType<ArtistD
  * Each release row carries the credit the service derived for it (own release,
  * featured appearance, or band release) so the page can order and label rows.
  *
- * Public by construction: every artist on the graph — the artist, its band
- * members, and each credited artist on a release — is parsed through
- * {@link artistPublicScalarSchema}, and Zod strips unknown keys, so the server
- * also runs a payload through this as the response guard (#765): a private
- * field a future query re-selects is dropped before it is serialised.
+ * Public by construction: the page artist is parsed through
+ * {@link artistPublicScalarSchema}, and every nested artist — its band members
+ * and each credited artist on a release — through
+ * {@link artistCreditScalarSchema}, which also drops the bio (nothing gates a
+ * nested artist on publication). Zod strips unknown keys, so the server also
+ * runs a payload through this as the response guard (#765): a private or
+ * nested bio field a future query re-selects is dropped before it is
+ * serialised.
  */
 export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend({
   labels: z.array(artistLabelSchema),

@@ -4,7 +4,9 @@
 import { z } from 'zod';
 
 import {
+  ARTIST_BIO_FIELD_MASK,
   ARTIST_PRIVATE_FIELD_MASK,
+  type ArtistCreditScalars,
   type ArtistPublicScalars,
   type ArtistScalars,
 } from '@/lib/types/domain/artist';
@@ -146,6 +148,16 @@ export const artistScalarSchema = z.object({
 export const artistPublicScalarSchema = artistScalarSchema.omit(
   ARTIST_PRIVATE_FIELD_MASK
 ) satisfies z.ZodType<ArtistPublicScalars>;
+
+/**
+ * The scalars a nested artist (a release credit, a band member or band, a tour
+ * headliner) may carry — {@link artistPublicScalarSchema} without any bio
+ * field. Nothing gates a nested artist on publication, so parsing through this
+ * drops a draft artist's bio instead of serialising it.
+ */
+export const artistCreditScalarSchema = artistPublicScalarSchema.omit(
+  ARTIST_BIO_FIELD_MASK
+) satisfies z.ZodType<ArtistCreditScalars>;
 
 /** All scalar fields of the `Release` model (no relations included). */
 export const releaseScalarSchema = z.object({
