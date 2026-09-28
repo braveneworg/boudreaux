@@ -50,7 +50,8 @@ interface ReleaseFileListDrawerProps {
   release: PublishedReleaseDetail;
   files: ReleaseTrackFile[];
   currentFile: ReleaseTrackFile;
-  primaryArtist: ReleasePrimaryArtist;
+  /** The album artist's name; `null` for a release with no public credit. */
+  artistName: string | null;
   releaseId: string;
   releaseTitle?: string;
   onFileSelect: (fileId: string) => void;
@@ -64,7 +65,7 @@ const ReleaseFileListDrawer = ({
   release,
   files,
   currentFile,
-  primaryArtist,
+  artistName,
   releaseId,
   releaseTitle,
   onFileSelect,
@@ -73,11 +74,11 @@ const ReleaseFileListDrawer = ({
     files={files}
     currentFileId={currentFile.id}
     onFileSelect={onFileSelect}
-    artistName={getArtistDisplayName(primaryArtist)}
+    artistName={artistName ?? ''}
     releaseTitle={release.title ?? ''}
     downloadTrigger={
       <DeferredDownloadDialog
-        artistName={getArtistDisplayName(primaryArtist)}
+        artistName={artistName ?? ''}
         releaseId={releaseId}
         releaseTitle={releaseTitle ?? ''}
       >
@@ -89,7 +90,8 @@ const ReleaseFileListDrawer = ({
 
 interface ReleasePlayerControlsProps {
   release: PublishedReleaseDetail;
-  primaryArtist: ReleasePrimaryArtist;
+  /** The album artist; absent for a release with no public credit. */
+  primaryArtist: ReleasePrimaryArtist | undefined;
   currentFile: ReleaseTrackFile;
   audioSrc: string;
   isPlaying: boolean;
@@ -144,7 +146,8 @@ const ReleasePlayerControls = ({
 
 interface ReleaseAddToPlaylistProps {
   currentFile: ReleaseTrackFile;
-  primaryArtist: ReleasePrimaryArtist;
+  /** The album artist's name; `null` for a release with no public credit. */
+  artistName: string | null;
   releaseId: string;
   coverArtSrc: string;
 }
@@ -158,7 +161,7 @@ interface ReleaseAddToPlaylistProps {
  */
 const ReleaseAddToPlaylist = ({
   currentFile,
-  primaryArtist,
+  artistName,
   releaseId,
   coverArtSrc,
 }: ReleaseAddToPlaylistProps) => {
@@ -166,7 +169,7 @@ const ReleaseAddToPlaylist = ({
     trackFileId: currentFile.id,
     releaseId,
     title: getTrackDisplayTitle(currentFile.title, currentFile.fileName),
-    artistName: getArtistDisplayName(primaryArtist),
+    artistName,
     coverArt: coverArtSrc,
     duration: currentFile.duration ?? null,
   });
@@ -181,7 +184,10 @@ const ReleaseAddToPlaylist = ({
 
 interface ReleasePlayerBodyProps {
   release: PublishedReleaseDetail;
+  /** The album artist; absent for a release with no public credit (ADR-0015). */
   primaryArtist: ReleasePrimaryArtist | undefined;
+  /** The album artist's name, `null` when there is none. The player runs either way. */
+  artistName: string | null;
   files: ReleaseTrackFile[];
   currentFile: ReleaseTrackFile | null;
   hasFiles: boolean;
@@ -211,6 +217,7 @@ interface ReleasePlayerBodyProps {
 const ReleasePlayerBody = ({
   release,
   primaryArtist,
+  artistName,
   files,
   currentFile,
   hasFiles,
@@ -233,12 +240,12 @@ const ReleasePlayerBody = ({
 }: ReleasePlayerBodyProps) => (
   <MediaPlayer className="mb-2">
     <div className="mt-2 space-y-2">
-      {hasFiles && currentFile && primaryArtist && (
+      {hasFiles && currentFile && (
         <ReleaseFileListDrawer
           release={release}
           files={files}
           currentFile={currentFile}
-          primaryArtist={primaryArtist}
+          artistName={artistName}
           releaseId={releaseId}
           releaseTitle={releaseTitle}
           onFileSelect={onFileSelect}
@@ -257,17 +264,17 @@ const ReleasePlayerBody = ({
               onTogglePlay={onTogglePlay}
               priority
             />
-            {currentFile && primaryArtist && (
+            {currentFile && (
               <ReleaseAddToPlaylist
                 currentFile={currentFile}
-                primaryArtist={primaryArtist}
+                artistName={artistName}
                 releaseId={releaseId}
                 coverArtSrc={coverArtSrc}
               />
             )}
           </div>
 
-          {hasFiles && currentFile && primaryArtist && audioSrc ? (
+          {hasFiles && currentFile && audioSrc ? (
             <ReleasePlayerControls
               release={release}
               primaryArtist={primaryArtist}
@@ -343,7 +350,8 @@ export const ReleasePlayer = ({
     return resolveStreamUrl(currentFile);
   }, [currentFile]);
 
-  const primaryArtist = release.artistReleases[0]?.artist;
+  const primaryArtist = release.artistReleases.at(0)?.artist;
+  const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
   const coverArtSrc = release.coverArt || release.images[0]?.src || '';
   const coverArtAlt = `${release.title} cover art`;
@@ -364,6 +372,7 @@ export const ReleasePlayer = ({
     <ReleasePlayerBody
       release={release}
       primaryArtist={primaryArtist}
+      artistName={artistName}
       files={files}
       currentFile={currentFile}
       hasFiles={hasFiles}

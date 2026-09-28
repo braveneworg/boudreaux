@@ -90,9 +90,10 @@ interface CollectionListProps {
   isAdmin: boolean;
 }
 
-const getArtistName = (purchase: CollectionPurchase): string => {
-  const artistRelease = purchase.release.artistReleases[0];
-  if (!artistRelease) return 'Unknown Artist';
+/** The album artist's name, or `null` for a release with no public credit. */
+const getArtistName = (purchase: CollectionPurchase): string | null => {
+  const artistRelease = purchase.release.artistReleases.at(0);
+  if (!artistRelease) return null;
   const { displayName, firstName, surname } = artistRelease.artist;
   return displayName ?? [firstName, surname].filter(Boolean).join(' ');
 };
@@ -192,7 +193,11 @@ const CollectionListItem = memo(
           >
             {purchase.release.title}
           </Link>
-          <p className="truncate text-sm text-zinc-500">{artistName}</p>
+          {artistName && (
+            <p data-testid="collection-artist-name" className="truncate text-sm text-zinc-500">
+              {artistName}
+            </p>
+          )}
           <p className="mt-1 text-xs text-zinc-400">
             {formatPrice(purchase.amountPaid, purchase.currency)}
             {' · '}

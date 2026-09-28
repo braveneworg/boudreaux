@@ -50,7 +50,8 @@ import { LazyControls } from './lazy-controls';
  */
 interface ArtistReleasePair {
   release: Pick<Release, 'title' | 'coverArt' | 'digitalFormats'>;
-  artist: ArtistNameFields;
+  /** Absent for a release with no public credit: it is shown with no byline. */
+  artist?: ArtistNameFields | null;
 }
 
 /**
@@ -321,11 +322,12 @@ const CoverArtView = ({
   height?: number;
 }) => {
   const { release, artist } = artistRelease;
+  const alt = artist ? `${release.title} by ${getArtistDisplayName(artist)}` : release.title;
 
   return (
     <Image
       src={buildCdnImageVariantUrl(release.coverArt, 384)}
-      alt={`${release.title} by ${getArtistDisplayName(artist)}`}
+      alt={alt}
       width={width}
       height={height}
       unoptimized
@@ -593,7 +595,7 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
   if ('artistRelease' in props && props.artistRelease) {
     const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
     return {
-      displayName: getArtistDisplayName(artistRelease.artist),
+      displayName: artistRelease.artist ? getArtistDisplayName(artistRelease.artist) : null,
       releaseTitle: artistRelease.release.title,
       trackTitle: trackName,
     };

@@ -1639,6 +1639,31 @@ describe('MediaPlayer', () => {
   });
 });
 
+describe('CoverArtView release without a public credit', () => {
+  it('describes the cover by the release title alone', () => {
+    render(
+      <MediaPlayer.CoverArtView
+        artistRelease={{ release: { title: 'My Album', coverArt: 'c.jpg', digitalFormats: [] } }}
+      />
+    );
+
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'My Album');
+  });
+});
+
+describe('InfoTickerTape release without a public credit', () => {
+  it('renders the track and release with no byline', () => {
+    render(
+      <MediaPlayer.InfoTickerTape
+        artistRelease={{ release: { title: 'My Album', coverArt: '', digitalFormats: [] } }}
+        trackName="Night Drive"
+      />
+    );
+
+    expect(screen.getByText('Night Drive • My Album')).toBeInTheDocument();
+  });
+});
+
 describe('InfoTickerTape minimal variant', () => {
   it('renders the track title with the artist name', () => {
     render(<MediaPlayer.InfoTickerTape trackTitle="Night Drive" artistName="Ceschi" />);

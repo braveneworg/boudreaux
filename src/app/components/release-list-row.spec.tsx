@@ -73,6 +73,12 @@ const baseRelease: PublishedReleaseListing = {
 };
 
 describe('ReleaseListRow', () => {
+  it('shows no byline for a release with no public credit', () => {
+    render(<ReleaseListRow release={{ ...baseRelease, artistReleases: [] }} />);
+
+    expect(screen.getByTestId('release-card')).toHaveAttribute('data-artist', '');
+  });
+
   it('derives the card props from the raw listing row', () => {
     render(<ReleaseListRow release={baseRelease} />);
 

@@ -74,9 +74,12 @@ const resolveDialogProps = (props: DownloadDialogProps): ResolvedDialogProps => 
   availableFormats: props.availableFormats ?? [],
 });
 
-/** Screen-reader dialog title — release-specific once purchased, otherwise artist-scoped. */
+/**
+ * Screen-reader dialog title — release-specific once purchased, or when the
+ * release has no public credit to name; otherwise artist-scoped.
+ */
 const dialogTitleFor = (resolved: ResolvedDialogProps): string =>
-  resolved.hasPurchase
+  resolved.hasPurchase || !resolved.artistName
     ? `Download ${resolved.releaseTitle}`
     : `Download ${resolved.artistName}'s music`;
 

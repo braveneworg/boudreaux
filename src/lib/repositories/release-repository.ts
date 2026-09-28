@@ -20,6 +20,7 @@ import type {
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact } from './_internal/drift';
@@ -104,6 +105,15 @@ const releaseListItemInclude = {
 } as const satisfies Prisma.ReleaseInclude;
 
 /**
+ * The credits a public read may show (ADR-0015): those whose artist is a
+ * public artist. A hidden artist's name never reaches a public payload; a
+ * release credited only to hidden artists is returned with no credits.
+ */
+const publicCreditWhere = {
+  artist: { is: publicArtistWhere },
+} as const satisfies Prisma.ArtistReleaseWhereInput;
+
+/**
  * Projection for the public releases page. Only the fields the listing UI
  * consumes (release rows + search combobox) are selected, keeping both the
  * Mongo read and the API payload small.
@@ -126,6 +136,7 @@ const publishedReleaseListingSelect = {
     select: { src: true, altText: true },
   },
   artistReleases: {
+    where: publicCreditWhere,
     select: {
       artist: {
         // slug feeds the landing headlines' artist links.
@@ -156,6 +167,7 @@ const publishedReleaseDetailInclude = {
     orderBy: { sortOrder: 'asc' },
   },
   artistReleases: {
+    where: publicCreditWhere,
     select: {
       artist: {
         select: {
@@ -324,14 +336,23 @@ const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
                 { catalogNumber: contains },
                 { description: contains },
                 {
+                  // Names match on public artists only, so a search cannot
+                  // confirm that a hidden artist exists.
                   artistReleases: {
                     some: {
                       artist: {
-                        OR: [
-                          { firstName: contains },
-                          { surname: contains },
-                          { displayName: contains },
-                        ],
+                        is: {
+                          AND: [
+                            publicArtistWhere,
+                            {
+                              OR: [
+                                { firstName: contains },
+                                { surname: contains },
+                                { displayName: contains },
+                              ],
+                            },
+                          ],
+                        },
                       },
                     },
                   },
@@ -563,9 +584,10 @@ export class ReleaseRepository {
   }
 
   /**
-   * Fetch other published, non-deleted releases by an artist, excluding the
-   * current release. Includes one image for cover-art display. Ordered by
-   * `releasedOn` desc.
+   * Fetch other published, non-deleted releases by a public artist, excluding
+   * the current release. Includes one image for cover-art display. Ordered by
+   * `releasedOn` desc. A hidden artist's id returns nothing, so the id cannot
+   * be used to list a hidden artist's releases.
    */
   static async findPublishedByArtistExcluding(
     artistId: string,
@@ -574,7 +596,7 @@ export class ReleaseRepository {
     return runQuery(() =>
       prisma.release.findMany({
         where: {
-          artistReleases: { some: { artistId } },
+          artistReleases: { some: { artistId, artist: { is: publicArtistWhere } } },
           id: { not: excludeReleaseId },
           publishedAt: { not: null },
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],

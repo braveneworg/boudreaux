@@ -32,9 +32,9 @@ interface ReleaseListRowProps {
  * long-form release notes belong to the detail page, not this row.
  */
 export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement => {
-  const artistName = release.artistReleases[0]
-    ? (getArtistDisplayNameForRelease(release.artistReleases[0].artist) ?? 'Unknown Artist')
-    : 'Unknown Artist';
+  // A release with no public credit is shown with no byline (ADR-0015).
+  const albumArtist = release.artistReleases.at(0)?.artist;
+  const artistName = albumArtist ? getArtistDisplayNameForRelease(albumArtist) : null;
 
   return (
     <article className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-start sm:gap-6">

@@ -65,6 +65,15 @@ describe('ReleaseRepository', () => {
     artistReleases: { include: { artist: true } },
   };
 
+  /** The public artist gate (ADR-0015): current or alumni, published, not deleted. */
+  const PUBLIC_ARTIST = {
+    AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+    publishedOn: { not: null },
+    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+  };
+  /** Only the credits whose artist is public are read. */
+  const PUBLIC_CREDITS = { artist: { is: PUBLIC_ARTIST } };
+
   const listingSelect = {
     id: true,
     title: true,
@@ -75,6 +84,7 @@ describe('ReleaseRepository', () => {
     catalogNumber: true,
     images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
     artistReleases: {
+      where: PUBLIC_CREDITS,
       select: {
         artist: {
           select: { id: true, firstName: true, surname: true, displayName: true, slug: true },
@@ -93,6 +103,7 @@ describe('ReleaseRepository', () => {
   const detailSelect = {
     images: { orderBy: { sortOrder: 'asc' } },
     artistReleases: {
+      where: PUBLIC_CREDITS,
       select: {
         artist: {
           select: {
@@ -441,7 +452,7 @@ describe('ReleaseRepository', () => {
       });
     });
 
-    it('adds a server-side search OR across title/catalog/description/artist', async () => {
+    it('adds a server-side search OR across title/catalog/description/public artist', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
 
       await ReleaseRepository.findPublished({ search: 'Doe' });
@@ -461,11 +472,18 @@ describe('ReleaseRepository', () => {
                 artistReleases: {
                   some: {
                     artist: {
-                      OR: [
-                        { firstName: contains },
-                        { surname: contains },
-                        { displayName: contains },
-                      ],
+                      is: {
+                        AND: [
+                          PUBLIC_ARTIST,
+                          {
+                            OR: [
+                              { firstName: contains },
+                              { surname: contains },
+                              { displayName: contains },
+                            ],
+                          },
+                        ],
+                      },
                     },
                   },
                 },
@@ -496,14 +514,14 @@ describe('ReleaseRepository', () => {
   });
 
   describe('findPublishedByArtistExcluding', () => {
-    it('filters by artist, excludes the current release, published-only, single image', async () => {
+    it('filters by a public artist, excludes the current release, published-only, single image', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
 
       await ReleaseRepository.findPublishedByArtistExcluding('artist-1', 'release-123');
 
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
-          artistReleases: { some: { artistId: 'artist-1' } },
+          artistReleases: { some: { artistId: 'artist-1', artist: { is: PUBLIC_ARTIST } } },
           id: { not: 'release-123' },
           publishedAt: { not: null },
           OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
