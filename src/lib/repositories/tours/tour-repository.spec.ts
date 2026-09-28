@@ -14,6 +14,7 @@ vi.mock('../../prisma', () => ({
     $transaction: vi.fn(),
     tour: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -89,6 +90,177 @@ describe('TourRepository', () => {
       expect(
         headlinerArtistSelect(vi.mocked(prisma.tour.findUnique).mock.calls[0][0])
       ).not.toHaveProperty(field);
+    });
+  });
+
+  describe('public reads (ADR-0015)', () => {
+    const PUBLIC_ARTIST = {
+      AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+      publishedOn: { not: null },
+      OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+    };
+    const PUBLIC_HEADLINER = { artist: { is: PUBLIC_ARTIST } };
+    const VISIBLE_DATE = {
+      OR: [
+        {
+          headliners: {
+            every: { OR: [{ artistId: null }, { artistId: { isSet: false } }] },
+          },
+        },
+        { headliners: { some: PUBLIC_HEADLINER } },
+      ],
+    };
+    const VISIBLE_TOUR = {
+      OR: [{ tourDates: { none: {} } }, { tourDates: { some: VISIBLE_DATE } }],
+    };
+
+    interface PublicTourArgs {
+      where: unknown;
+      include: {
+        tourDates: { where: unknown; include: { headliners: { where: unknown } } };
+      };
+      skip?: number;
+      take?: number;
+    }
+
+    beforeEach(() => {
+      vi.mocked(prisma.tour.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.tour.findFirst).mockResolvedValue(null);
+    });
+
+    afterEach(() => {
+      vi.mocked(prisma.tour.findMany).mockReset();
+      vi.mocked(prisma.tour.findFirst).mockReset();
+    });
+
+    const listArgs = async (params?: Parameters<typeof TourRepository.findAllPublic>[0]) => {
+      await TourRepository.findAllPublic(params);
+      return vi.mocked(prisma.tour.findMany).mock.calls.at(-1)?.[0] as unknown as PublicTourArgs;
+    };
+
+    it('lists tours with no dates or with a date the public may see', async () => {
+      const args = await listArgs();
+
+      expect(args.where).toEqual({ AND: [VISIBLE_TOUR] });
+    });
+
+    it('returns only the dates the public may see', async () => {
+      const args = await listArgs();
+
+      expect(args.include.tourDates.where).toEqual(VISIBLE_DATE);
+    });
+
+    it('names only the headliners that are public artists', async () => {
+      const args = await listArgs();
+
+      expect(args.include.tourDates.include.headliners.where).toEqual(PUBLIC_HEADLINER);
+    });
+
+    it('searches names of public headliners only, on dates the public may see', async () => {
+      const contains = { contains: 'ceschi', mode: 'insensitive' };
+
+      const args = await listArgs({ search: 'ceschi' });
+
+      expect(args.where).toEqual({
+        AND: [
+          VISIBLE_TOUR,
+          {
+            OR: [
+              { title: contains },
+              { subtitle: contains },
+              { subtitle2: contains },
+              { description: contains },
+              {
+                tourDates: {
+                  some: {
+                    AND: [
+                      VISIBLE_DATE,
+                      {
+                        OR: [
+                          {
+                            venue: {
+                              OR: [{ name: contains }, { city: contains }, { state: contains }],
+                            },
+                          },
+                          {
+                            headliners: {
+                              some: {
+                                artist: {
+                                  is: {
+                                    AND: [
+                                      PUBLIC_ARTIST,
+                                      {
+                                        OR: [
+                                          { firstName: contains },
+                                          { surname: contains },
+                                          { displayName: contains },
+                                        ],
+                                      },
+                                    ],
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('pages in the database, so a hidden tour never shortens a page', async () => {
+      const args = await listArgs({ skip: 24, take: 12 });
+
+      expect({ skip: args.skip, take: args.take }).toEqual({ skip: 24, take: 12 });
+    });
+
+    it('finds a tour by id only when the public may see it', async () => {
+      await TourRepository.findPublicById('507f1f77bcf86cd799439011');
+
+      const args = vi
+        .mocked(prisma.tour.findFirst)
+        .mock.calls.at(-1)?.[0] as unknown as PublicTourArgs;
+      expect(args.where).toEqual({ id: '507f1f77bcf86cd799439011', ...VISIBLE_TOUR });
+    });
+
+    it('reads a tour by id with the public dates and headliners', async () => {
+      await TourRepository.findPublicById('507f1f77bcf86cd799439011');
+
+      const args = vi
+        .mocked(prisma.tour.findFirst)
+        .mock.calls.at(-1)?.[0] as unknown as PublicTourArgs;
+      expect({
+        dates: args.include.tourDates.where,
+        headliners: args.include.tourDates.include.headliners.where,
+      }).toEqual({ dates: VISIBLE_DATE, headliners: PUBLIC_HEADLINER });
+    });
+
+    it('does not read for a malformed id', async () => {
+      const tour = await TourRepository.findPublicById('nope');
+
+      expect({ tour, reads: vi.mocked(prisma.tour.findFirst).mock.calls }).toEqual({
+        tour: null,
+        reads: [],
+      });
+    });
+
+    it('leaves the admin reads unfiltered', async () => {
+      await TourRepository.findAll();
+
+      const args = vi.mocked(prisma.tour.findMany).mock.calls.at(-1)?.[0] as unknown as {
+        where?: unknown;
+        include: { tourDates: object };
+      };
+      expect({ where: args.where, filtersDates: 'where' in args.include.tourDates }).toEqual({
+        where: undefined,
+        filtersDates: false,
+      });
     });
   });
 

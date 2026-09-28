@@ -37,7 +37,7 @@ export default async function ToursPage() {
     // client must refetch — the source of the flaky "0 tour cards" E2E
     // failures. Mirror the route's JSON shape (Date → ISO string).
     queryFn: async () => {
-      const rows = await TourRepository.findAll({ skip: 0, take: TOURS_PAGE_SIZE });
+      const rows = await TourRepository.findAllPublic({ skip: 0, take: TOURS_PAGE_SIZE });
       return serializeForResponse({
         rows,
         nextSkip: computeNextSkip(rows.length, 0, TOURS_PAGE_SIZE),

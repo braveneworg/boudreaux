@@ -188,6 +188,8 @@ export const queryKeys = {
     infinite: (search: string) =>
       [...queryKeys.tours.all, 'infinite', search.trim().toLowerCase()] as const,
     detail: (id: string) => [...queryKeys.tours.all, 'detail', id] as const,
+    /** The unfiltered tour an admin edits; kept apart from the public `detail`. */
+    adminDetail: (id: string) => [...queryKeys.tours.all, 'adminDetail', id] as const,
     dates: (tourId: string) => [...queryKeys.tours.all, 'dates', tourId] as const,
     images: (tourId: string) => [...queryKeys.tours.all, 'images', tourId] as const,
     dateImages: (tourId: string, tourDateId: string) =>

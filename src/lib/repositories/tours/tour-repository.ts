@@ -9,7 +9,13 @@ import type { TourScalars, TourWithRelations } from '@/lib/types/tours';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import { artistCreditSelect } from '../_internal/artist-public-select';
+import { publicArtistWhere } from '../_internal/artist-where';
 import { runQuery } from '../_internal/map-prisma-error';
+import {
+  publicHeadlinerWhere,
+  visibleTourDateWhere,
+  visibleTourWhere,
+} from '../_internal/tour-where';
 
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -54,8 +60,8 @@ const tourInclude = {
     include: {
       venue: true,
       headliners: {
-        // Public payload: headliners carry public scalars only (#765), and no
-        // bio, since a headliner is not gated on publication.
+        // Headliners carry public scalars only (#765) and no bio, whoever
+        // reads them.
         include: {
           artist: { select: artistCreditSelect },
         },
@@ -63,6 +69,23 @@ const tourInclude = {
       },
     },
     orderBy: { startDate: 'asc' as const },
+  },
+} satisfies Prisma.TourInclude;
+
+/**
+ * The include for public reads: the same shape, returning only the dates the
+ * public may see and naming only the headliners that are public artists
+ * (ADR-0015). Admin reads keep {@link tourInclude}.
+ */
+const publicTourInclude = {
+  ...tourInclude,
+  tourDates: {
+    ...tourInclude.tourDates,
+    where: visibleTourDateWhere,
+    include: {
+      ...tourInclude.tourDates.include,
+      headliners: { ...tourInclude.tourDates.include.headliners, where: publicHeadlinerWhere },
+    },
   },
 } satisfies Prisma.TourInclude;
 
@@ -129,6 +152,65 @@ const buildSearchWhere = (search?: string): Prisma.TourWhereInput | undefined =>
 };
 
 /**
+ * The public variant of the tour search (ADR-0015). Venue and headliner
+ * matches count only on dates the public may see, and headliner names match
+ * on public artists only, so a search cannot confirm that a hidden artist
+ * exists. As in {@link buildSearchWhere}, both matches share a single
+ * `tourDates: { some }`.
+ */
+const buildPublicSearchWhere = (search: string): Prisma.TourWhereInput => {
+  const contains = { contains: search, mode: 'insensitive' as const };
+
+  return {
+    OR: [
+      { title: contains },
+      { subtitle: contains },
+      { subtitle2: contains },
+      { description: contains },
+      {
+        tourDates: {
+          some: {
+            AND: [
+              visibleTourDateWhere,
+              {
+                OR: [
+                  { venue: { OR: [{ name: contains }, { city: contains }, { state: contains }] } },
+                  {
+                    headliners: {
+                      some: {
+                        artist: {
+                          is: {
+                            AND: [
+                              publicArtistWhere,
+                              {
+                                OR: [
+                                  { firstName: contains },
+                                  { surname: contains },
+                                  { displayName: contains },
+                                ],
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+};
+
+/** The public listing `where`: tours the public may see, narrowed by an optional search. */
+const buildPublicWhere = (search?: string): Prisma.TourWhereInput => ({
+  AND: [visibleTourWhere, ...(search ? [buildPublicSearchWhere(search)] : [])],
+});
+
+/**
  * Repository for Tour data access operations. The only layer that touches Prisma
  * for tours: it owns the query shapes (include/search DSL), wraps every call in
  * `runQuery` so callers see vendor-neutral `DataError`s, and returns
@@ -138,6 +220,7 @@ export class TourRepository {
   /**
    * Find all tours with optional filtering, search, and pagination.
    * Returns tours with tourDates (including venues and headliners) and images.
+   * Unfiltered: for admin reads. The public reads {@link findAllPublic}.
    *
    * Pagination accepts either `skip`/`take` (preferred, drives infinite scroll)
    * or legacy `page`/`limit`.
@@ -168,7 +251,44 @@ export class TourRepository {
   }
 
   /**
-   * Find a single tour by ID with all relations.
+   * Find a page of tours for the public: only tours, dates and headliners the
+   * public may see (ADR-0015). Filtered in the database, so a hidden tour
+   * never shortens a page. Pagination is skip/take.
+   */
+  static async findAllPublic(
+    params: Pick<TourQueryParams, 'search' | 'skip' | 'take'> = {}
+  ): Promise<TourWithRelations[]> {
+    const { search, skip, take } = params;
+    return runQuery(() =>
+      prisma.tour.findMany({
+        where: buildPublicWhere(search),
+        orderBy: { createdAt: 'desc' },
+        include: publicTourInclude,
+        ...(skip !== undefined && { skip }),
+        ...(take !== undefined && { take }),
+      })
+    ) as Promise<TourWithRelations[]>;
+  }
+
+  /**
+   * Find a single tour by id for the public. Reads as absent when every date
+   * of the tour is hidden.
+   */
+  static async findPublicById(id: string): Promise<TourWithRelations | null> {
+    if (!OBJECT_ID_REGEX.test(id)) {
+      return null;
+    }
+
+    return runQuery(() =>
+      prisma.tour.findFirst({
+        where: { id, ...visibleTourWhere },
+        include: publicTourInclude,
+      })
+    );
+  }
+
+  /**
+   * Find a single tour by ID with all relations. Unfiltered: for admin reads.
    */
   static async findById(id: string): Promise<TourWithRelations | null> {
     if (!OBJECT_ID_REGEX.test(id)) {
