@@ -5,9 +5,9 @@ import { render, screen } from '@testing-library/react';
 
 import RootLayout, { dynamic, metadata, viewport } from './layout';
 
-// Mock next/font/google
-vi.mock('next/font/google', () => ({
-  Jost: () => ({
+// Mock next/font/local
+vi.mock('next/font/local', () => ({
+  default: () => ({
     variable: '--font-jost',
     className: 'font-jost',
   }),

@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Jost } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import { Toaster } from '@/components/ui/sonner';
 
@@ -17,21 +17,28 @@ import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 
-// Jost is the body font. We disable next/font's auto-preload because the
-// loader emits a `<link rel=preload>` for every weight/style combination
-// declared below — four files — while first paint consumes only one or two
-// (400 normal, plus 400 italic now that the featured player server-renders
-// its NowPlayingHeading). Preloading all four would compete with the LCP
-// image fetch for early bandwidth; with `inlineCss` the `@font-face` rules
-// arrive with the HTML anyway, so discovery is already immediate.
+// Jost is the body font, loaded from the two variable-weight files in
+// `./fonts` (latin subset, SIL OFL — see `fonts/Jost-LICENSE.txt`) rather than
+// through `next/font/google`. The Google loader downloads the font while the
+// app builds, so a failed download fails the build; with the files in the
+// repo a build needs no network. They are still emitted to
+// `_next/static/media` and served from the CDN like every other asset.
+//
+// We disable next/font's auto-preload because the loader would emit a
+// `<link rel=preload>` for both files while first paint is mostly upright
+// text (the italic is used only by the featured player's NowPlayingHeading).
+// Preloading both would compete with the LCP image fetch for early
+// bandwidth; with `inlineCss` the `@font-face` rules arrive with the HTML
+// anyway, so discovery is already immediate.
 // `display: 'swap'` lets the page render with the fallback first and swap
 // to Jost when the font is fetched, and `next/font`'s automatic
-// `adjustFontFallback` (size-adjust descriptors on the fallback) prevents
-// the swap from causing layout shift.
-const jost = Jost({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
+// `adjustFontFallback` (size-adjust descriptors on an Arial fallback)
+// prevents the swap from causing layout shift.
+const jost = localFont({
+  src: [
+    { path: './fonts/jost-latin-wght-normal.woff2', weight: '100 900', style: 'normal' },
+    { path: './fonts/jost-latin-wght-italic.woff2', weight: '100 900', style: 'italic' },
+  ],
   variable: '--font-jost',
   display: 'swap',
   preload: false,
