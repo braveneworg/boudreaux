@@ -14,7 +14,7 @@ import type {
 
 import { digitalFormatWithFilesSchema } from './digital-format-schema';
 import {
-  artistPublicScalarSchema,
+  artistCreditScalarSchema,
   artistScalarSchema,
   date,
   formatSchema,
@@ -49,7 +49,8 @@ export const releaseSchema = releaseScalarSchema.extend({
 
 /**
  * {@link releaseSchema} as the public artist-detail page carries it: every
- * credited artist narrowed to its public scalars (#765).
+ * credited artist narrowed to its public scalars (#765) without its bio, since
+ * a credited artist is not gated on publication.
  */
 export const publicArtistReleaseSchema = releaseSchema.extend({
   artistReleases: z.array(
@@ -57,7 +58,7 @@ export const publicArtistReleaseSchema = releaseSchema.extend({
       id: z.string(),
       artistId: z.string(),
       releaseId: z.string(),
-      artist: artistPublicScalarSchema,
+      artist: artistCreditScalarSchema,
     })
   ),
 }) satisfies z.ZodType<PublicArtistRelease>;

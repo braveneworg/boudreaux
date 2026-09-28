@@ -1,11 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { artistSchema, artistWithPublishedReleasesSchema } from './artist-schema';
 import {
   artist,
+  artistBioValues,
   artistPrivateValues,
   artistPublicScalar,
   artistScalar,
@@ -166,5 +167,46 @@ describe('artistWithPublishedReleasesSchema — public projection (#765)', () =>
     ];
 
     expect(artists.filter((entry) => field in entry)).toEqual([]);
+  });
+});
+
+// Nothing gates a nested artist on publication, so a draft artist credited on
+// a published artist's release (or in its band) must not carry its bio.
+describe('artistWithPublishedReleasesSchema — nested artists carry no bio', () => {
+  const bioArtist = { ...artistScalar, ...artistBioValues };
+  const payload = {
+    ...artistWithPublishedReleases,
+    ...artistBioValues,
+    members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...bioArtist, id: 'a2' } }],
+    releases: [
+      {
+        id: 'ar1',
+        artistId: 'a1',
+        releaseId: 'r1',
+        credit: 'primary' as const,
+        release: {
+          ...release,
+          artistReleases: [
+            { id: 'ar2', artistId: 'a3', releaseId: 'r1', artist: { ...bioArtist, id: 'a3' } },
+          ],
+        },
+      },
+    ],
+  };
+
+  it.each(ARTIST_BIO_FIELDS)('strips %s from every nested artist', (field) => {
+    const parsed = artistWithPublishedReleasesSchema.parse(payload);
+    const nested = [
+      ...parsed.members.map(({ member }) => member),
+      ...parsed.releases.flatMap(({ release: row }) => row.artistReleases.map((ar) => ar.artist)),
+    ];
+
+    expect(nested.filter((entry) => field in entry)).toEqual([]);
+  });
+
+  it('keeps the bio of the page artist itself', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(payload);
+
+    expect(parsed.bio).toBe(artistBioValues.bio);
   });
 });

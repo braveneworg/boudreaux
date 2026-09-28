@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
-import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { TourDateRepository } from './tour-date-repository';
 
@@ -98,6 +98,28 @@ describe('TourDateRepository', () => {
       expect(headlinerArtistSelect(vi.mocked(prisma.tourDate.findUnique).mock.calls[0][0])).toEqual(
         expect.objectContaining({ id: true, slug: true, displayName: true })
       );
+    });
+
+    // Nothing gates a headliner on publication, so a draft headliner's bio
+    // must never ride along on the public tour payload.
+    it.each(ARTIST_BIO_FIELDS)('findByTourId never selects the bio field %s', async (field) => {
+      vi.mocked(prisma.tourDate.findMany).mockResolvedValueOnce([] as never);
+
+      await TourDateRepository.findByTourId(validObjectId2);
+
+      expect(
+        headlinerArtistSelect(vi.mocked(prisma.tourDate.findMany).mock.calls[0][0])
+      ).not.toHaveProperty(field);
+    });
+
+    it.each(ARTIST_BIO_FIELDS)('findById never selects the bio field %s', async (field) => {
+      vi.mocked(prisma.tourDate.findUnique).mockResolvedValueOnce(null);
+
+      await TourDateRepository.findById(validObjectId);
+
+      expect(
+        headlinerArtistSelect(vi.mocked(prisma.tourDate.findUnique).mock.calls[0][0])
+      ).not.toHaveProperty(field);
     });
   });
 

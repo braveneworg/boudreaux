@@ -33,3 +33,13 @@ Rules:
   cleanly. Splitting one file's changes across two commits is easiest by
   checking the file out at the earlier commit, re-applying the first change,
   committing, then restoring the finished version from a scratchpad copy.
+
+It happened again without `--amend` on 2026-09-27. One Bash call ran two
+commits in a row (`git add a && git commit …; echo; git add b && git
+commit …`). The first failed commitlint at 52 characters, leaving its
+files staged. The second, a docs commit, then swept them in, so a
+refactor shipped under a `docs(lessons)` header. The only signal was
+`exit 1` from the first commit, printed above a successful second one.
+Any second commit in the same command is the same trap, not just
+`--amend`. Run each commit as its own command and read its result
+before the next `git add`.

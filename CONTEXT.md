@@ -61,7 +61,11 @@ _In_ `src/lib/decorators/`.
 ## Domain nouns
 
 **Artist** — a person or act. Carries a generated **bio** (long, short, and alt
-variants), **bio images**, and reference links.
+variants), **bio images**, and reference links. A bio has no release state of
+its own: it is public only while its Artist is published and not deleted, and
+never on an Artist reached through another record (a release credit, a band
+member or band, a tour headliner), because those are not gated on
+publication.
 
 **bio image** — one image in an Artist's pool: discovered by a bio generation
 job or uploaded by an admin, always re-hosted on our CDN with its license and
