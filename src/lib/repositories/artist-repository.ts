@@ -29,6 +29,13 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
+import {
+  alumniArtistWhere,
+  currentArtistWhere,
+  currentOrAlumniWhere,
+  listedReleaseWhere,
+  notDeletedOr,
+} from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
@@ -360,9 +367,6 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
   return and.length > 0 ? { AND: and } : {};
 };
 
-/** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
-const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
-
 /** A row of the vocabulary source read — only ever the one selected column. */
 type VocabularyRow = { genres?: string | null; tags?: string | null };
 
@@ -394,39 +398,12 @@ const readVocabularyColumn = (
   }
 };
 
-/** A release that the public may see: published and not soft-deleted. */
-const listedReleaseWhere = {
-  publishedAt: { not: null },
-  OR: [...notDeletedOr],
-} as const satisfies Prisma.ReleaseWhereInput;
-
-/** A current artist: still on the label (`isActive`, which defaults to true). */
-const currentArtistWhere = { isActive: true } as const satisfies Prisma.ArtistWhereInput;
-
-/**
- * An alumnus: deactivated AND carrying a recorded departure date
- * (`deactivatedAt` — "left the label"). An inactive artist with no departure
- * date was hidden for some other reason and stays hidden everywhere public.
- * `{ not: null }` excludes an unset field as well as an explicit null, the
- * same guard the `publishedOn` gate relies on. `reactivatedAt` plays no part:
- * re-signing sets `isActive` back to true, which makes the artist current.
- */
-const alumniArtistWhere = {
-  isActive: false,
-  deactivatedAt: { not: null },
-} as const satisfies Prisma.ArtistWhereInput;
-
-/** Either a current artist or an alumnus — everyone the public may see. */
-const currentOrAlumniWhere = {
-  OR: [currentArtistWhere, alumniArtistWhere],
-} as const satisfies Prisma.ArtistWhereInput;
-
 /**
  * The gate every public artist read by slug applies (#786): current or
  * alumni, published, and not soft-deleted. `publishedOn: { not: null }`
- * excludes an absent field as well as an explicit null, as the `alumni`
- * `deactivatedAt` guard above notes; the in-memory twin for junction-joined
- * artists is `isVisibleArtist`.
+ * excludes an absent field as well as an explicit null, as
+ * `alumniArtistWhere` notes for `deactivatedAt`; the in-memory twin for
+ * junction-joined artists is `isVisibleArtist`.
  */
 const publicArtistWhere = {
   AND: [currentOrAlumniWhere],
@@ -764,24 +741,31 @@ export class ArtistRepository {
     );
   }
 
-  /** Find an artist by slug returning the name projection (find-or-create flow). */
+  /**
+   * Find the non-deleted artist that owns a slug, returning the name
+   * projection (find-or-create flow). A soft-deleted owner is not a match: a
+   * name lookup must never hand back an artist that stays hidden (ADR-0015).
+   */
   static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
     return runQuery(() =>
-      prisma.artist.findUnique({ where: { slug }, select: nameSelect })
+      prisma.artist.findFirst({ where: { slug, OR: [...notDeletedOr] }, select: nameSelect })
     ) as Promise<ArtistNameRecord | null>;
   }
 
-  /** Case-insensitive displayName lookup returning the name projection. */
+  /** Case-insensitive displayName lookup over non-deleted artists (name projection). */
   static async findFirstByDisplayName(displayName: string): Promise<ArtistNameRecord | null> {
     return runQuery(() =>
       prisma.artist.findFirst({
-        where: { displayName: { equals: displayName, mode: 'insensitive' } },
+        where: {
+          displayName: { equals: displayName, mode: 'insensitive' },
+          OR: [...notDeletedOr],
+        },
         select: nameSelect,
       })
     ) as Promise<ArtistNameRecord | null>;
   }
 
-  /** Case-insensitive firstName + surname lookup returning the name projection. */
+  /** Case-insensitive firstName + surname lookup over non-deleted artists (name projection). */
   static async findFirstByName(
     firstName: string,
     surname: string
@@ -793,6 +777,7 @@ export class ArtistRepository {
             { firstName: { equals: firstName, mode: 'insensitive' } },
             { surname: { equals: surname, mode: 'insensitive' } },
           ],
+          OR: [...notDeletedOr],
         },
         select: nameSelect,
       })

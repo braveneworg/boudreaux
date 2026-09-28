@@ -122,7 +122,34 @@ featured) on at least one published Release. A member credit alone does not
 list an Artist. The index shows **current artists** by default and
 **alumni** on request. See
 [ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md).
-_Avoid_: visible artist, public artist.
+_Avoid_: visible artist.
+
+**public artist** — an Artist the public may learn of: published, a **current
+artist** or one of the **alumni**, and not deleted. Nothing that identifies an
+Artist — name, aka names, slug, image — appears on a public surface unless the
+Artist is public. "Published" alone means only that a publication date is
+recorded; a published Artist that is deleted or off the roster is still
+hidden. Every **listed artist** is a public artist; a public artist with no
+direct credit is not listed. See
+[ADR-0015](docs/adr/0015-a-release-publishes-its-credited-artists-only-by-confirmation.md).
+_Avoid_: visible artist, published artist (as a synonym).
+
+**hidden artist** — any Artist that is not a **public artist**. Hiding an
+Artist never hides the work that credits it: a Release stays public without
+that byline.
+_Avoid_: unpublished artist (one of three ways to be hidden), draft artist.
+
+**credit awaiting confirmation** — a **hidden artist** credited on a Release
+who would become public by being published: never published, on the roster,
+not deleted. Publishing the Release publishes such an Artist only when an
+admin confirmed that Artist, having been shown what goes live with it. See
+[ADR-0015](docs/adr/0015-a-release-publishes-its-credited-artists-only-by-confirmation.md).
+_Avoid_: pending artist, unconfirmed artist.
+
+**credit that stays hidden** — a **hidden artist** credited on a Release whom
+publishing cannot make public: deleted, or inactive with no departure date.
+Reported to the admin with the reason; never blocks a publish and is never
+changed by one.
 
 **current artist** — an Artist still on the label: `isActive` is true.
 

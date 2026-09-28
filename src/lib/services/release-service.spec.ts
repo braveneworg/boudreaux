@@ -6,6 +6,7 @@ import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { DataError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData, UpdateReleaseData } from '@/lib/types/domain/release';
 import type { Format } from '@/lib/types/media-models';
+import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { cache } from '@/lib/utils/simple-cache';
 
 import { ReleaseService } from './release-service';
@@ -65,6 +66,11 @@ vi.mock('@/lib/repositories/download-event-repository', () => ({
   DownloadEventRepository: class {
     deleteAllByReleaseId = vi.fn().mockResolvedValue(0);
   },
+}));
+
+vi.mock('@/lib/utils/public-name-caches', () => ({
+  PUBLISHED_RELEASES_CACHE_PREFIX: 'published-releases:',
+  invalidatePublicNameCaches: vi.fn(),
 }));
 
 vi.mock('../utils/simple-cache', () => ({
@@ -636,6 +642,24 @@ describe('ReleaseService', () => {
       expect(ReleaseRepository.update).toHaveBeenCalledWith('release-123', {
         publishedAt: expect.any(Date),
       });
+    });
+
+    it('clears the public name caches once published', async () => {
+      vi.mocked(ReleaseRepository.update).mockResolvedValueOnce(mockRelease as never);
+
+      await ReleaseService.publishRelease('release-123');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
+    });
+
+    it('leaves the public name caches alone when the publish fails', async () => {
+      vi.mocked(ReleaseRepository.update).mockRejectedValueOnce(
+        new DataError('NOT_FOUND', 'Record not found')
+      );
+
+      await ReleaseService.publishRelease('non-existent');
+
+      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([]);
     });
 
     it('should return error when release not found', async () => {

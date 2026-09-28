@@ -10,6 +10,7 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
+import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
@@ -33,7 +34,7 @@ export class FeaturedArtistsService {
     limit = 10
   ): Promise<ServiceResponse<FeaturedArtist[]>> {
     // Create a cache key based on date and limit
-    const cacheKey = `featured-artists:${currentDate.toISOString().split('T')[0]}:${limit}`;
+    const cacheKey = `${FEATURED_ARTISTS_CACHE_PREFIX}${currentDate.toISOString().split('T')[0]}:${limit}`;
 
     return withCache(
       cacheKey,

@@ -4,17 +4,18 @@ Utility scripts for managing data, infrastructure, and deployment for the Fake F
 
 ## Quick Reference
 
-| Script                               | pnpm command                                                  | Description                                                |
-| ------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------- |
-| `mongo-backup.ts`                    | `pnpm run mongo:dump` / `mongo:restore`                       | Backup and restore MongoDB databases                       |
-| `s3-backup.ts`                       | `pnpm run s3:backup` / `s3:restore` / `s3:list` / `s3:upload` | Backup and restore S3 bucket contents                      |
-| `s3-apply-cache-headers.ts`          | `pnpm run s3:cache-headers`                                   | Apply Cache-Control headers to existing S3 media files     |
-| `upload-images.ts`                   | `pnpm run images:upload`                                      | Upload images to S3 with content-type detection            |
-| `sync-cdn.ts`                        | `pnpm exec tsx scripts/sync-cdn.ts`                           | Sync Next.js static assets to S3 and invalidate CloudFront |
-| `check-coverage-regression.ts`       | `pnpm run test:coverage:check`                                | Compare test coverage against baseline thresholds          |
-| `fix-featured-artist-connections.ts` | `pnpm exec tsx scripts/fix-featured-artist-connections.ts`    | Backfill Artist-to-FeaturedArtist connections              |
-| `create-stardust-svg.ts`             | `pnpm exec tsx scripts/create-stardust-svg.ts`                | Generate parameterized stardust texture SVGs               |
-| `generate-stardust-svg.tsx`          | `pnpm exec tsx scripts/generate-stardust-svg.tsx`             | Generate stardust SVGs (TSX variant)                       |
+| Script                                 | pnpm command                                                  | Description                                                |
+| -------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `mongo-backup.ts`                      | `pnpm run mongo:dump` / `mongo:restore`                       | Backup and restore MongoDB databases                       |
+| `s3-backup.ts`                         | `pnpm run s3:backup` / `s3:restore` / `s3:list` / `s3:upload` | Backup and restore S3 bucket contents                      |
+| `s3-apply-cache-headers.ts`            | `pnpm run s3:cache-headers`                                   | Apply Cache-Control headers to existing S3 media files     |
+| `upload-images.ts`                     | `pnpm run images:upload`                                      | Upload images to S3 with content-type detection            |
+| `sync-cdn.ts`                          | `pnpm exec tsx scripts/sync-cdn.ts`                           | Sync Next.js static assets to S3 and invalidate CloudFront |
+| `check-coverage-regression.ts`         | `pnpm run test:coverage:check`                                | Compare test coverage against baseline thresholds          |
+| `fix-featured-artist-connections.ts`   | `pnpm exec tsx scripts/fix-featured-artist-connections.ts`    | Backfill Artist-to-FeaturedArtist connections              |
+| `backfill-publish-credited-artists.ts` | `pnpm exec tsx scripts/backfill-publish-credited-artists.ts`  | Publish reviewed credited artists of published releases    |
+| `create-stardust-svg.ts`               | `pnpm exec tsx scripts/create-stardust-svg.ts`                | Generate parameterized stardust texture SVGs               |
+| `generate-stardust-svg.tsx`            | `pnpm exec tsx scripts/generate-stardust-svg.tsx`             | Generate stardust SVGs (TSX variant)                       |
 
 ### Shell Scripts
 
@@ -351,6 +352,36 @@ pnpm exec tsx scripts/fix-featured-artist-connections.ts --dry-run
 # Apply
 pnpm exec tsx scripts/fix-featured-artist-connections.ts
 ```
+
+### Publish Credited Artists
+
+**File:** `backfill-publish-credited-artists.ts`
+
+One-time backfill for [ADR-0015](../docs/adr/0015-a-release-publishes-its-credited-artists-only-by-confirmation.md). It publishes the credited artists of releases that were published before credits had to be confirmed. Only artists a human reviewed are published.
+
+```bash
+# 1. Dry run (default): writes the candidates file, writes nothing to the database
+DATABASE_URL='<target>' pnpm exec tsx scripts/backfill-publish-credited-artists.ts --out /tmp/candidates.tsv
+
+# 2. Review the file: delete the line of every artist that must stay hidden
+
+# 3. Publish only the ids left in the file
+DATABASE_URL='<target>' pnpm exec tsx scripts/backfill-publish-credited-artists.ts \
+  --execute --ids-file /tmp/candidates.tsv --published-by <userId>
+```
+
+| Option                    | Description                                                             |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `--out <path>`            | Where the dry run writes the candidates file (default: the OS temp dir) |
+| `--execute`               | Publish. Requires `--ids-file` and `--published-by`                     |
+| `--ids-file <path>`       | The reviewed candidates file                                            |
+| `--published-by <userId>` | The admin recorded in `publishedBy`                                     |
+
+- Each line shows what goes live with the artist: bio state, display image count, and the releases that credit it.
+- The dry run also reports credits that stay hidden whatever is published (soft-deleted, or inactive with no departure date). They are never modified.
+- If any id in the file is not an unpublished credit on a published release, the whole run is refused and nothing is written. This includes ids a previous run already published, so remove those lines before running the file again.
+- An artist left unpublished keeps its releases public without that byline.
+- The web server caches the public listings per process for ten minutes. A script cannot clear that cache, so bylines appear once it expires.
 
 ---
 
