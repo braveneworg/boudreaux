@@ -192,6 +192,9 @@ export const DataView = <T extends Record<string, unknown>>({
     async (verb: MutationVerb, item: T, mutation: EntityMutation) => {
       try {
         const response = await mutation(item.id as string);
+        if (response.cancelled) {
+          return;
+        }
         if (response.success) {
           toast.success(
             `Successfully ${toPastTense(verb)} ${entityDisplayLabel} - ${resolveDisplayName(item)}`

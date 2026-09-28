@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { ReleaseForm } from '@/app/components/forms/release-form';
 import { useReleaseDetailQuery } from '@/hooks/queries/use-release-query';
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
+import { updateReleaseAction } from '@/lib/actions/update-release-action';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -33,10 +34,23 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/releases/new',
 }));
 
+const creditDecisions = vi.hoisted(() => ({
+  requestDecisions: vi.fn(),
+  confirmation: null,
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@/hooks/use-credit-decisions', () => ({
+  useCreditDecisions: () => creditDecisions,
+}));
+
+// A real ObjectId: the form stamps `createdBy` from the session and validates it.
+const sessionUser = vi.hoisted(() => ({ id: 'b'.repeat(24) }));
+
 // Mock the client session hook
 vi.mock('@/hooks/use-session', () => ({
   useSession: () => ({
-    data: { user: { id: 'user-1', name: 'Admin', role: 'admin' } },
+    data: { user: { id: sessionUser.id, name: 'Admin', role: 'admin' } },
     status: 'authenticated',
   }),
 }));
@@ -262,6 +276,115 @@ describe('ReleaseForm — edit mode', () => {
     await waitFor(() => {
       expect(input).toHaveValue('7.99');
     });
+  });
+});
+
+describe('ReleaseForm — publishing (ADR-0015)', () => {
+  const useReleaseDetailQueryMock = vi.mocked(useReleaseDetailQuery);
+  const artistId = 'a'.repeat(24);
+  const decisions = { publishArtistIds: [artistId], keepHiddenArtistIds: [] };
+
+  const unpublishedRelease = {
+    id: 'rel-1',
+    title: 'My Release',
+    labels: ['Label A'],
+    releasedOn: new Date('2024-01-01T00:00:00.000Z'),
+    catalogNumber: 'CAT-1',
+    coverArt: 'https://cdn.example.com/cover.jpg',
+    description: null,
+    downloadUrls: [],
+    formats: ['DIGITAL'],
+    extendedData: [],
+    notes: [],
+    executiveProducedBy: [],
+    coProducedBy: [],
+    masteredBy: [],
+    mixedBy: [],
+    recordedBy: [],
+    artBy: [],
+    designBy: [],
+    photographyBy: [],
+    linerNotesBy: [],
+    imageTypes: [],
+    variants: [],
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+    deletedOn: null,
+    publishedAt: null,
+    featuredOn: null,
+    featuredUntil: null,
+    featuredDescription: null,
+    tagId: null,
+    suggestedPrice: null,
+    images: [],
+    artistReleases: [{ id: 'ar-1', artistId, releaseId: 'rel-1' }],
+    digitalFormats: [],
+    releaseUrls: [],
+  };
+
+  const clickPublish = async (): Promise<void> => {
+    render(<ReleaseForm releaseId="rel-1" />);
+    const user = userEvent.setup({ delay: null });
+    await user.click(await screen.findByRole('button', { name: 'Publish' }));
+  };
+
+  beforeEach(() => {
+    useReleaseDetailQueryMock.mockReturnValue({
+      data: unpublishedRelease as never,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    creditDecisions.requestDecisions.mockResolvedValue(decisions);
+    vi.mocked(updateReleaseAction).mockResolvedValue({ fields: {}, success: true });
+  });
+
+  afterEach(() => {
+    useReleaseDetailQueryMock.mockReturnValue({
+      data: null,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    creditDecisions.requestDecisions.mockReset();
+    vi.mocked(updateReleaseAction).mockReset();
+  });
+
+  it('asks about the artists the form credits before it publishes', async () => {
+    await clickPublish();
+
+    await waitFor(() =>
+      expect(creditDecisions.requestDecisions.mock.calls).toEqual([[{ artistIds: [artistId] }]])
+    );
+  });
+
+  it("sends the admin's decisions with the save", async () => {
+    await clickPublish();
+
+    await waitFor(() => expect(updateReleaseAction).toHaveBeenCalled());
+    expect(vi.mocked(updateReleaseAction).mock.calls[0][2].get('creditDecisions')).toBe(
+      JSON.stringify(decisions)
+    );
+  });
+
+  it('saves nothing when the admin cancels', async () => {
+    creditDecisions.requestDecisions.mockResolvedValue(null);
+
+    await clickPublish();
+    await waitFor(() => expect(creditDecisions.requestDecisions).toHaveBeenCalled());
+
+    expect(vi.mocked(updateReleaseAction).mock.calls).toEqual([]);
+  });
+
+  it('leaves the release unpublished in the form when the admin cancels', async () => {
+    creditDecisions.requestDecisions.mockResolvedValue(null);
+
+    await clickPublish();
+    await waitFor(() => expect(creditDecisions.requestDecisions).toHaveBeenCalled());
+
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
   });
 });
 

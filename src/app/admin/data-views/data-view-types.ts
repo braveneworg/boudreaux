@@ -7,6 +7,11 @@ import type { AdminEntity } from '@/app/admin/types';
 export interface EntityMutationResult {
   success: boolean;
   error?: string;
+  /**
+   * The admin backed out before anything was written. Not a success and not a
+   * failure: the DataView shows no toast and leaves the list as it is.
+   */
+  cancelled?: boolean;
 }
 
 /**

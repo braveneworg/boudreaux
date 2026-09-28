@@ -11,8 +11,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { CreditConfirmationDialog } from '@/app/components/credit-confirmation-dialog';
 import { useAlbumArtistName } from '@/app/components/forms/_hooks/use-album-artist-name';
 import { useEntitySubmit } from '@/app/components/forms/_hooks/use-entity-submit';
+import { useReleaseCreditGate } from '@/app/components/forms/_hooks/use-release-credit-gate';
 import type {
   ExistingFormat,
   ExtractedAudioMetadata,
@@ -364,15 +366,24 @@ export const ReleaseForm = ({
     [releaseForm]
   );
 
+  const clearPublishedAt = useCallback(
+    (): void => releaseForm.setValue('publishedAt', '', { shouldDirty: true }),
+    [releaseForm]
+  );
+  // A publishing save waits for the admin to decide each credited artist.
+  const creditGate = useReleaseCreditGate({ isPublished, clearPublishedAt });
+  const { getDecisions } = creditGate;
+
   const createRelease = useCallback(
     (values: ReleaseFormData): Promise<FormState> =>
-      createReleaseAsync({ ...values, preGeneratedId }),
-    [createReleaseAsync, preGeneratedId]
+      createReleaseAsync({ ...values, preGeneratedId, creditDecisions: getDecisions() }),
+    [createReleaseAsync, preGeneratedId, getDecisions]
   );
 
   const updateRelease = useCallback(
-    (id: string, values: ReleaseFormData): Promise<FormState> => updateReleaseAsync({ id, values }),
-    [updateReleaseAsync]
+    (id: string, values: ReleaseFormData): Promise<FormState> =>
+      updateReleaseAsync({ id, values, creditDecisions: getDecisions() }),
+    [updateReleaseAsync, getDecisions]
   );
 
   /**
@@ -438,11 +449,15 @@ export const ReleaseForm = ({
     onSuccess: onReleaseSubmitSuccess,
   });
 
+  const resolveCredits = creditGate.resolve;
   const onSubmitReleaseForm = useCallback(
     async (data: ReleaseFormData): Promise<void> => {
+      if (!(await resolveCredits(data))) {
+        return;
+      }
       startTransition(() => submitRelease(formRef.current, releaseId, data));
     },
-    [submitRelease, releaseId]
+    [submitRelease, releaseId, resolveCredits]
   );
 
   const isSubmitting = computeIsSubmitting({
@@ -528,6 +543,7 @@ export const ReleaseForm = ({
         },
       ]}
     >
+      <CreditConfirmationDialog {...creditGate.dialog} />
       <Card className="w-full border-none px-0 pb-0 shadow-none">
         <ReleaseCardHeader isEditMode={isEditMode} />
         <Form {...releaseForm}>
