@@ -8,17 +8,10 @@ import type { ReactElement } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Expand } from 'lucide-react';
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from '@/app/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatTourDate } from '@/lib/utils/date-utils';
+
+import { LIGHTBOX_ZOOM_CLASS, LightboxTrigger, ResponsiveLightbox } from './responsive-lightbox';
 
 interface ReleaseCoverModalProps {
   /** Unique release identifier, used for the detail-page link */
@@ -39,10 +32,12 @@ const COVER_SIZES =
 
 /**
  * The clickable cover art for a release card. When cover art exists, the image
- * acts as a zoom trigger that opens a dialog showing an enlarged cover, the
- * release title/artist/date, and a link through to the full detail page. When
- * there is no cover art, a non-interactive styled placeholder is shown instead
- * (there is nothing to enlarge).
+ * acts as a zoom trigger that opens an enlarged cover, the release
+ * title/artist/date, and a link through to the full detail page — in a dialog
+ * on wide viewports, a drawer from the bottom on narrow ones. The cover zooms
+ * when a mouse moves onto it or the keyboard focuses it, never from CSS hover.
+ * When there is no cover art, a non-interactive styled placeholder is shown
+ * instead (there is nothing to enlarge).
  */
 export const ReleaseCoverModal = ({
   id,
@@ -69,62 +64,52 @@ export const ReleaseCoverModal = ({
   }
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Expand cover art for ${title}`}
-          className={cn(
-            'group relative block aspect-square w-full cursor-zoom-in overflow-hidden border-2 border-black bg-zinc-100',
-            'focus-visible:ring-primary focus-visible:ring-2 focus-visible:outline-none'
-          )}
+    <ResponsiveLightbox
+      trigger={
+        <LightboxTrigger
+          label={`Expand cover art for ${title}`}
+          className="aspect-square w-full bg-zinc-100"
         >
           <Image
             src={coverArt.src}
             alt={coverArt.alt}
             fill
             loading="lazy"
-            className="object-cover"
+            className={cn('object-cover', LIGHTBOX_ZOOM_CLASS)}
             sizes={COVER_SIZES}
           />
-          <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
-            <Expand
-              className="size-6 text-white opacity-0 transition-opacity group-hover:opacity-100"
-              aria-hidden
-            />
-          </span>
-        </button>
-      </DialogTrigger>
-
-      <DialogContent className="max-w-md sm:max-w-lg">
-        <DialogTitle className="font-fake-four-cutout text-2xl tracking-wide text-black uppercase">
-          {title}
-        </DialogTitle>
-        <DialogDescription className="text-zinc-600">
+        </LightboxTrigger>
+      }
+      title={title}
+      titleClassName="font-fake-four-cutout pr-8 text-2xl font-normal tracking-wide text-black uppercase"
+      description={
+        <>
           {artistName && <span className="block font-medium text-zinc-900">{artistName}</span>}
           <span className="block text-sm">Released {formatTourDate(releasedOn)}</span>
-        </DialogDescription>
+        </>
+      }
+      descriptionClassName="text-zinc-600"
+      dialogClassName="max-w-md sm:max-w-lg"
+    >
+      <div className="relative aspect-square w-full overflow-hidden border-2 border-black bg-zinc-100">
+        <Image
+          src={coverArt.src}
+          alt={coverArt.alt}
+          fill
+          className="object-cover"
+          sizes="(max-width: 640px) 100vw, 512px"
+        />
+      </div>
 
-        <div className="relative aspect-square w-full overflow-hidden border-2 border-black bg-zinc-100">
-          <Image
-            src={coverArt.src}
-            alt={coverArt.alt}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, 512px"
-          />
-        </div>
-
-        <Link
-          href={`/releases/${id}`}
-          className={cn(
-            'shadow-zine-ink inline-flex items-center justify-center border-2 border-black px-4 py-2',
-            'bg-zinc-900 text-sm font-medium text-white transition-colors hover:bg-zinc-700'
-          )}
-        >
-          View release details
-        </Link>
-      </DialogContent>
-    </Dialog>
+      <Link
+        href={`/releases/${id}`}
+        className={cn(
+          'shadow-zine-ink inline-flex items-center justify-center border-2 border-black px-4 py-2',
+          'bg-zinc-900 text-sm font-medium text-white transition-colors hover:bg-zinc-700'
+        )}
+      >
+        View release details
+      </Link>
+    </ResponsiveLightbox>
   );
 };
