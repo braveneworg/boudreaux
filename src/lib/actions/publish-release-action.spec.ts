@@ -18,6 +18,7 @@ vi.mock('@/lib/utils/auth/require-role');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const releaseId = '507f1f77bcf86cd799439011';
+const artistId = '507f1f77bcf86cd799439012';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -44,10 +45,46 @@ describe('publishReleaseAction', () => {
     expect(result).toEqual({ success: false, error: 'Invalid release ID' });
   });
 
-  it('publishes the release via the service', async () => {
+  it('publishes with no decisions when none are given', async () => {
     await publishReleaseAction(releaseId);
 
-    expect(ReleaseService.publishRelease).toHaveBeenCalledWith(releaseId);
+    expect(vi.mocked(ReleaseService.publishRelease).mock.calls).toEqual([
+      [
+        releaseId,
+        {
+          decisions: { publishArtistIds: [], keepHiddenArtistIds: [] },
+          publishedBy: 'user-123',
+        },
+      ],
+    ]);
+  });
+
+  it("passes the admin's decisions and id to the service", async () => {
+    const decisions = { publishArtistIds: [artistId], keepHiddenArtistIds: [] };
+
+    await publishReleaseAction(releaseId, decisions);
+
+    expect(vi.mocked(ReleaseService.publishRelease).mock.calls).toEqual([
+      [releaseId, { decisions, publishedBy: 'user-123' }],
+    ]);
+  });
+
+  it('rejects decisions that are not artist ids and publishes nothing', async () => {
+    const result = await publishReleaseAction(releaseId, {
+      publishArtistIds: ['mc-example'],
+      keepHiddenArtistIds: [],
+    });
+
+    expect({ result, calls: vi.mocked(ReleaseService.publishRelease).mock.calls }).toEqual({
+      result: { success: false, error: 'Invalid artist decisions' },
+      calls: [],
+    });
+  });
+
+  it('revalidates the artist pages, since artists may now be public', async () => {
+    await publishReleaseAction(releaseId);
+
+    expect(revalidatePath).toHaveBeenCalledWith('/artists');
   });
 
   it('returns success when the publish succeeds', async () => {

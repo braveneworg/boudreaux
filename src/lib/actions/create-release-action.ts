@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import type { Release } from '@/lib/types/domain/release';
@@ -17,6 +18,8 @@ import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
+import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
@@ -95,6 +98,66 @@ const createArtistReleaseAssociations = async (
   }
 };
 
+/**
+ * Put a credit-confirmation failure on the form. Its message names the artists
+ * that need a decision, so it is shown as written.
+ */
+const applyCreditFailure = (formState: FormState, message: string): void => {
+  formState.success = false;
+  formState.errors = { ...formState.errors, general: [message] };
+};
+
+interface ReleaseCreate {
+  data: ReleaseFormData;
+  preGeneratedId: string | undefined;
+  decisions: CreditDecisions;
+  adminUserId: string;
+}
+
+interface ReleaseCreateResult {
+  /** Absent when the decisions failed the check and nothing was written. */
+  response?: ServiceResponse<Release>;
+  /** Why the release is not published: an undecided credit, or a failed publish. */
+  creditFailure?: string;
+}
+
+/**
+ * Create the release, store its credits, then publish it when the form asked
+ * for that. A release is created unpublished and published once its credits
+ * are stored, so the decisions are checked before anything is written.
+ */
+const createAndPublish = async ({
+  data,
+  preGeneratedId,
+  decisions,
+  adminUserId,
+}: ReleaseCreate): Promise<ReleaseCreateResult> => {
+  const publishes = Boolean(data.publishedAt);
+  if (publishes) {
+    const checked = await CreditConfirmationService.check(
+      { artistIds: data.artistIds ?? [] },
+      decisions
+    );
+    if (!checked.success) {
+      return { creditFailure: checked.error };
+    }
+  }
+
+  const response = await ReleaseService.createRelease(
+    buildReleaseCreateInput(data, preGeneratedId)
+  );
+  await createArtistReleaseAssociations(response, data.artistIds);
+  if (!publishes || !response.success) {
+    return { response };
+  }
+
+  const published = await ReleaseService.publishRelease(response.data.id, {
+    decisions,
+    publishedBy: adminUserId,
+  });
+  return published.success ? { response } : { response, creditFailure: published.error };
+};
+
 export const createReleaseAction = async (
   _initialState: FormState,
   payload: FormData
@@ -124,12 +187,23 @@ export const createReleaseAction = async (
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
 
   if (parsed.success) {
-    try {
-      const response = await ReleaseService.createRelease(
-        buildReleaseCreateInput(parsed.data, preGeneratedId)
-      );
+    const credit = readCreditDecisions(payload);
+    if (!credit.ok) {
+      applyCreditFailure(formState, 'Invalid artist decisions');
+      return formState;
+    }
 
-      await createArtistReleaseAssociations(response, parsed.data.artistIds);
+    try {
+      const { response, creditFailure } = await createAndPublish({
+        data: parsed.data,
+        preGeneratedId,
+        decisions: credit.decisions,
+        adminUserId: session.user.id,
+      });
+      if (!response) {
+        applyCreditFailure(formState, creditFailure ?? 'Invalid artist decisions');
+        return formState;
+      }
 
       // Log release creation for security audit
       logSecurityEvent({
@@ -154,6 +228,11 @@ export const createReleaseAction = async (
         ReleaseService.invalidateCache();
         revalidatePath('/releases');
         revalidatePath('/artists/[slug]', 'page');
+      }
+
+      // The release is saved; only publishing it failed.
+      if (creditFailure) {
+        applyCreditFailure(formState, creditFailure);
       }
     } catch {
       formState.success = false;

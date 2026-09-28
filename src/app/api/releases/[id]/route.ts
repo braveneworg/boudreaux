@@ -17,6 +17,7 @@ import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
+import { creditDecisionsSchema } from '@/lib/validation/credit-decisions-schema';
 import { updateReleaseSchema } from '@/lib/validation/update-schemas';
 
 export const dynamic = 'force-dynamic';
@@ -90,10 +91,11 @@ export const GET = withRateLimit<{ id: string }>(
 
 /**
  * PATCH /api/releases/[id]
- * Partially update a release by ID
+ * Partially update a release by ID. `creditDecisions` in the body carries the
+ * admin's decisions for a publishing update; it is not release data.
  */
 export const PATCH = withAdmin(
-  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }, session) => {
     try {
       const { id } = await params;
       const body = await request.json();
@@ -103,9 +105,17 @@ export const PATCH = withAdmin(
         return validation.response;
       }
 
+      // The admin's decisions for credits awaiting confirmation (ADR-0015).
+      // A publishing update with an undecided credit fails in the service.
+      const decisions = creditDecisionsSchema.safeParse(body?.creditDecisions ?? {});
+      if (!decisions.success) {
+        return NextResponse.json({ error: 'Invalid artist decisions' }, { status: 400 });
+      }
+
       const result = await ReleaseService.updateRelease(
         id,
-        validation.data as unknown as UpdateReleaseData
+        validation.data as unknown as UpdateReleaseData,
+        { decisions: decisions.data, publishedBy: session.user.id }
       );
 
       if (!result.success) {

@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -28,6 +29,7 @@ vi.mock('../prisma', () => ({
 // Mock all dependencies
 vi.mock('next/cache');
 vi.mock('../services/release-service');
+vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
@@ -61,6 +63,172 @@ describe('updateReleaseAction', () => {
   beforeEach(() => {
     vi.mocked(requireRole).mockResolvedValue(mockSession as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
+  });
+
+  describe('Credit confirmation (ADR-0015)', () => {
+    const artistA = '507f1f77bcf86cd799439012';
+    const artistB = '507f1f77bcf86cd799439013';
+    const decisions = { publishArtistIds: [artistA], keepHiddenArtistIds: [artistB] };
+    const undecided = {
+      success: false as const,
+      code: 'VALIDATION' as const,
+      error: 'Choose to publish or keep hidden: Bea',
+    };
+
+    const payloadWith = (creditDecisions?: string): FormData => {
+      const payload = new FormData();
+      if (creditDecisions !== undefined) {
+        payload.append('creditDecisions', creditDecisions);
+      }
+      return payload;
+    };
+
+    const parsedWith = (data: Record<string, unknown>): void => {
+      vi.mocked(getActionState).mockReturnValueOnce({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            ...data,
+          },
+        },
+      } as never);
+    };
+
+    beforeEach(() => {
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+        success: true,
+        data: { id: mockReleaseId },
+      } as never);
+      vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValue({
+        success: true,
+        data: 1,
+      });
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.artistRelease.createMany).mockResolvedValue({ count: 2 });
+    });
+
+    afterEach(() => {
+      vi.mocked(ReleaseService.updateRelease).mockReset();
+      vi.mocked(CreditConfirmationService.publishConfirmed).mockReset();
+      vi.mocked(prisma.artistRelease.findMany).mockReset();
+      vi.mocked(prisma.artistRelease.createMany).mockReset();
+    });
+
+    it("hands the service the admin's decisions and the artists the form credits", async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await updateReleaseAction(
+        mockReleaseId,
+        initialFormState,
+        payloadWith(JSON.stringify(decisions))
+      );
+
+      expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]).toEqual({
+        decisions,
+        publishedBy: 'user-123',
+        creditArtistIds: [artistA, artistB],
+      });
+    });
+
+    it('publishes the confirmed artists after the credits are stored', async () => {
+      const order: string[] = [];
+      vi.mocked(prisma.artistRelease.createMany).mockImplementationOnce((async () => {
+        order.push('store credits');
+        return { count: 2 };
+      }) as never);
+      vi.mocked(CreditConfirmationService.publishConfirmed).mockImplementationOnce(async () => {
+        order.push('publish artists');
+        return { success: true, data: 1 };
+      });
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await updateReleaseAction(
+        mockReleaseId,
+        initialFormState,
+        payloadWith(JSON.stringify(decisions))
+      );
+
+      expect(order).toEqual(['store credits', 'publish artists']);
+    });
+
+    it('publishes the confirmed artists with the decisions and the admin id', async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      await updateReleaseAction(
+        mockReleaseId,
+        initialFormState,
+        payloadWith(JSON.stringify(decisions))
+      );
+
+      expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([
+        [{ releaseId: mockReleaseId, decisions, publishedBy: 'user-123' }],
+      ]);
+    });
+
+    it('publishes no artist for a release that stays unpublished', async () => {
+      parsedWith({ artistIds: [artistA] });
+
+      await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
+
+      expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([]);
+    });
+
+    it('shows which artists need a decision and stores no credit', async () => {
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce(undecided);
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
+
+      expect({
+        success: result.success,
+        errors: result.errors,
+        stored: vi.mocked(prisma.artistRelease.createMany).mock.calls,
+      }).toEqual({
+        success: false,
+        errors: { general: ['Choose to publish or keep hidden: Bea'] },
+        stored: [],
+      });
+    });
+
+    it('rejects malformed decisions before it writes', async () => {
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z' });
+
+      const result = await updateReleaseAction(
+        mockReleaseId,
+        initialFormState,
+        payloadWith('not json')
+      );
+
+      expect({
+        success: result.success,
+        errors: result.errors,
+        writes: vi.mocked(ReleaseService.updateRelease).mock.calls,
+      }).toEqual({
+        success: false,
+        errors: { general: ['Invalid artist decisions'] },
+        writes: [],
+      });
+    });
+
+    it('reports a failure to publish the confirmed artists', async () => {
+      vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValueOnce(undecided);
+      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
+
+      const result = await updateReleaseAction(
+        mockReleaseId,
+        initialFormState,
+        payloadWith(JSON.stringify(decisions))
+      );
+
+      expect({ success: result.success, errors: result.errors }).toEqual({
+        success: false,
+        errors: { general: ['Choose to publish or keep hidden: Bea'] },
+      });
+    });
   });
 
   describe('Authorization', () => {
@@ -276,30 +444,34 @@ describe('updateReleaseAction', () => {
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(mockReleaseId, {
-        title: 'Updated Album',
-        releasedOn: expect.any(Date),
-        coverArt: 'https://example.com/cover.jpg',
-        formats: ['DIGITAL', 'VINYL'],
-        labels: ['Label 1', 'Label 2'],
-        catalogNumber: 'CAT-001',
-        description: 'Updated description',
-        notes: ['Note 1', 'Note 2'],
-        executiveProducedBy: ['Producer A'],
-        coProducedBy: [],
-        masteredBy: ['Engineer B'],
-        mixedBy: [],
-        recordedBy: [],
-        artBy: [],
-        designBy: [],
-        photographyBy: [],
-        linerNotesBy: [],
-        publishedAt: expect.any(Date),
-        featuredOn: undefined,
-        featuredUntil: undefined,
-        featuredDescription: undefined,
-        suggestedPrice: null,
-      });
+      expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
+        mockReleaseId,
+        {
+          title: 'Updated Album',
+          releasedOn: expect.any(Date),
+          coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL', 'VINYL'],
+          labels: ['Label 1', 'Label 2'],
+          catalogNumber: 'CAT-001',
+          description: 'Updated description',
+          notes: ['Note 1', 'Note 2'],
+          executiveProducedBy: ['Producer A'],
+          coProducedBy: [],
+          masteredBy: ['Engineer B'],
+          mixedBy: [],
+          recordedBy: [],
+          artBy: [],
+          designBy: [],
+          photographyBy: [],
+          linerNotesBy: [],
+          publishedAt: expect.any(Date),
+          featuredOn: undefined,
+          featuredUntil: undefined,
+          featuredDescription: undefined,
+          suggestedPrice: null,
+        },
+        expect.anything()
+      );
 
       expect(result.success).toBe(true);
       expect(result.data?.releaseId).toBe(mockReleaseId);
@@ -387,7 +559,8 @@ describe('updateReleaseAction', () => {
         mockReleaseId,
         expect.objectContaining({
           notes: ['Recorded in Brooklyn, mixed in Los Angeles, mastered at home.'],
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -415,7 +588,8 @@ describe('updateReleaseAction', () => {
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
-        expect.objectContaining({ notes: ['First paragraph.', 'Second paragraph.'] })
+        expect.objectContaining({ notes: ['First paragraph.', 'Second paragraph.'] }),
+        expect.anything()
       );
     });
 
@@ -445,7 +619,8 @@ describe('updateReleaseAction', () => {
         mockReleaseId,
         expect.objectContaining({
           suggestedPrice: 999,
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -474,7 +649,8 @@ describe('updateReleaseAction', () => {
         mockReleaseId,
         expect.objectContaining({
           formats: ['DIGITAL'],
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -508,7 +684,8 @@ describe('updateReleaseAction', () => {
           executiveProducedBy: ['Producer A', 'Producer B'],
           coProducedBy: ['Co-Producer 1', 'Co-Producer 2'],
           masteredBy: ['Engineer 1', 'Engineer 2', 'Engineer 3'],
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -540,7 +717,8 @@ describe('updateReleaseAction', () => {
         expect.objectContaining({
           executiveProducedBy: [],
           masteredBy: [],
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -574,7 +752,8 @@ describe('updateReleaseAction', () => {
           featuredOn: expect.any(Date),
           featuredUntil: expect.any(Date),
           featuredDescription: 'Featured release of the month',
-        })
+        }),
+        expect.anything()
       );
     });
 

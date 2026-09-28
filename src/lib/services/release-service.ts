@@ -20,6 +20,7 @@ import type {
   ReleaseListItem,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
+import { NO_CREDIT_DECISIONS, type CreditDecisions } from '@/lib/utils/credit-confirmation';
 import {
   invalidatePublicNameCaches,
   PUBLISHED_RELEASES_CACHE_PREFIX,
@@ -29,6 +30,7 @@ import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 import { cache, withCache } from '@/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
+import { CreditConfirmationService, type CreditSource } from './credit-confirmation-service';
 
 import type { ServiceResponse } from './service.types';
 
@@ -39,6 +41,32 @@ import type { ServiceResponse } from './service.types';
  * (kept as a separate constant because this module is `server-only`).
  */
 const PUBLISHED_RELEASES_PAGE_SIZE = 24;
+
+/**
+ * An admin's decisions for the credits a publishing write touches (ADR-0015).
+ * Omitted, the write passes only when no credit awaits confirmation.
+ */
+export interface CreditConfirmationInput {
+  decisions: CreditDecisions;
+  /** The admin who made the decisions. */
+  publishedBy: string;
+  /**
+   * The artists the caller is about to credit, when the credits are not stored
+   * yet. The check then reads these instead of the stored credits, and the
+   * caller publishes the confirmed artists itself once it has stored them.
+   */
+  creditArtistIds?: string[];
+}
+
+const NO_CONFIRMATION: CreditConfirmationInput = {
+  decisions: NO_CREDIT_DECISIONS,
+  publishedBy: '',
+};
+
+const creditSourceOf = (
+  releaseId: string,
+  { creditArtistIds }: CreditConfirmationInput
+): CreditSource => (creditArtistIds ? { artistIds: creditArtistIds } : { releaseId });
 
 const digitalFormatRepository = new ReleaseDigitalFormatRepository();
 const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
@@ -74,11 +102,14 @@ const collectReleaseS3Keys = (release: ReleaseForDeletion): string[] => {
 
 export class ReleaseService {
   /**
-   * Create a new release
+   * Create a new release. A release is always created unpublished: its
+   * credits are stored after it, and publishing needs them checked first
+   * (ADR-0015). Publish with {@link ReleaseService.publishRelease}.
    */
   static async createRelease(data: CreateReleaseData): Promise<ServiceResponse<Release>> {
     try {
-      const release = await ReleaseRepository.create(data);
+      const { publishedAt: _publishedAt, ...unpublished } = data;
+      const release = await ReleaseRepository.create(unpublished);
       return { success: true, data: release };
     } catch (error) {
       return failFromError(error, {
@@ -134,10 +165,34 @@ export class ReleaseService {
    */
   static async updateRelease(
     id: string,
-    data: UpdateReleaseData
+    data: UpdateReleaseData,
+    confirmation: CreditConfirmationInput = NO_CONFIRMATION
   ): Promise<ServiceResponse<Release>> {
+    const publishes = Boolean(data.publishedAt);
+    if (publishes) {
+      const checked = await CreditConfirmationService.check(
+        creditSourceOf(id, confirmation),
+        confirmation.decisions
+      );
+      if (!checked.success) {
+        return checked;
+      }
+    }
+
     try {
       const release = await ReleaseRepository.update(id, data);
+
+      // With credits still to store, the caller publishes the artists after.
+      if (publishes && !confirmation.creditArtistIds) {
+        const confirmed = await CreditConfirmationService.publishConfirmed({
+          releaseId: id,
+          decisions: confirmation.decisions,
+          publishedBy: confirmation.publishedBy,
+        });
+        if (!confirmed.success) {
+          return confirmed;
+        }
+      }
 
       return { success: true, data: release };
     } catch (error) {
@@ -238,13 +293,36 @@ export class ReleaseService {
   }
 
   /**
-   * Publish a release by stamping `publishedAt` with the current time.
+   * Publish a release by stamping `publishedAt`, and publish the credited
+   * artists the admin chose to publish. Every credit awaiting confirmation
+   * needs a decision, or this fails with `VALIDATION` and writes nothing
+   * (ADR-0015).
    */
-  static async publishRelease(id: string): Promise<ServiceResponse<Release>> {
+  static async publishRelease(
+    id: string,
+    confirmation: CreditConfirmationInput = NO_CONFIRMATION
+  ): Promise<ServiceResponse<Release>> {
+    const checked = await CreditConfirmationService.check(
+      { releaseId: id },
+      confirmation.decisions
+    );
+    if (!checked.success) {
+      return checked;
+    }
+
     try {
       const release = await ReleaseRepository.update(id, { publishedAt: new Date() });
       // A newly listed release changes the public listings and their bylines.
       invalidatePublicNameCaches();
+
+      const confirmed = await CreditConfirmationService.publishConfirmed({
+        releaseId: id,
+        decisions: confirmation.decisions,
+        publishedBy: confirmation.publishedBy,
+      });
+      if (!confirmed.success) {
+        return confirmed;
+      }
 
       return { success: true, data: release };
     } catch (error) {
@@ -366,25 +444,9 @@ export class ReleaseService {
     return ReleaseRepository.findByTitleInsensitive(title);
   }
 
-  /**
-   * Apply un-delete and/or publish to a found release. No-ops when there is
-   * nothing to update so callers don't have to inspect the partial payload.
-   */
-  static async applyFoundReleaseUpdate(
-    id: string,
-    updates: { undelete?: boolean; publish?: boolean }
-  ): Promise<void> {
-    const data: { deletedOn?: null; publishedAt?: Date } = {};
-    if (updates.undelete) {
-      data.deletedOn = null;
-    }
-    if (updates.publish) {
-      data.publishedAt = new Date();
-    }
-    if (Object.keys(data).length === 0) {
-      return;
-    }
-    await ReleaseRepository.updateData(id, data);
+  /** Restore a soft-deleted release that a find-or-create matched. */
+  static async restoreFoundRelease(id: string): Promise<void> {
+    await ReleaseRepository.updateData(id, { deletedOn: null });
   }
 
   /**

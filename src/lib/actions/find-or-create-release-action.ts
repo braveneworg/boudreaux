@@ -9,9 +9,11 @@ import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
 import { ArtistService } from '@/lib/services/artist-service';
+import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { Format } from '@/lib/types/media-models';
 import { requireRole } from '@/lib/utils/auth/require-role';
+import { needsCreditDecisions, type CreditConfirmation } from '@/lib/utils/credit-confirmation';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
@@ -55,6 +57,17 @@ export interface FindOrCreateReleaseResult {
   created?: boolean;
   /** The artist ID if found or created from metadata */
   artistId?: string;
+  /**
+   * Whether the release is published. Set when publishing was requested, or
+   * when `creditConfirmation` is reported for a release already published.
+   */
+  published?: boolean;
+  /**
+   * Set when a credit awaits confirmation (ADR-0015). A release that was to be
+   * published is then left unpublished: the admin decides each credit, and
+   * `publishReleaseAction` publishes with those decisions.
+   */
+  creditConfirmation?: CreditConfirmation;
   /** Error message if failed */
   error?: string;
 }
@@ -89,8 +102,9 @@ const parseReleaseDate = (year?: number, dateStr?: string): Date | undefined => 
  * Options for find-or-create release behaviour
  */
 export interface FindOrCreateReleaseOptions {
-  /** When true the release will be published (publishedAt set) if it is newly
-   *  created, or if an existing unpublished release is found. */
+  /** When true a newly created release, or an existing unpublished one, is
+   *  published — unless a credit awaits confirmation, in which case it is left
+   *  unpublished and the credits are returned (ADR-0015). */
   publish?: boolean;
 }
 
@@ -136,16 +150,68 @@ type ReleaseActionContext = {
   options: FindOrCreateReleaseOptions;
 };
 
+/** The part of the result that reports publication and credits to confirm. */
+type PublicationOutcome =
+  | { ok: true; fields: Pick<FindOrCreateReleaseResult, 'published' | 'creditConfirmation'> }
+  | { ok: false; error: string };
+
+interface PublicationRequest {
+  releaseId: string;
+  /** Whether the release is published before this call. */
+  alreadyPublished: boolean;
+  /** Whether the caller asked for the release to be published. */
+  publish: boolean;
+  /** Whether this call credited an artist on the release. */
+  credited: boolean;
+}
+
+/**
+ * Decide publication once the release's credits are stored. A release is
+ * published only when no credit awaits confirmation; otherwise the credits are
+ * returned for the admin to decide. A release already published reports the
+ * credits this call left awaiting confirmation.
+ */
+const resolvePublication = async ({
+  releaseId,
+  alreadyPublished,
+  publish,
+  credited,
+}: PublicationRequest): Promise<PublicationOutcome> => {
+  const publishing = publish && !alreadyPublished;
+  if (!publishing && !(alreadyPublished && credited)) {
+    return { ok: true, fields: {} };
+  }
+
+  const confirmation = await CreditConfirmationService.forRelease(releaseId);
+  if (!confirmation.success) {
+    return { ok: false, error: confirmation.error };
+  }
+  if (needsCreditDecisions(confirmation.data)) {
+    return {
+      ok: true,
+      fields: { published: alreadyPublished, creditConfirmation: confirmation.data },
+    };
+  }
+  if (!publishing) {
+    return { ok: true, fields: {} };
+  }
+
+  const published = await ReleaseService.publishRelease(releaseId);
+  if (!published.success) {
+    return { ok: false, error: published.error };
+  }
+  revalidatePath('/admin/releases');
+  revalidatePath('/releases');
+  return { ok: true, fields: { published: true } };
+};
+
 const handleFoundRelease = async (
   metadata: ReleaseMetadata,
   existingRelease: FoundRelease,
   ctx: ReleaseActionContext
 ): Promise<FindOrCreateReleaseResult> => {
-  const undelete = Boolean(existingRelease.deletedOn);
-  const publish = Boolean(ctx.options.publish && !existingRelease.publishedAt);
-
-  if (undelete || publish) {
-    await ReleaseService.applyFoundReleaseUpdate(existingRelease.id, { undelete, publish });
+  if (existingRelease.deletedOn) {
+    await ReleaseService.restoreFoundRelease(existingRelease.id);
     revalidatePath('/admin/releases');
   }
 
@@ -161,12 +227,23 @@ const handleFoundRelease = async (
 
   const foundArtistId = await connectArtistFromMetadata(metadata, existingRelease.id);
 
+  const publication = await resolvePublication({
+    releaseId: existingRelease.id,
+    alreadyPublished: Boolean(existingRelease.publishedAt),
+    publish: Boolean(ctx.options.publish),
+    credited: foundArtistId !== undefined,
+  });
+  if (!publication.ok) {
+    return { success: false, error: publication.error };
+  }
+
   return {
     success: true,
     releaseId: existingRelease.id,
     releaseTitle: existingRelease.title,
     created: false,
     artistId: foundArtistId,
+    ...publication.fields,
   };
 };
 
@@ -185,7 +262,6 @@ const buildCreateParams = (
     labels,
     catalogNumber: metadata.catalogNumber?.trim() || undefined,
     coverArt: metadata.coverArt || '',
-    ...(ctx.options.publish ? { publishedAt: new Date() } : {}),
   };
 };
 
@@ -220,12 +296,23 @@ const handleCreateResponse = async (
 
   const createdArtistId = await connectArtistFromMetadata(metadata, createResponse.data.id);
 
+  const publication = await resolvePublication({
+    releaseId: createResponse.data.id,
+    alreadyPublished: false,
+    publish: Boolean(ctx.options.publish),
+    credited: createdArtistId !== undefined,
+  });
+  if (!publication.ok) {
+    return { success: false, error: publication.error };
+  }
+
   return {
     success: true,
     releaseId: createResponse.data.id,
     releaseTitle: createResponse.data.title,
     created: true,
     artistId: createdArtistId,
+    ...publication.fields,
   };
 };
 

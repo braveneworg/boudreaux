@@ -55,8 +55,15 @@ describe('runAdminEntityAction', () => {
 
     const result = await runAdminEntityAction(config);
 
-    expect(config.perform).toHaveBeenCalledWith(id);
     expect(result).toEqual({ success: true });
+  });
+
+  it("hands the mutation the entity id and the acting admin's id", async () => {
+    const config = baseConfig();
+
+    await runAdminEntityAction(config);
+
+    expect(vi.mocked(config.perform).mock.calls).toEqual([[id, 'user-123']]);
   });
 
   it('logs the audit event with the configured metadata key', async () => {
