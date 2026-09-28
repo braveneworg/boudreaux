@@ -48,31 +48,50 @@ export const currentOrAlumniWhere = {
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
+ * Hidden only for want of a `publishedOn`: current or alumni, never
+ * published, not soft-deleted. Stamping `publishedOn` on exactly these makes
+ * them public.
+ */
+const awaitingConfirmationGate = {
+  AND: [currentOrAlumniWhere, { OR: [...unpublishedOr] }, { OR: [...notDeletedOr] }],
+} as const satisfies Prisma.ArtistWhereInput;
+
+/** Hidden whatever `publishedOn` says: soft-deleted, or inactive with no departure date. */
+const staysHiddenGate = {
+  OR: [{ deletedOn: { not: null } }, { isActive: false, OR: [...noDepartureDateOr] }],
+} as const satisfies Prisma.ArtistWhereInput;
+
+/**
  * Artists whose credit awaits confirmation (ADR-0015): credited as `credit`
- * describes, and hidden only for want of a `publishedOn` — current or alumni,
- * never published, not soft-deleted. Stamping `publishedOn` on exactly these
- * makes them public.
+ * describes, and hidden only for want of a `publishedOn`.
  *
  * @param credit - Which credits count: one release's, or every listed release's.
  */
 export const creditAwaitingConfirmationWhere = (
   credit: Prisma.ArtistReleaseWhereInput
-): Prisma.ArtistWhereInput => ({
-  releases: { some: credit },
-  AND: [currentOrAlumniWhere, { OR: [...unpublishedOr] }, { OR: [...notDeletedOr] }],
-});
+): Prisma.ArtistWhereInput => ({ releases: { some: credit }, ...awaitingConfirmationGate });
 
 /**
- * Artists whose credit stays hidden whatever `publishedOn` says: soft-deleted,
- * or inactive with no departure date.
+ * Artists whose credit stays hidden whatever `publishedOn` says.
  *
  * @param credit - Which credits count: one release's, or every listed release's.
  */
 export const creditThatStaysHiddenWhere = (
   credit: Prisma.ArtistReleaseWhereInput
-): Prisma.ArtistWhereInput => ({
-  releases: { some: credit },
-  OR: [{ deletedOn: { not: null } }, { isActive: false, OR: [...noDepartureDateOr] }],
+): Prisma.ArtistWhereInput => ({ releases: { some: credit }, ...staysHiddenGate });
+
+/**
+ * The same two gates over a given set of artists, for a write whose credits
+ * are not stored yet (a release form naming the artists it will credit).
+ */
+export const awaitingConfirmationAmongWhere = (artistIds: string[]): Prisma.ArtistWhereInput => ({
+  id: { in: artistIds },
+  ...awaitingConfirmationGate,
+});
+
+export const staysHiddenAmongWhere = (artistIds: string[]): Prisma.ArtistWhereInput => ({
+  id: { in: artistIds },
+  ...staysHiddenGate,
 });
 
 /** The name parts every credit description composes its displayed name from. */
