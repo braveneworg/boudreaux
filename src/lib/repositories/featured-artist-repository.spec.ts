@@ -57,6 +57,13 @@ describe('FeaturedArtistRepository', () => {
     });
   });
 
+  /** The public artist gate (ADR-0015): current or alumni, published, not deleted. */
+  const PUBLIC_ARTIST = {
+    AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+    publishedOn: { not: null },
+    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+  };
+
   describe('findFeatured', () => {
     it('should query with date filter, include, ordering and limit', async () => {
       const artists = [mockFeaturedArtist];
@@ -75,11 +82,19 @@ describe('FeaturedArtistRepository', () => {
             { featuredUntil: { isSet: false } },
             { featuredUntil: { gte: currentDate } },
           ],
+          AND: [{ OR: [{ artists: { none: {} } }, { artists: { some: PUBLIC_ARTIST } }] }],
         },
-        include: featuredArtistInclude,
+        include: {
+          ...featuredArtistInclude,
+          artists: { ...featuredArtistInclude.artists, where: PUBLIC_ARTIST },
+        },
         orderBy: { featuredOn: 'desc' },
         take: 5,
       });
+    });
+
+    it('leaves the admin include unfiltered, so an admin still sees hidden artists', () => {
+      expect(featuredArtistInclude.artists).not.toHaveProperty('where');
     });
   });
 
