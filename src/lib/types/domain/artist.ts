@@ -335,8 +335,19 @@ export interface ArtistWithPublishedReleases extends Omit<
   ArtistWithReleaseGraph,
   'memberOf' | 'releases'
 > {
-  releases: Array<ArtistReleaseGraphRow & { credit: ReleaseCredit }>;
+  releases: ArtistPublishedReleaseRow[];
 }
+
+/**
+ * One release on the public artist page. Its credits name public artists only
+ * (ADR-0015). `albumArtist` is the release's first credit, read before the
+ * hidden artists were dropped: `null` when that artist is hidden, so the page
+ * never attributes the release to whoever is credited next.
+ */
+export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
+  credit: ReleaseCredit;
+  albumArtist: ArtistCreditScalars | null;
+};
 
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';

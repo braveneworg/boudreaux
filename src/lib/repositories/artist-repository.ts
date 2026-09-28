@@ -35,6 +35,7 @@ import {
   currentOrAlumniWhere,
   listedReleaseWhere,
   notDeletedOr,
+  publicArtistWhere,
 } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
@@ -198,8 +199,15 @@ const artistListingSelect = {
       displayOrder: true,
     },
   },
-  members: { select: { member: { select: artistListingNameSelect } } },
-  memberOf: { select: { artist: { select: artistListingNameSelect } } },
+  // A card names only the members and bands that are public artists (ADR-0015).
+  members: {
+    where: { member: { is: publicArtistWhere } },
+    select: { member: { select: artistListingNameSelect } },
+  },
+  memberOf: {
+    where: { artist: { is: publicArtistWhere } },
+    select: { artist: { select: artistListingNameSelect } },
+  },
   releases: {
     select: {
       release: {
@@ -399,19 +407,6 @@ const readVocabularyColumn = (
 };
 
 /**
- * The gate every public artist read by slug applies (#786): current or
- * alumni, published, and not soft-deleted. `publishedOn: { not: null }`
- * excludes an absent field as well as an explicit null, as
- * `alumniArtistWhere` notes for `deactivatedAt`; the in-memory twin for
- * junction-joined artists is `isVisibleArtist`.
- */
-const publicArtistWhere = {
-  AND: [currentOrAlumniWhere],
-  publishedOn: { not: null },
-  OR: [...notDeletedOr],
-} as const satisfies Prisma.ArtistWhereInput;
-
-/**
  * The roster half of a listed artist's `where`, as `AND` members: current and
  * alumni are single field matches, "all" is either of the two. Returned as a
  * list so it composes with the token search's own `AND` without clobbering
@@ -432,21 +427,18 @@ const rosterWhere = (
 
 /**
  * Build the `where` shared by the public artists index and the public artist
- * search: a non-deleted artist in the requested roster (current by default)
- * holding a DIRECT credit on at least one listed release (a member credit
- * alone never qualifies — ADR-0007), with an optional case-insensitive token
- * search — every word must match one of the name fields, aka names, genres,
- * or the titles of their listed releases.
+ * search: a published, non-deleted artist in the requested roster (current by
+ * default) holding a DIRECT credit on at least one listed release (a member
+ * credit alone never qualifies — ADR-0007), with an optional case-insensitive
+ * token search — every word must match one of the name fields, aka names,
+ * genres, or the titles of their listed releases.
  *
- * `requirePublished` adds the artist-level `publishedOn` gate the index uses;
- * the playlist "By artist" search deliberately keeps today's rule without it.
+ * Both reads require the artist to be published: a search that matched a
+ * hidden artist would name it (ADR-0015).
  */
 const buildListedWhere = (
   search: string | undefined,
-  {
-    requirePublished,
-    roster = 'current',
-  }: { requirePublished: boolean; roster?: ArtistListingRoster }
+  { roster = 'current' }: { roster?: ArtistListingRoster } = {}
 ): Prisma.ArtistWhereInput => {
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
@@ -464,7 +456,7 @@ const buildListedWhere = (
   const and = [...rosterAnd, ...tokenSearch];
   return {
     ...fields,
-    ...(requirePublished && { publishedOn: { not: null } }),
+    publishedOn: { not: null },
     OR: [...notDeletedOr],
     releases: { some: { release: listedReleaseWhere } },
     ...(and.length > 0 && { AND: and }),
@@ -603,7 +595,7 @@ export class ArtistRepository {
     skip,
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
-    const where = buildListedWhere(search, { requirePublished: true, roster });
+    const where = buildListedWhere(search, { roster });
     const records = await runQuery(() =>
       prisma.artist.findMany({ where, select: artistListingSelect })
     );
@@ -699,10 +691,10 @@ export class ArtistRepository {
   }
 
   /**
-   * Search active, non-deleted artists that hold a direct credit on a listed
-   * release (the playlist "By artist" search), with the lightweight
-   * images/releases include that search consumes. Unlike the index, this does
-   * not require the artist row itself to be published. Matches are ordered by
+   * Search current listed artists — published, non-deleted, and holding a
+   * direct credit on a listed release (the playlist "By artist" search and the
+   * home-page typeahead), with the lightweight images/releases include that
+   * search consumes. Matches are ordered by
    * displayed name and sliced here, for the same reason as the index's A–Z
    * order ({@link ArtistRepository.listListed}).
    */
@@ -713,7 +705,7 @@ export class ArtistRepository {
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     const matches = await runQuery(() =>
       prisma.artist.findMany({
-        where: buildListedWhere(search, { requirePublished: false }),
+        where: buildListedWhere(search),
         include: artistSearchInclude,
       })
     );

@@ -125,6 +125,7 @@ export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend
       releaseId: z.string(),
       release: publicArtistReleaseSchema,
       credit: z.enum(RELEASE_CREDITS),
+      albumArtist: artistCreditScalarSchema.nullable(),
     })
   ),
 }) satisfies z.ZodType<ArtistWithPublishedReleases>;

@@ -174,6 +174,7 @@ describe('Artist by Slug API Route', () => {
           artistId: 'a1',
           releaseId: 'r1',
           credit: 'primary' as const,
+          albumArtist: null,
           release: {
             ...release,
             artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: mockArtist }],

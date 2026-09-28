@@ -24,6 +24,8 @@ import type {
   ArtistListingRow,
   ArtistNameRecord,
   ArtistPublicScalars,
+  ArtistPublishedReleaseRow,
+  ArtistReleaseGraphRow,
   ArtistScalars,
   ArtistSearchMatch,
   ArtistWithPublishedReleases,
@@ -33,9 +35,9 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import type { ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
-import { isVisibleArtist } from '@/lib/utils/artist-visibility';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
   DISPLAY_IMAGE_CAP,
@@ -46,6 +48,7 @@ import {
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
+import { isPublicArtist } from '@/lib/utils/is-public-artist';
 import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/lib/utils/s3-client';
@@ -346,6 +349,26 @@ interface ArtistCreateInput {
   details?: VideoArtistDetail;
 }
 
+type CreditedReleaseRow = ArtistReleaseGraphRow & { credit: ReleaseCredit };
+
+/**
+ * Drop the hidden artists from a release's credits, once its credit has been
+ * derived. The album artist is read from the full credit order first, so a
+ * hidden album artist leaves `albumArtist` null rather than handing the
+ * attribution to the next credit.
+ */
+const withPublicCredits = (row: CreditedReleaseRow): ArtistPublishedReleaseRow => {
+  const albumArtist = row.release.artistReleases.at(0)?.artist;
+  return {
+    ...row,
+    albumArtist: albumArtist && isPublicArtist(albumArtist) ? albumArtist : null,
+    release: {
+      ...row.release,
+      artistReleases: row.release.artistReleases.filter(({ artist }) => isPublicArtist(artist)),
+    },
+  };
+};
+
 /** Optional middleName spread: only include the field when a non-blank value is present. */
 const middleNameSpread = (value: string | undefined): { middleName?: string } =>
   value ? { middleName: value } : {};
@@ -546,10 +569,9 @@ export class ArtistService {
   }
 
   /**
-   * Search active, non-deleted artists that hold a direct credit on a published
-   * release (the playlist "By artist" search). The repository owns the
-   * Mongo-safe `where`; unlike the artists index this does not require the
-   * artist row itself to be published.
+   * Search current listed artists: published, non-deleted, and holding a
+   * direct credit on a published release (the playlist "By artist" search and
+   * the home-page typeahead). The repository owns the Mongo-safe `where`.
    */
   static async searchPublishedArtists(
     params?: ArtistListFilters
@@ -625,10 +647,11 @@ export class ArtistService {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
-      // The band graph is folded into `releases` and not exposed; the
-      // published/non-deleted filter on releases, members, and bands runs
-      // here because Prisma MongoDB doesn't support a nested where on
-      // junction-table includes (#786). Bio prose is sanitized on read so
+      // The band graph is folded into `releases` and not exposed. Hidden
+      // artists are dropped here rather than in the query because each
+      // release's credit is derived from its full credit order first: the
+      // first credit is the album artist even when that artist is hidden
+      // (ADR-0015). Bio prose is sanitized on read so
       // redisplay is safe regardless of how it was authored (generated bios
       // are also sanitized at write time).
       const { memberOf, members, ...publicArtist } = artist;
@@ -639,11 +662,11 @@ export class ArtistService {
         // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        members: members.filter(({ member }) => isVisibleArtist(member)),
+        members: members.filter(({ member }) => isPublicArtist(member)),
         releases: collectArtistReleases({
           ...artist,
-          memberOf: memberOf.filter(({ artist: band }) => isVisibleArtist(band)),
-        }),
+          memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
+        }).map(withPublicCredits),
       };
 
       return { success: true, data: filteredArtist };

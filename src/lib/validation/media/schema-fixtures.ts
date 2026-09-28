@@ -338,5 +338,14 @@ export const artistWithPublishedReleases = {
     },
   ],
   members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...artistScalar, id: 'a2' } }],
-  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release, credit: 'primary' as const }],
+  releases: [
+    {
+      id: 'ar1',
+      artistId: 'a1',
+      releaseId: 'r1',
+      release,
+      credit: 'primary' as const,
+      albumArtist: null,
+    },
+  ],
 };

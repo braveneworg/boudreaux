@@ -39,6 +39,32 @@ describe('artistWithPublishedReleasesSchema', () => {
     expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
   });
 
+  it('keeps a public album artist on a release row, without its bio', () => {
+    const [row] = artistWithPublishedReleases.releases;
+    const albumArtist = { ...artistWithPublishedReleases, bio: 'Should not survive.' };
+
+    const parsed = artistWithPublishedReleasesSchema.parse({
+      ...artistWithPublishedReleases,
+      releases: [{ ...row, albumArtist }],
+    });
+
+    expect({
+      id: parsed.releases[0].albumArtist?.id,
+      hasBio: 'bio' in (parsed.releases[0].albumArtist ?? {}),
+    }).toEqual({ id: artistWithPublishedReleases.id, hasBio: false });
+  });
+
+  it('rejects a release row that does not say who the album artist is', () => {
+    const [{ albumArtist: _albumArtist, ...row }] = artistWithPublishedReleases.releases;
+
+    const result = artistWithPublishedReleasesSchema.safeParse({
+      ...artistWithPublishedReleases,
+      releases: [row],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('accepts every release credit the service can assign', () => {
     const [row] = artistWithPublishedReleases.releases;
     const withCredits = {
@@ -126,6 +152,7 @@ describe('artistWithPublishedReleasesSchema — public projection (#765)', () =>
         artistId: 'a1',
         releaseId: 'r1',
         credit: 'primary' as const,
+        albumArtist: null,
         release: {
           ...release,
           artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: leakyArtist }],
@@ -184,6 +211,7 @@ describe('artistWithPublishedReleasesSchema — nested artists carry no bio', ()
         artistId: 'a1',
         releaseId: 'r1',
         credit: 'primary' as const,
+        albumArtist: null,
         release: {
           ...release,
           artistReleases: [

@@ -938,7 +938,7 @@ describe('ArtistService', () => {
             releasedOn: new Date('2024-01-01'),
             publishedAt: new Date('2024-01-01'),
             deletedOn: null,
-            artistReleases: [{ artistId: mockArtist.id }],
+            artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
             digitalFormats: [
               {
                 id: 'df-1',
@@ -958,7 +958,7 @@ describe('ArtistService', () => {
             releasedOn: new Date('2024-02-01'),
             publishedAt: null,
             deletedOn: null,
-            artistReleases: [{ artistId: mockArtist.id }],
+            artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
             digitalFormats: [],
           },
         },
@@ -972,7 +972,7 @@ describe('ArtistService', () => {
             releasedOn: new Date('2024-03-01'),
             publishedAt: new Date('2024-01-01'),
             deletedOn: new Date('2024-06-01'),
-            artistReleases: [{ artistId: mockArtist.id }],
+            artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
             digitalFormats: [],
           },
         },
@@ -986,9 +986,25 @@ describe('ArtistService', () => {
       releasedOn: Date;
       publishedAt: Date | null;
       deletedOn: Date | null;
-      artistReleases: Array<{ artistId: string }>;
+      artistReleases: Array<{ artistId: string; artist: { id: string; publishedOn: Date | null } }>;
       digitalFormats: never[];
     }
+
+    /** A credited artist as the credit select projects it: public unless overridden. */
+    const creditArtist = (id: string) => ({
+      id,
+      slug: id,
+      firstName: 'Artist',
+      surname: id,
+      displayName: id,
+      isActive: true,
+      deactivatedAt: null,
+      publishedOn: new Date('2024-01-01'),
+      deletedOn: null,
+    });
+
+    /** Ids whose credit the fixture builds as a hidden (unpublished) artist. */
+    const hiddenCreditIds = new Set(['artist-hidden']);
 
     const publishedRelease = (
       id: string,
@@ -1000,7 +1016,12 @@ describe('ArtistService', () => {
       releasedOn: new Date(releasedOn),
       publishedAt: new Date(releasedOn),
       deletedOn: null,
-      artistReleases: artistIds.map((artistId) => ({ artistId })),
+      artistReleases: artistIds.map((artistId) => ({
+        artistId,
+        artist: hiddenCreditIds.has(artistId)
+          ? { ...creditArtist(artistId), publishedOn: null }
+          : creditArtist(artistId),
+      })),
       digitalFormats: [],
     });
 
@@ -1065,6 +1086,70 @@ describe('ArtistService', () => {
         { releaseId: 'guest', credit: 'featured' },
         { releaseId: 'band-lp', credit: 'member' },
       ]);
+    });
+
+    describe('hidden credited artists (ADR-0015)', () => {
+      interface CreditedRow {
+        releaseId: string;
+        albumArtist: { id: string } | null;
+        release: { artistReleases: Array<{ artistId: string }> };
+      }
+
+      const readRows = async (release: PublishedReleaseRow): Promise<CreditedRow[]> => {
+        vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
+          ...mockArtist,
+          members: [],
+          memberOf: [],
+          releases: [joinRow(mockArtist.id, release)],
+        } as never);
+        const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+        return (result as { success: true; data: { releases: CreditedRow[] } }).data.releases;
+      };
+
+      it('drops a hidden artist from a release’s credits', async () => {
+        const [row] = await readRows(
+          publishedRelease('lp', [mockArtist.id, 'artist-hidden', 'artist-other'], '2024-01-01')
+        );
+
+        expect(row.release.artistReleases.map(({ artistId }) => artistId)).toEqual([
+          mockArtist.id,
+          'artist-other',
+        ]);
+      });
+
+      it('names the album artist when it is public', async () => {
+        const [row] = await readRows(
+          publishedRelease('guest', ['artist-other', mockArtist.id], '2024-01-01')
+        );
+
+        expect(row.albumArtist?.id).toBe('artist-other');
+      });
+
+      it('names no album artist when it is hidden, rather than the next credit', async () => {
+        const [row] = await readRows(
+          publishedRelease('guest', ['artist-hidden', mockArtist.id], '2024-01-01')
+        );
+
+        expect(row.albumArtist).toBeNull();
+      });
+
+      it('still derives the credit from the full credit order', async () => {
+        vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
+          ...mockArtist,
+          members: [],
+          memberOf: [],
+          releases: [
+            joinRow(
+              mockArtist.id,
+              publishedRelease('guest', ['artist-hidden', mockArtist.id], '2024-01-01')
+            ),
+          ],
+        } as never);
+
+        const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+        expect(readReleases(result).map(({ credit }) => credit)).toEqual(['featured']);
+      });
     });
 
     it('excludes an unpublished band release', async () => {
