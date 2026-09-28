@@ -29,11 +29,21 @@ own, so the artist's bio, display images and reference links go live with
 **Publishing a release publishes a credited artist only when an admin
 confirmed that artist by id. `publishedOn` always records a human decision.**
 
-- **The server enforces it.** Any write that would leave a published release
-  with a credit awaiting confirmation must carry the confirmed artist ids.
-  The service compares them with the actual credits awaiting confirmation
-  and fails with `VALIDATION`, naming the artists, when they differ. The
-  dialogs are how the list is built; they are not the gate.
+- **Each artist is decided explicitly.** A publishing write carries two
+  lists: the artists to publish and the artists to keep hidden. Together
+  they must cover every credit awaiting confirmation. An artist is published
+  or kept hidden by a decision, never by omission. In the dialog each artist
+  has a toggle that starts at "keep hidden".
+- **The server enforces it.** The service checks the two lists against the
+  actual credits awaiting confirmation and fails with `VALIDATION`, naming
+  the artists, when one has no decision, when an id to publish does not
+  await confirmation, or when an id is in both lists. The dialogs are how
+  the lists are built; they are not the gate.
+- **A release is always created unpublished.** Its credits are stored after
+  it, so `ReleaseService.createRelease` drops any publication date and
+  publishing goes through `publishRelease`, which checks the stored credits.
+- **Who decided is recorded.** `publishedBy` on each artist is the admin's id
+  from the session, never a value from the request.
 - **A credit awaits confirmation** when stamping `publishedOn` would make its
   artist public: no `publishedOn`, current or alumni, not deleted.
 - **A credit stays hidden** when publishing cannot make it public: the artist
@@ -48,9 +58,10 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   such credits saves the release unpublished and returns them. The admin
   confirms, and the ordinary publish runs with ids. When every credit is
   already public, the upload still publishes in one call.
-- **Hiding an artist always succeeds.** Unpublishing, archiving or deleting
-  an artist is never blocked by the work that credits it. The confirmation
-  lists the published releases and tour dates that will lose the name.
+- **Hiding an artist always succeeds.** Archiving an artist is never blocked
+  by the work that credits it. The confirmation lists the published releases
+  and tour dates that will lose the name. When that list cannot be loaded
+  the archive goes ahead without it: a takedown must not depend on a read.
 - **A published release with no byline is a legitimate state.** "A published
   release has only public credits" is not an invariant. Filtering hidden
   artists out of every public read is what guarantees rule 2.
@@ -64,6 +75,14 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   and tours are typed by an admin and are not gated.
 
 ## Alternatives rejected
+
+- **All or nothing: the confirmed ids must equal the awaiting credits.** An
+  admin could then publish a release only by publishing every credited
+  artist, or by removing the credit of a doubtful one. It contradicts the
+  backfill, which lets a human leave artists hidden, and the decision that a
+  release with no byline is a legitimate state.
+- **One list, anything not confirmed stays hidden.** A caller that sends an
+  empty list would publish with no decision made.
 
 - **Silent cascade: publishing a release publishes all its credits.** The
   first plan. It keeps every byline with no extra step, but it turns
@@ -87,7 +106,15 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
 
 ## Consequences
 
-- An upload that credits a new artist takes two steps to publish.
+- An upload that credits a new artist takes two steps to publish. Today no
+  screen sends `publish: true` with an upload, so this is a server rule with
+  no dialog of its own.
+- Archiving is the only way the admin UI hides an artist. There is no
+  unpublish action for artists, and permanently deleting an artist applies
+  only to one already archived, so neither shows the warning.
+- A publishing save on the release form is held until the admin answers. If
+  the admin cancels, the form takes back the publication date the publish
+  button set, so a later plain save does not publish by accident.
 - A release credited only to hidden artists is public with no byline, and
   its player runs without an album artist.
 - The public listings are cached per process for ten minutes. The services
