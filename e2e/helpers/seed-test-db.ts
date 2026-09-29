@@ -1357,8 +1357,9 @@ const seedTestDatabase = async () => {
 
     // 25 roster artists sharing one published, format-less compilation so the
     // public index has a second page (A–Z page 1 = E2E Artist, E2E Band,
-    // E2E Roster 01–22; page 2 = Roster 23–25 and the composed-name artist
-    // below). Bulk-created with createMany
+    // E2E Roster 01–22; page 2 = Roster 23–25, the artist no longer on the
+    // label and the composed-name artist, both below). Bulk-created with
+    // createMany
     // (concurrent create() read-backs race in CI on fresh collections) and
     // linked with one createMany as well; createdAt is pinned in the past for
     // the same admin-list reason as the band.

@@ -1266,8 +1266,8 @@ describe('ArtistService', () => {
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result.success).toBe(true);
-      // The full nested release/digital-format include AND the active/published
-      // where-clause (isActive + deletedOn null-safety) now live in (and are
+      // The full nested release/digital-format include AND the public artist
+      // where-clause (published + deletedOn null-safety) now live in (and are
       // covered by) ArtistRepository.findPublishedBySlugWithReleases; the service
       // only forwards the slug.
       expect(ArtistRepository.findPublishedBySlugWithReleases).toHaveBeenCalledWith('john-doe');

@@ -57,7 +57,7 @@ describe('FeaturedArtistRepository', () => {
     });
   });
 
-  /** The public artist gate (ADR-0015): current or alumni, published, not deleted. */
+  /** The public artist gate (ADR-0015, ADR-0016): published, not deleted. */
   const PUBLIC_ARTIST = {
     publishedOn: { not: null },
     OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],

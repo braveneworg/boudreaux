@@ -313,7 +313,7 @@ model Artist {
   urls                  Url[] // Various platform URLs associated with the artist
   tags                  String? // If stored with commas, split into array on retrieval; prefer dasherized case tags, ie. "indie-rock", "synth-pop"
   isPseudonymous        Boolean                @default(false) // Don't display real name if true; use first of akaNames or displayName instead in that order
-  isActive              Boolean                @default(true) // Whether the artist is currently active; used for filtering in listings
+  isActive              Boolean                @default(true) // Whether the artist is still on the label; decides nothing about what is public (ADR-0016)
   instruments           String? // If stored with commas, split into array on retrieval; list of instruments the artist plays from primary to occasional
   artistUrls            ArtistUrl[]
   bioImages             ArtistBioImage[] // Images discovered during AI bio generation (Wikimedia etc.)

@@ -421,7 +421,7 @@ sequenceDiagram
     Q->>R: fetch(url, {signal})
     R->>R: validate slug regex (else 400)
     R->>SV: getArtistBySlugWithReleases(slug)
-    SV->>DB: findFirst(slug, isActive, deletedOn null/isSet:false) + includes
+    SV->>DB: findFirst(slug, publishedOn set, deletedOn null/isSet:false) + includes
     DB-->>SV: artist | null
     SV-->>R: { success, data } | not found
     alt 200 OK
