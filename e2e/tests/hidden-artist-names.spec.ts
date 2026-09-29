@@ -18,6 +18,11 @@ import { expect, test } from '../fixtures/auth.fixture';
  * The spec seeds and removes its own rows in the isolated E2E database. It
  * reads releases and artists by search or by id, never through the cached
  * default listing page, so a cached page cannot hide the seeded rows.
+ *
+ * Parallel safety: every test reads the rows one `beforeAll` seeded, so the
+ * file runs in a single worker (`mode: 'default'`). Every row carries this
+ * worker's `STAMP`, and the cleanup removes rows with that stamp only, so a
+ * retry or another spec never deletes rows this run is still reading.
  */
 
 const E2E_DATABASE_URL =
@@ -25,7 +30,8 @@ const E2E_DATABASE_URL =
 
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
-const STAMP = Date.now();
+// Unique per worker process: a module is loaded once in each worker.
+const STAMP = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 const SLUG_PREFIX = 'e2e-hidden-names';
 const HIDDEN_NAME = `ZZHIDDENNAME${STAMP}`;
 const PUBLIC_NAME = `ZZPUBLICNAME${STAMP}`;
@@ -138,14 +144,16 @@ const seed = async (): Promise<Seeded> => {
   };
 };
 
+/** Removes the rows of THIS run only: everything that carries its stamp. */
 const cleanup = async (): Promise<void> => {
+  const stamped = { endsWith: String(STAMP) };
   const artists = await prisma.artist.findMany({
-    where: { slug: { startsWith: SLUG_PREFIX } },
+    where: { slug: { startsWith: SLUG_PREFIX, ...stamped } },
     select: { id: true },
   });
   const artistIds = artists.map(({ id }) => id);
   const tours = await prisma.tour.findMany({
-    where: { title: { startsWith: 'E2E Hidden Names ' } },
+    where: { title: stamped },
     select: { id: true },
   });
   const tourIds = tours.map(({ id }) => id);
@@ -153,21 +161,21 @@ const cleanup = async (): Promise<void> => {
   await prisma.tourDateHeadliner.deleteMany({ where: { tourDate: { tourId: { in: tourIds } } } });
   await prisma.tourDate.deleteMany({ where: { tourId: { in: tourIds } } });
   await prisma.tour.deleteMany({ where: { id: { in: tourIds } } });
-  await prisma.venue.deleteMany({ where: { name: { startsWith: 'E2E Hidden Names ' } } });
-  await prisma.featuredArtist.deleteMany({
-    where: { displayName: { startsWith: 'E2E Hidden Names ' } },
-  });
+  await prisma.venue.deleteMany({ where: { name: stamped } });
+  await prisma.featuredArtist.deleteMany({ where: { displayName: stamped } });
   await prisma.artistMember.deleteMany({
     where: { OR: [{ artistId: { in: artistIds } }, { memberId: { in: artistIds } }] },
   });
   await prisma.artistRelease.deleteMany({ where: { artistId: { in: artistIds } } });
-  await prisma.release.deleteMany({ where: { title: { startsWith: 'E2E Hidden Names ' } } });
+  await prisma.release.deleteMany({ where: { title: stamped } });
   await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
 };
 
 test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
+  // One worker for the whole file: the tests share the rows `beforeAll` seeds.
+  test.describe.configure({ mode: 'default' });
+
   test.beforeAll(async () => {
-    await cleanup();
     seeded = await seed();
   });
 

@@ -10,9 +10,14 @@ import { expect, test } from '../fixtures/auth.fixture';
  * confirmation, and hiding an artist warns about the public work that loses
  * the name.
  *
- * Each test seeds and removes its own release and artists via Prisma against
- * the isolated E2E database, so it never mutates the shared seed data other
- * specs assert on.
+ * Each test seeds its own release and artists via Prisma against the isolated
+ * E2E database, so it never mutates the shared seed data other specs assert
+ * on.
+ *
+ * Parallel safety: the tests of this file can run in different workers, and
+ * each worker runs `afterAll` when its own tests finish. So the cleanup
+ * removes only the rows this worker created, by id. Removing by a shared
+ * prefix would delete rows another worker is still reading.
  */
 
 const E2E_DATABASE_URL =
@@ -22,13 +27,16 @@ const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 const PREFIX = 'e2e-credit-confirmation';
 
+/** The rows this worker created, removed by id in `afterAll`. */
+const created = { artistIds: [] as string[], releaseIds: [] as string[] };
+
 interface SeededArtist {
   id: string;
   displayName: string;
 }
 
 const seedArtist = async (label: string, publishedOn?: Date): Promise<SeededArtist> => {
-  const stamp = Date.now();
+  const stamp = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
   const displayName = `E2E Credit ${label} ${stamp}`;
   const artist = await prisma.artist.create({
     data: {
@@ -39,6 +47,7 @@ const seedArtist = async (label: string, publishedOn?: Date): Promise<SeededArti
       ...(publishedOn ? { publishedOn } : {}),
     },
   });
+  created.artistIds.push(artist.id);
   return { id: artist.id, displayName };
 };
 
@@ -47,7 +56,7 @@ const seedRelease = async (
   artists: SeededArtist[],
   publishedAt?: Date
 ): Promise<{ id: string; title: string }> => {
-  const title = `E2E Credit ${label} ${Date.now()}`;
+  const title = `E2E Credit ${label} ${Date.now()}${Math.floor(Math.random() * 1e6)}`;
   const release = await prisma.release.create({
     data: {
       title,
@@ -57,6 +66,7 @@ const seedRelease = async (
       ...(publishedAt ? { publishedAt } : {}),
     },
   });
+  created.releaseIds.push(release.id);
   await prisma.artistRelease.createMany({
     data: artists.map(({ id }) => ({ artistId: id, releaseId: release.id })),
   });
@@ -65,13 +75,11 @@ const seedRelease = async (
 
 test.describe('Credit confirmation (ADR-0015)', () => {
   test.afterAll(async () => {
-    const artists = await prisma.artist.findMany({
-      where: { slug: { startsWith: PREFIX } },
-      select: { id: true },
+    const { artistIds, releaseIds } = created;
+    await prisma.artistRelease.deleteMany({
+      where: { OR: [{ artistId: { in: artistIds } }, { releaseId: { in: releaseIds } }] },
     });
-    const artistIds = artists.map(({ id }) => id);
-    await prisma.artistRelease.deleteMany({ where: { artistId: { in: artistIds } } });
-    await prisma.release.deleteMany({ where: { title: { startsWith: 'E2E Credit ' } } });
+    await prisma.release.deleteMany({ where: { id: { in: releaseIds } } });
     await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
     await prisma.$disconnect();
   });
