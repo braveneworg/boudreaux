@@ -21,7 +21,27 @@ prefixed rows credited on one published release, before it was committed:
 | inactive, `deactivatedAt: null`       | no                    | yes          |
 | unpublished, credited on a draft only | no                    | no           |
 
-Shapes the probe confirmed:
+ADR-0016 (2026-09-28) took the roster out of the rule: a public artist is
+published and not deleted, and `isActive` and `deactivatedAt` are not read.
+The three rows above that were hidden or awaiting because of the roster
+change accordingly. The new gates were probed the same way, with ten prefixed
+rows credited on one release:
+
+| Row                                           | Public | Awaiting | Stays hidden |
+| --------------------------------------------- | ------ | -------- | ------------ |
+| published, active (`deletedOn` absent / null) | yes    | no       | no           |
+| published, inactive, `deactivatedAt` absent   | yes    | no       | no           |
+| published, inactive, `deactivatedAt: null`    | yes    | no       | no           |
+| published, inactive, `deactivatedAt` set      | yes    | no       | no           |
+| `publishedOn` absent, or `null`               | no     | yes      | no           |
+| unpublished, inactive                         | no     | yes      | no           |
+| published and `deletedOn` set                 | no     | no       | yes          |
+| unpublished and `deletedOn` set               | no     | no       | yes          |
+
+`{ artist: { is: publicArtistWhere } }` on the junction matched the same rows
+as the rule applied to the artist directly.
+
+Shapes the first probe confirmed:
 
 - "Never set" is `OR: [{ field: null }, { field: { isSet: false } }]`.
 - "Set" is `{ field: { not: null } }` alone.
