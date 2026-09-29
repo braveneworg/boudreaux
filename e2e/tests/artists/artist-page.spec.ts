@@ -230,9 +230,16 @@ test.describe('Artist Page', () => {
       test('tapping the photo slides a drawer up from the bottom', async ({ page }) => {
         await page.goto('/artists');
         const card = cards(page).filter({ hasText: 'E2E Artist' }).first();
-        await card
-          .getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' })
-          .click({ timeout: 15_000 });
+        const photo = card.getByRole('button', {
+          name: 'Expand image: E2E Artist chosen portrait',
+        });
+
+        // The server renders the dialog's trigger. The drawer's trigger
+        // replaces it once the page has hydrated and measured the viewport, so
+        // a tap sent before then lands on a button that is about to be
+        // removed and opens nothing.
+        await expect(photo).toHaveAttribute('data-slot', 'drawer-trigger', { timeout: 15_000 });
+        await photo.click();
 
         const drawer = page.getByRole('dialog', { name: 'E2E Artist' });
         await expect(drawer).toBeVisible();
