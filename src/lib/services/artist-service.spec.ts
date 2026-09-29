@@ -208,7 +208,6 @@ describe('ArtistService', () => {
     notes: [],
     tags: null,
     isPseudonymous: false,
-    isActive: true,
     instruments: null,
     trackId: null,
     featuredArtistId: null,
@@ -997,7 +996,6 @@ describe('ArtistService', () => {
       firstName: 'Artist',
       surname: id,
       displayName: id,
-      isActive: true,
       deactivatedAt: null,
       publishedOn: new Date('2024-01-01'),
       deletedOn: null,
@@ -1027,7 +1025,6 @@ describe('ArtistService', () => {
 
     /** The visibility fields a joined-artist fixture may override (#786). */
     interface JoinedArtistOverrides {
-      isActive?: boolean;
       deactivatedAt?: Date | null;
       publishedOn?: Date | null;
       deletedOn?: Date | null;
@@ -1038,7 +1035,6 @@ describe('ArtistService', () => {
       ...mockArtist,
       id,
       slug: id,
-      isActive: true,
       publishedOn: new Date('2024-01-01'),
       deletedOn: null,
       ...overrides,
@@ -1188,7 +1184,7 @@ describe('ArtistService', () => {
             id: 'm-3',
             artistId: mockArtist.id,
             memberId: 'inactive',
-            member: joinedArtist('inactive', { isActive: false }),
+            member: joinedArtist('inactive'),
           },
           {
             id: 'm-4',
@@ -1201,7 +1197,6 @@ describe('ArtistService', () => {
             artistId: mockArtist.id,
             memberId: 'alumnus',
             member: joinedArtist('alumnus', {
-              isActive: false,
               deactivatedAt: new Date('2025-03-01'),
             }),
           },
@@ -1232,9 +1227,9 @@ describe('ArtistService', () => {
         memberOf: [
           bandRow('pub-band'),
           bandRow('draft-band', { publishedOn: null }),
-          bandRow('inactive-band', { isActive: false }),
+          bandRow('inactive-band'),
           bandRow('gone-band', { deletedOn: new Date('2024-06-01') }),
-          bandRow('alumni-band', { isActive: false, deactivatedAt: new Date('2025-03-01') }),
+          bandRow('alumni-band', { deactivatedAt: new Date('2025-03-01') }),
         ],
       } as never);
 
@@ -1444,7 +1439,6 @@ describe('ArtistService', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane-smith',
-        isActive: true,
       });
     });
 
@@ -1626,7 +1620,6 @@ describe('ArtistService', () => {
           middleName: 'Quill',
           surname: 'Brandt',
           displayName: 'Zora Quill Brandt',
-          isActive: true,
         })
       );
     });
@@ -1672,7 +1665,6 @@ describe('ArtistService', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane-smith',
-        isActive: true,
       });
     });
 

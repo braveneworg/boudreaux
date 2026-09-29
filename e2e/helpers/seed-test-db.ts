@@ -1417,8 +1417,8 @@ const seedTestDatabase = async () => {
     });
 
     // An artist no longer on the label: published and credited on a listed
-    // release, but inactive with no departure date. Whether an artist is still
-    // on the label decides nothing (ADR-0016), so the index lists it like any
+    // release, with a recorded departure date. Whether an artist is still on
+    // the label decides nothing (ADR-0016), so the index lists it like any
     // other. The name files after every "E2E Roster" row and before the
     // composed name, so page 1, the first card and the last card above stay
     // as they are. Credited on the roster compilation so no release count
@@ -1431,7 +1431,7 @@ const seedTestDatabase = async () => {
         slug: 'e2e-standing',
         displayName: 'E2E Standing',
         publishedOn: new Date(),
-        isActive: false,
+        deactivatedAt: new Date('2023-06-01T00:00:00Z'),
         createdAt: new Date('2019-01-01T00:00:00Z'),
       },
     });

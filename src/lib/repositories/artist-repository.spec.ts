@@ -1107,7 +1107,6 @@ describe('ArtistRepository', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane',
-        isActive: true,
       };
       const result = await ArtistRepository.createWithSelect(data);
 

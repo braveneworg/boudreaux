@@ -134,7 +134,6 @@ export const artistScalarSchema = z.object({
   notes: z.array(z.string()),
   tags: nullableString,
   isPseudonymous: z.boolean(),
-  isActive: z.boolean(),
   instruments: nullableString,
   featuredArtistId: nullableString,
 }) satisfies z.ZodType<ArtistScalars>;

@@ -390,7 +390,6 @@ const buildArtistCreateData = ({
   surname: trimDetail(details?.surname) || lastName,
   displayName: trimDetail(details?.displayName) || trimmed,
   slug: slug || generateSlug(firstName || 'artist'),
-  isActive: true,
   ...middleNameSpread(trimDetail(details?.middleName)),
 });
 

@@ -87,7 +87,6 @@ export const artistScalar = {
   notes: ['internal note'],
   tags: null,
   isPseudonymous: false,
-  isActive: true,
   instruments: null,
   featuredArtistId: null,
 };

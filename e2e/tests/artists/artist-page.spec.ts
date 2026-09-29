@@ -402,7 +402,7 @@ test.describe('Artist Page', () => {
       await page.goto('/artists');
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
-      // E2E Standing is inactive with no departure date.
+      // E2E Standing left the label: it carries a departure date.
       await (await openSearch(page)).fill('E2E Standing');
 
       await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });

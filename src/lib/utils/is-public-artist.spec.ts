@@ -18,13 +18,13 @@ describe('isPublicArtist', () => {
     expect(isPublicArtist({ publishedOn: new Date('2024-01-01') })).toBe(true);
   });
 
-  // Whether an artist is still on the label decides nothing (ADR-0016).
+  // Whether an artist is still on the label decides nothing (ADR-0016). A
+  // stored document may still carry the fields the rule once read.
   it.each([
-    ['that left the label', { isActive: false, deactivatedAt: new Date('2025-03-01') }],
-    ['that is inactive with no departure date', { isActive: false, deactivatedAt: null }],
-    ['that is inactive with the departure date absent', { isActive: false }],
-  ])('is true for a published artist %s', (_label, standing) => {
-    expect(isPublicArtist({ ...visible, ...standing })).toBe(true);
+    ['a departure date', { deactivatedAt: new Date('2025-03-01') }],
+    ['the removed isActive flag set to false', { isActive: false }],
+  ])('is true for a published artist that carries %s', (_label, legacy) => {
+    expect(isPublicArtist({ ...visible, ...legacy })).toBe(true);
   });
 
   it.each([

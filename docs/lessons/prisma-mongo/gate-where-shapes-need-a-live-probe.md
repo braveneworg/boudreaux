@@ -41,6 +41,13 @@ rows credited on one release:
 `{ artist: { is: publicArtistWhere } }` on the junction matched the same rows
 as the rule applied to the artist directly.
 
+The same decision removed `isActive` from the `Artist` model. A field
+dropped from the schema stays in the stored documents, so that was probed
+too: two documents inserted raw with `isActive: false` and `isActive: true`
+were read through Prisma, matched `publicArtistWhere`, came back without the
+field, and took an update. Prisma on MongoDB ignores a stored field the
+schema does not name.
+
 Shapes the first probe confirmed:
 
 - "Never set" is `OR: [{ field: null }, { field: { isSet: false } }]`.

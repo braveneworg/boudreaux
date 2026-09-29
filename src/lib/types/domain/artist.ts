@@ -75,7 +75,6 @@ export type ArtistScalars = {
   notes: string[];
   tags: string | null;
   isPseudonymous: boolean;
-  isActive: boolean;
   instruments: string | null;
   featuredArtistId: string | null;
 };
@@ -521,7 +520,6 @@ export interface ArtistWritableData {
   genres?: string | null;
   tags?: string | null;
   instruments?: string | null;
-  isActive?: boolean;
   isPseudonymous?: boolean;
   bornOn?: Date | null;
   diedOn?: Date | null;

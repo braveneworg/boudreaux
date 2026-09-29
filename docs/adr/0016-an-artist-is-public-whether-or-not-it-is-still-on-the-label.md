@@ -30,16 +30,17 @@ Three things were true of that rule:
 **Whether an artist is still on the label plays no part in whether the artist
 is public. A public artist is one that is published and not archived.**
 
-- **`isActive` is not read.** An artist that left the label stays on the site
-  like any other: on the index, on its own page, on the releases and tour
-  dates that name it, and in every search.
+- **`isActive` is removed from the `Artist` model**, with its index. It was
+  the field the old rule turned on, and nothing else used it. An artist that
+  left the label stays on the site like any other: on the index, on its own
+  page, on the releases and tour dates that name it, and in every search.
 - **The artists index is one list.** The Current / Alumni / All filter is
   removed, with its `roster` query parameter. A request that still sends
   `roster` is served the one list.
-- **The fields stay in the schema.** `isActive`, `deactivatedAt`,
+- **The departure fields stay in the schema.** `deactivatedAt`,
   `deactivatedBy`, `reactivatedAt` and `reactivatedBy` are kept on the
-  `Artist` model and nothing reads them to decide what is public. Removing
-  them is a schema change with no gain today.
+  `Artist` model as a record, and nothing reads them to decide what is
+  public.
 - **Archiving is the one way to take an artist off the site.**
 
 ## Consequences
@@ -52,6 +53,10 @@ is public. A public artist is one that is published and not archived.**
   artist that left the label. They used to search current artists only.
 - An artist card no longer needs to say whether the artist is current.
 - The terms **current artist** and **alumni** leave the glossary.
+- Stored artist documents keep their `isActive` value. MongoDB has no
+  column to drop, and Prisma ignores a field the schema does not name. The
+  index on it is dropped by the schema push.
+- The public payloads of an artist no longer carry `isActive`.
 - If the label later wants to show who is on the roster now, that is a new
   decision. It needs an admin screen that writes the fields first.
 

@@ -46,7 +46,6 @@ export const artistPublicSelect = {
   reactivatedAt: true,
   tags: true,
   isPseudonymous: true,
-  isActive: true,
   instruments: true,
   featuredArtistId: true,
 } as const satisfies Prisma.ArtistSelect;
@@ -88,7 +87,6 @@ export const artistCreditSelect = {
   reactivatedAt: true,
   tags: true,
   isPseudonymous: true,
-  isActive: true,
   instruments: true,
   featuredArtistId: true,
 } as const satisfies Prisma.ArtistSelect;
