@@ -48,6 +48,20 @@ export const currentOrAlumniWhere = {
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
+ * A public artist (ADR-0015): current or alumni, published, and not
+ * soft-deleted. Every public read applies it: to the artist a page is about,
+ * and, nested as `{ artist: { is: publicArtistWhere } }`, to the artists a
+ * release credits, a band lists, a featured row names, or a tour date
+ * headlines. `publishedOn: { not: null }` excludes an absent field as well as
+ * an explicit null. Its in-memory twin is `isPublicArtist`.
+ */
+export const publicArtistWhere = {
+  AND: [currentOrAlumniWhere],
+  publishedOn: { not: null },
+  OR: [...notDeletedOr],
+} as const satisfies Prisma.ArtistWhereInput;
+
+/**
  * Hidden only for want of a `publishedOn`: current or alumni, never
  * published, not soft-deleted. Stamping `publishedOn` on exactly these makes
  * them public.

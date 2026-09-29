@@ -617,6 +617,45 @@ describe('ReleasePlayer', () => {
     expect(menu).toHaveClass('absolute', 'right-1', 'top-1', 'z-10', 'text-white', 'rounded-full');
   });
 
+  describe('a release with no public credit (ADR-0015)', () => {
+    const uncredited = { ...mockRelease, artistReleases: [] };
+
+    it('still plays', () => {
+      render(<ReleasePlayer release={uncredited} releaseId="release-1" />);
+
+      expect(screen.getByTestId('media-controls')).toBeInTheDocument();
+    });
+
+    it('does not claim there are no tracks', () => {
+      render(<ReleasePlayer release={uncredited} releaseId="release-1" />);
+
+      expect(screen.queryByText('No playable tracks available.')).not.toBeInTheDocument();
+    });
+
+    it('still lists the tracks', () => {
+      render(<ReleasePlayer release={uncredited} releaseId="release-1" />);
+
+      expect(screen.getByTestId('format-file-list-drawer')).toBeInTheDocument();
+    });
+
+    it('adds a track to a playlist without an artist name', () => {
+      render(<ReleasePlayer release={uncredited} releaseId="release-1" />);
+
+      const menu = screen.getByRole('button', { name: /add to a playlist/i });
+      const item = JSON.parse(menu.getAttribute('data-item') ?? '{}') as PlaylistSearchItem;
+
+      expect(item.artistName).toBeNull();
+    });
+
+    it('opens the download dialog without an artist name', () => {
+      render(<ReleasePlayer release={uncredited} releaseId="release-1" />);
+
+      fireEvent.click(screen.getByTestId('download-trigger-button'));
+
+      expect(screen.getByTestId('download-dialog')).toHaveAttribute('data-artist-name', '');
+    });
+  });
+
   it('should not render the add-to-playlist menu when there are no files', () => {
     render(<ReleasePlayer release={mockReleaseNoTracks} releaseId="release-no-tracks" />);
 

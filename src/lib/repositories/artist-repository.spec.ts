@@ -449,6 +449,7 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
         isActive: true,
+        publishedOn: { not: null },
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         releases: {
           some: {
@@ -511,13 +512,13 @@ describe('ArtistRepository', () => {
       expect(result.map(({ id }) => id)).toEqual(['b']);
     });
 
-    it('does not require the artist itself to be published (playlist search keeps its rule)', async () => {
+    it('never matches an unpublished artist, so a search cannot name a hidden one', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.searchPublished({ search: 'foo' });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).not.toHaveProperty('publishedOn');
+      expect(arg?.where?.publishedOn).toEqual({ not: null });
     });
 
     it('adds a title/name search AND clause when a search term is given', async () => {
@@ -527,6 +528,35 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where?.AND).toBeDefined();
+    });
+  });
+
+  describe('listListed band names (ADR-0015)', () => {
+    const PUBLIC_ARTIST = {
+      AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+      publishedOn: { not: null },
+      OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+    };
+
+    const readSelect = async (): Promise<{
+      members: { where: unknown };
+      memberOf: { where: unknown };
+    }> => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+      await ArtistRepository.listListed({ sort: 'alpha', roster: 'current', skip: 0, take: 24 });
+      return vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.select as never;
+    };
+
+    it('names only the members that are public artists', async () => {
+      const select = await readSelect();
+
+      expect(select.members.where).toEqual({ member: { is: PUBLIC_ARTIST } });
+    });
+
+    it('names only the bands that are public artists', async () => {
+      const select = await readSelect();
+
+      expect(select.memberOf.where).toEqual({ artist: { is: PUBLIC_ARTIST } });
     });
   });
 

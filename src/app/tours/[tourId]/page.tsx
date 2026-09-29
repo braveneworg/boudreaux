@@ -27,7 +27,7 @@ export default async function TourPage({ params }: TourPageProps) {
   const { tourId } = await params;
   const queryClient = getQueryClient();
 
-  const tour = await TourRepository.findById(tourId);
+  const tour = await TourRepository.findPublicById(tourId);
 
   if (!tour) {
     notFound();

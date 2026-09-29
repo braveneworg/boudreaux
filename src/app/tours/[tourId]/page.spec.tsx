@@ -38,7 +38,7 @@ vi.mock('@/lib/utils/get-internal-api-url', () => ({
 const mockFindById = vi.fn();
 vi.mock('@/lib/repositories/tours/tour-repository', () => ({
   TourRepository: {
-    findById: (...args: unknown[]) => mockFindById(...args),
+    findPublicById: (...args: unknown[]) => mockFindById(...args),
   },
 }));
 
@@ -80,7 +80,7 @@ describe('TourPage', () => {
     mockFindById.mockResolvedValue(mockTour);
   });
 
-  it('should call TourRepository.findById with tourId', async () => {
+  it('should call TourRepository.findPublicById with tourId', async () => {
     const Page = await TourPage({ params: defaultParams });
     render(Page);
 

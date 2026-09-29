@@ -130,8 +130,8 @@ export const artistPublicScalar = Object.fromEntries(
 
 /**
  * Every bio field, populated — text a nested artist (a release credit, a band
- * member, a tour headliner) must never carry, because nothing gates a nested
- * artist on publication. Spread over a row to build one that leaks its bio.
+ * member, a tour headliner) must never carry, because a bio is shown only on
+ * its artist's own page. Spread over a row to build one that leaks its bio.
  */
 export const artistBioValues = {
   bio: 'Unreleased long bio',
@@ -338,5 +338,14 @@ export const artistWithPublishedReleases = {
     },
   ],
   members: [{ id: 'am1', artistId: 'a1', memberId: 'a2', member: { ...artistScalar, id: 'a2' } }],
-  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release, credit: 'primary' as const }],
+  releases: [
+    {
+      id: 'ar1',
+      artistId: 'a1',
+      releaseId: 'r1',
+      release,
+      credit: 'primary' as const,
+      albumArtist: null,
+    },
+  ],
 };

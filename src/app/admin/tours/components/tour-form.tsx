@@ -27,7 +27,7 @@ import {
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { Textarea } from '@/app/components/ui/textarea';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { useTourQuery } from '@/hooks/queries/use-tour-query';
+import { useAdminTourQuery } from '@/hooks/queries/use-tour-query';
 import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
 import {
   tourCreateSchema,
@@ -85,10 +85,10 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const { deleteTourAsync, isDeletingTour } = useDeleteTourMutation();
   const isSubmitting = isCreatingTour || isUpdatingTour;
 
-  // Edit-mode data loading. `useTourQuery` is skipped when an `initialTour`
+  // Edit-mode data loading. `useAdminTourQuery` is skipped when an `initialTour`
   // prop is supplied (the fast-path resets straight from the prop). Tour images
   // are always fetched in edit mode; `refetch` re-pulls them after an upload.
-  const { data: tourData, isPending: isTourPending } = useTourQuery(tourIdOrEmpty, {
+  const { data: tourData, isPending: isTourPending } = useAdminTourQuery(tourIdOrEmpty, {
     enabled: isEditMode && !initialTour,
   });
   const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(tourIdOrEmpty, {

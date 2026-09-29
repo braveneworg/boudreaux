@@ -11,10 +11,19 @@ import { GET, DELETE } from './route';
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
-// Mock withAdmin decorator to bypass auth in tests
-vi.mock('@/lib/decorators/with-auth', () => ({
-  withAdmin: (handler: () => unknown) => handler,
-}));
+// Model withAdmin: pass through for an admin, 401 otherwise.
+const authState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/lib/decorators/with-auth', async () => {
+  const { NextResponse: Response } = await import('next/server');
+  return {
+    withAdmin:
+      (handler: (...args: unknown[]) => unknown) =>
+      (...args: unknown[]) =>
+        authState.isAdmin
+          ? handler(...args)
+          : Response.json({ error: 'Authentication required' }, { status: 401 }),
+  };
+});
 
 vi.mock('@/lib/services/featured-artists-service', () => ({
   FeaturedArtistsService: {
@@ -43,6 +52,43 @@ describe('Featured Artist by ID API Routes', () => {
     params: Promise.resolve({ id }),
   });
   describe('GET /api/featured-artists/[id]', () => {
+    describe('access (ADR-0015)', () => {
+      const get = (): Promise<Response> =>
+        GET(
+          new NextRequest('http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011'),
+          createParams('507f1f77bcf86cd799439011')
+        ) as Promise<Response>;
+
+      beforeEach(() => {
+        vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
+          success: true,
+          data: mockFeaturedArtist as never,
+        });
+      });
+
+      afterEach(() => {
+        authState.isAdmin = true;
+        vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockReset();
+      });
+
+      it('refuses a visitor who is not an admin, without reading', async () => {
+        authState.isAdmin = false;
+
+        const response = await get();
+
+        expect({
+          status: response.status,
+          reads: vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mock.calls,
+        }).toEqual({ status: 401, reads: [] });
+      });
+
+      it('is never shared-cached: the payload names artists whatever their state', async () => {
+        const response = await get();
+
+        expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+      });
+    });
+
     it('should return a featured artist by ID', async () => {
       vi.mocked(FeaturedArtistsService.getFeaturedArtistById).mockResolvedValue({
         success: true,

@@ -21,7 +21,8 @@ export type ToursPageResponse = PaginatedResponse<TourWithRelations>;
 /**
  * GET /api/tours
  * Returns a skip/offset page of tours with related data (venues, headliners,
- * artists, images), optionally filtered by a server-side `search` term.
+ * artists, images), optionally filtered by a server-side `search` term. Only
+ * the tours, dates and headliners the public may see are returned (ADR-0015).
  *
  * Query params: `skip` (default 0), `take` (default 24, clamped to 100),
  * `search`.
@@ -39,7 +40,7 @@ export const GET = withRateLimit(
     );
     const search = searchParams.get('search') ?? undefined;
 
-    const rows = await TourRepository.findAll({ skip, take, search });
+    const rows = await TourRepository.findAllPublic({ skip, take, search });
 
     return NextResponse.json(
       { rows, nextSkip: computeNextSkip(rows.length, skip, take) } satisfies ToursPageResponse,

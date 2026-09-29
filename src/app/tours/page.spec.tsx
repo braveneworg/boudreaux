@@ -32,7 +32,7 @@ vi.mock('@/lib/utils/get-query-client', () => ({
 const mockFindAll = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/repositories/tours/tour-repository', () => ({
   TourRepository: {
-    findAll: (...args: unknown[]) => mockFindAll(...args),
+    findAllPublic: (...args: unknown[]) => mockFindAll(...args),
   },
 }));
 

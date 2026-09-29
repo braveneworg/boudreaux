@@ -2074,3 +2074,18 @@ describe('DownloadDialog — purchase-confirmed step variants', () => {
     expect(screen.queryByText(/resets in/i)).not.toBeInTheDocument();
   });
 });
+
+describe('DownloadDialog title for a release with no public credit', () => {
+  it('names the release, since there is no artist to name', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <DownloadDialog artistName="" releaseId="release-1" releaseTitle="My Album">
+        <button type="button">Open</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Download My Album' })).toBeInTheDocument();
+  });
+});

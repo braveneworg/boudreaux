@@ -241,6 +241,20 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             coverArt: true,
             publishedAt: true,
             artistReleases: {
+              // Only public artists are named (ADR-0015).
+              where: {
+                artist: {
+                  is: {
+                    AND: [
+                      {
+                        OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }],
+                      },
+                    ],
+                    publishedOn: { not: null },
+                    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+                  },
+                },
+              },
               select: {
                 artist: {
                   select: {

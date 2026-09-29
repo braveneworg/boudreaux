@@ -152,8 +152,9 @@ export const artistPublicScalarSchema = artistScalarSchema.omit(
 /**
  * The scalars a nested artist (a release credit, a band member or band, a tour
  * headliner) may carry — {@link artistPublicScalarSchema} without any bio
- * field. Nothing gates a nested artist on publication, so parsing through this
- * drops a draft artist's bio instead of serialising it.
+ * field. A bio is shown only on its artist's own page, so parsing through this
+ * drops a bio that a query selected for a nested artist instead of
+ * serialising it.
  */
 export const artistCreditScalarSchema = artistPublicScalarSchema.omit(
   ARTIST_BIO_FIELD_MASK

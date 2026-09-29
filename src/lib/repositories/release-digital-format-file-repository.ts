@@ -7,6 +7,7 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 
 import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
@@ -38,7 +39,10 @@ const trackFileWithReleaseSelect = {
           title: true,
           coverArt: true,
           publishedAt: true,
+          // Only public artists are named (ADR-0015); a track of a release
+          // credited only to hidden artists is returned with no artist.
           artistReleases: {
+            where: { artist: { is: publicArtistWhere } },
             select: {
               artist: {
                 select: {

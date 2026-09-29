@@ -134,10 +134,11 @@ export type ArtistPublicScalars = Omit<ArtistScalars, ArtistPrivateField>;
 /**
  * The bio text and its generation metadata. Public, but only for an artist the
  * public may see: a bio is released when its artist is published and not
- * deleted, and it has no release state of its own. Only the gated page artist
- * reads them; an artist reached through another record — a release credit, a
- * band member or band, a tour headliner — is not gated on publication, so its
- * projection leaves every one of these out. Keyed as a `true` mask like
+ * deleted, and it has no release state of its own. Only the page artist reads
+ * them. An artist reached through another record — a release credit, a band
+ * member or band, a tour headliner — is a public artist too (ADR-0015), but
+ * no surface shows its bio there, so its projection leaves every one of these
+ * out. Keyed as a `true` mask like
  * {@link ARTIST_PRIVATE_FIELD_MASK}.
  */
 export const ARTIST_BIO_FIELD_MASK = {
@@ -335,8 +336,19 @@ export interface ArtistWithPublishedReleases extends Omit<
   ArtistWithReleaseGraph,
   'memberOf' | 'releases'
 > {
-  releases: Array<ArtistReleaseGraphRow & { credit: ReleaseCredit }>;
+  releases: ArtistPublishedReleaseRow[];
 }
+
+/**
+ * One release on the public artist page. Its credits name public artists only
+ * (ADR-0015). `albumArtist` is the release's first credit, read before the
+ * hidden artists were dropped: `null` when that artist is hidden, so the page
+ * never attributes the release to whoever is credited next.
+ */
+export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
+  credit: ReleaseCredit;
+  albumArtist: ArtistCreditScalars | null;
+};
 
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';

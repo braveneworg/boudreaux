@@ -30,6 +30,14 @@ export type TourWithRelations = Tour & {
   images: TourImage[];
 };
 
+/** Which read of a tour: what the public may see, or the unfiltered tour an admin edits. */
+type TourScope = 'public' | 'admin';
+
+const tourUrl = (tourId: string, scope: TourScope): string => {
+  const url = `/api/tours/${encodeURIComponent(tourId)}`;
+  return scope === 'admin' ? `${url}?scope=admin` : url;
+};
+
 /**
  * Fetches a single tour from the `/api/tours/[tourId]` route handler.
  *
@@ -37,15 +45,17 @@ export type TourWithRelations = Tour & {
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
  *
  * @param tourId - The tour identifier to fetch.
+ * @param scope - The public read, or the admin's unfiltered read.
  * @param signal - The `AbortSignal` forwarded from TanStack Query.
  * @returns The parsed tour with relations, or `null` when not found (404).
  * @throws If the response status is not OK (other than 404).
  */
 const fetchTour = async (
   tourId: string,
+  scope: TourScope,
   signal?: AbortSignal
 ): Promise<TourWithRelations | null> => {
-  const url = `/api/tours/${encodeURIComponent(tourId)}`;
+  const url = tourUrl(tourId, scope);
   const response = await fetch(url, { signal });
   if (!response.ok) {
     if (response.status === 404) {
@@ -58,7 +68,9 @@ const fetchTour = async (
 };
 
 /**
- * React Query hook for fetching a single tour.
+ * React Query hook for fetching a single tour as the public may see it: only
+ * the dates and headliners of public artists (ADR-0015). A tour whose dates
+ * are all hidden resolves to `null`.
  *
  * Wraps {@link fetchTour} with a stable query key and exposes the request
  * state. Cancellation is handled automatically via the forwarded `AbortSignal`.
@@ -80,7 +92,38 @@ export const useTourQuery = (
     refetch,
   } = useQuery({
     queryKey: queryKeys.tours.detail(tourId),
-    queryFn: ({ signal }) => fetchTour(tourId, signal),
+    queryFn: ({ signal }) => fetchTour(tourId, 'public', signal),
+    ...options,
+    enabled: (options.enabled ?? true) && !!tourId,
+  });
+
+  return { isPending, error, data, refetch };
+};
+
+/**
+ * React Query hook for the tour an admin edits: the unfiltered tour, with
+ * every date and headliner whatever the artists' state. Admin only; the route
+ * refuses anyone else. Keyed apart from {@link useTourQuery} so the filtered
+ * and unfiltered payloads are never served for one another.
+ *
+ * @param tourId - The tour identifier to fetch.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`); the non-empty-tourId gate is always applied on top.
+ * @returns The query state: `isPending`, `error` (defaulted when unknown),
+ * `data`, and `refetch`.
+ */
+export const useAdminTourQuery = (
+  tourId: string,
+  options: QueryOptionsOverride<TourWithRelations | null> = {}
+) => {
+  const {
+    isPending,
+    error = Error('Unknown error'),
+    data,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.tours.adminDetail(tourId),
+    queryFn: ({ signal }) => fetchTour(tourId, 'admin', signal),
     ...options,
     enabled: (options.enabled ?? true) && !!tourId,
   });

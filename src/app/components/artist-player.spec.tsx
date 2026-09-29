@@ -441,6 +441,7 @@ describe('ArtistPlayer', () => {
           releaseId: 'guest',
           release: guest,
           credit: 'featured',
+          albumArtist: band,
         },
       ],
     } as unknown as ArtistWithPublishedReleases;
@@ -455,6 +456,46 @@ describe('ArtistPlayer', () => {
       expect(screen.getByRole('button', { name: 'Play Guest Album' })).toHaveAttribute(
         'data-subtitle',
         'by The Problems'
+      );
+    });
+  });
+
+  describe('a release whose album artist is hidden (ADR-0015)', () => {
+    const guest = createRelease('guest', 'Guest Album', [mockFile2]);
+    const artist = {
+      ...baseArtist,
+      releases: [
+        {
+          id: 'ar-guest',
+          artistId: baseArtist.id,
+          releaseId: 'guest',
+          // The hidden album artist was dropped; the page artist is what is left.
+          release: {
+            ...guest,
+            artistReleases: [
+              { id: 'ar-self', artistId: baseArtist.id, releaseId: 'guest', artist: baseArtist },
+            ],
+          },
+          credit: 'featured',
+          albumArtist: null,
+        },
+        {
+          id: 'ar-own',
+          artistId: baseArtist.id,
+          releaseId: 'own',
+          release: createRelease('own', 'Own Album', [mockFile1]),
+          credit: 'primary',
+          albumArtist: baseArtist,
+        },
+      ],
+    } as unknown as ArtistWithPublishedReleases;
+
+    it('is not attributed to the next credited artist', () => {
+      render(<ArtistPlayer artist={artist} />);
+
+      expect(screen.getByRole('button', { name: 'Play Guest Album' })).toHaveAttribute(
+        'data-subtitle',
+        ''
       );
     });
   });

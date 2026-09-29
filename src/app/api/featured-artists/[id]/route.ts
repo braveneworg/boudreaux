@@ -4,9 +4,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
-import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
@@ -15,33 +13,38 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /**
  * GET /api/featured-artists/[id]
- * Get a single featured artist by ID
+ * Admin-only. The full featured artist the edit form loads: every connected
+ * artist whatever its publication state, and the row itself whether or not it
+ * is published. It names hidden artists, so it is never public and never
+ * shared-cached (ADR-0015). The public reads the active listing instead.
  */
-export const GET = withRateLimit<{ id: string }>(
-  publicLimiter,
-  PUBLIC_LIMIT
-)(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-  try {
-    const { id } = await params;
+export const GET = withAdmin(
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+      const { id } = await params;
 
-    if (!isValidObjectId(id)) {
-      return NextResponse.json({ error: 'Invalid featured artist ID' }, { status: 400 });
+      if (!isValidObjectId(id)) {
+        return NextResponse.json({ error: 'Invalid featured artist ID' }, { status: 400 });
+      }
+
+      const result = await FeaturedArtistsService.getFeaturedArtistById(id);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
+      }
+
+      return NextResponse.json(serializeForResponse(result.data), {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    } catch (error) {
+      loggers.media.error('FeaturedArtist GET by ID error', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    const result = await FeaturedArtistsService.getFeaturedArtistById(id);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(serializeForResponse(result.data), {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
-    });
-  } catch (error) {
-    loggers.media.error('FeaturedArtist GET by ID error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-});
+);
 
 /**
  * DELETE /api/featured-artists/[id]

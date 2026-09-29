@@ -5,6 +5,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 
 interface CreatePurchaseData {
@@ -167,7 +168,10 @@ export class PurchaseRepository {
             title: true,
             coverArt: true,
             images: true,
+            // Only public artists are named (ADR-0015); a release credited
+            // only to hidden artists is listed with no byline.
             artistReleases: {
+              where: { artist: { is: publicArtistWhere } },
               include: {
                 artist: {
                   select: {

@@ -61,8 +61,9 @@ const tourDateInclude = {
   venue: true,
   tour: true,
   headliners: {
-    // Public payload: headliners carry public scalars only (#765), and no bio,
-    // since a headliner is not gated on publication.
+    // Headliners carry public scalars only (#765) and no bio. Every headliner
+    // is returned whatever its artist's state: these reads feed the admin
+    // screens. The public reads a tour's dates through `TourRepository`.
     include: {
       artist: { select: artistCreditSelect },
     },

@@ -205,6 +205,25 @@ describe('PurchaseRepository', () => {
   });
 
   describe('findAllByUser', () => {
+    it('reads only the credits whose artist is public (ADR-0015)', async () => {
+      vi.mocked(prisma.releasePurchase.findMany).mockResolvedValueOnce([] as never);
+
+      await PurchaseRepository.findAllByUser('user-123');
+
+      const args = vi.mocked(prisma.releasePurchase.findMany).mock.calls.at(-1)?.[0] as {
+        include: { release: { select: { artistReleases: { where: unknown } } } };
+      };
+      expect(args.include.release.select.artistReleases.where).toEqual({
+        artist: {
+          is: {
+            AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
+            publishedOn: { not: null },
+            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          },
+        },
+      });
+    });
+
     it('should call prisma.releasePurchase.findMany with the userId and include release details', async () => {
       const mockRecords = [
         {

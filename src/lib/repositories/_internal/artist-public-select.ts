@@ -63,7 +63,7 @@ const _artistPublicScalarsDrift: _ArtistPublicScalarsDrift = true;
  * a tour headliner. {@link artistPublicSelect} without the bio fields: nothing
  * gates a nested artist on publication, so a draft artist's bio would
  * otherwise ride along on a published artist's page or a tour. Keeps the
- * publication and roster fields `isVisibleArtist` reads. An allow-list,
+ * publication and roster fields `isPublicArtist` reads. An allow-list,
  * drift-checked against {@link ArtistCreditScalars}.
  */
 export const artistCreditSelect = {

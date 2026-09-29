@@ -143,7 +143,7 @@ describe('CollectionList', () => {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 
-  it('shows Unknown Artist when no artist releases', () => {
+  it('shows no byline for a release with no public credit', () => {
     const purchase = buildPurchase();
     purchase.release.artistReleases = [];
 
@@ -151,7 +151,18 @@ describe('CollectionList', () => {
       wrapper: createQueryWrapper(),
     });
 
-    expect(screen.getByText('Unknown Artist')).toBeInTheDocument();
+    expect(screen.queryByTestId('collection-artist-name')).not.toBeInTheDocument();
+  });
+
+  it('never prints a placeholder artist', () => {
+    const purchase = buildPurchase();
+    purchase.release.artistReleases = [];
+
+    render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
+      wrapper: createQueryWrapper(),
+    });
+
+    expect(screen.queryByText('Unknown Artist')).not.toBeInTheDocument();
   });
 
   it('does not show delete button when not admin', () => {

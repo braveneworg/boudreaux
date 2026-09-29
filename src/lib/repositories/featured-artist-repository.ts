@@ -12,6 +12,7 @@ import type {
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact } from './_internal/drift';
@@ -64,6 +65,25 @@ export const featuredArtistInclude = {
     },
   },
 } satisfies Prisma.FeaturedArtistInclude;
+
+/**
+ * The include for public reads: the same shape, naming only the artists that
+ * are public artists (ADR-0015). Admin reads keep {@link featuredArtistInclude},
+ * which names every connected artist.
+ */
+const publicFeaturedArtistInclude = {
+  ...featuredArtistInclude,
+  artists: { ...featuredArtistInclude.artists, where: publicArtistWhere },
+} satisfies Prisma.FeaturedArtistInclude;
+
+/**
+ * A featured row the public may see as far as its artists go: it names no
+ * artist at all (a row carried by its own display name), or at least one
+ * public artist. A row whose artists are all hidden is dropped.
+ */
+const hasNoHiddenOnlyArtists = {
+  OR: [{ artists: { none: {} } }, { artists: { some: publicArtistWhere } }],
+} satisfies Prisma.FeaturedArtistWhereInput;
 
 // Compile-time drift guard: fail `pnpm run typecheck` if the hand-written
 // `FeaturedArtist` domain type diverges from the Prisma payload its query
@@ -140,7 +160,9 @@ export class FeaturedArtistRepository {
 
   /**
    * Find featured artists currently visible on `currentDate` (published, within
-   * the featured window), newest first, capped at `take`.
+   * the featured window), newest first, capped at `take`. A row whose artists
+   * are all hidden is left out, and the rows returned name public artists
+   * only (ADR-0015).
    */
   static async findFeatured(currentDate: Date, take: number): Promise<FeaturedArtist[]> {
     return runQuery(() =>
@@ -155,8 +177,9 @@ export class FeaturedArtistRepository {
             { featuredUntil: { isSet: false } },
             { featuredUntil: { gte: currentDate } },
           ],
+          AND: [hasNoHiddenOnlyArtists],
         },
-        include: featuredArtistInclude,
+        include: publicFeaturedArtistInclude,
         orderBy: {
           featuredOn: 'desc',
         },

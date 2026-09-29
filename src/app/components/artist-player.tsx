@@ -86,12 +86,12 @@ interface ArtistReleaseSelectorProps {
 
 /**
  * Qualifier for a release the artist did not put out themselves — a featured
- * appearance or a band release — naming the release's album artist (its first
- * credit). The artist's own releases get no qualifier.
+ * appearance or a band release — naming the release's album artist. The
+ * artist's own releases get no qualifier, and neither does a release whose
+ * album artist is hidden (ADR-0015).
  */
-const releaseSubtitle = ({ credit, release }: ArtistRelease): string | null => {
+const releaseSubtitle = ({ credit, albumArtist }: ArtistRelease): string | null => {
   if (credit === 'primary') return null;
-  const albumArtist = release.artistReleases.at(0)?.artist;
   return albumArtist ? `by ${getArtistDisplayName(albumArtist)}` : null;
 };
 
