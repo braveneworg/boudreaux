@@ -17,62 +17,37 @@ export const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } 
 /** Mongo null-safe "never published" clause (absent field counts as unpublished). */
 export const unpublishedOr = [{ publishedOn: null }, { publishedOn: { isSet: false } }] as const;
 
-/** Mongo null-safe "no departure date" clause (absent field counts as none). */
-const noDepartureDateOr = [{ deactivatedAt: null }, { deactivatedAt: { isSet: false } }] as const;
-
 /** A release that the public may see: published and not soft-deleted. */
 export const listedReleaseWhere = {
   publishedAt: { not: null },
   OR: [...notDeletedOr],
 } as const satisfies Prisma.ReleaseWhereInput;
 
-/** A current artist: still on the label (`isActive`, which defaults to true). */
-export const currentArtistWhere = { isActive: true } as const satisfies Prisma.ArtistWhereInput;
-
 /**
- * An alumnus: deactivated AND carrying a recorded departure date
- * (`deactivatedAt` — "left the label"). An inactive artist with no departure
- * date was hidden for some other reason and stays hidden everywhere public.
- * `{ not: null }` excludes an unset field as well as an explicit null, the
- * same guard the `publishedOn` gate relies on. `reactivatedAt` plays no part:
- * re-signing sets `isActive` back to true, which makes the artist current.
- */
-export const alumniArtistWhere = {
-  isActive: false,
-  deactivatedAt: { not: null },
-} as const satisfies Prisma.ArtistWhereInput;
-
-/** Either a current artist or an alumnus — everyone the public may see. */
-export const currentOrAlumniWhere = {
-  OR: [currentArtistWhere, alumniArtistWhere],
-} as const satisfies Prisma.ArtistWhereInput;
-
-/**
- * A public artist (ADR-0015): current or alumni, published, and not
- * soft-deleted. Every public read applies it: to the artist a page is about,
- * and, nested as `{ artist: { is: publicArtistWhere } }`, to the artists a
- * release credits, a band lists, a featured row names, or a tour date
- * headlines. `publishedOn: { not: null }` excludes an absent field as well as
- * an explicit null. Its in-memory twin is `isPublicArtist`.
+ * A public artist (ADR-0015, ADR-0016): published and not soft-deleted.
+ * Whether the artist is still on the label plays no part. Every public read
+ * applies it: to the artist a page is about, and, nested as
+ * `{ artist: { is: publicArtistWhere } }`, to the artists a release credits, a
+ * band lists, a featured row names, or a tour date headlines.
+ * `publishedOn: { not: null }` excludes an absent field as well as an explicit
+ * null. Its in-memory twin is `isPublicArtist`.
  */
 export const publicArtistWhere = {
-  AND: [currentOrAlumniWhere],
   publishedOn: { not: null },
   OR: [...notDeletedOr],
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
- * Hidden only for want of a `publishedOn`: current or alumni, never
- * published, not soft-deleted. Stamping `publishedOn` on exactly these makes
- * them public.
+ * Hidden only for want of a `publishedOn`: never published, not soft-deleted.
+ * Stamping `publishedOn` on exactly these makes them public.
  */
 const awaitingConfirmationGate = {
-  AND: [currentOrAlumniWhere, { OR: [...unpublishedOr] }, { OR: [...notDeletedOr] }],
+  AND: [{ OR: [...unpublishedOr] }, { OR: [...notDeletedOr] }],
 } as const satisfies Prisma.ArtistWhereInput;
 
-/** Hidden whatever `publishedOn` says: soft-deleted, or inactive with no departure date. */
+/** Hidden whatever `publishedOn` says: soft-deleted. */
 const staysHiddenGate = {
-  OR: [{ deletedOn: { not: null } }, { isActive: false, OR: [...noDepartureDateOr] }],
+  deletedOn: { not: null },
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
@@ -133,10 +108,8 @@ export const creditConfirmationSelect = {
   },
 } as const satisfies Prisma.ArtistSelect;
 
-/** What a credit that stays hidden reads: the name and the fields that hide it. */
+/** What a credit that stays hidden reads: the name and the field that hides it. */
 export const hiddenCreditSelect = {
   ...creditNameSelect,
-  isActive: true,
-  deactivatedAt: true,
   deletedOn: true,
 } as const satisfies Prisma.ArtistSelect;

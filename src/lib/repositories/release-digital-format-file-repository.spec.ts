@@ -245,11 +245,6 @@ describe('ReleaseDigitalFormatFileRepository', () => {
               where: {
                 artist: {
                   is: {
-                    AND: [
-                      {
-                        OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }],
-                      },
-                    ],
                     publishedOn: { not: null },
                     OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
                   },

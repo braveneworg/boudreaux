@@ -1415,26 +1415,27 @@ const seedTestDatabase = async () => {
       data: { artistId: composedNameArtist.id, releaseId: rosterCompilation.id },
     });
 
-    // Alumnus: published and credited on a listed release, but deactivated
-    // with a recorded departure date — the index's Alumni roster. Default
-    // (Current) listings never include them, so no index count, search, or
-    // page boundary above moves. Credited on the roster compilation so no
-    // release count moves either; createdAt pinned in the past for the same
-    // admin-list reason as the band.
-    const alumnusArtist = await prisma.artist.create({
+    // An artist no longer on the label: published and credited on a listed
+    // release, but inactive with no departure date. Whether an artist is still
+    // on the label decides nothing (ADR-0016), so the index lists it like any
+    // other. The name files after every "E2E Roster" row and before the
+    // composed name, so page 1, the first card and the last card above stay
+    // as they are. Credited on the roster compilation so no release count
+    // moves; createdAt pinned in the past for the same admin-list reason as
+    // the band.
+    const departedArtist = await prisma.artist.create({
       data: {
         firstName: 'E2E',
-        surname: 'Alumnus',
-        slug: 'e2e-alumnus',
-        displayName: 'E2E Alumnus',
+        surname: 'Standing',
+        slug: 'e2e-standing',
+        displayName: 'E2E Standing',
         publishedOn: new Date(),
         isActive: false,
-        deactivatedAt: new Date('2023-06-01T00:00:00Z'),
         createdAt: new Date('2019-01-01T00:00:00Z'),
       },
     });
     await prisma.artistRelease.create({
-      data: { artistId: alumnusArtist.id, releaseId: rosterCompilation.id },
+      data: { artistId: departedArtist.id, releaseId: rosterCompilation.id },
     });
 
     // Create MP3_320KBPS digital formats with track files for each E2E release.

@@ -82,14 +82,14 @@ describe('queryKeys', () => {
       expect(key).toEqual(['artists', 'search', 'rock']);
     });
 
-    it('keys the public listing by sort, roster, and normalized search', () => {
-      const key = queryKeys.artists.publishedInfinite('newest', '  Punk ', 'alumni');
-      expect(key).toEqual(['artists', 'publishedInfinite', 'newest', 'alumni', 'punk']);
+    it('keys the public listing by sort and normalized search', () => {
+      const key = queryKeys.artists.publishedInfinite('newest', '  Punk ');
+      expect(key).toEqual(['artists', 'publishedInfinite', 'newest', 'punk']);
     });
 
-    it('defaults the public listing to current artists with an empty search', () => {
+    it('defaults the public listing to an empty search', () => {
       const key = queryKeys.artists.publishedInfinite('alpha');
-      expect(key).toEqual(['artists', 'publishedInfinite', 'alpha', 'current', '']);
+      expect(key).toEqual(['artists', 'publishedInfinite', 'alpha', '']);
     });
 
     it('should return filteredList key with params', () => {

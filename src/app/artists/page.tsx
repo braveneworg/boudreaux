@@ -6,7 +6,7 @@
  * Public artists index at `/artists`.
  * Server Component that prefetches the first A–Z page of listed artists
  * (ADR-0007) for SSR, then hydrates the client content island that owns the
- * search combobox, the roster and sort toggles, and infinite scroll. No sign-in is
+ * search combobox, the sort toggle, and infinite scroll. No sign-in is
  * required — the listing (like `/videos`) is open to anonymous visitors.
  */
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
@@ -43,12 +43,11 @@ export default async function ArtistsIndexPage() {
   // under load on the standalone server. A service failure degrades to an empty
   // first page (the client refetches) rather than crashing the page.
   await queryClient.prefetchInfiniteQuery({
-    queryKey: queryKeys.artists.publishedInfinite('alpha', '', 'current'),
+    queryKey: queryKeys.artists.publishedInfinite('alpha', ''),
     initialPageParam: 0,
     queryFn: async () => {
       const result = await ArtistService.listPublishedArtists({
         sort: 'alpha',
-        roster: 'current',
         skip: 0,
         take: PUBLISHED_ARTISTS_PAGE_SIZE,
       });

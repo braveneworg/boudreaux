@@ -1173,7 +1173,7 @@ describe('ArtistService', () => {
       expect(readReleases(result)).toEqual([]);
     });
 
-    it('omits unpublished, deactivated non-alumni, and deleted members but keeps alumni (#786)', async () => {
+    it('omits unpublished and deleted members, and keeps one that left the label (ADR-0016)', async () => {
       vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
         ...mockArtistWithReleases,
         members: [
@@ -1212,10 +1212,10 @@ describe('ArtistService', () => {
 
       const data = (result as { success: true; data: { members: Array<{ memberId: string }> } })
         .data;
-      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub', 'alumnus']);
+      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub', 'inactive', 'alumnus']);
     });
 
-    it('drops the releases of an unpublished, deactivated non-alumni, or deleted band (#786)', async () => {
+    it('drops the releases of an unpublished or deleted band, whatever its standing (ADR-0016)', async () => {
       const bandRow = (id: string, overrides: JoinedArtistOverrides = {}) => ({
         id: `am-${id}`,
         artistId: id,
@@ -1240,10 +1240,11 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
-      expect(readReleases(result).map(({ releaseId }) => releaseId)).toEqual([
-        'pub-band-lp',
-        'alumni-band-lp',
-      ]);
+      expect(
+        readReleases(result)
+          .map(({ releaseId }) => releaseId)
+          .sort()
+      ).toEqual(['alumni-band-lp', 'inactive-band-lp', 'pub-band-lp']);
     });
 
     it('does not expose the band graph on the public payload', async () => {
@@ -1893,7 +1894,7 @@ describe('ArtistService', () => {
       ],
     };
 
-    const filters = { sort: 'alpha' as const, roster: 'current' as const, skip: 0, take: 24 };
+    const filters = { sort: 'alpha' as const, skip: 0, take: 24 };
 
     const listOne = async () => {
       vi.mocked(ArtistRepository.listListed).mockResolvedValue([listingRecord] as never);
@@ -1911,16 +1912,6 @@ describe('ArtistService', () => {
         search: 'punk',
         sort: 'newest',
       });
-    });
-
-    it('forwards the alumni roster filter to the repository', async () => {
-      vi.mocked(ArtistRepository.listListed).mockResolvedValue([] as never);
-
-      await ArtistService.listPublishedArtists({ ...filters, roster: 'alumni' });
-
-      expect(vi.mocked(ArtistRepository.listListed).mock.calls).toEqual([
-        [{ ...filters, roster: 'alumni' }],
-      ]);
     });
 
     it('strips markup from the short bio (plain-text sanitization)', async () => {

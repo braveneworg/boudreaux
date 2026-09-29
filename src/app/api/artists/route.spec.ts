@@ -407,27 +407,34 @@ describe('Artist API Routes', () => {
       expect(auth).not.toHaveBeenCalled();
     });
 
-    it('calls the listing service with the default A–Z page of current artists', async () => {
+    it('calls the listing service with the default A–Z page', async () => {
       await callPublished();
 
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         sort: 'alpha',
-        roster: 'current',
         skip: 0,
         take: 24,
       });
     });
 
-    it('forwards a trimmed search term, the sort, the roster, and the pagination', async () => {
-      await callPublished('&search=%20punk%20&sort=newest&roster=alumni&skip=24&take=12');
+    it('forwards a trimmed search term, the sort, and the pagination', async () => {
+      await callPublished('&search=%20punk%20&sort=newest&skip=24&take=12');
 
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         search: 'punk',
         sort: 'newest',
-        roster: 'alumni',
         skip: 24,
         take: 12,
       });
+    });
+
+    // The roster filter is gone (ADR-0016); an old link that still sends it works.
+    it('serves the one list to a request that still sends a roster', async () => {
+      await callPublished('&roster=alumni');
+
+      expect(vi.mocked(ArtistService.listPublishedArtists).mock.calls).toEqual([
+        [{ sort: 'alpha', skip: 0, take: 24 }],
+      ]);
     });
 
     it('degrades a malformed listing query to defaults instead of a 400', async () => {
@@ -436,7 +443,6 @@ describe('Artist API Routes', () => {
       expect(response.status).toBe(200);
       expect(ArtistService.listPublishedArtists).toHaveBeenCalledWith({
         sort: 'alpha',
-        roster: 'current',
         skip: 0,
         take: 100,
       });

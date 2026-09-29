@@ -19,7 +19,7 @@ const creditThatStaysHiddenSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
-  reason: z.enum(['deleted', 'no-departure-date']),
+  reason: z.enum(['deleted']),
 });
 
 /** The response of the two credits routes (ADR-0015). */

@@ -59,7 +59,6 @@ describe('FeaturedArtistRepository', () => {
 
   /** The public artist gate (ADR-0015): current or alumni, published, not deleted. */
   const PUBLIC_ARTIST = {
-    AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
     publishedOn: { not: null },
     OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
   };

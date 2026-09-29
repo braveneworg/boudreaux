@@ -219,7 +219,7 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
 
   test('lists a band without its hidden member', async ({ page }) => {
     const response = await page.request.get(
-      `/api/artists?listing=published&roster=all&search=${encodeURIComponent(BAND_NAME)}`
+      `/api/artists?listing=published&search=${encodeURIComponent(BAND_NAME)}`
     );
     const body = await response.text();
 
@@ -232,7 +232,7 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
   test('finds nothing when the public searches for the hidden name', async ({ page }) => {
     const searches = [
       `/api/releases?listing=published&search=${HIDDEN_NAME}`,
-      `/api/artists?listing=published&roster=all&search=${HIDDEN_NAME}`,
+      `/api/artists?listing=published&search=${HIDDEN_NAME}`,
       `/api/artists/search?q=${HIDDEN_NAME}`,
       `/api/tours?search=${HIDDEN_NAME}`,
     ];
