@@ -43,6 +43,12 @@ const THROTTLED_RESPONSE = {
 };
 
 test.describe('Admin bio palettes', () => {
+  // One worker, in order. Choosing a display image writes the artist's whole
+  // list of display images, and every test here works on the one seeded
+  // palette artist. Two tests choosing at once overwrite each other: the
+  // second write carries a list without the first test's image.
+  test.describe.configure({ mode: 'default' });
+
   // nginx's api zone once 429'd the status read during rapid admin navigation
   // and the manager showed "Image pool (0)" for an artist with 36 images
   // (2026-09-21). The client now backs off and retries; a transient 429 must
