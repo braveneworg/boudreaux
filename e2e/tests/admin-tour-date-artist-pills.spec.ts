@@ -80,8 +80,12 @@ test.describe('Admin Tour Date Artist Pills', () => {
     // (fullyParallel + workers=50%), yanking their seeded tour date out from
     // under them mid-run and causing flaky "record not found" / empty-list
     // failures. Deleting the tour cascades to its tour dates and headliners.
-    await prisma.tourDate.deleteMany({ where: { tourId } });
-    await prisma.tour.deleteMany({ where: { id: tourId } });
+    // Guarded: Prisma drops a filter whose value is undefined, so after a
+    // failed setup an unguarded `{ tourId }` deletes every tour date.
+    if (tourId) {
+      await prisma.tourDate.deleteMany({ where: { tourId } });
+      await prisma.tour.deleteMany({ where: { id: tourId } });
+    }
     if (venueId) {
       await prisma.venue.deleteMany({ where: { id: venueId } });
     }

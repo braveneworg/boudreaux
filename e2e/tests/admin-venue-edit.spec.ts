@@ -59,11 +59,16 @@ const createTestVenue = async (overrides?: Record<string, string>) => {
 
 test.describe('Admin Venue Edit', () => {
   test.describe.configure({ timeout: 150000 });
-  let tourId: string;
-  let venueId: string;
+  let tourId: string | undefined;
+  let venueId: string | undefined;
   let venueName: string;
 
   test.beforeEach(async ({ adminPage }) => {
+    // Forget the previous test's rows first. If the setup below fails, the
+    // cleanup must find nothing to remove rather than the last test's ids.
+    tourId = undefined;
+    venueId = undefined;
+
     // Create a venue without address/postalCode to simulate the update use case
     const venue = await createTestVenue();
     venueId = venue.id;
@@ -79,10 +84,14 @@ test.describe('Admin Venue Edit', () => {
   });
 
   test.afterEach(async () => {
-    await prisma.tourDate.deleteMany({ where: { tourId } });
-    await prisma.tour.deleteMany({
-      where: { title: { startsWith: 'E2E Venue Edit Tour' } },
-    });
+    // Remove THIS test's tour only, by id. Prisma drops a filter whose value
+    // is undefined, so an unguarded `{ tourId }` after a failed setup deletes
+    // every tour date in the database. A title prefix would remove the tours
+    // of the other tests of this file running in other workers.
+    if (tourId) {
+      await prisma.tourDate.deleteMany({ where: { tourId } });
+      await prisma.tour.deleteMany({ where: { id: tourId } });
+    }
     if (venueId) {
       await prisma.venue.deleteMany({ where: { id: venueId } });
     }
