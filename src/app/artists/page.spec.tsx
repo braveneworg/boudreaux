@@ -180,18 +180,17 @@ describe('ArtistsIndexPage', () => {
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['artists', 'publishedInfinite', 'alpha', 'current', ''],
+        queryKey: ['artists', 'publishedInfinite', 'alpha', ''],
         initialPageParam: 0,
       })
     );
   });
 
-  it('should read the artist service directly for the first page of current artists', async () => {
+  it('should read the artist service directly for the first page', async () => {
     await ArtistsIndexPage();
 
     expect(mockListPublishedArtists).toHaveBeenCalledWith({
       sort: 'alpha',
-      roster: 'current',
       skip: 0,
       take: 24,
     });

@@ -23,11 +23,7 @@ const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
 const LISTED_RELEASE = { publishedAt: { not: null }, OR: NOT_DELETED_OR };
 const AWAITING_WHERE = {
   releases: { some: { release: LISTED_RELEASE } },
-  AND: [
-    { OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] },
-    { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] },
-    { OR: NOT_DELETED_OR },
-  ],
+  AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }, { OR: NOT_DELETED_OR }],
 };
 
 const nameFields = {
@@ -61,8 +57,6 @@ const hiddenRow = {
   slug: 'old-duplicate',
   firstName: 'Old',
   surname: 'Duplicate',
-  isActive: true,
-  deactivatedAt: null,
   deletedOn: NOW,
 };
 

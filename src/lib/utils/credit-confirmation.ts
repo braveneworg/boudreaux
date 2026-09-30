@@ -7,9 +7,9 @@
  * artists are published with it (ADR-0015).
  *
  * A credit is **awaiting confirmation** when stamping `publishedOn` would make
- * its artist public: no `publishedOn`, current or alumni, not deleted. A
- * credit **stays hidden** when publishing cannot make it public, because the
- * artist is soft-deleted or inactive with no departure date.
+ * its artist public: no `publishedOn`, not deleted. A credit **stays hidden**
+ * when publishing cannot make it public, because the artist is soft-deleted.
+ * Whether the artist is still on the label plays no part (ADR-0016).
  *
  * Pure and client-safe: the repository, the confirmation dialog and the
  * backfill script all describe a credit through here.
@@ -22,7 +22,7 @@ import { getArtistDisplayName, type ArtistNameFields } from './get-artist-displa
 export type CreditBioState = 'none' | 'hand-written' | 'generated';
 
 /** Why publishing an artist would still leave it hidden. */
-export type HiddenCreditReason = 'deleted' | 'no-departure-date';
+export type HiddenCreditReason = 'deleted';
 
 /** The fields read off an artist whose credit awaits confirmation. */
 export interface CreditConfirmationRow extends ArtistNameFields {
@@ -39,8 +39,6 @@ export interface CreditConfirmationRow extends ArtistNameFields {
 export interface HiddenCreditRow extends ArtistNameFields {
   id: string;
   slug: string;
-  isActive: boolean;
-  deactivatedAt: Date | null;
   deletedOn: Date | null;
 }
 
@@ -129,16 +127,12 @@ export const toCreditAwaitingConfirmation = (
   };
 };
 
-/**
- * Describe a credit that stays hidden. A soft-deleted artist reports
- * `'deleted'` even when it is also off the roster, because restoring it is the
- * first step either way.
- */
+/** Describe a credit that stays hidden: its artist is soft-deleted. */
 export const toCreditThatStaysHidden = (row: HiddenCreditRow): CreditThatStaysHidden => ({
   id: row.id,
   slug: row.slug,
   name: getArtistDisplayName(row),
-  reason: row.deletedOn == null ? 'no-departure-date' : 'deleted',
+  reason: 'deleted',
 });
 
 /** Whether a publish must stop and ask: some credit awaits a decision. */

@@ -109,17 +109,6 @@ describe('CreditConfirmationDialog', () => {
     expect(screen.getByTestId('hidden-x')).toHaveTextContent('Gone — deleted');
   });
 
-  it('explains an artist that is off the roster', () => {
-    renderDialog({
-      awaiting: [],
-      stayHidden: [{ ...gone, reason: 'no-departure-date' }],
-    });
-
-    expect(screen.getByTestId('hidden-x')).toHaveTextContent(
-      'Gone — inactive with no departure date'
-    );
-  });
-
   it('confirms with every artist kept hidden when no toggle is flipped', async () => {
     const { user, onConfirm } = renderDialog();
 

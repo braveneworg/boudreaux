@@ -40,8 +40,6 @@ const hiddenRow = (over: Partial<HiddenCreditRow> = {}): HiddenCreditRow => ({
   surname: 'Duplicate',
   title: null,
   suffix: null,
-  isActive: true,
-  deactivatedAt: null,
   deletedOn: null,
   ...over,
 });
@@ -202,18 +200,6 @@ describe('credit-confirmation', () => {
   describe('toCreditThatStaysHidden', () => {
     it('gives a soft-deleted artist the deleted reason', () => {
       const credit = toCreditThatStaysHidden(hiddenRow({ deletedOn: new Date() }));
-
-      expect(credit.reason).toBe('deleted');
-    });
-
-    it('gives an inactive artist with no departure date the roster reason', () => {
-      const credit = toCreditThatStaysHidden(hiddenRow({ isActive: false }));
-
-      expect(credit.reason).toBe('no-departure-date');
-    });
-
-    it('prefers the deleted reason when both apply', () => {
-      const credit = toCreditThatStaysHidden(hiddenRow({ isActive: false, deletedOn: new Date() }));
 
       expect(credit.reason).toBe('deleted');
     });

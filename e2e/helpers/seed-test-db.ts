@@ -1357,8 +1357,9 @@ const seedTestDatabase = async () => {
 
     // 25 roster artists sharing one published, format-less compilation so the
     // public index has a second page (A–Z page 1 = E2E Artist, E2E Band,
-    // E2E Roster 01–22; page 2 = Roster 23–25 and the composed-name artist
-    // below). Bulk-created with createMany
+    // E2E Roster 01–22; page 2 = Roster 23–25, the artist no longer on the
+    // label and the composed-name artist, both below). Bulk-created with
+    // createMany
     // (concurrent create() read-backs race in CI on fresh collections) and
     // linked with one createMany as well; createdAt is pinned in the past for
     // the same admin-list reason as the band.
@@ -1415,26 +1416,27 @@ const seedTestDatabase = async () => {
       data: { artistId: composedNameArtist.id, releaseId: rosterCompilation.id },
     });
 
-    // Alumnus: published and credited on a listed release, but deactivated
-    // with a recorded departure date — the index's Alumni roster. Default
-    // (Current) listings never include them, so no index count, search, or
-    // page boundary above moves. Credited on the roster compilation so no
-    // release count moves either; createdAt pinned in the past for the same
-    // admin-list reason as the band.
-    const alumnusArtist = await prisma.artist.create({
+    // An artist no longer on the label: published and credited on a listed
+    // release, with a recorded departure date. Whether an artist is still on
+    // the label decides nothing (ADR-0016), so the index lists it like any
+    // other. The name files after every "E2E Roster" row and before the
+    // composed name, so page 1, the first card and the last card above stay
+    // as they are. Credited on the roster compilation so no release count
+    // moves; createdAt pinned in the past for the same admin-list reason as
+    // the band.
+    const departedArtist = await prisma.artist.create({
       data: {
         firstName: 'E2E',
-        surname: 'Alumnus',
-        slug: 'e2e-alumnus',
-        displayName: 'E2E Alumnus',
+        surname: 'Standing',
+        slug: 'e2e-standing',
+        displayName: 'E2E Standing',
         publishedOn: new Date(),
-        isActive: false,
         deactivatedAt: new Date('2023-06-01T00:00:00Z'),
         createdAt: new Date('2019-01-01T00:00:00Z'),
       },
     });
     await prisma.artistRelease.create({
-      data: { artistId: alumnusArtist.id, releaseId: rosterCompilation.id },
+      data: { artistId: departedArtist.id, releaseId: rosterCompilation.id },
     });
 
     // Create MP3_320KBPS digital formats with track files for each E2E release.

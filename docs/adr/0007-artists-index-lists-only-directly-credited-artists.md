@@ -25,6 +25,10 @@ non-deleted release. A member credit alone does not list an artist.**
 (Amended by [ADR-0011](0011-alumni-are-deactivated-artists-with-a-departure-date.md):
 "active" is now the index's default roster, and alumni can be listed on
 request under the same rule.)
+(Amended again by
+[ADR-0016](0016-an-artist-is-public-whether-or-not-it-is-still-on-the-label.md):
+"active" is no longer part of the rule. A listed artist is published, not
+deleted, and directly credited, and the index is one list.)
 
 - One `where` builder (`buildListedWhere`) defines "holds a listed direct
   release" for both the index and the playlist "By artist" search. Only the

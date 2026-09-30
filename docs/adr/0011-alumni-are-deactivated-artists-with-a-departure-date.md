@@ -1,6 +1,9 @@
 # ADR-0011: Alumni are deactivated artists with a departure date
 
-- **Status**: Accepted
+- **Status**: Superseded by
+  [ADR-0016](0016-an-artist-is-public-whether-or-not-it-is-still-on-the-label.md) on 2026-09-28.
+  Whether an artist is still on the label no longer decides whether it is
+  public, and the roster filter is removed.
 - **Date**: 2026-09-26
 
 ## Context

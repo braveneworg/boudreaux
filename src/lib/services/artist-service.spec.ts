@@ -208,7 +208,6 @@ describe('ArtistService', () => {
     notes: [],
     tags: null,
     isPseudonymous: false,
-    isActive: true,
     instruments: null,
     trackId: null,
     featuredArtistId: null,
@@ -997,7 +996,6 @@ describe('ArtistService', () => {
       firstName: 'Artist',
       surname: id,
       displayName: id,
-      isActive: true,
       deactivatedAt: null,
       publishedOn: new Date('2024-01-01'),
       deletedOn: null,
@@ -1027,7 +1025,6 @@ describe('ArtistService', () => {
 
     /** The visibility fields a joined-artist fixture may override (#786). */
     interface JoinedArtistOverrides {
-      isActive?: boolean;
       deactivatedAt?: Date | null;
       publishedOn?: Date | null;
       deletedOn?: Date | null;
@@ -1038,7 +1035,6 @@ describe('ArtistService', () => {
       ...mockArtist,
       id,
       slug: id,
-      isActive: true,
       publishedOn: new Date('2024-01-01'),
       deletedOn: null,
       ...overrides,
@@ -1173,7 +1169,7 @@ describe('ArtistService', () => {
       expect(readReleases(result)).toEqual([]);
     });
 
-    it('omits unpublished, deactivated non-alumni, and deleted members but keeps alumni (#786)', async () => {
+    it('omits unpublished and deleted members, and keeps one that left the label (ADR-0016)', async () => {
       vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
         ...mockArtistWithReleases,
         members: [
@@ -1188,7 +1184,7 @@ describe('ArtistService', () => {
             id: 'm-3',
             artistId: mockArtist.id,
             memberId: 'inactive',
-            member: joinedArtist('inactive', { isActive: false }),
+            member: joinedArtist('inactive'),
           },
           {
             id: 'm-4',
@@ -1201,7 +1197,6 @@ describe('ArtistService', () => {
             artistId: mockArtist.id,
             memberId: 'alumnus',
             member: joinedArtist('alumnus', {
-              isActive: false,
               deactivatedAt: new Date('2025-03-01'),
             }),
           },
@@ -1212,10 +1207,10 @@ describe('ArtistService', () => {
 
       const data = (result as { success: true; data: { members: Array<{ memberId: string }> } })
         .data;
-      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub', 'alumnus']);
+      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub', 'inactive', 'alumnus']);
     });
 
-    it('drops the releases of an unpublished, deactivated non-alumni, or deleted band (#786)', async () => {
+    it('drops the releases of an unpublished or deleted band, whatever its standing (ADR-0016)', async () => {
       const bandRow = (id: string, overrides: JoinedArtistOverrides = {}) => ({
         id: `am-${id}`,
         artistId: id,
@@ -1232,18 +1227,19 @@ describe('ArtistService', () => {
         memberOf: [
           bandRow('pub-band'),
           bandRow('draft-band', { publishedOn: null }),
-          bandRow('inactive-band', { isActive: false }),
+          bandRow('inactive-band'),
           bandRow('gone-band', { deletedOn: new Date('2024-06-01') }),
-          bandRow('alumni-band', { isActive: false, deactivatedAt: new Date('2025-03-01') }),
+          bandRow('alumni-band', { deactivatedAt: new Date('2025-03-01') }),
         ],
       } as never);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
-      expect(readReleases(result).map(({ releaseId }) => releaseId)).toEqual([
-        'pub-band-lp',
-        'alumni-band-lp',
-      ]);
+      expect(
+        readReleases(result)
+          .map(({ releaseId }) => releaseId)
+          .sort()
+      ).toEqual(['alumni-band-lp', 'inactive-band-lp', 'pub-band-lp']);
     });
 
     it('does not expose the band graph on the public payload', async () => {
@@ -1265,8 +1261,8 @@ describe('ArtistService', () => {
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result.success).toBe(true);
-      // The full nested release/digital-format include AND the active/published
-      // where-clause (isActive + deletedOn null-safety) now live in (and are
+      // The full nested release/digital-format include AND the public artist
+      // where-clause (published + deletedOn null-safety) now live in (and are
       // covered by) ArtistRepository.findPublishedBySlugWithReleases; the service
       // only forwards the slug.
       expect(ArtistRepository.findPublishedBySlugWithReleases).toHaveBeenCalledWith('john-doe');
@@ -1443,7 +1439,6 @@ describe('ArtistService', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane-smith',
-        isActive: true,
       });
     });
 
@@ -1625,7 +1620,6 @@ describe('ArtistService', () => {
           middleName: 'Quill',
           surname: 'Brandt',
           displayName: 'Zora Quill Brandt',
-          isActive: true,
         })
       );
     });
@@ -1671,7 +1665,6 @@ describe('ArtistService', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane-smith',
-        isActive: true,
       });
     });
 
@@ -1893,7 +1886,7 @@ describe('ArtistService', () => {
       ],
     };
 
-    const filters = { sort: 'alpha' as const, roster: 'current' as const, skip: 0, take: 24 };
+    const filters = { sort: 'alpha' as const, skip: 0, take: 24 };
 
     const listOne = async () => {
       vi.mocked(ArtistRepository.listListed).mockResolvedValue([listingRecord] as never);
@@ -1911,16 +1904,6 @@ describe('ArtistService', () => {
         search: 'punk',
         sort: 'newest',
       });
-    });
-
-    it('forwards the alumni roster filter to the repository', async () => {
-      vi.mocked(ArtistRepository.listListed).mockResolvedValue([] as never);
-
-      await ArtistService.listPublishedArtists({ ...filters, roster: 'alumni' });
-
-      expect(vi.mocked(ArtistRepository.listListed).mock.calls).toEqual([
-        [{ ...filters, roster: 'alumni' }],
-      ]);
     });
 
     it('strips markup from the short bio (plain-text sanitization)', async () => {

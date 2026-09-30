@@ -13,7 +13,6 @@ describe('getArtistDisplayName', () => {
     slug: 'john-doe',
     notes: [],
     isPseudonymous: false,
-    isActive: true,
     createdAt: new Date(),
   } as unknown as Partial<Artist>;
 
@@ -350,7 +349,6 @@ describe('getArtistDisplayName', () => {
         artistReleases: [],
         urls: [],
         isPseudonymous: false,
-        isActive: true,
         createdAt: new Date(),
       } as unknown as Artist;
 

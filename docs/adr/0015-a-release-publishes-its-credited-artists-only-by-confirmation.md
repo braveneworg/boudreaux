@@ -1,6 +1,11 @@
 # ADR-0015: A release publishes its credited artists only by confirmation
 
-- **Status**: Accepted
+- **Status**: Accepted; amended 2026-09-28 by
+  [ADR-0016](0016-an-artist-is-public-whether-or-not-it-is-still-on-the-label.md).
+  Wherever this record says "current or alumni" or "inactive with no
+  departure date", that condition no longer applies: a public artist is
+  published and not deleted, and a credit stays hidden only when its artist
+  is soft-deleted.
 - **Date**: 2026-09-26
 
 ## Context

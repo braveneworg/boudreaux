@@ -216,7 +216,6 @@ describe('PurchaseRepository', () => {
       expect(args.include.release.select.artistReleases.where).toEqual({
         artist: {
           is: {
-            AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
             publishedOn: { not: null },
             OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
           },

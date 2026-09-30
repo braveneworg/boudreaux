@@ -101,7 +101,7 @@ describe('ArtistsContent sorting', () => {
   it('defaults to the A–Z sort', () => {
     render(<ArtistsContent />);
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '');
   });
 
   it('labels the sort toggle for assistive tech', () => {
@@ -115,7 +115,7 @@ describe('ArtistsContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'Newest release' }));
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('newest', '', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('newest', '');
   });
 
   it('returns to A–Z when that toggle is reselected', async () => {
@@ -124,7 +124,7 @@ describe('ArtistsContent sorting', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Newest release' }));
     await userEvent.click(screen.getByRole('radio', { name: 'A–Z' }));
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '');
   });
 
   it('keeps the current sort when the selection is cleared', async () => {
@@ -132,104 +132,58 @@ describe('ArtistsContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'A–Z' }));
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '');
   });
 });
 
-describe('ArtistsContent roster', () => {
-  it('defaults to current artists', () => {
+// The roster filter is gone (ADR-0016): the index is one list.
+describe('ArtistsContent without a roster filter', () => {
+  it('offers no roster toggle', () => {
     render(<ArtistsContent />);
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'current');
-    expect(screen.getByRole('radio', { name: 'Current' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('radiogroup', { name: 'Artist roster' })).not.toBeInTheDocument();
   });
 
-  it('labels the roster toggle for assistive tech', () => {
+  it.each(['Current', 'Alumni', 'All'])('offers no %s option', (label) => {
     render(<ArtistsContent />);
 
-    expect(screen.getByRole('radiogroup', { name: 'Artist roster' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: label })).not.toBeInTheDocument();
   });
 
-  it('offers Current, Alumni, and All in that order', () => {
+  it('asks for the listing by sort and search alone', () => {
     render(<ArtistsContent />);
 
-    const group = screen.getByRole('radiogroup', { name: 'Artist roster' });
-    const labels = Array.from(group.querySelectorAll('[role="radio"]')).map(
-      (radio) => radio.textContent
+    expect(vi.mocked(useInfinitePublishedArtistsQuery).mock.lastCall).toEqual(['alpha', '']);
+  });
+
+  it('keeps the sort toggle as the first control of the toolbar', () => {
+    const { container } = render(<ArtistsContent />);
+
+    const toolbar = container.querySelector('[data-slot="artists-toolbar"]');
+    expect(toolbar?.firstElementChild).toBe(
+      screen.getByRole('radiogroup', { name: 'Sort artists' })
     );
-    expect(labels).toEqual(['Current', 'Alumni', 'All']);
   });
 
-  it('lists alumni when that toggle is selected', async () => {
+  it('fills the selected sort with the full hot-pink accent, not the soft shade', () => {
     render(<ArtistsContent />);
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Alumni' }));
-
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'alumni');
-  });
-
-  it('lists the whole roster when All is selected', async () => {
-    render(<ArtistsContent />);
-
-    await userEvent.click(screen.getByRole('radio', { name: 'All' }));
-
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'all');
-  });
-
-  it('keeps the roster when the selection is cleared', async () => {
-    render(<ArtistsContent />);
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Current' }));
-
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '', 'current');
-  });
-
-  it('keeps the chosen roster when the sort changes', async () => {
-    render(<ArtistsContent />);
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Alumni' }));
-    await userEvent.click(screen.getByRole('radio', { name: 'Newest release' }));
-
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('newest', '', 'alumni');
-  });
-
-  it('places the roster toggle to the left of the sort toggle', () => {
-    render(<ArtistsContent />);
-
-    const roster = screen.getByRole('radiogroup', { name: 'Artist roster' });
-    const sort = screen.getByRole('radiogroup', { name: 'Sort artists' });
-
-    expect(roster.compareDocumentPosition(sort) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('dresses the roster toggle in the punk-zine frame', () => {
-    render(<ArtistsContent />);
-
-    const group = screen.getByRole('radiogroup', { name: 'Artist roster' });
-    expect(group).toHaveClass('shadow-zine-ink', 'border-2', 'border-black');
-  });
-
-  it('fills the selected roster with the full hot-pink accent, not the soft shade', () => {
-    render(<ArtistsContent />);
-
-    const selected = screen.getByRole('radio', { name: 'Current' });
+    const selected = screen.getByRole('radio', { name: 'A–Z' });
     expect(selected).toHaveClass('data-[state=on]:bg-(--card-accent)');
     expect(selected).not.toHaveClass('data-[state=on]:bg-(--card-accent-soft)');
   });
 
-  it('lets the toolbar wrap so three controls never overflow a narrow row', () => {
+  it('lets the toolbar wrap so its controls never overflow a narrow row', () => {
     const { container } = render(<ArtistsContent />);
 
     const toolbar = container.querySelector('[data-slot="artists-toolbar"]');
     expect(toolbar).toHaveClass('sm:flex-wrap');
   });
 
-  it('says there are no alumni when that roster is empty', async () => {
+  it('says nothing is published when the list is empty', () => {
     render(<ArtistsContent />);
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Alumni' }));
-
-    expect(screen.getByText('No alumni yet.')).toBeInTheDocument();
+    expect(screen.getByText('No artists have been published yet.')).toBeInTheDocument();
   });
 });
 
@@ -254,7 +208,7 @@ describe('ArtistsContent search', () => {
 
     await userEvent.type(await openSearch(), 'punk');
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', 'punk', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', 'punk');
   });
 
   it('trims the search term before querying', async () => {
@@ -262,7 +216,7 @@ describe('ArtistsContent search', () => {
 
     await userEvent.type(await openSearch(), '  Punk ');
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', 'Punk', 'current');
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', 'Punk');
   });
 
   it('shows a no-match message when a search returns nothing', async () => {
@@ -319,11 +273,7 @@ describe('ArtistsContent search', () => {
     await openSearch();
     await userEvent.click(screen.getByText('Alpha LP'));
 
-    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith(
-      'alpha',
-      'Alpha Act',
-      'current'
-    );
+    expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', 'Alpha Act');
     expect(screen.getByRole('button', { name: 'Search artists' })).toHaveTextContent('Alpha Act');
   });
 
@@ -448,7 +398,7 @@ describe('ArtistsContent list', () => {
     expect(search).not.toHaveClass('sm:max-w-xs');
   });
 
-  it('counts the roster at the toolbar’s right edge', () => {
+  it('counts the artists at the toolbar’s right edge', () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({
         pages: [{ rows: [row('a', 'Alpha'), row('b', 'Bravo')], nextSkip: null }],
@@ -475,7 +425,7 @@ describe('ArtistsContent list', () => {
     expect(container.querySelector('[data-slot="artists-count"]')).toHaveTextContent('1 artist');
   });
 
-  it('counts the matches, not the roster, while a search narrows the list', async () => {
+  it('counts the matches, not every artist, while a search narrows the list', async () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({ pages: [{ rows: [row('a', 'Alpha')], nextSkip: null }] }) as never
     );
@@ -555,14 +505,14 @@ describe('ArtistsContent states', () => {
     expect(list).not.toHaveClass('lg:w-3/4');
   });
 
-  it('reserves a placeholder for each toolbar toggle in the skeleton', () => {
+  it('reserves a placeholder for the sort toggle in the skeleton', () => {
     vi.mocked(useInfinitePublishedArtistsQuery).mockReturnValue(
       toInfiniteResult({ isPending: true, data: undefined }) as never
     );
 
     const { container } = render(<ArtistsContent />);
 
-    expect(container.querySelectorAll('[data-slot="artists-skeleton-toggle"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-slot="artists-skeleton-toggle"]')).toHaveLength(1);
   });
 
   it('mirrors the card’s photo frame and row spacing in the skeleton so nothing jumps', () => {

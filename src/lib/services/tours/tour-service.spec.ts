@@ -126,7 +126,6 @@ describe('TourService', () => {
               notes: [],
               tags: null,
               isPseudonymous: false,
-              isActive: true,
               instruments: null,
               featuredArtistId: null,
             },

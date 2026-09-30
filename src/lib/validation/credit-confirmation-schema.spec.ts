@@ -44,6 +44,15 @@ describe('creditConfirmationSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects the reason of the roster rule that was removed', () => {
+    const result = creditConfirmationSchema.safeParse({
+      awaiting: [],
+      stayHidden: [{ id: 'x', slug: 'gone', name: 'Gone', reason: 'no-departure-date' }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('rejects an unknown hidden reason', () => {
     const result = creditConfirmationSchema.safeParse({
       awaiting: [],
