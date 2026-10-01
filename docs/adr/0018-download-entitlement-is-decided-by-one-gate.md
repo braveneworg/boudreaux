@@ -67,6 +67,13 @@ The rules the gate enforces:
   until it is hard-deleted; free mode never gets it.** The "anyone within 90
   days" and "buyer forever" grace rules are dropped: the S3 object is removed
   on hard delete, so "forever" was a promise the storage could not keep.
+- **Every free format counts alike.** MP3 and AAC both tick the lifetime cap
+  and the free throttle, on every path. The playlist download's exemption of
+  MP3 from the cap and the lock ends; the constants comment that called MP3
+  "no quota" described a rule only that route followed.
+- **A guest is always on the free tier.** Purchases belong to users (guest
+  checkout creates the user by email), so a guest subject never holds
+  entitlement and the guest purchase-throttle counter was unreachable.
 - **The lock is an internal seam with one in-process adapter.** Production is
   one container; a Mongo compare-and-swap adapter drops in if that changes.
 
@@ -87,6 +94,10 @@ Guest identity resolution moves to its own module; `PurchaseService` keeps
   throttle, because the charge is made when the deliverable exists, not when
   the bytes land. Delivery confirmation from the client was rejected as
   untrustworthy.
+- A free user's MP3 playlist now counts each release against the lifetime cap,
+  so a playlist of more than five releases is refused on the free tier where
+  it used to download. That is the rule applied evenly, not a regression to
+  fix.
 - The single-format route survives as an adapter over the gate; its UI client
   is unused and is not restored by this decision.
 - Policy is tested once, as a table over `decide`; the four counters have one
