@@ -38,6 +38,7 @@ import type {
 } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
+import { isListable } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 import { safeArchiveEntryName } from '@/lib/utils/zip-stream';
@@ -538,7 +539,7 @@ const collectArtistReleaseTargets = (artists: ArtistSearchMatch[]): ArtistReleas
     const artistName = deriveArtistName(artist);
     for (const { release } of artist.releases) {
       if (targets.length >= ARTIST_EXPANSION_LIMIT) return targets;
-      if (!release.publishedAt || release.deletedOn || seen.has(release.id)) continue;
+      if (!isListable(release) || seen.has(release.id)) continue;
       seen.add(release.id);
       targets.push({ releaseId: release.id, artistName });
     }
