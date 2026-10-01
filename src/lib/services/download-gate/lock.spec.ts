@@ -2,15 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { FreeDownloadLockService } from '@/lib/services/free-download-lock-service';
+import { InProcessDownloadLock } from './lock';
 
 vi.mock('server-only', () => ({}));
 
-describe('FreeDownloadLockService', () => {
-  let service: FreeDownloadLockService;
+describe('InProcessDownloadLock', () => {
+  let service: InProcessDownloadLock;
 
   beforeEach(() => {
-    service = new FreeDownloadLockService(30_000);
+    service = new InProcessDownloadLock(30_000);
   });
 
   it('acquires a fresh key successfully', () => {
@@ -62,7 +62,7 @@ describe('FreeDownloadLockService', () => {
   });
 
   it('respects a custom TTL passed to the constructor', () => {
-    const shortLived = new FreeDownloadLockService(1_000);
+    const shortLived = new InProcessDownloadLock(1_000);
     const now = 5_000;
     expect(shortLived.acquire('k', now)).toBe(true);
     expect(shortLived.acquire('k', now + 500)).toBe(false);

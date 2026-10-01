@@ -1,111 +1,60 @@
-// @vitest-environment node
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 import { NextRequest } from 'next/server';
 
-import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import {
-  CapReachedError,
-  freeDownloadQuotaService,
-} from '@/lib/services/free-download-quota-service';
-import type * as FreeDownloadQuotaServiceModule from '@/lib/services/free-download-quota-service';
-import { ReleaseService } from '@/lib/services/release-service';
-import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
+import { auth } from '@/lib/auth';
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
+import type { DownloadStatus } from '@/lib/services/download-gate/types';
+import { resolveDownloadSubject } from '@/lib/utils/resolve-download-subject';
 
 import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
-
 vi.mock('@/lib/decorators/with-rate-limit', () => ({
-  withRateLimit:
-    (_limiter: unknown, _limit: number) =>
-    (handler: (req: unknown, ctx: unknown) => unknown) =>
-    (req: unknown, ctx: unknown) =>
-      handler(req, ctx),
-  extractClientIp: () => '203.0.113.42',
+  withRateLimit: () => (handler: unknown) => handler,
 }));
-
-vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  downloadLimiter: {},
-  DOWNLOAD_LIMIT: 10,
+vi.mock('@/lib/config/rate-limit-tiers', () => ({ DOWNLOAD_LIMIT: 10, downloadLimiter: {} }));
+vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }));
+vi.mock('@/lib/services/download-gate/download-gate', () => ({
+  downloadGate: { status: vi.fn() },
 }));
-
-vi.mock('@/lib/services/release-service', () => ({
-  ReleaseService: { existsById: vi.fn() },
-}));
-
-vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
-  ReleaseDigitalFormatRepository: vi.fn(),
-}));
-
-vi.mock('@/lib/services/free-download-quota-service', async () => {
-  const actual = await vi.importActual<typeof FreeDownloadQuotaServiceModule>(
-    '@/lib/services/free-download-quota-service'
-  );
-  return {
-    ...actual,
-    freeDownloadQuotaService: {
-      resolveVisitorIdentity: vi.fn(),
-      assertFreeDownloadAllowed: vi.fn(),
-    },
-  };
-});
-
-vi.mock('@/lib/utils/guest-visitor-id', () => ({
-  readGuestVisitorId: vi.fn(),
-  setGuestVisitorIdCookie: vi.fn(),
+vi.mock('@/lib/utils/resolve-download-subject', () => ({
+  resolveDownloadSubject: vi.fn(),
 }));
 
 const validReleaseId = '507f1f77bcf86cd799439011';
+const RESET_AT = new Date('2026-10-02T11:00:00.000Z');
 
 const buildRequest = (): NextRequest =>
   new NextRequest(`http://localhost:3000/api/releases/${validReleaseId}/download/free-status`, {
     headers: { 'user-agent': 'test-agent', 'accept-language': 'en-US' },
   });
 
-const dummyContext = { params: Promise.resolve({ id: validReleaseId }) };
+const context = { params: Promise.resolve({ id: validReleaseId }) };
+
+const freeStatus = (overrides: Partial<DownloadStatus> = {}): DownloadStatus => ({
+  entitled: false,
+  mode: 'free',
+  availableFreeFormats: ['MP3_320KBPS', 'AAC'],
+  freeThrottle: { allowed: true, remaining: 3, resetsAt: null },
+  lifetime: null,
+  purchaseThrottle: null,
+  ...overrides,
+});
 
 describe('GET /api/releases/[id]/download/free-status', () => {
   beforeEach(() => {
-    vi.mocked(ReleaseService.existsById).mockReset().mockResolvedValue(true);
-    vi.mocked(ReleaseDigitalFormatRepository)
-      .mockReset()
-      .mockImplementation(
-        class {
-          findAllByRelease = vi
-            .fn()
-            .mockResolvedValue([
-              { formatType: 'MP3_320KBPS' },
-              { formatType: 'AAC' },
-              { formatType: 'FLAC' },
-            ]);
-        } as never
-      );
-    vi.mocked(freeDownloadQuotaService.resolveVisitorIdentity)
-      .mockReset()
-      .mockResolvedValue({
-        primaryVisitorId: 'visitor-1',
-        allVisitorIds: ['visitor-1'],
-        cookieReissue: false,
-      });
-    vi.mocked(freeDownloadQuotaService.assertFreeDownloadAllowed).mockReset().mockResolvedValue({
-      allowed: true,
-      remaining: 3,
-      count: 0,
-      oldestInWindow: null,
-      resetsAt: null,
-    });
-    vi.mocked(readGuestVisitorId).mockReset().mockResolvedValue('visitor-1');
-    vi.mocked(setGuestVisitorIdCookie).mockReset().mockResolvedValue(undefined);
+    vi.mocked(auth.api.getSession).mockResolvedValue(null as never);
+    vi.mocked(resolveDownloadSubject).mockResolvedValue({ kind: 'guest', visitorId: 'visitor-1' });
+    vi.mocked(downloadGate.status).mockResolvedValue(freeStatus());
   });
 
-  it('returns 200 with allowed=true and full availableFreeFormats on first hit', async () => {
-    const response = await GET(buildRequest(), dummyContext);
+  it('returns the free-tier status for a guest', async () => {
+    const response = await GET(buildRequest(), context);
+
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual({
+    expect(await response.json()).toEqual({
       allowed: true,
       remaining: 3,
       windowSeconds: 86_400,
@@ -113,122 +62,67 @@ describe('GET /api/releases/[id]/download/free-status', () => {
       blockedReason: null,
       availableFreeFormats: ['MP3_320KBPS', 'AAC'],
     });
-    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(vi.mocked(downloadGate.status).mock.calls).toEqual([
+      [{ kind: 'guest', visitorId: 'visitor-1' }, validReleaseId],
+    ]);
   });
 
-  it('issues boudreaux_visitor_id cookie when identity resolution signals reissue', async () => {
-    vi.mocked(readGuestVisitorId).mockResolvedValue(null);
-    vi.mocked(freeDownloadQuotaService.resolveVisitorIdentity).mockResolvedValue({
-      primaryVisitorId: 'minted-uuid',
-      allVisitorIds: ['minted-uuid'],
-      cookieReissue: true,
+  it('asks the gate about the signed-in user, not a guest, when there is a session', async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(resolveDownloadSubject).mockResolvedValue({ kind: 'user', userId: 'user-1' });
+
+    await GET(buildRequest(), context);
+
+    expect(vi.mocked(resolveDownloadSubject).mock.calls).toEqual([
+      [expect.any(NextRequest), 'user-1'],
+    ]);
+    expect(vi.mocked(downloadGate.status).mock.calls[0]?.[0]).toEqual({
+      kind: 'user',
+      userId: 'user-1',
     });
-
-    await GET(buildRequest(), dummyContext);
-    expect(setGuestVisitorIdCookie).toHaveBeenCalledWith('minted-uuid');
   });
 
-  it('does not re-issue cookie when valid cookie is present', async () => {
-    await GET(buildRequest(), dummyContext);
-    expect(setGuestVisitorIdCookie).not.toHaveBeenCalled();
+  it('reports cap-reached with the reset moment when the free throttle is exhausted', async () => {
+    vi.mocked(downloadGate.status).mockResolvedValue(
+      freeStatus({ freeThrottle: { allowed: false, remaining: 0, resetsAt: RESET_AT } })
+    );
+
+    const body = await (await GET(buildRequest(), context)).json();
+
+    expect(body).toMatchObject({
+      allowed: false,
+      remaining: 0,
+      resetsAtIso: RESET_AT.toISOString(),
+      blockedReason: 'cap-reached',
+    });
   });
 
-  it('returns 404 when the release does not exist', async () => {
-    vi.mocked(ReleaseService.existsById).mockResolvedValue(false);
-    const response = await GET(buildRequest(), dummyContext);
+  it('reports no-free-formats when the release has none the free tier may take', async () => {
+    vi.mocked(downloadGate.status).mockResolvedValue(freeStatus({ availableFreeFormats: [] }));
+
+    const body = await (await GET(buildRequest(), context)).json();
+
+    expect(body).toMatchObject({ allowed: false, remaining: 0, blockedReason: 'no-free-formats' });
+  });
+
+  it('returns 404 when the gate knows no such listed release', async () => {
+    vi.mocked(downloadGate.status).mockResolvedValue(null);
+
+    const response = await GET(buildRequest(), context);
+
     expect(response.status).toBe(404);
   });
 
-  it('returns 400 for an invalid releaseId format', async () => {
-    const response = await GET(buildRequest(), {
-      params: Promise.resolve({ id: 'not-an-objectid' }),
-    });
+  it('returns 400 for an invalid releaseId', async () => {
+    const response = await GET(buildRequest(), { params: Promise.resolve({ id: 'nope' }) });
+
     expect(response.status).toBe(400);
+    expect(downloadGate.status).not.toHaveBeenCalled();
   });
 
-  it('intersects FREE_FORMAT_TYPES with published formats correctly', async () => {
-    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(
-      class {
-        findAllByRelease = vi
-          .fn()
-          .mockResolvedValue([{ formatType: 'MP3_320KBPS' }, { formatType: 'WAV' }]);
-      } as never
-    );
+  it('sends no-store on every response', async () => {
+    const response = await GET(buildRequest(), context);
 
-    const response = await GET(buildRequest(), dummyContext);
-    const body = await response.json();
-    expect(body.availableFreeFormats).toEqual(['MP3_320KBPS']);
-  });
-
-  it('returns blockedReason="no-free-formats" when intersection is empty', async () => {
-    vi.mocked(ReleaseDigitalFormatRepository).mockImplementation(
-      class {
-        findAllByRelease = vi.fn().mockResolvedValue([{ formatType: 'FLAC' }]);
-      } as never
-    );
-
-    const response = await GET(buildRequest(), dummyContext);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual({
-      allowed: false,
-      remaining: 0,
-      windowSeconds: 86_400,
-      resetsAtIso: null,
-      blockedReason: 'no-free-formats',
-      availableFreeFormats: [],
-    });
-  });
-
-  it('returns cap-reached payload when assertFreeDownloadAllowed throws CapReachedError', async () => {
-    const resetsAt = new Date('2026-05-08T18:00:00.000Z');
-    vi.mocked(freeDownloadQuotaService.assertFreeDownloadAllowed).mockRejectedValue(
-      new CapReachedError(resetsAt)
-    );
-
-    const response = await GET(buildRequest(), dummyContext);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual({
-      allowed: false,
-      remaining: 0,
-      windowSeconds: 86_400,
-      resetsAtIso: resetsAt.toISOString(),
-      blockedReason: 'cap-reached',
-      availableFreeFormats: ['MP3_320KBPS', 'AAC'],
-    });
-  });
-
-  it('rethrows non-CapReachedError failures from assertFreeDownloadAllowed', async () => {
-    // A non-cap error is not a CapReachedError, so the catch re-throws it
-    // (the route does not swallow unexpected failures).
-    const unexpected = new Error('quota service exploded');
-    vi.mocked(freeDownloadQuotaService.assertFreeDownloadAllowed).mockRejectedValue(unexpected);
-
-    await expect(GET(buildRequest(), dummyContext)).rejects.toThrow('quota service exploded');
-  });
-
-  it('passes union of all visitorIds to assertFreeDownloadAllowed (identity-conflict union)', async () => {
-    // Cookie + fingerprint resolve to two different existing rows. Cap query
-    // must union the events so cookie-cleared sessions cannot reset the cap.
-    vi.mocked(freeDownloadQuotaService.resolveVisitorIdentity).mockResolvedValueOnce({
-      primaryVisitorId: 'visitor-cookie',
-      allVisitorIds: ['visitor-cookie', 'visitor-fingerprint'],
-      cookieReissue: false,
-    });
-    vi.mocked(freeDownloadQuotaService.assertFreeDownloadAllowed).mockRejectedValueOnce(
-      new CapReachedError(new Date('2026-05-08T18:00:00.000Z'))
-    );
-
-    const response = await GET(buildRequest(), dummyContext);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.allowed).toBe(false);
-    expect(body.blockedReason).toBe('cap-reached');
-    expect(freeDownloadQuotaService.assertFreeDownloadAllowed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        visitorIds: ['visitor-cookie', 'visitor-fingerprint'],
-      })
-    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
   });
 });

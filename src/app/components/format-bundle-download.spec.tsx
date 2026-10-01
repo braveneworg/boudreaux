@@ -389,9 +389,7 @@ describe('FormatBundleDownload', () => {
     await user.click(screen.getByRole('button', { name: /Download 2 formats/ }));
 
     await waitFor(() => {
-      expect(triggerDownload).toHaveBeenCalledWith(
-        expect.stringMatching(/respond=stream&mode=free/)
-      );
+      expect(triggerDownload).toHaveBeenCalledWith(expect.stringMatching(/respond=stream/));
       expect(triggerDownload).toHaveBeenCalledTimes(1);
     });
   });
@@ -753,7 +751,7 @@ describe('FormatBundleDownload', () => {
     // The captured stream URL is surfaced as a tappable fallback anchor; with
     // no fileName delivered the `download` attribute resolves to undefined.
     const fallback = screen.getByRole('link', { name: /Tap here/i });
-    expect(fallback).toHaveAttribute('href', expect.stringContaining('respond=stream&mode=free'));
+    expect(fallback).toHaveAttribute('href', expect.stringContaining('respond=stream'));
     expect(fallback).not.toHaveAttribute('download');
   });
 
@@ -783,7 +781,7 @@ describe('FormatBundleDownload', () => {
       expect(labels.some((t) => /WAV/i.test(t))).toBe(false);
     });
 
-    it('appends &mode=free to the bundle fetch URL', async () => {
+    it('sends only the formats — never a mode — on the bundle fetch URL', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const mockFetch = vi.fn().mockResolvedValueOnce(makeSSEResponse());
       vi.stubGlobal('fetch', mockFetch);
@@ -802,11 +800,11 @@ describe('FormatBundleDownload', () => {
         expect(mockFetch).toHaveBeenCalled();
       });
       const calledUrl = mockFetch.mock.calls[0]?.[0] as string;
-      expect(calledUrl).toContain('mode=free');
+      expect(calledUrl).not.toContain('mode=');
       expect(calledUrl).toContain('formats=MP3_320KBPS');
     });
 
-    it('defaults to paid mode when prop omitted (uses streaming, not SSE)', async () => {
+    it('offers every format when the prop is omitted (uses streaming, not SSE)', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       const mockFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
       vi.stubGlobal('fetch', mockFetch);
@@ -820,11 +818,11 @@ describe('FormatBundleDownload', () => {
       });
       const calledUrl = (triggerDownload as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
       expect(calledUrl).toContain('respond=stream');
-      expect(calledUrl).not.toContain('mode=free');
+      expect(calledUrl).not.toContain('mode=');
       // Paid mode issues exactly one preflight fetch — no SSE body read.
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(mockFetch.mock.calls[0]?.[0]).toContain('respond=preflight');
-      expect(mockFetch.mock.calls[0]?.[0]).not.toContain('mode=free');
+      expect(mockFetch.mock.calls[0]?.[0]).not.toContain('mode=');
     });
   });
 

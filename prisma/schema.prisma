@@ -821,6 +821,7 @@ model DownloadEvent {
   formatType   String // Format downloaded (e.g., MP3_320KBPS, FLAC)
   success      Boolean // true = download succeeded, false = failed (quota exceeded, auth error, etc.)
   errorCode    String? // Optional error code for failed downloads (e.g., QUOTA_EXCEEDED, NOT_PURCHASED)
+  mode         String? // Rules the download ran under: free | purchased (ADR-0018). Absent on rows written before it existed; the free throttle counts only `free`.
   ipAddress    String? // IP address for security audit (optional, privacy-sensitive)
   userAgent    String? // User agent string (optional, for analytics)
   downloadedAt DateTime @default(now())

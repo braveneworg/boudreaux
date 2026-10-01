@@ -21,11 +21,9 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
   },
 }));
 
-const mockGetDownloadAccess = vi.fn();
-vi.mock('@/lib/services/purchase-service', () => ({
-  PurchaseService: {
-    getDownloadAccessForPurchase: (...args: unknown[]) => mockGetDownloadAccess(...args),
-  },
+const mockStatus = vi.fn();
+vi.mock('@/lib/services/download-gate/download-gate', () => ({
+  downloadGate: { status: (...args: unknown[]) => mockStatus(...args) },
 }));
 
 const mockFindAllByRelease = vi.fn().mockResolvedValue([]);
@@ -42,12 +40,13 @@ describe('GET /api/releases/[id]/user-status', () => {
 
   beforeEach(() => {
     mockFindAllByRelease.mockResolvedValue([]);
-    mockGetDownloadAccess.mockResolvedValue({
-      allowed: true,
-      reason: null,
-      downloadCount: 0,
-      lastDownloadedAt: null,
-      resetInHours: null,
+    mockStatus.mockResolvedValue({
+      entitled: false,
+      mode: 'free',
+      availableFreeFormats: [],
+      freeThrottle: { allowed: true, remaining: 3, resetsAt: null },
+      lifetime: null,
+      purchaseThrottle: null,
     });
   });
 
@@ -71,17 +70,18 @@ describe('GET /api/releases/[id]/user-status', () => {
     expect(response.status).toBe(401);
   });
 
-  it('should return user status with purchase info and resetInHours', async () => {
+  it('returns purchase info with the purchase throttle from the gate', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findByUserAndRelease).mockResolvedValue({
       purchasedAt: new Date('2024-06-01'),
     } as never);
-    mockGetDownloadAccess.mockResolvedValue({
-      allowed: false,
-      reason: 'download_limit_reached',
-      downloadCount: 5,
-      lastDownloadedAt: new Date('2024-06-01T10:00:00.000Z'),
-      resetInHours: 4,
+    mockStatus.mockResolvedValue({
+      entitled: true,
+      mode: 'purchased',
+      availableFreeFormats: [],
+      freeThrottle: { allowed: true, remaining: 3, resetsAt: null },
+      lifetime: null,
+      purchaseThrottle: { count: 5, resetInHours: 4 },
     });
 
     mockFindAllByRelease.mockResolvedValue([
@@ -100,11 +100,7 @@ describe('GET /api/releases/[id]/user-status', () => {
       resetInHours: 4,
       availableFormats: [{ formatType: 'MP3_320KBPS', fileName: 'album.zip' }],
     });
-    expect(mockGetDownloadAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ purchasedAt: new Date('2024-06-01') }),
-      'user-1',
-      'release-1'
-    );
+    expect(mockStatus.mock.calls).toEqual([[{ kind: 'user', userId: 'user-1' }, 'release-1']]);
   });
 
   it('should map availableFormats fileName from fileName, files[0], and fallback format zip', async () => {

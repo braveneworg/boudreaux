@@ -65,12 +65,19 @@ export const FORMAT_MIME_TYPES = {
 } as const;
 
 /**
- * Freemium download quota limit
- *
- * Maximum number of unique releases a user can download for free
- * before being required to purchase releases.
+ * Lifetime cap (CONTEXT.md "free tier", ADR-0018): the number of distinct
+ * releases a signed-in user may take free, ever. A guest has no lifetime cap.
  */
 export const MAX_FREE_DOWNLOAD_QUOTA = 5;
+
+/**
+ * Free throttle (CONTEXT.md "free tier", ADR-0018): free downloads of one
+ * release by one subject allowed inside the rolling window.
+ */
+export const FREE_DOWNLOAD_CAP = 3;
+
+/** Rolling window of the free throttle, in milliseconds. */
+export const FREE_DOWNLOAD_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Soft delete grace period in days (for purchasers)
@@ -120,13 +127,9 @@ export const VALID_FORMAT_TYPES: ReadonlyArray<DigitalFormatType> = [
 ] as const;
 
 /**
- * Free digital format types
- *
- * The set of digital formats eligible for free (non-paid) downloads.
- * Feature: 007-free-digital-downloads
- *
- * - MP3_320KBPS: unsigned + CDN-cached delivery (no quota)
- * - AAC: presigned URL, counts against the freemium quota (MAX_FREE_DOWNLOAD_QUOTA)
+ * Free formats (CONTEXT.md "digital format"): the encodings the free tier may
+ * take. Every free format counts alike against the lifetime cap and the free
+ * throttle (ADR-0018); every other format needs entitlement.
  */
 export const FREE_FORMAT_TYPES = [
   'MP3_320KBPS',
@@ -137,6 +140,10 @@ export const FREE_FORMAT_TYPES = [
  * Free format type literal union
  */
 export type FreeFormatType = (typeof FREE_FORMAT_TYPES)[number];
+
+/** Narrow a stored string (the `formatType` column) to a known format type. */
+export const isValidFormatType = (value: string): value is DigitalFormatType =>
+  (VALID_FORMAT_TYPES as ReadonlyArray<string>).includes(value);
 
 /**
  * Type guard: is a format type eligible for free download?

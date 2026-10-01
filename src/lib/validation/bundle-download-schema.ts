@@ -6,48 +6,26 @@ import { z } from 'zod';
 
 import { FREE_FORMAT_TYPES, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 
-const BUNDLE_MODES = ['paid', 'free'] as const;
-
 /**
- * Zod schema for validating the `formats` and `mode` query parameters
- * on the bundle download API route.
- *
- * `formats` is a comma-separated string of valid digital format types
- * (e.g., "FLAC,WAV,MP3_320KBPS"). When `mode` is `'free'` (the freemium
- * download path), every requested format must be one of `FREE_FORMAT_TYPES`
- * (`MP3_320KBPS` or `AAC`); otherwise the request is rejected with the
- * `INVALID_FORMATS` issue.
- *
- * `mode` defaults to `'paid'` for backwards compatibility with existing
- * paid-bundle callers.
+ * Zod schema for the `formats` query parameter on the bundle download API
+ * route: a comma-separated list of valid digital format types (e.g.
+ * "FLAC,WAV,MP3_320KBPS"), one to eight of them. Which of them the subject
+ * may actually take — and whether that is the free tier or a purchase — is
+ * the download gate's decision (ADR-0018), not the query's; a legacy `mode`
+ * parameter is ignored.
  */
-export const bundleDownloadQuerySchema = z
-  .object({
-    formats: z
-      .string()
-      .min(1, 'At least one format is required')
-      .transform((val) => val.split(','))
-      .pipe(
-        z
-          .array(z.enum(VALID_FORMAT_TYPES as unknown as [string, ...string[]]))
-          .min(1, 'Select at least one format')
-          .max(8, 'Maximum 8 formats per bundle')
-      ),
-    mode: z.enum(BUNDLE_MODES).optional().default('paid'),
-  })
-  .superRefine((value, ctx) => {
-    if (value.mode !== 'free') return;
-    const allowed = new Set<string>(FREE_FORMAT_TYPES);
-    const invalid = value.formats.filter((f) => !allowed.has(f));
-    if (invalid.length > 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['formats'],
-        params: { code: 'INVALID_FORMATS', invalid },
-        message: `Free downloads only support ${FREE_FORMAT_TYPES.join(', ')}`,
-      });
-    }
-  });
+export const bundleDownloadQuerySchema = z.object({
+  formats: z
+    .string()
+    .min(1, 'At least one format is required')
+    .transform((val) => val.split(','))
+    .pipe(
+      z
+        .array(z.enum(VALID_FORMAT_TYPES as unknown as [string, ...string[]]))
+        .min(1, 'Select at least one format')
+        .max(8, 'Maximum 8 formats per bundle')
+    ),
+});
 
 export type BundleDownloadQuery = z.infer<typeof bundleDownloadQuerySchema>;
 

@@ -9,6 +9,7 @@ import {
   getFileExtensionForFormat,
   isFreeFormatType,
   VALID_FORMAT_TYPES,
+  isValidFormatType,
 } from '@/lib/constants/digital-formats';
 
 describe('digital-formats constants', () => {
@@ -82,5 +83,13 @@ describe('digital-formats constants', () => {
         expect(isFreeFormatType(formatType)).toBe(false);
       }
     );
+  });
+
+  describe('isValidFormatType', () => {
+    it('accepts every valid format type and rejects anything else', () => {
+      expect(VALID_FORMAT_TYPES.every((formatType) => isValidFormatType(formatType))).toBe(true);
+      expect(isValidFormatType('MP3')).toBe(false);
+      expect(isValidFormatType('')).toBe(false);
+    });
   });
 });

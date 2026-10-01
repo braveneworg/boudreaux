@@ -88,41 +88,51 @@ test.describe('Free digital downloads (007 US1) — Pixel 7 emulation', () => {
     await expect(innerDownload).toBeVisible({ timeout: 10_000 });
 
     // Step 5: guard against the CI standalone server losing its AWS credentials.
-    // A missing-credentials server returns a clean HTTP 500 from the stream
-    // route — `getS3Client()` throws before any streaming begins. With
-    // credentials present the request reaches S3 and starts streaming the ZIP,
-    // which then aborts on NoSuchKey (the seeded release has no S3 objects) and
-    // resets the connection, so no clean status is ever produced. Therefore
-    // "any outcome other than a clean 500" proves the server reached S3.
+    // A missing-credentials server answers INTERNAL_ERROR from the stream route
+    // — `getS3Client()` throws before any streaming begins. With credentials
+    // present the request reaches S3, finds no object for the seeded release
+    // (NoSuchKey), and the download gate's producer refuses to deliver an empty
+    // ZIP: a clean 500 whose body says STREAM_FAILED (ADR-0018). If S3 fixtures
+    // are ever seeded, the stream completes with a 200 instead. So "a 200, or a
+    // 500 that names STREAM_FAILED" proves the server reached S3.
     //
-    // We probe with the low-level `node:http` client because the aborted body
-    // breaks higher-level clients: a browser fetch/anchor network-retries the
-    // GET until the free cap is hit (only ever surfacing the eventual 403), and
-    // `page.request.get` / Node `fetch` throw on the truncated response. This
-    // request uses its own visitor identity (distinct fingerprint — no
-    // User-Agent), so it does not touch the browser's cap or the cookie the UI
-    // flow issues below. The check is forward-compatible: if S3 fixtures are
-    // ever seeded, the stream completes with a 200 (still not a 500).
+    // We probe with the low-level `node:http` client because a browser
+    // fetch/anchor network-retries the GET until the free cap is hit (only ever
+    // surfacing the eventual 403). This request uses its own visitor identity
+    // (distinct fingerprint — no User-Agent), so it does not touch the
+    // browser's cap or the cookie the UI flow issues below.
     const streamUrl = new URL(
-      `/api/releases/${e2eRelease1Id}/download/bundle?formats=MP3_320KBPS,AAC&respond=stream&mode=free`,
+      `/api/releases/${e2eRelease1Id}/download/bundle?formats=MP3_320KBPS,AAC&respond=stream`,
       page.url()
     ).toString();
-    const streamOutcome = await new Promise<number | 'connection-reset' | 'timeout'>((resolve) => {
+    const streamOutcome = await new Promise<
+      { status: number; body: string } | 'connection-reset' | 'timeout'
+    >((resolve) => {
       const request = http.get(streamUrl, (response) => {
-        // The body aborts mid-stream (NoSuchKey); swallow its error and drop it.
-        response.on('error', () => undefined);
-        resolve(response.statusCode ?? 0);
-        response.destroy();
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('error', () => resolve('connection-reset'));
+        response.on('end', () =>
+          resolve({
+            status: response.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        );
       });
-      // A reset before/at the headers means the server got far enough to stream.
       request.on('error', () => resolve('connection-reset'));
       request.setTimeout(15_000, () => {
         request.destroy();
         resolve('timeout');
       });
     });
-    expect(streamOutcome).not.toBe(500);
     expect(streamOutcome).not.toBe('timeout');
+    // A 500 is acceptable only as the gate's explicit STREAM_FAILED; any other
+    // 500 (e.g. INTERNAL_ERROR from missing credentials) fails the guard.
+    const fiveHundredError =
+      typeof streamOutcome === 'object' && streamOutcome.status === 500
+        ? (JSON.parse(streamOutcome.body) as { error?: string }).error
+        : 'STREAM_FAILED';
+    expect(fiveHundredError).toBe('STREAM_FAILED');
 
     // Step 5b: drive the real UI download and confirm the dialog's preflight
     // gate authorizes it end to end — it is the call that issues the visitor
@@ -134,8 +144,7 @@ test.describe('Free digital downloads (007 US1) — Pixel 7 emulation', () => {
     const preflightResponse = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/releases/${e2eRelease1Id}/download/bundle`) &&
-        response.url().includes('respond=preflight') &&
-        response.url().includes('mode=free'),
+        response.url().includes('respond=preflight'),
       { timeout: 15_000 }
     );
     await innerDownload.click();

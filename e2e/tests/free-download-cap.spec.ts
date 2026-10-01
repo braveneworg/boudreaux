@@ -69,8 +69,9 @@ const seedCapReached = async (releaseId: string): Promise<SeededIdentity> => {
       fingerprintHash: `e2e-fingerprint-${visitorId}`,
     },
   });
-  // Three successful DownloadEvents pushes the (visitorId, releaseId) pair
-  // to the FREE_DOWNLOAD_CAP (3) and forces the cap-reached state.
+  // Three successful free-mode DownloadEvents push the (visitorId, releaseId)
+  // pair to the FREE_DOWNLOAD_CAP (3) and force the cap-reached state. Only
+  // `mode: 'free'` rows tick the free throttle (ADR-0018).
   const now = Date.now();
   for (let i = 0; i < 3; i += 1) {
     await prisma.downloadEvent.create({
@@ -79,6 +80,7 @@ const seedCapReached = async (releaseId: string): Promise<SeededIdentity> => {
         releaseId,
         formatType: i === 0 ? 'AAC' : 'MP3_320KBPS',
         success: true,
+        mode: 'free',
         downloadedAt: new Date(now - (i + 1) * 60_000),
       },
     });

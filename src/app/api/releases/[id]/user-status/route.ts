@@ -9,7 +9,7 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import { PurchaseService } from '@/lib/services/purchase-service';
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -24,15 +24,13 @@ export const GET = withAuth<{ id: string }>(async (_request, context, session) =
     const { id: releaseId } = await context.params;
     const userId = session.user.id;
 
-    const [purchase, digitalFormats] = await Promise.all([
+    // The purchase throttle comes from the gate (ADR-0018); the purchase row
+    // itself is read for `purchasedAt`, which the gate's view does not carry.
+    const [purchase, digitalFormats, status] = await Promise.all([
       PurchaseRepository.findByUserAndRelease(userId, releaseId),
       new ReleaseDigitalFormatRepository().findAllByRelease(releaseId),
+      downloadGate.status({ kind: 'user', userId }, releaseId),
     ]);
-    const downloadAccess = await PurchaseService.getDownloadAccessForPurchase(
-      purchase,
-      userId,
-      releaseId
-    );
 
     const availableFormats = digitalFormats.map((f) => ({
       formatType: f.formatType as DigitalFormatType,
@@ -42,8 +40,8 @@ export const GET = withAuth<{ id: string }>(async (_request, context, session) =
     return NextResponse.json({
       hasPurchase: purchase !== null,
       purchasedAt: purchase?.purchasedAt ?? null,
-      downloadCount: downloadAccess.downloadCount,
-      resetInHours: downloadAccess.resetInHours,
+      downloadCount: status?.purchaseThrottle?.count ?? 0,
+      resetInHours: status?.purchaseThrottle?.resetInHours ?? null,
       availableFormats,
     });
   } catch (error) {

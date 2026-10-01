@@ -153,32 +153,43 @@ describe('PurchaseRepository', () => {
     });
   });
 
-  describe('upsertDownloadCount', () => {
-    it('should call prisma.releaseDownload.upsert with increment update and create with count 1', async () => {
-      const mockRecord = {
-        id: 'dl-1',
-        userId: 'user-123',
-        releaseId: 'release-abc',
-        downloadCount: 3,
-        lastDownloadedAt: new Date(),
-      };
-      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue(mockRecord as never);
+  describe('recordPurchasedDownload', () => {
+    const now = new Date('2026-10-01T12:00:00.000Z');
 
-      await PurchaseRepository.upsertDownloadCount('user-123', 'release-abc');
+    it('increments the purchase throttle and stamps the download time', async () => {
+      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue({} as never);
 
-      expect(prisma.releaseDownload.upsert).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-        update: {
-          downloadCount: { increment: 1 },
-          lastDownloadedAt: expect.any(Date),
-        },
-        create: {
-          userId: 'user-123',
-          releaseId: 'release-abc',
-          downloadCount: 1,
-          lastDownloadedAt: expect.any(Date),
-        },
+      await PurchaseRepository.recordPurchasedDownload('user-123', 'release-abc', {
+        restart: false,
+        now,
       });
+
+      expect(vi.mocked(prisma.releaseDownload.upsert).mock.calls).toEqual([
+        [
+          {
+            where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
+            update: { downloadCount: { increment: 1 }, lastDownloadedAt: now },
+            create: {
+              userId: 'user-123',
+              releaseId: 'release-abc',
+              downloadCount: 1,
+              lastDownloadedAt: now,
+            },
+          },
+        ],
+      ]);
+    });
+
+    it('restarts the count at one when the idle window has elapsed', async () => {
+      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue({} as never);
+
+      await PurchaseRepository.recordPurchasedDownload('user-123', 'release-abc', {
+        restart: true,
+        now,
+      });
+
+      const call = vi.mocked(prisma.releaseDownload.upsert).mock.calls[0]?.[0];
+      expect(call?.update).toEqual({ downloadCount: 1, lastDownloadedAt: now });
     });
   });
 
@@ -314,27 +325,6 @@ describe('PurchaseRepository', () => {
     });
   });
 
-  describe('resetDownloadCount', () => {
-    it('should call prisma.releaseDownload.update with count 0 and new lastDownloadedAt', async () => {
-      const mockRecord = {
-        id: 'dl-1',
-        userId: 'user-123',
-        releaseId: 'release-abc',
-        downloadCount: 0,
-        lastDownloadedAt: new Date(),
-      };
-      vi.mocked(prisma.releaseDownload.update).mockResolvedValue(mockRecord as never);
-
-      const result = await PurchaseRepository.resetDownloadCount('user-123', 'release-abc');
-
-      expect(prisma.releaseDownload.update).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-        data: { downloadCount: 0, lastDownloadedAt: expect.any(Date) },
-      });
-      expect(result).toEqual(mockRecord);
-    });
-  });
-
   describe('updateSessionId', () => {
     it('should call prisma.releasePurchase.update with the new sessionId', async () => {
       const mockRecord = { id: 'purchase-1', stripeSessionId: 'cs_new_session' };
@@ -385,20 +375,6 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markRefunded('pi_test_123');
 
       expect(result).toBe(false);
-    });
-  });
-
-  describe('findByUserReleaseKey', () => {
-    it('should look up a purchase by the userId+releaseId composite unique key', async () => {
-      const mockRecord = { id: 'purchase-1', userId: 'user-123', releaseId: 'release-abc' };
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(mockRecord as never);
-
-      const result = await PurchaseRepository.findByUserReleaseKey('user-123', 'release-abc');
-
-      expect(result).toEqual(mockRecord);
-      expect(prisma.releasePurchase.findUnique).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-      });
     });
   });
 

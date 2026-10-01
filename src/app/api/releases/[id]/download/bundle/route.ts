@@ -5,32 +5,22 @@
 import { PassThrough, Transform } from 'node:stream';
 
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { Upload } from '@aws-sdk/lib-storage';
 
 import { auth } from '@/lib/auth';
 import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
-import {
-  FORMAT_LABELS,
-  FREE_FORMAT_TYPES,
-  isFreeFormatType,
-  type DigitalFormatType,
-} from '@/lib/constants/digital-formats';
+import { FORMAT_LABELS, type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
-import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import { freeDownloadLockService } from '@/lib/services/free-download-lock-service';
-import {
-  CapReachedError,
-  freeDownloadQuotaService,
-} from '@/lib/services/free-download-quota-service';
-import { PurchaseService } from '@/lib/services/purchase-service';
+import type { AuditContext } from '@/lib/services/download-gate/counters';
+import { downloadGate, type GateFormatRecord } from '@/lib/services/download-gate/download-gate';
+import type { Deliverable, DownloadRequest, Grant } from '@/lib/services/download-gate/types';
 import { ReleaseService } from '@/lib/services/release-service';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
-import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
+import { downloadRefusal } from '@/lib/utils/download-outcome-response';
 import { loggers } from '@/lib/utils/logger';
+import { resolveDownloadSubject } from '@/lib/utils/resolve-download-subject';
 import {
   generatePresignedDownloadUrl,
   getS3BucketName,
@@ -38,7 +28,6 @@ import {
   verifyS3ObjectExists,
 } from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-import { computeFingerprintHash } from '@/lib/utils/visitor-fingerprint';
 import {
   createStoreArchive,
   issuePrefetch,
@@ -47,7 +36,6 @@ import {
   type ZipArchive,
 } from '@/lib/utils/zip-stream';
 import { bundleDownloadQuerySchema } from '@/lib/validation/bundle-download-schema';
-import type { DownloadSubject } from '@/types/download-subject';
 
 import type { Readable } from 'node:stream';
 
@@ -107,26 +95,29 @@ interface ResolvedFormat {
 }
 
 /**
- * Everything the three response-delivery paths need from the already-resolved
- * setup/auth/validation phase. The GET handler runs all gating once, then
- * dispatches to exactly one path function with this immutable context — so the
- * paths never re-derive auth, cap, or format state and operation order is
- * preserved byte-for-byte.
+ * Everything the three producers need once the gate has granted: the files to
+ * archive and where the built ZIP lives in the cache. The gate owns the
+ * decision and the charge; the producers only build, upload, and presign.
  */
 interface BundleDeliveryContext {
   readonly resolvedFormats: ResolvedFormat[];
   readonly cachedZipKey: string;
   readonly cachedZipFileName: string;
   readonly releaseId: string;
-  readonly isFreeMode: boolean;
-  readonly userId: string | null;
-  readonly guestVisitorId: string | null;
-  readonly auditIp: string;
-  readonly auditUserAgent: string;
-  /** Record one successful free-tier download (no-op for paid mode). */
-  readonly recordFreeSuccess: (formatType: DigitalFormatType) => Promise<void>;
-  /** Audit a free-flow stream failure (no-op for paid mode). */
-  readonly recordFreeStreamFailure: () => Promise<void>;
+}
+
+/** What a producer resolves with: the presigned URL of the built ZIP. */
+interface BuiltZip {
+  downloadUrl: string;
+  fileName: string;
+}
+
+/** Thrown by a producer when nothing could be delivered, so the gate charges nothing. */
+class NothingToDeliverError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NothingToDeliverError';
+  }
 }
 
 /** A single archive entry flattened across every requested format (SSE path). */
@@ -204,47 +195,6 @@ const buildFileEntries = (
     }));
   });
 
-/**
- * Best-effort paid-mode bundle analytics: increment the per-release download
- * count once (bundle = 1 download action) and write a success download-event
- * per format. No-op for free mode — the free quota service is the source of
- * truth there. Never throws: failures are logged with `errorMessage` context.
- */
-const recordPaidBundleAnalytics = async (
-  ctx: BundleDeliveryContext,
-  formats: readonly DigitalFormatType[],
-  errorMessage: string
-): Promise<void> => {
-  const { isFreeMode, userId, guestVisitorId, releaseId, auditIp, auditUserAgent } = ctx;
-  try {
-    if (!isFreeMode && userId) {
-      await PurchaseRepository.upsertDownloadCount(userId, releaseId);
-    }
-
-    if (!isFreeMode) {
-      const downloadEventRepo = new DownloadEventRepository();
-      await Promise.all(
-        formats.map((formatType) =>
-          downloadEventRepo.logDownloadEvent({
-            userId,
-            visitorId: guestVisitorId,
-            releaseId,
-            formatType,
-            success: true,
-            ipAddress: auditIp,
-            userAgent: auditUserAgent,
-          })
-        )
-      );
-    }
-  } catch (analyticsError) {
-    loggers.downloads.error(errorMessage, analyticsError, {
-      completedFormats: [...formats],
-      releaseId,
-    });
-  }
-};
-
 /** Mutable handle threaded through the SSE archive build for teardown. */
 interface SseArchiveHandles {
   combinedArchive: ZipArchive | null;
@@ -266,17 +216,15 @@ interface SseSession {
  * Cache hit fast path — a previously-built ZIP for this exact (release,
  * formats) tuple already exists in S3. Skip archiving entirely, emit synthetic
  * progress events so the UI advances through `done` → `uploading` → `ready`
- * immediately, sign a fresh download URL, and record analytics. Returns after
- * emitting `ready`; the caller emits `complete` and closes the controller.
+ * immediately, and sign a fresh download URL. The caller emits `ready` once
+ * the gate has charged, then `complete`, and closes the controller.
  */
-const runSseCacheHit = async (session: SseSession): Promise<void> => {
+const runSseCacheHit = async (session: SseSession): Promise<BuiltZip> => {
   const { ctx, send } = session;
-  const { resolvedFormats, cachedZipKey, cachedZipFileName, isFreeMode } = ctx;
-  const completedFormats: DigitalFormatType[] = [];
+  const { resolvedFormats, cachedZipKey, cachedZipFileName } = ctx;
   for (const { formatType } of resolvedFormats) {
     const label = resolveFormatLabel(formatType);
     send('progress', { formatType, label, status: 'zipping' });
-    completedFormats.push(formatType);
     send('progress', { formatType, label, status: 'done' });
   }
   send('progress', { status: 'uploading' });
@@ -286,19 +234,7 @@ const runSseCacheHit = async (session: SseSession): Promise<void> => {
     cachedZipFileName,
     TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
   );
-
-  // Free mode: increment cap exactly once per bundle BEFORE the
-  // SSE `ready` event so delivery and accounting are atomic.
-  if (isFreeMode && completedFormats.length > 0) {
-    await ctx.recordFreeSuccess(completedFormats[0]);
-  }
-  send('ready', { downloadUrl, fileName: cachedZipFileName });
-
-  await recordPaidBundleAnalytics(
-    ctx,
-    completedFormats,
-    'Failed to record bundle download analytics (cache hit)'
-  );
+  return { downloadUrl, fileName: cachedZipFileName };
 };
 
 /**
@@ -454,9 +390,9 @@ const appendSseEntry = async (
 const runSseLiveBuild = async (
   session: SseSession,
   abortSseUpload: () => Promise<void>
-): Promise<void> => {
+): Promise<BuiltZip> => {
   const { ctx, send } = session;
-  const { resolvedFormats, cachedZipKey, cachedZipFileName, isFreeMode } = ctx;
+  const { resolvedFormats, cachedZipKey, cachedZipFileName } = ctx;
   const { archive, getArchiveError } = initSseArchive(session);
 
   // Append files — use format subfolders only when multiple
@@ -471,10 +407,7 @@ const runSseLiveBuild = async (
 
   if (completedFormats.length === 0) {
     await abortSseUpload();
-    send('error', { message: 'No formats could be prepared.' });
-    // `complete` + controller close is emitted once by the caller's trailing
-    // handler for every path — do not emit it here (would duplicate it).
-    return;
+    throw new NothingToDeliverError('No formats could be prepared.');
   }
 
   // Finalize archive and wait for upload to complete
@@ -482,25 +415,12 @@ const runSseLiveBuild = async (
   archive.finalize();
   await session.handles.uploadPromise;
 
-  // Generate presigned URL
   const downloadUrl = await generatePresignedDownloadUrl(
     cachedZipKey,
     cachedZipFileName,
     TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
   );
-
-  // Free mode: record success exactly once BEFORE 'ready' is emitted.
-  if (isFreeMode && completedFormats.length > 0) {
-    await ctx.recordFreeSuccess(completedFormats[0]);
-  }
-  send('ready', { downloadUrl, fileName: cachedZipFileName });
-
-  // Increment download count and log events server-side on a best-effort basis.
-  await recordPaidBundleAnalytics(
-    ctx,
-    completedFormats,
-    'Failed to record bundle download analytics'
-  );
+  return { downloadUrl, fileName: cachedZipFileName };
 };
 
 /**
@@ -510,7 +430,7 @@ const runSseLiveBuild = async (
  * the archive upload completes — this ensures iOS Safari (which cannot handle
  * multiple concurrent downloads) receives exactly one file.
  */
-const streamSseResponse = (ctx: BundleDeliveryContext): Response => {
+const streamSseResponse = (gateArgs: GateArgs): NextResponse => {
   const s3Client = getS3Client();
   const bucket = getS3BucketName();
   const handles: SseArchiveHandles = {
@@ -526,7 +446,6 @@ const streamSseResponse = (ctx: BundleDeliveryContext): Response => {
       const send = (event: string, data: Record<string, unknown>): void => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
-      const session: SseSession = { ctx, send, s3Client, bucket, handles };
       const abortSseUpload = async (): Promise<void> => {
         handles.combinedArchive?.abort();
         if (handles.combinedPassThrough && !handles.combinedPassThrough.destroyed) {
@@ -539,16 +458,39 @@ const streamSseResponse = (ctx: BundleDeliveryContext): Response => {
       };
 
       try {
-        if (await verifyS3ObjectExists(ctx.cachedZipKey)) {
-          await runSseCacheHit(session);
-        } else {
-          await runSseLiveBuild(session, abortSseUpload);
+        // The gate decides, then runs this producer, then charges; `ready`
+        // goes out only after the charge, so delivery and accounting stay
+        // atomic as before.
+        const outcome = await downloadGate.download(
+          gateArgs.request,
+          async (grant, records) => {
+            const ctx = gateArgs.contextFor(grant, records);
+            const session: SseSession = { ctx, send, s3Client, bucket, handles };
+            const built = (await verifyS3ObjectExists(ctx.cachedZipKey))
+              ? await runSseCacheHit(session)
+              : await runSseLiveBuild(session, abortSseUpload);
+            return { kind: 'url', ...built };
+          },
+          gateArgs.audit
+        );
+        if (outcome.ok && outcome.deliverable.kind === 'url') {
+          send('ready', {
+            downloadUrl: outcome.deliverable.downloadUrl,
+            fileName: outcome.deliverable.fileName,
+          });
+        } else if (!outcome.ok) {
+          const { body } = downloadRefusal(outcome);
+          send('error', { message: body.message, errorCode: body.error });
         }
       } catch (streamError) {
         await abortSseUpload();
-        await ctx.recordFreeStreamFailure();
         loggers.downloads.error('Bundle SSE stream error', streamError);
-        send('error', { message: 'An unexpected error occurred.' });
+        send('error', {
+          message:
+            streamError instanceof NothingToDeliverError
+              ? streamError.message
+              : 'An unexpected error occurred.',
+        });
       }
 
       send('complete', {});
@@ -556,7 +498,7 @@ const streamSseResponse = (ctx: BundleDeliveryContext): Response => {
     },
   });
 
-  return new Response(stream, {
+  return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'private, no-store',
@@ -566,38 +508,20 @@ const streamSseResponse = (ctx: BundleDeliveryContext): Response => {
 };
 
 /**
- * Cache hit fast path (302) — reuse a previously-built ZIP for this exact
+ * Cache hit fast path — reuse a previously-built ZIP for this exact
  * (release, formats) tuple. The cache TTL is bounded by the
- * `tmp-bundles-expire-after-1-day` S3 lifecycle rule. Records cap/analytics on
- * a best-effort basis, then 302-redirects to a fresh presigned URL.
+ * `tmp-bundles-expire-after-1-day` S3 lifecycle rule. Presigns a fresh URL;
+ * the caller 302-redirects once the gate has charged.
  */
-const respondCacheHit302 = async (ctx: BundleDeliveryContext): Promise<Response> => {
-  const { resolvedFormats, cachedZipKey, cachedZipFileName, isFreeMode } = ctx;
-  const downloadUrl = await generatePresignedDownloadUrl(
-    cachedZipKey,
-    cachedZipFileName,
+const produceCachedZip = async (ctx: BundleDeliveryContext): Promise<Deliverable> => ({
+  kind: 'url',
+  downloadUrl: await generatePresignedDownloadUrl(
+    ctx.cachedZipKey,
+    ctx.cachedZipFileName,
     TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
-  );
-
-  // Free mode: increment cap exactly once per bundle.
-  if (isFreeMode && resolvedFormats.length > 0) {
-    await ctx.recordFreeSuccess(resolvedFormats[0].formatType);
-  }
-
-  await recordPaidBundleAnalytics(
-    ctx,
-    resolvedFormats.map(({ formatType }) => formatType),
-    'Failed to record bundle download analytics (cache hit, 302 path)'
-  );
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: downloadUrl,
-      ...NO_STORE_HEADERS,
-    },
-  });
-};
+  ),
+  fileName: ctx.cachedZipFileName,
+});
 
 /** Wiring for the direct-stream tee path: archiver → response + cache upload. */
 interface StreamPipeline {
@@ -763,35 +687,30 @@ const toWebStream = (pipeline: StreamPipeline): ReadableStream<Uint8Array> => {
  * cap enforcement have already run — this branch only changes how the prepared
  * bytes are delivered, not who is allowed to receive them.
  */
-const streamDirectResponse = async (
+const produceDirectStream = async (
   ctx: BundleDeliveryContext,
   s3Client: ReturnType<typeof getS3Client>,
   bucketName: string
-): Promise<Response> => {
-  const { resolvedFormats, cachedZipFileName, isFreeMode } = ctx;
+): Promise<Deliverable> => {
+  const { resolvedFormats, cachedZipFileName } = ctx;
   const pipeline = buildStreamPipeline(ctx, s3Client, bucketName);
 
   const useSubfolders = resolvedFormats.length > 1;
   const fileEntries = buildFileEntries(resolvedFormats, useSubfolders);
 
   // Kick off the prefetch pipeline ONCE and peek at the first object body
-  // up-front. This lets the free-tier cap accounting below distinguish a
-  // real delivery from an all-missing bundle (every S3 object deleted →
-  // empty ZIP) without giving up the "cap committed before the Response is
-  // returned" guarantee that concurrent same-tuple requests rely on. (M3)
-  // The same `inFlight` list is handed to the drive so the first batch of S3
-  // GETs is issued exactly once.
-  //
-  // A rejection here (e.g. S3 NoSuchKey when a release has no objects) is
-  // coalesced to `null`; it must NOT fault the whole request with a 500.
-  // The drive below already handles a failed body by aborting the archive
-  // mid-stream — the client observes a connection reset, not an error
-  // status. Coalescing to `null` also leaves the cap uncharged for a
-  // download that ultimately delivered nothing.
+  // up-front: the gate charges once this producer resolves, so an
+  // all-missing bundle (every S3 object deleted → empty ZIP) must throw
+  // instead, and the same `inFlight` list is handed to the drive so the
+  // first batch of S3 GETs is issued exactly once.
   const s3: S3Target = { client: s3Client, bucket: bucketName };
   const streamKeys = fileEntries.map((entry) => entry.s3Key);
   const streamInFlight = startBufferPrefetch(s3Client, bucketName, streamKeys, S3_PREFETCH_DEPTH);
   const streamFirstBuffer = await peekFirstBody(streamInFlight);
+  if (streamFirstBuffer === null) {
+    pipeline.archive.abort();
+    throw new NothingToDeliverError('No files could be fetched for this bundle.');
+  }
 
   driveStreamArchive(ctx, pipeline, fileEntries, {
     inFlight: streamInFlight,
@@ -799,19 +718,7 @@ const streamDirectResponse = async (
     s3,
   });
 
-  // Free-mode cap accounting: record the successful free-tier download
-  // BEFORE returning the streaming Response so the cap increment is
-  // committed atomically with delivery — same semantics as the SSE
-  // pre-`ready` placement. Skipped when the first object body is missing:
-  // an all-files-deleted bundle yields an empty ZIP and must not consume
-  // the user's cap (M3). Cancellation after the first byte still counts.
-  if (isFreeMode && resolvedFormats.length > 0 && streamFirstBuffer !== null) {
-    await ctx.recordFreeSuccess(resolvedFormats[0].formatType);
-  }
-
-  scheduleStreamPaidAnalytics(ctx, pipeline.cacheUploadPromise);
-
-  return new Response(toWebStream(pipeline), {
+  const response = new NextResponse(toWebStream(pipeline), {
     status: 200,
     headers: {
       'Content-Type': 'application/zip',
@@ -820,14 +727,14 @@ const streamDirectResponse = async (
       'X-Accel-Buffering': 'no',
     },
   });
+  return { kind: 'stream', response };
 };
 
 /**
  * Peek at the first prefetched object body from the shared in-flight list,
- * coalescing a rejection (e.g. S3 NoSuchKey) to `null` so the cap is not charged
- * and the request still streams — the drive aborts the archive mid-flight on a
- * failed body. Returns the resolved first body, or `null` when the bundle is
- * empty (no entries) or the first body is missing/failed.
+ * coalescing a rejection (e.g. S3 NoSuchKey) to `null`. Returns the resolved
+ * first body, or `null` when the bundle is empty (no entries) or the first
+ * body is missing/failed — the producer then refuses to deliver.
  */
 const peekFirstBody = async (
   streamInFlight: ReadonlyArray<Promise<Buffer | null>>
@@ -835,52 +742,24 @@ const peekFirstBody = async (
   try {
     return await streamInFlight[0];
   } catch {
-    // First body failed (e.g. S3 NoSuchKey); leave it null so the cap is
-    // not charged and the request still streams — the drive below aborts
-    // the archive mid-flight.
+    // First body failed (e.g. S3 NoSuchKey); the producer refuses to deliver.
     return null;
   }
 };
 
 /**
- * Paid-mode best-effort analytics for the stream path: only record once the
- * cache upload completes — that signals the full ZIP made it through the tee,
- * which means the client also received every byte (or that the response stream
- * is still draining; either way we credit a successful delivery). If the client
- * canceled mid-stream the cache upload also fails and we skip analytics. Free
- * mode skips this path entirely — the free quota service is the source of truth
- * and per-format `logDownloadEvent` is reserved for paid download analytics
- * (matches the SSE free-mode path which also skips per-format event logging).
+ * Build one combined ZIP, upload it to the shared cache key, and sign a
+ * short-lived presigned URL (default `respond`-absent path; the caller
+ * 302-redirects once the gate has charged). On a build failure the archive and
+ * upload are aborted and the error rethrown — the gate records STREAM_FAILED;
+ * on a post-upload failure the cached ZIP is retained (the lifecycle rule
+ * bounds its lifetime) and the error rethrown.
  */
-const scheduleStreamPaidAnalytics = (
-  ctx: BundleDeliveryContext,
-  cacheUploadPromise: Promise<boolean>
-): void => {
-  if (ctx.isFreeMode) {
-    return;
-  }
-  void cacheUploadPromise.then(async (uploadOk) => {
-    if (!uploadOk) return;
-    await recordPaidBundleAnalytics(
-      ctx,
-      ctx.resolvedFormats.map(({ formatType }) => formatType),
-      'Failed to record bundle download analytics (stream path)'
-    );
-  });
-};
-
-/**
- * Build one combined ZIP, upload it to the shared cache key, sign a short-lived
- * presigned URL, record cap/analytics, and 302-redirect (default
- * `respond=stream`-absent path). On a build failure writes a free-flow
- * STREAM_FAILED audit and rethrows; on a post-upload failure retains the cached
- * ZIP (the lifecycle rule bounds its lifetime) and rethrows.
- */
-const buildAndRedirectResponse = async (
+const produceBuiltZip = async (
   ctx: BundleDeliveryContext,
   s3Client: ReturnType<typeof getS3Client>,
   bucketName: string
-): Promise<Response> => {
+): Promise<Deliverable> => {
   const { resolvedFormats, cachedZipKey, cachedZipFileName } = ctx;
   const archive = createStoreArchive(); // store mode (no compression)
   const passThrough = new PassThrough();
@@ -919,14 +798,13 @@ const buildAndRedirectResponse = async (
     s3: { client: s3Client, bucket: bucketName },
   });
 
-  return finalizeRedirectResponse(ctx);
+  return presignBuiltZip(ctx);
 };
 
 /**
  * Download bodies into memory in parallel so archiver only does memory→memory
  * copies and the multipart uploader drains at full throughput, then finalize
- * and await the upload. On failure: abort the archive + upload, write a free
- * STREAM_FAILED audit row (not counted by the cap), and rethrow.
+ * and await the upload. On failure: abort the archive + upload and rethrow.
  */
 const driveRedirectArchive = async (
   ctx: BundleDeliveryContext,
@@ -972,8 +850,7 @@ const driveRedirectArchive = async (
     }
     upload.abort();
     await uploadPromise.catch(() => undefined);
-    // Free flow: write a STREAM_FAILED audit row (not counted by cap).
-    await ctx.recordFreeStreamFailure();
+    // The gate records STREAM_FAILED and charges nothing.
     throw archiveError;
   }
 };
@@ -1012,52 +889,15 @@ const appendRedirectEntry = (
  * valid for subsequent requests; the 24-hour S3 lifecycle rule bounds its lifetime
  * and a future request reuses it via the cache hit fast path.
  */
-const finalizeRedirectResponse = async (ctx: BundleDeliveryContext): Promise<Response> => {
-  const { resolvedFormats, cachedZipKey, cachedZipFileName, isFreeMode, userId, releaseId } = ctx;
+const presignBuiltZip = async (ctx: BundleDeliveryContext): Promise<Deliverable> => {
+  const { cachedZipKey, cachedZipFileName } = ctx;
   try {
-    // Step 8: Generate a short-lived presigned download URL for the temporary ZIP
     const downloadUrl = await generatePresignedDownloadUrl(
       cachedZipKey,
       cachedZipFileName,
       TEMP_BUNDLE_DOWNLOAD_URL_EXPIRATION_SECONDS
     );
-
-    // Free mode: increment cap exactly once per bundle.
-    if (isFreeMode && resolvedFormats.length > 0) {
-      await ctx.recordFreeSuccess(resolvedFormats[0].formatType);
-    }
-
-    // Step 9: Increment download count (bundle = 1 download action) — paid only.
-    if (!isFreeMode && userId) {
-      await PurchaseRepository.upsertDownloadCount(userId, releaseId);
-    }
-
-    // Step 10: Log download events per format — paid flow only. The free
-    // flow already wrote a single success row via `recordFreeSuccess`.
-    if (!isFreeMode) {
-      const downloadEventRepo = new DownloadEventRepository();
-      await Promise.all(
-        resolvedFormats.map(({ formatType }) =>
-          downloadEventRepo.logDownloadEvent({
-            userId,
-            visitorId: ctx.guestVisitorId,
-            releaseId,
-            formatType,
-            success: true,
-            ipAddress: ctx.auditIp,
-            userAgent: ctx.auditUserAgent,
-          })
-        )
-      );
-    }
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: downloadUrl,
-        ...NO_STORE_HEADERS,
-      },
-    });
+    return { kind: 'url', downloadUrl, fileName: cachedZipFileName };
   } catch (postUploadError) {
     loggers.downloads.error('Bundle post-upload error (cached ZIP retained)', postUploadError, {
       tempS3Key: cachedZipKey,
@@ -1066,732 +906,251 @@ const finalizeRedirectResponse = async (ctx: BundleDeliveryContext): Promise<Res
   }
 };
 
+/** What every delivery path hands the gate. */
+interface GateArgs {
+  readonly request: DownloadRequest;
+  readonly audit: AuditContext;
+  /** Build the producers' context from the granted formats' records. */
+  readonly contextFor: (grant: Grant, records: GateFormatRecord[]) => BundleDeliveryContext;
+}
+
+/** Either the fully-resolved inputs or an early response to return verbatim. */
+type BundleSetup =
+  | { kind: 'response'; response: NextResponse }
+  | {
+      kind: 'ok';
+      gateArgs: GateArgs;
+      respond: 'json' | 'stream' | 'preflight' | null;
+    };
+
+const refusalResponse = (refusal: Parameters<typeof downloadRefusal>[0]): NextResponse => {
+  const { status, body } = downloadRefusal(refusal);
+  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+};
+
+// Rate limiting — skipped in E2E test mode to avoid 429s during test runs.
+const enforceDownloadRateLimit = async (ip: string): Promise<NextResponse | null> => {
+  if (process.env.E2E_MODE === 'true') {
+    return null;
+  }
+  try {
+    await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
+    return null;
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429, headers: NO_STORE_HEADERS }
+    );
+  }
+};
+
+/** A granted format's repository record, flattened to the files to archive. */
+const toResolvedFormat = (record: GateFormatRecord): ResolvedFormat | null => {
+  const formatType = record.formatType as DigitalFormatType;
+  // Prefer multi-track child files; fall back to legacy single-file
+  if (record.files.length > 0) {
+    return {
+      formatType,
+      files: record.files.map((f) => ({ s3Key: f.s3Key, fileName: f.fileName })),
+    };
+  }
+  if (record.s3Key && record.fileName) {
+    return { formatType, files: [{ s3Key: record.s3Key, fileName: record.fileName }] };
+  }
+  return null;
+};
+
 /**
- * GET /api/releases/[id]/download/bundle?formats=FLAC,WAV,...[&respond=json]
+ * Rate-limit, validate the release id and `formats`, resolve the download
+ * subject (signed-in user or guest), and confirm the release is listed — the
+ * HTTP half of the request. A legacy `mode` parameter is ignored: the gate
+ * decides the mode from entitlement (ADR-0018).
  *
- * Bundle multiple digital format files into a single ZIP, upload it to S3
- * as a temporary object, and respond with a 302 redirect to a short-lived
- * presigned download URL. Redirecting (rather than returning JSON) lets the
- * client trigger the request with a synchronous `window.open(url, '_self')`
- * inside the user's click gesture — the only pattern iOS Safari honors for
- * downloads. The presigned URL sets Content-Disposition: attachment so the
- * browser downloads the ZIP without leaving the current page.
+ * Cache rationale: bundle ZIPs are immutable for a given (release, formats)
+ * tuple — the digital format files are content-addressed by S3 key — so a
+ * previously-built ZIP is safely reused across subjects and modes. The S3
+ * lifecycle rule `tmp-bundles-expire-after-1-day` bounds the cache TTL, which
+ * also bounds the staleness window if a format is re-uploaded. The download
+ * URL is signed per request with Content-Disposition set at signing time.
+ */
+interface ParsedBundleQuery {
+  releaseId: string;
+  formats: DigitalFormatType[];
+  respond: 'json' | 'stream' | 'preflight' | null;
+}
+
+const invalidRequest = (error: string, message: string): NextResponse =>
+  NextResponse.json({ success: false, error, message }, { status: 400, headers: NO_STORE_HEADERS });
+
+/** Rate-limit, then validate the release id and the `formats` / `respond` query. */
+const parseBundleRequest = async (
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+): Promise<
+  { kind: 'query'; query: ParsedBundleQuery } | { kind: 'response'; response: NextResponse }
+> => {
+  const rateLimited = await enforceDownloadRateLimit(extractClientIp(request));
+  if (rateLimited) return { kind: 'response', response: rateLimited };
+
+  const { id: releaseId } = await context.params;
+  if (!isValidObjectId(releaseId)) {
+    return { kind: 'response', response: invalidRequest('INVALID_REQUEST', 'Invalid release id.') };
+  }
+
+  const parsed = bundleDownloadQuerySchema.safeParse({
+    formats: request.nextUrl.searchParams.get('formats'),
+  });
+  if (!parsed.success) {
+    return {
+      kind: 'response',
+      response: invalidRequest(
+        'INVALID_FORMATS',
+        parsed.error.issues[0]?.message ?? 'Invalid formats parameter.'
+      ),
+    };
+  }
+  const respondParam = request.nextUrl.searchParams.get('respond');
+  return {
+    kind: 'query',
+    query: {
+      releaseId,
+      formats: parsed.data.formats as DigitalFormatType[],
+      respond:
+        respondParam === 'json' || respondParam === 'stream' || respondParam === 'preflight'
+          ? respondParam
+          : null,
+    },
+  };
+};
+
+const resolveBundleSetup = async (
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+): Promise<BundleSetup> => {
+  const parsed = await parseBundleRequest(request, context);
+  if (parsed.kind === 'response') {
+    return parsed;
+  }
+  const { releaseId, formats, respond } = parsed.query;
+
+  const session = await auth.api.getSession({ headers: request.headers });
+  const subject = await resolveDownloadSubject(request, session?.user?.id ?? null);
+
+  const release = await ReleaseService.findPublishedTitleById(releaseId);
+  if (!release) {
+    return {
+      kind: 'response',
+      response: refusalResponse({ ok: false, denial: null, reason: 'NOT_FOUND' }),
+    };
+  }
+  const safeTitle = release.title.replace(/[^\w\s.-]/g, '').trim() || 'release';
+  const sortedFormatKey = [...formats].sort().join('-');
+
+  return {
+    kind: 'ok',
+    respond,
+    gateArgs: {
+      request: { subject, releaseId, formats },
+      audit: {
+        ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
+        userAgent: request.headers.get('user-agent') ?? 'unknown',
+      },
+      contextFor: (_grant, records) => ({
+        releaseId,
+        resolvedFormats: records
+          .map(toResolvedFormat)
+          .filter((f): f is ResolvedFormat => f !== null),
+        cachedZipKey: `tmp/bundles/cache/${releaseId}/${sortedFormatKey}.zip`,
+        cachedZipFileName: `${safeTitle}.zip`,
+      }),
+    },
+  };
+};
+
+/**
+ * Preflight: paid- and free-mode clients call this before triggering
+ * anchor-based streaming downloads so 4xx errors (auth, purchase, download
+ * cap, free-tier cap) surface as in-dialog messages instead of the browser
+ * rendering raw JSON. Decided by the gate, nothing locked or charged.
+ */
+const preflightResponse = async (request: DownloadRequest): Promise<NextResponse> => {
+  const result = await downloadGate.check(request);
+  if (result.kind === 'not-found') {
+    return refusalResponse({ ok: false, denial: null, reason: 'NOT_FOUND' });
+  }
+  if (result.kind === 'denial') {
+    return refusalResponse({ ok: false, denial: result });
+  }
+  return NextResponse.json({ success: true }, { status: 200, headers: NO_STORE_HEADERS });
+};
+
+/**
+ * GET /api/releases/[id]/download/bundle?formats=A,B[&respond=json|stream|preflight]
  *
- * Response contract:
- * - Default: 302 redirect to the short-lived presigned ZIP URL
- * - respond=json: streams SSE events while one combined ZIP is prepared and
- *   uploaded to S3. Events: progress (per-format zipping + uploading), ready
- *   (single download URL), error (per-format/global failure), complete.
- *   Download count increment and per-format download-event logging happen
- *   server-side on a best-effort basis after ready is emitted.
- *
- * Authorization:
- * 1. Authenticate user
- * 2. Validate formats query parameter
- * 3. Verify purchase exists
- * 4. Check download limit (< MAX_RELEASE_DOWNLOAD_COUNT)
- * 5. Fetch release title for ZIP filename
- * 6. Resolve requested format records with child files from DB
- * 7. Stream files from S3 into archiver → Upload to S3 temp object
- * 8. Generate presigned download URL
- * 9. Increment download count once (bundle = 1 download)
- * 10. Log download event per format
+ * One ZIP of the requested formats. An adapter over the download gate
+ * (ADR-0018): the gate decides the mode and charges once the deliverable
+ * exists; this route resolves the subject and produces the ZIP — as SSE
+ * progress + a presigned URL (`respond=json`), as the bytes themselves
+ * (`respond=stream`), or as a 302 to a presigned URL (default), reusing a
+ * cached build when one exists.
  */
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
-): Promise<Response> {
-  // Hoisted so the outer `finally` can release the in-process collision lock
-  // regardless of which exit branch the request takes (success, audit
-  // rejection, S3 failure, etc.). The 30s TTL on the lock entry bounds
-  // leakage if a process crashes between acquire and release.
-  let outerLockAcquired = false;
-  let outerLockKey: string | null = null;
+): Promise<NextResponse> {
   try {
     const setup = await resolveBundleSetup(request, context);
     if (setup.kind === 'response') {
       return setup.response;
     }
-    const { gate } = setup;
-    outerLockKey = gate.lockKey;
+    const { gateArgs, respond } = setup;
 
-    const capResult = await enforceFreeCapAndLock(gate);
-    if (capResult.kind === 'response') {
-      return capResult.response;
+    if (respond === 'preflight') {
+      return await preflightResponse(gateArgs.request);
     }
-    outerLockAcquired = capResult.lockAcquired;
-
-    // Preflight: paid- and free-mode clients call this before triggering
-    // anchor-based streaming downloads so 4xx errors (auth, purchase,
-    // download cap, free-tier cap) surface as in-dialog messages instead
-    // of the browser rendering raw JSON. All gating checks above have
-    // already executed; reaching here means the download is permitted.
-    if (gate.respondPreflight) {
-      return Response.json({ success: true }, { status: 200, headers: NO_STORE_HEADERS });
+    if (respond === 'json') {
+      return streamSseResponse(gateArgs);
     }
 
-    const ctx = buildDeliveryContext(gate);
-
-    // SSE streaming path — emits one combined ZIP as progress events.
-    if (gate.respondJson) {
-      return streamSseResponse(ctx);
-    }
-
-    // Cache hit fast path — reuse a previously-built ZIP for this exact
-    // (release, formats) tuple. The cache TTL is bounded by the
-    // `tmp-bundles-expire-after-1-day` S3 lifecycle rule.
     const s3Client = getS3Client();
     const bucketName = getS3BucketName();
-    if (await verifyS3ObjectExists(ctx.cachedZipKey)) {
-      // `await` (not bare `return`) so a rejection from these paths is caught
-      // by this handler's `try/catch` and surfaced as a 500 — a bare returned
-      // promise would reject after control left the `try`, escaping the catch.
-      return await respondCacheHit302(ctx);
+    const outcome = await downloadGate.download(
+      gateArgs.request,
+      async (grant, records) => {
+        const ctx = gateArgs.contextFor(grant, records);
+        if (await verifyS3ObjectExists(ctx.cachedZipKey)) {
+          return produceCachedZip(ctx);
+        }
+        return respond === 'stream'
+          ? produceDirectStream(ctx, s3Client, bucketName)
+          : produceBuiltZip(ctx, s3Client, bucketName);
+      },
+      gateArgs.audit
+    );
+    if (!outcome.ok) {
+      return refusalResponse(outcome);
     }
-
-    if (gate.respondStream) {
-      return await streamDirectResponse(ctx, s3Client, bucketName);
+    if (outcome.deliverable.kind === 'stream') {
+      return outcome.deliverable.response;
     }
-
-    return await buildAndRedirectResponse(ctx, s3Client, bucketName);
+    return new NextResponse(null, {
+      status: 302,
+      headers: { Location: outcome.deliverable.downloadUrl, ...NO_STORE_HEADERS },
+    });
   } catch (error) {
     loggers.downloads.error('Bundle download error', error);
-
-    return Response.json(
-      { success: false, error: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof NothingToDeliverError ? 'STREAM_FAILED' : 'INTERNAL_ERROR',
+        message:
+          error instanceof NothingToDeliverError ? error.message : 'An unexpected error occurred.',
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
-  } finally {
-    if (outerLockAcquired && outerLockKey !== null) {
-      freeDownloadLockService.release(outerLockKey);
-    }
   }
 }
-
-/**
- * Fully-resolved setup/auth/validation state for a permitted request. Carries
- * everything Phase B + the delivery paths need; the cap/lock step and delivery
- * dispatch consume it without re-deriving auth or format state.
- */
-interface BundleGate {
-  readonly request: NextRequest;
-  readonly releaseId: string;
-  readonly requestedFormats: DigitalFormatType[];
-  readonly mode: string | undefined;
-  readonly isFreeMode: boolean;
-  readonly userId: string | null;
-  readonly guestVisitorId: string | null;
-  readonly guestAllVisitorIds: string[] | undefined;
-  readonly respondJson: boolean;
-  readonly respondStream: boolean;
-  readonly respondPreflight: boolean;
-  readonly resolvedFormats: ResolvedFormat[];
-  readonly cachedZipKey: string;
-  readonly cachedZipFileName: string;
-  readonly freeSubject: DownloadSubject | null;
-  readonly lockKey: string | null;
-  readonly auditIp: string;
-  readonly auditUserAgent: string;
-}
-
-/** Either a fully-resolved gate or an early Response to return verbatim. */
-type SetupResult = { kind: 'gate'; gate: BundleGate } | { kind: 'response'; response: Response };
-
-/**
- * Phase A — rate-limit, authenticate, validate formats/mode, resolve guest
- * identity, enforce the free-only format restriction, verify purchase + the
- * per-release download cap, fetch the release title, resolve requested format
- * records with their files, and compute the deterministic cache key. Returns an
- * early `Response` for any reject branch, else the resolved `BundleGate`.
- */
-const resolveBundleSetup = async (
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-): Promise<SetupResult> => {
-  const auth = await authenticateBundleRequest(request, context);
-  if (auth.kind === 'response') {
-    return auth;
-  }
-  const { releaseId, requestedFormats, mode, isFreeMode, userId, respondFlags } = auth;
-
-  const identity = await resolveFreeVisitorIdentity(request, isFreeMode, userId);
-
-  // For free-mode flows we still want to retain the format-restriction check
-  // (defence-in-depth — schema also validates this).
-  const isFreeOnlyRequest = requestedFormats.every(isFreeFormatType);
-  if (isFreeMode && !isFreeOnlyRequest) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        {
-          success: false,
-          error: 'INVALID_FORMATS',
-          message: `Free downloads only support ${FREE_FORMAT_TYPES.join(', ')}`,
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const access = await verifyBundleAccess(isFreeMode, userId, releaseId, isFreeOnlyRequest);
-  if (access.kind === 'response') {
-    return { kind: 'response', response: access.response };
-  }
-
-  // #668: the free-tier cap + quota must key on the delivered format set and
-  // purchase entitlement, not the client-supplied `mode` flag. A free-only
-  // request from a caller with no purchase is a free-tier download — treat it
-  // as such for all downstream accounting even when `mode=free` was omitted.
-  // A purchaser keeps the paid path (per-release cap, no free-tier draw-down).
-  const effectiveFreeMode = isFreeMode || (isFreeOnlyRequest && !access.hasEntitlement);
-
-  // Step 5: Fetch release title for ZIP filename
-  const release = await ReleaseService.findPublishedTitleById(releaseId);
-  if (!release) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        { success: false, error: 'NOT_FOUND', message: 'Release not found.' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const resolved = await resolveRequestedFormats(releaseId, requestedFormats);
-  if (resolved.length === 0) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        { success: false, error: 'NO_FILES', message: 'No downloadable files found.' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  return {
-    kind: 'gate',
-    gate: assembleGate({
-      request,
-      releaseId,
-      requestedFormats,
-      mode,
-      isFreeMode: effectiveFreeMode,
-      userId,
-      identity,
-      respondFlags,
-      resolvedFormats: resolved,
-      releaseTitle: release.title,
-    }),
-  };
-};
-
-/** Resolved respond-mode flags parsed from the query string. */
-interface RespondFlags {
-  readonly respondJson: boolean;
-  readonly respondStream: boolean;
-  readonly respondPreflight: boolean;
-}
-
-/** Successful authentication + validation result for a permitted request. */
-interface AuthResult {
-  readonly releaseId: string;
-  readonly requestedFormats: DigitalFormatType[];
-  readonly mode: string | undefined;
-  readonly isFreeMode: boolean;
-  readonly userId: string | null;
-  readonly respondFlags: RespondFlags;
-}
-
-/** Either a successful auth result or an early Response to return verbatim. */
-type AuthOutcome = ({ kind: 'auth' } & AuthResult) | { kind: 'response'; response: Response };
-
-/**
- * Rate-limit (skipped in E2E test mode), authenticate the session token (paid
- * mode requires a session; free mode is open to guests), validate the release
- * ID, and parse + validate the `formats`/`mode`/`respond` query parameters.
- * Returns an early `Response` for any reject branch, else the auth result.
- */
-const authenticateBundleRequest = async (
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-): Promise<AuthOutcome> => {
-  // Rate limiting — skipped in E2E test mode to avoid 429s during test runs
-  // (repeated/retried downloads from one IP), matching the `withRateLimit`
-  // decorator used by the sibling free-status route.
-  const ip = extractClientIp(request);
-  if (process.env.E2E_MODE !== 'true') {
-    try {
-      await downloadLimiter.check(DOWNLOAD_LIMIT, ip);
-    } catch {
-      return {
-        kind: 'response',
-        response: Response.json(
-          {
-            success: false,
-            error: 'RATE_LIMITED',
-            message: 'Too many requests. Please try again later.',
-          },
-          { status: 429, headers: NO_STORE_HEADERS }
-        ),
-      };
-    }
-  }
-
-  // Step 1: Authentication (deferred for mode='free' — guest flow). Read the
-  // better-auth session from the request cookies; better-auth owns cookie
-  // naming/secure-prefix selection internally, so we only forward the headers.
-  const session = await auth.api.getSession({ headers: request.headers });
-  const userId = session?.user?.id ?? null;
-
-  const { id: releaseId } = await context.params;
-
-  // Validate release ID
-  if (!isValidObjectId(releaseId)) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        { success: false, error: 'INVALID_ID', message: 'Invalid release ID.' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  return parseBundleQuery(request, releaseId, userId);
-};
-
-/**
- * Parse + validate the `formats`/`mode`/`respond` query parameters and apply
- * the paid-mode auth gate. Returns an early `Response` on a validation/auth
- * reject, else the assembled auth result.
- */
-const parseBundleQuery = (
-  request: NextRequest,
-  releaseId: string,
-  tokenSub: string | null
-): AuthOutcome => {
-  // Step 2: Parse and validate formats + mode query parameters
-  const formatsParam = request.nextUrl.searchParams.get('formats');
-  const modeParam = request.nextUrl.searchParams.get('mode') ?? undefined;
-  const respondJson = request.nextUrl.searchParams.get('respond') === 'json';
-  const respondStream = request.nextUrl.searchParams.get('respond') === 'stream';
-  const respondPreflight = request.nextUrl.searchParams.get('respond') === 'preflight';
-  const parseResult = bundleDownloadQuerySchema.safeParse({
-    formats: formatsParam,
-    mode: modeParam,
-  });
-
-  if (!parseResult.success) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        {
-          success: false,
-          error: 'INVALID_FORMATS',
-          message: parseResult.error.issues[0]?.message ?? 'Invalid formats parameter.',
-        },
-        { status: 400, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const requestedFormats = parseResult.data.formats as DigitalFormatType[];
-  const mode = parseResult.data.mode;
-  const isFreeMode = mode === 'free';
-
-  // Auth gating: paid mode requires a session; free mode is open to guests.
-  if (!isFreeMode && !tokenSub) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        { success: false, error: 'UNAUTHORIZED', message: 'You must be logged in to download.' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  return {
-    kind: 'auth',
-    releaseId,
-    requestedFormats,
-    mode,
-    isFreeMode,
-    userId: tokenSub,
-    respondFlags: { respondJson, respondStream, respondPreflight },
-  };
-};
-
-/** Resolved guest visitor identity for the free flow. */
-interface FreeVisitorIdentity {
-  readonly guestVisitorId: string | null;
-  readonly guestAllVisitorIds: string[] | undefined;
-}
-
-/**
- * Free-mode: resolve guest visitor identity BEFORE any streaming starts so the
- * Set-Cookie header is part of the initial Response. iOS Safari only honors a
- * cookie issued in the very first byte of the response — placing this work
- * after the ReadableStream body would silently strip it. Authenticated users on
- * the free path bypass the visitor cookie entirely (Session 2026-05-08 Q5,
- * T061) — their cap is keyed by `userId`, not by composite identity.
- */
-const resolveFreeVisitorIdentity = async (
-  request: NextRequest,
-  isFreeMode: boolean,
-  userId: string | null
-): Promise<FreeVisitorIdentity> => {
-  if (!isFreeMode || userId) {
-    return { guestVisitorId: null, guestAllVisitorIds: undefined };
-  }
-  const cookieValue = await readGuestVisitorId();
-  const fingerprintHash = computeFingerprintHash({
-    userAgent: request.headers.get('user-agent'),
-    acceptLanguage: request.headers.get('accept-language'),
-    ip: extractClientIp(request),
-  });
-  const identity = await freeDownloadQuotaService.resolveVisitorIdentity({
-    cookieValue,
-    fingerprintHash,
-  });
-  if (identity.cookieReissue) {
-    await setGuestVisitorIdCookie(identity.primaryVisitorId);
-  }
-  return {
-    guestVisitorId: identity.primaryVisitorId,
-    guestAllVisitorIds: identity.allVisitorIds,
-  };
-};
-
-/** Access outcome: an early reject `Response`, or whether the caller is entitled by purchase. */
-type BundleAccessResult =
-  { kind: 'response'; response: Response } | { kind: 'ok'; hasEntitlement: boolean };
-
-/**
- * Steps 3–4: Verify purchase and check download limit (with 6-hour auto-reset).
- * Explicit free mode skips both — guest downloads are gated by the freemium
- * quota service (added in US2/US3). Otherwise the purchase entitlement is
- * resolved and returned: a free-only request from a non-entitled caller is
- * allowed through here (no purchase required for free formats) but flagged
- * `hasEntitlement: false` so the caller treats it as a free-tier download and
- * still applies the rolling cap + quota (#668). Returns a reject `Response`
- * (mixed formats without purchase, or download-limit reached) otherwise.
- */
-const verifyBundleAccess = async (
-  isFreeMode: boolean,
-  userId: string | null,
-  releaseId: string,
-  isFreeOnlyRequest: boolean
-): Promise<BundleAccessResult> => {
-  if (isFreeMode) {
-    return { kind: 'ok', hasEntitlement: false };
-  }
-  // Non-null assertion equivalent: userId is guaranteed by the auth gate above.
-  const access = await PurchaseService.getDownloadAccess(
-    { kind: 'user', userId: userId as string },
-    releaseId
-  );
-
-  if (!access.allowed && access.reason === 'no_purchase' && !isFreeOnlyRequest) {
-    return {
-      kind: 'response',
-      response: Response.json(
-        { success: false, error: 'PURCHASE_REQUIRED', message: 'Purchase required to download.' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  if (!access.allowed && access.reason === 'download_limit_reached') {
-    return {
-      kind: 'response',
-      response: Response.json(
-        {
-          success: false,
-          error: 'DOWNLOAD_LIMIT',
-          message: `Download limit reached (${MAX_RELEASE_DOWNLOAD_COUNT}). Contact support.`,
-          resetInHours: access.resetInHours,
-        },
-        { status: 403, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-  return { kind: 'ok', hasEntitlement: access.allowed };
-};
-
-/**
- * Step 6: Resolve all requested format records with their files (single query).
- * Prefers multi-track child files; falls back to legacy single-file. Skips
- * unavailable or fileless formats silently.
- */
-const resolveRequestedFormats = async (
-  releaseId: string,
-  requestedFormats: readonly DigitalFormatType[]
-): Promise<ResolvedFormat[]> => {
-  const formatRepo = new ReleaseDigitalFormatRepository();
-  const allFormats = await formatRepo.findAllByRelease(releaseId);
-  const formatMap = new Map(allFormats.map((f) => [f.formatType, f]));
-
-  const resolvedFormats: ResolvedFormat[] = [];
-  for (const formatType of requestedFormats) {
-    const format = formatMap.get(formatType);
-    if (!format) {
-      continue; // skip unavailable formats silently
-    }
-    // Prefer multi-track child files; fall back to legacy single-file
-    if (format.files && format.files.length > 0) {
-      resolvedFormats.push({
-        formatType,
-        files: format.files.map((f) => ({ s3Key: f.s3Key, fileName: f.fileName })),
-      });
-    } else if (format.s3Key && format.fileName) {
-      resolvedFormats.push({
-        formatType,
-        files: [{ s3Key: format.s3Key, fileName: format.fileName }],
-      });
-    }
-  }
-  return resolvedFormats;
-};
-
-/**
- * Assemble the immutable `BundleGate` from resolved auth/format state: compute
- * the deterministic cache key (keyed by release + sorted format list + mode),
- * the safe ZIP filename, and the free-mode subject + collision lock key.
- *
- * Cache rationale: bundle ZIPs are immutable for a given (release, formats)
- * tuple — the underlying digital format files are content-addressed by S3 key —
- * so a previously-built ZIP is safely reused across users. The S3 lifecycle
- * rule `tmp-bundles-expire-after-1-day` bounds the cache TTL to 24 hours, which
- * also bounds the staleness window if a format is re-uploaded. The download URL
- * is signed per-request with Content-Disposition set at signing time, so the
- * cached object's upload-time filename never leaks into the user's download.
- */
-const assembleGate = (args: {
-  request: NextRequest;
-  releaseId: string;
-  requestedFormats: DigitalFormatType[];
-  mode: string | undefined;
-  isFreeMode: boolean;
-  userId: string | null;
-  identity: FreeVisitorIdentity;
-  respondFlags: RespondFlags;
-  resolvedFormats: ResolvedFormat[];
-  releaseTitle: string;
-}): BundleGate => {
-  const { releaseId, requestedFormats, mode, isFreeMode, userId, identity } = args;
-  const sortedFormatKey = [...requestedFormats].sort().join('-');
-  const cachedZipKey = `tmp/bundles/cache/${releaseId}/${mode}/${sortedFormatKey}.zip`;
-  const safeTitleForKey = args.releaseTitle.replace(/[^\w\s.-]/g, '').trim() || 'release';
-  const cachedZipFileName = `${safeTitleForKey}.zip`;
-
-  // 007-free-digital-downloads US2/US3 — free-mode subjects (guest or
-  // authenticated) are keyed by `userId` when authenticated, else by the
-  // guest visitorId. The lock prevents two concurrent free requests for the
-  // same `(subject, release, sortedFormatKey)` from racing on the cap query.
-  const freeSubject: DownloadSubject | null = isFreeMode
-    ? userId
-      ? { kind: 'user', userId }
-      : { kind: 'guest', visitorId: identity.guestVisitorId as string }
-    : null;
-  const freeSubjectKey =
-    freeSubject?.kind === 'user'
-      ? `user:${freeSubject.userId}`
-      : freeSubject !== null
-        ? `guest:${freeSubject.visitorId}`
-        : null;
-  // #667: key the collision lock by SUBJECT only — not release/format-scoped —
-  // so a subject's concurrent free downloads serialize on the shared per-subject
-  // quota instead of racing on distinct keys and each drawing it down.
-  const lockKey = freeSubjectKey;
-
-  return {
-    request: args.request,
-    releaseId,
-    requestedFormats,
-    mode,
-    isFreeMode,
-    userId,
-    guestVisitorId: identity.guestVisitorId,
-    guestAllVisitorIds: identity.guestAllVisitorIds,
-    respondJson: args.respondFlags.respondJson,
-    respondStream: args.respondFlags.respondStream,
-    respondPreflight: args.respondFlags.respondPreflight,
-    resolvedFormats: args.resolvedFormats,
-    cachedZipKey,
-    cachedZipFileName,
-    freeSubject,
-    lockKey,
-    auditIp: args.request.headers.get('x-forwarded-for') ?? 'unknown',
-    auditUserAgent: args.request.headers.get('user-agent') ?? 'unknown',
-  };
-};
-
-/** Cap/lock outcome: either an early Response or whether this request holds the lock. */
-type CapLockResult =
-  { kind: 'response'; response: Response } | { kind: 'ok'; lockAcquired: boolean };
-
-/**
- * 007-free-digital-downloads US2/US3 — enforce the rolling 24h free-tier cap
- * BEFORE bundle prep (so we do not pay the S3 round-trip for a request that will
- * be rejected) and acquire the per-(subject, release, formats) collision lock.
- * On a cap breach writes a CAP_REACHED audit row and returns 403. On a lock
- * collision with no warm cache returns 409 LOCK_HELD; with a warm cache it
- * proceeds without the lock. No-op for paid mode (returns lockAcquired=false).
- */
-const enforceFreeCapAndLock = async (gate: BundleGate): Promise<CapLockResult> => {
-  const { isFreeMode, freeSubject } = gate;
-  if (!isFreeMode || freeSubject === null) {
-    return { kind: 'ok', lockAcquired: false };
-  }
-
-  const capResponse = await assertFreeCap(gate, freeSubject);
-  if (capResponse) {
-    return { kind: 'response', response: capResponse };
-  }
-
-  // Skip lock acquisition for preflight requests — preflight is a
-  // gating-check only and the follow-up streaming request will
-  // re-acquire the lock for the actual delivery.
-  if (gate.respondPreflight) {
-    return { kind: 'ok', lockAcquired: false };
-  }
-
-  // Acquire the per-(subject, release, formats) collision lock. If another
-  // concurrent caller holds it AND there is no warm cache for the same tuple,
-  // return 409 LOCK_HELD so the client can retry.
-  const lockKey = gate.lockKey as string;
-  const lockAcquired = freeDownloadLockService.acquire(lockKey);
-  if (!lockAcquired) {
-    const cacheWarm = await verifyS3ObjectExists(gate.cachedZipKey);
-    if (!cacheWarm) {
-      return {
-        kind: 'response',
-        response: Response.json(
-          {
-            errorCode: 'LOCK_HELD',
-            message: 'Another download is in progress for this release. Please retry shortly.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        ),
-      };
-    }
-    // Cache warm: proceed without holding the lock; the original holder
-    // is still responsible for cap accounting on their request, and this
-    // path will independently call `recordSuccessfulDownload` below.
-  }
-  return { kind: 'ok', lockAcquired };
-};
-
-/**
- * Assert the free-tier cap for the resolved subject. On a `CapReachedError`,
- * write an audit row (`success:false, errorCode:'CAP_REACHED'` — intentionally
- * NOT counted by future cap queries, which require `success:true`) and return a
- * 403 Response. Returns `null` when the cap allows the download; rethrows any
- * non-cap error so the GET handler surfaces it as a 500.
- */
-const assertFreeCap = async (
-  gate: BundleGate,
-  freeSubject: DownloadSubject
-): Promise<Response | null> => {
-  try {
-    await freeDownloadQuotaService.assertFreeDownloadAllowed({
-      subject: freeSubject,
-      visitorIds: gate.guestAllVisitorIds,
-      releaseId: gate.releaseId,
-    });
-    return null;
-  } catch (capError) {
-    if (capError instanceof CapReachedError) {
-      try {
-        await new DownloadEventRepository().logDownloadEvent({
-          userId: gate.userId,
-          visitorId: gate.guestVisitorId,
-          releaseId: gate.releaseId,
-          formatType: gate.requestedFormats[0],
-          success: false,
-          errorCode: 'CAP_REACHED',
-          ipAddress: gate.auditIp,
-          userAgent: gate.auditUserAgent,
-        });
-      } catch (auditError) {
-        loggers.downloads.error('Failed to write CAP_REACHED audit event', auditError, {
-          releaseId: gate.releaseId,
-        });
-      }
-      return Response.json(
-        {
-          errorCode: 'CAP_REACHED',
-          message: 'Free download limit reached for this release.',
-          resetsAtIso: capError.resetsAt.toISOString(),
-        },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-    throw capError;
-  }
-};
-
-/**
- * Derive the immutable `BundleDeliveryContext` consumed by the delivery paths,
- * including the free-mode `recordFreeSuccess` / `recordFreeStreamFailure`
- * closures. `recordFreeSuccess` records a single successful free-tier download
- * for the resolved subject (called exactly once per successful bundle, T050 —
- * before the SSE `ready` / 302 so the cap is incremented atomically with
- * delivery). `recordFreeStreamFailure` writes a `success:false,
- * errorCode:'STREAM_FAILED'` audit event for observability — NOT counted by the
- * cap (T062). Both no-op for paid mode.
- */
-const buildDeliveryContext = (gate: BundleGate): BundleDeliveryContext => {
-  const { isFreeMode, freeSubject, releaseId, userId, guestVisitorId, auditIp, auditUserAgent } =
-    gate;
-
-  const recordFreeSuccess = async (formatType: DigitalFormatType): Promise<void> => {
-    if (!isFreeMode || freeSubject === null) return;
-    try {
-      await freeDownloadQuotaService.recordSuccessfulDownload({
-        subject: freeSubject,
-        releaseId,
-        formatType,
-        ipAddress: auditIp,
-        userAgent: auditUserAgent,
-      });
-    } catch (recordError) {
-      loggers.downloads.error('Failed to record successful free download', recordError, {
-        releaseId,
-      });
-    }
-  };
-
-  const recordFreeStreamFailure = async (): Promise<void> => {
-    if (!isFreeMode) return;
-    try {
-      await new DownloadEventRepository().logDownloadEvent({
-        userId,
-        visitorId: guestVisitorId,
-        releaseId,
-        formatType: gate.requestedFormats[0],
-        success: false,
-        errorCode: 'STREAM_FAILED',
-        ipAddress: auditIp,
-        userAgent: auditUserAgent,
-      });
-    } catch (auditError) {
-      loggers.downloads.error('Failed to write STREAM_FAILED audit event', auditError, {
-        releaseId,
-      });
-    }
-  };
-
-  return {
-    resolvedFormats: gate.resolvedFormats,
-    cachedZipKey: gate.cachedZipKey,
-    cachedZipFileName: gate.cachedZipFileName,
-    releaseId,
-    isFreeMode,
-    userId,
-    guestVisitorId,
-    auditIp,
-    auditUserAgent,
-    recordFreeSuccess,
-    recordFreeStreamFailure,
-  };
-};

@@ -5,20 +5,23 @@
 import 'server-only';
 
 /**
- * In-process lock service for the free-download flow.
- *
- * Prevents the same visitor from initiating two concurrent free-download
- * bundle requests for the same release+format-set, which would otherwise
- * race on the rolling-window cap and double-bill the visitor.
- *
- * Scope: single Node.js process / serverless instance. With multiple
- * replicas the lock is best-effort, but the cap query (driven by
- * `DownloadEvent`) remains the source of truth, so at worst a visitor
- * could obtain one extra successful download in a narrow window.
- *
- * Default TTL: 30 seconds. Locks are GC'd lazily on the next `acquire`.
+ * The gate's lock seam (ADR-0018): one subject may be inside
+ * authorize → produce → commit at a time, so two overlapping requests cannot
+ * both read a counter below its cap and both be charged. Production runs one
+ * container, so the adapter is in-process; a Mongo compare-and-swap adapter
+ * drops in here if that changes.
  */
-export class FreeDownloadLockService {
+export interface DownloadLock {
+  acquire(key: string, now?: number): boolean;
+  release(key: string): void;
+}
+
+/**
+ * In-process adapter: a per-key expiry map, GC'd lazily on the next
+ * `acquire`. Default TTL 30 seconds, above any single download's production
+ * time, so a crashed request cannot hold its subject's key for long.
+ */
+export class InProcessDownloadLock implements DownloadLock {
   private readonly ttlMs: number;
   private readonly locks: Map<string, number> = new Map();
 
@@ -63,4 +66,4 @@ export class FreeDownloadLockService {
   }
 }
 
-export const freeDownloadLockService = new FreeDownloadLockService();
+export const inProcessDownloadLock = new InProcessDownloadLock();

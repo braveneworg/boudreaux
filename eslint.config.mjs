@@ -591,6 +591,9 @@ const eslintConfig = [
       // adapter takes the client, and the health check pings it.
       'src/lib/auth.ts',
       'src/lib/utils/database-utils.ts',
+      // Database contract specs drive the real client against Docker Mongo
+      // (`pnpm run test:db`); seeding and asserting rows is their whole job.
+      'src/**/*.contract.spec.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',

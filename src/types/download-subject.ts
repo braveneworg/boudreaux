@@ -3,17 +3,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * Download Subject
+ * Download subject (CONTEXT.md): who is downloading — a signed-in user, or a
+ * guest identified by the `boudreaux_visitor_id` cookie together with a
+ * browser fingerprint. Every download rule is keyed on the subject.
  *
- * Discriminated union identifying the entity initiating a digital download.
- * Used to key per-release download counts and freemium quota records for
- * authenticated users (`userId`) and anonymous guests (`visitorId`, sourced
- * from the `boudreaux_visitor_id` HTTP-only cookie).
- *
- * Feature: 007-free-digital-downloads
+ * A guest may carry `visitorIds`: every visitor id whose downloads count as
+ * this guest's (the identity union from guest-identity resolution, when the
+ * cookie and the fingerprint resolved to different rows). Readers treat an
+ * absent `visitorIds` as `[visitorId]`.
  */
 export type DownloadSubject =
-  { kind: 'user'; userId: string } | { kind: 'guest'; visitorId: string };
+  { kind: 'user'; userId: string } | { kind: 'guest'; visitorId: string; visitorIds?: string[] };
+
+/** Every visitor id a guest's downloads are counted under. */
+export const guestVisitorIds = (subject: Extract<DownloadSubject, { kind: 'guest' }>): string[] =>
+  subject.visitorIds && subject.visitorIds.length > 0 ? subject.visitorIds : [subject.visitorId];
 
 /**
  * Type guard: subject is an authenticated user.

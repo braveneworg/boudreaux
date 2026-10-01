@@ -50,22 +50,6 @@ export class PurchaseRepository {
     });
   }
 
-  /**
-   * Look up a purchase by the userId + releaseId composite unique key.
-   * Used by the download-authorization flow to verify ownership (any
-   * non-refunded state — refund handling is the caller's concern).
-   */
-  static async findByUserReleaseKey(userId: string, releaseId: string) {
-    return prisma.releasePurchase.findUnique({
-      where: {
-        userId_releaseId: {
-          userId,
-          releaseId,
-        },
-      },
-    });
-  }
-
   /** Find an active (non-refunded) purchase by userId + releaseId composite key. */
   static async findByUserAndRelease(userId: string, releaseId: string) {
     return prisma.releasePurchase.findFirst({
@@ -85,33 +69,21 @@ export class PurchaseRepository {
   }
 
   /**
-   * Reset the download counter for a user+release pair back to 0.
-   * Used when the 6-hour cooldown window has elapsed.
+   * Charge the purchase throttle for one download (ADR-0018). `restart` is
+   * true when the gate saw that the idle window had elapsed: the count starts
+   * over at one instead of growing past the cap.
    */
-  static async resetDownloadCount(userId: string, releaseId: string) {
-    return prisma.releaseDownload.update({
+  static async recordPurchasedDownload(
+    userId: string,
+    releaseId: string,
+    { restart, now }: { restart: boolean; now: Date }
+  ): Promise<void> {
+    await prisma.releaseDownload.upsert({
       where: { userId_releaseId: { userId, releaseId } },
-      data: { downloadCount: 0, lastDownloadedAt: new Date() },
-    });
-  }
-
-  /**
-   * Atomically increment the download counter for a user+release pair.
-   * Upserts the record if it does not yet exist.
-   */
-  static async upsertDownloadCount(userId: string, releaseId: string) {
-    return prisma.releaseDownload.upsert({
-      where: { userId_releaseId: { userId, releaseId } },
-      update: {
-        downloadCount: { increment: 1 },
-        lastDownloadedAt: new Date(),
-      },
-      create: {
-        userId,
-        releaseId,
-        downloadCount: 1,
-        lastDownloadedAt: new Date(),
-      },
+      update: restart
+        ? { downloadCount: 1, lastDownloadedAt: now }
+        : { downloadCount: { increment: 1 }, lastDownloadedAt: now },
+      create: { userId, releaseId, downloadCount: 1, lastDownloadedAt: now },
     });
   }
 

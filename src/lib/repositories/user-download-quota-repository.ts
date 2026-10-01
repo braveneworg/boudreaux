@@ -39,16 +39,16 @@ export class UserDownloadQuotaRepository {
   /**
    * Find existing quota record or create a new one for the subject.
    */
-  async findOrCreateBySubject(subject: DownloadSubject): Promise<UserDownloadQuota> {
-    const existing = await prisma.userDownloadQuota.findUnique({
+  /**
+   * The releases the subject has taken free so far — the lifetime cap's
+   * state. A read only: a subject with no row has taken none.
+   */
+  async findReleaseIds(subject: DownloadSubject): Promise<string[]> {
+    const quota = await prisma.userDownloadQuota.findUnique({
       where: this.whereForSubject(subject),
+      select: { uniqueReleaseIds: true },
     });
-    if (existing) {
-      return existing;
-    }
-    return prisma.userDownloadQuota.create({
-      data: this.createDataForSubject(subject),
-    });
+    return quota?.uniqueReleaseIds ?? [];
   }
 
   /**
@@ -64,37 +64,5 @@ export class UserDownloadQuotaRepository {
       update: { uniqueReleaseIds: { push: releaseId } },
       create: { ...this.createDataForSubject(subject), uniqueReleaseIds: [releaseId] },
     });
-  }
-
-  /**
-   * Check if the subject has exceeded the freemium quota.
-   */
-  async checkQuotaExceeded(subject: DownloadSubject, maxQuota = 5): Promise<boolean> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds.length >= maxQuota;
-  }
-
-  /**
-   * Number of remaining free downloads for the subject.
-   */
-  async getRemainingQuota(subject: DownloadSubject, maxQuota = 5): Promise<number> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return Math.max(0, maxQuota - quota.uniqueReleaseIds.length);
-  }
-
-  /**
-   * Whether the subject has already counted the given release toward quota.
-   */
-  async hasDownloadedRelease(subject: DownloadSubject, releaseId: string): Promise<boolean> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds.includes(releaseId);
-  }
-
-  /**
-   * All release IDs the subject has consumed under the freemium quota.
-   */
-  async getDownloadedReleaseIds(subject: DownloadSubject): Promise<string[]> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds;
   }
 }

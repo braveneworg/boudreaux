@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { freeDownloadLockService } from '@/lib/services/free-download-lock-service';
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
+import type { Grant } from '@/lib/services/download-gate/types';
 import { PlaylistService } from '@/lib/services/playlist-service';
 import type { PlaylistDownloadManifest } from '@/lib/services/playlist-service';
 import type * as ZipStreamModule from '@/lib/utils/zip-stream';
@@ -19,15 +20,8 @@ vi.mock('@/lib/services/playlist-service', () => ({
   PlaylistService: { getDownloadManifest: vi.fn() },
 }));
 
-const { checkFreeDownloadQuotaMock, incrementQuotaMock } = vi.hoisted(() => ({
-  checkFreeDownloadQuotaMock: vi.fn(),
-  incrementQuotaMock: vi.fn(),
-}));
-vi.mock('@/lib/services/quota-enforcement-service', () => ({
-  QuotaEnforcementService: class {
-    checkFreeDownloadQuota = checkFreeDownloadQuotaMock;
-    incrementQuota = incrementQuotaMock;
-  },
+vi.mock('@/lib/services/download-gate/download-gate', () => ({
+  downloadGate: { checkMany: vi.fn(), downloadMany: vi.fn() },
 }));
 
 const { limiterCheckMock } = vi.hoisted(() => ({ limiterCheckMock: vi.fn() }));
@@ -55,9 +49,6 @@ vi.mock('@/lib/utils/zip-stream', async () => {
 });
 
 const PLAYLIST_ID = '507f1f77bcf86cd799439011';
-// #667: subject-only lock key — a subject's concurrent free downloads serialize
-// on the shared per-subject quota, not per (playlist, format).
-const LOCK_KEY = `user:user-1`;
 
 const manifest: PlaylistDownloadManifest = {
   playlistTitle: 'Morning Mix!',
@@ -77,24 +68,31 @@ const manifest: PlaylistDownloadManifest = {
   distinctReleaseIds: ['r1', 'r2'],
 };
 
-const withinQuota = {
-  allowed: true,
-  reason: 'WITHIN_QUOTA',
-  remainingQuota: 3,
-  uniqueDownloads: 1,
-} as const;
-const alreadyDownloaded = {
-  allowed: true,
-  reason: 'ALREADY_DOWNLOADED',
-  remainingQuota: 4,
-  uniqueDownloads: 1,
-} as const;
-const exceeded = {
-  allowed: false,
-  reason: 'QUOTA_EXCEEDED',
-  remainingQuota: 0,
-  uniqueDownloads: 5,
-} as const;
+const grant: Grant = {
+  kind: 'grant',
+  mode: 'free',
+  formats: [{ formatType: 'AAC', withdrawn: false }],
+  charge: { lifetime: true, freeThrottle: true, purchaseThrottle: false },
+};
+const user = { kind: 'user', userId: 'user-1' } as const;
+const gateRequests = (format: 'AAC' | 'MP3_320KBPS') => [
+  { subject: user, releaseId: 'r1', formats: [format] },
+  { subject: user, releaseId: 'r2', formats: [format] },
+];
+
+/** The gate grants everything: it runs the route's producer and returns its outcome. */
+const gateGrantsAll = () =>
+  vi.mocked(downloadGate.downloadMany).mockImplementation(async (requests, produce) => ({
+    ok: true,
+    grants: requests.map((request) => ({
+      request,
+      releaseId: request.releaseId,
+      grant,
+      records: [],
+      facts: {} as never,
+    })),
+    deliverable: await produce([]),
+  }));
 
 const makeRequest = (query: string): NextRequest =>
   new NextRequest(`http://localhost:3000/api/playlists/${PLAYLIST_ID}/download?${query}`);
@@ -106,13 +104,12 @@ beforeEach(() => {
   mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
   limiterCheckMock.mockResolvedValue(undefined);
   vi.mocked(PlaylistService.getDownloadManifest).mockResolvedValue(manifest);
-  checkFreeDownloadQuotaMock.mockResolvedValue(withinQuota);
-  incrementQuotaMock.mockResolvedValue(undefined);
+  vi.mocked(downloadGate.checkMany).mockResolvedValue([grant, grant]);
+  gateGrantsAll();
   startBufferPrefetchMock.mockImplementation((_c, _b, keys: readonly string[]) =>
     keys.slice(0, 4).map(() => Promise.resolve(Buffer.from('audio-bytes')))
   );
   issuePrefetchMock.mockResolvedValue(Buffer.from('audio-bytes'));
-  freeDownloadLockService.release(LOCK_KEY);
 });
 
 describe('GET /api/playlists/[id]/download', () => {
@@ -147,76 +144,69 @@ describe('GET /api/playlists/[id]/download', () => {
     expect(await response.json()).toEqual({ error: 'NOT_FOUND' });
   });
 
-  it('preflight MP3 reports counts without consulting the quota', async () => {
+  it('preflight asks the gate about every distinct release, in the one format, without charging', async () => {
     const response = await GET(makeRequest('format=MP3_320KBPS&respond=preflight'), makeContext());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, trackCount: 2, skippedCount: 1 });
-    expect(checkFreeDownloadQuotaMock).not.toHaveBeenCalled();
+    expect(vi.mocked(downloadGate.checkMany).mock.calls).toEqual([[gateRequests('MP3_320KBPS')]]);
+    expect(downloadGate.downloadMany).not.toHaveBeenCalled();
   });
 
-  it('preflight AAC checks every distinct release and never charges', async () => {
-    const response = await GET(makeRequest('format=AAC&respond=preflight'), makeContext());
-    expect(response.status).toBe(200);
-    expect(checkFreeDownloadQuotaMock).toHaveBeenCalledTimes(2);
-    expect(checkFreeDownloadQuotaMock).toHaveBeenCalledWith(
-      { kind: 'user', userId: 'user-1' },
-      'r1'
-    );
-    expect(incrementQuotaMock).not.toHaveBeenCalled();
-  });
-
-  it('preflight AAC returns 403 QUOTA_EXCEEDED when any release is denied', async () => {
-    checkFreeDownloadQuotaMock.mockResolvedValueOnce(withinQuota).mockResolvedValueOnce(exceeded);
+  it("preflight answers 403 with the gate's code when any release is refused", async () => {
+    vi.mocked(downloadGate.checkMany).mockResolvedValue([
+      grant,
+      { kind: 'denial', reason: 'LIFETIME_CAP' },
+    ]);
     const response = await GET(makeRequest('format=AAC&respond=preflight'), makeContext());
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ ok: false, reason: 'QUOTA_EXCEEDED' });
   });
 
-  it('rejects all-or-nothing when remaining quota cannot cover every new release', async () => {
-    // remaining slot = 1, but 2 not-yet-downloaded releases → deny outright.
-    const lastSlot = {
-      allowed: true,
-      reason: 'WITHIN_QUOTA',
-      remainingQuota: 0,
-      uniqueDownloads: 4,
-    } as const;
-    checkFreeDownloadQuotaMock.mockResolvedValue(lastSlot);
+  it('preflight answers 404 when a release is no longer listed', async () => {
+    vi.mocked(downloadGate.checkMany).mockResolvedValue([grant, { kind: 'not-found' }]);
     const response = await GET(makeRequest('format=AAC&respond=preflight'), makeContext());
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
   });
 
-  it('streams an AAC zip, charging only WITHIN_QUOTA releases after the first buffer', async () => {
-    checkFreeDownloadQuotaMock
-      .mockResolvedValueOnce(alreadyDownloaded) // r1 — allowed, not charged
-      .mockResolvedValueOnce(withinQuota); // r2 — charged
+  it('streams an AAC zip through the gate as one all-or-nothing set', async () => {
     const response = await GET(makeRequest('format=AAC'), makeContext());
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/zip');
     const bytes = Buffer.from(await response.arrayBuffer());
     expect(bytes.subarray(0, 2).toString()).toBe('PK');
     expect(bytes.includes('01 - Ceschi - Cold Wind.aac')).toBe(true);
-    expect(incrementQuotaMock).toHaveBeenCalledTimes(1);
-    expect(incrementQuotaMock).toHaveBeenCalledWith({ kind: 'user', userId: 'user-1' }, 'r2');
-    // Lock released after the handler returned.
-    expect(freeDownloadLockService.acquire(LOCK_KEY)).toBe(true);
-    freeDownloadLockService.release(LOCK_KEY);
+    const [requests, , audit] = vi.mocked(downloadGate.downloadMany).mock.calls[0];
+    expect(requests).toEqual(gateRequests('AAC'));
+    expect(audit).toEqual({ ipAddress: 'unknown', userAgent: 'unknown' });
   });
 
-  it('returns 409 LOCK_HELD when a concurrent AAC download holds the lock', async () => {
-    expect(freeDownloadLockService.acquire(LOCK_KEY)).toBe(true);
+  it.each([
+    [{ ok: false, denial: null, reason: 'LOCK_HELD' }, 409, 'LOCK_HELD'],
+    [
+      { ok: false, denial: { kind: 'denial', reason: 'THROTTLED' }, releaseId: 'r2' },
+      403,
+      'CAP_REACHED',
+    ],
+    [
+      { ok: false, denial: { kind: 'denial', reason: 'LIFETIME_CAP' }, releaseId: 'r1' },
+      403,
+      'QUOTA_EXCEEDED',
+    ],
+  ] as const)('maps a refused download (%o) to %i', async (outcome, status, errorCode) => {
+    vi.mocked(downloadGate.downloadMany).mockResolvedValue(outcome as never);
     const response = await GET(makeRequest('format=AAC'), makeContext());
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ errorCode: 'LOCK_HELD' });
-    freeDownloadLockService.release(LOCK_KEY);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ ok: false, errorCode });
   });
 
-  it('streams MP3 with a sanitized attachment filename and no quota calls', async () => {
+  it('streams MP3 with a sanitized attachment filename', async () => {
     const response = await GET(makeRequest('format=MP3_320KBPS'), makeContext());
     expect(response.status).toBe(200);
     expect(response.headers.get('content-disposition')).toContain('Morning Mix.zip');
     await response.arrayBuffer();
-    expect(checkFreeDownloadQuotaMock).not.toHaveBeenCalled();
-    expect(incrementQuotaMock).not.toHaveBeenCalled();
+    expect(vi.mocked(downloadGate.downloadMany).mock.calls[0]?.[0]).toEqual(
+      gateRequests('MP3_320KBPS')
+    );
   });
 
   it('collapses an interior newline in the title to a valid Content-Disposition', async () => {
@@ -234,14 +224,13 @@ describe('GET /api/playlists/[id]/download', () => {
     await response.arrayBuffer();
   });
 
-  it('does not charge when the first prefetched buffer is missing', async () => {
+  it('answers STREAM_FAILED when the first prefetched buffer is missing — the producer throws, so nothing is charged', async () => {
     startBufferPrefetchMock.mockImplementation((_c, _b, keys: readonly string[]) =>
       keys.slice(0, 4).map(() => Promise.resolve(null))
     );
     const response = await GET(makeRequest('format=AAC'), makeContext());
-    expect(response.status).toBe(200);
-    await response.arrayBuffer();
-    expect(incrementQuotaMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'STREAM_FAILED' });
   });
 
   it('aborts the archive when a later buffer fails mid-stream (no hang)', async () => {
@@ -265,8 +254,8 @@ describe('GET /api/playlists/[id]/download', () => {
     // client sees a corrupt/incomplete archive, never a silent success.
     const bytes = Buffer.from(await response.arrayBuffer());
     expect(bytes.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06]))).toBe(false);
-    // Both distinct releases were charged before streaming began.
-    expect(incrementQuotaMock).toHaveBeenCalledTimes(2);
+    // The gate committed both releases once the producer resolved.
+    expect(downloadGate.downloadMany).toHaveBeenCalledTimes(1);
   });
 
   it('returns 404 NO_TRACKS on the stream path for an empty manifest but 200 on preflight', async () => {
@@ -301,9 +290,7 @@ describe('GET /api/playlists/[id]/download', () => {
     vi.unstubAllEnvs();
   });
 
-  it('does not charge when the FIRST prefetched buffer rejects (S3 failure)', async () => {
-    // The charge-after-first-buffer rule: a rejected first body is coalesced
-    // to null so an all-failing download never consumes quota.
+  it('answers STREAM_FAILED when the FIRST prefetched buffer rejects (S3 failure)', async () => {
     startBufferPrefetchMock.mockImplementation((_c, _b, keys: readonly string[]) =>
       keys.slice(0, 4).map(() => {
         const failing = Promise.reject(new Error('NoSuchKey'));
@@ -312,9 +299,8 @@ describe('GET /api/playlists/[id]/download', () => {
       })
     );
     const response = await GET(makeRequest('format=AAC'), makeContext());
-    expect(response.status).toBe(200);
-    await response.arrayBuffer();
-    expect(incrementQuotaMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'STREAM_FAILED' });
   });
 
   it('refills the prefetch window for a playlist longer than the depth', async () => {
