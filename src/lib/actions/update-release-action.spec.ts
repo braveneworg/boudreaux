@@ -4,7 +4,7 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
@@ -16,15 +16,7 @@ import { requireRole } from '@/utils/auth/require-role';
 import { updateReleaseAction } from './update-release-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../prisma', () => ({
-  prisma: {
-    artistRelease: {
-      findMany: vi.fn(),
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-  },
-}));
+vi.mock('../repositories/artist-credit-repository');
 
 // Mock all dependencies
 vi.mock('next/cache');
@@ -107,15 +99,13 @@ describe('updateReleaseAction', () => {
         success: true,
         data: 1,
       });
-      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.artistRelease.createMany).mockResolvedValue({ count: 2 });
+      vi.mocked(ArtistCreditRepository.syncCredits).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
       vi.mocked(ReleaseService.updateRelease).mockReset();
       vi.mocked(CreditConfirmationService.publishConfirmed).mockReset();
-      vi.mocked(prisma.artistRelease.findMany).mockReset();
-      vi.mocked(prisma.artistRelease.createMany).mockReset();
+      vi.mocked(ArtistCreditRepository.syncCredits).mockReset();
     });
 
     it("hands the service the admin's decisions and the artists the form credits", async () => {
@@ -136,10 +126,9 @@ describe('updateReleaseAction', () => {
 
     it('publishes the confirmed artists after the credits are stored', async () => {
       const order: string[] = [];
-      vi.mocked(prisma.artistRelease.createMany).mockImplementationOnce((async () => {
+      vi.mocked(ArtistCreditRepository.syncCredits).mockImplementationOnce(async () => {
         order.push('store credits');
-        return { count: 2 };
-      }) as never);
+      });
       vi.mocked(CreditConfirmationService.publishConfirmed).mockImplementationOnce(async () => {
         order.push('publish artists');
         return { success: true, data: 1 };
@@ -186,7 +175,7 @@ describe('updateReleaseAction', () => {
       expect({
         success: result.success,
         errors: result.errors,
-        stored: vi.mocked(prisma.artistRelease.createMany).mock.calls,
+        stored: vi.mocked(ArtistCreditRepository.syncCredits).mock.calls,
       }).toEqual({
         success: false,
         errors: { general: ['Choose to publish or keep hidden: Bea'] },
@@ -1134,8 +1123,8 @@ describe('updateReleaseAction', () => {
   });
 
   describe('Artist Associations', () => {
-    it('should sync ArtistRelease associations - add new, remove old', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+    const parsedWithArtists = (artistIds: string[]) =>
+      ({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -1144,80 +1133,27 @@ describe('updateReleaseAction', () => {
             releasedOn: '2024-01-15',
             coverArt: 'https://example.com/cover.jpg',
             formats: ['DIGITAL'],
-            artistIds: ['artist-2', 'artist-3'],
+            artistIds,
           },
         },
-      } as never);
+      }) as never;
 
+    it('syncs the credits to the submitted artist ids after a successful update', async () => {
+      vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-2', 'artist-3']));
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: true,
         data: { id: mockReleaseId },
       } as never);
 
-      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([
-        { id: 'ar-1', artistId: 'artist-1' },
-        { id: 'ar-2', artistId: 'artist-2' },
-      ] as never);
-
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      // Should delete artist-1 (removed)
-      expect(prisma.artistRelease.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['ar-1'] } },
-      });
-
-      // Should create artist-3 (new)
-      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
-        data: [{ artistId: 'artist-3', releaseId: mockReleaseId }],
-      });
+      expect(vi.mocked(ArtistCreditRepository.syncCredits).mock.calls).toEqual([
+        [mockReleaseId, ['artist-2', 'artist-3']],
+      ]);
     });
 
-    it('should not delete associations when all existing are kept', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Updated Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-            artistIds: ['artist-1', 'artist-2'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
-        success: true,
-        data: { id: mockReleaseId },
-      } as never);
-
-      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([
-        { id: 'ar-1', artistId: 'artist-1' },
-        { id: 'ar-2', artistId: 'artist-2' },
-      ] as never);
-
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
-
-      expect(prisma.artistRelease.deleteMany).not.toHaveBeenCalled();
-      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
-    });
-
-    it('should not sync associations when update fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Updated Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-            artistIds: ['artist-1'],
-          },
-        },
-      } as never);
-
+    it('does not sync credits when the update fails', async () => {
+      vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-1']));
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database error',
@@ -1225,45 +1161,7 @@ describe('updateReleaseAction', () => {
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(prisma.artistRelease.findMany).not.toHaveBeenCalled();
-    });
-
-    it('should handle replacing all associations', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Updated Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-            artistIds: ['artist-3'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
-        success: true,
-        data: { id: mockReleaseId },
-      } as never);
-
-      vi.mocked(prisma.artistRelease.findMany).mockResolvedValue([
-        { id: 'ar-1', artistId: 'artist-1' },
-        { id: 'ar-2', artistId: 'artist-2' },
-      ] as never);
-
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
-
-      // Should delete both existing
-      expect(prisma.artistRelease.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['ar-1', 'ar-2'] } },
-      });
-
-      // Should create the new one
-      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
-        data: [{ artistId: 'artist-3', releaseId: mockReleaseId }],
-      });
+      expect(ArtistCreditRepository.syncCredits).not.toHaveBeenCalled();
     });
   });
 });

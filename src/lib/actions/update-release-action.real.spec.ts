@@ -15,15 +15,7 @@ import { updateReleaseAction } from './update-release-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    artistRelease: {
-      findMany: vi.fn().mockResolvedValue([]),
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-  },
-}));
+vi.mock('@/lib/repositories/artist-credit-repository');
 vi.mock('@/lib/services/release-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/require-role');

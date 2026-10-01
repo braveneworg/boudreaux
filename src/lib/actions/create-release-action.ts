@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
@@ -91,10 +91,7 @@ const createArtistReleaseAssociations = async (
   artistIds: string[] | undefined
 ): Promise<void> => {
   if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
-    const createdReleaseId = response.data.id;
-    await prisma.artistRelease.createMany({
-      data: artistIds.map((artistId) => ({ artistId, releaseId: createdReleaseId })),
-    });
+    await ArtistCreditRepository.addCredits(response.data.id, artistIds);
   }
 };
 

@@ -7,7 +7,8 @@ import 'server-only';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
-import { prisma } from '@/lib/prisma';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 import { loggers } from '@/lib/utils/logger';
@@ -54,10 +55,7 @@ const resolveAlreadyPurchased = async (
     return PurchaseService.checkExistingPurchase(userId, releaseId);
   }
   if (email) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
+    const existingUser = await UserRepository.findIdByEmail(email);
     if (existingUser) {
       return PurchaseService.checkExistingPurchase(existingUser.id, releaseId);
     }
@@ -140,10 +138,7 @@ export const createPurchaseCheckoutSessionAction = async (
     const [alreadyPurchased, release] = await Promise.all([
       resolveAlreadyPurchased(userId, email, releaseId),
       // Verify release exists and is published; fetch title for Stripe product data
-      prisma.release.findFirst({
-        where: { id: releaseId, publishedAt: { not: null } },
-        select: { id: true, title: true },
-      }),
+      ReleaseRepository.findPublishedTitleById(releaseId),
     ]);
 
     if (alreadyPurchased) {

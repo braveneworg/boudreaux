@@ -4,7 +4,7 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
@@ -16,13 +16,7 @@ import { requireRole } from '@/utils/auth/require-role';
 import { createReleaseAction } from './create-release-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../prisma', () => ({
-  prisma: {
-    artistRelease: {
-      createMany: vi.fn(),
-    },
-  },
-}));
+vi.mock('../repositories/artist-credit-repository');
 
 // Mock all dependencies
 vi.mock('next/cache');
@@ -108,14 +102,14 @@ describe('createReleaseAction', () => {
         success: true,
         data: { id: 'release-new' },
       } as never);
-      vi.mocked(prisma.artistRelease.createMany).mockResolvedValue({ count: 2 });
+      vi.mocked(ArtistCreditRepository.addCredits).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
       vi.mocked(CreditConfirmationService.check).mockReset();
       vi.mocked(ReleaseService.createRelease).mockReset();
       vi.mocked(ReleaseService.publishRelease).mockReset();
-      vi.mocked(prisma.artistRelease.createMany).mockReset();
+      vi.mocked(ArtistCreditRepository.addCredits).mockReset();
     });
 
     it('checks the decisions against the artists the form credits before it writes', async () => {
@@ -147,10 +141,9 @@ describe('createReleaseAction', () => {
 
     it('publishes the release after its credits are stored', async () => {
       const order: string[] = [];
-      vi.mocked(prisma.artistRelease.createMany).mockImplementationOnce((async () => {
+      vi.mocked(ArtistCreditRepository.addCredits).mockImplementationOnce(async () => {
         order.push('store credits');
-        return { count: 2 };
-      }) as never);
+      });
       vi.mocked(ReleaseService.publishRelease).mockImplementationOnce(async () => {
         order.push('publish');
         return { success: true, data: { id: 'release-new' } } as never;
@@ -854,12 +847,9 @@ describe('createReleaseAction', () => {
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(prisma.artistRelease.createMany).toHaveBeenCalledWith({
-        data: [
-          { artistId: 'artist-1', releaseId: 'release-123' },
-          { artistId: 'artist-2', releaseId: 'release-123' },
-        ],
-      });
+      expect(vi.mocked(ArtistCreditRepository.addCredits).mock.calls).toEqual([
+        ['release-123', ['artist-1', 'artist-2']],
+      ]);
     });
 
     it('should not create associations when artistIds is empty', async () => {
@@ -884,7 +874,7 @@ describe('createReleaseAction', () => {
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
     });
 
     it('should not create associations when release creation fails', async () => {
@@ -909,7 +899,7 @@ describe('createReleaseAction', () => {
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
     });
 
     it('should not create associations when artistIds is not provided', async () => {
@@ -933,7 +923,7 @@ describe('createReleaseAction', () => {
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
     });
   });
 
