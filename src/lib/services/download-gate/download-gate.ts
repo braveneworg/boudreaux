@@ -329,8 +329,10 @@ const lifetimeOverrun = (grants: GrantedRelease[]): GrantedRelease | null => {
   if (first === undefined || first.facts.lifetime === null) {
     return null;
   }
-  const remaining = MAX_FREE_DOWNLOAD_QUOTA - first.facts.lifetime.distinctReleases;
-  return charging.length > remaining ? (charging[remaining] ?? null) : null;
+  // Slots left can only be positive here (a charging grant passed its own
+  // per-release cap check), but a negative index would count from the end.
+  const remaining = Math.max(0, MAX_FREE_DOWNLOAD_QUOTA - first.facts.lifetime.distinctReleases);
+  return charging.at(remaining) ?? null;
 };
 
 const formatRepository = new ReleaseDigitalFormatRepository();
