@@ -68,20 +68,19 @@ interface BundleDownloadUrls {
 }
 
 /**
- * Build the streaming + preflight bundle URLs for the selected formats and mode.
- * `free` mode appends `&mode=free`; both responses negotiate
+ * Build the streaming + preflight bundle URLs for the selected formats. The
+ * request carries only the formats: whether they come free or under a
+ * purchase is the server's decision (ADR-0018). Both responses negotiate
  * `Content-Disposition: attachment` natively.
  */
 const buildBundleDownloadUrls = (
   releaseId: string,
-  selectedFormats: string[],
-  mode: 'paid' | 'free'
+  selectedFormats: string[]
 ): BundleDownloadUrls => {
   const joined = selectedFormats.join(',');
-  const modeQuery = mode === 'free' ? '&mode=free' : '';
   return {
-    streamUrl: `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=stream${modeQuery}`,
-    preflightUrl: `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=preflight${modeQuery}`,
+    streamUrl: `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=stream`,
+    preflightUrl: `/api/releases/${releaseId}/download/bundle?formats=${joined}&respond=preflight`,
   };
 };
 
@@ -99,10 +98,9 @@ interface FormatBundleDownloadProps {
   /** Auto-trigger the bundle download on mount. Requires `initialSelectedFormats`. */
   autoStart?: boolean;
   /**
-   * Selects which bundle endpoint flow to use. `'paid'` (default) requires a
-   * verified purchase server-side. `'free'` (feature 007) restricts the
-   * available format options to {@link FREE_FORMAT_TYPES}, appends
-   * `&mode=free` to the bundle URL, and is gated by the per-visitor cap.
+   * Which format options to offer. `'free'` (feature 007) restricts them to
+   * {@link FREE_FORMAT_TYPES}; `'paid'` (default) offers them all. A display
+   * choice only — the server decides which rules a download runs under.
    */
   mode?: 'paid' | 'free';
 }
@@ -438,7 +436,7 @@ export const FormatBundleDownload = ({
     // download as soon as the first byte arrives — no S3 multipart-upload
     // round-trip on the critical path. Per-format progress is sacrificed
     // for speed; the browser's native download UI takes over.
-    const { streamUrl, preflightUrl } = buildBundleDownloadUrls(releaseId, selectedFormats, mode);
+    const { streamUrl, preflightUrl } = buildBundleDownloadUrls(releaseId, selectedFormats);
 
     setDownloadPhase('downloading');
     setDownloadError(null);

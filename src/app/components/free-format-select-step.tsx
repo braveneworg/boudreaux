@@ -60,7 +60,7 @@ interface FreeFormatSelectStepProps {
  * Shows an instructional message and delegates the actual format picker +
  * SSE-driven progress UI to {@link FormatBundleDownload} in `'free'` mode so
  * the same proven streaming pipeline is reused — only the option set and the
- * `&mode=free` URL flag change.
+ * format restriction.
  *
  * Feature: 007-free-digital-downloads (US1, US2 cap-reached, T038/T053).
  */

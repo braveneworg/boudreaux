@@ -69,60 +69,11 @@ describe('bundleDownloadQuerySchema', () => {
     expect(result.success).toBe(false);
   });
 
-  describe('mode', () => {
-    it('defaults mode to paid when omitted', () => {
-      const parsed = bundleDownloadQuerySchema.parse({ formats: 'FLAC' });
-      expect(parsed.mode).toBe('paid');
-    });
+  it('ignores a legacy mode parameter: the gate decides the mode (ADR-0018)', () => {
+    const result = bundleDownloadQuerySchema.safeParse({ formats: 'FLAC', mode: 'free' });
 
-    it('accepts mode=paid with any valid formats', () => {
-      const result = bundleDownloadQuerySchema.safeParse({
-        formats: 'FLAC,WAV',
-        mode: 'paid',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts mode=free with only free format types', () => {
-      const result = bundleDownloadQuerySchema.safeParse({
-        formats: 'MP3_320KBPS,AAC',
-        mode: 'free',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects mode=free when a non-free format is requested', () => {
-      const result = bundleDownloadQuerySchema.safeParse({
-        formats: 'FLAC',
-        mode: 'free',
-      });
-      expect(result.success).toBe(false);
-      const issues = result.success ? [] : result.error.issues;
-      const issue = issues.find((i) => i.code === 'custom' && i.path.includes('formats')) as
-        { params?: { code?: string; invalid?: string[] } } | undefined;
-      expect(issue?.params?.code).toBe('INVALID_FORMATS');
-      expect(issue?.params?.invalid).toEqual(['FLAC']);
-    });
-
-    it('rejects mode=free when any of several formats is non-free', () => {
-      const result = bundleDownloadQuerySchema.safeParse({
-        formats: 'MP3_320KBPS,WAV,AAC',
-        mode: 'free',
-      });
-      expect(result.success).toBe(false);
-      const issues = result.success ? [] : result.error.issues;
-      const issue = issues.find((i) => i.code === 'custom' && i.path.includes('formats')) as
-        { params?: { invalid?: string[] } } | undefined;
-      expect(issue?.params?.invalid).toEqual(['WAV']);
-    });
-
-    it('rejects an unknown mode value', () => {
-      const result = bundleDownloadQuerySchema.safeParse({
-        formats: 'FLAC',
-        mode: 'gift',
-      });
-      expect(result.success).toBe(false);
-    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ formats: ['FLAC'] });
   });
 
   describe('FreeStatusResponseSchema', () => {
