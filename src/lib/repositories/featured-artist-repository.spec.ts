@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { publicArtistWhere } from './_internal/artist-where';
+import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
 import { FeaturedArtistRepository, featuredArtistInclude } from './featured-artist-repository';
 
 vi.mock('server-only', () => ({}));
@@ -47,10 +49,7 @@ describe('FeaturedArtistRepository', () => {
   });
 
   /** The public artist gate (ADR-0015, ADR-0016): published, not deleted. */
-  const PUBLIC_ARTIST = {
-    publishedOn: { not: null },
-    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-  };
+  const PUBLIC_ARTIST = publicArtistWhere;
 
   describe('findFeatured', () => {
     it('should query with date filter, include, ordering and limit', async () => {
@@ -63,13 +62,8 @@ describe('FeaturedArtistRepository', () => {
       expect(result).toEqual(artists);
       expect(mockFindMany).toHaveBeenCalledWith({
         where: {
-          publishedOn: { not: null },
-          featuredOn: { lte: currentDate },
-          OR: [
-            { featuredUntil: null },
-            { featuredUntil: { isSet: false } },
-            { featuredUntil: { gte: currentDate } },
-          ],
+          ...featuredArtistWhere.published,
+          ...featuredWindowAt(currentDate),
           AND: [{ OR: [{ artists: { none: {} } }, { artists: { some: PUBLIC_ARTIST } }] }],
         },
         include: {
@@ -126,7 +120,7 @@ describe('FeaturedArtistRepository', () => {
       await FeaturedArtistRepository.findAll({ published: true });
 
       const arg = mockFindMany.mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({ AND: [{ publishedOn: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [featuredArtistWhere.published] });
     });
 
     it('filters to unpublished featured artists when published=false', async () => {
@@ -136,7 +130,7 @@ describe('FeaturedArtistRepository', () => {
 
       const arg = mockFindMany.mock.calls[0]?.[0];
       expect(arg?.where).toEqual({
-        AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
+        AND: [featuredArtistWhere.unpublished],
       });
     });
 
@@ -175,7 +169,7 @@ describe('FeaturedArtistRepository', () => {
 
       await FeaturedArtistRepository.count({ published: true });
 
-      expect(mockCount).toHaveBeenCalledWith({ where: { publishedOn: { not: null } } });
+      expect(mockCount).toHaveBeenCalledWith({ where: featuredArtistWhere.published });
     });
   });
 
