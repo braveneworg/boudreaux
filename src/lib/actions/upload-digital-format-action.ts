@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { UploadService } from '@/lib/services/upload-service';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
+import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
 import type { ActionResult, PresignedUploadResponse } from '@/types/digital-format';
 
 /**
@@ -19,7 +20,7 @@ import type { ActionResult, PresignedUploadResponse } from '@/types/digital-form
  */
 const uploadActionSchema = z.object({
   releaseId: z.string().min(1),
-  formatType: z.enum(['MP3_V0', 'MP3_320KBPS', 'AAC', 'OGG_VORBIS', 'FLAC', 'ALAC', 'WAV', 'AIFF']),
+  formatType: digitalFormatTypeSchema,
   fileName: z.string().min(1),
   fileSize: z.number().positive(),
   mimeType: z.string(),

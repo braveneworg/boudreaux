@@ -3,20 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import { VALID_FORMAT_TYPES, type DigitalFormatType } from '@/lib/constants/digital-formats';
 
 /**
  * Schema for a {@link DigitalFormatType} discriminator returned by the digital
  * format API routes. Kept in sync with `FORMAT_SIZE_LIMITS` keys via the
  * `satisfies` guard below.
  */
-export const digitalFormatTypeSchema = z.enum([
-  'MP3_V0',
-  'MP3_320KBPS',
-  'AAC',
-  'OGG_VORBIS',
-  'FLAC',
-  'ALAC',
-  'WAV',
-  'AIFF',
-]) satisfies z.ZodType<DigitalFormatType>;
+export const digitalFormatTypeSchema = z.enum(
+  VALID_FORMAT_TYPES
+) satisfies z.ZodType<DigitalFormatType>;
