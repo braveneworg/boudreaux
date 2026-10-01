@@ -13,7 +13,6 @@ import type {
 } from '@/lib/types/domain/featured-artist';
 
 import { publicArtistWhere } from './_internal/artist-where';
-import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -144,18 +143,16 @@ const buildListWhere = (filters: FeaturedArtistListFilters): Prisma.FeaturedArti
 /**
  * Data-access layer for the FeaturedArtist model. The only layer that touches
  * Prisma for featured artists: it owns the query shape (include/where DSL),
- * translates domain input to Prisma input, and wraps every call in `runQuery`
- * so callers see vendor-neutral `DataError`s and hand-written domain types.
+ * translates domain input to Prisma input, and returns hand-written domain
+ * types; failures surface as vendor-neutral `DataError`s.
  */
 export class FeaturedArtistRepository {
   /** Create a featured artist, returning it with all relations included. */
   static async create(data: CreateFeaturedArtistData): Promise<FeaturedArtist> {
-    return runQuery(() =>
-      prisma.featuredArtist.create({
-        data: toPrismaCreate(data),
-        include: featuredArtistInclude,
-      })
-    ) as Promise<FeaturedArtist>;
+    return prisma.featuredArtist.create({
+      data: toPrismaCreate(data),
+      include: featuredArtistInclude,
+    }) as Promise<FeaturedArtist>;
   }
 
   /**
@@ -165,27 +162,25 @@ export class FeaturedArtistRepository {
    * only (ADR-0015).
    */
   static async findFeatured(currentDate: Date, take: number): Promise<FeaturedArtist[]> {
-    return runQuery(() =>
-      prisma.featuredArtist.findMany({
-        where: {
-          publishedOn: { not: null },
-          featuredOn: {
-            lte: currentDate,
-          },
-          OR: [
-            { featuredUntil: null },
-            { featuredUntil: { isSet: false } },
-            { featuredUntil: { gte: currentDate } },
-          ],
-          AND: [hasNoHiddenOnlyArtists],
+    return prisma.featuredArtist.findMany({
+      where: {
+        publishedOn: { not: null },
+        featuredOn: {
+          lte: currentDate,
         },
-        include: publicFeaturedArtistInclude,
-        orderBy: {
-          featuredOn: 'desc',
-        },
-        take,
-      })
-    ) as Promise<FeaturedArtist[]>;
+        OR: [
+          { featuredUntil: null },
+          { featuredUntil: { isSet: false } },
+          { featuredUntil: { gte: currentDate } },
+        ],
+        AND: [hasNoHiddenOnlyArtists],
+      },
+      include: publicFeaturedArtistInclude,
+      orderBy: {
+        featuredOn: 'desc',
+      },
+      take,
+    }) as Promise<FeaturedArtist[]>;
   }
 
   /**
@@ -195,15 +190,13 @@ export class FeaturedArtistRepository {
    */
   static async findAll(filters: FeaturedArtistListFilters): Promise<FeaturedArtist[]> {
     const { skip = 0, take = 50 } = filters;
-    return runQuery(() =>
-      prisma.featuredArtist.findMany({
-        where: buildListWhere(filters),
-        skip,
-        take,
-        orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
-        include: featuredArtistInclude,
-      })
-    ) as Promise<FeaturedArtist[]>;
+    return prisma.featuredArtist.findMany({
+      where: buildListWhere(filters),
+      skip,
+      take,
+      orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
+      include: featuredArtistInclude,
+    }) as Promise<FeaturedArtist[]>;
   }
 
   /** Count featured artists matching an optional published filter (admin dashboard). */
@@ -214,47 +207,39 @@ export class FeaturedArtistRepository {
         : filters.published === false
           ? { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }
           : {};
-    return runQuery(() => prisma.featuredArtist.count({ where }));
+    return prisma.featuredArtist.count({ where });
   }
 
   /** Find a single featured artist by id, or `null` if it does not exist. */
   static async findById(id: string): Promise<FeaturedArtist | null> {
-    return runQuery(() =>
-      prisma.featuredArtist.findUnique({
-        where: { id },
-        include: featuredArtistInclude,
-      })
-    ) as Promise<FeaturedArtist | null>;
+    return prisma.featuredArtist.findUnique({
+      where: { id },
+      include: featuredArtistInclude,
+    }) as Promise<FeaturedArtist | null>;
   }
 
   /** Update a featured artist by id, returning it with all relations included. */
   static async update(id: string, data: UpdateFeaturedArtistData): Promise<FeaturedArtist> {
-    return runQuery(() =>
-      prisma.featuredArtist.update({
-        where: { id },
-        data: toPrismaUpdate(data),
-        include: featuredArtistInclude,
-      })
-    ) as Promise<FeaturedArtist>;
+    return prisma.featuredArtist.update({
+      where: { id },
+      data: toPrismaUpdate(data),
+      include: featuredArtistInclude,
+    }) as Promise<FeaturedArtist>;
   }
 
   /** Persist a new cover-art URL on a featured artist (no relations re-hydrated). */
   static async updateCoverArt(id: string, coverArt: string): Promise<void> {
-    await runQuery(() =>
-      prisma.featuredArtist.update({
-        where: { id },
-        data: { coverArt },
-      })
-    );
+    await prisma.featuredArtist.update({
+      where: { id },
+      data: { coverArt },
+    });
   }
 
   /** Hard-delete a featured artist by id, returning the deleted record. */
   static async delete(id: string): Promise<FeaturedArtist> {
-    return runQuery(() =>
-      prisma.featuredArtist.delete({
-        where: { id },
-        include: featuredArtistInclude,
-      })
-    ) as Promise<FeaturedArtist>;
+    return prisma.featuredArtist.delete({
+      where: { id },
+      include: featuredArtistInclude,
+    }) as Promise<FeaturedArtist>;
   }
 }

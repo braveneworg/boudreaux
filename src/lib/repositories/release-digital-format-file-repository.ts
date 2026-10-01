@@ -8,7 +8,6 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
 import { publicArtistWhere } from './_internal/artist-where';
-import { runQuery } from './_internal/map-prisma-error';
 
 import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
 
@@ -216,12 +215,10 @@ export class ReleaseDigitalFormatFileRepository {
    * `fileSize` is omitted from the select — BigInt breaks JSON serialisation.
    */
   async findManyByIdsWithRelease(ids: string[]): Promise<TrackFileWithRelease[]> {
-    return runQuery(() =>
-      prisma.releaseDigitalFormatFile.findMany({
-        where: { id: { in: ids } },
-        select: trackFileWithReleaseSelect,
-      })
-    );
+    return prisma.releaseDigitalFormatFile.findMany({
+      where: { id: { in: ids } },
+      select: trackFileWithReleaseSelect,
+    });
   }
 
   /**
@@ -232,23 +229,21 @@ export class ReleaseDigitalFormatFileRepository {
    * `fileSize` is omitted from the select — BigInt breaks JSON serialisation.
    */
   async searchTracksByTitle(q: string, take: number): Promise<TrackFileWithRelease[]> {
-    return runQuery(() =>
-      prisma.releaseDigitalFormatFile.findMany({
-        where: {
-          title: { contains: q, mode: 'insensitive' },
-          format: {
-            is: {
-              formatType: 'MP3_320KBPS',
-              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-              release: { is: publishedReleaseFilter },
-            },
+    return prisma.releaseDigitalFormatFile.findMany({
+      where: {
+        title: { contains: q, mode: 'insensitive' },
+        format: {
+          is: {
+            formatType: 'MP3_320KBPS',
+            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+            release: { is: publishedReleaseFilter },
           },
         },
-        orderBy: { title: 'asc' },
-        take,
-        select: trackFileWithReleaseSelect,
-      })
-    );
+      },
+      orderBy: { title: 'asc' },
+      take,
+      select: trackFileWithReleaseSelect,
+    });
   }
 
   /**
@@ -261,20 +256,18 @@ export class ReleaseDigitalFormatFileRepository {
     releaseIds: string[],
     formatType: DigitalFormatType
   ): Promise<PlaylistDownloadFile[]> {
-    return runQuery(() =>
-      prisma.releaseDigitalFormatFile.findMany({
-        where: {
-          format: {
-            is: {
-              formatType,
-              releaseId: { in: releaseIds },
-              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-              release: { is: publishedReleaseFilter },
-            },
+    return prisma.releaseDigitalFormatFile.findMany({
+      where: {
+        format: {
+          is: {
+            formatType,
+            releaseId: { in: releaseIds },
+            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+            release: { is: publishedReleaseFilter },
           },
         },
-        select: playlistDownloadFileSelect,
-      })
-    );
+      },
+      select: playlistDownloadFileSelect,
+    });
   }
 }

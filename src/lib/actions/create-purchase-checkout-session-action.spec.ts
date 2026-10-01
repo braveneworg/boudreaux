@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { prisma } from '@/lib/prisma';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { stripe } from '@/lib/stripe';
 
@@ -31,16 +32,8 @@ vi.mock('@/auth', () => ({
   auth: () => mockAuth(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    release: {
-      findFirst: vi.fn(),
-    },
-    user: {
-      findUnique: vi.fn(),
-    },
-  },
-}));
+vi.mock('@/lib/repositories/release-repository');
+vi.mock('@/lib/repositories/user-repository');
 
 vi.mock('@/lib/services/purchase-service', () => ({
   PurchaseService: {
@@ -68,7 +61,7 @@ describe('createPurchaseCheckoutSessionAction', () => {
     // Default: authenticated user
     mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
     vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
-    vi.mocked(prisma.release.findFirst).mockResolvedValue({
+    vi.mocked(ReleaseRepository.findPublishedTitleById).mockResolvedValue({
       id: 'release-123',
       title: 'Test Album',
     } as never);
@@ -188,7 +181,9 @@ describe('createPurchaseCheckoutSessionAction', () => {
     it('should return "already_purchased" when a guest email resolves to a user who already purchased', async () => {
       // No auth session → guest checkout with customerEmail
       mockAuth.mockResolvedValue(null);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'existing-user-456' } as never);
+      vi.mocked(UserRepository.findIdByEmail).mockResolvedValue({
+        id: 'existing-user-456',
+      } as never);
       vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(true);
 
       const result = await createPurchaseCheckoutSessionAction({
@@ -196,10 +191,9 @@ describe('createPurchaseCheckoutSessionAction', () => {
         customerEmail: 'existing@example.com',
       });
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'existing@example.com' },
-        select: { id: true },
-      });
+      expect(vi.mocked(UserRepository.findIdByEmail).mock.calls).toEqual([
+        ['existing@example.com'],
+      ]);
       expect(PurchaseService.checkExistingPurchase).toHaveBeenCalledWith(
         'existing-user-456',
         'release-123'
@@ -209,7 +203,9 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
     it('should allow guest checkout when email resolves to a user without existing purchase', async () => {
       mockAuth.mockResolvedValue(null);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'existing-user-789' } as never);
+      vi.mocked(UserRepository.findIdByEmail).mockResolvedValue({
+        id: 'existing-user-789',
+      } as never);
       vi.mocked(PurchaseService.checkExistingPurchase).mockResolvedValue(false);
 
       const result = await createPurchaseCheckoutSessionAction({
@@ -222,7 +218,7 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
     it('should allow guest checkout when email does not resolve to any existing user', async () => {
       mockAuth.mockResolvedValue(null);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(UserRepository.findIdByEmail).mockResolvedValue(null);
 
       const result = await createPurchaseCheckoutSessionAction({
         ...validInput,
@@ -235,8 +231,8 @@ describe('createPurchaseCheckoutSessionAction', () => {
   });
 
   describe('release availability check', () => {
-    it('should return "release_unavailable" when prisma.release.findFirst returns null', async () => {
-      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+    it('should return "release_unavailable" when no published release matches', async () => {
+      vi.mocked(ReleaseRepository.findPublishedTitleById).mockResolvedValue(null);
 
       const result = await createPurchaseCheckoutSessionAction(validInput);
 

@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateReleaseData } from '@/lib/types/domain/release';
@@ -126,40 +126,6 @@ const buildReleaseUpdateInput = (data: {
   };
 };
 
-const syncArtistReleases = async (releaseId: string, artistIds: string[]): Promise<void> => {
-  const existingArtistReleases = await prisma.artistRelease.findMany({
-    where: { releaseId },
-    select: { id: true, artistId: true },
-  });
-
-  const existingArtistIds = new Set(
-    existingArtistReleases.map((ar: { id: string; artistId: string }) => ar.artistId)
-  );
-  const newArtistIds = new Set(artistIds);
-
-  const toDelete = existingArtistReleases.filter(
-    (ar: { id: string; artistId: string }) => !newArtistIds.has(ar.artistId)
-  );
-  const toCreate = artistIds.filter((artistId) => !existingArtistIds.has(artistId));
-
-  const ops: Promise<unknown>[] = [];
-  if (toDelete.length > 0) {
-    ops.push(
-      prisma.artistRelease.deleteMany({
-        where: { id: { in: toDelete.map((ar: { id: string; artistId: string }) => ar.id) } },
-      })
-    );
-  }
-  if (toCreate.length > 0) {
-    ops.push(
-      prisma.artistRelease.createMany({
-        data: toCreate.map((artistId) => ({ artistId, releaseId })),
-      })
-    );
-  }
-  await Promise.all(ops);
-};
-
 /**
  * Put a credit-confirmation failure on the form. Its message names the artists
  * that need a decision, so it is shown as written rather than replaced by the
@@ -207,7 +173,7 @@ const writeRelease = async ({
     return { response };
   }
 
-  await syncArtistReleases(releaseId, data.artistIds);
+  await ArtistCreditRepository.syncCredits(releaseId, data.artistIds);
   if (!input.publishedAt) {
     return { response };
   }

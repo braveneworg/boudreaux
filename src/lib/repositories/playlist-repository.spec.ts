@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
 import { DataError } from '@/lib/types/domain/errors';
 import type { AddPlaylistItemData, CreatePlaylistData } from '@/lib/types/domain/playlist';
@@ -91,24 +89,6 @@ describe('PlaylistRepository', () => {
 
       expect(result).toEqual(mockPlaylist);
       expect(prisma.playlist.create).toHaveBeenCalledWith({ data: createData });
-    });
-
-    it('wraps a Prisma duplicate error as a DataError with code DUPLICATE', async () => {
-      vi.mocked(prisma.playlist.create).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2002', clientVersion: '6' })
-      );
-
-      await expect(PlaylistRepository.create(createData)).rejects.toMatchObject({
-        code: 'DUPLICATE',
-      });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.playlist.create).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(PlaylistRepository.create(createData)).rejects.toBeInstanceOf(DataError);
     });
   });
 
@@ -384,9 +364,10 @@ describe('PlaylistRepository', () => {
     it('throws NOT_FOUND when the playlist is missing', async () => {
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(null);
 
-      await expect(PlaylistRepository.addItem('missing', trackItem)).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
+      const rejection = PlaylistRepository.addItem('missing', trackItem);
+
+      await expect(rejection).rejects.toBeInstanceOf(DataError);
+      await expect(rejection).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('returns the created item', async () => {

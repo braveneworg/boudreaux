@@ -1,9 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Prisma } from '@prisma/client';
-
-import { DataError } from '@/lib/types/domain/errors';
 
 import { FeaturedArtistRepository, featuredArtistInclude } from './featured-artist-repository';
 
@@ -46,14 +43,6 @@ describe('FeaturedArtistRepository', () => {
         data: { displayName: 'Test' },
         include: featuredArtistInclude,
       });
-    });
-
-    it('wraps a Prisma error as a DataError', async () => {
-      mockCreate.mockRejectedValue(new Prisma.PrismaClientInitializationError('no db', '6'));
-
-      await expect(FeaturedArtistRepository.create({ displayName: 'x' })).rejects.toBeInstanceOf(
-        DataError
-      );
     });
   });
 

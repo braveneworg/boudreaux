@@ -24,7 +24,27 @@ vi.mock('@prisma/client', () => ({
   }),
 }));
 
+interface ExtensionLike {
+  name: string;
+}
+
 describe('prisma', () => {
+  it('applies the slow-query extension and then the DataError translation', async () => {
+    delete (globalThis as { prisma?: unknown }).prisma;
+    vi.resetModules();
+
+    await vi.importActual<typeof PrismaModule>('@/lib/prisma');
+
+    const { PrismaClient } = await import('@prisma/client');
+    const [client] = vi.mocked(PrismaClient).mock.results.map(({ value }) => value) as Array<{
+      $extends: ReturnType<typeof vi.fn>;
+    }>;
+    const applied = client.$extends.mock.calls.map(
+      ([extension]) => (extension as ExtensionLike).name
+    );
+    expect(applied).toEqual(['slow-query-logging', 'data-error-translation']);
+  });
+
   it('should export a prisma client object', async () => {
     const { prisma } = await vi.importActual<typeof PrismaModule>('@/lib/prisma');
     expect(prisma).toBeDefined();

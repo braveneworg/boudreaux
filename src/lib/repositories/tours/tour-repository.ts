@@ -212,9 +212,9 @@ const buildPublicWhere = (search?: string): Prisma.TourWhereInput => ({
 
 /**
  * Repository for Tour data access operations. The only layer that touches Prisma
- * for tours: it owns the query shapes (include/search DSL), wraps every call in
- * `runQuery` so callers see vendor-neutral `DataError`s, and returns
- * hand-written, Prisma-free domain types.
+ * for tours: it owns the query shapes (include/search DSL), surfaces failures
+ * as vendor-neutral `DataError`s, and returns hand-written, Prisma-free domain
+ * types.
  */
 export class TourRepository {
   /**
@@ -247,7 +247,7 @@ export class TourRepository {
       query.take = limit;
     }
 
-    return runQuery(() => prisma.tour.findMany(query)) as Promise<TourWithRelations[]>;
+    return prisma.tour.findMany(query) as Promise<TourWithRelations[]>;
   }
 
   /**
@@ -259,15 +259,13 @@ export class TourRepository {
     params: Pick<TourQueryParams, 'search' | 'skip' | 'take'> = {}
   ): Promise<TourWithRelations[]> {
     const { search, skip, take } = params;
-    return runQuery(() =>
-      prisma.tour.findMany({
-        where: buildPublicWhere(search),
-        orderBy: { createdAt: 'desc' },
-        include: publicTourInclude,
-        ...(skip !== undefined && { skip }),
-        ...(take !== undefined && { take }),
-      })
-    ) as Promise<TourWithRelations[]>;
+    return prisma.tour.findMany({
+      where: buildPublicWhere(search),
+      orderBy: { createdAt: 'desc' },
+      include: publicTourInclude,
+      ...(skip !== undefined && { skip }),
+      ...(take !== undefined && { take }),
+    }) as Promise<TourWithRelations[]>;
   }
 
   /**
@@ -279,12 +277,10 @@ export class TourRepository {
       return null;
     }
 
-    return runQuery(() =>
-      prisma.tour.findFirst({
-        where: { id, ...visibleTourWhere },
-        include: publicTourInclude,
-      })
-    );
+    return prisma.tour.findFirst({
+      where: { id, ...visibleTourWhere },
+      include: publicTourInclude,
+    });
   }
 
   /**
@@ -295,19 +291,17 @@ export class TourRepository {
       return null;
     }
 
-    return runQuery(() =>
-      prisma.tour.findUnique({
-        where: { id },
-        include: tourInclude,
-      })
-    );
+    return prisma.tour.findUnique({
+      where: { id },
+      include: tourInclude,
+    });
   }
 
   /**
    * Create a new tour (without tour dates - add dates separately).
    */
   static async create(data: TourCreateData): Promise<TourScalars> {
-    return runQuery(() => prisma.tour.create({ data }));
+    return prisma.tour.create({ data });
   }
 
   /**
@@ -319,16 +313,14 @@ export class TourRepository {
     data: TourUpdateData,
     userId: string
   ): Promise<TourWithRelations> {
-    return runQuery(() =>
-      prisma.tour.update({
-        where: { id },
-        data: {
-          ...data,
-          updatedBy: userId,
-        },
-        include: tourInclude,
-      })
-    );
+    return prisma.tour.update({
+      where: { id },
+      data: {
+        ...data,
+        updatedBy: userId,
+      },
+      include: tourInclude,
+    });
   }
 
   /**
@@ -370,6 +362,6 @@ export class TourRepository {
     // Apply the same search filter as findAll.
     const where = buildSearchWhere(search) ?? {};
 
-    return runQuery(() => prisma.tour.count({ where }));
+    return prisma.tour.count({ where });
   }
 }

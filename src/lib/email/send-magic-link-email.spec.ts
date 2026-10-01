@@ -10,14 +10,10 @@ import { sendMagicLinkEmail } from './send-magic-link-email';
 
 vi.mock('server-only', () => ({}));
 
-const mockFindUnique = vi.hoisted(() => vi.fn());
+const mockFindIdByEmail = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: mockFindUnique,
-    },
-  },
+vi.mock('@/lib/repositories/user-repository', () => ({
+  UserRepository: { findIdByEmail: mockFindIdByEmail },
 }));
 
 const mockSendMail = vi.hoisted(() => vi.fn());
@@ -69,7 +65,7 @@ describe('sendMagicLinkEmail', () => {
 
   beforeEach(() => {
     vi.stubEnv('EMAIL_FROM', 'noreply@fakefourrecords.com');
-    mockFindUnique.mockResolvedValue({ id: 'user-1' });
+    mockFindIdByEmail.mockResolvedValue({ id: 'user-1' });
     mockSendMail.mockResolvedValue({ message: Buffer.from('raw-mime-message') });
     mockCreateTransport.mockReturnValue({ sendMail: mockSendMail });
     mockSesClientSend.mockResolvedValue({});
@@ -146,8 +142,8 @@ describe('sendMagicLinkEmail', () => {
   });
 
   describe('new vs returning user detection', () => {
-    it('sets isNewUser=true when prisma returns null (user not found)', async () => {
-      mockFindUnique.mockResolvedValue(null);
+    it('sets isNewUser=true when the repository finds no user', async () => {
+      mockFindIdByEmail.mockResolvedValue(null);
 
       await sendMagicLinkEmail(validInput);
 
@@ -156,8 +152,8 @@ describe('sendMagicLinkEmail', () => {
       );
     });
 
-    it('sets isNewUser=false when prisma returns an existing user', async () => {
-      mockFindUnique.mockResolvedValue({ id: 'user-1' });
+    it('sets isNewUser=false when the repository finds an existing user', async () => {
+      mockFindIdByEmail.mockResolvedValue({ id: 'user-1' });
 
       await sendMagicLinkEmail(validInput);
 
@@ -169,14 +165,12 @@ describe('sendMagicLinkEmail', () => {
     it('looks up the user by email', async () => {
       await sendMagicLinkEmail(validInput);
 
-      expect(mockFindUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { email: 'fan@example.com' } })
-      );
+      expect(mockFindIdByEmail.mock.calls).toEqual([['fan@example.com']]);
     });
 
     it('defaults to returning-user (isNewUser=false) when the DB lookup throws', async () => {
       const loggerErrorSpy = vi.spyOn(loggers.auth, 'error').mockImplementation(() => {});
-      mockFindUnique.mockRejectedValue(new Error('DB unavailable'));
+      mockFindIdByEmail.mockRejectedValue(new Error('DB unavailable'));
 
       await sendMagicLinkEmail(validInput);
 
@@ -244,7 +238,7 @@ describe('sendMagicLinkEmail', () => {
     });
 
     it('uses a welcome subject for new users', async () => {
-      mockFindUnique.mockResolvedValue(null);
+      mockFindIdByEmail.mockResolvedValue(null);
 
       await sendMagicLinkEmail(validInput);
 
@@ -256,7 +250,7 @@ describe('sendMagicLinkEmail', () => {
     });
 
     it('uses a welcome-back subject for returning users', async () => {
-      mockFindUnique.mockResolvedValue({ id: 'user-1' });
+      mockFindIdByEmail.mockResolvedValue({ id: 'user-1' });
 
       await sendMagicLinkEmail(validInput);
 

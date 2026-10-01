@@ -8,7 +8,7 @@ import path from 'path';
 import { SendRawEmailCommand } from '@aws-sdk/client-ses';
 import nodemailer from 'nodemailer';
 
-import { prisma } from '@/lib/prisma';
+import { UserRepository } from '@/lib/repositories/user-repository';
 import { loggers } from '@/lib/utils/logger';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { sesClient } from '@/lib/utils/ses-client';
@@ -41,10 +41,7 @@ export interface SendMagicLinkEmailInput {
  */
 const resolveIsNewUser = async (email: string): Promise<boolean> => {
   try {
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
+    const existingUser = await UserRepository.findIdByEmail(email);
     return existingUser === null;
   } catch (error) {
     loggers.auth.error('[sendMagicLinkEmail] Failed to look up user', error);

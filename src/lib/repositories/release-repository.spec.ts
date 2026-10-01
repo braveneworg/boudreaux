@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
-import { DataError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 
 import { ReleaseRepository } from './release-repository';
@@ -161,22 +158,6 @@ describe('ReleaseRepository', () => {
       const result = await ReleaseRepository.findById('missing');
 
       expect(result).toBeNull();
-    });
-
-    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
-      vi.mocked(prisma.release.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
-      );
-
-      await expect(ReleaseRepository.findById('a')).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.release.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(ReleaseRepository.findById('a')).rejects.toBeInstanceOf(DataError);
     });
   });
 

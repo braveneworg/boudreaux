@@ -7,8 +7,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { ArtistBioLinkRecord, CreateArtistBioLinkData } from '@/lib/types/domain/artist';
 
-import { runQuery } from './_internal/map-prisma-error';
-
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -33,26 +31,24 @@ export class ArtistBioLinkRepository {
   /** Creates a single bio link row (admin-authored custom link), appending it
    *  after the artist's current highest `sortOrder`. */
   static async create(data: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
-    return runQuery(async () => {
-      const { _max } = await prisma.artistBioLink.aggregate({
-        where: { artistId: data.artistId },
-        _max: { sortOrder: true },
-      });
-      const sortOrder = (_max.sortOrder ?? -1) + 1;
-      return prisma.artistBioLink.create({
-        data: {
-          artistId: data.artistId,
-          label: data.label,
-          url: data.url,
-          kind: data.kind,
-          // The admin-authored path only ever creates custom rows, so a
-          // regeneration preserves them (see `replaceBioContent`).
-          origin: data.origin ?? 'custom',
-          sortOrder,
-          reference: data.reference ?? true,
-          imageSource: data.imageSource ?? false,
-        },
-      });
+    const { _max } = await prisma.artistBioLink.aggregate({
+      where: { artistId: data.artistId },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = (_max.sortOrder ?? -1) + 1;
+    return prisma.artistBioLink.create({
+      data: {
+        artistId: data.artistId,
+        label: data.label,
+        url: data.url,
+        kind: data.kind,
+        // The admin-authored path only ever creates custom rows, so a
+        // regeneration preserves them (see `replaceBioContent`).
+        origin: data.origin ?? 'custom',
+        sortOrder,
+        reference: data.reference ?? true,
+        imageSource: data.imageSource ?? false,
+      },
     }) as Promise<ArtistBioLinkRecord>;
   }
 
@@ -62,34 +58,31 @@ export class ArtistBioLinkRepository {
    * any other row is deleted. An unknown id is a no-op.
    */
   static async removeReference(linkId: string): Promise<void> {
-    await runQuery(async () => {
-      const row = await prisma.artistBioLink.findUnique({ where: { id: linkId } });
-      if (!row) return;
-      if (row.imageSource) {
-        await prisma.artistBioLink.update({ where: { id: linkId }, data: { reference: false } });
-      } else {
-        await prisma.artistBioLink.delete({ where: { id: linkId } });
-      }
-    });
+    const row = await prisma.artistBioLink.findUnique({ where: { id: linkId } });
+    if (!row) return;
+    if (row.imageSource) {
+      await prisma.artistBioLink.update({ where: { id: linkId }, data: { reference: false } });
+    } else {
+      await prisma.artistBioLink.delete({ where: { id: linkId } });
+    }
   }
 
   /** Grants the reference role back to a row that was image-source only, so
    *  the URL reappears in the palette, the bio payload and the public links. */
   static async restoreReference(linkId: string): Promise<ArtistBioLinkRecord> {
-    return runQuery(() =>
-      prisma.artistBioLink.update({ where: { id: linkId }, data: { reference: true } })
-    ) as Promise<ArtistBioLinkRecord>;
+    return prisma.artistBioLink.update({
+      where: { id: linkId },
+      data: { reference: true },
+    }) as Promise<ArtistBioLinkRecord>;
   }
 
   /** Lists the artist's image-source links (rows flagged `imageSource`) in
    *  sort order — the pages the images-from-links job reads for photos. */
   static async findImageSources(artistId: string): Promise<ArtistBioLinkRecord[]> {
-    return runQuery(() =>
-      prisma.artistBioLink.findMany({
-        where: { artistId, imageSource: true },
-        orderBy: { sortOrder: 'asc' },
-      })
-    ) as Promise<ArtistBioLinkRecord[]>;
+    return prisma.artistBioLink.findMany({
+      where: { artistId, imageSource: true },
+      orderBy: { sortOrder: 'asc' },
+    }) as Promise<ArtistBioLinkRecord[]>;
   }
 
   /**
@@ -106,31 +99,29 @@ export class ArtistBioLinkRepository {
     url: string,
     label: string
   ): Promise<ArtistBioLinkRecord> {
-    return runQuery(async () => {
-      const existing = await prisma.artistBioLink.findFirst({ where: { artistId, url } });
-      if (existing) {
-        if (existing.imageSource) return existing;
-        return prisma.artistBioLink.update({
-          where: { id: existing.id },
-          data: { imageSource: true, origin: 'custom' },
-        });
-      }
-      const { _max } = await prisma.artistBioLink.aggregate({
-        where: { artistId },
-        _max: { sortOrder: true },
-      });
-      return prisma.artistBioLink.create({
-        data: {
-          artistId,
-          label,
-          url,
-          kind: 'other',
-          origin: 'custom',
-          sortOrder: (_max.sortOrder ?? -1) + 1,
-          reference: false,
-          imageSource: true,
-        },
-      });
+    const existing = await prisma.artistBioLink.findFirst({ where: { artistId, url } });
+    if (existing) {
+      if (existing.imageSource) return existing as ArtistBioLinkRecord;
+      return prisma.artistBioLink.update({
+        where: { id: existing.id },
+        data: { imageSource: true, origin: 'custom' },
+      }) as Promise<ArtistBioLinkRecord>;
+    }
+    const { _max } = await prisma.artistBioLink.aggregate({
+      where: { artistId },
+      _max: { sortOrder: true },
+    });
+    return prisma.artistBioLink.create({
+      data: {
+        artistId,
+        label,
+        url,
+        kind: 'other',
+        origin: 'custom',
+        sortOrder: (_max.sortOrder ?? -1) + 1,
+        reference: false,
+        imageSource: true,
+      },
     }) as Promise<ArtistBioLinkRecord>;
   }
 
@@ -141,26 +132,24 @@ export class ArtistBioLinkRepository {
    * belongs to the artist (a foreign or stale id is a no-op, never an error).
    */
   static async removeImageSource(artistId: string, linkId: string): Promise<boolean> {
-    return runQuery(async () => {
-      const row = await prisma.artistBioLink.findFirst({
-        where: { id: linkId, artistId, imageSource: true },
-      });
-      if (!row) return false;
-      if (row.reference === false) {
-        await prisma.artistBioLink.delete({ where: { id: linkId } });
-      } else {
-        await prisma.artistBioLink.update({ where: { id: linkId }, data: { imageSource: false } });
-      }
-      return true;
+    const row = await prisma.artistBioLink.findFirst({
+      where: { id: linkId, artistId, imageSource: true },
     });
+    if (!row) return false;
+    if (row.reference === false) {
+      await prisma.artistBioLink.delete({ where: { id: linkId } });
+    } else {
+      await prisma.artistBioLink.update({ where: { id: linkId }, data: { imageSource: false } });
+    }
+    return true;
   }
 
   /** Finds one bio link row for an artist by exact URL, or null when none.
    *  Used to dedupe the admin add-link path so the same URL is never stored
    *  twice (whether it was previously added as custom or discovered). */
   static async findByUrl(artistId: string, url: string): Promise<ArtistBioLinkRecord | null> {
-    return runQuery(() =>
-      prisma.artistBioLink.findFirst({ where: { artistId, url } })
-    ) as Promise<ArtistBioLinkRecord | null>;
+    return prisma.artistBioLink.findFirst({
+      where: { artistId, url },
+    }) as Promise<ArtistBioLinkRecord | null>;
   }
 }

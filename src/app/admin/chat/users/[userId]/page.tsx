@@ -5,7 +5,8 @@ import { notFound } from 'next/navigation';
 
 import { Heading } from '@/app/components/ui/heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { prisma } from '@/lib/prisma';
+import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
+import { UserRepository } from '@/lib/repositories/user-repository';
 
 import { UserDetailView } from './user-detail-view';
 
@@ -16,19 +17,13 @@ interface PageProps {
 export default async function AdminChatUserPage({ params }: PageProps) {
   const { userId } = await params;
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      phone: true,
-      chatUsers: { select: { disabled: true } },
-    },
-  });
+  const [user, chatUser] = await Promise.all([
+    UserRepository.findById(userId),
+    ChatUserRepository.findByUserId(userId),
+  ]);
   if (!user) notFound();
 
-  const chatDisabled = user.chatUsers.some((cu) => cu.disabled);
+  const chatDisabled = chatUser?.disabled ?? false;
 
   return (
     <ZinePanel

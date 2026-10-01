@@ -2,15 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import type { AssertExact } from '@/lib/types/assert';
 import {
   ARTIST_BIO_FIELDS,
   ARTIST_PRIVATE_FIELDS,
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
-import { DataError } from '@/lib/types/domain/errors';
 
 import { ArtistRepository } from './artist-repository';
 
@@ -125,24 +122,6 @@ describe('ArtistRepository', () => {
       expect(prisma.artist.findUnique).toHaveBeenCalledWith({
         where: { id: 'a' },
       });
-    });
-
-    it('wraps a Prisma error as a DataError', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('missing', { code: 'P2025', clientVersion: '6' })
-      );
-
-      await expect(ArtistRepository.findById('a')).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.artist.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(ArtistRepository.findById('a')).rejects.toBeInstanceOf(DataError);
     });
   });
 
@@ -948,16 +927,6 @@ describe('ArtistRepository', () => {
       });
 
       expect(result.map(({ id }) => id)).toEqual(['b', 'c']);
-    });
-
-    it('maps a connection failure to an UNAVAILABLE DataError', async () => {
-      vi.mocked(prisma.artist.findMany).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('down', '6.0.0')
-      );
-
-      await expect(
-        ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 })
-      ).rejects.toMatchObject({ code: 'UNAVAILABLE' });
     });
   });
 

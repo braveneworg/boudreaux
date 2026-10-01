@@ -23,6 +23,21 @@ export interface ImageOwnerWhere {
   releaseId: string;
 }
 
+/** The projection a delete needs: the image, its source URL, and its owner. */
+export type ImageSourceRecord = Pick<ImageRecord, 'id' | 'src' | 'releaseId'>;
+
+/** The projection the release image listing shows. */
+export type ImageListingRecord = Pick<
+  ImageRecord,
+  'id' | 'src' | 'caption' | 'altText' | 'sortOrder'
+>;
+
+/** Metadata an admin may edit on an image. */
+export interface UpdateImageMetadataData {
+  caption?: string;
+  altText?: string;
+}
+
 /** Data accepted by the repository to create an image row. */
 export interface CreateImageData {
   src?: string | null;

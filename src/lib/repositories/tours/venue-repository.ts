@@ -7,8 +7,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { VenueScalars } from '@/lib/types/tours';
 
-import { runQuery } from '../_internal/map-prisma-error';
-
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -75,8 +73,8 @@ const buildWhere = (search?: string, city?: string): Prisma.VenueWhereInput | un
 
 /**
  * Repository for Venue data access operations. The only layer that touches
- * Prisma for venues: it owns the where DSL, wraps every call in `runQuery`, and
- * returns hand-written, Prisma-free domain types.
+ * Prisma for venues: it owns the where DSL and returns hand-written,
+ * Prisma-free domain types.
  */
 export class VenueRepository {
   /**
@@ -99,7 +97,7 @@ export class VenueRepository {
       query.take = limit;
     }
 
-    return runQuery(() => prisma.venue.findMany(query));
+    return prisma.venue.findMany(query);
   }
 
   /**
@@ -107,23 +105,19 @@ export class VenueRepository {
    * Used as the default list before the user types a search term.
    */
   static async findRecent(limit = 5): Promise<VenueScalars[]> {
-    return runQuery(() =>
-      prisma.venue.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      })
-    );
+    return prisma.venue.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
   }
 
   /**
    * Find a single venue by ID.
    */
   static async findById(id: string): Promise<VenueScalars | null> {
-    return runQuery(() =>
-      prisma.venue.findUnique({
-        where: { id },
-      })
-    );
+    return prisma.venue.findUnique({
+      where: { id },
+    });
   }
 
   /**
@@ -131,40 +125,34 @@ export class VenueRepository {
    * checking.
    */
   static async findByName(name: string): Promise<VenueScalars[]> {
-    return runQuery(() =>
-      prisma.venue.findMany({
-        where: {
-          name: { equals: name, mode: 'insensitive' },
-        },
-        take: 1,
-      })
-    );
+    return prisma.venue.findMany({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+      },
+      take: 1,
+    });
   }
 
   /**
    * Create a new venue.
    */
   static async create(data: VenueCreateData): Promise<VenueScalars> {
-    return runQuery(() =>
-      prisma.venue.create({
-        data,
-      })
-    );
+    return prisma.venue.create({
+      data,
+    });
   }
 
   /**
    * Update an existing venue.
    */
   static async update(id: string, data: VenueUpdateData, userId: string): Promise<VenueScalars> {
-    return runQuery(() =>
-      prisma.venue.update({
-        where: { id },
-        data: {
-          ...data,
-          updatedBy: userId,
-        },
-      })
-    );
+    return prisma.venue.update({
+      where: { id },
+      data: {
+        ...data,
+        updatedBy: userId,
+      },
+    });
   }
 
   /**
@@ -172,11 +160,9 @@ export class VenueRepository {
    * constraint).
    */
   static async delete(id: string): Promise<VenueScalars> {
-    return runQuery(() =>
-      prisma.venue.delete({
-        where: { id },
-      })
-    );
+    return prisma.venue.delete({
+      where: { id },
+    });
   }
 
   /**
@@ -186,6 +172,6 @@ export class VenueRepository {
     const { search, city } = params ?? {};
     const where = buildWhere(search, city) ?? {};
 
-    return runQuery(() => prisma.venue.count({ where }));
+    return prisma.venue.count({ where });
   }
 }

@@ -6,7 +6,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 
 import { publicArtistWhere } from './_internal/artist-where';
-import { runQuery } from './_internal/map-prisma-error';
 
 interface CreatePurchaseData {
   userId: string;
@@ -23,20 +22,18 @@ interface CreatePurchaseData {
  */
 export class PurchaseRepository {
   /**
-   * Create a new purchase record after webhook confirms payment. Wrapped in
-   * `runQuery` so a unique-constraint race surfaces as a vendor-neutral
-   * `DataError` (code `DUPLICATE`) for the webhook's idempotency recovery.
+   * Create a new purchase record after webhook confirms payment. A
+   * unique-constraint race surfaces as a vendor-neutral `DataError` (code
+   * `DUPLICATE`) for the webhook's idempotency recovery.
    */
   static async create(data: CreatePurchaseData) {
-    return runQuery(() =>
-      prisma.releasePurchase.create({
-        data: {
-          ...data,
-          confirmationEmailSentAt: null,
-          refundedAt: null,
-        },
-      })
-    );
+    return prisma.releasePurchase.create({
+      data: {
+        ...data,
+        confirmationEmailSentAt: null,
+        refundedAt: null,
+      },
+    });
   }
 
   /** Find a purchase by its Stripe PaymentIntent ID (idempotency key). */

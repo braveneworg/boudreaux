@@ -22,7 +22,6 @@ import {
   listedReleaseWhere,
   staysHiddenAmongWhere,
 } from './_internal/artist-where';
-import { runQuery } from './_internal/map-prisma-error';
 
 import type { Prisma } from '@prisma/client';
 
@@ -42,16 +41,14 @@ const byName = (a: { name: string }, b: { name: string }): number =>
 const readAwaitingConfirmation = async (
   where: Prisma.ArtistWhereInput
 ): Promise<CreditAwaitingConfirmation[]> => {
-  const rows = await runQuery(() =>
-    prisma.artist.findMany({ where, select: creditConfirmationSelect })
-  );
+  const rows = await prisma.artist.findMany({ where, select: creditConfirmationSelect });
   return rows.map(toCreditAwaitingConfirmation).sort(byName);
 };
 
 const readThatStayHidden = async (
   where: Prisma.ArtistWhereInput
 ): Promise<CreditThatStaysHidden[]> => {
-  const rows = await runQuery(() => prisma.artist.findMany({ where, select: hiddenCreditSelect }));
+  const rows = await prisma.artist.findMany({ where, select: hiddenCreditSelect });
   return rows.map(toCreditThatStaysHidden).sort(byName);
 };
 
@@ -111,13 +108,58 @@ export class ArtistCreditRepository {
     if (artistIds.length === 0) {
       return 0;
     }
-    const { count } = await runQuery(() =>
-      prisma.artist.updateMany({
-        where: { id: { in: artistIds }, ...creditAwaitingConfirmationWhere({ releaseId }) },
-        data: { publishedOn: now, publishedBy },
-      })
-    );
+    const { count } = await prisma.artist.updateMany({
+      where: { id: { in: artistIds }, ...creditAwaitingConfirmationWhere({ releaseId }) },
+      data: { publishedOn: now, publishedBy },
+    });
     return count;
+  }
+
+  /**
+   * Credit the given artists on a release, in the given order. Credit order is
+   * insertion order (ADR-0006), so the caller's array order is the credit order.
+   */
+  static async addCredits(releaseId: string, artistIds: string[]): Promise<void> {
+    if (artistIds.length === 0) {
+      return;
+    }
+    await prisma.artistRelease.createMany({
+      data: artistIds.map((artistId) => ({ artistId, releaseId })),
+    });
+  }
+
+  /**
+   * Make a release's credits match `artistIds`: drop credits for artists no
+   * longer listed and add credits for artists not yet credited. Existing rows
+   * are kept, so re-ordering the list does not re-order existing credits
+   * (the ADR-0006 trade-off).
+   */
+  static async syncCredits(releaseId: string, artistIds: string[]): Promise<void> {
+    const existing = await prisma.artistRelease.findMany({
+      where: { releaseId },
+      select: { id: true, artistId: true },
+    });
+
+    const existingArtistIds = new Set(existing.map(({ artistId }) => artistId));
+    const wantedArtistIds = new Set(artistIds);
+
+    const toDelete = existing.filter(({ artistId }) => !wantedArtistIds.has(artistId));
+    const toCreate = artistIds.filter((artistId) => !existingArtistIds.has(artistId));
+
+    const ops: Promise<unknown>[] = [];
+    if (toDelete.length > 0) {
+      ops.push(
+        prisma.artistRelease.deleteMany({ where: { id: { in: toDelete.map(({ id }) => id) } } })
+      );
+    }
+    if (toCreate.length > 0) {
+      ops.push(
+        prisma.artistRelease.createMany({
+          data: toCreate.map((artistId) => ({ artistId, releaseId })),
+        })
+      );
+    }
+    await Promise.all(ops);
   }
 
   /**
@@ -127,22 +169,18 @@ export class ArtistCreditRepository {
    */
   static async findPublishedWorkCreditedTo(artistId: string): Promise<PublishedWorkCreditedTo> {
     const [credits, headliners] = await Promise.all([
-      runQuery(() =>
-        prisma.artistRelease.findMany({
-          where: { artistId, release: listedReleaseWhere },
-          select: { release: { select: { id: true, title: true } } },
-        })
-      ),
-      runQuery(() =>
-        prisma.tourDateHeadliner.findMany({
-          where: { artistId },
-          select: {
-            tourDate: {
-              select: { id: true, startDate: true, tour: { select: { id: true, title: true } } },
-            },
+      prisma.artistRelease.findMany({
+        where: { artistId, release: listedReleaseWhere },
+        select: { release: { select: { id: true, title: true } } },
+      }),
+      prisma.tourDateHeadliner.findMany({
+        where: { artistId },
+        select: {
+          tourDate: {
+            select: { id: true, startDate: true, tour: { select: { id: true, title: true } } },
           },
-        })
-      ),
+        },
+      }),
     ]);
     return {
       releases: credits.map(({ release }) => release),

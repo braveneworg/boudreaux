@@ -16,8 +16,6 @@ import type {
   UserUsernameRecord,
 } from '@/lib/types/domain/user';
 
-import { runQuery } from './_internal/map-prisma-error';
-
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -52,61 +50,64 @@ const smsOptedInWhere = {
 /**
  * Data-access layer for the User model. The only layer that touches Prisma for
  * users: it owns the include shape, translates domain input to Prisma input, and
- * wraps every call in `runQuery` so callers see vendor-neutral `DataError`s and
- * hand-written domain types.
+ * returns hand-written domain types; failures surface as vendor-neutral
+ * `DataError`s.
  */
 export class UserRepository {
   /** Look up a full user record by email. Returns `null` when not found. */
   static async findByEmail(email: string): Promise<User | null> {
-    return runQuery(() =>
-      prisma.user.findUnique({ where: { email }, include: userFullInclude })
-    ) as Promise<User | null>;
+    return prisma.user.findUnique({
+      where: { email },
+      include: userFullInclude,
+    }) as Promise<User | null>;
   }
 
   /** Look up a full user record by id. Returns `null` when not found. */
   static async findById(id: string): Promise<User | null> {
-    return runQuery(() =>
-      prisma.user.findUnique({ where: { id }, include: userFullInclude })
-    ) as Promise<User | null>;
+    return prisma.user.findUnique({
+      where: { id },
+      include: userFullInclude,
+    }) as Promise<User | null>;
   }
 
   /** Look up a user by email, selecting only their id. */
   static async findIdByEmail(email: string): Promise<UserIdRecord | null> {
-    return runQuery(() => prisma.user.findUnique({ where: { email }, select: { id: true } }));
+    return prisma.user.findUnique({ where: { email }, select: { id: true } });
   }
 
   /** Look up a user by id, selecting only their email. */
   static async findEmailById(id: string): Promise<UserEmailRecord | null> {
-    return runQuery(() => prisma.user.findUnique({ where: { id }, select: { email: true } }));
+    return prisma.user.findUnique({ where: { id }, select: { email: true } });
   }
 
   /** Look up a user by username, selecting id, username and email. */
   static async findByUsername(username: string): Promise<UserContactRecord | null> {
-    return runQuery(() =>
-      prisma.user.findUnique({
-        where: { username },
-        select: { id: true, username: true, email: true },
-      })
-    );
+    return prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, email: true },
+    });
   }
 
   /** Create a user with the supplied data, returning the full user payload. */
   static async create(data: CreateUserData): Promise<User> {
-    return runQuery(() =>
-      prisma.user.create({ data: toPrismaCreate(data), include: userFullInclude })
-    ) as Promise<User>;
+    return prisma.user.create({
+      data: toPrismaCreate(data),
+      include: userFullInclude,
+    }) as Promise<User>;
   }
 
   /** Create a guest user, returning only the new id. */
   static async createGuest(data: CreateUserData): Promise<UserIdRecord> {
-    return runQuery(() => prisma.user.create({ data: toPrismaCreate(data), select: { id: true } }));
+    return prisma.user.create({ data: toPrismaCreate(data), select: { id: true } });
   }
 
   /** Update a user's username, returning the full user payload. */
   static async updateUsername(id: string, username: string): Promise<User> {
-    return runQuery(() =>
-      prisma.user.update({ where: { id }, data: { username }, include: userFullInclude })
-    ) as Promise<User>;
+    return prisma.user.update({
+      where: { id },
+      data: { username },
+      include: userFullInclude,
+    }) as Promise<User>;
   }
 
   /**
@@ -120,26 +121,22 @@ export class UserRepository {
     previousEmail: string,
     allowEmailNotifications?: boolean
   ): Promise<User> {
-    return runQuery(() =>
-      prisma.user.update({
-        where: { id },
-        data: {
-          email,
-          previousEmail,
-          ...(allowEmailNotifications === undefined ? {} : { allowEmailNotifications }),
-        },
-        include: userFullInclude,
-      })
-    ) as Promise<User>;
+    return prisma.user.update({
+      where: { id },
+      data: {
+        email,
+        previousEmail,
+        ...(allowEmailNotifications === undefined ? {} : { allowEmailNotifications }),
+      },
+      include: userFullInclude,
+    }) as Promise<User>;
   }
 
   /**
    * Update a user's editable profile fields, returning the full user payload.
    */
   static async updateProfile(id: string, data: UpdateUserProfileData): Promise<User> {
-    return runQuery(() =>
-      prisma.user.update({ where: { id }, data, include: userFullInclude })
-    ) as Promise<User>;
+    return prisma.user.update({ where: { id }, data, include: userFullInclude }) as Promise<User>;
   }
 
   /**
@@ -151,17 +148,15 @@ export class UserRepository {
     excludeUserId: string,
     take: number
   ): Promise<UserUsernameRecord[]> {
-    return runQuery(() =>
-      prisma.user.findMany({
-        where: {
-          username: { startsWith: prefix, mode: 'insensitive' },
-          NOT: { id: excludeUserId },
-        },
-        select: { id: true, username: true },
-        take,
-        orderBy: { username: 'asc' },
-      })
-    );
+    return prisma.user.findMany({
+      where: {
+        username: { startsWith: prefix, mode: 'insensitive' },
+        NOT: { id: excludeUserId },
+      },
+      select: { id: true, username: true },
+      take,
+      orderBy: { username: 'asc' },
+    });
   }
 
   /**
@@ -172,31 +167,27 @@ export class UserRepository {
     usernames: string[],
     excludeUserId: string
   ): Promise<UserContactRecord[]> {
-    return runQuery(() =>
-      prisma.user.findMany({
-        where: {
-          username: { in: usernames, mode: 'insensitive' },
-          NOT: { id: excludeUserId },
-        },
-        select: { id: true, username: true, email: true },
-      })
-    );
+    return prisma.user.findMany({
+      where: {
+        username: { in: usernames, mode: 'insensitive' },
+        NOT: { id: excludeUserId },
+      },
+      select: { id: true, username: true, email: true },
+    });
   }
 
   /** Fetch every admin user with the fields needed for notification fan-out. */
   static async findAdmins(): Promise<UserAdminRecord[]> {
-    return runQuery(() =>
-      prisma.user.findMany({
-        where: { role: 'admin' },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          phone: true,
-          allowSmsNotifications: true,
-        },
-      })
-    );
+    return prisma.user.findMany({
+      where: { role: 'admin' },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        phone: true,
+        allowSmsNotifications: true,
+      },
+    });
   }
 
   /**
@@ -205,12 +196,10 @@ export class UserRepository {
    * Used by the SMS blast service to build the recipient list.
    */
   static async findSmsOptedInUsers(): Promise<UserSmsRecipientRecord[]> {
-    return runQuery(() =>
-      prisma.user.findMany({
-        where: smsOptedInWhere,
-        select: { id: true, phone: true },
-      })
-    );
+    return prisma.user.findMany({
+      where: smsOptedInWhere,
+      select: { id: true, phone: true },
+    });
   }
 
   /**
@@ -218,6 +207,6 @@ export class UserRepository {
    * Used by the admin UI to show the estimated recipient count before sending.
    */
   static async countSmsOptedIn(): Promise<number> {
-    return runQuery(() => prisma.user.count({ where: smsOptedInWhere }));
+    return prisma.user.count({ where: smsOptedInWhere });
   }
 }
