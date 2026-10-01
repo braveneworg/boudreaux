@@ -156,9 +156,9 @@ export class DownloadGate {
       mode: counters.entitled ? 'purchased' : 'free',
       availableFreeFormats: records
         .map(toGateFormat)
-        .filter((format): format is GateFormat => format !== null)
-        .filter(({ formatType, withdrawn }) => isFreeFormatType(formatType) && !withdrawn)
-        .map(({ formatType }) => formatType),
+        .filter((format): format is GateFormat => format !== null && !format.withdrawn)
+        .map(({ formatType }) => formatType)
+        .filter(isFreeFormatType),
       freeThrottle: {
         allowed: freeRemaining > 0,
         remaining: freeRemaining,

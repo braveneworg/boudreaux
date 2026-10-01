@@ -209,10 +209,6 @@ export const queryKeys = {
     byRelease: (releaseId: string, dateRange: string) =>
       [...queryKeys.downloadAnalytics.all, releaseId, dateRange] as const,
   },
-  downloadQuota: {
-    all: ['downloadQuota'] as const,
-    user: () => [...queryKeys.downloadQuota.all, 'user'] as const,
-  },
   health: {
     all: ['health'] as const,
     status: () => [...queryKeys.health.all, 'status'] as const,

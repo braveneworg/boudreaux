@@ -213,17 +213,6 @@ describe('queryKeys', () => {
     });
   });
 
-  describe('downloadQuota', () => {
-    it('should return all key', () => {
-      expect(queryKeys.downloadQuota.all).toEqual(['downloadQuota']);
-    });
-
-    it('should return user key', () => {
-      const key = queryKeys.downloadQuota.user();
-      expect(key).toEqual(['downloadQuota', 'user']);
-    });
-  });
-
   describe('health', () => {
     it('should return all key', () => {
       expect(queryKeys.health.all).toEqual(['health']);

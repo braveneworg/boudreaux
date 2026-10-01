@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { DigitalFormatType } from '@/lib/constants/digital-formats';
+import type { DigitalFormatType, FreeFormatType } from '@/lib/constants/digital-formats';
 import type { DownloadSubject } from '@/types/download-subject';
 
 /**
@@ -117,7 +117,7 @@ export interface DownloadStatus {
   /** The mode a download would run under right now. */
   mode: DownloadMode;
   /** The release's free formats that are not withdrawn — what the free tier may take. */
-  availableFreeFormats: DigitalFormatType[];
+  availableFreeFormats: FreeFormatType[];
   freeThrottle: { allowed: boolean; remaining: number; resetsAt: Date | null };
   /** Signed-in users only. */
   lifetime: { remaining: number; includesThisRelease: boolean } | null;
