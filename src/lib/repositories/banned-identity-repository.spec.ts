@@ -4,6 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { banWhere } from './_internal/ban-where';
 import { BannedIdentityRepository } from './banned-identity-repository';
 
 vi.mock('server-only', () => ({}));
@@ -81,10 +82,7 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
 
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
-        AND: [
-          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
-          { OR: [{ userId: 'user-1' }] },
-        ],
+        AND: [banWhere.active, { OR: [{ userId: 'user-1' }] }],
       },
       orderBy: { bannedAt: 'desc' },
     });
@@ -102,7 +100,7 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
         AND: [
-          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
+          banWhere.active,
           {
             OR: [
               { userId: 'user-1' },
@@ -127,10 +125,7 @@ describe('BannedIdentityRepository.findActiveMatch', () => {
 
     expect(prisma.bannedIdentity.findFirst).toHaveBeenCalledWith({
       where: {
-        AND: [
-          { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] },
-          { OR: [{ fingerprintHash: 'fp-hash' }] },
-        ],
+        AND: [banWhere.active, { OR: [{ fingerprintHash: 'fp-hash' }] }],
       },
       orderBy: { bannedAt: 'desc' },
     });
@@ -158,7 +153,7 @@ describe('BannedIdentityRepository.listActive', () => {
 
     expect(prisma.bannedIdentity.findMany).toHaveBeenCalledWith({
       where: {
-        OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }],
+        ...banWhere.active,
       },
       orderBy: { bannedAt: 'desc' },
     });

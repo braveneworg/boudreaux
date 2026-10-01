@@ -5,6 +5,9 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import { banWhere } from './_internal/ban-where';
+import { allOf } from './_internal/where-kit';
+
 interface CreateBannedIdentityData {
   userId?: string | null;
   email: string;
@@ -57,9 +60,7 @@ export class BannedIdentityRepository {
     if (or.length === 0) return null;
 
     return prisma.bannedIdentity.findFirst({
-      where: {
-        AND: [{ OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] }, { OR: or }],
-      },
+      where: allOf(banWhere.active, { OR: or }),
       orderBy: { bannedAt: 'desc' },
     });
   }
@@ -75,9 +76,7 @@ export class BannedIdentityRepository {
   /** List active bans for the admin moderation view. */
   static async listActive() {
     return prisma.bannedIdentity.findMany({
-      where: {
-        OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }],
-      },
+      where: banWhere.active,
       orderBy: { bannedAt: 'desc' },
     });
   }

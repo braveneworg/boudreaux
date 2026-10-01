@@ -6,6 +6,9 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { ChatReactions } from '@/lib/validation/chat-message-schema';
 
+import { chatMessageWhere } from './_internal/chat-message-where';
+import { allOf } from './_internal/where-kit';
+
 interface CreateChatMessageData {
   userId: string;
   body: string;
@@ -64,27 +67,9 @@ export class ChatMessageRepository {
         ]
       : [];
 
-    // Active-ban predicate: a BannedIdentity is active when `unbannedAt`
-    // is null OR the field is absent from the document. Prisma MongoDB
-    // equality on `null` does not match missing fields, so both cases
-    // must be enumerated.
-    const activeBan = { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] };
-
     return prisma.chatMessage.findMany({
       where: {
-        AND: [
-          ...cursorAnd,
-          // hiddenAt may be absent on legacy rows; same null-vs-absent quirk.
-          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-          {
-            user: {
-              is: {
-                chatUsers: { none: { disabled: true } },
-                bannedIdentities: { none: activeBan },
-              },
-            },
-          },
-        ],
+        AND: [...cursorAnd, chatMessageWhere.visible, chatMessageWhere.byAllowedAuthor],
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
@@ -182,12 +167,7 @@ export class ChatMessageRepository {
    */
   static async findPinned() {
     return prisma.chatMessage.findMany({
-      where: {
-        AND: [
-          { OR: [{ pinnedAt: { not: null } }] },
-          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-        ],
-      },
+      where: allOf(chatMessageWhere.pinned, chatMessageWhere.visible),
       orderBy: [{ pinnedAt: 'desc' }],
       include: { user: { select: { id: true, username: true, email: true, role: true } } },
     });
@@ -196,12 +176,7 @@ export class ChatMessageRepository {
   /** Count of currently pinned messages. Used to enforce the 3-pin cap. */
   static async countPinned(): Promise<number> {
     return prisma.chatMessage.count({
-      where: {
-        AND: [
-          { pinnedAt: { not: null } },
-          { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-        ],
-      },
+      where: allOf(chatMessageWhere.pinned, chatMessageWhere.visible),
     });
   }
 
@@ -219,10 +194,7 @@ export class ChatMessageRepository {
     adminId: string;
   }) {
     return prisma.chatMessage.updateMany({
-      where: {
-        userId,
-        OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
-      },
+      where: { userId, ...chatMessageWhere.visible },
       data: {
         hiddenAt: new Date(),
         hiddenByAdminId: adminId,
@@ -237,10 +209,7 @@ export class ChatMessageRepository {
    */
   static async findVisibleIdsByUser(userId: string) {
     return prisma.chatMessage.findMany({
-      where: {
-        userId,
-        OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
-      },
+      where: { userId, ...chatMessageWhere.visible },
       select: { id: true },
     });
   }

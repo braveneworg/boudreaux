@@ -4,6 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { chatMessageWhere } from './_internal/chat-message-where';
 import { ChatMessageRepository } from './chat-message-repository';
 
 vi.mock('server-only', () => ({}));
@@ -40,18 +41,7 @@ describe('ChatMessageRepository', () => {
   });
 
   describe('findRecent', () => {
-    const activeBan = { OR: [{ unbannedAt: null }, { unbannedAt: { isSet: false } }] };
-    const baseAnd = [
-      { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-      {
-        user: {
-          is: {
-            chatUsers: { none: { disabled: true } },
-            bannedIdentities: { none: activeBan },
-          },
-        },
-      },
-    ];
+    const baseAnd = [chatMessageWhere.visible, chatMessageWhere.byAllowedAuthor];
 
     it('treats missing hiddenAt as not-hidden and excludes disabled/banned authors', async () => {
       const rows = [{ id: 'msg-2' }, { id: 'msg-1' }];
@@ -182,10 +172,7 @@ describe('ChatMessageRepository', () => {
         adminId: 'admin-1',
       });
       const call = vi.mocked(prisma.chatMessage.updateMany).mock.calls.at(-1)?.[0];
-      expect(call?.where).toEqual({
-        userId: 'user-1',
-        OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
-      });
+      expect(call?.where).toEqual({ userId: 'user-1', ...chatMessageWhere.visible });
       expect(call?.data?.hiddenByAdminId).toBe('admin-1');
       expect(call?.data?.hiddenReason).toBe('admin_flagged');
       expect(call?.data?.hiddenAt).toBeInstanceOf(Date);
@@ -197,10 +184,7 @@ describe('ChatMessageRepository', () => {
       vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([{ id: 'a' }, { id: 'b' }] as never);
       const result = await ChatMessageRepository.findVisibleIdsByUser('user-1');
       expect(prisma.chatMessage.findMany).toHaveBeenCalledWith({
-        where: {
-          userId: 'user-1',
-          OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }],
-        },
+        where: { userId: 'user-1', ...chatMessageWhere.visible },
         select: { id: true },
       });
       expect(result).toEqual([{ id: 'a' }, { id: 'b' }]);
@@ -251,12 +235,7 @@ describe('ChatMessageRepository', () => {
       vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([] as never);
       await ChatMessageRepository.findPinned();
       expect(prisma.chatMessage.findMany).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            { OR: [{ pinnedAt: { not: null } }] },
-            { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-          ],
-        },
+        where: { AND: [chatMessageWhere.pinned, chatMessageWhere.visible] },
         orderBy: [{ pinnedAt: 'desc' }],
         include: { user: { select: { id: true, username: true, email: true, role: true } } },
       });
@@ -268,12 +247,7 @@ describe('ChatMessageRepository', () => {
       vi.mocked(prisma.chatMessage.count).mockResolvedValue(2 as never);
       const result = await ChatMessageRepository.countPinned();
       expect(prisma.chatMessage.count).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            { pinnedAt: { not: null } },
-            { OR: [{ hiddenAt: null }, { hiddenAt: { isSet: false } }] },
-          ],
-        },
+        where: { AND: [chatMessageWhere.pinned, chatMessageWhere.visible] },
       });
       expect(result).toBe(2);
     });
