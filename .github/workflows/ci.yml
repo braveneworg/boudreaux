@@ -147,6 +147,33 @@ jobs:
   # ── Merge shards → coverage ────────────────────────────────────────────────
   # Combines both blobs into a single coverage report, runs the regression
   # check, posts the PR comment, and updates badges on main.
+  # ── Database contract specs ───────────────────────────────────────────────
+  # `*.contract.spec.ts` prove repository `where` fragments against a real
+  # MongoDB (null vs absent fields filter differently on this stack — see
+  # docs/lessons/prisma-mongo/gate-where-shapes-need-a-live-probe.md). They are
+  # excluded from the unit shards, which have no database, and run here under
+  # the `db-contract` vitest project against the same replica set the E2E
+  # suite uses. `pnpm run test:db` scopes DATABASE_URL to localhost:27018 and
+  # the project's setup file refuses any other URL.
+  db-contract:
+    name: Database Contract Specs
+    needs: [quality]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+
+      - name: Start MongoDB replica set
+        uses: ./.github/actions/start-mongo
+
+      - name: Run contract specs
+        run: pnpm run test:db
+
   coverage:
     name: Coverage & Regression Check
     needs: [test]
@@ -303,55 +330,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Start MongoDB replica set
-        run: |
-          # Pull the image up front with retries. GitHub-hosted runners share
-          # IPs that intermittently time out or hit anonymous-pull rate limits
-          # against Docker Hub ("context deadline exceeded"); a few retries
-          # make the pull resilient without needing registry credentials.
-          for i in $(seq 1 5); do
-            if docker pull mongo:7; then
-              echo "Pulled mongo:7"
-              break
-            fi
-            if [ "$i" = "5" ]; then
-              echo "docker pull mongo:7 failed after 5 attempts" >&2
-              exit 1
-            fi
-            echo "docker pull failed (attempt $i/5); retrying in 15s..."
-            sleep 15
-          done
-
-          docker run -d --name mongo-e2e \
-            -p 27018:27018 \
-            -e MONGO_INITDB_DATABASE=boudreaux-e2e \
-            mongo:7 mongod --replSet rs0 --bind_ip_all --port 27018
-
-          # Wait for mongod to accept connections
-          for i in $(seq 1 30); do
-            if docker exec mongo-e2e mongosh --port 27018 --eval "db.runCommand({ping:1})" 2>/dev/null; then
-              echo "MongoDB is ready"
-              break
-            fi
-            echo "Waiting for MongoDB... ($i/30)"
-            sleep 2
-          done
-
-          # Initiate replica set (ignore "already initialized" errors)
-          docker exec mongo-e2e mongosh --port 27018 --eval "
-            try { rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27018'}]}) }
-            catch(e) { if (e.codeName !== 'AlreadyInitialized') throw e; }
-          "
-
-          # Wait for primary election
-          for i in $(seq 1 15); do
-            PRIMARY=$(docker exec mongo-e2e mongosh --port 27018 --quiet --eval "rs.isMaster().ismaster" 2>/dev/null || echo "false")
-            if [ "$PRIMARY" = "true" ]; then
-              echo "Replica set primary elected"
-              break
-            fi
-            echo "Waiting for primary election... ($i/15)"
-            sleep 2
-          done
+        uses: ./.github/actions/start-mongo
 
       - name: Get Playwright version
         id: playwright-version

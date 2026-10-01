@@ -44,10 +44,19 @@ export const SHELL_SCRIPT_SPECS = [
   'scripts/check-toolchain-pins.spec.ts',
 ];
 
+// Database contract specs: prove a repository `where` fragment against a real
+// MongoDB, not a mocked client (`{ field: null }` misses absent fields on this
+// stack — see docs/lessons/prisma-mongo/gate-where-shapes-need-a-live-probe.md).
+// They need the Docker Mongo on localhost:27018 and the real Prisma engine, so
+// they run only under `pnpm run test:db` (`VITEST_DB_SPECS=1`) and the CI
+// `db-contract` job — never in the unit shards, which have no database.
+export const DB_CONTRACT_SPECS = ['src/**/*.contract.spec.ts'];
+
 // https://vitejs.dev/config/
 export default defineConfig((): ViteUserConfig => {
   const withCoverage = process.argv.includes('--coverage');
   const withShellScripts = Boolean(process.env.CI) || process.env.VITEST_SHELL_SPECS === '1';
+  const withDbSpecs = process.env.VITEST_DB_SPECS === '1';
 
   return {
     server: {
@@ -94,6 +103,7 @@ export default defineConfig((): ViteUserConfig => {
               'stripe-webhook/**',
               ...NATIVE_ADDON_SPECS,
               ...SHELL_SCRIPT_SPECS,
+              ...DB_CONTRACT_SPECS,
             ],
           },
         },
@@ -109,6 +119,7 @@ export default defineConfig((): ViteUserConfig => {
               'stripe-webhook/**',
               ...HTML_PARSER_SPECS,
               ...SHELL_SCRIPT_SPECS,
+              ...DB_CONTRACT_SPECS,
             ],
           },
         },
@@ -127,6 +138,7 @@ export default defineConfig((): ViteUserConfig => {
               'bio-generator/**',
               'stripe-webhook/**',
               ...SHELL_SCRIPT_SPECS,
+              ...DB_CONTRACT_SPECS,
             ],
           },
         },
@@ -144,6 +156,7 @@ export default defineConfig((): ViteUserConfig => {
               'bio-generator/**',
               'stripe-webhook/**',
               ...SHELL_SCRIPT_SPECS,
+              ...DB_CONTRACT_SPECS,
             ],
           },
         },
@@ -157,7 +170,31 @@ export default defineConfig((): ViteUserConfig => {
                   name: 'shell-scripts',
                   environment: 'node',
                   include: SHELL_SCRIPT_SPECS,
+                  exclude: [
+                    '**/node_modules/**',
+                    'bio-generator/**',
+                    'stripe-webhook/**',
+                    ...DB_CONTRACT_SPECS,
+                  ],
+                },
+              },
+            ]
+          : []),
+        // Database contract specs: only `VITEST_DB_SPECS=1`. Forks pool because
+        // the real Prisma engine's native addon aborts under vmThreads, and its
+        // own setup file so the global `@/lib/prisma` mock never applies and the
+        // DATABASE_URL guard runs before any spec. See DB_CONTRACT_SPECS.
+        ...(withDbSpecs
+          ? [
+              {
+                extends: true,
+                test: {
+                  name: 'db-contract',
+                  environment: 'node',
+                  pool: 'forks',
+                  include: DB_CONTRACT_SPECS,
                   exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+                  setupFiles: ['./setupTests.db.ts'],
                 },
               },
             ]

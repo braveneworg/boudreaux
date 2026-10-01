@@ -18,6 +18,8 @@
     "ask": [
       "Bash(pnpm run seed *)",
       "Bash(pnpm seed *)",
+      "Bash(pnpm run test:db *)",
+      "Bash(pnpm test:db *)",
       "Bash(pnpm run mongo:dump *)",
       "Bash(pnpm mongo:dump *)",
       "Bash(pnpm run mongo:restore *)",

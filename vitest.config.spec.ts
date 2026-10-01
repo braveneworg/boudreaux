@@ -3,13 +3,20 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { existsSync, readFileSync } from 'node:fs';
 
-import config, { SHELL_SCRIPT_SPECS } from './vitest.config';
+import config, { DB_CONTRACT_SPECS, SHELL_SCRIPT_SPECS } from './vitest.config';
 
 interface ProjectShape {
-  test?: { name?: string; include?: string[]; exclude?: string[] };
+  test?: {
+    name?: string;
+    include?: string[];
+    exclude?: string[];
+    pool?: string;
+    setupFiles?: string[];
+  };
 }
 
 const SHELL_PROJECT = 'shell-scripts';
+const DB_PROJECT = 'db-contract';
 
 /** Evaluate the config factory under the current (stubbed) environment. */
 const resolveProjects = async (): Promise<ProjectShape[]> => {
@@ -27,6 +34,7 @@ describe('vitest.config — shell-script specs', () => {
   beforeEach(() => {
     vi.stubEnv('CI', '');
     vi.stubEnv('VITEST_SHELL_SPECS', '');
+    vi.stubEnv('VITEST_DB_SPECS', '');
   });
 
   it.each(SHELL_SCRIPT_SPECS)('%s exists', (spec) => {
@@ -61,5 +69,49 @@ describe('vitest.config — shell-script specs', () => {
     const projects = await resolveProjects();
 
     expect(projectNames(projects)).toContain(SHELL_PROJECT);
+  });
+});
+
+describe('vitest.config — db-contract specs', () => {
+  beforeEach(() => {
+    vi.stubEnv('CI', '');
+    vi.stubEnv('VITEST_SHELL_SPECS', '');
+    vi.stubEnv('VITEST_DB_SPECS', '');
+  });
+
+  it('leaves contract specs out of every project in a plain local run', async () => {
+    const projects = await resolveProjects();
+
+    expect(projectNames(projects)).not.toContain(DB_PROJECT);
+    for (const { test } of projects) {
+      expect(test?.exclude).toEqual(expect.arrayContaining([...DB_CONTRACT_SPECS]));
+    }
+  });
+
+  it('leaves contract specs out in CI too — the unit shards have no database', async () => {
+    vi.stubEnv('CI', 'true');
+
+    const projects = await resolveProjects();
+
+    expect(projectNames(projects)).not.toContain(DB_PROJECT);
+  });
+
+  it('runs them under the db-contract project only with VITEST_DB_SPECS=1', async () => {
+    vi.stubEnv('VITEST_DB_SPECS', '1');
+
+    const projects = await resolveProjects();
+    const db = projects.find(({ test }) => test?.name === DB_PROJECT);
+
+    expect(db?.test?.include).toEqual([...DB_CONTRACT_SPECS]);
+  });
+
+  it('runs the real Prisma engine in the forks pool with the database guard, not the unit mocks', async () => {
+    vi.stubEnv('VITEST_DB_SPECS', '1');
+
+    const projects = await resolveProjects();
+    const db = projects.find(({ test }) => test?.name === DB_PROJECT);
+
+    expect(db?.test?.pool).toBe('forks');
+    expect(db?.test?.setupFiles).toEqual(['./setupTests.db.ts']);
   });
 });

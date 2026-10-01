@@ -15,6 +15,7 @@
     "test": "vitest --reporter=dot --silent",
     "test:run": "vitest run",
     "test:shell": "VITEST_SHELL_SPECS=1 vitest run --project shell-scripts",
+    "test:db": "DATABASE_URL='mongodb://localhost:27018/boudreaux-contract?replicaSet=rs0' VITEST_DB_SPECS=1 vitest run --project db-contract",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
