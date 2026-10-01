@@ -215,6 +215,23 @@ _Avoid_: release datetime, upload date.
 upload completes so that later work has a row to attach to. A draft may lack a
 release date and a description.
 
+**go-live moment** — the instant a published Video becomes visible to the
+public, recorded when an admin publishes it. It is distinct from the
+**release date**: the release date says when the work came out; the go-live
+moment says when this site shows it. A Video with a go-live moment is
+**published**, whether that moment has arrived or not.
+_Avoid_: publish date (ambiguous with release date).
+
+**scheduled** — a published Video whose go-live moment is still ahead. The
+admin listing's published filter includes it; no public surface shows it.
+_Avoid_: pending, upcoming, queued.
+
+**live** — a published Video whose go-live moment has arrived. The only
+videos a public surface reads; the admin dashboard's published count counts
+these alone, so a scheduled Video counts toward the draft side until it goes
+live.
+_Avoid_: visible, active.
+
 **release-date lookup** — the bounded automatic search for a Video's release
 date from its title and artist, run on upload and on opening a dateless draft.
 It retries a fixed number of times per distinct title-and-artist pair and then
