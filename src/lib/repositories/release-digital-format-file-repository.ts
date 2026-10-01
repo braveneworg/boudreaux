@@ -8,6 +8,8 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { digitalFormatWhere } from './_internal/digital-format-where';
+import { releaseWhere } from './_internal/release-where';
 
 import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
 
@@ -57,16 +59,6 @@ const trackFileWithReleaseSelect = {
     },
   },
 } as const satisfies Prisma.ReleaseDigitalFormatFileSelect;
-
-/**
- * The published-release filter mirrored from `release-repository.ts`
- * `buildPublishedWhere` (no search term variant). Matches records whose release
- * has `publishedAt` set and has not been soft-deleted (`deletedOn`).
- */
-const publishedReleaseFilter = {
-  publishedAt: { not: null },
-  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-} as const satisfies Prisma.ReleaseWhereInput;
 
 /**
  * Select for playlist zip downloads: just enough to match a requested-format
@@ -235,8 +227,8 @@ export class ReleaseDigitalFormatFileRepository {
         format: {
           is: {
             formatType: 'MP3_320KBPS',
-            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-            release: { is: publishedReleaseFilter },
+            ...digitalFormatWhere.active,
+            release: { is: releaseWhere.listed },
           },
         },
       },
@@ -262,8 +254,8 @@ export class ReleaseDigitalFormatFileRepository {
           is: {
             formatType,
             releaseId: { in: releaseIds },
-            OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-            release: { is: publishedReleaseFilter },
+            ...digitalFormatWhere.active,
+            release: { is: releaseWhere.listed },
           },
         },
       },

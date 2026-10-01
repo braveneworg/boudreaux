@@ -7,6 +7,8 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
+import { digitalFormatWhere } from './_internal/digital-format-where';
+
 import type { Prisma, ReleaseDigitalFormat, ReleaseDigitalFormatFile } from '@prisma/client';
 
 /** ReleaseDigitalFormat with its child track files included */
@@ -57,39 +59,26 @@ export class ReleaseDigitalFormatRepository {
   }
 
   /**
-   * Find the first active (non-deleted) format for a release + formatType
-   * using a strict `deletedAt: null` filter. Used by the download-authorization
-   * flow, which performs its own grace-period check on the returned record.
-   * Returns the bare format (no child files) or null.
+   * Find the first active (non-deleted) format for a release + formatType.
+   * Used by the download-authorization flow. Returns the bare format (no
+   * child files) or null.
    */
   async findActiveByReleaseAndFormat(
     releaseId: string,
     formatType: DigitalFormatType
   ): Promise<ReleaseDigitalFormat | null> {
     return await prisma.releaseDigitalFormat.findFirst({
-      where: {
-        releaseId,
-        formatType,
-        deletedAt: null,
-      },
+      where: { releaseId, formatType, ...digitalFormatWhere.active },
     });
   }
 
   /**
    * Find all active (non-deleted) digital formats for a release
    * Includes child track files ordered by trackNumber
-   *
-   * NOTE: Uses OR + isSet to handle MongoDB's distinction between a field
-   * that is explicitly null vs a field that doesn't exist in the document.
-   * Prisma's MongoDB adapter omits optional fields on create, so most
-   * active records won't have deletedAt in the document at all.
    */
   async findAllByRelease(releaseId: string): Promise<ReleaseDigitalFormatWithFiles[]> {
     return await prisma.releaseDigitalFormat.findMany({
-      where: {
-        releaseId,
-        OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-      },
+      where: { releaseId, ...digitalFormatWhere.active },
       include: { files: { orderBy: { trackNumber: 'asc' } } },
     });
   }
