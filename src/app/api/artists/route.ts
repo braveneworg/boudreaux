@@ -7,16 +7,12 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
-import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { CreateArtistData } from '@/lib/types/domain/artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
-import { validateBody } from '@/lib/utils/validate-request';
 import { artistListingQuerySchema } from '@/lib/validation/artist-listing-query-schema';
-import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,33 +140,6 @@ export const GET = withRateLimit(
       : await handleAdminListing(searchParams);
   } catch (error) {
     loggers.media.error('Artist GET error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-});
-
-/**
- * POST /api/artists
- * Create a new artist
- * Requires admin role
- */
-export const POST = await withAdmin(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const validation = validateBody(createArtistSchema, body);
-
-    if (!validation.success) {
-      return validation.response;
-    }
-
-    const result = await ArtistService.createArtist(validation.data as unknown as CreateArtistData);
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(result.data, { status: 201 });
-  } catch (error) {
-    loggers.media.error('Artist POST error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

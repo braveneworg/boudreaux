@@ -8,12 +8,9 @@ import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
-import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-import { updateArtistSchema } from '@/lib/validation/update-schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,76 +44,6 @@ export const GET = withAdmin(
       });
     } catch (error) {
       loggers.media.error('Artist GET by ID error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);
-
-/**
- * PUT /api/artist/[id]
- * Update an artist by ID
- */
-export const PUT = withAdmin(
-  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-      const body = await request.json();
-      const validation = validateBody(updateArtistSchema, body);
-
-      if (!validation.success) {
-        return validation.response;
-      }
-
-      const result = await ArtistService.updateArtist(
-        id,
-        validation.data as unknown as UpdateArtistData
-      );
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json(result.data);
-    } catch (error) {
-      loggers.media.error('Artist PUT error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);
-
-/**
- * PATCH /api/artist/[id]
- * Partially update an artist by ID
- */
-export const PATCH = withAdmin(
-  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-      const body = await request.json();
-      const validation = validateBody(updateArtistSchema, body);
-
-      if (!validation.success) {
-        return validation.response;
-      }
-
-      const result = await ArtistService.updateArtist(
-        id,
-        validation.data as unknown as UpdateArtistData
-      );
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json(result.data);
-    } catch (error) {
-      loggers.media.error('Artist PATCH error', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
   }
