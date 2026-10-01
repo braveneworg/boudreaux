@@ -13,24 +13,9 @@ import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
 import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
 import { artistPublicScalarSchema } from '@/lib/validation/media/shared-schema';
+import { isSlug } from '@/lib/validation/primitives';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * Validate slug format: lowercase alphanumeric + hyphens, max 100 chars,
- * must start and end with an alphanumeric character.
- */
-const isValidSlug = (slug: string): boolean => {
-  const firstChar = slug.at(0) ?? '';
-  const lastChar = slug.at(-1) ?? '';
-  return (
-    slug.length >= 1 &&
-    slug.length <= 100 &&
-    /^[a-z0-9]$/.test(firstChar) &&
-    /^[a-z0-9]$/.test(lastChar) &&
-    /^[a-z0-9-]+$/.test(slug)
-  );
-};
 
 /**
  * GET /api/artist/slug/[slug]
@@ -47,7 +32,7 @@ export const GET = withRateLimit<{ slug: string }>(
   try {
     const { slug } = await params;
 
-    if (!isValidSlug(slug)) {
+    if (!isSlug(slug)) {
       return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 });
     }
 

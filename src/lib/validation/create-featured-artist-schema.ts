@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { objectId } from './primitives';
+
 export const createFeaturedArtistSchema = z.object({
   displayName: z
     .string()
@@ -25,14 +27,8 @@ export const createFeaturedArtistSchema = z.object({
     .min(0, { message: 'Position must be 0 or greater' }),
   featuredOn: z.string().optional().or(z.literal('')),
   featuredUntil: z.string().optional().or(z.literal('')),
-  digitalFormatId: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid digital format ID format' })
-    .min(1, { message: 'Digital format is required' }),
-  releaseId: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid release ID format' })
-    .min(1, { message: 'Release is required' }),
+  digitalFormatId: objectId,
+  releaseId: objectId,
   featuredTrackNumber: z
     .number()
     .int({ message: 'Featured track number must be a whole number' })

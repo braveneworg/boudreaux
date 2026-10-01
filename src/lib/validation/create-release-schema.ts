@@ -5,10 +5,11 @@ import { z } from 'zod';
 
 import { FORMATS } from '@/lib/types/media-models';
 
+import { objectId } from './primitives';
+
 const formatValues = Object.values(FORMATS);
 
 // MongoDB ObjectId regex pattern
-const mongoObjectIdPattern = /^[a-f0-9]{24}$/i;
 
 export const releaseBaseSchema = z.object({
   title: z
@@ -23,9 +24,7 @@ export const releaseBaseSchema = z.object({
   formats: z
     .array(z.enum(formatValues as [string, ...string[]]))
     .min(1, { message: 'At least one format is required' }),
-  artistIds: z
-    .array(z.string().regex(mongoObjectIdPattern, { message: 'Invalid artist ID format' }))
-    .optional(),
+  artistIds: z.array(objectId).optional(),
   labels: z
     .string()
     .max(500, { message: 'Labels must be less than 500 characters' })
@@ -119,11 +118,7 @@ export const releaseBaseSchema = z.object({
       },
       { message: 'Suggested price must have at most 2 decimal places' }
     ),
-  // MongoDB ObjectId is a 24-character hex string
-  createdBy: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid MongoDB ObjectId format' })
-    .optional(),
+  createdBy: objectId.optional(),
 });
 
 export const createReleaseSchema = releaseBaseSchema.refine(

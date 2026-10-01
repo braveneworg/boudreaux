@@ -40,6 +40,7 @@ import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
 import { type GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
+import { isSlug } from '@/lib/validation/primitives';
 import { ZinePanel } from '@/ui/zine-panel';
 
 import { useApplyGeneratedBio } from './_hooks/use-apply-generated-bio';
@@ -58,18 +59,6 @@ interface ArtistFormProps {
    */
   returnTo?: string;
 }
-
-/**
- * Validates a URL slug (lowercase alphanumeric segments joined by single
- * dashes, with no leading/trailing/double dashes). Implemented with a single
- * character-class quantifier plus boundary checks to avoid the catastrophic
- * backtracking risk of a nested-quantifier pattern.
- */
-const isValidSlug = (value: string): boolean =>
-  /^[a-z0-9-]+$/.test(value) &&
-  !value.startsWith('-') &&
-  !value.endsWith('-') &&
-  !value.includes('--');
 
 const ToastContent = ({ fullName }: { fullName: string }) => (
   <>
@@ -442,7 +431,7 @@ export const ArtistForm = ({
 
   // Clear slug error when the value becomes valid (lowercase alphanumeric with dashes)
   useEffect(() => {
-    if (slug && isValidSlug(slug)) {
+    if (slug && isSlug(slug)) {
       artistForm.clearErrors('slug');
     }
   }, [slug, artistForm]);

@@ -29,8 +29,15 @@ describe('submitAbuseReportSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects usernames longer than 64 chars', () => {
-    const result = submitAbuseReportSchema.safeParse({ reportedUsername: 'a'.repeat(65) });
+  // The report accepts every username the change form can create: one
+  // shared limit, so a long username is no longer unreportable.
+  it('accepts a username at the shared maximum', () => {
+    const result = submitAbuseReportSchema.safeParse({ reportedUsername: 'a'.repeat(100) });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a username past the shared maximum', () => {
+    const result = submitAbuseReportSchema.safeParse({ reportedUsername: 'a'.repeat(101) });
     expect(result.success).toBe(false);
   });
 });

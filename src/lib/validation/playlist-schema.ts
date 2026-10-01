@@ -19,13 +19,13 @@ import type {
   PlaylistsResponse,
 } from '@/lib/types/domain/playlist';
 
+import { objectId } from './primitives';
+
 // ---------------------------------------------------------------------------
 // Shared primitives
 // ---------------------------------------------------------------------------
 
 /** 24-character hex MongoDB ObjectId — mirrors the repo-wide convention. */
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
-
 // ---------------------------------------------------------------------------
 // Input schemas
 // ---------------------------------------------------------------------------

@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { objectId, slug } from './primitives';
+
 // Bio fields are authored in the rich-text editor and stored as HTML, so their
 // length limits must count visible prose, not markup — otherwise `<p>`/`<a>`
 // overhead can reject a bio whose readable text is well within the limit.
@@ -53,13 +55,7 @@ export const artistBaseSchema = z.object({
     .max(50, { message: 'Suffix must be less than 50 characters' })
     .optional()
     .or(z.literal('')),
-  slug: z
-    .string()
-    .min(1, { message: 'Slug is required' })
-    .max(200, { message: 'Slug must be less than 200 characters' })
-    .regex(/^[a-z0-9](?:[a-z0-9]|-[a-z0-9])*$/, {
-      message: 'Slug must be lowercase, alphanumeric, and dash-separated (e.g., "john-doe")',
-    }),
+  slug,
   bio: z
     .string()
     .refine((value) => visibleLength(value) <= MAX_BIO_LENGTH, {
@@ -95,11 +91,7 @@ export const artistBaseSchema = z.object({
   diedOn: z.string().optional().or(z.literal('')),
   formedOn: z.string().optional().or(z.literal('')),
   publishedOn: z.string().optional().or(z.literal('')),
-  // MongoDB ObjectId is a 24-character hex string, not a standard UUID
-  createdBy: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, { message: 'Invalid MongoDB ObjectId format' })
-    .optional(),
+  createdBy: objectId.optional(),
 });
 
 export const createArtistSchema = artistBaseSchema.superRefine((data, ctx) => {

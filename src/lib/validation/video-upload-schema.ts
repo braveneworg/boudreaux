@@ -11,8 +11,10 @@ import {
   VIDEO_PART_URL_BATCH_MAX,
 } from '@/lib/constants/video-uploads';
 
-/** 24-character hex MongoDB ObjectId, matching the repo-wide convention. */
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid video id');
+import { objectId } from './primitives';
+
+/** The one video id shape every upload request names. */
+const videoId = objectId;
 
 const s3Key = z.string().min(1, 'S3 key is required');
 const uploadId = z.string().min(1, 'Upload id is required');
@@ -23,7 +25,7 @@ const uploadId = z.string().min(1, 'Upload id is required');
  * supported formats rather than a generic enum error.
  */
 export const initiateVideoUploadSchema = z.object({
-  videoId: objectId,
+  videoId,
   fileName: z.string().min(1, 'File name is required').max(255, 'File name is too long'),
   contentType: z.enum(VIDEO_ALLOWED_MIME_TYPES, {
     message: 'Only MP4 and WebM videos are supported',
