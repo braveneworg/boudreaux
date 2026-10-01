@@ -42,6 +42,11 @@ export const findReleaseDateSuggestion = (
 /**
  * Fills an EMPTY release date from the enrichment's suggestion as soon as it
  * appears — a date nobody has set yet should be used without a manual click.
+ * The server already does this at enrichment time (`VideoEnrichmentService.
+ * completeCallback` asks the editorial rules and fills the row itself), so a
+ * pending release-date suggestion normally meets a date that is already set.
+ * This hook mirrors the rule for the one case the server cannot see: the
+ * admin clears the date in the form while that suggestion is still pending.
  * The guard is emptiness, not dirtiness: a date already in the form (typed,
  * found by the automatic lookup, or loaded from the row) is never overwritten
  * — the found date stays, and the suggestion remains a pending card with

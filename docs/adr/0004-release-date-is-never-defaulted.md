@@ -41,6 +41,25 @@ typed it.**
   dateless row with `VALIDATION` copy, closing the list-level Publish bypass
   that never went through the form's validation.
 
+### Enforcement (2026-10-01)
+
+The rules above are pure decisions in `src/lib/services/video-editorial-rules.ts`,
+asked by every writer rather than enforced where a form happens to be open:
+
+- The empty-field fill now happens **at enrichment time**, in
+  `VideoEnrichmentService.completeCallback`, with no form open; the edit
+  form's hook mirrors it for the one case the server cannot see (the admin
+  clears the date while the suggestion is still pending).
+- A suggestion equal to today's UTC day is **never filled by itself**. It stays
+  a pending suggestion for the admin to confirm — the enrichment counterpart of
+  the lookup's "today is a miss".
+- published ⇒ dated is asked of the same module by `publishVideo` and
+  `updateVideoReleaseDate`.
+- A release day is a `ReleaseDay` (`src/lib/utils/validation/iso-date.ts`),
+  built by `releaseDayFromForm` (a form string names its local day) or
+  `releaseDayFromStored` (a stored `Date` names its UTC day). The two differ
+  west of Greenwich, so no single parser serves both.
+
 ## Why this is surprising without context
 
 - The form field _looks_ required, but the row is not. A reader who sees the

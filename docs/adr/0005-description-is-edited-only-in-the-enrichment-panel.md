@@ -53,6 +53,15 @@ The only source of synthesized prose is the enrichment run.**
   applied or ignored — never dismissed. Applied rows and legacy dismissed rows
   render nothing.
 
+### Enforcement (2026-10-01)
+
+"Never dismissed" and "a blank description takes the synthesized one" are
+pure decisions in `src/lib/services/video-editorial-rules.ts`. The suggestion
+action refuses to dismiss a video-level description suggestion whoever calls
+it — the panel never offered the button, and now the server never honours the
+request either. The enrichment callback asks the same module before filling a
+blank description.
+
 ## Why this is surprising without context
 
 - The form's Description field is inside the **Web Enrichment** section, not
