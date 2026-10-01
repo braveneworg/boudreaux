@@ -64,6 +64,16 @@ overridden per call site; `code` is the stable fact callers branch on.
 - Test fixtures that stub a service failure must supply a code. This is a
   feature: a test asserting 503 now says `UNAVAILABLE` rather than relying on a
   message spelled the same way in two files.
+- (2026-10-01) Translation from Prisma's error taxonomy to `DataError` is a
+  property of the client, not of each repository method. A
+  `data-error-translation` client extension (`src/lib/prisma.ts`) routes every
+  model operation through the translator, so repositories no longer wrap calls
+  in `runQuery` and nothing above the client can see a raw Prisma error. The one
+  exception is `prisma.$transaction(...)`: operations on the `tx` client are
+  translated, but the transaction's own start/commit/rollback is not a model
+  operation, so those calls keep `runQuery`. Before this, ~90 of ~269 methods
+  were unwrapped and a database outage reached `failFromError` as `UNKNOWN`
+  (500) instead of `UNAVAILABLE` (503).
 
 ## Alternatives considered
 
