@@ -469,6 +469,149 @@ describe('GET /api/releases/[id]/download/bundle', () => {
     });
   });
 
+  describe('ZIP production — the half the gate did not change', () => {
+    const manyTracks = {
+      id: 'format-flac-10',
+      formatType: 'FLAC',
+      s3Key: null,
+      fileName: null,
+      deletedAt: null,
+      files: Array.from({ length: 10 }, (_, i) => ({
+        s3Key: `releases/r1/FLAC/${i}.flac`,
+        fileName: `${i}.flac`,
+      })),
+    } as unknown as GateFormatRecord;
+
+    it.each(['', '&respond=json', '&respond=stream'])(
+      'pipelines S3 GETs beyond the prefetch depth and archives every track (%s)',
+      async (respond) => {
+        gateGrants([manyTracks]);
+
+        const response = await GET(makeRequest(`formats=FLAC${respond}`), makeParams());
+        await response.arrayBuffer();
+
+        expect(mockS3Send).toHaveBeenCalledTimes(10);
+        expect(mockAppend).toHaveBeenCalledTimes(10);
+      }
+    );
+
+    it.each(['', '&respond=json', '&respond=stream'])(
+      'skips an S3 object with no Body after the first and archives the rest (%s)',
+      async (respond) => {
+        mockS3Send
+          .mockResolvedValueOnce({ Body: Readable.from(Buffer.from('one')) })
+          .mockResolvedValueOnce({ Body: null });
+
+        const response = await GET(makeRequest(`formats=FLAC${respond}`), makeParams());
+        await response.arrayBuffer();
+
+        expect(mockAppend).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('skips a legacy record that has an s3Key but no fileName', async () => {
+      gateGrants([{ ...wavRecord, fileName: null } as unknown as GateFormatRecord, flacRecord]);
+
+      await GET(makeRequest(), makeParams());
+
+      // One format survives, so its tracks sit flat at the ZIP root.
+      expect(mockAppend.mock.calls.map(([, opts]) => (opts as { name: string }).name)).toEqual([
+        '01 - Intro.flac',
+        '02 - Main.flac',
+      ]);
+    });
+
+    it('names the ZIP release.zip when the title sanitizes to nothing', async () => {
+      vi.mocked(ReleaseService.findPublishedTitleById).mockResolvedValue({
+        id: RELEASE_ID,
+        title: '!!!',
+      });
+
+      await GET(makeRequest('formats=WAV'), makeParams());
+
+      expect(mockGeneratePresignedDownloadUrl.mock.calls[0]?.[1]).toBe('release.zip');
+    });
+
+    it('audits unknown when the request carries no forwarded-for or user-agent header', async () => {
+      await GET(
+        new NextRequest(
+          `http://localhost:3000/api/releases/${RELEASE_ID}/download/bundle?formats=WAV`
+        ),
+        makeParams()
+      );
+
+      const [, , audit] = vi.mocked(downloadGate.download).mock.calls[0];
+      expect(audit).toEqual({ ipAddress: 'unknown', userAgent: 'unknown' });
+    });
+
+    it('302 path: an S3 failure after the first object aborts the archive and the upload', async () => {
+      mockS3Send
+        .mockResolvedValueOnce({ Body: Readable.from(Buffer.from('one')) })
+        .mockRejectedValueOnce(new Error('S3 fetch failed'));
+
+      const response = await GET(makeRequest('formats=FLAC'), makeParams());
+
+      expect(response.status).toBe(500);
+      expect(mockArchiveAbort).toHaveBeenCalled();
+      expect(mockUploadAbort).toHaveBeenCalled();
+    });
+
+    it('SSE path: an archiver error fails the format, then the bundle, and aborts the upload', async () => {
+      mockAppend.mockImplementationOnce(() => {
+        mockArchiverPassThrough.emit('error', new Error('zip broke'));
+      });
+
+      const events = await readSSEEvents(
+        await GET(makeRequest('formats=FLAC&respond=json'), makeParams())
+      );
+
+      expect(events.filter(({ event }) => event === 'error').map(({ data }) => data)).toEqual([
+        { formatType: 'FLAC', message: 'Failed to prepare download.' },
+        { message: 'No formats could be prepared.' },
+      ]);
+      expect(events.map(({ event }) => event)).not.toContain('ready');
+      expect(mockUploadAbort).toHaveBeenCalled();
+    });
+
+    it('SSE path: a cache-upload failure is reported, not the deliverable', async () => {
+      mockUploadDone.mockRejectedValue(new Error('upload failed'));
+
+      const events = await readSSEEvents(
+        await GET(makeRequest('formats=WAV&respond=json'), makeParams())
+      );
+
+      expect(events.map(({ event }) => event)).not.toContain('ready');
+      expect(events.find(({ event }) => event === 'error')?.data).toEqual({
+        message: 'An unexpected error occurred.',
+      });
+    });
+
+    it('stream path: an S3 failure mid-drive aborts the archive and the cache upload', async () => {
+      mockS3Send
+        .mockResolvedValueOnce({ Body: Readable.from(Buffer.from('one')) })
+        .mockRejectedValueOnce(new Error('S3 fetch failed'));
+
+      const response = await GET(makeRequest('formats=FLAC&respond=stream'), makeParams());
+
+      expect(response.status).toBe(200);
+      await response.arrayBuffer().catch(() => undefined);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockArchiveAbort).toHaveBeenCalled();
+      expect(mockUploadAbort).toHaveBeenCalled();
+    });
+
+    it('stream path: cancelling the response aborts the archive and the cache upload', async () => {
+      gateGrants([manyTracks]);
+
+      const response = await GET(makeRequest('formats=FLAC&respond=stream'), makeParams());
+      await response.body?.cancel();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockArchiveAbort).toHaveBeenCalled();
+      expect(mockUploadAbort).toHaveBeenCalled();
+    });
+  });
+
   it('returns 500 INTERNAL_ERROR when the gate itself throws', async () => {
     vi.mocked(downloadGate.download).mockRejectedValue(new Error('boom'));
 
