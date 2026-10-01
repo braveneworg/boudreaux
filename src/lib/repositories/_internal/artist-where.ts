@@ -9,46 +9,49 @@
  * can load it.
  */
 
+import { allOf, isPresent, isUnset } from './where-kit';
+
 import type { Prisma } from '@prisma/client';
 
-/** Mongo null-safe "not soft-deleted" clause (absent field counts as not deleted). */
-export const notDeletedOr = [{ deletedOn: null }, { deletedOn: { isSet: false } }] as const;
+/**
+ * Artist state fragments on the null-safe kit. Proved against Docker Mongo by
+ * `artist-where.contract.spec.ts`.
+ */
+export const artistWhere = {
+  /** Not soft-deleted — `deletedOn` is null or absent. */
+  notDeleted: isUnset('deletedOn'),
 
-/** Mongo null-safe "never published" clause (absent field counts as unpublished). */
-export const unpublishedOr = [{ publishedOn: null }, { publishedOn: { isSet: false } }] as const;
+  /** Soft-deleted — `deletedOn` holds a date. */
+  deleted: isPresent('deletedOn'),
 
-/** A release that the public may see: published and not soft-deleted. */
-export const listedReleaseWhere = {
-  publishedAt: { not: null },
-  OR: [...notDeletedOr],
-} as const satisfies Prisma.ReleaseWhereInput;
+  /** Never published — `publishedOn` is null or absent. */
+  unpublished: isUnset('publishedOn'),
+} as const satisfies Record<string, Prisma.ArtistWhereInput>;
 
 /**
  * A public artist (ADR-0015, ADR-0016): published and not soft-deleted.
  * Whether the artist is still on the label plays no part. Every public read
  * applies it: to the artist a page is about, and, nested as
  * `{ artist: { is: publicArtistWhere } }`, to the artists a release credits, a
- * band lists, a featured row names, or a tour date headlines.
- * `publishedOn: { not: null }` excludes an absent field as well as an explicit
- * null. Its in-memory twin is `isPublicArtist`.
+ * band lists, a featured row names, or a tour date headlines. Its in-memory
+ * twin is `isPublicArtist`.
  */
 export const publicArtistWhere = {
-  publishedOn: { not: null },
-  OR: [...notDeletedOr],
+  ...isPresent('publishedOn'),
+  ...artistWhere.notDeleted,
 } as const satisfies Prisma.ArtistWhereInput;
 
 /**
- * Hidden only for want of a `publishedOn`: never published, not soft-deleted.
- * Stamping `publishedOn` on exactly these makes them public.
+ * Hidden only for want of a `publishedOn`: never published, not deleted.
+ * Two `OR` groups, so each sits in its own `AND` member.
  */
-const awaitingConfirmationGate = {
-  AND: [{ OR: [...unpublishedOr] }, { OR: [...notDeletedOr] }],
-} as const satisfies Prisma.ArtistWhereInput;
+const awaitingConfirmationGate = allOf(
+  artistWhere.unpublished,
+  artistWhere.notDeleted
+) satisfies Prisma.ArtistWhereInput;
 
 /** Hidden whatever `publishedOn` says: soft-deleted. */
-const staysHiddenGate = {
-  deletedOn: { not: null },
-} as const satisfies Prisma.ArtistWhereInput;
+const staysHiddenGate = artistWhere.deleted satisfies Prisma.ArtistWhereInput;
 
 /**
  * Artists whose credit awaits confirmation (ADR-0015): credited as `credit`

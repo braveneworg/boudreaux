@@ -47,8 +47,8 @@ import {
   creditConfirmationSelect,
   creditThatStaysHiddenWhere,
   hiddenCreditSelect,
-  listedReleaseWhere,
 } from '../src/lib/repositories/_internal/artist-where';
+import { releaseWhere } from '../src/lib/repositories/_internal/release-where';
 import {
   toCreditAwaitingConfirmation,
   toCreditThatStaysHidden,
@@ -65,7 +65,7 @@ const TAG = '[backfill-publish-credited-artists]';
 const DEFAULT_OUT_PATH = join(tmpdir(), 'backfill-publish-credited-artists.tsv');
 
 /** Credits on any listed release, the scope of the whole backfill. */
-const ON_ANY_LISTED_RELEASE = { release: listedReleaseWhere };
+const ON_ANY_LISTED_RELEASE = { release: releaseWhere.listed };
 
 /** A credit awaiting confirmation plus the listed releases that credit it. */
 export interface BackfillCandidate extends CreditAwaitingConfirmation {

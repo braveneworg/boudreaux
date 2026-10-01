@@ -19,9 +19,9 @@ import {
   creditConfirmationSelect,
   creditThatStaysHiddenWhere,
   hiddenCreditSelect,
-  listedReleaseWhere,
   staysHiddenAmongWhere,
 } from './_internal/artist-where';
+import { releaseWhere } from './_internal/release-where';
 
 import type { Prisma } from '@prisma/client';
 
@@ -170,7 +170,7 @@ export class ArtistCreditRepository {
   static async findPublishedWorkCreditedTo(artistId: string): Promise<PublishedWorkCreditedTo> {
     const [credits, headliners] = await Promise.all([
       prisma.artistRelease.findMany({
-        where: { artistId, release: listedReleaseWhere },
+        where: { artistId, release: releaseWhere.listed },
         select: { release: { select: { id: true, title: true } } },
       }),
       prisma.tourDateHeadliner.findMany({

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { artistWhere } from './_internal/artist-where';
+import { releaseWhere } from './_internal/release-where';
 import { ArtistCreditRepository } from './artist-credit-repository';
 
 vi.mock('server-only', () => ({}));
@@ -27,12 +29,7 @@ const { prisma } = await import('@/lib/prisma');
 
 const NOW = new Date('2026-09-26T12:00:00.000Z');
 
-const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
-
-const AWAITING_GATE = [
-  { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] },
-  { OR: NOT_DELETED_OR },
-];
+const AWAITING_GATE = [artistWhere.unpublished, artistWhere.notDeleted];
 
 const NAME_SELECT = {
   id: true,
@@ -283,7 +280,7 @@ describe('ArtistCreditRepository', () => {
           {
             where: {
               artistId: 'artist-1',
-              release: { publishedAt: { not: null }, OR: NOT_DELETED_OR },
+              release: releaseWhere.listed,
             },
             select: { release: { select: { id: true, title: true } } },
           },

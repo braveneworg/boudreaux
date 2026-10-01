@@ -28,8 +28,9 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
-import { listedReleaseWhere, notDeletedOr, publicArtistWhere } from './_internal/artist-where';
+import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
+import { releaseWhere } from './_internal/release-where';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
 import type { AssertExact } from './_internal/drift';
@@ -355,12 +356,12 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
   const and: Prisma.ArtistWhereInput[] = [];
 
   if (!deleted) {
-    and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
+    and.push(artistWhere.notDeleted);
   }
   if (published === true) {
     and.push({ publishedOn: { not: null } });
   } else if (published === false) {
-    and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
+    and.push(artistWhere.unpublished);
   }
   if (search) {
     and.push(...buildTokenSearch(search, nameFieldClauses));
@@ -419,14 +420,14 @@ const buildListedWhere = (search: string | undefined): Prisma.ArtistWhereInput =
         { genres: containsToken(token) },
         {
           releases: {
-            some: { release: { title: containsToken(token), ...listedReleaseWhere } },
+            some: { release: { title: containsToken(token), ...releaseWhere.listed } },
           },
         },
       ])
     : [];
   return {
     ...publicArtistWhere,
-    releases: { some: { release: listedReleaseWhere } },
+    releases: { some: { release: releaseWhere.listed } },
     ...(tokenSearch.length > 0 && { AND: tokenSearch }),
   };
 };
@@ -498,14 +499,12 @@ export class ArtistRepository {
    * Published and unpublished artists both count: the suggestions serve the
    * admin form, where an unpublished artist's genres are just as real.
    *
-   * The soft-delete filter is the unset-safe `notDeletedOr`, never a bare
-   * `deletedOn: null` — rows written before the column existed have no
-   * `deletedOn` at all and a bare null misses them (the Prisma/Mongo null
-   * filter quirk every other query in this file guards against).
+   * Rows written before the column existed have no `deletedOn` at all, which
+   * is why the filter is the null-safe fragment.
    */
   static async listVocabularySource(field: ArtistVocabularyField): Promise<string[]> {
     const rows = await prisma.artist.findMany({
-      where: { OR: [...notDeletedOr] },
+      where: artistWhere.notDeleted,
       select: vocabularySelect(field),
     });
 
@@ -582,15 +581,18 @@ export class ArtistRepository {
     }) as Promise<Artist[]>;
   }
 
-  /** Count artists matching an optional published filter (admin dashboard). */
+  /**
+   * Count artists matching an optional published filter (admin dashboard).
+   * Soft-deleted artists never count — the trash view has its own list.
+   */
   static async count(filters: ArtistCountFilters = {}): Promise<number> {
-    const where: Prisma.ArtistWhereInput =
-      filters.published === true
-        ? { publishedOn: { not: null } }
-        : filters.published === false
-          ? { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }
-          : {};
-    return prisma.artist.count({ where });
+    const and: Prisma.ArtistWhereInput[] = [artistWhere.notDeleted];
+    if (filters.published === true) {
+      and.push({ publishedOn: { not: null } });
+    } else if (filters.published === false) {
+      and.push(artistWhere.unpublished);
+    }
+    return prisma.artist.count({ where: { AND: and } });
   }
 
   /** Update an artist by id, returning the full admin payload. */
@@ -695,7 +697,7 @@ export class ArtistRepository {
    */
   static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
     return prisma.artist.findFirst({
-      where: { slug, OR: [...notDeletedOr] },
+      where: { slug, ...artistWhere.notDeleted },
       select: nameSelect,
     }) as Promise<ArtistNameRecord | null>;
   }
@@ -705,7 +707,7 @@ export class ArtistRepository {
     return prisma.artist.findFirst({
       where: {
         displayName: { equals: displayName, mode: 'insensitive' },
-        OR: [...notDeletedOr],
+        ...artistWhere.notDeleted,
       },
       select: nameSelect,
     }) as Promise<ArtistNameRecord | null>;
@@ -722,7 +724,7 @@ export class ArtistRepository {
           { firstName: { equals: firstName, mode: 'insensitive' } },
           { surname: { equals: surname, mode: 'insensitive' } },
         ],
-        OR: [...notDeletedOr],
+        ...artistWhere.notDeleted,
       },
       select: nameSelect,
     }) as Promise<ArtistNameRecord | null>;
