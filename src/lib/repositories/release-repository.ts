@@ -21,6 +21,8 @@ import type {
 } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
+import { isPresent } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -286,12 +288,10 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
   const and: Prisma.ReleaseWhereInput[] = [];
 
   if (!deleted) {
-    and.push({ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] });
+    and.push(releaseWhere.notDeleted);
   }
-  if (published === true) {
-    and.push({ publishedAt: { not: null } });
-  } else if (published === false) {
-    and.push({ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] });
+  if (published !== undefined) {
+    and.push(releasePublishedFilter(published));
   }
   if (search) {
     and.push({
@@ -324,9 +324,9 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
 const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
   const contains = containsInsensitive(search ?? '');
   return {
-    publishedAt: { not: null },
+    ...isPresent('publishedAt'),
     AND: [
-      { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+      releaseWhere.notDeleted,
       ...(search
         ? [
             {
@@ -413,15 +413,16 @@ export class ReleaseRepository {
     }) as Promise<ReleaseListItem[]>;
   }
 
-  /** Count releases matching an optional published filter (admin dashboard). */
+  /**
+   * Count releases matching an optional published filter (admin dashboard).
+   * Soft-deleted releases never count — the trash view has its own list.
+   */
   static async count(filters: ReleaseCountFilters = {}): Promise<number> {
-    const where: Prisma.ReleaseWhereInput =
-      filters.published === true
-        ? { publishedAt: { not: null } }
-        : filters.published === false
-          ? { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }
-          : {};
-    return prisma.release.count({ where });
+    const and: Prisma.ReleaseWhereInput[] = [releaseWhere.notDeleted];
+    if (filters.published !== undefined) {
+      and.push(releasePublishedFilter(filters.published));
+    }
+    return prisma.release.count({ where: { AND: and } });
   }
 
   /**
@@ -549,11 +550,7 @@ export class ReleaseRepository {
    */
   static async findPublishedWithTracks(id: string): Promise<PublishedReleaseDetail | null> {
     return prisma.release.findFirst({
-      where: {
-        id,
-        publishedAt: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-      },
+      where: { id, ...releaseWhere.listed },
       include: publishedReleaseDetailInclude,
     }) as Promise<PublishedReleaseDetail | null>;
   }
@@ -572,8 +569,7 @@ export class ReleaseRepository {
       where: {
         artistReleases: { some: { artistId, artist: { is: publicArtistWhere } } },
         id: { not: excludeReleaseId },
-        publishedAt: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        ...releaseWhere.listed,
       },
       orderBy: { releasedOn: 'desc' },
       include: releaseCarouselInclude,
@@ -590,8 +586,7 @@ export class ReleaseRepository {
     return prisma.release.findMany({
       where: {
         artistReleases: { some: { artistId } },
-        publishedAt: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        ...releaseWhere.listed,
       },
       orderBy: { releasedOn: 'desc' },
       select: { id: true, title: true },
@@ -610,8 +605,7 @@ export class ReleaseRepository {
     const releases = await prisma.release.findMany({
       where: {
         artistReleases: { some: { artistId } },
-        publishedAt: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+        ...releaseWhere.listed,
       },
       orderBy: { releasedOn: 'desc' },
       select: releaseCoverSourceSelect,
@@ -651,12 +645,12 @@ export class ReleaseRepository {
   }
 
   /**
-   * Fetch the title of a published release by id. Returns null when the
-   * release is missing or unpublished.
+   * Fetch the title of a listed release by id. Returns null when the release
+   * is missing, unpublished, or soft-deleted.
    */
   static async findPublishedTitleById(id: string): Promise<{ id: string; title: string } | null> {
     return prisma.release.findFirst({
-      where: { id, publishedAt: { not: null } },
+      where: { id, ...releaseWhere.listed },
       select: { id: true, title: true },
     });
   }
