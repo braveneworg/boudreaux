@@ -85,4 +85,65 @@ describe('digitalFormatWhere (Docker Mongo contract)', () => {
       expectTypes((storage) => storage === 'set')
     );
   });
+
+  describe('hasFiles', () => {
+    // Its own release (tests run shuffled, so the storage rows above must
+    // stay untouched): a legacy fileName stored each way with no track files,
+    // and one row with no fileName but one track file.
+    let fileReleaseId = '';
+
+    beforeAll(async () => {
+      const release = await prisma.release.create({
+        data: {
+          title: `${prefix}files`,
+          releasedOn: SET_AT,
+          coverArt: 'https://cdn.example.com/contract.webp',
+        },
+        select: { id: true },
+      });
+      fileReleaseId = release.id;
+      await prisma.releaseDigitalFormat.create({
+        data: { releaseId: fileReleaseId, formatType: 'fileName=absent' },
+      });
+      await prisma.releaseDigitalFormat.create({
+        data: { releaseId: fileReleaseId, formatType: 'fileName=null', fileName: null },
+      });
+      await prisma.releaseDigitalFormat.create({
+        data: { releaseId: fileReleaseId, formatType: 'fileName=set', fileName: 'album.zip' },
+      });
+      await prisma.releaseDigitalFormat.create({
+        data: {
+          releaseId: fileReleaseId,
+          formatType: 'files=one',
+          files: {
+            create: {
+              trackNumber: 1,
+              s3Key: `${prefix}track.mp3`,
+              fileName: '01.mp3',
+              fileSize: 1,
+              mimeType: 'audio/mpeg',
+            },
+          },
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.releaseDigitalFormatFile.deleteMany({
+        where: { format: { releaseId: fileReleaseId } },
+      });
+      await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: fileReleaseId } });
+    });
+
+    it('matches a legacy fileName or a track file, never an absent or null fileName alone', async () => {
+      const rows = await prisma.releaseDigitalFormat.findMany({
+        where: { releaseId: fileReleaseId, AND: [digitalFormatWhere.hasFiles] },
+        select: { formatType: true },
+      });
+      expect(rows.map(({ formatType }) => formatType).sort()).toEqual([
+        'fileName=set',
+        'files=one',
+      ]);
+    });
+  });
 });

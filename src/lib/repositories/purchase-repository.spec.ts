@@ -4,6 +4,10 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { publicArtistWhere } from './_internal/artist-where';
+import { digitalFormatWhere } from './_internal/digital-format-where';
+import { purchaseWhere } from './_internal/purchase-where';
+import { allOf } from './_internal/where-kit';
 import { PurchaseRepository } from './purchase-repository';
 
 vi.mock('server-only', () => ({}));
@@ -110,7 +114,7 @@ describe('PurchaseRepository', () => {
         where: {
           userId: 'user-123',
           releaseId: 'release-abc',
-          OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+          ...purchaseWhere.active,
         },
       });
       expect(result).toEqual(mockRecord);
@@ -225,12 +229,7 @@ describe('PurchaseRepository', () => {
         include: { release: { select: { artistReleases: { where: unknown } } } };
       };
       expect(args.include.release.select.artistReleases.where).toEqual({
-        artist: {
-          is: {
-            publishedOn: { not: null },
-            OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-          },
-        },
+        artist: { is: publicArtistWhere },
       });
     });
 
@@ -255,18 +254,7 @@ describe('PurchaseRepository', () => {
             release: expect.objectContaining({
               select: expect.objectContaining({
                 digitalFormats: expect.objectContaining({
-                  where: expect.objectContaining({
-                    AND: expect.arrayContaining([
-                      expect.objectContaining({
-                        OR: expect.arrayContaining([
-                          { files: { some: {} } },
-                          expect.objectContaining({
-                            AND: expect.arrayContaining([{ fileName: { not: null } }]),
-                          }),
-                        ]),
-                      }),
-                    ]),
-                  }),
+                  where: allOf(digitalFormatWhere.active, digitalFormatWhere.hasFiles),
                   select: expect.objectContaining({
                     formatType: true,
                     fileName: true,
@@ -362,7 +350,7 @@ describe('PurchaseRepository', () => {
       expect(prisma.releasePurchase.updateMany).toHaveBeenCalledWith({
         where: {
           stripePaymentIntentId: 'pi_test_123',
-          OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+          ...purchaseWhere.active,
         },
         data: { refundedAt: expect.any(Date) },
       });

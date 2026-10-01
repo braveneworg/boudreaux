@@ -6,6 +6,9 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { digitalFormatWhere } from './_internal/digital-format-where';
+import { purchaseWhere } from './_internal/purchase-where';
+import { allOf } from './_internal/where-kit';
 
 interface CreatePurchaseData {
   userId: string;
@@ -56,7 +59,7 @@ export class PurchaseRepository {
       where: {
         userId,
         releaseId,
-        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
+        ...purchaseWhere.active,
       },
     });
   }
@@ -153,19 +156,7 @@ export class PurchaseRepository {
               },
             },
             digitalFormats: {
-              where: {
-                AND: [
-                  { OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }] },
-                  {
-                    OR: [
-                      { files: { some: {} } },
-                      {
-                        AND: [{ fileName: { not: null } }, { fileName: { isSet: true } }],
-                      },
-                    ],
-                  },
-                ],
-              },
+              where: allOf(digitalFormatWhere.active, digitalFormatWhere.hasFiles),
               select: {
                 formatType: true,
                 fileName: true,
@@ -230,15 +221,12 @@ export class PurchaseRepository {
 
   /**
    * Mark a purchase as refunded by its Stripe PaymentIntent ID.
-   * Uses updateMany with a `refundedAt: null` filter for idempotency —
+   * Uses updateMany filtered to active purchases for idempotency —
    * duplicate webhook deliveries for the same charge are no-ops.
    */
   static async markRefunded(paymentIntentId: string): Promise<boolean> {
     const result = await prisma.releasePurchase.updateMany({
-      where: {
-        stripePaymentIntentId: paymentIntentId,
-        OR: [{ refundedAt: null }, { refundedAt: { isSet: false } }],
-      },
+      where: { stripePaymentIntentId: paymentIntentId, ...purchaseWhere.active },
       data: { refundedAt: new Date() },
     });
     return result.count > 0;
