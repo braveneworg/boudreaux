@@ -9,6 +9,7 @@ import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ArtistSearchBioImage, ArtistSearchMatch } from '@/lib/types/domain/artist';
+import { isListable } from '@/lib/utils/artist-release-credits';
 import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
@@ -36,9 +37,7 @@ const firstDisplayImageSrc = (bioImages: ArtistSearchBioImage[]): string | null 
 };
 
 const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResult => {
-  const releases = artist.releases
-    .map(({ release }) => release)
-    .filter((r) => r.publishedAt != null && r.deletedOn == null);
+  const releases = artist.releases.map(({ release }) => release).filter(isListable);
   return {
     artistSlug: artist.slug,
     artistName: getArtistDisplayName(artist),

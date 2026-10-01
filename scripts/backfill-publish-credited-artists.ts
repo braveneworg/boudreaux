@@ -49,6 +49,7 @@ import {
   hiddenCreditSelect,
 } from '../src/lib/repositories/_internal/artist-where';
 import { releaseWhere } from '../src/lib/repositories/_internal/release-where';
+import { isListable } from '../src/lib/utils/artist-release-credits';
 import {
   toCreditAwaitingConfirmation,
   toCreditThatStaysHidden,
@@ -91,8 +92,7 @@ interface CreditedReleaseRow {
   release: { title: string; publishedAt: Date | null; deletedOn: Date | null };
 }
 
-const isListed = ({ release }: CreditedReleaseRow): boolean =>
-  release.publishedAt != null && release.deletedOn == null;
+const isListed = ({ release }: CreditedReleaseRow): boolean => isListable(release);
 
 const byName = (a: { name: string }, b: { name: string }): number =>
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
