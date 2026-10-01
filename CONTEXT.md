@@ -158,6 +158,48 @@ publishing cannot make public: deleted.
 Reported to the admin with the reason; never blocks a publish and is never
 changed by one.
 
+**digital format** — one downloadable encoding of a Release (`MP3_320KBPS`,
+`AAC`, `FLAC`, …) with its track files. The **free formats** are the
+encodings the **free tier** may take; every other format needs
+**entitlement**. See
+[ADR-0018](docs/adr/0018-download-entitlement-is-decided-by-one-gate.md).
+
+**withdrawn format** — a **digital format** an admin has soft-deleted. The
+**free tier** never gets it; an entitled **download subject** may still
+download it until it is hard-deleted, when its files are gone for good.
+_Avoid_: deleted format (ambiguous with hard delete).
+
+**download subject** — who is downloading: a signed-in User, or a **guest**
+identified by a visitor cookie together with a browser fingerprint. Every
+download rule is keyed on the subject.
+_Avoid_: visitor (one half of a guest identity), customer.
+
+**entitlement** — whether a **download subject** holds a non-refunded purchase
+of a Release. A refund revokes it. Entitlement decides which rules apply to a
+download, never which formats exist.
+_Avoid_: access, has purchased (as a synonym for the unrefunded check).
+
+**free tier** — the download rules for a **download subject** without
+**entitlement**: the **free formats** only, the **lifetime cap** (a signed-in
+user may take five distinct Releases free, ever; a guest has no lifetime cap)
+and the **free throttle** (any subject may download one Release three times
+per rolling 24 hours). See
+[ADR-0018](docs/adr/0018-download-entitlement-is-decided-by-one-gate.md).
+_Avoid_: freemium, quota.
+
+**purchase throttle** — the re-download rule for an entitled **download
+subject**: five downloads per Release, resetting after six idle hours. More
+generous than the **free throttle** by design.
+_Avoid_: download limit.
+
+**download gate** — the one decision "may this **download subject** download
+these **digital formats** of this Release", and the charge against the
+matching cap or throttle, made only once the file to deliver exists. A failed
+download is recorded with its reason and charges nothing. See
+[ADR-0018](docs/adr/0018-download-entitlement-is-decided-by-one-gate.md).
+_Avoid_: download authorization, quota enforcement (two of the four modules it
+replaced).
+
 **Video** — an uploaded video asset with **probe** metadata (technical fields
 extracted by ffprobe), a **description**, and **enrichment** (externally
 sourced facts such as release date; available to any category once the video
