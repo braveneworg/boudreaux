@@ -25,6 +25,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 const { UserRepository } = await import('./user-repository');
+const { userWhere } = await import('./_internal/user-where');
 
 /** The full include shape the repository attaches to whole-user reads/writes. */
 const fullInclude = { accounts: true, sessions: true };
@@ -238,16 +239,13 @@ describe('UserRepository', () => {
   });
 
   describe('findSmsOptedInUsers', () => {
-    it('queries users with allowSmsNotifications true and all three phone clauses', async () => {
+    it('queries users who opted in and are reachable by phone', async () => {
       const rows = [{ id: 'u1', phone: '+15550001234' }];
       findManyMock.mockResolvedValue(rows);
 
       await expect(UserRepository.findSmsOptedInUsers()).resolves.toBe(rows);
       expect(findManyMock).toHaveBeenCalledWith({
-        where: {
-          allowSmsNotifications: true,
-          AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
-        },
+        where: userWhere.smsReachable,
         select: { id: true, phone: true },
       });
     });
@@ -259,10 +257,7 @@ describe('UserRepository', () => {
 
       await expect(UserRepository.countSmsOptedIn()).resolves.toBe(42);
       expect(countMock).toHaveBeenCalledWith({
-        where: {
-          allowSmsNotifications: true,
-          AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
-        },
+        where: userWhere.smsReachable,
       });
     });
   });

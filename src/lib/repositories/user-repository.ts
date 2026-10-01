@@ -16,6 +16,8 @@ import type {
   UserUsernameRecord,
 } from '@/lib/types/domain/user';
 
+import { userWhere } from './_internal/user-where';
+
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -40,12 +42,6 @@ const _userDrift: _UserDrift = true;
 
 /** Build a Prisma create payload from domain create data. */
 const toPrismaCreate = (data: CreateUserData): Prisma.UserCreateInput => ({ ...data });
-
-/** Opted-in AND phone set, non-null, non-empty. Mongo: absent fields need isSet. */
-const smsOptedInWhere = {
-  allowSmsNotifications: true,
-  AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
-} as const satisfies Prisma.UserWhereInput;
 
 /**
  * Data-access layer for the User model. The only layer that touches Prisma for
@@ -197,7 +193,7 @@ export class UserRepository {
    */
   static async findSmsOptedInUsers(): Promise<UserSmsRecipientRecord[]> {
     return prisma.user.findMany({
-      where: smsOptedInWhere,
+      where: userWhere.smsReachable,
       select: { id: true, phone: true },
     });
   }
@@ -207,6 +203,6 @@ export class UserRepository {
    * Used by the admin UI to show the estimated recipient count before sending.
    */
   static async countSmsOptedIn(): Promise<number> {
-    return prisma.user.count({ where: smsOptedInWhere });
+    return prisma.user.count({ where: userWhere.smsReachable });
   }
 }
