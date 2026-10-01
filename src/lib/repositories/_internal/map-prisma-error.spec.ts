@@ -94,6 +94,12 @@ describe('toDataError', () => {
 
     expect(toDataError(original).cause).toBe(original);
   });
+
+  it('returns a DataError unchanged instead of re-wrapping it as UNKNOWN', () => {
+    const already = new DataError('NOT_FOUND', 'Playlist not found');
+
+    expect(toDataError(already)).toBe(already);
+  });
 });
 
 describe('runQuery', () => {

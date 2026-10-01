@@ -38,6 +38,12 @@ const isTimeout = (error: unknown): boolean =>
  * need to import Prisma to interpret failures.
  */
 export const toDataError = (error: unknown): DataError => {
+  // Already translated — a repository raising its own business-rule failure
+  // inside a query must not be re-wrapped as UNKNOWN.
+  if (error instanceof DataError) {
+    return error;
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return new DataError(KNOWN_REQUEST_CODE.get(error.code) ?? 'UNKNOWN', error.message, error);
   }

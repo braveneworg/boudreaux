@@ -5,12 +5,18 @@ import 'server-only';
 
 import { PrismaClient } from '@prisma/client';
 
+import { createDataErrorExtension } from '@/lib/repositories/_internal/data-error-extension';
 import { createSlowQueryExtension } from '@/lib/utils/slow-query-extension';
 
+// Slow-query logging sits closest to the driver so it times the raw query;
+// DataError translation wraps it so every failure leaves the client as a
+// `DataError` (ADR-0001) — repositories no longer wrap calls themselves.
 const createPrismaClient = () =>
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  }).$extends(createSlowQueryExtension());
+  })
+    .$extends(createSlowQueryExtension())
+    .$extends(createDataErrorExtension());
 
 type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 
