@@ -6,8 +6,8 @@
 import 'server-only';
 import { headers } from 'next/headers';
 
-import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
 import { PurchaseService } from '@/lib/services/purchase-service';
 import { rateLimit } from '@/lib/utils/rate-limit';
 
@@ -58,14 +58,17 @@ export const checkGuestPurchaseAction = async (
     return { hasPurchase: false, downloadCount: 0, atCap: false, resetInHours: null };
   }
 
-  const access = await PurchaseService.getDownloadAccess(
-    { kind: 'user', userId: user.id },
-    releaseId
-  );
-  return {
-    hasPurchase: true,
-    downloadCount: access.downloadCount,
-    atCap: access.downloadCount >= MAX_RELEASE_DOWNLOAD_COUNT,
-    resetInHours: access.resetInHours,
-  };
+  // The purchase throttle is the gate's to read (ADR-0018): at the cap means
+  // the count is full AND the idle window has not passed.
+  const status = await downloadGate.status({ kind: 'user', userId: user.id }, releaseId);
+  return purchaseThrottleStatus(status?.purchaseThrottle ?? null);
 };
+
+const purchaseThrottleStatus = (
+  throttle: { count: number; resetInHours: number | null } | null
+): GuestPurchaseStatus => ({
+  hasPurchase: true,
+  downloadCount: throttle?.count ?? 0,
+  atCap: throttle !== null && throttle.resetInHours !== null,
+  resetInHours: throttle?.resetInHours ?? null,
+});

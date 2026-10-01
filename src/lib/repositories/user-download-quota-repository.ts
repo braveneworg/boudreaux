@@ -51,18 +51,6 @@ export class UserDownloadQuotaRepository {
     return quota?.uniqueReleaseIds ?? [];
   }
 
-  async findOrCreateBySubject(subject: DownloadSubject): Promise<UserDownloadQuota> {
-    const existing = await prisma.userDownloadQuota.findUnique({
-      where: this.whereForSubject(subject),
-    });
-    if (existing) {
-      return existing;
-    }
-    return prisma.userDownloadQuota.create({
-      data: this.createDataForSubject(subject),
-    });
-  }
-
   /**
    * Atomically add a unique release ID to the subject's download quota.
    *
@@ -76,37 +64,5 @@ export class UserDownloadQuotaRepository {
       update: { uniqueReleaseIds: { push: releaseId } },
       create: { ...this.createDataForSubject(subject), uniqueReleaseIds: [releaseId] },
     });
-  }
-
-  /**
-   * Check if the subject has exceeded the freemium quota.
-   */
-  async checkQuotaExceeded(subject: DownloadSubject, maxQuota = 5): Promise<boolean> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds.length >= maxQuota;
-  }
-
-  /**
-   * Number of remaining free downloads for the subject.
-   */
-  async getRemainingQuota(subject: DownloadSubject, maxQuota = 5): Promise<number> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return Math.max(0, maxQuota - quota.uniqueReleaseIds.length);
-  }
-
-  /**
-   * Whether the subject has already counted the given release toward quota.
-   */
-  async hasDownloadedRelease(subject: DownloadSubject, releaseId: string): Promise<boolean> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds.includes(releaseId);
-  }
-
-  /**
-   * All release IDs the subject has consumed under the freemium quota.
-   */
-  async getDownloadedReleaseIds(subject: DownloadSubject): Promise<string[]> {
-    const quota = await this.findOrCreateBySubject(subject);
-    return quota.uniqueReleaseIds;
   }
 }

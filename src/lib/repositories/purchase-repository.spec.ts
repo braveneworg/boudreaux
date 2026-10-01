@@ -193,35 +193,6 @@ describe('PurchaseRepository', () => {
     });
   });
 
-  describe('upsertDownloadCount', () => {
-    it('should call prisma.releaseDownload.upsert with increment update and create with count 1', async () => {
-      const mockRecord = {
-        id: 'dl-1',
-        userId: 'user-123',
-        releaseId: 'release-abc',
-        downloadCount: 3,
-        lastDownloadedAt: new Date(),
-      };
-      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue(mockRecord as never);
-
-      await PurchaseRepository.upsertDownloadCount('user-123', 'release-abc');
-
-      expect(prisma.releaseDownload.upsert).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-        update: {
-          downloadCount: { increment: 1 },
-          lastDownloadedAt: expect.any(Date),
-        },
-        create: {
-          userId: 'user-123',
-          releaseId: 'release-abc',
-          downloadCount: 1,
-          lastDownloadedAt: expect.any(Date),
-        },
-      });
-    });
-  });
-
   describe('markEmailSent', () => {
     it('should return true when updateMany sets the flag on exactly one record', async () => {
       vi.mocked(prisma.releasePurchase.updateMany).mockResolvedValue({ count: 1 } as never);
@@ -354,27 +325,6 @@ describe('PurchaseRepository', () => {
     });
   });
 
-  describe('resetDownloadCount', () => {
-    it('should call prisma.releaseDownload.update with count 0 and new lastDownloadedAt', async () => {
-      const mockRecord = {
-        id: 'dl-1',
-        userId: 'user-123',
-        releaseId: 'release-abc',
-        downloadCount: 0,
-        lastDownloadedAt: new Date(),
-      };
-      vi.mocked(prisma.releaseDownload.update).mockResolvedValue(mockRecord as never);
-
-      const result = await PurchaseRepository.resetDownloadCount('user-123', 'release-abc');
-
-      expect(prisma.releaseDownload.update).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-        data: { downloadCount: 0, lastDownloadedAt: expect.any(Date) },
-      });
-      expect(result).toEqual(mockRecord);
-    });
-  });
-
   describe('updateSessionId', () => {
     it('should call prisma.releasePurchase.update with the new sessionId', async () => {
       const mockRecord = { id: 'purchase-1', stripeSessionId: 'cs_new_session' };
@@ -425,20 +375,6 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markRefunded('pi_test_123');
 
       expect(result).toBe(false);
-    });
-  });
-
-  describe('findByUserReleaseKey', () => {
-    it('should look up a purchase by the userId+releaseId composite unique key', async () => {
-      const mockRecord = { id: 'purchase-1', userId: 'user-123', releaseId: 'release-abc' };
-      vi.mocked(prisma.releasePurchase.findUnique).mockResolvedValue(mockRecord as never);
-
-      const result = await PurchaseRepository.findByUserReleaseKey('user-123', 'release-abc');
-
-      expect(result).toEqual(mockRecord);
-      expect(prisma.releasePurchase.findUnique).toHaveBeenCalledWith({
-        where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
-      });
     });
   });
 

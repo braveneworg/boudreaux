@@ -7,7 +7,7 @@ vi.mock('server-only', () => ({}));
 
 const mockFindUserByEmail = vi.fn();
 const mockCheckExistingPurchase = vi.fn();
-const mockGetDownloadAccess = vi.fn();
+const mockStatus = vi.fn();
 const mockHeaders = vi.fn();
 
 vi.mock('next/headers', () => ({
@@ -23,8 +23,10 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 vi.mock('@/lib/services/purchase-service', () => ({
   PurchaseService: {
     checkExistingPurchase: (...args: unknown[]) => mockCheckExistingPurchase(...args),
-    getDownloadAccess: (...args: unknown[]) => mockGetDownloadAccess(...args),
   },
+}));
+vi.mock('@/lib/services/download-gate/download-gate', () => ({
+  downloadGate: { status: (...args: unknown[]) => mockStatus(...args) },
 }));
 
 describe('checkGuestPurchaseAction', () => {
@@ -71,13 +73,13 @@ describe('checkGuestPurchaseAction', () => {
       resetInHours: null,
     });
     expect(mockCheckExistingPurchase).toHaveBeenCalledWith('user-123', 'release-1');
-    expect(mockGetDownloadAccess).not.toHaveBeenCalled();
+    expect(mockStatus).not.toHaveBeenCalled();
   });
 
   it('should return purchase status with download count when user has a purchase', async () => {
     mockFindUserByEmail.mockResolvedValue({ id: 'user-456' });
     mockCheckExistingPurchase.mockResolvedValue(true);
-    mockGetDownloadAccess.mockResolvedValue({ downloadCount: 2 });
+    mockStatus.mockResolvedValue({ purchaseThrottle: { count: 2, resetInHours: null } });
 
     const result = await checkGuestPurchaseAction('buyer@example.com', 'release-2');
 
@@ -85,17 +87,15 @@ describe('checkGuestPurchaseAction', () => {
       hasPurchase: true,
       downloadCount: 2,
       atCap: false,
+      resetInHours: null,
     });
-    expect(mockGetDownloadAccess).toHaveBeenCalledWith(
-      { kind: 'user', userId: 'user-456' },
-      'release-2'
-    );
+    expect(mockStatus.mock.calls).toEqual([[{ kind: 'user', userId: 'user-456' }, 'release-2']]);
   });
 
   it('should return atCap=true when download count reaches the maximum', async () => {
     mockFindUserByEmail.mockResolvedValue({ id: 'user-789' });
     mockCheckExistingPurchase.mockResolvedValue(true);
-    mockGetDownloadAccess.mockResolvedValue({ downloadCount: 5 });
+    mockStatus.mockResolvedValue({ purchaseThrottle: { count: 5, resetInHours: 4 } });
 
     const result = await checkGuestPurchaseAction('capped@example.com', 'release-3');
 
@@ -103,20 +103,22 @@ describe('checkGuestPurchaseAction', () => {
       hasPurchase: true,
       downloadCount: 5,
       atCap: true,
+      resetInHours: 4,
     });
   });
 
-  it('should return atCap=true when download count exceeds the maximum', async () => {
+  it('is not at cap once the idle window has passed, whatever the count says', async () => {
     mockFindUserByEmail.mockResolvedValue({ id: 'user-over' });
     mockCheckExistingPurchase.mockResolvedValue(true);
-    mockGetDownloadAccess.mockResolvedValue({ downloadCount: 7 });
+    mockStatus.mockResolvedValue({ purchaseThrottle: { count: 7, resetInHours: null } });
 
     const result = await checkGuestPurchaseAction('over@example.com', 'release-4');
 
     expect(result).toEqual({
       hasPurchase: true,
       downloadCount: 7,
-      atCap: true,
+      atCap: false,
+      resetInHours: null,
     });
   });
 
