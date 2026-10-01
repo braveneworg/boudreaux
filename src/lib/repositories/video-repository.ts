@@ -16,6 +16,7 @@ import type {
 import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 
 import { runQuery } from './_internal/map-prisma-error';
+import { videoLiveAt, videoWhere } from './_internal/video-where';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -60,36 +61,27 @@ const toPrismaJson = (value: unknown): Prisma.InputJsonValue | null =>
 
 const containsInsensitive = (value: string) => ({ contains: value, mode: 'insensitive' as const });
 
-/** Clause matching videos whose publish date has arrived (public visibility). */
-const publishedVisibleClause = (now: Date): Prisma.VideoWhereInput => ({
-  publishedAt: { not: null, lte: now },
-});
-
 /**
  * Build the admin-listing `where` from domain filters. The archived, published,
- * and search clauses are combined under `AND` so their `OR` keys never collide
- * (Prisma 6 + MongoDB null-safe pattern). `archived` absent/false excludes
- * archived rows (null-safe OR); `archived: true` is an exclusive archived-only
- * view. `published` true/false narrows to published/unpublished (presence-based,
- * admin toggle — a scheduled video is "published" here even if not yet visible);
- * null/absent adds no publish clause. When `visibleAt` is supplied instead, uses
- * the visibility clause (`publishedAt <= visibleAt`) for the three public reads.
+ * and search clauses are combined under `AND` so their `OR` keys never collide.
+ * `archived` absent/false excludes archived rows; `archived: true` is an
+ * exclusive archived-only view. `published` true/false narrows to
+ * published/draft — the admin toggle, where a scheduled video counts as
+ * published even before it is live; null/absent adds no publish clause. When
+ * `visibleAt` is supplied instead, the public reads take only the videos live
+ * at that moment.
  */
 const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
   const { search, published, archived, visibleAt } = filters;
   const and: Prisma.VideoWhereInput[] = [];
 
-  if (archived) {
-    and.push({ archivedAt: { not: null } });
-  } else {
-    and.push({ OR: [{ archivedAt: null }, { archivedAt: { isSet: false } }] });
-  }
+  and.push(archived ? videoWhere.archived : videoWhere.notArchived);
   if (visibleAt) {
-    and.push(publishedVisibleClause(visibleAt));
+    and.push(videoLiveAt(visibleAt));
   } else if (published === true) {
-    and.push({ publishedAt: { not: null } });
+    and.push(videoWhere.published);
   } else if (published === false) {
-    and.push({ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] });
+    and.push(videoWhere.draft);
   }
   if (search) {
     and.push({
@@ -234,16 +226,16 @@ export class VideoRepository {
 
   /**
    * Count videos matching an optional published filter (admin dashboard).
-   * `published: true` counts only published and visible (publishedAt ≤ now)
-   * videos — a scheduled video whose publish date has not yet arrived counts
-   * toward the draft side (total − published) instead.
+   * `published: true` counts only the videos live now — a scheduled video
+   * counts toward the draft side (total − published) instead; `published:
+   * false` counts drafts alone.
    */
   static async count(filters: VideoCountFilters = {}): Promise<number> {
     const where: Prisma.VideoWhereInput =
       filters.published === true
-        ? publishedVisibleClause(new Date())
+        ? videoLiveAt(new Date())
         : filters.published === false
-          ? { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }
+          ? videoWhere.draft
           : {};
     return prisma.video.count({ where });
   }

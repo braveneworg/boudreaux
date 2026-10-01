@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
+import { videoLiveAt, videoWhere } from './_internal/video-where';
 import { VideoRepository, type VideoSummary } from './video-repository';
 
 vi.mock('server-only', () => ({}));
@@ -46,9 +47,10 @@ describe('VideoRepository', () => {
     mimeType: 'video/mp4',
   };
 
-  // The Mongo null-safe exclusions pushed by the where builder.
-  const notArchived = { OR: [{ archivedAt: null }, { archivedAt: { isSet: false } }] };
-  const notPublished = { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] };
+  // The fragments the where builder composes; their Mongo shape is the
+  // fragment module's contract, not this spec's.
+  const notArchived = videoWhere.notArchived;
+  const notPublished = videoWhere.draft;
   const contains = (value: string) => ({ contains: value, mode: 'insensitive' });
 
   describe('create', () => {
@@ -118,7 +120,7 @@ describe('VideoRepository', () => {
       await VideoRepository.findMany({ archived: true });
 
       const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({ AND: [{ archivedAt: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [videoWhere.archived] });
     });
 
     it('filters to published videos when published=true', async () => {
@@ -127,7 +129,7 @@ describe('VideoRepository', () => {
       await VideoRepository.findMany({ published: true });
 
       const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({ AND: [notArchived, { publishedAt: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [notArchived, videoWhere.published] });
     });
 
     it('filters to unpublished videos when published=false', async () => {
@@ -205,7 +207,7 @@ describe('VideoRepository', () => {
 
       expect(result).toEqual([mockVideo]);
       expect(prisma.video.findMany).toHaveBeenCalledWith({
-        where: { AND: [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }] },
+        where: { AND: [notArchived, videoLiveAt(expect.any(Date) as Date)] },
         orderBy: { releasedOn: 'desc' },
         skip: 0,
         take: 5,
@@ -230,7 +232,7 @@ describe('VideoRepository', () => {
 
       const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
       expect(arg?.where).toEqual({
-        AND: [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }],
+        AND: [notArchived, videoLiveAt(expect.any(Date) as Date)],
         OR: [
           { title: { contains: 'basement', mode: 'insensitive' } },
           { artist: { contains: 'basement', mode: 'insensitive' } },
@@ -245,7 +247,7 @@ describe('VideoRepository', () => {
 
       const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
       expect(arg?.where).toEqual({
-        AND: [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }],
+        AND: [notArchived, videoLiveAt(expect.any(Date) as Date)],
       });
     });
   });
@@ -263,7 +265,7 @@ describe('VideoRepository', () => {
   // The published + non-archived clauses for public visibility (publishedAt <= now).
   // We use `expect.any(Date)` for the `lte` bound since `new Date()` is called inside
   // the repository and cannot be pinned to an exact instant from outside.
-  const publishedVisible = [notArchived, { publishedAt: { not: null, lte: expect.any(Date) } }];
+  const publishedVisible = [notArchived, videoLiveAt(expect.any(Date) as Date)];
 
   const mockSummary: VideoSummary = {
     id: 'video-123',
@@ -360,7 +362,7 @@ describe('VideoRepository', () => {
       await VideoRepository.count({ published: true });
 
       expect(prisma.video.count).toHaveBeenCalledWith({
-        where: { publishedAt: { not: null, lte: expect.any(Date) } },
+        where: videoLiveAt(expect.any(Date) as Date),
       });
     });
 
@@ -404,8 +406,8 @@ describe('VideoRepository', () => {
       const publishedClause = (arg?.where as { AND: { publishedAt?: unknown }[] }).AND.find(
         (c) => c.publishedAt !== undefined
       );
-      // Presence-based: { publishedAt: { not: null } } — no lte bound.
-      expect(publishedClause).toEqual({ publishedAt: { not: null } });
+      // The admin toggle: dated (scheduled ∪ live), not live-at-now.
+      expect(publishedClause).toEqual(videoWhere.published);
     });
   });
 

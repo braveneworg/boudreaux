@@ -1,13 +1,21 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { allOf, isPresent, isUnset } from './where-kit';
+import { allOf, isPresent, isUnset, isUnsetOr } from './where-kit';
 
 describe('where-kit', () => {
   describe('isUnset', () => {
     it('matches both an explicit null and an absent field', () => {
       expect(isUnset('deletedOn')).toEqual({
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      });
+    });
+  });
+
+  describe('isUnsetOr', () => {
+    it('reads an unset field as the given value: the value, null, or absent all match', () => {
+      expect(isUnsetOr('reference', true)).toEqual({
+        OR: [{ reference: true }, { reference: null }, { reference: { isSet: false } }],
       });
     });
   });

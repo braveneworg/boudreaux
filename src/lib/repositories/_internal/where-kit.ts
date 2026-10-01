@@ -25,6 +25,10 @@ type UnsetClause<F extends string> = {
   OR: [Record<F, null>, Record<F, { isSet: false }>];
 };
 
+type UnsetOrClause<F extends string, V> = {
+  OR: [Record<F, V>, Record<F, null>, Record<F, { isSet: false }>];
+};
+
 type PresentClause<F extends string> = Record<F, { not: null }>;
 
 /** "Never set": the field is `null` or absent from the document. */
@@ -32,6 +36,17 @@ export const isUnset = <F extends string>(field: F): UnsetClause<F> =>
   ({
     OR: [{ [field]: null }, { [field]: { isSet: false } }],
   }) as UnsetClause<F>;
+
+/**
+ * A tri-value field read with a default: rows where `field` holds `value`,
+ * plus the rows where it is null or absent, which legacy documents written
+ * before the field existed are read as. `isUnsetOr('reference', true)` is
+ * "plays the reference role unless explicitly opted out".
+ */
+export const isUnsetOr = <F extends string, V>(field: F, value: V): UnsetOrClause<F, V> =>
+  ({
+    OR: [{ [field]: value }, { [field]: null }, { [field]: { isSet: false } }],
+  }) as UnsetOrClause<F, V>;
 
 /** "Set": the field holds a non-null value. */
 export const isPresent = <F extends string>(field: F): PresentClause<F> =>

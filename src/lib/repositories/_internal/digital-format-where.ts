@@ -17,4 +17,10 @@ export const digitalFormatWhere = {
 
   /** Withdrawn: soft-deleted — `deletedAt` holds a date. */
   withdrawn: isPresent('deletedAt'),
+  /**
+   * Has something to download: at least one track file, or a legacy
+   * single-file `fileName`. `{ not: null }` alone excludes an absent
+   * `fileName` on Mongo, so no `isSet` guard is needed beside it.
+   */
+  hasFiles: { OR: [{ files: { some: {} } }, isPresent('fileName')] },
 } as const satisfies Record<string, Prisma.ReleaseDigitalFormatWhereInput>;

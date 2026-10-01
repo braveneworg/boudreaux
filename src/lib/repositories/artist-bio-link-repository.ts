@@ -7,19 +7,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { ArtistBioLinkRecord, CreateArtistBioLinkData } from '@/lib/types/domain/artist';
 
-import type { Prisma } from '@prisma/client';
-
-/**
- * Prisma filter selecting rows that play the bio *reference* role. Legacy
- * documents predate the `reference` field, so `null` and absent (`isSet: false`
- * — a Mongo-only quirk: `{ reference: null }` does not match a missing field)
- * both read as reference links; only an explicit `false` (an image-source-only
- * row) is excluded.
- */
-export const referenceLinkWhere: Prisma.ArtistBioLinkWhereInput = {
-  OR: [{ reference: true }, { reference: null }, { reference: { isSet: false } }],
-};
-
 /**
  * Data access for `ArtistBioLink` rows — the reference links discovered during
  * AI bio generation or authored by an admin. A child collection of the `Artist`

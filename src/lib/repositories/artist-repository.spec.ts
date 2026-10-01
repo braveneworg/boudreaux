@@ -10,6 +10,7 @@ import {
 } from '@/lib/types/domain/artist';
 
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { releaseWhere } from './_internal/release-where';
 import { ArtistRepository } from './artist-repository';
 
@@ -1262,7 +1263,7 @@ describe('ArtistRepository', () => {
       });
     });
 
-    it('deletes only generated and legacy rows (Mongo isSet quirk is the contract)', async () => {
+    it('deletes only generated and legacy rows (the fragment carries the Mongo contract)', async () => {
       const tx = buildTx({});
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
 
@@ -1270,7 +1271,7 @@ describe('ArtistRepository', () => {
 
       const legacyOr = {
         artistId: 'a1',
-        OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
+        ...bioMediaWhere.generatedOrLegacy,
       };
       expect(tx.artistBioImage.deleteMany).toHaveBeenCalledWith({ where: legacyOr });
       expect(tx.artistBioLink.deleteMany).toHaveBeenCalledWith({ where: legacyOr });
@@ -1696,7 +1697,7 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findUnique).mock.calls[0][0];
       expect(arg?.select?.bioLinks).toMatchObject({
-        where: { OR: [{ reference: true }, { reference: null }, { reference: { isSet: false } }] },
+        where: bioLinkWhere.reference,
       });
     });
 

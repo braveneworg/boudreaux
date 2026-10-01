@@ -13,6 +13,7 @@ import type {
 } from '@/lib/types/domain/featured-artist';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -124,9 +125,9 @@ const buildListWhere = (filters: FeaturedArtistListFilters): Prisma.FeaturedArti
   const and: Prisma.FeaturedArtistWhereInput[] = [];
 
   if (published === true) {
-    and.push({ publishedOn: { not: null } });
+    and.push(featuredArtistWhere.published);
   } else if (published === false) {
-    and.push({ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] });
+    and.push(featuredArtistWhere.unpublished);
   }
   if (search) {
     and.push({
@@ -164,15 +165,8 @@ export class FeaturedArtistRepository {
   static async findFeatured(currentDate: Date, take: number): Promise<FeaturedArtist[]> {
     return prisma.featuredArtist.findMany({
       where: {
-        publishedOn: { not: null },
-        featuredOn: {
-          lte: currentDate,
-        },
-        OR: [
-          { featuredUntil: null },
-          { featuredUntil: { isSet: false } },
-          { featuredUntil: { gte: currentDate } },
-        ],
+        ...featuredArtistWhere.published,
+        ...featuredWindowAt(currentDate),
         AND: [hasNoHiddenOnlyArtists],
       },
       include: publicFeaturedArtistInclude,
@@ -203,9 +197,9 @@ export class FeaturedArtistRepository {
   static async count(filters: FeaturedArtistCountFilters = {}): Promise<number> {
     const where: Prisma.FeaturedArtistWhereInput =
       filters.published === true
-        ? { publishedOn: { not: null } }
+        ? featuredArtistWhere.published
         : filters.published === false
-          ? { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }
+          ? featuredArtistWhere.unpublished
           : {};
     return prisma.featuredArtist.count({ where });
   }
