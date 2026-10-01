@@ -29,9 +29,9 @@ import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { releaseWhere } from './_internal/release-where';
-import { referenceLinkWhere } from './artist-bio-link-repository';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -260,7 +260,7 @@ const artistWithReleaseGraphSelect = {
   labels: true,
   urls: true,
   bioImages: { orderBy: { sortOrder: 'asc' } },
-  bioLinks: { where: referenceLinkWhere, orderBy: { sortOrder: 'asc' } },
+  bioLinks: { where: bioLinkWhere.reference, orderBy: { sortOrder: 'asc' } },
   members: { include: { member: { select: artistCreditSelect } } },
   releases: artistReleaseRowsInclude,
   memberOf: {
@@ -745,9 +745,8 @@ export class ArtistRepository {
    * (`origin: 'custom'`) images and links so a regeneration never destroys them.
    *
    * The transaction (a) reads the surviving custom rows, (b) deletes generated and
-   * legacy rows — legacy rows carry `origin: null`/absent, and on MongoDB
-   * `{ origin: null }` does NOT match absent-field documents, so `{ origin: { isSet:
-   * false } }` is included too — then (c) recreates the incoming rows stamped
+   * legacy rows (`bioMediaWhere.generatedOrLegacy` — legacy rows have `origin`
+   * null or absent), then (c) recreates the incoming rows stamped
    * `origin: 'generated'`, skipping any whose URL case-insensitively matches a
    * surviving custom row (the custom copy wins). Note: `altBio` is AI-generated, so
    * regeneration overwrites any hand-authored alt bio.
@@ -794,17 +793,13 @@ export class ArtistRepository {
               select: { url: true },
             }),
             tx.artistBioLink.findMany({
-              where: { artistId, origin: 'custom' },
+              where: { artistId, ...bioMediaWhere.custom },
               select: { url: true },
             }),
           ]);
 
-          // (b) Delete generated + legacy rows only. `{ origin: null }` misses
-          // absent-field docs on Mongo, so `{ isSet: false }` is required too.
-          const legacyOrigin = {
-            artistId,
-            OR: [{ origin: 'generated' }, { origin: null }, { origin: { isSet: false } }],
-          };
+          // (b) Delete generated + legacy rows only; custom and linked rows stay.
+          const legacyOrigin = { artistId, ...bioMediaWhere.generatedOrLegacy };
           await tx.artistBioImage.deleteMany({ where: legacyOrigin });
           await tx.artistBioLink.deleteMany({ where: legacyOrigin });
 
@@ -994,7 +989,7 @@ export class ArtistRepository {
           },
         },
         bioLinks: {
-          where: referenceLinkWhere,
+          where: bioLinkWhere.reference,
           orderBy: { sortOrder: 'asc' },
           select: { id: true, label: true, url: true, kind: true, origin: true },
         },
