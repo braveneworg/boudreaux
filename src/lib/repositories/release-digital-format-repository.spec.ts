@@ -146,6 +146,21 @@ describe('ReleaseDigitalFormatRepository', () => {
     });
   });
 
+  describe('findAllByReleaseIncludingWithdrawn', () => {
+    it('reads every format of the release, soft-deleted ones included, with files', async () => {
+      const rows = [createMockFormat(), createMockFormat({ id: 'gone', deletedAt: new Date() })];
+      vi.mocked(prisma.releaseDigitalFormat.findMany).mockResolvedValue(rows as never);
+
+      const result = await repository.findAllByReleaseIncludingWithdrawn(mockReleaseId);
+
+      expect(result).toEqual(rows);
+      expect(prisma.releaseDigitalFormat.findMany).toHaveBeenCalledWith({
+        where: { releaseId: mockReleaseId },
+        include: { files: { orderBy: { trackNumber: 'asc' } } },
+      });
+    });
+  });
+
   describe('findAllByRelease', () => {
     it('should find all active digital formats for a release', async () => {
       const mockFormats: ReleaseDigitalFormat[] = [

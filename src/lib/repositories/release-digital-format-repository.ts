@@ -84,6 +84,21 @@ export class ReleaseDigitalFormatRepository {
   }
 
   /**
+   * Every digital format of a release, withdrawn (soft-deleted) ones
+   * included, with child track files. The download gate reads this: whether
+   * a withdrawn format may still be delivered is the gate's decision, not the
+   * query's (ADR-0018).
+   */
+  async findAllByReleaseIncludingWithdrawn(
+    releaseId: string
+  ): Promise<ReleaseDigitalFormatWithFiles[]> {
+    return await prisma.releaseDigitalFormat.findMany({
+      where: { releaseId },
+      include: { files: { orderBy: { trackNumber: 'asc' } } },
+    });
+  }
+
+  /**
    * Soft delete a format by setting deletedAt timestamp
    * S3 key is preserved for grace period restoration
    */

@@ -141,6 +141,10 @@ export const FREE_FORMAT_TYPES = [
  */
 export type FreeFormatType = (typeof FREE_FORMAT_TYPES)[number];
 
+/** Narrow a stored string (the `formatType` column) to a known format type. */
+export const isValidFormatType = (value: string): value is DigitalFormatType =>
+  (VALID_FORMAT_TYPES as ReadonlyArray<string>).includes(value);
+
 /**
  * Type guard: is a format type eligible for free download?
  */

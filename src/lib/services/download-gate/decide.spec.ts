@@ -35,10 +35,10 @@ describe('decide — formats', () => {
     expect(decide(base({ requested: ['WAV'] }))).toEqual({ kind: 'denial', reason: 'NO_FILES' });
   });
 
-  it('delivers the requested formats that exist and ignores the rest', () => {
-    const decision = decide(base({ requested: ['MP3_320KBPS', 'WAV'] }));
+  it('delivers the requested formats that exist, in request order, and ignores the rest', () => {
+    const decision = decide(base({ requested: ['AAC', 'WAV', 'MP3_320KBPS'] }));
 
-    expect(decision).toMatchObject({ kind: 'grant', formats: [mp3] });
+    expect(decision).toMatchObject({ kind: 'grant', formats: [aac, mp3] });
   });
 });
 
@@ -141,7 +141,7 @@ describe('decide — entitled', () => {
     expect(decide(entitled({ requested: ['FLAC', 'AAC'] }))).toEqual({
       kind: 'grant',
       mode: 'purchased',
-      formats: [aac, flac],
+      formats: [flac, aac],
       charge: { lifetime: false, freeThrottle: false, purchaseThrottle: true },
     });
   });

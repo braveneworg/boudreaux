@@ -32,7 +32,10 @@ const HOUR_MS = 60 * 60 * 1000;
  *    (users only) is checked before the free throttle.
  */
 export const decide = (facts: DownloadFacts): Decision => {
-  const formats = facts.available.filter(({ formatType }) => facts.requested.includes(formatType));
+  // Granted in request order: the route names the bundle after it.
+  const formats = facts.requested
+    .map((formatType) => facts.available.find((format) => format.formatType === formatType))
+    .filter((format): format is GateFormat => format !== undefined);
   if (formats.length === 0) {
     return { kind: 'denial', reason: 'NO_FILES' };
   }

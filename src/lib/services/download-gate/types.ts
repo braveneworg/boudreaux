@@ -114,10 +114,13 @@ export type Outcome<D extends Deliverable = Deliverable> =
 /** Read-only view for the status endpoints and the download dialog. */
 export interface DownloadStatus {
   entitled: boolean;
+  /** The mode a download would run under right now. */
   mode: DownloadMode;
-  /** Free formats of the release the free tier may still take (none when entitled is irrelevant). */
+  /** The release's free formats that are not withdrawn — what the free tier may take. */
   availableFreeFormats: DigitalFormatType[];
   freeThrottle: { allowed: boolean; remaining: number; resetsAt: Date | null };
-  lifetime: { remaining: number; downloadedReleaseIds: string[] } | null;
+  /** Signed-in users only. */
+  lifetime: { remaining: number; includesThisRelease: boolean } | null;
+  /** Entitled subjects only. */
   purchaseThrottle: { count: number; resetInHours: number | null } | null;
 }
