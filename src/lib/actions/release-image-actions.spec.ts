@@ -5,7 +5,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { ImageRepository } from '@/lib/repositories/image-repository';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { requireRole } from '@/utils/auth/require-role';
 
@@ -21,17 +21,7 @@ vi.mock('server-only', () => ({}));
 // Mock all dependencies
 vi.mock('next/cache');
 vi.mock('@/auth');
-vi.mock('../prisma', () => ({
-  prisma: {
-    image: {
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      delete: vi.fn(),
-      update: vi.fn(),
-    },
-    $transaction: vi.fn(),
-  },
-}));
+vi.mock('../repositories/image-repository');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/require-role');
 
@@ -122,13 +112,13 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalled();
+      expect(ImageRepository.delete).toHaveBeenCalled();
     });
 
     it('should skip S3 delete when image src is empty', async () => {
@@ -138,13 +128,13 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalled();
+      expect(ImageRepository.delete).toHaveBeenCalled();
     });
 
     it('should skip S3 delete when URL does not match any known pattern', async () => {
@@ -154,13 +144,13 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalled();
+      expect(ImageRepository.delete).toHaveBeenCalled();
     });
 
     it('should skip S3 delete when S3 URL is malformed without key path', async () => {
@@ -170,19 +160,19 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalled();
+      expect(ImageRepository.delete).toHaveBeenCalled();
       // S3 send should not be called because s3Key extraction failed
       expect(mockS3Send).not.toHaveBeenCalled();
     });
 
     it('should return error when image not found', async () => {
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(null);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(null);
 
       const result = await deleteReleaseImageAction('nonexistent-image');
 
@@ -197,15 +187,13 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalledWith({
-        where: { id: 'image-123' },
-      });
+      expect(vi.mocked(ImageRepository.delete).mock.calls).toEqual([['image-123']]);
       // Verify S3 delete was attempted
       expect(mockS3Send).toHaveBeenCalled();
     });
@@ -217,8 +205,8 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 
@@ -233,14 +221,14 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
       mockS3Send.mockRejectedValueOnce(new Error('S3 error'));
 
       const result = await deleteReleaseImageAction('image-123');
 
       expect(result.success).toBe(true);
-      expect(prisma.image.delete).toHaveBeenCalled();
+      expect(ImageRepository.delete).toHaveBeenCalled();
     });
 
     it('should log security event on successful deletion', async () => {
@@ -250,8 +238,8 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       await deleteReleaseImageAction('image-123');
 
@@ -273,8 +261,8 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       await deleteReleaseImageAction('image-123');
 
@@ -283,7 +271,7 @@ describe('release-image-actions', () => {
     });
 
     it('should return error on unexpected failure', async () => {
-      vi.mocked(prisma.image.findUnique).mockRejectedValue(Error('Database error'));
+      vi.mocked(ImageRepository.findSourceById).mockRejectedValue(Error('Database error'));
 
       const result = await deleteReleaseImageAction('image-123');
 
@@ -311,7 +299,7 @@ describe('release-image-actions', () => {
         },
       ];
 
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue(mockImages as never);
 
       const result = await getReleaseImagesAction('release-123');
 
@@ -322,7 +310,7 @@ describe('release-image-actions', () => {
     });
 
     it('should return empty array when no images found', async () => {
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue([]);
 
       const result = await getReleaseImagesAction('release-123');
 
@@ -337,11 +325,11 @@ describe('release-image-actions', () => {
           src: null,
           caption: null,
           altText: null,
-          sortOrder: null,
+          sortOrder: 0,
         },
       ];
 
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue(mockImages as never);
 
       const result = await getReleaseImagesAction('release-123');
 
@@ -356,7 +344,7 @@ describe('release-image-actions', () => {
     });
 
     it('should return error on database failure', async () => {
-      vi.mocked(prisma.image.findMany).mockRejectedValue(Error('Database error'));
+      vi.mocked(ImageRepository.findListingByRelease).mockRejectedValue(Error('Database error'));
 
       const result = await getReleaseImagesAction('release-123');
 
@@ -365,21 +353,11 @@ describe('release-image-actions', () => {
     });
 
     it('should order images by sortOrder ascending', async () => {
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue([]);
 
       await getReleaseImagesAction('release-123');
 
-      expect(prisma.image.findMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-        orderBy: { sortOrder: 'asc' },
-        select: {
-          id: true,
-          src: true,
-          caption: true,
-          altText: true,
-          sortOrder: true,
-        },
-      });
+      expect(vi.mocked(ImageRepository.findListingByRelease).mock.calls).toEqual([['release-123']]);
     });
   });
 
@@ -426,39 +404,29 @@ describe('release-image-actions', () => {
     });
 
     it('should update image caption', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.updateMetadata).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
       expect(result.success).toBe(true);
-      expect(prisma.image.update).toHaveBeenCalledWith({
-        where: { id: 'image-123' },
-        data: {
-          caption: 'New caption',
-          altText: undefined,
-          updatedAt: expect.any(Date),
-        },
-      });
+      expect(vi.mocked(ImageRepository.updateMetadata).mock.calls).toEqual([
+        ['image-123', { caption: 'New caption', altText: undefined }],
+      ]);
     });
 
     it('should update image altText', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.updateMetadata).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await updateReleaseImageAction('image-123', { altText: 'New alt text' });
 
       expect(result.success).toBe(true);
-      expect(prisma.image.update).toHaveBeenCalledWith({
-        where: { id: 'image-123' },
-        data: {
-          caption: undefined,
-          altText: 'New alt text',
-          updatedAt: expect.any(Date),
-        },
-      });
+      expect(vi.mocked(ImageRepository.updateMetadata).mock.calls).toEqual([
+        ['image-123', { caption: undefined, altText: 'New alt text' }],
+      ]);
     });
 
     it('should update both caption and altText', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.updateMetadata).mockResolvedValue({ id: 'image-123' } as never);
 
       const result = await updateReleaseImageAction('image-123', {
         caption: 'New caption',
@@ -466,18 +434,13 @@ describe('release-image-actions', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(prisma.image.update).toHaveBeenCalledWith({
-        where: { id: 'image-123' },
-        data: {
-          caption: 'New caption',
-          altText: 'New alt text',
-          updatedAt: expect.any(Date),
-        },
-      });
+      expect(vi.mocked(ImageRepository.updateMetadata).mock.calls).toEqual([
+        ['image-123', { caption: 'New caption', altText: 'New alt text' }],
+      ]);
     });
 
     it('should revalidate path on successful update', async () => {
-      vi.mocked(prisma.image.update).mockResolvedValue({ id: 'image-123' } as never);
+      vi.mocked(ImageRepository.updateMetadata).mockResolvedValue({ id: 'image-123' } as never);
 
       await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
@@ -485,7 +448,7 @@ describe('release-image-actions', () => {
     });
 
     it('should return error on database failure', async () => {
-      vi.mocked(prisma.image.update).mockRejectedValue(Error('Database error'));
+      vi.mocked(ImageRepository.updateMetadata).mockRejectedValue(Error('Database error'));
 
       const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
@@ -549,18 +512,18 @@ describe('release-image-actions', () => {
         { id: 'image-1', src: 'https://cdn.example.com/image1.jpg', sortOrder: 1 },
       ];
 
-      vi.mocked(prisma.$transaction).mockResolvedValue([]);
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.reorder).mockResolvedValue(undefined);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue(mockImages as never);
 
       const result = await reorderReleaseImagesAction('release-123', ['image-2', 'image-1']);
 
       expect(result.success).toBe(true);
-      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(vi.mocked(ImageRepository.reorder).mock.calls).toEqual([[['image-2', 'image-1']]]);
     });
 
     it('should log security event on successful reorder', async () => {
-      vi.mocked(prisma.$transaction).mockResolvedValue([]);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ImageRepository.reorder).mockResolvedValue(undefined);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue([]);
 
       await reorderReleaseImagesAction('release-123', ['image-1', 'image-2', 'image-3']);
 
@@ -576,8 +539,8 @@ describe('release-image-actions', () => {
     });
 
     it('should revalidate paths on successful reorder', async () => {
-      vi.mocked(prisma.$transaction).mockResolvedValue([]);
-      vi.mocked(prisma.image.findMany).mockResolvedValue([]);
+      vi.mocked(ImageRepository.reorder).mockResolvedValue(undefined);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue([]);
 
       await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
 
@@ -603,8 +566,8 @@ describe('release-image-actions', () => {
         },
       ];
 
-      vi.mocked(prisma.$transaction).mockResolvedValue([]);
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.reorder).mockResolvedValue(undefined);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue(mockImages as never);
 
       const result = await reorderReleaseImagesAction('release-123', ['image-2', 'image-1']);
 
@@ -621,12 +584,12 @@ describe('release-image-actions', () => {
           src: null,
           caption: null,
           altText: null,
-          sortOrder: null,
+          sortOrder: 0,
         },
       ];
 
-      vi.mocked(prisma.$transaction).mockResolvedValue([]);
-      vi.mocked(prisma.image.findMany).mockResolvedValue(mockImages as never);
+      vi.mocked(ImageRepository.reorder).mockResolvedValue(undefined);
+      vi.mocked(ImageRepository.findListingByRelease).mockResolvedValue(mockImages as never);
 
       const result = await reorderReleaseImagesAction('release-123', ['image-1']);
 
@@ -641,7 +604,7 @@ describe('release-image-actions', () => {
     });
 
     it('should return error on database failure', async () => {
-      vi.mocked(prisma.$transaction).mockRejectedValue(Error('Database error'));
+      vi.mocked(ImageRepository.reorder).mockRejectedValue(Error('Database error'));
 
       const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
 
@@ -662,8 +625,8 @@ describe('release-image-actions', () => {
         releaseId: 'release-123',
       };
 
-      vi.mocked(prisma.image.findUnique).mockResolvedValue(mockImage as never);
-      vi.mocked(prisma.image.delete).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue(mockImage as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue(mockImage as never);
 
       const result = await deleteReleaseImageAction('image-123');
 

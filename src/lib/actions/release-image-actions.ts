@@ -8,7 +8,8 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { ImageRepository } from '@/lib/repositories/image-repository';
+import type { ImageListingRecord } from '@/lib/types/domain/image';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -25,15 +26,25 @@ const logger = loggers.s3;
  */
 export interface ImageUploadActionResult {
   success: boolean;
-  data?: {
-    id: string;
-    src: string;
-    caption?: string;
-    altText?: string;
-    sortOrder: number;
-  }[];
+  data?: ImageUploadResultItem[];
   error?: string;
 }
+
+interface ImageUploadResultItem {
+  id: string;
+  src: string;
+  caption?: string;
+  altText?: string;
+  sortOrder: number;
+}
+
+const toImageUploadResult = (img: ImageListingRecord): ImageUploadResultItem => ({
+  id: img.id,
+  src: img.src || '',
+  caption: img.caption || undefined,
+  altText: img.altText || undefined,
+  sortOrder: img.sortOrder,
+});
 
 /**
  * Server action to delete a release image
@@ -49,10 +60,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
     }
 
     // Get the image to find the src URL
-    const image = await prisma.image.findUnique({
-      where: { id: imageId },
-      select: { id: true, src: true, releaseId: true },
-    });
+    const image = await ImageRepository.findSourceById(imageId);
 
     if (!image) {
       return { success: false, error: 'Image not found' };
@@ -71,9 +79,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
     }
 
     // Delete from database
-    await prisma.image.delete({
-      where: { id: imageId },
-    });
+    await ImageRepository.delete(imageId);
 
     // Log image deletion for security audit
     logSecurityEvent({
@@ -104,36 +110,9 @@ export const getReleaseImagesAction = async (
   releaseId: string
 ): Promise<ImageUploadActionResult> => {
   try {
-    const images = await prisma.image.findMany({
-      where: { releaseId },
-      orderBy: { sortOrder: 'asc' },
-      select: {
-        id: true,
-        src: true,
-        caption: true,
-        altText: true,
-        sortOrder: true,
-      },
-    });
+    const images = await ImageRepository.findListingByRelease(releaseId);
 
-    return {
-      success: true,
-      data: images.map(
-        (img: {
-          id: string;
-          src: string | null;
-          caption: string | null;
-          altText: string | null;
-          sortOrder: number | null;
-        }) => ({
-          id: img.id,
-          src: img.src || '',
-          caption: img.caption || undefined,
-          altText: img.altText || undefined,
-          sortOrder: img.sortOrder ?? 0,
-        })
-      ),
-    };
+    return { success: true, data: images.map(toImageUploadResult) };
   } catch (error) {
     logger.error('Get release images action error', error);
     return { success: false, error: 'Failed to retrieve images' };
@@ -156,14 +135,7 @@ export const updateReleaseImageAction = async (
       return { success: false, error: 'Unauthorized' };
     }
 
-    await prisma.image.update({
-      where: { id: imageId },
-      data: {
-        caption: data.caption,
-        altText: data.altText,
-        updatedAt: new Date(),
-      },
-    });
+    await ImageRepository.updateMetadata(imageId, data);
 
     revalidatePath(`/releases/[slug]`, 'page');
     return { success: true };
@@ -195,28 +167,9 @@ export const reorderReleaseImagesAction = async (
       return { success: false, error: 'No image IDs provided' };
     }
 
-    // Update each image's sortOrder in a transaction
-    await prisma.$transaction(
-      imageIds.map((imageId, index) =>
-        prisma.image.update({
-          where: { id: imageId },
-          data: { sortOrder: index },
-        })
-      )
-    );
+    await ImageRepository.reorder(imageIds);
 
-    // Get updated images
-    const images = await prisma.image.findMany({
-      where: { releaseId },
-      orderBy: { sortOrder: 'asc' },
-      select: {
-        id: true,
-        src: true,
-        caption: true,
-        altText: true,
-        sortOrder: true,
-      },
-    });
+    const images = await ImageRepository.findListingByRelease(releaseId);
 
     // Log image reorder for security audit
     logSecurityEvent({
@@ -235,21 +188,7 @@ export const reorderReleaseImagesAction = async (
 
     return {
       success: true,
-      data: images.map(
-        (img: {
-          id: string;
-          src: string | null;
-          caption: string | null;
-          altText: string | null;
-          sortOrder: number | null;
-        }) => ({
-          id: img.id,
-          src: img.src || '',
-          caption: img.caption || undefined,
-          altText: img.altText || undefined,
-          sortOrder: img.sortOrder ?? 0,
-        })
-      ),
+      data: images.map(toImageUploadResult),
     };
   } catch (error) {
     logger.error('Reorder release images action error', error);

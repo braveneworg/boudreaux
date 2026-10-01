@@ -5,7 +5,16 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
-import type { CreateImageData, ImageOwnerWhere, ImageRecord } from '@/lib/types/domain/image';
+import type {
+  CreateImageData,
+  ImageListingRecord,
+  ImageOwnerWhere,
+  ImageRecord,
+  ImageSourceRecord,
+  UpdateImageMetadataData,
+} from '@/lib/types/domain/image';
+
+import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -34,5 +43,46 @@ export class ImageRepository {
   /** Create a single image row from the supplied create data. */
   static async create(data: CreateImageData): Promise<ImageRecord> {
     return prisma.image.create({ data: toPrismaCreate(data) });
+  }
+
+  /** The id, source URL, and owning release of one image — what a delete needs. */
+  static async findSourceById(id: string): Promise<ImageSourceRecord | null> {
+    return prisma.image.findUnique({
+      where: { id },
+      select: { id: true, src: true, releaseId: true },
+    });
+  }
+
+  /** Delete one image row by id. */
+  static async delete(id: string): Promise<void> {
+    await prisma.image.delete({ where: { id } });
+  }
+
+  /** A release's images in display order, projected for listing. */
+  static async findListingByRelease(releaseId: string): Promise<ImageListingRecord[]> {
+    return prisma.image.findMany({
+      where: { releaseId },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, src: true, caption: true, altText: true, sortOrder: true },
+    });
+  }
+
+  /** Update an image's caption and alt text. */
+  static async updateMetadata(id: string, data: UpdateImageMetadataData): Promise<void> {
+    await prisma.image.update({ where: { id }, data: { ...data } });
+  }
+
+  /**
+   * Set each image's `sortOrder` to its index in `imageIds`, in one transaction
+   * so a failure leaves the previous order intact.
+   */
+  static async reorder(imageIds: string[]): Promise<void> {
+    await runQuery(() =>
+      prisma.$transaction(
+        imageIds.map((id, index) =>
+          prisma.image.update({ where: { id }, data: { sortOrder: index } })
+        )
+      )
+    );
   }
 }
