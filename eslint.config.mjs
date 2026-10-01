@@ -527,11 +527,12 @@ const eslintConfig = [
   eslintPluginPrettierRecommended,
   // Confine Prisma to the data-access layer of the app source. Only files under
   // `src/lib/repositories/**` (and the DB-client infra files, allowlisted in the
-  // override block below) may import `@prisma/client`. Every other layer depends
-  // on the hand-written, Prisma-free domain types in `@/lib/types/domain` and
-  // catches `DataError` (`@/lib/types/domain/errors`) instead of Prisma error
-  // classes. Scoped to `src/**` so e2e tests, seed/maintenance scripts, and the
-  // standalone `stripe-webhook` project keep their direct Prisma access.
+  // override block below) may import `@prisma/client` or the `@/lib/prisma`
+  // client singleton. Every other layer depends on the hand-written, Prisma-free
+  // domain types in `@/lib/types/domain` and catches `DataError`
+  // (`@/lib/types/domain/errors`) instead of Prisma error classes. Scoped to
+  // `src/**` so e2e tests, seed/maintenance scripts, and the standalone
+  // `stripe-webhook` project keep their direct Prisma access.
   // `allowTypeImports` is left at its default (false) so even `import type` is blocked.
   {
     files: ['src/**/*.{ts,tsx}'],
@@ -549,6 +550,11 @@ const eslintConfig = [
               name: '@prisma/client/runtime/library',
               message:
                 'Prisma may only be imported in src/lib/repositories/**. Catch DataError from @/lib/types/domain/errors instead.',
+            },
+            {
+              name: '@/lib/prisma',
+              message:
+                'The Prisma client may only be used in src/lib/repositories/**. Add the query to the owning repository and call that instead.',
             },
           ],
           // Defense-in-depth: also catch any current/future Prisma submodule
@@ -581,6 +587,10 @@ const eslintConfig = [
       // Reads the generated data model (schema metadata, no data access) to pin
       // better-auth's fail-closed startup schema check to the real Prisma schema.
       'src/lib/auth-schema-validation.spec.ts',
+      // Client-singleton consumers with no query of their own: better-auth's
+      // adapter takes the client, and the health check pings it.
+      'src/lib/auth.ts',
+      'src/lib/utils/database-utils.ts',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': 'off',
