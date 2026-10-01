@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
+import { isPublicArtist } from '@/lib/utils/is-public-artist';
 
 import {
   artistWhere,
@@ -147,6 +148,21 @@ describe('artistWhere (Docker Mongo contract)', () => {
     expect(await findKeys(publicArtistWhere)).toEqual(
       expectKeys(({ publishedOn, deletedOn }) => publishedOn === 'set' && deletedOn !== 'set')
     );
+  });
+
+  it('publicArtistWhere and its in-memory twin isPublicArtist agree on every storage', async () => {
+    // The twin reads what Prisma hands back: an absent field comes back as
+    // null, so the predicate sees two storages where the database sees three.
+    const all = await prisma.artist.findMany({
+      where: scope,
+      select: { slug: true, publishedOn: true, deletedOn: true },
+    });
+    const byPredicate = all
+      .filter(isPublicArtist)
+      .map(({ slug }) => slug.slice(prefix.length))
+      .sort();
+
+    expect(await findKeys(publicArtistWhere)).toEqual(byPredicate);
   });
 });
 
