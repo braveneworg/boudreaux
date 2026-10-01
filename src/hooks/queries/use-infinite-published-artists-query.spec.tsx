@@ -6,7 +6,7 @@
 import { renderHook } from '@testing-library/react';
 
 import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
-import type { ArtistListingRoster, ArtistListingSort } from '@/lib/types/domain/artist';
+import type { ArtistListingSort } from '@/lib/types/domain/artist';
 
 import {
   PUBLISHED_ARTISTS_PAGE_SIZE,
@@ -60,11 +60,10 @@ const artistRowResponse = {
 const getOptions = (
   sort: ArtistListingSort = 'alpha',
   search = '',
-  roster: ArtistListingRoster = 'current',
   overrides: InfiniteQueryOptionsOverride<PublishedArtistsPaginatedResponse> = {}
 ): PublishedArtistsQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useInfinitePublishedArtistsQuery(sort, search, roster, overrides));
+  renderHook(() => useInfinitePublishedArtistsQuery(sort, search, overrides));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as PublishedArtistsQueryOptions;
 };
 
@@ -80,25 +79,19 @@ describe('useInfinitePublishedArtistsQuery', () => {
   it('keys the query by the published-infinite sort', () => {
     const opts = getOptions('newest');
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'newest', 'current', '']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'newest', '']);
   });
 
-  it('defaults to the A–Z sort of current artists', () => {
+  it('defaults to the A–Z sort', () => {
     const opts = getOptions();
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'current', '']);
-  });
-
-  it('keys the query by the roster so switching it resets pagination', () => {
-    const opts = getOptions('alpha', '', 'alumni');
-
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'alumni', '']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', '']);
   });
 
   it('keys the query by the normalized search term', () => {
     const opts = getOptions('alpha', '  Punk  ');
 
-    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'current', 'punk']);
+    expect(opts.queryKey).toEqual(['artists', 'publishedInfinite', 'alpha', 'punk']);
   });
 
   it('starts pagination at skip 0', () => {
@@ -131,7 +124,7 @@ describe('useInfinitePublishedArtistsQuery', () => {
     await opts.queryFn({ pageParam: 24, signal });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/artists?listing=published&skip=24&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=newest&roster=current`,
+      `/api/artists?listing=published&skip=24&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=newest`,
       { signal }
     );
   });
@@ -148,24 +141,24 @@ describe('useInfinitePublishedArtistsQuery', () => {
     await opts.queryFn({ pageParam: 0, signal });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&roster=current&search=Punk`,
+      `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&search=Punk`,
       { signal }
     );
   });
 
-  it('requests the chosen roster', async () => {
+  it('sends no roster', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ rows: [artistRowResponse], nextSkip: null }),
     });
     vi.stubGlobal('fetch', fetchMock);
-    const opts = getOptions('alpha', '', 'all');
+    const opts = getOptions();
 
     await opts.queryFn({ pageParam: 0 });
 
     expect(fetchMock.mock.calls).toEqual([
       [
-        `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha&roster=all`,
+        `/api/artists?listing=published&skip=0&take=${PUBLISHED_ARTISTS_PAGE_SIZE}&sort=alpha`,
         { signal: undefined },
       ],
     ]);
@@ -194,7 +187,7 @@ describe('useInfinitePublishedArtistsQuery', () => {
   });
 
   it('lets a caller override enabled via the trailing options', () => {
-    const opts = getOptions('alpha', '', 'current', { enabled: false });
+    const opts = getOptions('alpha', '', { enabled: false });
 
     expect(opts.enabled).toBe(false);
   });

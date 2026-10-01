@@ -6,6 +6,7 @@ excludes documents where the field is explicitly `null` and documents
 where the field is absent.
 
 On 2026-09-27 the repo said both things. The `alumniArtistWhere` comment
+(removed with the roster rule by ADR-0016)
 was right. The `publicArtistWhere` comment (#792) said `not: null` alone
 matched absent fields, so it added a redundant `publishedOn: { isSet: true }`.
 An audit then flagged the artists index as a probable leak on that claim.

@@ -12,7 +12,6 @@ describe('artistListingQuerySchema', () => {
   it('fills every default when no params are given', () => {
     expect(artistListingQuerySchema.parse({})).toEqual({
       sort: 'alpha',
-      roster: 'current',
       skip: 0,
       take: ARTIST_LISTING_DEFAULT_TAKE,
     });
@@ -42,12 +41,13 @@ describe('artistListingQuerySchema', () => {
     expect(artistListingQuerySchema.parse({ sort: 'sideways' }).sort).toBe('alpha');
   });
 
-  it.each(['current', 'alumni', 'all'] as const)('accepts the %s roster', (roster) => {
-    expect(artistListingQuerySchema.parse({ roster }).roster).toBe(roster);
-  });
-
-  it('falls back to the current roster for an unknown value', () => {
-    expect(artistListingQuerySchema.parse({ roster: 'retired' }).roster).toBe('current');
+  // The roster filter is gone (ADR-0016); an old link that still sends it works.
+  it.each(['current', 'alumni', 'all', 'retired'])('ignores a %s roster', (roster) => {
+    expect(artistListingQuerySchema.parse({ roster })).toEqual({
+      sort: 'alpha',
+      skip: 0,
+      take: ARTIST_LISTING_DEFAULT_TAKE,
+    });
   });
 
   it('coerces numeric strings for skip and take', () => {

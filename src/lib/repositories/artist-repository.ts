@@ -10,7 +10,6 @@ import type {
   ArtistDetail,
   ArtistListFilters,
   ArtistListingFilters,
-  ArtistListingRoster,
   ArtistListingRecord,
   ArtistNameRecord,
   ArtistPublicScalars,
@@ -29,14 +28,7 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
-import {
-  alumniArtistWhere,
-  currentArtistWhere,
-  currentOrAlumniWhere,
-  listedReleaseWhere,
-  notDeletedOr,
-  publicArtistWhere,
-} from './_internal/artist-where';
+import { listedReleaseWhere, notDeletedOr, publicArtistWhere } from './_internal/artist-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { referenceLinkWhere } from './artist-bio-link-repository';
 
@@ -409,39 +401,17 @@ const readVocabularyColumn = (
 };
 
 /**
- * The roster half of a listed artist's `where`, as `AND` members: current and
- * alumni are single field matches, "all" is either of the two. Returned as a
- * list so it composes with the token search's own `AND` without clobbering
- * the top-level `OR` the soft-delete guard owns.
- */
-const rosterWhere = (
-  roster: ArtistListingRoster
-): { fields: Prisma.ArtistWhereInput; and: Prisma.ArtistWhereInput[] } => {
-  switch (roster) {
-    case 'current':
-      return { fields: currentArtistWhere, and: [] };
-    case 'alumni':
-      return { fields: alumniArtistWhere, and: [] };
-    case 'all':
-      return { fields: {}, and: [currentOrAlumniWhere] };
-  }
-};
-
-/**
  * Build the `where` shared by the public artists index and the public artist
- * search: a published, non-deleted artist in the requested roster (current by
- * default) holding a DIRECT credit on at least one listed release (a member
- * credit alone never qualifies — ADR-0007), with an optional case-insensitive
- * token search — every word must match one of the name fields, aka names,
- * genres, or the titles of their listed releases.
+ * search: a published, non-deleted artist holding a DIRECT credit on at least
+ * one listed release (a member credit alone never qualifies — ADR-0007), with
+ * an optional case-insensitive token search — every word must match one of
+ * the name fields, aka names, genres, or the titles of their listed releases.
+ * Whether the artist is still on the label plays no part (ADR-0016).
  *
  * Both reads require the artist to be published: a search that matched a
  * hidden artist would name it (ADR-0015).
  */
-const buildListedWhere = (
-  search: string | undefined,
-  { roster = 'current' }: { roster?: ArtistListingRoster } = {}
-): Prisma.ArtistWhereInput => {
+const buildListedWhere = (search: string | undefined): Prisma.ArtistWhereInput => {
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
         ...nameFieldClauses(token),
@@ -454,14 +424,10 @@ const buildListedWhere = (
         },
       ])
     : [];
-  const { fields, and: rosterAnd } = rosterWhere(roster);
-  const and = [...rosterAnd, ...tokenSearch];
   return {
-    ...fields,
-    publishedOn: { not: null },
-    OR: [...notDeletedOr],
+    ...publicArtistWhere,
     releases: { some: { release: listedReleaseWhere } },
-    ...(and.length > 0 && { AND: and }),
+    ...(tokenSearch.length > 0 && { AND: tokenSearch }),
   };
 };
 
@@ -565,10 +531,9 @@ export class ArtistRepository {
   }
 
   /**
-   * Find a current or alumni, published, non-deleted artist by slug (no
-   * relations), projected to the public scalars — this backs the public
-   * `GET /api/artists/slug/[slug]`. A draft, deleted, or deactivated
-   * non-alumnus artist reads as absent (#786).
+   * Find a published, non-deleted artist by slug (no relations), projected to
+   * the public scalars — this backs the public `GET /api/artists/slug/[slug]`.
+   * A draft or deleted artist reads as absent (#786).
    */
   static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
     return runQuery(() =>
@@ -577,9 +542,9 @@ export class ArtistRepository {
   }
 
   /**
-   * List one page of listed artists for the public `/artists` index — in the
-   * requested roster (current, alumni, or both), published, non-deleted, and
-   * directly credited on a listed release — with the narrow
+   * List one page of listed artists for the public `/artists` index —
+   * published, non-deleted, and directly credited on a listed release — with
+   * the narrow
    * {@link artistListingSelect} projection and an optional search.
    *
    * Neither order can be sorted in the database: `alpha` ranks by the name an
@@ -587,17 +552,16 @@ export class ArtistRepository {
    * `displayName` is stored (a DB sort on `displayName` files those nulls
    * first, outside the alphabet), and `newest` by each artist's latest listed
    * release, a relation aggregate Prisma on MongoDB cannot sort by. The listed
-   * roster is read whole and ordered + sliced here; the roster is small, and
-   * ADR-0007 records the revisit trigger.
+   * artists are read whole and ordered + sliced here; there are few of them,
+   * and ADR-0007 records the revisit trigger.
    */
   static async listListed({
     search,
     sort,
-    roster,
     skip,
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
-    const where = buildListedWhere(search, { roster });
+    const where = buildListedWhere(search);
     const records = await runQuery(() =>
       prisma.artist.findMany({ where, select: artistListingSelect })
     );
@@ -693,7 +657,7 @@ export class ArtistRepository {
   }
 
   /**
-   * Search current listed artists — published, non-deleted, and holding a
+   * Search listed artists — published, non-deleted, and holding a
    * direct credit on a listed release (the playlist "By artist" search and the
    * home-page typeahead), with the lightweight images/releases include that
    * search consumes. Matches are ordered by
@@ -715,12 +679,11 @@ export class ArtistRepository {
   }
 
   /**
-   * Find a single current-or-alumni, published, non-deleted artist by slug
-   * with the public scalars and the full nested release + bio graph used on the
-   * public detail page (every artist on it projected public; the index links
-   * alumni cards here too, so an alumnus must resolve), including the releases
-   * of every band the artist belongs to. A draft, deleted, or deactivated
-   * non-alumnus artist reads as absent (#786). The service folds the band
+   * Find a single published, non-deleted artist by slug with the public
+   * scalars and the full nested release + bio graph used on the public detail
+   * page (every artist on it projected public), including the releases of
+   * every band the artist belongs to. A draft or deleted artist reads as
+   * absent (#786). The service folds the band
    * releases in and post-filters members, bands, and releases to published,
    * non-deleted.
    */

@@ -396,44 +396,43 @@ test.describe('Artist Page', () => {
       await expect(cards(page).last()).toContainText('Tokensmith');
     });
 
-    test('lists current artists by default and alumni on demand', async ({ page }) => {
+    // Whether an artist is still on the label decides nothing (ADR-0016).
+    test('offers one list, with no roster filter', async ({ page }) => {
       await page.goto('/artists');
       await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
 
-      // E2E Alumnus is deactivated with a departure date: never on the
-      // default (Current) roster.
-      await expect(page.getByRole('radio', { name: 'Current' })).toHaveAttribute(
-        'aria-checked',
-        'true'
-      );
-      await expect(page.getByRole('link', { name: 'E2E Alumnus', exact: true })).toHaveCount(0);
-
-      await page.getByRole('radio', { name: 'Alumni' }).click();
-
-      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
-      await expect(cards(page).first()).toContainText('E2E Alumnus');
+      await expect(page.getByRole('radiogroup', { name: 'Sort artists' })).toBeVisible();
+      await expect(page.getByRole('radiogroup', { name: 'Artist roster' })).toHaveCount(0);
     });
 
-    test('lists alumni alongside current artists under All', async ({ page }) => {
-      await page.goto('/artists');
-      await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
-
-      await page.getByRole('radio', { name: 'All', exact: true }).click();
-
-      // A–Z: "E2E Alumnus" files just ahead of "E2E Artist".
-      await expect(cards(page).first()).toContainText('E2E Alumnus', { timeout: 10_000 });
-      await expect(cards(page).nth(1)).toContainText('E2E Artist');
-    });
-
-    test('an alumni card links through to the artist page', async ({ page }) => {
+    test('lists an artist that is no longer on the label like any other', async ({ page }) => {
       await page.goto('/artists');
       await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole('radio', { name: 'Alumni' }).click();
-      await page.getByRole('link', { name: 'E2E Alumnus', exact: true }).click();
+      // E2E Standing left the label: it carries a departure date.
+      await (await openSearch(page)).fill('E2E Standing');
 
-      await expect(page).toHaveURL(/\/artists\/e2e-alumnus$/);
-      await expect(page.getByText('E2E Alumnus').first()).toBeVisible({ timeout: 15_000 });
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      await expect(cards(page).first()).toContainText('E2E Standing');
+    });
+
+    test('the card of an artist no longer on the label links to its page', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+
+      await scrollToLoad(page, page.getByRole('link', { name: 'E2E Standing', exact: true }));
+      await page.getByRole('link', { name: 'E2E Standing', exact: true }).click();
+
+      await expect(page).toHaveURL(/\/artists\/e2e-standing$/);
+      await expect(page.getByText('E2E Standing').first()).toBeVisible({ timeout: 15_000 });
+    });
+
+    test('serves the one list to an old link that still names a roster', async ({ request }) => {
+      const response = await request.get('/api/artists?listing=published&roster=alumni&take=100');
+      const { rows } = (await response.json()) as { rows: Array<{ displayName: string | null }> };
+
+      const names = rows.map(({ displayName }) => displayName);
+      expect(names).toEqual(expect.arrayContaining(['E2E Artist', 'E2E Standing']));
     });
 
     test('redirects the retired search page to the index', async ({ page }) => {

@@ -89,7 +89,7 @@ export class ArtistCreditRepository {
 
   /**
    * The artists credited on a release that stay hidden even when published:
-   * soft-deleted, or inactive with no departure date.
+   * soft-deleted.
    */
   static async findThatStayHidden(releaseId: string): Promise<CreditThatStaysHidden[]> {
     return readThatStayHidden(creditThatStaysHiddenWhere({ releaseId }));

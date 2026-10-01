@@ -74,11 +74,10 @@ const nameSelect = { id: true, displayName: true, firstName: true, surname: true
 const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
 
 /**
- * The public artist gate every public slug read applies (#786): current or
- * alumni, published, not soft-deleted.
+ * The public artist gate every public slug read applies (#786, ADR-0016):
+ * published, not soft-deleted.
  */
 const PUBLIC_ARTIST_WHERE = {
-  AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
   publishedOn: { not: null },
   OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
 };
@@ -148,7 +147,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('findBySlug', () => {
-    it('finds a current or alumni, published, non-deleted artist by slug with a select projection', async () => {
+    it('finds a published, non-deleted artist by slug with a select projection', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findBySlug('john-doe');
@@ -448,7 +447,6 @@ describe('ArtistRepository', () => {
       expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
-        isActive: true,
         publishedOn: { not: null },
         OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
         releases: {
@@ -533,7 +531,6 @@ describe('ArtistRepository', () => {
 
   describe('listListed band names (ADR-0015)', () => {
     const PUBLIC_ARTIST = {
-      AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
       publishedOn: { not: null },
       OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
     };
@@ -543,7 +540,7 @@ describe('ArtistRepository', () => {
       memberOf: { where: unknown };
     }> => {
       vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
-      await ArtistRepository.listListed({ sort: 'alpha', roster: 'current', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
       return vi.mocked(prisma.artist.findMany).mock.calls.at(-1)?.[0]?.select as never;
     };
 
@@ -593,59 +590,33 @@ describe('ArtistRepository', () => {
             ],
     });
 
-    it('lists only active, published, non-deleted artists with a listed direct release', async () => {
+    it('lists only published, non-deleted artists with a listed direct release', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
-
-      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        isActive: true,
-        publishedOn: { not: null },
-        OR: notDeleted,
-        releases: listedReleaseClause,
-      });
-    });
-
-    // Alumni left the label: deactivated AND carrying a recorded departure
-    // date. An inactive row with no `deactivatedAt` was hidden for some other
-    // reason and must stay hidden. `{ not: null }` also excludes a document
-    // where the field is unset (the same guard `publishedOn` relies on).
-    const alumniClause = { isActive: false, deactivatedAt: { not: null } };
-
-    it('lists alumni: deactivated artists with a recorded departure date', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
-
-      await ArtistRepository.listListed({ roster: 'alumni', sort: 'alpha', skip: 0, take: 24 });
-
-      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        ...alumniClause,
-        publishedOn: { not: null },
-        OR: notDeleted,
-        releases: listedReleaseClause,
-      });
-    });
-
-    it('lists current artists and alumni together for the all roster', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
-
-      await ArtistRepository.listListed({ roster: 'all', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
         publishedOn: { not: null },
         OR: notDeleted,
         releases: listedReleaseClause,
-        AND: [{ OR: [{ isActive: true }, alumniClause] }],
       });
     });
 
-    it('keeps every search word alongside the all-roster clause', async () => {
+    // Whether an artist is still on the label decides nothing (ADR-0016).
+    it('reads no roster field', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
+
+      const where = vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where ?? {};
+      expect(JSON.stringify(where)).not.toMatch(/isActive|deactivatedAt/);
+    });
+
+    it('keeps every search word as its own clause', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({
-        roster: 'all',
         search: 'foo bar',
         sort: 'alpha',
         skip: 0,
@@ -655,7 +626,6 @@ describe('ArtistRepository', () => {
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
       expect(and.map(({ OR }) => OR[0])).toEqual([
-        { isActive: true },
         { firstName: { contains: 'foo', mode: 'insensitive' } },
         { firstName: { contains: 'bar', mode: 'insensitive' } },
       ]);
@@ -664,7 +634,7 @@ describe('ArtistRepository', () => {
     it('selects a narrow projection with no contact fields', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg).not.toHaveProperty('include');
@@ -680,7 +650,7 @@ describe('ArtistRepository', () => {
     it('selects the chosen-or-suggested bio images in sort order without a DB cap', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({
@@ -693,7 +663,7 @@ describe('ArtistRepository', () => {
     it('selects the display-image fields on listing bio images', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.select?.bioImages).toMatchObject({
@@ -704,7 +674,7 @@ describe('ArtistRepository', () => {
     it('selects the band graph and the narrow release projection', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.select?.members).toBeDefined();
@@ -722,7 +692,6 @@ describe('ArtistRepository', () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({
-        roster: 'current',
         search: 'foo',
         sort: 'alpha',
         skip: 0,
@@ -755,7 +724,6 @@ describe('ArtistRepository', () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({
-        roster: 'current',
         search: 'Dr. Quillon M. Tokensmith Jr.',
         sort: 'alpha',
         skip: 0,
@@ -776,7 +744,6 @@ describe('ArtistRepository', () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({
-        roster: 'current',
         search: ' . - ',
         sort: 'alpha',
         skip: 0,
@@ -790,7 +757,7 @@ describe('ArtistRepository', () => {
     it('omits the search clause when no term is given', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).not.toHaveProperty('AND');
@@ -799,7 +766,7 @@ describe('ArtistRepository', () => {
     it('fetches every listed artist for the A–Z order instead of paging in the database', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 24, take: 24 });
+      await ArtistRepository.listListed({ sort: 'alpha', skip: 24, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg).not.toHaveProperty('skip');
@@ -824,7 +791,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'alpha',
         skip: 0,
         take: 24,
@@ -842,7 +808,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'alpha',
         skip: 0,
         take: 24,
@@ -858,7 +823,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'alpha',
         skip: 0,
         take: 24,
@@ -875,7 +839,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'alpha',
         skip: 1,
         take: 1,
@@ -887,7 +850,7 @@ describe('ArtistRepository', () => {
     it('fetches every listed artist for the newest-release order instead of paging in the database', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      await ArtistRepository.listListed({ roster: 'current', sort: 'newest', skip: 24, take: 24 });
+      await ArtistRepository.listListed({ sort: 'newest', skip: 24, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg).not.toHaveProperty('skip');
@@ -903,7 +866,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'newest',
         skip: 0,
         take: 24,
@@ -933,7 +895,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'newest',
         skip: 0,
         take: 24,
@@ -949,7 +910,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'newest',
         skip: 0,
         take: 24,
@@ -965,7 +925,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'newest',
         skip: 0,
         take: 24,
@@ -983,7 +942,6 @@ describe('ArtistRepository', () => {
       ] as never);
 
       const result = await ArtistRepository.listListed({
-        roster: 'current',
         sort: 'newest',
         skip: 1,
         take: 2,
@@ -998,15 +956,13 @@ describe('ArtistRepository', () => {
       );
 
       await expect(
-        ArtistRepository.listListed({ roster: 'current', sort: 'alpha', skip: 0, take: 24 })
+        ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 })
       ).rejects.toMatchObject({ code: 'UNAVAILABLE' });
     });
   });
 
   describe('findPublishedBySlugWithReleases', () => {
-    // The index links every card — alumni included — to this page, so it
-    // resolves the same roster the index's "All" filter lists.
-    it('finds a current or alumni, published, non-deleted artist by slug with the detail select', async () => {
+    it('finds a published, non-deleted artist by slug with the detail select', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
       const result = await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
@@ -1151,7 +1107,6 @@ describe('ArtistRepository', () => {
         surname: 'Smith',
         displayName: 'Jane Smith',
         slug: 'jane',
-        isActive: true,
       };
       const result = await ArtistRepository.createWithSelect(data);
 

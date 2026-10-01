@@ -95,7 +95,6 @@ describe('TourRepository', () => {
 
   describe('public reads (ADR-0015)', () => {
     const PUBLIC_ARTIST = {
-      AND: [{ OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] }],
       publishedOn: { not: null },
       OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
     };

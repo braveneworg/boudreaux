@@ -58,8 +58,6 @@ const reasonLabel = (reason: HiddenCreditReason): string => {
   switch (reason) {
     case 'deleted':
       return 'deleted';
-    case 'no-departure-date':
-      return 'inactive with no departure date';
   }
 };
 

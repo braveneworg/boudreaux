@@ -28,7 +28,6 @@ const NOW = new Date('2026-09-26T12:00:00.000Z');
 const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
 
 const AWAITING_GATE = [
-  { OR: [{ isActive: true }, { isActive: false, deactivatedAt: { not: null } }] },
   { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] },
   { OR: NOT_DELETED_OR },
 ];
@@ -173,15 +172,12 @@ describe('ArtistCreditRepository', () => {
   });
 
   describe('findThatStayHiddenAmong', () => {
-    it('reads the given artists that are deleted or off the roster', async () => {
+    it('reads the given artists that are deleted', async () => {
       await ArtistCreditRepository.findThatStayHiddenAmong(['artist-1']);
 
       expect(vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where).toEqual({
         id: { in: ['artist-1'] },
-        OR: [
-          { deletedOn: { not: null } },
-          { isActive: false, OR: [{ deactivatedAt: null }, { deactivatedAt: { isSet: false } }] },
-        ],
+        deletedOn: { not: null },
       });
     });
 
@@ -196,7 +192,7 @@ describe('ArtistCreditRepository', () => {
   });
 
   describe('findThatStayHidden', () => {
-    it('reads the credited artists that are deleted or off the roster', async () => {
+    it('reads the credited artists that are deleted', async () => {
       await ArtistCreditRepository.findThatStayHidden('release-1');
 
       expect(vi.mocked(prisma.artist.findMany).mock.calls).toEqual([
@@ -204,15 +200,9 @@ describe('ArtistCreditRepository', () => {
           {
             where: {
               releases: { some: { releaseId: 'release-1' } },
-              OR: [
-                { deletedOn: { not: null } },
-                {
-                  isActive: false,
-                  OR: [{ deactivatedAt: null }, { deactivatedAt: { isSet: false } }],
-                },
-              ],
+              deletedOn: { not: null },
             },
-            select: { ...NAME_SELECT, isActive: true, deactivatedAt: true, deletedOn: true },
+            select: { ...NAME_SELECT, deletedOn: true },
           },
         ],
       ]);
@@ -220,7 +210,7 @@ describe('ArtistCreditRepository', () => {
 
     it('describes each credit with the reason it stays hidden', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([
-        { ...nameRow, isActive: true, deactivatedAt: null, deletedOn: NOW },
+        { ...nameRow, deletedOn: NOW },
       ] as never);
 
       const credits = await ArtistCreditRepository.findThatStayHidden('release-1');

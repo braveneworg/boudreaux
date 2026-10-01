@@ -75,7 +75,6 @@ export type ArtistScalars = {
   notes: string[];
   tags: string | null;
   isPseudonymous: boolean;
-  isActive: boolean;
   instruments: string | null;
   featuredArtistId: string | null;
 };
@@ -159,8 +158,8 @@ export const ARTIST_BIO_FIELDS = Object.keys(ARTIST_BIO_FIELD_MASK) as readonly 
 /**
  * The scalars of an artist reached through another record (a release credit,
  * a band member or band, a tour headliner): {@link ArtistPublicScalars} minus
- * every {@link ArtistBioField}. It keeps the publication and roster fields,
- * which the visibility filter needs.
+ * every {@link ArtistBioField}. It keeps `publishedOn` and `deletedOn`, which
+ * the visibility filter needs.
  */
 export type ArtistCreditScalars = Omit<ArtistPublicScalars, ArtistBioField>;
 
@@ -353,20 +352,11 @@ export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';
 
-/**
- * Which part of the label's roster the public artists index shows:
- * **current** artists (`isActive`), **alumni** (deactivated with a recorded
- * `deactivatedAt` — they left the label), or **all** of both. An inactive
- * artist with no departure date is neither and stays hidden.
- */
-export type ArtistListingRoster = 'current' | 'alumni' | 'all';
-
-/** Pagination, search, sort, and roster for the public artists index. */
+/** Pagination, search, and sort for the public artists index. */
 export interface ArtistListingFilters {
   /** Case-insensitive term matched against names, aka names, genres, and release titles. */
   search?: string;
   sort: ArtistListingSort;
-  roster: ArtistListingRoster;
   skip: number;
   take: number;
 }
@@ -530,7 +520,6 @@ export interface ArtistWritableData {
   genres?: string | null;
   tags?: string | null;
   instruments?: string | null;
-  isActive?: boolean;
   isPseudonymous?: boolean;
   bornOn?: Date | null;
   diedOn?: Date | null;
