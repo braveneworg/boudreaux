@@ -20,7 +20,7 @@ import {
 } from '@/hooks/mutations/use-video-mutations';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
-import { toIsoDay } from '@/lib/utils/validation/iso-date';
+import { releaseDayFromForm } from '@/lib/utils/validation/iso-date';
 import { createVideoSchema, type VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichment-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
@@ -393,7 +393,8 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
   // reaches the autosave, the description prompt, or Save.
   const handleSelectDate = useCallback(
     (dateString: string, fieldName: string): void => {
-      const value = fieldName === 'releasedOn' ? (toIsoDay(dateString) ?? '') : dateString;
+      const value =
+        fieldName === 'releasedOn' ? (releaseDayFromForm(dateString) ?? '') : dateString;
       setValue(fieldName as keyof VideoFormData, value, {
         shouldDirty: true,
         shouldValidate: true,

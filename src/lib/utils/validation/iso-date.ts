@@ -31,7 +31,19 @@ export const isRealCalendarDate = (value: string): boolean => {
 };
 
 /**
- * Normalise a form date value to a `YYYY-MM-DD` day, or `null`.
+ * A Video's **release date**: one day-precision UTC calendar day as
+ * `YYYY-MM-DD` (ADR-0004). The brand marks a string that came through one of
+ * the two constructors below, so the editorial rules compare like with like.
+ * Which constructor applies depends on where the value came from — a form
+ * string and a stored `Date` name their day differently.
+ */
+export type ReleaseDay = string & { readonly __brand: 'ReleaseDay' };
+
+/** Narrow a string to a `ReleaseDay`: strict shape and a real calendar day. */
+export const isReleaseDay = (value: string): value is ReleaseDay => isRealCalendarDate(value);
+
+/**
+ * The release day a FORM value names, or `null`.
  *
  * - A `YYYY-MM-DD` string passes through unchanged.
  * - An ISO datetime collapses to its LOCAL day: the DatePicker commits
@@ -40,15 +52,24 @@ export const isRealCalendarDate = (value: string): boolean => {
  *   Greenwich).
  * - Anything empty or unparseable is `null`.
  */
-export const toIsoDay = (value: string | null | undefined): string | null => {
+export const releaseDayFromForm = (value: string | null | undefined): ReleaseDay | null => {
   if (!value) return null;
-  if (ISO_DATE_PATTERN.test(value)) return value;
+  if (ISO_DATE_PATTERN.test(value)) return value as ReleaseDay;
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : format(parsed, 'yyyy-MM-dd');
+  return Number.isNaN(parsed.getTime()) ? null : (format(parsed, 'yyyy-MM-dd') as ReleaseDay);
 };
 
+/**
+ * The release day a STORED value names, or `null`. `releasedOn` is persisted
+ * at UTC midnight, so its day is the UTC day — never the local one, which is
+ * the previous day west of Greenwich.
+ */
+export const releaseDayFromStored = (value: Date | null | undefined): ReleaseDay | null =>
+  value && !Number.isNaN(value.getTime()) ? (value.toISOString().slice(0, 10) as ReleaseDay) : null;
+
 /** Today's UTC calendar day as `YYYY-MM-DD` (`now` injectable for tests). */
-export const todayUtcIsoDate = (now: Date = new Date()): string => now.toISOString().slice(0, 10);
+export const todayUtcIsoDate = (now: Date = new Date()): ReleaseDay =>
+  now.toISOString().slice(0, 10) as ReleaseDay;
 
 /**
  * Whether a `YYYY-MM-DD` day is today's UTC day. A release-date lookup that
