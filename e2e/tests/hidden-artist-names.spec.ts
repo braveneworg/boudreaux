@@ -42,6 +42,13 @@ const TOUR_TITLE = `E2E Hidden Names Tour ${STAMP}`;
 const HIDDEN_TOUR_TITLE = `E2E Hidden Names Hidden Tour ${STAMP}`;
 const VENUE_NAME = `E2E Hidden Names Venue ${STAMP}`;
 const FEATURED_NAME = `E2E Hidden Names Featured ${STAMP}`;
+/**
+ * Long before the seeded featured row. The home page player leads with the
+ * newest `featuredOn`, and this row has no cover art and no release, so a
+ * recent date here takes the lead from the seeded row and leaves the home page
+ * without a playable cover for as long as this file runs.
+ */
+const FEATURED_ON = new Date('2020-01-01T00:00:00.000Z');
 
 interface Seeded {
   hiddenId: string;
@@ -126,7 +133,7 @@ const seed = async (): Promise<Seeded> => {
     data: {
       displayName: FEATURED_NAME,
       publishedOn: now,
-      featuredOn: new Date(now.getTime() - 60_000),
+      featuredOn: FEATURED_ON,
       artists: { connect: [{ id: hidden.id }, { id: visible.id }] },
     },
   });

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { randomUUID } from 'node:crypto';
+
 import { PrismaClient } from '@prisma/client';
 
 import { test, expect } from '../fixtures/base.fixture';
@@ -12,6 +14,14 @@ const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+
+/**
+ * A name suffix no other test can share. A timestamp is not enough: several
+ * tests of this file start in the same millisecond in different workers, and
+ * a venue picked by name is then another test's venue, which that test
+ * deletes when it ends.
+ */
+const uniqueSuffix = (): string => randomUUID().slice(0, 8);
 
 /**
  * Helper to create a tour via the admin UI and return its ID.
@@ -48,7 +58,7 @@ const createTourViaUi = async (adminPage: Page, title: string): Promise<string> 
 const createTestVenue = async (overrides?: Record<string, string>) => {
   return prisma.venue.create({
     data: {
-      name: `E2E Venue ${Date.now()}`,
+      name: `E2E Venue ${uniqueSuffix()}`,
       city: 'New Orleans',
       state: 'LA',
       country: 'US',
@@ -59,18 +69,23 @@ const createTestVenue = async (overrides?: Record<string, string>) => {
 
 test.describe('Admin Venue Edit', () => {
   test.describe.configure({ timeout: 150000 });
-  let tourId: string;
-  let venueId: string;
+  let tourId: string | undefined;
+  let venueId: string | undefined;
   let venueName: string;
 
   test.beforeEach(async ({ adminPage }) => {
+    // Forget the previous test's rows first. If the setup below fails, the
+    // cleanup must find nothing to remove rather than the last test's ids.
+    tourId = undefined;
+    venueId = undefined;
+
     // Create a venue without address/postalCode to simulate the update use case
     const venue = await createTestVenue();
     venueId = venue.id;
     venueName = venue.name;
 
     // Create a tour via UI
-    const title = `E2E Venue Edit Tour ${Date.now()}`;
+    const title = `E2E Venue Edit Tour ${uniqueSuffix()}`;
     tourId = await createTourViaUi(adminPage, title);
 
     // Navigate to the tour edit page
@@ -79,10 +94,14 @@ test.describe('Admin Venue Edit', () => {
   });
 
   test.afterEach(async () => {
-    await prisma.tourDate.deleteMany({ where: { tourId } });
-    await prisma.tour.deleteMany({
-      where: { title: { startsWith: 'E2E Venue Edit Tour' } },
-    });
+    // Remove THIS test's tour only, by id. Prisma drops a filter whose value
+    // is undefined, so an unguarded `{ tourId }` after a failed setup deletes
+    // every tour date in the database. A title prefix would remove the tours
+    // of the other tests of this file running in other workers.
+    if (tourId) {
+      await prisma.tourDate.deleteMany({ where: { tourId } });
+      await prisma.tour.deleteMany({ where: { id: tourId } });
+    }
     if (venueId) {
       await prisma.venue.deleteMany({ where: { id: venueId } });
     }

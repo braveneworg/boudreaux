@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { randomUUID } from 'node:crypto';
+
 import { PrismaClient } from '@prisma/client';
 
 import { test, expect } from '../fixtures/base.fixture';
@@ -12,12 +14,20 @@ const E2E_DATABASE_URL =
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 /**
+ * A name suffix no other test can share. A timestamp is not enough: several
+ * tests of this file start in the same millisecond in different workers, and
+ * a venue picked by name is then another test's venue, which that test
+ * deletes when it ends.
+ */
+const uniqueSuffix = (): string => randomUUID().slice(0, 8);
+
+/**
  * Helper to create a venue directly in the DB for test use.
  */
 const createTestVenue = async () => {
   return prisma.venue.create({
     data: {
-      name: `E2E Venue ${Date.now()}`,
+      name: `E2E Venue ${uniqueSuffix()}`,
       city: 'New Orleans',
       state: 'LA',
       country: 'US',
@@ -48,7 +58,7 @@ test.describe('Admin Tour Date Artist Pills', () => {
     const now = new Date();
     const tour = await prisma.tour.create({
       data: {
-        title: `E2E Artist Pills Tour ${Date.now()}`,
+        title: `E2E Artist Pills Tour ${uniqueSuffix()}`,
         tourDates: {
           create: {
             startDate: now,
@@ -80,8 +90,12 @@ test.describe('Admin Tour Date Artist Pills', () => {
     // (fullyParallel + workers=50%), yanking their seeded tour date out from
     // under them mid-run and causing flaky "record not found" / empty-list
     // failures. Deleting the tour cascades to its tour dates and headliners.
-    await prisma.tourDate.deleteMany({ where: { tourId } });
-    await prisma.tour.deleteMany({ where: { id: tourId } });
+    // Guarded: Prisma drops a filter whose value is undefined, so after a
+    // failed setup an unguarded `{ tourId }` deletes every tour date.
+    if (tourId) {
+      await prisma.tourDate.deleteMany({ where: { tourId } });
+      await prisma.tour.deleteMany({ where: { id: tourId } });
+    }
     if (venueId) {
       await prisma.venue.deleteMany({ where: { id: venueId } });
     }

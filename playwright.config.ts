@@ -25,7 +25,9 @@ export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: true,
   forbidOnly: IS_CI,
-  retries: IS_CI ? 1 : 0,
+  // No retries anywhere. A retry hid the cross-spec races that PR #804
+  // fixed: each had passed CI on its second try. CI fails as a local run does.
+  retries: 0,
   timeout: IS_CI ? 45_000 : 30_000,
   expect: {
     timeout: 10_000,
@@ -43,7 +45,9 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || E2E_BASE_URL,
-    trace: 'on-first-retry',
+    // Without retries 'on-first-retry' never records; the failing run is the
+    // only run, so it keeps its trace (CI uploads e2e/test-results on failure).
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     navigationTimeout: 30_000,
