@@ -10,6 +10,8 @@ import {
   type BackfillCandidate,
   type BackfillDeps,
 } from './backfill-publish-credited-artists';
+import { artistWhere } from '../src/lib/repositories/_internal/artist-where';
+import { releaseWhere } from '../src/lib/repositories/_internal/release-where';
 
 import type { PrismaClient } from '@prisma/client';
 
@@ -19,11 +21,9 @@ const ID_B = 'bbbbbbbbbbbbbbbbbbbbbbbb';
 const ID_UNKNOWN = 'cccccccccccccccccccccccc';
 const ADMIN_ID = 'dddddddddddddddddddddddd';
 
-const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
-const LISTED_RELEASE = { publishedAt: { not: null }, OR: NOT_DELETED_OR };
 const AWAITING_WHERE = {
-  releases: { some: { release: LISTED_RELEASE } },
-  AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }, { OR: NOT_DELETED_OR }],
+  releases: { some: { release: releaseWhere.listed } },
+  AND: [artistWhere.unpublished, artistWhere.notDeleted],
 };
 
 const nameFields = {

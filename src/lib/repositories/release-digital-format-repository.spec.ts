@@ -4,6 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { digitalFormatWhere } from './_internal/digital-format-where';
 import { ReleaseDigitalFormatRepository } from './release-digital-format-repository';
 
 import type { ReleaseDigitalFormat, Prisma } from '@prisma/client';
@@ -164,10 +165,7 @@ describe('ReleaseDigitalFormatRepository', () => {
       const result = await repository.findAllByRelease(mockReleaseId);
 
       expect(prisma.releaseDigitalFormat.findMany).toHaveBeenCalledWith({
-        where: {
-          releaseId: mockReleaseId,
-          OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-        },
+        where: { releaseId: mockReleaseId, ...digitalFormatWhere.active },
         include: { files: { orderBy: { trackNumber: 'asc' } } },
       });
       expect(result).toHaveLength(2);
@@ -401,7 +399,7 @@ describe('ReleaseDigitalFormatRepository', () => {
   });
 
   describe('findActiveByReleaseAndFormat', () => {
-    it('queries with a strict deletedAt null filter and returns the bare format', async () => {
+    it('filters with the active fragment (null-safe) and returns the bare format', async () => {
       const mockFormat = createMockFormat();
       vi.mocked(prisma.releaseDigitalFormat.findFirst).mockResolvedValue(mockFormat);
 
@@ -412,7 +410,7 @@ describe('ReleaseDigitalFormatRepository', () => {
         where: {
           releaseId: mockReleaseId,
           formatType: 'MP3_320KBPS',
-          deletedAt: null,
+          ...digitalFormatWhere.active,
         },
       });
     });

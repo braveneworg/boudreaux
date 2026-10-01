@@ -4,6 +4,9 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { publicArtistWhere } from './_internal/artist-where';
+import { digitalFormatWhere } from './_internal/digital-format-where';
+import { releaseWhere } from './_internal/release-where';
 import {
   ReleaseDigitalFormatFileRepository,
   type TrackFileWithRelease,
@@ -239,14 +242,7 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             publishedAt: true,
             artistReleases: {
               // Only public artists are named (ADR-0015).
-              where: {
-                artist: {
-                  is: {
-                    publishedOn: { not: null },
-                    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-                  },
-                },
-              },
+              where: { artist: { is: publicArtistWhere } },
               select: {
                 artist: {
                   select: {
@@ -344,13 +340,8 @@ describe('ReleaseDigitalFormatFileRepository', () => {
           format: {
             is: {
               formatType: 'MP3_320KBPS',
-              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-              release: {
-                is: {
-                  publishedAt: { not: null },
-                  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-                },
-              },
+              ...digitalFormatWhere.active,
+              release: { is: releaseWhere.listed },
             },
           },
         },
@@ -391,13 +382,8 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             is: {
               formatType: 'AAC',
               releaseId: { in: ['r1', 'r2'] },
-              OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
-              release: {
-                is: {
-                  publishedAt: { not: null },
-                  AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-                },
-              },
+              ...digitalFormatWhere.active,
+              release: { is: releaseWhere.listed },
             },
           },
         },

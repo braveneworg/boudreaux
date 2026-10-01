@@ -12,13 +12,12 @@
  */
 
 import { publicArtistWhere } from './artist-where';
+import { isUnset } from './where-kit';
 
 import type { Prisma } from '@prisma/client';
 
 /** A headliner row that names no artist (absent counts as none). */
-const namesNoArtist = {
-  OR: [{ artistId: null }, { artistId: { isSet: false } }],
-} as const satisfies Prisma.TourDateHeadlinerWhereInput;
+const namesNoArtist = isUnset('artistId') satisfies Prisma.TourDateHeadlinerWhereInput;
 
 /** A headliner the public may see: one whose artist is a public artist. */
 export const publicHeadlinerWhere = {

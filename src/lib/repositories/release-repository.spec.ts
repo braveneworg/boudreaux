@@ -5,6 +5,8 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 
+import { publicArtistWhere } from './_internal/artist-where';
+import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { ReleaseRepository } from './release-repository';
 
 vi.mock('server-only', () => ({}));
@@ -62,13 +64,8 @@ describe('ReleaseRepository', () => {
     artistReleases: { include: { artist: true } },
   };
 
-  /** The public artist gate (ADR-0015, ADR-0016): published, not deleted. */
-  const PUBLIC_ARTIST = {
-    publishedOn: { not: null },
-    OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-  };
-  /** Only the credits whose artist is public are read. */
-  const PUBLIC_CREDITS = { artist: { is: PUBLIC_ARTIST } };
+  /** Only the credits whose artist is public are read (ADR-0015, ADR-0016). */
+  const PUBLIC_CREDITS = { artist: { is: publicArtistWhere } };
 
   const listingSelect = {
     id: true,
@@ -181,9 +178,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findMany({});
 
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({
-        AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-      });
+      expect(arg?.where).toEqual({ AND: [releaseWhere.notDeleted] });
     });
 
     it('includes soft-deleted releases when deleted=true', async () => {
@@ -201,7 +196,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findMany({ deleted: true, published: true });
 
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({ AND: [{ publishedAt: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [releasePublishedFilter(true)] });
     });
 
     it('filters to unpublished releases when published=false', async () => {
@@ -210,9 +205,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findMany({ deleted: true, published: false });
 
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({
-        AND: [{ OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }],
-      });
+      expect(arg?.where).toEqual({ AND: [releaseWhere.unpublished] });
     });
 
     it('adds a case-insensitive search OR across title/catalog/description', async () => {
@@ -266,13 +259,15 @@ describe('ReleaseRepository', () => {
   });
 
   describe('count', () => {
-    it('counts all releases with no filter', async () => {
+    it('counts every release that is not deleted when no filter is given', async () => {
       vi.mocked(prisma.release.count).mockResolvedValue(7 as never);
 
       const result = await ReleaseRepository.count();
 
       expect(result).toBe(7);
-      expect(prisma.release.count).toHaveBeenCalledWith({ where: {} });
+      expect(prisma.release.count).toHaveBeenCalledWith({
+        where: { AND: [releaseWhere.notDeleted] },
+      });
     });
 
     it('counts only published releases when published=true', async () => {
@@ -280,7 +275,9 @@ describe('ReleaseRepository', () => {
 
       await ReleaseRepository.count({ published: true });
 
-      expect(prisma.release.count).toHaveBeenCalledWith({ where: { publishedAt: { not: null } } });
+      expect(prisma.release.count).toHaveBeenCalledWith({
+        where: { AND: [releaseWhere.notDeleted, releasePublishedFilter(true)] },
+      });
     });
 
     it('counts only unpublished releases when published=false', async () => {
@@ -289,7 +286,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.count({ published: false });
 
       expect(prisma.release.count).toHaveBeenCalledWith({
-        where: { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] },
+        where: { AND: [releaseWhere.notDeleted, releaseWhere.unpublished] },
       });
     });
   });
@@ -421,10 +418,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findPublished({ skip: 24, take: 12 });
 
       expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: {
-          publishedAt: { not: null },
-          AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-        },
+        where: releaseWhere.listed,
         orderBy: { releasedOn: 'desc' },
         skip: 24,
         take: 12,
@@ -442,7 +436,7 @@ describe('ReleaseRepository', () => {
       expect(arg?.where).toEqual({
         publishedAt: { not: null },
         AND: [
-          { OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] },
+          releaseWhere.notDeleted,
           {
             OR: [
               { title: contains },
@@ -454,7 +448,7 @@ describe('ReleaseRepository', () => {
                     artist: {
                       is: {
                         AND: [
-                          PUBLIC_ARTIST,
+                          publicArtistWhere,
                           {
                             OR: [
                               { firstName: contains },
@@ -485,8 +479,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'release-123',
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          ...releaseWhere.listed,
         },
         include: detailSelect,
       });
@@ -501,10 +494,9 @@ describe('ReleaseRepository', () => {
 
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
-          artistReleases: { some: { artistId: 'artist-1', artist: { is: PUBLIC_ARTIST } } },
+          artistReleases: { some: { artistId: 'artist-1', artist: { is: publicArtistWhere } } },
           id: { not: 'release-123' },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          ...releaseWhere.listed,
         },
         orderBy: { releasedOn: 'desc' },
         include: {
@@ -537,8 +529,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
           artistReleases: { some: { artistId: 'artist-1' } },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          ...releaseWhere.listed,
         },
         orderBy: { releasedOn: 'desc' },
         select: { id: true, title: true },
@@ -599,8 +590,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
           artistReleases: { some: { artistId: 'artist-1' } },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+          ...releaseWhere.listed,
         },
         orderBy: { releasedOn: 'desc' },
         select: {
@@ -633,14 +623,14 @@ describe('ReleaseRepository', () => {
   });
 
   describe('findPublishedTitleById', () => {
-    it('queries a published release projecting id/title', async () => {
+    it('queries a listed (published, not deleted) release projecting id/title', async () => {
       vi.mocked(prisma.release.findFirst).mockResolvedValue({ id: 'r-1', title: 'T' } as never);
 
       const result = await ReleaseRepository.findPublishedTitleById('r-1');
 
       expect(result).toEqual({ id: 'r-1', title: 'T' });
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
-        where: { id: 'r-1', publishedAt: { not: null } },
+        where: { id: 'r-1', ...releaseWhere.listed },
         select: { id: true, title: true },
       });
     });

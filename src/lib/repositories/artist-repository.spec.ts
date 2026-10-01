@@ -9,6 +9,8 @@ import {
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
 
+import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { releaseWhere } from './_internal/release-where';
 import { ArtistRepository } from './artist-repository';
 
 vi.mock('server-only', () => ({}));
@@ -67,17 +69,8 @@ const adminInclude = {
 
 const nameSelect = { id: true, displayName: true, firstName: true, surname: true };
 
-/** The Mongo null-safe soft-delete guard: an absent field counts as not deleted. */
-const NOT_DELETED_OR = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
-
-/**
- * The public artist gate every public slug read applies (#786, ADR-0016):
- * published, not soft-deleted.
- */
-const PUBLIC_ARTIST_WHERE = {
-  publishedOn: { not: null },
-  OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-};
+/** The public artist gate every public slug read applies (#786, ADR-0016). */
+const PUBLIC_ARTIST_WHERE = publicArtistWhere;
 
 describe('ArtistRepository', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -167,9 +160,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findMany({});
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        AND: [{ OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }] }],
-      });
+      expect(arg?.where).toEqual({ AND: [artistWhere.notDeleted] });
     });
 
     it('includes soft-deleted artists when deleted=true', async () => {
@@ -196,9 +187,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findMany({ deleted: true, published: false });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        AND: [{ OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }],
-      });
+      expect(arg?.where).toEqual({ AND: [artistWhere.unpublished] });
     });
 
     it('adds a case-insensitive search OR across name fields', async () => {
@@ -250,13 +239,15 @@ describe('ArtistRepository', () => {
   });
 
   describe('count', () => {
-    it('counts all artists with no filter', async () => {
+    it('counts every artist that is not deleted when no filter is given', async () => {
       vi.mocked(prisma.artist.count).mockResolvedValue(7 as never);
 
       const result = await ArtistRepository.count();
 
       expect(result).toBe(7);
-      expect(prisma.artist.count).toHaveBeenCalledWith({ where: {} });
+      expect(prisma.artist.count).toHaveBeenCalledWith({
+        where: { AND: [artistWhere.notDeleted] },
+      });
     });
 
     it('counts only published artists when published=true', async () => {
@@ -264,7 +255,9 @@ describe('ArtistRepository', () => {
 
       await ArtistRepository.count({ published: true });
 
-      expect(prisma.artist.count).toHaveBeenCalledWith({ where: { publishedOn: { not: null } } });
+      expect(prisma.artist.count).toHaveBeenCalledWith({
+        where: { AND: [artistWhere.notDeleted, { publishedOn: { not: null } }] },
+      });
     });
   });
 
@@ -426,16 +419,8 @@ describe('ArtistRepository', () => {
       expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
-        publishedOn: { not: null },
-        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        releases: {
-          some: {
-            release: {
-              publishedAt: { not: null },
-              OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-            },
-          },
-        },
+        ...publicArtistWhere,
+        releases: { some: { release: releaseWhere.listed } },
       });
       expect(arg?.include?.bioImages).toEqual({
         where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
@@ -509,10 +494,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('listListed band names (ADR-0015)', () => {
-    const PUBLIC_ARTIST = {
-      publishedOn: { not: null },
-      OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-    };
+    const PUBLIC_ARTIST = publicArtistWhere;
 
     const readSelect = async (): Promise<{
       members: { where: unknown };
@@ -537,15 +519,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('listListed', () => {
-    const notDeleted = [{ deletedOn: null }, { deletedOn: { isSet: false } }];
-    const listedReleaseClause = {
-      some: {
-        release: {
-          publishedAt: { not: null },
-          OR: notDeleted,
-        },
-      },
-    };
+    const listedReleaseClause = { some: { release: releaseWhere.listed } };
     const searchOr = (arg: { where?: { AND?: Array<{ OR?: unknown[] }> } } | undefined) =>
       arg?.where?.AND?.[0]?.OR ?? [];
 
@@ -575,11 +549,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({
-        publishedOn: { not: null },
-        OR: notDeleted,
-        releases: listedReleaseClause,
-      });
+      expect(arg?.where).toEqual({ ...publicArtistWhere, releases: listedReleaseClause });
     });
 
     // Whether an artist is still on the label decides nothing (ADR-0016).
@@ -692,7 +662,7 @@ describe('ArtistRepository', () => {
         {
           releases: {
             some: {
-              release: { title: contains, publishedAt: { not: null }, OR: notDeleted },
+              release: { title: contains, ...releaseWhere.listed },
             },
           },
         },
@@ -1028,7 +998,7 @@ describe('ArtistRepository', () => {
 
       expect(result).toEqual({ id: 'a' });
       expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([
-        [{ where: { slug: 'ceschi', OR: NOT_DELETED_OR }, select: nameSelect }],
+        [{ where: { slug: 'ceschi', ...artistWhere.notDeleted }, select: nameSelect }],
       ]);
     });
   });
@@ -1041,7 +1011,10 @@ describe('ArtistRepository', () => {
 
       expect(result).toEqual({ id: 'a' });
       expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: { displayName: { equals: 'Ceschi', mode: 'insensitive' }, OR: NOT_DELETED_OR },
+        where: {
+          displayName: { equals: 'Ceschi', mode: 'insensitive' },
+          ...artistWhere.notDeleted,
+        },
         select: nameSelect,
       });
     });
@@ -1060,7 +1033,7 @@ describe('ArtistRepository', () => {
             { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
             { surname: { equals: 'Ramos', mode: 'insensitive' } },
           ],
-          OR: NOT_DELETED_OR,
+          ...artistWhere.notDeleted,
         },
         select: nameSelect,
       });
@@ -1550,16 +1523,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.listVocabularySource('genres');
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where?.OR).toEqual([{ deletedOn: null }, { deletedOn: { isSet: false } }]);
-    });
-
-    it('does not filter on deletedOn outside the OR clause', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
-
-      await ArtistRepository.listVocabularySource('genres');
-
-      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).not.toHaveProperty('deletedOn');
+      expect(arg?.where).toEqual(artistWhere.notDeleted);
     });
 
     it('selects only the requested column', async () => {
