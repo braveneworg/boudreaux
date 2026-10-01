@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { releaseDayFromStored } from '@/lib/utils/validation/iso-date';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 
@@ -11,7 +12,6 @@ import {
   type ReleaseDateLookupStatus,
 } from './use-release-date-auto-lookup';
 import { useReleaseDateAutosave } from './use-release-date-autosave';
-import { formatDateForForm } from './video-form-helpers';
 
 import type { VideoUploadStatus } from './use-video-upload';
 import type { UseFormReturn } from 'react-hook-form';
@@ -63,7 +63,7 @@ export const useVideoAutoFill = ({
   useReleaseDateAutosave({
     form,
     videoId: effectiveVideoId,
-    persistedReleasedOn: video ? formatDateForForm(video.releasedOn) : '',
+    persistedReleasedOn: releaseDayFromStored(video?.releasedOn) ?? '',
   });
   return { releaseDateLookupStatus: status };
 };

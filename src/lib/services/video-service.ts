@@ -15,6 +15,7 @@ import { deleteS3Object } from '@/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 
 import { failFromError } from './_internal/map-data-error';
+import { decidePublish, decideReleaseDate, type EditorialRefusal } from './video-editorial-rules';
 
 import type { ServiceResponse } from './service.types';
 
@@ -39,6 +40,13 @@ const collectVideoS3Keys = ({ s3Key, posterUrl, posterCandidates }: Video): stri
   });
 
   return [...keys];
+};
+
+/** The admin-facing message for each editorial refusal this service can return. */
+const EDITORIAL_REFUSALS: Record<EditorialRefusal, string> = {
+  RELEASE_DATE_REQUIRED: 'Set a release date before publishing',
+  PUBLISHED_KEEPS_DATE: 'A published video must keep a release date',
+  DESCRIPTION_NEVER_DISMISSED: 'A description suggestion is never dismissed',
 };
 
 export class VideoService {
@@ -115,7 +123,7 @@ export class VideoService {
   /**
    * Publish a video by stamping `publishedAt` with the current time. A
    * published video always carries a release date (ADR-0004): the list-level
-   * Publish action has no form to require one, so the refusal lives here.
+   * Publish action has no form to require one, so the rule is asked here.
    */
   static async publishVideo(id: string): Promise<ServiceResponse<Video>> {
     try {
@@ -123,12 +131,9 @@ export class VideoService {
       if (!existing) {
         return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
       }
-      if (!existing.releasedOn) {
-        return {
-          success: false,
-          error: 'Set a release date before publishing',
-          code: 'VALIDATION',
-        };
+      const decision = decidePublish(existing);
+      if (!decision.ok) {
+        return { success: false, error: EDITORIAL_REFUSALS[decision.reason], code: 'VALIDATION' };
       }
       const video = await VideoRepository.update(id, { publishedAt: new Date() });
       return { success: true, data: video };
@@ -143,8 +148,8 @@ export class VideoService {
   /**
    * Persist ONLY the release date — the single writer behind the edit form's
    * autosave. `null` clears it, which a draft may do (its date is never
-   * inferred) but a published video may not: published ⇒ dated is enforced
-   * here, not in the schema (ADR-0004).
+   * inferred) but a published video may not: published ⇒ dated is asked of
+   * the editorial rules here, not of the schema (ADR-0004).
    */
   static async updateVideoReleaseDate(
     id: string,
@@ -155,12 +160,9 @@ export class VideoService {
       if (!existing) {
         return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
       }
-      if (releasedOn === null && existing.publishedAt) {
-        return {
-          success: false,
-          error: 'A published video must keep a release date',
-          code: 'VALIDATION',
-        };
+      const decision = decideReleaseDate(existing, releasedOn);
+      if (!decision.ok) {
+        return { success: false, error: EDITORIAL_REFUSALS[decision.reason], code: 'VALIDATION' };
       }
       const video = await VideoRepository.update(id, { releasedOn });
       return { success: true, data: video };

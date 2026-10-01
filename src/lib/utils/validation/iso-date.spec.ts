@@ -4,9 +4,11 @@
 import {
   ISO_DATE_PATTERN,
   isRealCalendarDate,
+  isReleaseDay,
   isTodayUtc,
+  releaseDayFromForm,
+  releaseDayFromStored,
   todayUtcIsoDate,
-  toIsoDay,
 } from './iso-date';
 
 describe('ISO_DATE_PATTERN', () => {
@@ -53,25 +55,25 @@ describe('isRealCalendarDate', () => {
   });
 });
 
-describe('toIsoDay', () => {
+describe('releaseDayFromForm', () => {
   it('passes a YYYY-MM-DD day through unchanged', () => {
-    expect(toIsoDay('2020-06-01')).toBe('2020-06-01');
+    expect(releaseDayFromForm('2020-06-01')).toBe('2020-06-01');
   });
 
   it('returns null for an empty string', () => {
-    expect(toIsoDay('')).toBeNull();
+    expect(releaseDayFromForm('')).toBeNull();
   });
 
   it('returns null for null', () => {
-    expect(toIsoDay(null)).toBeNull();
+    expect(releaseDayFromForm(null)).toBeNull();
   });
 
   it('returns null for undefined', () => {
-    expect(toIsoDay(undefined)).toBeNull();
+    expect(releaseDayFromForm(undefined)).toBeNull();
   });
 
   it('returns null for an unparseable value', () => {
-    expect(toIsoDay('not-a-date')).toBeNull();
+    expect(releaseDayFromForm('not-a-date')).toBeNull();
   });
 
   // The DatePicker commits `date.toISOString()` for a Date built at LOCAL
@@ -80,13 +82,43 @@ describe('toIsoDay', () => {
   it('collapses a local-midnight ISO datetime to the local day', () => {
     const localMidnight = new Date(2020, 5, 1, 0, 0, 0);
 
-    expect(toIsoDay(localMidnight.toISOString())).toBe('2020-06-01');
+    expect(releaseDayFromForm(localMidnight.toISOString())).toBe('2020-06-01');
   });
 
   it('collapses a late-evening local ISO datetime to the same local day', () => {
     const lateEvening = new Date(2020, 5, 1, 23, 30, 0);
 
-    expect(toIsoDay(lateEvening.toISOString())).toBe('2020-06-01');
+    expect(releaseDayFromForm(lateEvening.toISOString())).toBe('2020-06-01');
+  });
+});
+
+describe('releaseDayFromStored', () => {
+  it('formats a stored UTC-midnight Date as its UTC day, whatever the local zone', () => {
+    expect(releaseDayFromStored(new Date('2020-06-01T00:00:00.000Z'))).toBe('2020-06-01');
+  });
+
+  it('keeps the UTC day right before UTC midnight', () => {
+    expect(releaseDayFromStored(new Date('2020-06-01T23:59:59.999Z'))).toBe('2020-06-01');
+  });
+
+  it('returns null for null and undefined', () => {
+    expect(releaseDayFromStored(null)).toBeNull();
+    expect(releaseDayFromStored(undefined)).toBeNull();
+  });
+
+  it('returns null for an invalid Date', () => {
+    expect(releaseDayFromStored(new Date('nope'))).toBeNull();
+  });
+});
+
+describe('isReleaseDay', () => {
+  it('narrows a real calendar day', () => {
+    expect(isReleaseDay('2024-02-29')).toBe(true);
+  });
+
+  it('rejects a non-day', () => {
+    expect(isReleaseDay('2023-02-29')).toBe(false);
+    expect(isReleaseDay('2024-02-29T00:00:00Z')).toBe(false);
   });
 });
 

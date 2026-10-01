@@ -16,6 +16,7 @@ import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-en
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { Json } from '@/lib/types/domain/shared';
+import type { UpdateVideoData } from '@/lib/types/domain/video';
 import type {
   CreateSuggestionRow,
   VideoEnrichmentState,
@@ -24,6 +25,12 @@ import type {
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
+import {
+  isReleaseDay,
+  releaseDayFromStored,
+  todayUtcIsoDate,
+  type ReleaseDay,
+} from '@/lib/utils/validation/iso-date';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
   isEnrichmentEligible,
@@ -59,6 +66,7 @@ import {
   verifyJobCallback,
   type CallbackProof,
 } from './lambda-dispatch';
+import { decideEnrichmentAutoApply } from './video-editorial-rules';
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
 import type { VideoEnrichmentCategory } from '@fakefour/job-contract';
@@ -334,6 +342,12 @@ const collectArtistRows = (
  * precision) from the admin-entered date and it was not already applied or
  * dismissed. Returns null when there is nothing to suggest.
  */
+/** The release day a Lambda value names, or null when it is not a calendar day. */
+const suggestedReleaseDay = (value: string): ReleaseDay | null => {
+  const day = normalizeDay(value);
+  return isReleaseDay(day) ? day : null;
+};
+
 const buildReleaseDateRow = (
   data: VideoEnrichmentData,
   state: VideoEnrichmentState,
@@ -341,12 +355,13 @@ const buildReleaseDateRow = (
 ): CreateSuggestionRow | null => {
   const releasedOn = data.video?.releasedOn;
   if (!releasedOn) return null;
-  if (normalizeDay(releasedOn.value) === toIsoDate(state.releasedOn)) return null;
+  const day = suggestedReleaseDay(releasedOn.value);
+  if (day === null || day === releaseDayFromStored(state.releasedOn)) return null;
   if (matchesExistingFact(facts, null, 'releasedOn', releasedOn.value)) return null;
   return {
     artistId: null,
     field: 'releasedOn',
-    value: normalizeDay(releasedOn.value),
+    value: day,
     confidence: releasedOn.confidence,
     sources: toJsonSources(releasedOn.sources),
     note: releasedOn.note ?? null,
@@ -415,25 +430,43 @@ const buildFeaturedArtistRows = ({
   return out;
 };
 
+/** The video-level row for `field`, if the batch carries one. */
+const videoLevelRow = (pending: CreateSuggestionRow[], field: string): CreateSuggestionRow | null =>
+  pending.find((row) => row.artistId === null && row.field === field) ?? null;
+
 /**
- * Split the description row out of the pending batch when it should
- * auto-apply: a video with no stored description (upload, or a replace that
- * cleared it) takes the synthesized prose directly instead of parking it for
- * review. A non-blank description is never overwritten — the row stays
- * pending for the admin to apply or dismiss.
+ * Split out of the pending batch the rows the editorial rules let the
+ * callback apply by itself — an empty release date takes the offered day
+ * (never today's), a blank description takes the synthesized prose — and
+ * keep the rest pending for review (ADR-0004, ADR-0005).
  */
-const takeAutoApplyDescription = (
+const takeAutoApplied = (
   state: VideoEnrichmentState,
-  pending: CreateSuggestionRow[]
-): { autoApply: CreateSuggestionRow | null; remaining: CreateSuggestionRow[] } => {
-  if (state.description?.trim()) return { autoApply: null, remaining: pending };
-  const autoApply =
-    pending.find((row) => row.artistId === null && row.field === 'description') ?? null;
-  return {
-    autoApply,
-    remaining: autoApply ? pending.filter((row) => row !== autoApply) : pending,
-  };
+  pending: CreateSuggestionRow[],
+  now: Date
+): { autoApplied: CreateSuggestionRow[]; remaining: CreateSuggestionRow[] } => {
+  const releaseRow = videoLevelRow(pending, 'releasedOn');
+  const descriptionRow = videoLevelRow(pending, 'description');
+  const decision = decideEnrichmentAutoApply({
+    state: { releasedOn: releaseDayFromStored(state.releasedOn), description: state.description },
+    offered: {
+      releasedOn: releaseRow ? suggestedReleaseDay(releaseRow.value) : null,
+      description: descriptionRow?.value ?? null,
+    },
+    today: todayUtcIsoDate(now),
+  });
+  const autoApplied = [
+    ...(decision.releasedOn !== null && releaseRow ? [releaseRow] : []),
+    ...(decision.description !== null && descriptionRow ? [descriptionRow] : []),
+  ];
+  return { autoApplied, remaining: pending.filter((row) => !autoApplied.includes(row)) };
 };
+
+/** The row's value as the field's stored type. */
+const toAppliedUpdate = (row: CreateSuggestionRow): UpdateVideoData =>
+  row.field === 'releasedOn'
+    ? { releasedOn: new Date(`${row.value}T00:00:00.000Z`) }
+    : { description: row.value };
 
 /**
  * Convert the Lambda's validated payload into pending suggestion rows:
@@ -537,7 +570,7 @@ const dispatchEnrichment = async (
     title: state.title,
     artistDisplay: state.artist,
     category: state.category,
-    releasedOn: toIsoDate(state.releasedOn),
+    releasedOn: releaseDayFromStored(state.releasedOn) ?? undefined,
     artists: toLambdaArtists(rows),
     callbackUrl: `${base}/api/videos/${state.id}/enrichment/callback`,
     progressUrl: `${base}/api/videos/${state.id}/enrichment/progress`,
@@ -673,7 +706,7 @@ export class VideoEnrichmentService {
       error,
       progress,
       enrichedAt: state.enrichedAt ? state.enrichedAt.toISOString() : null,
-      currentReleasedOn: toIsoDate(state.releasedOn) ?? '',
+      currentReleasedOn: releaseDayFromStored(state.releasedOn) ?? '',
       artists: rows.map(toStatusArtist),
       suggestions: stored
         .map(toStatusSuggestion)
@@ -748,8 +781,8 @@ export class VideoEnrichmentService {
   /**
    * Complete a claimed job: a non-ok result flips to `failed`; an ok result
    * filters/fences/merges the suggestions (see {@link buildPendingRows}),
-   * replaces the pending rows, auto-applies the synthesized description when
-   * the video has none (see {@link takeAutoApplyDescription}), and flips to
+   * replaces the pending rows, applies by itself what the editorial rules
+   * allow (see {@link takeAutoApplied}), and flips to
    * `succeeded`. Never throws — it runs post-response via `after()`.
    */
   static async completeCallback(videoId: string, result: VideoEnrichmentResult): Promise<void> {
@@ -763,11 +796,11 @@ export class VideoEnrichmentService {
       const rows = await VideoArtistRepository.findByVideoId(videoId);
       const facts = await VideoEnrichmentSuggestionRepository.findExistingFacts(videoId);
       const pending = buildPendingRows({ data: result.data, state, rows, facts });
-      const { autoApply, remaining } = takeAutoApplyDescription(state, pending);
+      const { autoApplied, remaining } = takeAutoApplied(state, pending, new Date());
       await VideoEnrichmentSuggestionRepository.replacePending(videoId, remaining);
-      if (autoApply) {
-        await VideoRepository.update(videoId, { description: autoApply.value });
-        await VideoEnrichmentSuggestionRepository.createApplied(videoId, autoApply);
+      for (const row of autoApplied) {
+        await VideoRepository.update(videoId, toAppliedUpdate(row));
+        await VideoEnrichmentSuggestionRepository.createApplied(videoId, row);
       }
       await VideoRepository.setEnrichmentStatus(videoId, 'succeeded', { error: null });
     } catch (error) {

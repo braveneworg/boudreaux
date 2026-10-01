@@ -11,6 +11,7 @@ import { VideoArtistRepository } from '@/lib/repositories/video-artist-repositor
 import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { ArtistService, type ArtistEnrichedField } from '@/lib/services/artist-service';
+import { decideSuggestionDismiss } from '@/lib/services/video-editorial-rules';
 import type { VideoEnrichmentSuggestionRecord } from '@/lib/types/domain/video-enrichment';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
@@ -113,6 +114,13 @@ const dismissSuggestion = async (
   suggestionId: string,
   userId: string
 ): Promise<ApplyVideoSuggestionActionResult> => {
+  const suggestion = await VideoEnrichmentSuggestionRepository.findById(suggestionId);
+  if (!suggestion) return ALREADY_RESOLVED;
+  // A description suggestion is applied or ignored, never dismissed (ADR-0005).
+  const decision = decideSuggestionDismiss(suggestion);
+  if (!decision.ok) {
+    return { success: false, error: 'A description suggestion is never dismissed.' };
+  }
   const dismissed = await VideoEnrichmentSuggestionRepository.markDismissed(suggestionId);
   if (!dismissed) return ALREADY_RESOLVED;
   logSecurityEvent({

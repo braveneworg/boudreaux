@@ -240,8 +240,9 @@ _Avoid_: autofill, "Find release date".
 
 **pending suggestion** — an enrichment fact that awaits human review before it
 changes a Video. A release-date suggestion fills only an **empty** release date
-by itself; when a date already exists it stays pending until applied or
-dismissed.
+by itself, and never when it names today — today only ever appears because a
+human typed it; when a date already exists, or the suggestion is today, it
+stays pending until applied or dismissed.
 _Avoid_: auto-apply (that is what happens to it, not what it is).
 
 **description** — the prose stored on a Video and shown on its page. It is

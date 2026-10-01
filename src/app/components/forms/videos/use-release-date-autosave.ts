@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 import { useUpdateVideoReleaseDateMutation } from '@/hooks/mutations/use-video-mutations';
 import { useDebounce } from '@/hooks/use-debounce';
-import { toIsoDay } from '@/lib/utils/validation/iso-date';
+import { releaseDayFromForm } from '@/lib/utils/validation/iso-date';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import type { UseFormReturn } from 'react-hook-form';
@@ -68,7 +68,7 @@ export const useReleaseDateAutosave = ({
 
   useEffect(() => {
     if (!videoId || inFlightRef.current) return;
-    const day = toIsoDay(debounced);
+    const day = releaseDayFromForm(debounced);
     if (!day || day === lastPersistedRef.current || day === lastFailedRef.current) return;
 
     const fail = (): void => {
@@ -84,7 +84,7 @@ export const useReleaseDateAutosave = ({
         }
         lastPersistedRef.current = day;
         lastFailedRef.current = null;
-        if (toIsoDay(getValues('releasedOn')) === day) {
+        if (releaseDayFromForm(getValues('releasedOn')) === day) {
           resetField('releasedOn', { defaultValue: day });
         }
       })

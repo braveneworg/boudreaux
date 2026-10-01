@@ -1351,7 +1351,9 @@ describe('completeCallback', () => {
     ]);
   });
 
-  it('persists the release date as a suggestion when the draft has no date yet', async () => {
+  // ADR-0004: a release-date suggestion fills only an empty release date, by
+  // itself — here, at enrichment time, with no form open.
+  it('fills an empty release date from the suggestion and records it as applied', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValueOnce(
       baseState({ releasedOn: null })
     );
@@ -1371,9 +1373,67 @@ describe('completeCallback', () => {
       },
     });
 
-    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
-      expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2021-04-09' }),
+    expect(vi.mocked(VideoRepository.update).mock.calls).toEqual([
+      [VIDEO_ID, { releasedOn: new Date('2021-04-09T00:00:00.000Z') }],
     ]);
+    expect(VideoEnrichmentSuggestionRepository.createApplied).toHaveBeenCalledWith(
+      VIDEO_ID,
+      expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2021-04-09' })
+    );
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
+  });
+
+  it("leaves today's UTC day pending for review — today never appears by itself", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'));
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValueOnce(
+      baseState({ releasedOn: null })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          releasedOn: {
+            value: '2026-10-01',
+            confidence: 'medium',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+    vi.useRealTimers();
+
+    expect(VideoRepository.update).not.toHaveBeenCalled();
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
+      expect.objectContaining({ artistId: null, field: 'releasedOn', value: '2026-10-01' }),
+    ]);
+  });
+
+  it('drops a release-date suggestion that is not a calendar day', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValueOnce(
+      baseState({ releasedOn: null })
+    );
+
+    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+      ok: true,
+      data: {
+        artists: [],
+        video: {
+          releasedOn: {
+            value: 'spring 2021',
+            confidence: 'low',
+            sources: [{ url: 'https://example.com/premiere' }],
+          },
+        },
+        model: 'gemini-2.5-flash',
+      },
+    });
+
+    expect(VideoRepository.update).not.toHaveBeenCalled();
+    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('persists description and featuredArtist rows from the callback', async () => {

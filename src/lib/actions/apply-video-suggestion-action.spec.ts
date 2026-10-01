@@ -247,6 +247,37 @@ describe('applyVideoSuggestionAction', () => {
     expect(VideoEnrichmentSuggestionRepository.markDismissed).toHaveBeenCalledWith(SUGGESTION_ID);
   });
 
+  // ADR-0005: a description suggestion is applied or ignored, never dismissed —
+  // a rule the panel never offered, now refused by the server as well.
+  it('refuses to dismiss a video-level description suggestion', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
+      suggestion({ artistId: null, field: 'description', value: 'Prose.' })
+    );
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'dismiss',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'A description suggestion is never dismissed.',
+    });
+    expect(VideoEnrichmentSuggestionRepository.markDismissed).not.toHaveBeenCalled();
+  });
+
+  it('reports a dismiss of a suggestion that no longer exists as already resolved', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(null);
+
+    const result = await applyVideoSuggestionAction({
+      suggestionId: SUGGESTION_ID,
+      op: 'dismiss',
+    });
+
+    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(VideoEnrichmentSuggestionRepository.markDismissed).not.toHaveBeenCalled();
+  });
+
   it('rejects an impossible calendar month for bornOn (2020-13-45)', async () => {
     vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(
       suggestion({ value: '2020-13-45' })

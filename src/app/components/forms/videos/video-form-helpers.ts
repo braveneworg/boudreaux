@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { VIDEO_ALLOWED_MIME_TYPES, VIDEO_MAX_FILE_SIZE } from '@/lib/constants/video-uploads';
+import { releaseDayFromStored } from '@/lib/utils/validation/iso-date';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type { VideoRow } from '@/lib/validation/video-schema';
 import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
@@ -46,7 +47,7 @@ export const mapVideoToFormValues = (video: VideoRow): VideoFormData => ({
   artist: video.artist,
   category: video.category,
   description: video.description ?? '',
-  releasedOn: formatDateForForm(video.releasedOn),
+  releasedOn: releaseDayFromStored(video.releasedOn) ?? '',
   durationSeconds: video.durationSeconds == null ? '' : String(video.durationSeconds),
   s3Key: video.s3Key,
   fileName: video.fileName,
