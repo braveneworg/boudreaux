@@ -21,7 +21,6 @@ import type {
 } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
-import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -371,8 +370,8 @@ const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
  *
  * The only layer that touches Prisma for releases: it owns the query shapes
  * (includes/selects/where DSL), translates domain input to Prisma input, and
- * wraps every call in `runQuery` so callers see vendor-neutral `DataError`s and
- * hand-written domain types.
+ * returns hand-written domain types; failures surface as vendor-neutral
+ * `DataError`s.
  */
 export class ReleaseRepository {
   /**
@@ -380,12 +379,10 @@ export class ReleaseRepository {
    * (images unbounded, plus artists, digital formats + files, and URLs).
    */
   static async create(data: CreateReleaseData): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.create({
-        data: toPrismaCreate(data),
-        include: releaseDetailIncludeUnorderedImages,
-      })
-    ) as Promise<Release>;
+    return prisma.release.create({
+      data: toPrismaCreate(data),
+      include: releaseDetailIncludeUnorderedImages,
+    }) as Promise<Release>;
   }
 
   /**
@@ -393,12 +390,10 @@ export class ReleaseRepository {
    * and ordered by `sortOrder`. Returns `null` when not found.
    */
   static async findById(id: string): Promise<Release | null> {
-    return runQuery(() =>
-      prisma.release.findUnique({
-        where: { id },
-        include: releaseDetailIncludeWithImages,
-      })
-    ) as Promise<Release | null>;
+    return prisma.release.findUnique({
+      where: { id },
+      include: releaseDetailIncludeWithImages,
+    }) as Promise<Release | null>;
   }
 
   /**
@@ -409,15 +404,13 @@ export class ReleaseRepository {
    */
   static async findMany(filters: ReleaseListFilters): Promise<ReleaseListItem[]> {
     const { skip = 0, take = 50 } = filters;
-    return runQuery(() =>
-      prisma.release.findMany({
-        where: buildListWhere(filters),
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: releaseListItemInclude,
-      })
-    ) as Promise<ReleaseListItem[]>;
+    return prisma.release.findMany({
+      where: buildListWhere(filters),
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: releaseListItemInclude,
+    }) as Promise<ReleaseListItem[]>;
   }
 
   /** Count releases matching an optional published filter (admin dashboard). */
@@ -428,7 +421,7 @@ export class ReleaseRepository {
         : filters.published === false
           ? { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }
           : {};
-    return runQuery(() => prisma.release.count({ where }));
+    return prisma.release.count({ where });
   }
 
   /**
@@ -436,13 +429,11 @@ export class ReleaseRepository {
    * unordered to match the prior payload shape).
    */
   static async update(id: string, data: UpdateReleaseData): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.update({
-        where: { id },
-        data: toPrismaUpdate(data),
-        include: releaseDetailIncludeUnorderedImages,
-      })
-    ) as Promise<Release>;
+    return prisma.release.update({
+      where: { id },
+      data: toPrismaUpdate(data),
+      include: releaseDetailIncludeUnorderedImages,
+    }) as Promise<Release>;
   }
 
   /**
@@ -450,12 +441,10 @@ export class ReleaseRepository {
    * without re-hydrating relations. Returns the raw updated release.
    */
   static async updateData(id: string, data: UpdateReleaseData): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.update({
-        where: { id },
-        data: toPrismaUpdate(data),
-      })
-    ) as unknown as Promise<Release>;
+    return prisma.release.update({
+      where: { id },
+      data: toPrismaUpdate(data),
+    }) as unknown as Promise<Release>;
   }
 
   /**
@@ -463,13 +452,11 @@ export class ReleaseRepository {
    * with the full detail include (files unordered, matching the prior shape).
    */
   static async softDelete(id: string): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.update({
-        where: { id },
-        data: { deletedOn: new Date() },
-        include: releaseDetailIncludeUnorderedImages,
-      })
-    ) as Promise<Release>;
+    return prisma.release.update({
+      where: { id },
+      data: { deletedOn: new Date() },
+      include: releaseDetailIncludeUnorderedImages,
+    }) as Promise<Release>;
   }
 
   /**
@@ -477,13 +464,11 @@ export class ReleaseRepository {
    * full detail include (files unordered, matching the prior shape).
    */
   static async restore(id: string): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.update({
-        where: { id },
-        data: { deletedOn: null },
-        include: releaseDetailIncludeUnorderedImages,
-      })
-    ) as Promise<Release>;
+    return prisma.release.update({
+      where: { id },
+      data: { deletedOn: null },
+      include: releaseDetailIncludeUnorderedImages,
+    }) as Promise<Release>;
   }
 
   /**
@@ -492,12 +477,10 @@ export class ReleaseRepository {
    * release does not exist.
    */
   static async findForDeletion(id: string): Promise<ReleaseForDeletion | null> {
-    return runQuery(() =>
-      prisma.release.findUnique({
-        where: { id },
-        include: releaseForDeletionInclude,
-      })
-    ) as Promise<ReleaseForDeletion | null>;
+    return prisma.release.findUnique({
+      where: { id },
+      include: releaseForDeletionInclude,
+    }) as Promise<ReleaseForDeletion | null>;
   }
 
   /**
@@ -505,18 +488,16 @@ export class ReleaseRepository {
    * all related records have been removed).
    */
   static async delete(id: string): Promise<Release> {
-    return runQuery(() =>
-      prisma.release.delete({
-        where: { id },
-      })
-    ) as unknown as Promise<Release>;
+    return prisma.release.delete({
+      where: { id },
+    }) as unknown as Promise<Release>;
   }
 
   /**
    * Delete all ReleaseUrl junction records for a release.
    */
   static async deleteReleaseUrls(releaseId: string): Promise<void> {
-    await runQuery(() => prisma.releaseUrl.deleteMany({ where: { releaseId } }));
+    await prisma.releaseUrl.deleteMany({ where: { releaseId } });
   }
 
   /**
@@ -524,7 +505,7 @@ export class ReleaseRepository {
    * release only). Part of the release delete cascade.
    */
   static async deleteImages(releaseId: string): Promise<void> {
-    await runQuery(() => prisma.image.deleteMany({ where: { releaseId } }));
+    await prisma.image.deleteMany({ where: { releaseId } });
   }
 
   /**
@@ -532,7 +513,7 @@ export class ReleaseRepository {
    * the Artist records themselves).
    */
   static async deleteArtistReleases(releaseId: string): Promise<void> {
-    await runQuery(() => prisma.artistRelease.deleteMany({ where: { releaseId } }));
+    await prisma.artistRelease.deleteMany({ where: { releaseId } });
   }
 
   /**
@@ -540,12 +521,10 @@ export class ReleaseRepository {
    * without deleting the FeaturedArtist records.
    */
   static async clearFeaturedArtistReferences(releaseId: string): Promise<void> {
-    await runQuery(() =>
-      prisma.featuredArtist.updateMany({
-        where: { releaseId },
-        data: { releaseId: null },
-      })
-    );
+    await prisma.featuredArtist.updateMany({
+      where: { releaseId },
+      data: { releaseId: null },
+    });
   }
 
   /**
@@ -555,15 +534,13 @@ export class ReleaseRepository {
    */
   static async findPublished(filters: PublishedReleaseFilters): Promise<PublishedReleaseListing[]> {
     const { skip = 0, take = 24, search } = filters;
-    return runQuery(() =>
-      prisma.release.findMany({
-        where: buildPublishedWhere(search),
-        orderBy: { releasedOn: 'desc' },
-        skip,
-        take,
-        select: publishedReleaseListingSelect,
-      })
-    ) as Promise<PublishedReleaseListing[]>;
+    return prisma.release.findMany({
+      where: buildPublishedWhere(search),
+      orderBy: { releasedOn: 'desc' },
+      skip,
+      take,
+      select: publishedReleaseListingSelect,
+    }) as Promise<PublishedReleaseListing[]>;
   }
 
   /**
@@ -571,16 +548,14 @@ export class ReleaseRepository {
    * (tracks ordered by trackNumber). Returns `null` when missing/unpublished.
    */
   static async findPublishedWithTracks(id: string): Promise<PublishedReleaseDetail | null> {
-    return runQuery(() =>
-      prisma.release.findFirst({
-        where: {
-          id,
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        include: publishedReleaseDetailInclude,
-      })
-    ) as Promise<PublishedReleaseDetail | null>;
+    return prisma.release.findFirst({
+      where: {
+        id,
+        publishedAt: { not: null },
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+      include: publishedReleaseDetailInclude,
+    }) as Promise<PublishedReleaseDetail | null>;
   }
 
   /**
@@ -593,18 +568,16 @@ export class ReleaseRepository {
     artistId: string,
     excludeReleaseId: string
   ): Promise<ReleaseCarouselItem[]> {
-    return runQuery(() =>
-      prisma.release.findMany({
-        where: {
-          artistReleases: { some: { artistId, artist: { is: publicArtistWhere } } },
-          id: { not: excludeReleaseId },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        orderBy: { releasedOn: 'desc' },
-        include: releaseCarouselInclude,
-      })
-    ) as Promise<ReleaseCarouselItem[]>;
+    return prisma.release.findMany({
+      where: {
+        artistReleases: { some: { artistId, artist: { is: publicArtistWhere } } },
+        id: { not: excludeReleaseId },
+        publishedAt: { not: null },
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+      orderBy: { releasedOn: 'desc' },
+      include: releaseCarouselInclude,
+    }) as Promise<ReleaseCarouselItem[]>;
   }
 
   /**
@@ -614,17 +587,15 @@ export class ReleaseRepository {
    * generation (the lambda has no DB access).
    */
   static async findPublishedByArtist(artistId: string): Promise<ReleaseLinkSource[]> {
-    return runQuery(() =>
-      prisma.release.findMany({
-        where: {
-          artistReleases: { some: { artistId } },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        orderBy: { releasedOn: 'desc' },
-        select: { id: true, title: true },
-      })
-    ) as Promise<ReleaseLinkSource[]>;
+    return prisma.release.findMany({
+      where: {
+        artistReleases: { some: { artistId } },
+        publishedAt: { not: null },
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+      orderBy: { releasedOn: 'desc' },
+      select: { id: true, title: true },
+    }) as Promise<ReleaseLinkSource[]>;
   }
 
   /**
@@ -636,17 +607,15 @@ export class ReleaseRepository {
    * cover art to the image palette after generation.
    */
   static async findPublishedByArtistWithCovers(artistId: string): Promise<ReleaseCoverSource[]> {
-    const releases = await runQuery(() =>
-      prisma.release.findMany({
-        where: {
-          artistReleases: { some: { artistId } },
-          publishedAt: { not: null },
-          OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-        },
-        orderBy: { releasedOn: 'desc' },
-        select: releaseCoverSourceSelect,
-      })
-    );
+    const releases = await prisma.release.findMany({
+      where: {
+        artistReleases: { some: { artistId } },
+        publishedAt: { not: null },
+        OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
+      },
+      orderBy: { releasedOn: 'desc' },
+      select: releaseCoverSourceSelect,
+    });
     return releases.map(({ id, title, releasedOn, images }) => ({
       id,
       title,
@@ -665,22 +634,20 @@ export class ReleaseRepository {
     publishedAt: Date | null;
     deletedOn: Date | null;
   } | null> {
-    return runQuery(() =>
-      prisma.release.findFirst({
-        where: {
-          title: {
-            equals: title,
-            mode: 'insensitive',
-          },
+    return prisma.release.findFirst({
+      where: {
+        title: {
+          equals: title,
+          mode: 'insensitive',
         },
-        select: {
-          id: true,
-          title: true,
-          publishedAt: true,
-          deletedOn: true,
-        },
-      })
-    );
+      },
+      select: {
+        id: true,
+        title: true,
+        publishedAt: true,
+        deletedOn: true,
+      },
+    });
   }
 
   /**
@@ -688,36 +655,30 @@ export class ReleaseRepository {
    * release is missing or unpublished.
    */
   static async findPublishedTitleById(id: string): Promise<{ id: string; title: string } | null> {
-    return runQuery(() =>
-      prisma.release.findFirst({
-        where: { id, publishedAt: { not: null } },
-        select: { id: true, title: true },
-      })
-    );
+    return prisma.release.findFirst({
+      where: { id, publishedAt: { not: null } },
+      select: { id: true, title: true },
+    });
   }
 
   /**
    * Fetch the title of a release by id regardless of publish state.
    */
   static async findTitleById(id: string): Promise<{ id: string; title: string } | null> {
-    return runQuery(() =>
-      prisma.release.findUnique({
-        where: { id },
-        select: { id: true, title: true },
-      })
-    );
+    return prisma.release.findUnique({
+      where: { id },
+      select: { id: true, title: true },
+    });
   }
 
   /**
    * Lightweight existence check by release id.
    */
   static async existsById(id: string): Promise<boolean> {
-    const found = await runQuery(() =>
-      prisma.release.findUnique({
-        where: { id },
-        select: { id: true },
-      })
-    );
+    const found = await prisma.release.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     return Boolean(found);
   }
 }

@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
-import { DataError } from '@/lib/types/domain/errors';
 import type { AddPlaylistItemData, CreatePlaylistData } from '@/lib/types/domain/playlist';
 
 import { PlaylistRepository } from './playlist-repository';
@@ -91,24 +88,6 @@ describe('PlaylistRepository', () => {
 
       expect(result).toEqual(mockPlaylist);
       expect(prisma.playlist.create).toHaveBeenCalledWith({ data: createData });
-    });
-
-    it('wraps a Prisma duplicate error as a DataError with code DUPLICATE', async () => {
-      vi.mocked(prisma.playlist.create).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2002', clientVersion: '6' })
-      );
-
-      await expect(PlaylistRepository.create(createData)).rejects.toMatchObject({
-        code: 'DUPLICATE',
-      });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.playlist.create).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(PlaylistRepository.create(createData)).rejects.toBeInstanceOf(DataError);
     });
   });
 

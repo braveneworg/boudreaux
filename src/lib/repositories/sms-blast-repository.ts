@@ -6,8 +6,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { CreateSmsBlastData, SmsBlastRecord } from '@/lib/types/domain';
 
-import { runQuery } from './_internal/map-prisma-error';
-
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -18,15 +16,14 @@ const _smsBlastDrift: _SmsBlastDrift = true;
 
 /**
  * Data-access layer for `SmsBlast` records. The only layer that touches Prisma
- * for SMS blast history: it owns the query shapes, wraps every call in
- * `runQuery` so callers see vendor-neutral `DataError`s, and returns
- * hand-written domain types. Business logic (recipient selection, chunked
+ * for SMS blast history: it owns the query shapes, surfaces failures as
+ * vendor-neutral `DataError`s, and returns hand-written domain types. Business logic (recipient selection, chunked
  * sending, ServiceResponse wrapping) stays in the service.
  */
 export class SmsBlastRepository {
   /** Persist a completed SMS blast record. */
   static async create(data: CreateSmsBlastData): Promise<SmsBlastRecord> {
-    return runQuery(() => prisma.smsBlast.create({ data }));
+    return prisma.smsBlast.create({ data });
   }
 
   /**
@@ -34,11 +31,9 @@ export class SmsBlastRepository {
    * Used by the admin announcements history view.
    */
   static async findRecent(take: number): Promise<SmsBlastRecord[]> {
-    return runQuery(() =>
-      prisma.smsBlast.findMany({
-        orderBy: { createdAt: 'desc' },
-        take,
-      })
-    );
+    return prisma.smsBlast.findMany({
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
   }
 }

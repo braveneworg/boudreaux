@@ -486,8 +486,8 @@ const buildGeneratedLinks = (
 /**
  * Data-access layer for the Artist and ArtistRelease models. The only layer that
  * touches Prisma for artists: it owns the query shapes (includes/where DSL),
- * translates domain input to Prisma input, and wraps every call in `runQuery`
- * so callers see vendor-neutral `DataError`s and hand-written domain types.
+ * translates domain input to Prisma input, and returns hand-written domain
+ * types; failures surface as vendor-neutral `DataError`s.
  */
 export class ArtistRepository {
   /**
@@ -504,21 +504,20 @@ export class ArtistRepository {
    * filter quirk every other query in this file guards against).
    */
   static async listVocabularySource(field: ArtistVocabularyField): Promise<string[]> {
-    const rows = await runQuery(() =>
-      prisma.artist.findMany({
-        where: { OR: [...notDeletedOr] },
-        select: vocabularySelect(field),
-      })
-    );
+    const rows = await prisma.artist.findMany({
+      where: { OR: [...notDeletedOr] },
+      select: vocabularySelect(field),
+    });
 
     return rows.map((row) => readVocabularyColumn(field, row) ?? '').filter(Boolean);
   }
 
   /** Create a new artist, returning the full admin payload. */
   static async create(data: CreateArtistData): Promise<Artist> {
-    return runQuery(() =>
-      prisma.artist.create({ data: toPrismaCreate(data), include: artistAdminInclude })
-    ) as Promise<Artist>;
+    return prisma.artist.create({
+      data: toPrismaCreate(data),
+      include: artistAdminInclude,
+    }) as Promise<Artist>;
   }
 
   /**
@@ -527,7 +526,7 @@ export class ArtistRepository {
    * shape omits.
    */
   static async findById(id: string): Promise<ArtistDetail | null> {
-    return runQuery(() => prisma.artist.findUnique({ where: { id } }));
+    return prisma.artist.findUnique({ where: { id } });
   }
 
   /**
@@ -536,9 +535,10 @@ export class ArtistRepository {
    * A draft or deleted artist reads as absent (#786).
    */
   static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
-    return runQuery(() =>
-      prisma.artist.findFirst({ where: { slug, ...publicArtistWhere }, select: artistPublicSelect })
-    );
+    return prisma.artist.findFirst({
+      where: { slug, ...publicArtistWhere },
+      select: artistPublicSelect,
+    });
   }
 
   /**
@@ -562,9 +562,7 @@ export class ArtistRepository {
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
     const where = buildListedWhere(search);
-    const records = await runQuery(() =>
-      prisma.artist.findMany({ where, select: artistListingSelect })
-    );
+    const records = await prisma.artist.findMany({ where, select: artistListingSelect });
     const compare = sort === 'alpha' ? compareByDisplayName : compareByNewestRelease;
     return [...records].sort(compare).slice(skip, skip + take);
   }
@@ -575,15 +573,13 @@ export class ArtistRepository {
    */
   static async findMany(filters: ArtistListFilters): Promise<Artist[]> {
     const { skip = 0, take = 50 } = filters;
-    return runQuery(() =>
-      prisma.artist.findMany({
-        where: buildListWhere(filters),
-        skip,
-        take,
-        orderBy: { createdAt: 'desc' },
-        include: artistAdminInclude,
-      })
-    ) as Promise<Artist[]>;
+    return prisma.artist.findMany({
+      where: buildListWhere(filters),
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: artistAdminInclude,
+    }) as Promise<Artist[]>;
   }
 
   /** Count artists matching an optional published filter (admin dashboard). */
@@ -594,18 +590,16 @@ export class ArtistRepository {
         : filters.published === false
           ? { OR: [{ publishedOn: null }, { publishedOn: { isSet: false } }] }
           : {};
-    return runQuery(() => prisma.artist.count({ where }));
+    return prisma.artist.count({ where });
   }
 
   /** Update an artist by id, returning the full admin payload. */
   static async update(id: string, data: UpdateArtistData): Promise<Artist> {
-    return runQuery(() =>
-      prisma.artist.update({
-        where: { id },
-        data: toPrismaUpdate(data),
-        include: artistAdminInclude,
-      })
-    ) as Promise<Artist>;
+    return prisma.artist.update({
+      where: { id },
+      data: toPrismaUpdate(data),
+      include: artistAdminInclude,
+    }) as Promise<Artist>;
   }
 
   /**
@@ -637,23 +631,23 @@ export class ArtistRepository {
 
   /** Soft-delete (archive) an artist by setting deletedOn to now. */
   static async archive(id: string): Promise<ArtistScalars> {
-    return runQuery(() =>
-      prisma.artist.update({ where: { id }, data: { deletedOn: new Date() } })
-    ) as Promise<ArtistScalars>;
+    return prisma.artist.update({
+      where: { id },
+      data: { deletedOn: new Date() },
+    }) as Promise<ArtistScalars>;
   }
 
   /** Lightweight existence check returning only the id (or null). */
   static async existsById(artistId: string): Promise<{ id: string } | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } })
-    );
+    return prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } });
   }
 
   /** Find an artist by id returning only the name projection (or null). */
   static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({ where: { id: artistId }, select: nameSelect })
-    ) as Promise<ArtistNameRecord | null>;
+    return prisma.artist.findUnique({
+      where: { id: artistId },
+      select: nameSelect,
+    }) as Promise<ArtistNameRecord | null>;
   }
 
   /**
@@ -669,12 +663,10 @@ export class ArtistRepository {
     skip = 0,
     take = 50,
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
-    const matches = await runQuery(() =>
-      prisma.artist.findMany({
-        where: buildListedWhere(search),
-        include: artistSearchInclude,
-      })
-    );
+    const matches = await prisma.artist.findMany({
+      where: buildListedWhere(search),
+      include: artistSearchInclude,
+    });
     return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
   }
 
@@ -690,12 +682,10 @@ export class ArtistRepository {
   static async findPublishedBySlugWithReleases(
     slug: string
   ): Promise<ArtistWithReleaseGraph | null> {
-    return runQuery(() =>
-      prisma.artist.findFirst({
-        where: { slug, ...publicArtistWhere },
-        select: artistWithReleaseGraphSelect,
-      })
-    );
+    return prisma.artist.findFirst({
+      where: { slug, ...publicArtistWhere },
+      select: artistWithReleaseGraphSelect,
+    });
   }
 
   /**
@@ -704,22 +694,21 @@ export class ArtistRepository {
    * name lookup must never hand back an artist that stays hidden (ADR-0015).
    */
   static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findFirst({ where: { slug, OR: [...notDeletedOr] }, select: nameSelect })
-    ) as Promise<ArtistNameRecord | null>;
+    return prisma.artist.findFirst({
+      where: { slug, OR: [...notDeletedOr] },
+      select: nameSelect,
+    }) as Promise<ArtistNameRecord | null>;
   }
 
   /** Case-insensitive displayName lookup over non-deleted artists (name projection). */
   static async findFirstByDisplayName(displayName: string): Promise<ArtistNameRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findFirst({
-        where: {
-          displayName: { equals: displayName, mode: 'insensitive' },
-          OR: [...notDeletedOr],
-        },
-        select: nameSelect,
-      })
-    ) as Promise<ArtistNameRecord | null>;
+    return prisma.artist.findFirst({
+      where: {
+        displayName: { equals: displayName, mode: 'insensitive' },
+        OR: [...notDeletedOr],
+      },
+      select: nameSelect,
+    }) as Promise<ArtistNameRecord | null>;
   }
 
   /** Case-insensitive firstName + surname lookup over non-deleted artists (name projection). */
@@ -727,25 +716,24 @@ export class ArtistRepository {
     firstName: string,
     surname: string
   ): Promise<ArtistNameRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findFirst({
-        where: {
-          AND: [
-            { firstName: { equals: firstName, mode: 'insensitive' } },
-            { surname: { equals: surname, mode: 'insensitive' } },
-          ],
-          OR: [...notDeletedOr],
-        },
-        select: nameSelect,
-      })
-    ) as Promise<ArtistNameRecord | null>;
+    return prisma.artist.findFirst({
+      where: {
+        AND: [
+          { firstName: { equals: firstName, mode: 'insensitive' } },
+          { surname: { equals: surname, mode: 'insensitive' } },
+        ],
+        OR: [...notDeletedOr],
+      },
+      select: nameSelect,
+    }) as Promise<ArtistNameRecord | null>;
   }
 
   /** Create an artist returning only the name projection (find-or-create flow). */
   static async createWithSelect(data: CreateArtistData): Promise<ArtistNameRecord> {
-    return runQuery(() =>
-      prisma.artist.create({ data: toPrismaCreate(data), select: nameSelect })
-    ) as Promise<ArtistNameRecord>;
+    return prisma.artist.create({
+      data: toPrismaCreate(data),
+      select: nameSelect,
+    }) as Promise<ArtistNameRecord>;
   }
 
   /**
@@ -858,17 +846,15 @@ export class ArtistRepository {
     status: BioStatus,
     opts: { error?: string | null; startedAt?: Date | null } = {}
   ): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({
-        where: { id: artistId },
-        data: {
-          bioStatus: status,
-          ...(opts.error !== undefined ? { bioError: opts.error } : {}),
-          ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
-          ...(status === 'pending' ? { bioProgress: null } : {}),
-        },
-      })
-    );
+    await prisma.artist.update({
+      where: { id: artistId },
+      data: {
+        bioStatus: status,
+        ...(opts.error !== undefined ? { bioError: opts.error } : {}),
+        ...(opts.startedAt !== undefined ? { bioStartedAt: opts.startedAt } : {}),
+        ...(status === 'pending' ? { bioProgress: null } : {}),
+      },
+    });
   }
 
   /**
@@ -878,19 +864,15 @@ export class ArtistRepository {
    * does). `null` clears the field to a DB null.
    */
   static async setBioProgress(artistId: string, progress: BioProgress | null): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({
-        where: { id: artistId },
-        data: { bioProgress: progress },
-      })
-    );
+    await prisma.artist.update({
+      where: { id: artistId },
+      data: { bioProgress: progress },
+    });
   }
 
   /** Set (or clear, with null) the per-job async-callback token for an artist. */
   static async setBioJobToken(artistId: string, token: string | null): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({ where: { id: artistId }, data: { bioJobToken: token } })
-    );
+    await prisma.artist.update({ where: { id: artistId }, data: { bioJobToken: token } });
   }
 
   /**
@@ -899,12 +881,10 @@ export class ArtistRepository {
    * Returns true iff THIS caller claimed it (updateMany count === 1).
    */
   static async claimBioJobToken(artistId: string, token: string): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.artist.updateMany({
-        where: { id: artistId, bioJobToken: token, bioStatus: 'processing' },
-        data: { bioJobToken: null },
-      })
-    );
+    const result = await prisma.artist.updateMany({
+      where: { id: artistId, bioJobToken: token, bioStatus: 'processing' },
+      data: { bioJobToken: null },
+    });
     return result.count === 1;
   }
 
@@ -919,27 +899,23 @@ export class ArtistRepository {
     status: AsyncJobStatus,
     opts: { error?: string | null; startedAt?: Date | null; addedCount?: number | null } = {}
   ): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({
-        where: { id: artistId },
-        data: {
-          imageLinksStatus: status,
-          ...(opts.error !== undefined ? { imageLinksError: opts.error } : {}),
-          ...(opts.startedAt !== undefined ? { imageLinksStartedAt: opts.startedAt } : {}),
-          ...(opts.addedCount !== undefined ? { imageLinksAddedCount: opts.addedCount } : {}),
-          ...(status === 'pending' && opts.addedCount === undefined
-            ? { imageLinksAddedCount: null }
-            : {}),
-        },
-      })
-    );
+    await prisma.artist.update({
+      where: { id: artistId },
+      data: {
+        imageLinksStatus: status,
+        ...(opts.error !== undefined ? { imageLinksError: opts.error } : {}),
+        ...(opts.startedAt !== undefined ? { imageLinksStartedAt: opts.startedAt } : {}),
+        ...(opts.addedCount !== undefined ? { imageLinksAddedCount: opts.addedCount } : {}),
+        ...(status === 'pending' && opts.addedCount === undefined
+          ? { imageLinksAddedCount: null }
+          : {}),
+      },
+    });
   }
 
   /** Set (or clear, with null) the per-job callback token of the images-from-links job. */
   static async setImageLinksJobToken(artistId: string, token: string | null): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({ where: { id: artistId }, data: { imageLinksJobToken: token } })
-    );
+    await prisma.artist.update({ where: { id: artistId }, data: { imageLinksJobToken: token } });
   }
 
   /**
@@ -948,31 +924,27 @@ export class ArtistRepository {
    * callback wins. Returns true iff THIS caller claimed it.
    */
   static async claimImageLinksJobToken(artistId: string, token: string): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.artist.updateMany({
-        where: { id: artistId, imageLinksJobToken: token, imageLinksStatus: 'processing' },
-        data: { imageLinksJobToken: null },
-      })
-    );
+    const result = await prisma.artist.updateMany({
+      where: { id: artistId, imageLinksJobToken: token, imageLinksStatus: 'processing' },
+      data: { imageLinksJobToken: null },
+    });
     return result.count === 1;
   }
 
   /** Reads the images-from-links job columns (plus slug, for revalidation).
    *  Returns `null` when the artist does not exist. */
   static async getImageLinksJobState(artistId: string): Promise<ImageLinksJobStateRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({
-        where: { id: artistId },
-        select: {
-          slug: true,
-          imageLinksStatus: true,
-          imageLinksError: true,
-          imageLinksStartedAt: true,
-          imageLinksJobToken: true,
-          imageLinksAddedCount: true,
-        },
-      })
-    );
+    return prisma.artist.findUnique({
+      where: { id: artistId },
+      select: {
+        slug: true,
+        imageLinksStatus: true,
+        imageLinksError: true,
+        imageLinksStartedAt: true,
+        imageLinksJobToken: true,
+        imageLinksAddedCount: true,
+      },
+    });
   }
 
   /**
@@ -981,53 +953,51 @@ export class ArtistRepository {
    * admin form to populate. Returns `null` when the artist does not exist.
    */
   static async getBioGenerationState(artistId: string): Promise<BioGenerationStateRecord | null> {
-    return runQuery(() =>
-      prisma.artist.findUnique({
-        where: { id: artistId },
-        select: {
-          bioStatus: true,
-          bioError: true,
-          bioStartedAt: true,
-          bioJobToken: true,
-          bioProgress: true,
-          bioGeneratedAt: true,
-          slug: true,
-          shortBio: true,
-          bio: true,
-          altBio: true,
-          genres: true,
-          bioModel: true,
-          bioImages: {
-            orderBy: { sortOrder: 'asc' },
-            select: {
-              id: true,
-              url: true,
-              thumbnailUrl: true,
-              title: true,
-              attribution: true,
-              license: true,
-              licenseUrl: true,
-              sourceUrl: true,
-              originalUrl: true,
-              width: true,
-              height: true,
-              isPrimary: true,
-              kind: true,
-              alt: true,
-              hasFace: true,
-              faceScore: true,
-              origin: true,
-              displayOrder: true,
-            },
-          },
-          bioLinks: {
-            where: referenceLinkWhere,
-            orderBy: { sortOrder: 'asc' },
-            select: { id: true, label: true, url: true, kind: true, origin: true },
+    return prisma.artist.findUnique({
+      where: { id: artistId },
+      select: {
+        bioStatus: true,
+        bioError: true,
+        bioStartedAt: true,
+        bioJobToken: true,
+        bioProgress: true,
+        bioGeneratedAt: true,
+        slug: true,
+        shortBio: true,
+        bio: true,
+        altBio: true,
+        genres: true,
+        bioModel: true,
+        bioImages: {
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            id: true,
+            url: true,
+            thumbnailUrl: true,
+            title: true,
+            attribution: true,
+            license: true,
+            licenseUrl: true,
+            sourceUrl: true,
+            originalUrl: true,
+            width: true,
+            height: true,
+            isPrimary: true,
+            kind: true,
+            alt: true,
+            hasFace: true,
+            faceScore: true,
+            origin: true,
+            displayOrder: true,
           },
         },
-      })
-    );
+        bioLinks: {
+          where: referenceLinkWhere,
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, label: true, url: true, kind: true, origin: true },
+        },
+      },
+    });
   }
 
   /**
@@ -1035,13 +1005,11 @@ export class ArtistRepository {
    * table. Uses upsert to avoid duplicate constraint violations.
    */
   static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
-    await runQuery(() =>
-      prisma.artistRelease.upsert({
-        where: { artistId_releaseId: { artistId, releaseId } },
-        update: {},
-        create: { artistId, releaseId },
-      })
-    );
+    await prisma.artistRelease.upsert({
+      where: { artistId_releaseId: { artistId, releaseId } },
+      update: {},
+      create: { artistId, releaseId },
+    });
   }
 
   /** Applies one whitelisted enriched field, stamping `updatedBy` for audit. */
@@ -1050,9 +1018,7 @@ export class ArtistRepository {
     data: EnrichedArtistFieldUpdate,
     updatedBy: string
   ): Promise<void> {
-    await runQuery(() =>
-      prisma.artist.update({ where: { id: artistId }, data: { ...data, updatedBy } })
-    );
+    await prisma.artist.update({ where: { id: artistId }, data: { ...data, updatedBy } });
   }
 }
 

@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { DataError } from '@/lib/types/domain/errors';
 
 export {};
 
@@ -252,12 +251,6 @@ describe('UserRepository', () => {
         select: { id: true, phone: true },
       });
     });
-
-    it('wraps a Prisma error as a DataError', async () => {
-      findManyMock.mockRejectedValue(new Error('boom'));
-
-      await expect(UserRepository.findSmsOptedInUsers()).rejects.toBeInstanceOf(DataError);
-    });
   });
 
   describe('countSmsOptedIn', () => {
@@ -271,29 +264,6 @@ describe('UserRepository', () => {
           AND: [{ phone: { isSet: true } }, { phone: { not: null } }, { phone: { not: '' } }],
         },
       });
-    });
-
-    it('wraps a Prisma error as a DataError', async () => {
-      countMock.mockRejectedValue(new Error('boom'));
-
-      await expect(UserRepository.countSmsOptedIn()).rejects.toBeInstanceOf(DataError);
-    });
-  });
-
-  describe('error translation', () => {
-    it('wraps a Prisma duplicate-key failure as a DUPLICATE DataError', async () => {
-      const { Prisma } = await import('@prisma/client');
-      updateMock.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: 'test',
-        })
-      );
-
-      await expect(UserRepository.updateUsername('u1', 'taken')).rejects.toMatchObject({
-        code: 'DUPLICATE',
-      });
-      await expect(UserRepository.updateUsername('u1', 'taken')).rejects.toBeInstanceOf(DataError);
     });
   });
 });

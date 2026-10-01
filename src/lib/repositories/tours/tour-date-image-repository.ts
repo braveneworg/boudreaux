@@ -40,64 +40,54 @@ const _tourDateImageDrift: _TourDateImageDrift = true;
 
 /**
  * Repository for tour date image database operations. The only layer that
- * touches Prisma for tour-date images: it wraps every call in `runQuery` and
- * returns hand-written, Prisma-free domain types.
+ * touches Prisma for tour-date images: it returns hand-written, Prisma-free
+ * domain types.
  */
 export class TourDateImageRepository {
   /**
    * Find all images for a tour date, sorted by display order.
    */
   static async findByTourDateId(tourDateId: string): Promise<TourDateImageScalars[]> {
-    return runQuery(() =>
-      prisma.tourDateImage.findMany({
-        where: { tourDateId },
-        orderBy: { displayOrder: 'asc' },
-      })
-    );
+    return prisma.tourDateImage.findMany({
+      where: { tourDateId },
+      orderBy: { displayOrder: 'asc' },
+    });
   }
 
   /**
    * Find a single image by ID.
    */
   static async findById(id: string): Promise<TourDateImageScalars | null> {
-    return runQuery(() =>
-      prisma.tourDateImage.findUnique({
-        where: { id },
-      })
-    );
+    return prisma.tourDateImage.findUnique({
+      where: { id },
+    });
   }
 
   /**
    * Create a new tour date image record.
    */
   static async create(data: CreateTourDateImageInput): Promise<TourDateImageScalars> {
-    return runQuery(() =>
-      prisma.tourDateImage.create({
-        data,
-      })
-    );
+    return prisma.tourDateImage.create({
+      data,
+    });
   }
 
   /**
    * Delete an image by ID.
    */
   static async delete(id: string): Promise<TourDateImageScalars> {
-    return runQuery(() =>
-      prisma.tourDateImage.delete({
-        where: { id },
-      })
-    );
+    return prisma.tourDateImage.delete({
+      where: { id },
+    });
   }
 
   /**
    * Delete all images for a tour date. Returns the count of deleted images.
    */
   static async deleteByTourDateId(tourDateId: string): Promise<number> {
-    const result = await runQuery(() =>
-      prisma.tourDateImage.deleteMany({
-        where: { tourDateId },
-      })
-    );
+    const result = await prisma.tourDateImage.deleteMany({
+      where: { tourDateId },
+    });
     return result.count;
   }
 
@@ -105,12 +95,10 @@ export class TourDateImageRepository {
    * Update the display order of a single image.
    */
   static async updateDisplayOrder(id: string, displayOrder: number): Promise<TourDateImageScalars> {
-    return runQuery(() =>
-      prisma.tourDateImage.update({
-        where: { id },
-        data: { displayOrder },
-      })
-    );
+    return prisma.tourDateImage.update({
+      where: { id },
+      data: { displayOrder },
+    });
   }
 
   /**
@@ -135,22 +123,18 @@ export class TourDateImageRepository {
    * Count images for a tour date.
    */
   static async count(tourDateId: string): Promise<number> {
-    return runQuery(() =>
-      prisma.tourDateImage.count({
-        where: { tourDateId },
-      })
-    );
+    return prisma.tourDateImage.count({
+      where: { tourDateId },
+    });
   }
 
   /**
    * Update alt text for an image.
    */
   static async updateAltText(id: string, altText: string | null): Promise<TourDateImageScalars> {
-    return runQuery(() =>
-      prisma.tourDateImage.update({
-        where: { id },
-        data: { altText },
-      })
-    );
+    return prisma.tourDateImage.update({
+      where: { id },
+      data: { altText },
+    });
   }
 }

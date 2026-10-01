@@ -136,8 +136,8 @@ const toPrismaUpdate = (data: TourDateUpdateFields): Prisma.TourDateUpdateInput 
 
 /**
  * Repository for TourDate data access operations. The only layer that touches
- * Prisma for tour dates: it owns the include/update DSL, wraps every call in
- * `runQuery`, and returns hand-written, Prisma-free domain types.
+ * Prisma for tour dates: it owns the include/update DSL and returns
+ * hand-written, Prisma-free domain types.
  */
 export class TourDateRepository {
   /**
@@ -148,13 +148,11 @@ export class TourDateRepository {
       return [];
     }
 
-    return runQuery(() =>
-      prisma.tourDate.findMany({
-        where: { tourId },
-        orderBy: { startDate: 'asc' },
-        include: tourDateInclude,
-      })
-    );
+    return prisma.tourDate.findMany({
+      where: { tourId },
+      orderBy: { startDate: 'asc' },
+      include: tourDateInclude,
+    });
   }
 
   /**
@@ -165,12 +163,10 @@ export class TourDateRepository {
       return null;
     }
 
-    return runQuery(() =>
-      prisma.tourDate.findUnique({
-        where: { id },
-        include: tourDateInclude,
-      })
-    );
+    return prisma.tourDate.findUnique({
+      where: { id },
+      include: tourDateInclude,
+    });
   }
 
   /**
@@ -181,31 +177,27 @@ export class TourDateRepository {
   static async create(data: TourDateCreateData): Promise<TourDateScalars> {
     const { headlinerIds, venueId, tourId, ...tourDateData } = data;
 
-    const tourDate = await runQuery(() =>
-      prisma.tourDate.create({
-        data: {
-          ...tourDateData,
-          tour: {
-            connect: { id: tourId },
-          },
-          venue: {
-            connect: { id: venueId },
-          },
+    const tourDate = await prisma.tourDate.create({
+      data: {
+        ...tourDateData,
+        tour: {
+          connect: { id: tourId },
         },
-      })
-    );
+        venue: {
+          connect: { id: venueId },
+        },
+      },
+    });
 
     // Create TourDateHeadliner records with sortOrder
     if (headlinerIds && headlinerIds.length > 0) {
-      await runQuery(() =>
-        prisma.tourDateHeadliner.createMany({
-          data: headlinerIds.map((artistId, index) => ({
-            tourDateId: tourDate.id,
-            artistId,
-            sortOrder: index,
-          })),
-        })
-      );
+      await prisma.tourDateHeadliner.createMany({
+        data: headlinerIds.map((artistId, index) => ({
+          tourDateId: tourDate.id,
+          artistId,
+          sortOrder: index,
+        })),
+      });
     }
 
     return tourDate;
@@ -221,43 +213,35 @@ export class TourDateRepository {
 
     // If headlinerIds are provided, replace all existing headliner associations
     if (headlinerIds !== undefined) {
-      await runQuery(() =>
-        prisma.tourDateHeadliner.deleteMany({
-          where: { tourDateId: id },
-        })
-      );
+      await prisma.tourDateHeadliner.deleteMany({
+        where: { tourDateId: id },
+      });
 
       if (headlinerIds.length > 0) {
-        await runQuery(() =>
-          prisma.tourDateHeadliner.createMany({
-            data: headlinerIds.map((artistId, index) => ({
-              tourDateId: id,
-              artistId,
-              sortOrder: index,
-            })),
-          })
-        );
+        await prisma.tourDateHeadliner.createMany({
+          data: headlinerIds.map((artistId, index) => ({
+            tourDateId: id,
+            artistId,
+            sortOrder: index,
+          })),
+        });
       }
     }
 
-    return runQuery(() =>
-      prisma.tourDate.update({
-        where: { id },
-        data: updateData,
-        include: tourDateInclude,
-      })
-    );
+    return prisma.tourDate.update({
+      where: { id },
+      data: updateData,
+      include: tourDateInclude,
+    });
   }
 
   /**
    * Delete a tour date. Cascades to related records (headliners) per schema.
    */
   static async delete(id: string): Promise<TourDateScalars> {
-    return runQuery(() =>
-      prisma.tourDate.delete({
-        where: { id },
-      })
-    );
+    return prisma.tourDate.delete({
+      where: { id },
+    });
   }
 
   /**
@@ -268,11 +252,9 @@ export class TourDateRepository {
       return 0;
     }
 
-    return runQuery(() =>
-      prisma.tourDate.count({
-        where: { tourId },
-      })
-    );
+    return prisma.tourDate.count({
+      where: { tourId },
+    });
   }
 
   /**
@@ -281,39 +263,33 @@ export class TourDateRepository {
    */
   static async findUpcoming(limit?: number): Promise<TourDateWithTourAndRelations[]> {
     const now = new Date();
-    return runQuery(() =>
-      prisma.tourDate.findMany({
-        where: {
-          startDate: {
-            gte: now,
-          },
+    return prisma.tourDate.findMany({
+      where: {
+        startDate: {
+          gte: now,
         },
-        orderBy: { startDate: 'asc' },
-        take: limit,
-        include: tourDateInclude,
-      })
-    );
+      },
+      orderBy: { startDate: 'asc' },
+      take: limit,
+      include: tourDateInclude,
+    });
   }
 
   /** Count tour dates scheduled on or after now (used by the admin dashboard). */
   static async countUpcoming(): Promise<number> {
-    return runQuery(() =>
-      prisma.tourDate.count({
-        where: { startDate: { gte: new Date() } },
-      })
-    );
+    return prisma.tourDate.count({
+      where: { startDate: { gte: new Date() } },
+    });
   }
 
   /**
    * Update the setTime for a specific headliner on a tour date.
    */
   static async updateHeadlinerSetTime(headlinerId: string, setTime: Date | null): Promise<void> {
-    await runQuery(() =>
-      prisma.tourDateHeadliner.update({
-        where: { id: headlinerId },
-        data: { setTime },
-      })
-    );
+    await prisma.tourDateHeadliner.update({
+      where: { id: headlinerId },
+      data: { setTime },
+    });
   }
 
   /**
@@ -325,12 +301,10 @@ export class TourDateRepository {
     artistId: string,
     setTime: Date | null
   ): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.tourDateHeadliner.updateMany({
-        where: { tourDateId, artistId },
-        data: { setTime },
-      })
-    );
+    const result = await prisma.tourDateHeadliner.updateMany({
+      where: { tourDateId, artistId },
+      data: { setTime },
+    });
 
     return result.count > 0;
   }
@@ -340,11 +314,9 @@ export class TourDateRepository {
    * TourDateHeadliner junction record — does NOT delete the artist.
    */
   static async removeHeadliner(headlinerId: string): Promise<void> {
-    await runQuery(() =>
-      prisma.tourDateHeadliner.delete({
-        where: { id: headlinerId },
-      })
-    );
+    await prisma.tourDateHeadliner.delete({
+      where: { id: headlinerId },
+    });
   }
 
   /**
@@ -355,11 +327,9 @@ export class TourDateRepository {
     tourDateId: string,
     artistId: string
   ): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.tourDateHeadliner.deleteMany({
-        where: { tourDateId, artistId },
-      })
-    );
+    const result = await prisma.tourDateHeadliner.deleteMany({
+      where: { tourDateId, artistId },
+    });
 
     return result.count > 0;
   }

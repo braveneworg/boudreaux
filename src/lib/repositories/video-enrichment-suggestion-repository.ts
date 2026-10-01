@@ -67,33 +67,29 @@ export class VideoEnrichmentSuggestionRepository {
    * stays null — the column holds a user ObjectId and no user acted here.
    */
   static async createApplied(videoId: string, row: CreateSuggestionRow): Promise<void> {
-    await runQuery(() =>
-      prisma.videoEnrichmentSuggestion.create({
-        data: {
-          ...row,
-          sources: toPrismaSources(row.sources),
-          videoId,
-          status: 'applied',
-          appliedAt: new Date(),
-          appliedBy: null,
-        },
-      })
-    );
+    await prisma.videoEnrichmentSuggestion.create({
+      data: {
+        ...row,
+        sources: toPrismaSources(row.sources),
+        videoId,
+        status: 'applied',
+        appliedAt: new Date(),
+        appliedBy: null,
+      },
+    });
   }
 
   /** All suggestion rows for a video, oldest first. */
   static async findByVideoId(videoId: string): Promise<VideoEnrichmentSuggestionRecord[]> {
-    return runQuery(() =>
-      prisma.videoEnrichmentSuggestion.findMany({
-        where: { videoId },
-        orderBy: { createdAt: 'asc' },
-      })
-    );
+    return prisma.videoEnrichmentSuggestion.findMany({
+      where: { videoId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   /** One suggestion row by id, or null. */
   static async findById(id: string): Promise<VideoEnrichmentSuggestionRecord | null> {
-    return runQuery(() => prisma.videoEnrichmentSuggestion.findUnique({ where: { id } }));
+    return prisma.videoEnrichmentSuggestion.findUnique({ where: { id } });
   }
 
   /**
@@ -102,23 +98,19 @@ export class VideoEnrichmentSuggestionRepository {
    * apply/dismiss of the same row loses.
    */
   static async markApplied(id: string, userId: string): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.videoEnrichmentSuggestion.updateMany({
-        where: { id, status: 'pending' },
-        data: { status: 'applied', appliedAt: new Date(), appliedBy: userId },
-      })
-    );
+    const result = await prisma.videoEnrichmentSuggestion.updateMany({
+      where: { id, status: 'pending' },
+      data: { status: 'applied', appliedAt: new Date(), appliedBy: userId },
+    });
     return result.count > 0;
   }
 
   /** Atomically flip a PENDING row to dismissed. True iff this caller won. */
   static async markDismissed(id: string): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.videoEnrichmentSuggestion.updateMany({
-        where: { id, status: 'pending' },
-        data: { status: 'dismissed' },
-      })
-    );
+    const result = await prisma.videoEnrichmentSuggestion.updateMany({
+      where: { id, status: 'pending' },
+      data: { status: 'dismissed' },
+    });
     return result.count > 0;
   }
 
@@ -126,21 +118,17 @@ export class VideoEnrichmentSuggestionRepository {
   static async findExistingFacts(
     videoId: string
   ): Promise<Array<{ artistId: string | null; field: string; value: string }>> {
-    return runQuery(() =>
-      prisma.videoEnrichmentSuggestion.findMany({
-        where: { videoId, status: { in: ['applied', 'dismissed'] } },
-        select: { artistId: true, field: true, value: true },
-      })
-    );
+    return prisma.videoEnrichmentSuggestion.findMany({
+      where: { videoId, status: { in: ['applied', 'dismissed'] } },
+      select: { artistId: true, field: true, value: true },
+    });
   }
 
   /** Drop pending rows for artists detached by an artist-string re-sync. */
   static async deletePendingForArtists(videoId: string, artistIds: string[]): Promise<void> {
     if (artistIds.length === 0) return;
-    await runQuery(() =>
-      prisma.videoEnrichmentSuggestion.deleteMany({
-        where: { videoId, status: 'pending', artistId: { in: artistIds } },
-      })
-    );
+    await prisma.videoEnrichmentSuggestion.deleteMany({
+      where: { videoId, status: 'pending', artistId: { in: artistIds } },
+    });
   }
 }

@@ -144,18 +144,18 @@ const _videoSummaryDrift: _VideoSummaryDrift = true;
 /**
  * Data-access layer for the `Video` model. The only layer that touches Prisma
  * for videos: it owns the where DSL, translates domain input to Prisma input,
- * and wraps every call in `runQuery` so callers see vendor-neutral `DataError`s
- * and hand-written domain types.
+ * and returns hand-written domain types; failures surface as vendor-neutral
+ * `DataError`s.
  */
 export class VideoRepository {
   /** Create a new video from domain create data. */
   static async create(data: CreateVideoData): Promise<Video> {
-    return runQuery(() => prisma.video.create({ data: toPrismaCreate(data) }));
+    return prisma.video.create({ data: toPrismaCreate(data) });
   }
 
   /** Find a video by id. Returns `null` when not found. */
   static async findById(id: string): Promise<Video | null> {
-    return runQuery(() => prisma.video.findUnique({ where: { id } }));
+    return prisma.video.findUnique({ where: { id } });
   }
 
   /**
@@ -165,14 +165,12 @@ export class VideoRepository {
    */
   static async findMany(filters: VideoListFilters): Promise<Video[]> {
     const { sort = 'desc', skip = 0, take = 5 } = filters;
-    return runQuery(() =>
-      prisma.video.findMany({
-        where: buildListWhere(filters),
-        orderBy: { releasedOn: sort },
-        skip,
-        take,
-      })
-    );
+    return prisma.video.findMany({
+      where: buildListWhere(filters),
+      orderBy: { releasedOn: sort },
+      skip,
+      take,
+    });
   }
 
   /**
@@ -187,19 +185,17 @@ export class VideoRepository {
     filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search'>
   ): Promise<Video[]> {
     const { sort = 'desc', skip = 0, take = 5, search } = filters;
-    return runQuery(() =>
-      prisma.video.findMany({
-        where: {
-          ...buildListWhere({ visibleAt: new Date() }),
-          ...(search && {
-            OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
-          }),
-        },
-        orderBy: { releasedOn: sort },
-        skip,
-        take,
-      })
-    );
+    return prisma.video.findMany({
+      where: {
+        ...buildListWhere({ visibleAt: new Date() }),
+        ...(search && {
+          OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
+        }),
+      },
+      orderBy: { releasedOn: sort },
+      skip,
+      take,
+    });
   }
 
   /**
@@ -211,12 +207,10 @@ export class VideoRepository {
    * the two reads can never drift apart.
    */
   static async findManyByIds(ids: string[]): Promise<VideoSummary[]> {
-    return runQuery(() =>
-      prisma.video.findMany({
-        where: { ...buildListWhere({ visibleAt: new Date() }), id: { in: ids } },
-        select: videoSummarySelect,
-      })
-    );
+    return prisma.video.findMany({
+      where: { ...buildListWhere({ visibleAt: new Date() }), id: { in: ids } },
+      select: videoSummarySelect,
+    });
   }
 
   /**
@@ -227,17 +221,15 @@ export class VideoRepository {
    * with the search `OR`. Used by the playlist media-search endpoint.
    */
   static async searchPublished(q: string, take: number): Promise<VideoSummary[]> {
-    return runQuery(() =>
-      prisma.video.findMany({
-        where: {
-          ...buildListWhere({ visibleAt: new Date() }),
-          OR: [{ title: containsInsensitive(q) }, { artist: containsInsensitive(q) }],
-        },
-        orderBy: { title: 'asc' },
-        take,
-        select: videoSummarySelect,
-      })
-    );
+    return prisma.video.findMany({
+      where: {
+        ...buildListWhere({ visibleAt: new Date() }),
+        OR: [{ title: containsInsensitive(q) }, { artist: containsInsensitive(q) }],
+      },
+      orderBy: { title: 'asc' },
+      take,
+      select: videoSummarySelect,
+    });
   }
 
   /**
@@ -253,7 +245,7 @@ export class VideoRepository {
         : filters.published === false
           ? { OR: [{ publishedAt: null }, { publishedAt: { isSet: false } }] }
           : {};
-    return runQuery(() => prisma.video.count({ where }));
+    return prisma.video.count({ where });
   }
 
   /**
@@ -262,7 +254,7 @@ export class VideoRepository {
    * `archivedAt`.
    */
   static async update(id: string, data: UpdateVideoData): Promise<Video> {
-    return runQuery(() => prisma.video.update({ where: { id }, data: toPrismaUpdate(data) }));
+    return prisma.video.update({ where: { id }, data: toPrismaUpdate(data) });
   }
 
   /**
@@ -277,15 +269,13 @@ export class VideoRepository {
     data: SaveProbeResultData
   ): Promise<boolean> {
     const { probeData, ...scalars } = data;
-    const result = await runQuery(() =>
-      prisma.video.updateMany({
-        where: { id: videoId, s3Key: probedS3Key },
-        data: {
-          ...scalars,
-          ...(probeData !== undefined ? { probeData: toPrismaJson(probeData) } : {}),
-        },
-      })
-    );
+    const result = await prisma.video.updateMany({
+      where: { id: videoId, s3Key: probedS3Key },
+      data: {
+        ...scalars,
+        ...(probeData !== undefined ? { probeData: toPrismaJson(probeData) } : {}),
+      },
+    });
     return result.count > 0;
   }
 
@@ -323,27 +313,23 @@ export class VideoRepository {
     status: 'pending' | 'processing' | 'succeeded' | 'failed',
     opts: { error?: string | null } = {}
   ): Promise<void> {
-    await runQuery(() =>
-      prisma.video.update({
-        where: { id: videoId },
-        data: {
-          enrichmentStatus: status,
-          ...(opts.error !== undefined ? { enrichmentError: opts.error } : {}),
-          ...(status === 'pending' ? { enrichmentProgress: null, enrichmentError: null } : {}),
-          ...(status === 'pending' || status === 'processing'
-            ? { enrichmentStartedAt: new Date() }
-            : {}),
-          ...(status === 'succeeded' ? { enrichedAt: new Date() } : {}),
-        },
-      })
-    );
+    await prisma.video.update({
+      where: { id: videoId },
+      data: {
+        enrichmentStatus: status,
+        ...(opts.error !== undefined ? { enrichmentError: opts.error } : {}),
+        ...(status === 'pending' ? { enrichmentProgress: null, enrichmentError: null } : {}),
+        ...(status === 'pending' || status === 'processing'
+          ? { enrichmentStartedAt: new Date() }
+          : {}),
+        ...(status === 'succeeded' ? { enrichedAt: new Date() } : {}),
+      },
+    });
   }
 
   /** Set (or clear, with null) the per-job async-callback token. */
   static async setEnrichmentJobToken(videoId: string, token: string | null): Promise<void> {
-    await runQuery(() =>
-      prisma.video.update({ where: { id: videoId }, data: { enrichmentJobToken: token } })
-    );
+    await prisma.video.update({ where: { id: videoId }, data: { enrichmentJobToken: token } });
   }
 
   /**
@@ -352,46 +338,40 @@ export class VideoRepository {
    * concurrent callback wins (mirrors `ArtistRepository.claimBioJobToken`).
    */
   static async claimEnrichmentJobToken(videoId: string, token: string): Promise<boolean> {
-    const result = await runQuery(() =>
-      prisma.video.updateMany({
-        where: { id: videoId, enrichmentJobToken: token, enrichmentStatus: 'processing' },
-        data: { enrichmentJobToken: null },
-      })
-    );
+    const result = await prisma.video.updateMany({
+      where: { id: videoId, enrichmentJobToken: token, enrichmentStatus: 'processing' },
+      data: { enrichmentJobToken: null },
+    });
     return result.count === 1;
   }
 
   /** Persist the latest enrichment progress checkpoint (validated upstream). */
   static async setEnrichmentProgress(videoId: string, progress: unknown): Promise<void> {
-    await runQuery(() =>
-      prisma.video.update({
-        where: { id: videoId },
-        data: { enrichmentProgress: progress as Prisma.InputJsonValue },
-      })
-    );
+    await prisma.video.update({
+      where: { id: videoId },
+      data: { enrichmentProgress: progress as Prisma.InputJsonValue },
+    });
   }
 
   /** Read the enrichment lifecycle + dispatch context, or null when missing. */
   static async getEnrichmentState(videoId: string): Promise<VideoEnrichmentState | null> {
-    return runQuery(() =>
-      prisma.video.findUnique({
-        where: { id: videoId },
-        select: {
-          id: true,
-          enrichmentStatus: true,
-          enrichmentError: true,
-          enrichmentStartedAt: true,
-          enrichmentJobToken: true,
-          enrichmentProgress: true,
-          enrichedAt: true,
-          category: true,
-          artist: true,
-          title: true,
-          releasedOn: true,
-          description: true,
-          s3Key: true,
-        },
-      })
-    );
+    return prisma.video.findUnique({
+      where: { id: videoId },
+      select: {
+        id: true,
+        enrichmentStatus: true,
+        enrichmentError: true,
+        enrichmentStartedAt: true,
+        enrichmentJobToken: true,
+        enrichmentProgress: true,
+        enrichedAt: true,
+        category: true,
+        artist: true,
+        title: true,
+        releasedOn: true,
+        description: true,
+        s3Key: true,
+      },
+    });
   }
 }

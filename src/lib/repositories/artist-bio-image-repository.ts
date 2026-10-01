@@ -40,34 +40,32 @@ export class ArtistBioImageRepository {
    *  appending it after the artist's current highest `sortOrder`. */
   static async create(data: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
     const isPrimary = data.isPrimary ?? false;
-    return runQuery(async () => {
-      const { _max } = await prisma.artistBioImage.aggregate({
-        where: { artistId: data.artistId },
-        _max: { sortOrder: true },
-      });
-      const sortOrder = (_max.sortOrder ?? -1) + 1;
-      return prisma.artistBioImage.create({
-        data: {
-          artistId: data.artistId,
-          url: data.url,
-          thumbnailUrl: data.thumbnailUrl,
-          title: data.title,
-          attribution: data.attribution,
-          license: data.license,
-          licenseUrl: data.licenseUrl,
-          sourceUrl: data.sourceUrl,
-          originalUrl: data.originalUrl,
-          width: data.width,
-          height: data.height,
-          isPrimary,
-          kind: data.kind,
-          alt: data.alt,
-          // The manual/RTE-upload path only ever creates custom rows, so a
-          // regeneration preserves them (see `replaceBioContent`).
-          origin: data.origin ?? 'custom',
-          sortOrder,
-        },
-      });
+    const { _max } = await prisma.artistBioImage.aggregate({
+      where: { artistId: data.artistId },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = (_max.sortOrder ?? -1) + 1;
+    return prisma.artistBioImage.create({
+      data: {
+        artistId: data.artistId,
+        url: data.url,
+        thumbnailUrl: data.thumbnailUrl,
+        title: data.title,
+        attribution: data.attribution,
+        license: data.license,
+        licenseUrl: data.licenseUrl,
+        sourceUrl: data.sourceUrl,
+        originalUrl: data.originalUrl,
+        width: data.width,
+        height: data.height,
+        isPrimary,
+        kind: data.kind,
+        alt: data.alt,
+        // The manual/RTE-upload path only ever creates custom rows, so a
+        // regeneration preserves them (see `replaceBioContent`).
+        origin: data.origin ?? 'custom',
+        sortOrder,
+      },
     }) as Promise<ArtistBioImageRecord>;
   }
 
@@ -81,50 +79,46 @@ export class ArtistBioImageRepository {
   static async createMany(rows: CreateArtistBioImageData[]): Promise<number> {
     if (rows.length === 0) return 0;
     const [{ artistId }] = rows;
-    return runQuery(async () => {
-      const { _max } = await prisma.artistBioImage.aggregate({
-        where: { artistId },
-        _max: { sortOrder: true },
-      });
-      const base = (_max.sortOrder ?? -1) + 1;
-      const { count } = await prisma.artistBioImage.createMany({
-        data: rows.map((data, index) => ({
-          artistId: data.artistId,
-          url: data.url,
-          thumbnailUrl: data.thumbnailUrl,
-          title: data.title,
-          attribution: data.attribution,
-          license: data.license,
-          licenseUrl: data.licenseUrl,
-          sourceUrl: data.sourceUrl,
-          originalUrl: data.originalUrl,
-          width: data.width,
-          height: data.height,
-          isPrimary: data.isPrimary ?? false,
-          kind: data.kind,
-          alt: data.alt,
-          hasFace: data.hasFace ?? null,
-          faceScore: data.faceScore ?? null,
-          contentHash: data.contentHash ?? null,
-          perceptualHash: data.perceptualHash ?? null,
-          origin: data.origin ?? 'custom',
-          sortOrder: base + index,
-        })),
-      });
-      return count;
+    const { _max } = await prisma.artistBioImage.aggregate({
+      where: { artistId },
+      _max: { sortOrder: true },
     });
+    const base = (_max.sortOrder ?? -1) + 1;
+    const { count } = await prisma.artistBioImage.createMany({
+      data: rows.map((data, index) => ({
+        artistId: data.artistId,
+        url: data.url,
+        thumbnailUrl: data.thumbnailUrl,
+        title: data.title,
+        attribution: data.attribution,
+        license: data.license,
+        licenseUrl: data.licenseUrl,
+        sourceUrl: data.sourceUrl,
+        originalUrl: data.originalUrl,
+        width: data.width,
+        height: data.height,
+        isPrimary: data.isPrimary ?? false,
+        kind: data.kind,
+        alt: data.alt,
+        hasFace: data.hasFace ?? null,
+        faceScore: data.faceScore ?? null,
+        contentHash: data.contentHash ?? null,
+        perceptualHash: data.perceptualHash ?? null,
+        origin: data.origin ?? 'custom',
+        sortOrder: base + index,
+      })),
+    });
+    return count;
   }
 
   /** The set of every URL the artist's pool already holds — stored CDN URLs
    *  and the external `originalUrl`s they were re-hosted from — so a scrape can
    *  skip images that are already in the pool before re-hosting them. */
   static async findExistingUrls(artistId: string): Promise<Set<string>> {
-    const rows = await runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId },
-        select: { url: true, originalUrl: true },
-      })
-    );
+    const rows = await prisma.artistBioImage.findMany({
+      where: { artistId },
+      select: { url: true, originalUrl: true },
+    });
     const urls = new Set<string>();
     for (const { url, originalUrl } of rows) {
       urls.add(url);
@@ -145,12 +139,10 @@ export class ArtistBioImageRepository {
     artistId: string,
     origins?: ReadonlyArray<'custom' | 'linked'>
   ): Promise<BioImageFingerprint[]> {
-    const rows = await runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: origins ? { artistId, origin: { in: [...origins] } } : { artistId },
-        select: { url: true, contentHash: true, perceptualHash: true },
-      })
-    );
+    const rows = await prisma.artistBioImage.findMany({
+      where: origins ? { artistId, origin: { in: [...origins] } } : { artistId },
+      select: { url: true, contentHash: true, perceptualHash: true },
+    });
     return rows.flatMap(({ url, contentHash, perceptualHash }) =>
       contentHash || perceptualHash
         ? [{ url, contentHash: contentHash ?? null, perceptualHash: perceptualHash ?? null }]
@@ -171,49 +163,44 @@ export class ArtistBioImageRepository {
   /** Lists an artist's bio image rows with the URLs needed to decide whether a
    *  save-time full re-host is required (thumbnail → originalUrl upgrade). */
   static async findForRehost(artistId: string): Promise<BioImageRehostRow[]> {
-    return runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId },
-        select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
-      })
-    );
+    return prisma.artistBioImage.findMany({
+      where: { artistId },
+      select: { id: true, url: true, thumbnailUrl: true, originalUrl: true },
+    });
   }
 
   /** Lists an artist's admin-uploaded (`origin: 'custom'`) bio image URLs in
    *  sort order — used to seed the Lambda's face-matching reference images. */
   static async findCustomUrls(artistId: string): Promise<string[]> {
-    const rows = await runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId, origin: 'custom' },
-        orderBy: { sortOrder: 'asc' },
-        select: { url: true },
-      })
-    );
+    const rows = await prisma.artistBioImage.findMany({
+      where: { artistId, origin: 'custom' },
+      orderBy: { sortOrder: 'asc' },
+      select: { url: true },
+    });
     return rows.map(({ url }) => url);
   }
 
   /** Points a bio image row at its upgraded (fully re-hosted) CDN URL. */
   static async updateUrl(imageId: string, url: string): Promise<void> {
-    await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { url } }));
+    await prisma.artistBioImage.update({ where: { id: imageId }, data: { url } });
   }
 
   /** Updates a single bio image row's attribution text (admin edit). */
   static async updateAttribution(imageId: string, attribution: string | null): Promise<void> {
-    await runQuery(() =>
-      prisma.artistBioImage.update({ where: { id: imageId }, data: { attribution } })
-    );
+    await prisma.artistBioImage.update({ where: { id: imageId }, data: { attribution } });
   }
 
   /** Updates a single bio image row's alt text (admin edit). */
   static async updateAlt(imageId: string, alt: string | null): Promise<void> {
-    await runQuery(() => prisma.artistBioImage.update({ where: { id: imageId }, data: { alt } }));
+    await prisma.artistBioImage.update({ where: { id: imageId }, data: { alt } });
   }
 
   /** Lists an artist's full bio image rows in pool (`sortOrder`) order. */
   static async findManyByArtist(artistId: string): Promise<ArtistBioImageRecord[]> {
-    return runQuery(() =>
-      prisma.artistBioImage.findMany({ where: { artistId }, orderBy: { sortOrder: 'asc' } })
-    ) as Promise<ArtistBioImageRecord[]>;
+    return prisma.artistBioImage.findMany({
+      where: { artistId },
+      orderBy: { sortOrder: 'asc' },
+    }) as Promise<ArtistBioImageRecord[]>;
   }
 
   /**
@@ -222,12 +209,10 @@ export class ArtistBioImageRepository {
    */
   static async findManyByIds(artistId: string, ids: string[]): Promise<BioImageEligibilityRow[]> {
     if (ids.length === 0) return [];
-    return runQuery(() =>
-      prisma.artistBioImage.findMany({
-        where: { artistId, id: { in: ids } },
-        select: { id: true, alt: true, origin: true },
-      })
-    );
+    return prisma.artistBioImage.findMany({
+      where: { artistId, id: { in: ids } },
+      select: { id: true, alt: true, origin: true },
+    });
   }
 
   /**

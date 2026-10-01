@@ -4,8 +4,6 @@
 
 import { Prisma } from '@prisma/client';
 
-import { DataError } from '@/lib/types/domain/errors';
-
 import { ImageRepository } from './image-repository';
 
 // Mock Prisma Client
@@ -242,30 +240,6 @@ describe('ImageRepository', () => {
       expect(prisma.tourImage.delete).toHaveBeenCalledWith({
         where: { id: 'img1' },
       });
-    });
-
-    it('should wrap a Prisma not-found error as a NOT_FOUND DataError', async () => {
-      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
-
-      (prisma.tourImage.delete as ReturnType<typeof vi.fn>).mockRejectedValue(prismaError);
-
-      await expect(ImageRepository.delete('non-existent')).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw a DataError instance for known Prisma failures', async () => {
-      const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-        code: 'P2025',
-        clientVersion: '5.0.0',
-      });
-
-      (prisma.tourImage.delete as ReturnType<typeof vi.fn>).mockRejectedValue(prismaError);
-
-      await expect(ImageRepository.delete('non-existent')).rejects.toBeInstanceOf(DataError);
     });
   });
 

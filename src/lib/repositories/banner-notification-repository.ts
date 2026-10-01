@@ -10,8 +10,6 @@ import type {
   UpsertBannerNotificationData,
 } from '@/lib/types/domain/banner-notification';
 
-import { runQuery } from './_internal/map-prisma-error';
-
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -29,9 +27,9 @@ const buildSearchWhere = (query: string): Prisma.BannerNotificationWhereInput =>
 
 /**
  * Data-access layer for `BannerNotification` records. The only layer that touches
- * Prisma for the homepage banner carousel: it owns the query shapes, wraps every
- * call in `runQuery` so callers see vendor-neutral `DataError`s, and returns
- * hand-written domain types. Business logic (sanitization, caching,
+ * Prisma for the homepage banner carousel: it owns the query shapes, surfaces
+ * failures as vendor-neutral `DataError`s, and returns hand-written domain
+ * types. Business logic (sanitization, caching,
  * ServiceResponse wrapping) stays in the service.
  */
 export class BannerNotificationRepository {
@@ -40,20 +38,16 @@ export class BannerNotificationRepository {
    * Used by both the public carousel and the admin management view.
    */
   static async findAllOrderedBySlot(): Promise<BannerNotificationRecord[]> {
-    return runQuery(() =>
-      prisma.bannerNotification.findMany({
-        orderBy: { slotNumber: 'asc' },
-      })
-    );
+    return prisma.bannerNotification.findMany({
+      orderBy: { slotNumber: 'asc' },
+    });
   }
 
   /** Count banner slots that have content (used by the admin dashboard). */
   static async countActive(): Promise<number> {
-    return runQuery(() =>
-      prisma.bannerNotification.count({
-        where: { content: { not: null } },
-      })
-    );
+    return prisma.bannerNotification.count({
+      where: { content: { not: null } },
+    });
   }
 
   /**
@@ -65,21 +59,19 @@ export class BannerNotificationRepository {
     query: string,
     take: number
   ): Promise<BannerNotificationSearchRecord[]> {
-    return runQuery(() =>
-      prisma.bannerNotification.findMany({
-        where: buildSearchWhere(query),
-        select: {
-          id: true,
-          content: true,
-          textColor: true,
-          backgroundColor: true,
-          slotNumber: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take,
-      })
-    );
+    return prisma.bannerNotification.findMany({
+      where: buildSearchWhere(query),
+      select: {
+        id: true,
+        content: true,
+        textColor: true,
+        backgroundColor: true,
+        slotNumber: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
   }
 
   /**
@@ -89,30 +81,28 @@ export class BannerNotificationRepository {
     slotNumber: number,
     data: UpsertBannerNotificationData
   ): Promise<BannerNotificationRecord> {
-    return runQuery(() =>
-      prisma.bannerNotification.upsert({
-        where: { slotNumber },
-        update: {
-          content: data.content,
-          textColor: data.textColor,
-          backgroundColor: data.backgroundColor,
-          displayFrom: data.displayFrom,
-          displayUntil: data.displayUntil,
-          repostedFromId: data.repostedFromId,
-          addedById: data.addedById,
-        },
-        create: {
-          slotNumber,
-          content: data.content,
-          textColor: data.textColor,
-          backgroundColor: data.backgroundColor,
-          displayFrom: data.displayFrom,
-          displayUntil: data.displayUntil,
-          repostedFromId: data.repostedFromId,
-          addedById: data.addedById,
-        },
-      })
-    );
+    return prisma.bannerNotification.upsert({
+      where: { slotNumber },
+      update: {
+        content: data.content,
+        textColor: data.textColor,
+        backgroundColor: data.backgroundColor,
+        displayFrom: data.displayFrom,
+        displayUntil: data.displayUntil,
+        repostedFromId: data.repostedFromId,
+        addedById: data.addedById,
+      },
+      create: {
+        slotNumber,
+        content: data.content,
+        textColor: data.textColor,
+        backgroundColor: data.backgroundColor,
+        displayFrom: data.displayFrom,
+        displayUntil: data.displayUntil,
+        repostedFromId: data.repostedFromId,
+        addedById: data.addedById,
+      },
+    });
   }
 
   /**
@@ -120,10 +110,8 @@ export class BannerNotificationRepository {
    * Prisma's `P2025` (no record) as a `NOT_FOUND` `DataError`.
    */
   static async deleteBySlot(slotNumber: number): Promise<BannerNotificationRecord> {
-    return runQuery(() =>
-      prisma.bannerNotification.delete({
-        where: { slotNumber },
-      })
-    );
+    return prisma.bannerNotification.delete({
+      where: { slotNumber },
+    });
   }
 }

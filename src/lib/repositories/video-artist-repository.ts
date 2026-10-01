@@ -35,8 +35,8 @@ const artistIdentitySelect = {
 
 /**
  * Data-access layer for the `VideoArtist` join model. The only layer that
- * touches Prisma for video-artist links; every call is wrapped in `runQuery`
- * so callers see vendor-neutral `DataError`s.
+ * touches Prisma for video-artist links; the client translates failures so
+ * callers see vendor-neutral `DataError`s.
  */
 export class VideoArtistRepository {
   /**
@@ -62,22 +62,20 @@ export class VideoArtistRepository {
 
   /** List a video's artist links (sortOrder asc) with the identity projection. */
   static async findByVideoId(videoId: string): Promise<VideoArtistWithArtist[]> {
-    return runQuery(() =>
-      prisma.videoArtist.findMany({
-        where: { videoId },
-        orderBy: { sortOrder: 'asc' },
-        select: {
-          artistId: true,
-          role: true,
-          sortOrder: true,
-          artist: { select: artistIdentitySelect },
-        },
-      })
-    );
+    return prisma.videoArtist.findMany({
+      where: { videoId },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        artistId: true,
+        role: true,
+        sortOrder: true,
+        artist: { select: artistIdentitySelect },
+      },
+    });
   }
 
   /** Delete every artist link for a video (video hard-delete cleanup). */
   static async deleteByVideoId(videoId: string): Promise<void> {
-    await runQuery(() => prisma.videoArtist.deleteMany({ where: { videoId } }));
+    await prisma.videoArtist.deleteMany({ where: { videoId } });
   }
 }

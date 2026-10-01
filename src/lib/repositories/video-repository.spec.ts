@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
-import { DataError } from '@/lib/types/domain/errors';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
 import { VideoRepository, type VideoSummary } from './video-repository';
@@ -81,22 +78,6 @@ describe('VideoRepository', () => {
       const result = await VideoRepository.findById('missing');
 
       expect(result).toBeNull();
-    });
-
-    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
-      vi.mocked(prisma.video.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
-      );
-
-      await expect(VideoRepository.findById('a')).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.video.findUnique).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(VideoRepository.findById('a')).rejects.toBeInstanceOf(DataError);
     });
   });
 
@@ -325,25 +306,6 @@ describe('VideoRepository', () => {
 
       expect(result).toEqual([]);
     });
-
-    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
-      vi.mocked(prisma.video.findMany).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
-      );
-
-      await expect(VideoRepository.findManyByIds(['a'])).rejects.toMatchObject({
-        name: 'DataError',
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.video.findMany).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(VideoRepository.findManyByIds(['a'])).rejects.toBeInstanceOf(DataError);
-    });
   });
 
   describe('searchPublished', () => {
@@ -379,25 +341,6 @@ describe('VideoRepository', () => {
       const result = await VideoRepository.searchPublished('zzz', 8);
 
       expect(result).toEqual([]);
-    });
-
-    it('wraps a Prisma not-found error as a DataError with code NOT_FOUND', async () => {
-      vi.mocked(prisma.video.findMany).mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('x', { code: 'P2025', clientVersion: '6' })
-      );
-
-      await expect(VideoRepository.searchPublished('a', 8)).rejects.toMatchObject({
-        name: 'DataError',
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('throws a DataError instance on failure', async () => {
-      vi.mocked(prisma.video.findMany).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(VideoRepository.searchPublished('a', 8)).rejects.toBeInstanceOf(DataError);
     });
   });
 
@@ -614,16 +557,6 @@ describe('VideoRepository', () => {
         probedAt: new Date('2026-07-11T00:00:00.000Z'),
         probeData: null,
       });
-    });
-
-    it('wraps a connection failure as a DataError', async () => {
-      vi.mocked(prisma.video.updateMany).mockRejectedValue(
-        new Prisma.PrismaClientInitializationError('no db', '6')
-      );
-
-      await expect(
-        VideoRepository.saveProbeResult('video-123', 'videos/test.mp4', saveData)
-      ).rejects.toBeInstanceOf(DataError);
     });
   });
 

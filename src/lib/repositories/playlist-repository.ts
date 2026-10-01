@@ -74,13 +74,13 @@ const sumDurations = (items: AddPlaylistItemData[]): number =>
  * Data-access layer for the `Playlist` and `PlaylistItem` models. The only layer
  * that touches Prisma for playlists: it owns the where DSL, keeps the
  * denormalized `itemCount`/`totalDuration` counters and dense `sortOrder`
- * consistent inside `$transaction`s, and wraps every call in `runQuery` so
- * callers see vendor-neutral `DataError`s and hand-written domain types.
+ * consistent inside `$transaction`s, and returns hand-written domain types;
+ * failures surface as vendor-neutral `DataError`s.
  */
 export class PlaylistRepository {
   /** Create an empty playlist from domain create data. */
   static async create(data: CreatePlaylistData): Promise<PlaylistRecord> {
-    return runQuery(() => prisma.playlist.create({ data: toPrismaCreate(data) }));
+    return prisma.playlist.create({ data: toPrismaCreate(data) });
   }
 
   /**
@@ -115,7 +115,7 @@ export class PlaylistRepository {
 
   /** Find a playlist by id. Returns `null` when not found. */
   static async findById(id: string): Promise<PlaylistRecord | null> {
-    return runQuery(() => prisma.playlist.findUnique({ where: { id } }));
+    return prisma.playlist.findUnique({ where: { id } });
   }
 
   /**
@@ -125,12 +125,10 @@ export class PlaylistRepository {
   static async findByIdWithItems(
     id: string
   ): Promise<(PlaylistRecord & { items: PlaylistItemRecord[] }) | null> {
-    const playlist = await runQuery(() =>
-      prisma.playlist.findUnique({
-        where: { id },
-        include: { items: { orderBy: { sortOrder: 'asc' } } },
-      })
-    );
+    const playlist = await prisma.playlist.findUnique({
+      where: { id },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
     if (!playlist) return null;
     const { items, ...scalars } = playlist;
     return { ...scalars, items: items.map(toItemRecord) };
@@ -149,19 +147,17 @@ export class PlaylistRepository {
       ownerId,
       ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
     };
-    return runQuery(() =>
-      prisma.playlist.findMany({ where, orderBy: { updatedAt: 'desc' }, skip, take })
-    );
+    return prisma.playlist.findMany({ where, orderBy: { updatedAt: 'desc' }, skip, take });
   }
 
   /** Update a playlist by id from domain update data. */
   static async update(id: string, data: UpdatePlaylistData): Promise<PlaylistRecord> {
-    return runQuery(() => prisma.playlist.update({ where: { id }, data: toPrismaUpdate(data) }));
+    return prisma.playlist.update({ where: { id }, data: toPrismaUpdate(data) });
   }
 
   /** Hard-delete a playlist by id; its items cascade-delete with it. */
   static async delete(id: string): Promise<void> {
-    await runQuery(() => prisma.playlist.delete({ where: { id } }));
+    await prisma.playlist.delete({ where: { id } });
   }
 
   /**
@@ -179,9 +175,7 @@ export class PlaylistRepository {
         ? { videoId: ref.videoId }
         : null;
     if (!sourceFilter) return null;
-    const row = await runQuery(() =>
-      prisma.playlistItem.findFirst({ where: { playlistId, ...sourceFilter } })
-    );
+    const row = await prisma.playlistItem.findFirst({ where: { playlistId, ...sourceFilter } });
     return row ? toItemRecord(row) : null;
   }
 
@@ -267,17 +261,15 @@ export class PlaylistRepository {
     excludeOwnerId: string,
     take: number
   ): Promise<Array<PlaylistItemRecord & { playlist: { id: string; title: string } }>> {
-    const rows = await runQuery(() =>
-      prisma.playlistItem.findMany({
-        where: {
-          itemType: 'track',
-          title: { contains: q, mode: 'insensitive' },
-          playlist: { is: { isPublic: true, ownerId: { not: excludeOwnerId } } },
-        },
-        include: { playlist: { select: { id: true, title: true } } },
-        take,
-      })
-    );
+    const rows = await prisma.playlistItem.findMany({
+      where: {
+        itemType: 'track',
+        title: { contains: q, mode: 'insensitive' },
+        playlist: { is: { isPublic: true, ownerId: { not: excludeOwnerId } } },
+      },
+      include: { playlist: { select: { id: true, title: true } } },
+      take,
+    });
     return rows.map(({ playlist, ...item }) => ({ ...toItemRecord(item), playlist }));
   }
 }

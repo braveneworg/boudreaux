@@ -7,8 +7,6 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { CreateImageData, ImageOwnerWhere, ImageRecord } from '@/lib/types/domain/image';
 
-import { runQuery } from './_internal/map-prisma-error';
-
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -24,17 +22,17 @@ const toPrismaCreate = (data: CreateImageData): Prisma.ImageUncheckedCreateInput
 /**
  * Data-access layer for the general Image model. The only layer that touches
  * Prisma for images: it owns the query shapes, translates domain input, and
- * wraps every call in `runQuery` so callers see hand-written domain types and
- * vendor-neutral `DataError`s. Sort-order computation stays in the calling service.
+ * returns hand-written domain types; failures surface as vendor-neutral
+ * `DataError`s. Sort-order computation stays in the calling service.
  */
 export class ImageRepository {
   /** Find the (id-only) images for a single owner. Used to seed sortOrder. */
   static async findManyByOwner(owner: ImageOwnerWhere): Promise<Array<{ id: string }>> {
-    return runQuery(() => prisma.image.findMany({ where: owner, select: { id: true } }));
+    return prisma.image.findMany({ where: owner, select: { id: true } });
   }
 
   /** Create a single image row from the supplied create data. */
   static async create(data: CreateImageData): Promise<ImageRecord> {
-    return runQuery(() => prisma.image.create({ data: toPrismaCreate(data) }));
+    return prisma.image.create({ data: toPrismaCreate(data) });
   }
 }

@@ -12,8 +12,8 @@ const producerSummarySelect = { id: true, name: true } as const;
 
 /**
  * Data-access layer for the `Producer` model and `VideoProducer` join. The only
- * layer that touches Prisma for producer data; every call is wrapped in
- * `runQuery` so callers see vendor-neutral `DataError`s.
+ * layer that touches Prisma for producer data; failures surface as
+ * vendor-neutral `DataError`s.
  */
 export class ProducerRepository {
   /**
@@ -21,14 +21,12 @@ export class ProducerRepository {
    * Results ordered by name ascending, capped at `take`.
    */
   static async search(q: string, take: number): Promise<ProducerSummary[]> {
-    return runQuery(() =>
-      prisma.producer.findMany({
-        where: { name: { contains: q, mode: 'insensitive' } },
-        orderBy: { name: 'asc' },
-        take,
-        select: producerSummarySelect,
-      })
-    );
+    return prisma.producer.findMany({
+      where: { name: { contains: q, mode: 'insensitive' } },
+      orderBy: { name: 'asc' },
+      take,
+      select: producerSummarySelect,
+    });
   }
 
   /**
@@ -37,25 +35,21 @@ export class ProducerRepository {
    */
   static async findOrCreateByName(name: string, createdBy?: string): Promise<ProducerSummary> {
     const trimmed = name.trim();
-    const existing = await runQuery(() =>
-      prisma.producer.findFirst({
-        where: { name: { equals: trimmed, mode: 'insensitive' } },
-        select: producerSummarySelect,
-      })
-    );
+    const existing = await prisma.producer.findFirst({
+      where: { name: { equals: trimmed, mode: 'insensitive' } },
+      select: producerSummarySelect,
+    });
     if (existing) return existing;
 
     const data: CreateProducerData = { name: trimmed, createdBy: createdBy ?? null };
     try {
-      return await runQuery(() => prisma.producer.create({ data, select: producerSummarySelect }));
+      return await prisma.producer.create({ data, select: producerSummarySelect });
     } catch {
       // Unique-name race: another request created the same name first — re-find.
-      const recovered = await runQuery(() =>
-        prisma.producer.findFirst({
-          where: { name: { equals: trimmed, mode: 'insensitive' } },
-          select: producerSummarySelect,
-        })
-      );
+      const recovered = await prisma.producer.findFirst({
+        where: { name: { equals: trimmed, mode: 'insensitive' } },
+        select: producerSummarySelect,
+      });
       if (recovered) return recovered;
       throw new Error(`Failed to create producer "${trimmed}"`);
     }
@@ -84,13 +78,11 @@ export class ProducerRepository {
    * Returns lightweight `ProducerSummary` objects for display.
    */
   static async findByVideoId(videoId: string): Promise<ProducerSummary[]> {
-    const rows = await runQuery(() =>
-      prisma.videoProducer.findMany({
-        where: { videoId },
-        orderBy: { sortOrder: 'asc' },
-        select: { producer: { select: producerSummarySelect } },
-      })
-    );
+    const rows = await prisma.videoProducer.findMany({
+      where: { videoId },
+      orderBy: { sortOrder: 'asc' },
+      select: { producer: { select: producerSummarySelect } },
+    });
     return rows.map(({ producer }) => producer);
   }
 }

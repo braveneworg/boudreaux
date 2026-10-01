@@ -70,9 +70,13 @@ export const toDataError = (error: unknown): DataError => {
 };
 
 /**
- * Runs a repository query, translating any Prisma failure into a
- * {@link DataError} before it escapes the repository layer. Repositories wrap
- * every Prisma call in this so callers only ever catch domain errors.
+ * Runs a query, translating any Prisma failure into a {@link DataError}.
+ *
+ * Model operations are already translated by the `data-error-translation`
+ * client extension, so repositories do not wrap them. The one call that still
+ * needs this is `prisma.$transaction(...)`: operations on the `tx` client are
+ * translated, but the transaction's own start/commit/rollback is not a model
+ * operation and can fail outside the extension's reach.
  */
 export const runQuery = async <T>(fn: () => Promise<T>): Promise<T> => {
   try {

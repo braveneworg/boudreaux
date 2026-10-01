@@ -1,11 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import type { SmsBlastRecord } from '@/lib/types/domain';
-import { DataError } from '@/lib/types/domain';
 
 import { SmsBlastRepository } from './sms-blast-repository';
 
@@ -57,12 +55,6 @@ describe('SmsBlastRepository', () => {
       expect(result).toEqual(mockBlast);
       expect(mockCreate).toHaveBeenCalledWith({ data: mockCreateData });
     });
-
-    it('wraps a Prisma error as a DataError', async () => {
-      mockCreate.mockRejectedValue(new Error('boom'));
-
-      await expect(SmsBlastRepository.create(mockCreateData)).rejects.toBeInstanceOf(DataError);
-    });
   });
 
   describe('findRecent', () => {
@@ -84,26 +76,6 @@ describe('SmsBlastRepository', () => {
       await SmsBlastRepository.findRecent(20);
 
       expect(mockFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 20 }));
-    });
-
-    it('wraps a Prisma P2025 error as a NOT_FOUND DataError', async () => {
-      mockFindMany.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
-
-      await expect(SmsBlastRepository.findRecent(5)).rejects.toMatchObject({
-        name: 'DataError',
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('throws a DataError instance on generic failure', async () => {
-      mockFindMany.mockRejectedValue(new Error('db gone'));
-
-      await expect(SmsBlastRepository.findRecent(5)).rejects.toBeInstanceOf(DataError);
     });
   });
 });

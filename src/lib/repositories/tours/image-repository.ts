@@ -40,64 +40,53 @@ const _tourImageDrift: _TourImageDrift = true;
 
 /**
  * Repository for tour image database operations. The only layer that touches
- * Prisma for tour images: it wraps every call in `runQuery` and returns
- * hand-written, Prisma-free domain types.
+ * Prisma for tour images: it returns hand-written, Prisma-free domain types.
  */
 export class ImageRepository {
   /**
    * Find all images for a tour, sorted by display order.
    */
   static async findByTourId(tourId: string): Promise<TourImageScalars[]> {
-    return runQuery(() =>
-      prisma.tourImage.findMany({
-        where: { tourId },
-        orderBy: { displayOrder: 'asc' },
-      })
-    );
+    return prisma.tourImage.findMany({
+      where: { tourId },
+      orderBy: { displayOrder: 'asc' },
+    });
   }
 
   /**
    * Find a single image by ID.
    */
   static async findById(id: string): Promise<TourImageScalars | null> {
-    return runQuery(() =>
-      prisma.tourImage.findUnique({
-        where: { id },
-      })
-    );
+    return prisma.tourImage.findUnique({
+      where: { id },
+    });
   }
 
   /**
    * Create a new tour image record.
    */
   static async create(data: CreateImageInput): Promise<TourImageScalars> {
-    return runQuery(() =>
-      prisma.tourImage.create({
-        data,
-      })
-    );
+    return prisma.tourImage.create({
+      data,
+    });
   }
 
   /**
    * Delete an image by ID.
    */
   static async delete(id: string): Promise<TourImageScalars> {
-    return runQuery(() =>
-      prisma.tourImage.delete({
-        where: { id },
-      })
-    );
+    return prisma.tourImage.delete({
+      where: { id },
+    });
   }
 
   /**
    * Delete all images for a tour. Returns the count of deleted images.
    */
   static async deleteByTourId(tourId: string): Promise<number> {
-    const result = await runQuery(() =>
-      prisma.tourImage.deleteMany({
-        where: { tourId },
-      })
-    );
+    const result = await prisma.tourImage.deleteMany({
+      where: { tourId },
+    });
     return result.count;
   }
 
@@ -105,12 +94,10 @@ export class ImageRepository {
    * Update the display order of a single image.
    */
   static async updateDisplayOrder(id: string, displayOrder: number): Promise<TourImageScalars> {
-    return runQuery(() =>
-      prisma.tourImage.update({
-        where: { id },
-        data: { displayOrder },
-      })
-    );
+    return prisma.tourImage.update({
+      where: { id },
+      data: { displayOrder },
+    });
   }
 
   /**
@@ -133,22 +120,18 @@ export class ImageRepository {
    * Count images for a tour.
    */
   static async count(tourId: string): Promise<number> {
-    return runQuery(() =>
-      prisma.tourImage.count({
-        where: { tourId },
-      })
-    );
+    return prisma.tourImage.count({
+      where: { tourId },
+    });
   }
 
   /**
    * Update alt text for an image.
    */
   static async updateAltText(id: string, altText: string | null): Promise<TourImageScalars> {
-    return runQuery(() =>
-      prisma.tourImage.update({
-        where: { id },
-        data: { altText },
-      })
-    );
+    return prisma.tourImage.update({
+      where: { id },
+      data: { altText },
+    });
   }
 }
