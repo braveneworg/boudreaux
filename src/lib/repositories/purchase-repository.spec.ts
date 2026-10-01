@@ -153,6 +153,46 @@ describe('PurchaseRepository', () => {
     });
   });
 
+  describe('recordPurchasedDownload', () => {
+    const now = new Date('2026-10-01T12:00:00.000Z');
+
+    it('increments the purchase throttle and stamps the download time', async () => {
+      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue({} as never);
+
+      await PurchaseRepository.recordPurchasedDownload('user-123', 'release-abc', {
+        restart: false,
+        now,
+      });
+
+      expect(vi.mocked(prisma.releaseDownload.upsert).mock.calls).toEqual([
+        [
+          {
+            where: { userId_releaseId: { userId: 'user-123', releaseId: 'release-abc' } },
+            update: { downloadCount: { increment: 1 }, lastDownloadedAt: now },
+            create: {
+              userId: 'user-123',
+              releaseId: 'release-abc',
+              downloadCount: 1,
+              lastDownloadedAt: now,
+            },
+          },
+        ],
+      ]);
+    });
+
+    it('restarts the count at one when the idle window has elapsed', async () => {
+      vi.mocked(prisma.releaseDownload.upsert).mockResolvedValue({} as never);
+
+      await PurchaseRepository.recordPurchasedDownload('user-123', 'release-abc', {
+        restart: true,
+        now,
+      });
+
+      const call = vi.mocked(prisma.releaseDownload.upsert).mock.calls[0]?.[0];
+      expect(call?.update).toEqual({ downloadCount: 1, lastDownloadedAt: now });
+    });
+  });
+
   describe('upsertDownloadCount', () => {
     it('should call prisma.releaseDownload.upsert with increment update and create with count 1', async () => {
       const mockRecord = {

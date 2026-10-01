@@ -38,6 +38,7 @@ describe('DownloadEventRepository', () => {
     formatType: mockFormatType,
     success: true,
     errorCode: null,
+    mode: null,
     ipAddress: '192.168.1.1',
     userAgent: 'Mozilla/5.0',
     downloadedAt: new Date(),
@@ -75,10 +76,27 @@ describe('DownloadEventRepository', () => {
           ...eventData,
           visitorId: null,
           errorCode: null,
+          mode: null,
         },
       });
       expect(result).toEqual(mockCreatedEvent);
-      expect(result.success).toBe(true);
+    });
+
+    it('records which rules the download ran under', async () => {
+      vi.mocked(prisma.downloadEvent.create).mockResolvedValue(createMockEvent());
+
+      await repository.logDownloadEvent({
+        userId: mockUserId,
+        releaseId: mockReleaseId,
+        formatType: mockFormatType,
+        success: true,
+        mode: 'free',
+        ipAddress: '192.168.1.1',
+        userAgent: 'Mozilla/5.0',
+      });
+
+      const call = vi.mocked(prisma.downloadEvent.create).mock.calls[0]?.[0];
+      expect(call?.data).toMatchObject({ mode: 'free' });
     });
 
     it('should log a failed download event with error code', async () => {
@@ -103,7 +121,7 @@ describe('DownloadEventRepository', () => {
       const result = await repository.logDownloadEvent(eventData);
 
       expect(prisma.downloadEvent.create).toHaveBeenCalledWith({
-        data: { ...eventData, visitorId: null },
+        data: { ...eventData, visitorId: null, mode: null },
       });
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('QUOTA_EXCEEDED');
@@ -332,7 +350,7 @@ describe('DownloadEventRepository', () => {
     });
   });
 
-  describe('countSuccessfulDownloadsInWindow', () => {
+  describe('countFreeDownloadsInWindow', () => {
     const windowStart = new Date('2026-05-07T00:00:00Z');
     const oldest = new Date('2026-05-07T01:23:45Z');
 
@@ -342,7 +360,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: oldest },
       } as never);
 
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         visitorId: 'visitor-abc',
         releaseId: mockReleaseId,
         windowStart,
@@ -354,6 +372,7 @@ describe('DownloadEventRepository', () => {
           visitorId: 'visitor-abc',
           releaseId: mockReleaseId,
           success: true,
+          mode: 'free',
           downloadedAt: { gte: windowStart },
         },
         _count: { _all: true },
@@ -367,7 +386,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: windowStart },
       } as never);
 
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         visitorId: 'visitor-abc',
         releaseId: mockReleaseId,
         windowStart,
@@ -384,7 +403,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: null },
       } as never);
 
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         visitorId: 'visitor-abc',
         releaseId: mockReleaseId,
         windowStart,
@@ -399,7 +418,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: oldest },
       } as never);
 
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         visitorIds: ['visitor-a', 'visitor-b'],
         releaseId: mockReleaseId,
         windowStart,
@@ -411,6 +430,7 @@ describe('DownloadEventRepository', () => {
           visitorId: { in: ['visitor-a', 'visitor-b'] },
           releaseId: mockReleaseId,
           success: true,
+          mode: 'free',
           downloadedAt: { gte: windowStart },
         },
         _count: { _all: true },
@@ -419,7 +439,7 @@ describe('DownloadEventRepository', () => {
     });
 
     it('short-circuits to count=0 without DB access when visitorIds is empty', async () => {
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         visitorIds: [],
         releaseId: mockReleaseId,
         windowStart,
@@ -435,7 +455,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: oldest },
       } as never);
 
-      const result = await repository.countSuccessfulDownloadsInWindow({
+      const result = await repository.countFreeDownloadsInWindow({
         userId: mockUserId,
         releaseId: mockReleaseId,
         windowStart,
@@ -447,6 +467,7 @@ describe('DownloadEventRepository', () => {
           userId: mockUserId,
           releaseId: mockReleaseId,
           success: true,
+          mode: 'free',
           downloadedAt: { gte: windowStart },
         },
         _count: { _all: true },
@@ -461,7 +482,7 @@ describe('DownloadEventRepository', () => {
         _min: { downloadedAt: null },
       } as never);
 
-      await repository.countSuccessfulDownloadsInWindow({
+      await repository.countFreeDownloadsInWindow({
         visitorId: 'visitor-abc',
         releaseId: mockReleaseId,
         windowStart,

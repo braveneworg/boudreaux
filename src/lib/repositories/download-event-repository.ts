@@ -6,6 +6,7 @@ import 'server-only';
 
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
+import type { DownloadMode } from '@/lib/services/download-gate/types';
 
 import type { DownloadEvent, Prisma } from '@prisma/client';
 
@@ -26,6 +27,8 @@ export class DownloadEventRepository {
     formatType: DigitalFormatType;
     success: boolean;
     errorCode?: string | null;
+    /** Which rules the download ran under (ADR-0018); null on a failure before a decision. */
+    mode?: DownloadMode | null;
     ipAddress: string;
     userAgent: string;
   }): Promise<DownloadEvent> {
@@ -37,6 +40,7 @@ export class DownloadEventRepository {
         formatType: data.formatType,
         success: data.success,
         errorCode: data.errorCode ?? null,
+        mode: data.mode ?? null,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },
@@ -201,9 +205,9 @@ export class DownloadEventRepository {
   }
 
   /**
-   * Count successful download events within a rolling window for cap
-   * enforcement. Supports three identity scopes used by the free-download
-   * flow (007-free-digital-downloads):
+   * Count successful free-mode download events within a rolling window — the
+   * free throttle (CONTEXT.md "free tier", ADR-0018). Supports three identity
+   * scopes:
    *
    * 1. `visitorId: string` — single anonymous identity.
    * 2. `visitorIds: string[]` — union of anonymous identities, used when
@@ -217,7 +221,7 @@ export class DownloadEventRepository {
    * `resetsAt = oldestInWindow + windowDuration`), or `null` when no events
    * match.
    */
-  async countSuccessfulDownloadsInWindow(
+  async countFreeDownloadsInWindow(
     params: {
       releaseId: string;
       windowStart: Date;
@@ -239,6 +243,10 @@ export class DownloadEventRepository {
       ...identityClause,
       releaseId: params.releaseId,
       success: true,
+      // Only free-mode rows tick the free throttle (ADR-0018). Rows written
+      // before `mode` existed have no mode and stop counting as the 24h
+      // window passes them; a paid download never counts.
+      mode: 'free',
       downloadedAt: { gte: params.windowStart },
     };
 

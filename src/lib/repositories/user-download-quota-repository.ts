@@ -39,6 +39,18 @@ export class UserDownloadQuotaRepository {
   /**
    * Find existing quota record or create a new one for the subject.
    */
+  /**
+   * The releases the subject has taken free so far — the lifetime cap's
+   * state. A read only: a subject with no row has taken none.
+   */
+  async findReleaseIds(subject: DownloadSubject): Promise<string[]> {
+    const quota = await prisma.userDownloadQuota.findUnique({
+      where: this.whereForSubject(subject),
+      select: { uniqueReleaseIds: true },
+    });
+    return quota?.uniqueReleaseIds ?? [];
+  }
+
   async findOrCreateBySubject(subject: DownloadSubject): Promise<UserDownloadQuota> {
     const existing = await prisma.userDownloadQuota.findUnique({
       where: this.whereForSubject(subject),

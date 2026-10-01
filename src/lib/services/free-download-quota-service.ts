@@ -185,12 +185,12 @@ export class FreeDownloadQuotaService {
 
     const { count, oldestInWindow } =
       params.subject.kind === 'user'
-        ? await this.downloadEventRepo.countSuccessfulDownloadsInWindow({
+        ? await this.downloadEventRepo.countFreeDownloadsInWindow({
             userId: params.subject.userId,
             releaseId: params.releaseId,
             windowStart,
           })
-        : await this.downloadEventRepo.countSuccessfulDownloadsInWindow({
+        : await this.downloadEventRepo.countFreeDownloadsInWindow({
             visitorIds: params.visitorIds ?? [params.subject.visitorId],
             releaseId: params.releaseId,
             windowStart,

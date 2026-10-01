@@ -46,7 +46,7 @@ describe('FreeDownloadQuotaService', () => {
     vi.spyOn(visitorRepo, 'upsert').mockImplementation(async ({ visitorId }) =>
       makeRow({ visitorId, fingerprintHash })
     );
-    vi.spyOn(eventRepo, 'countSuccessfulDownloadsInWindow').mockResolvedValue({
+    vi.spyOn(eventRepo, 'countFreeDownloadsInWindow').mockResolvedValue({
       count: 0,
       oldestInWindow: null,
     });
@@ -184,7 +184,7 @@ describe('FreeDownloadQuotaService', () => {
     const userSubject: DownloadSubject = { kind: 'user', userId: 'user-1' };
 
     it('returns allowed=true with remaining=3 when no events have been recorded', async () => {
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: 0,
         oldestInWindow: null,
       });
@@ -206,7 +206,7 @@ describe('FreeDownloadQuotaService', () => {
 
     it('returns remaining=1 with resetsAt when count=2', async () => {
       const oldest = new Date(now.getTime() - 5 * 60 * 60 * 1000); // 5h ago
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: 2,
         oldestInWindow: oldest,
       });
@@ -225,7 +225,7 @@ describe('FreeDownloadQuotaService', () => {
 
     it('throws CapReachedError when count >= 3', async () => {
       const oldest = new Date(now.getTime() - 1 * 60 * 60 * 1000);
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: 3,
         oldestInWindow: oldest,
       });
@@ -245,7 +245,7 @@ describe('FreeDownloadQuotaService', () => {
     });
 
     it('queries by visitorIds union when provided (identity conflict)', async () => {
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: 0,
         oldestInWindow: null,
       });
@@ -257,7 +257,7 @@ describe('FreeDownloadQuotaService', () => {
         now,
       });
 
-      const call = vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mock.calls[0]?.[0];
+      const call = vi.mocked(eventRepo.countFreeDownloadsInWindow).mock.calls[0]?.[0];
       expect(call).toEqual({
         visitorIds: ['visitor-1', 'visitor-2'],
         releaseId,
@@ -266,7 +266,7 @@ describe('FreeDownloadQuotaService', () => {
     });
 
     it('queries by userId for authenticated subjects, skipping identity resolution', async () => {
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: 0,
         oldestInWindow: null,
       });
@@ -277,7 +277,7 @@ describe('FreeDownloadQuotaService', () => {
         now,
       });
 
-      const call = vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mock.calls[0]?.[0];
+      const call = vi.mocked(eventRepo.countFreeDownloadsInWindow).mock.calls[0]?.[0];
       expect(call).toEqual({
         userId: 'user-1',
         releaseId,
@@ -364,13 +364,13 @@ describe('FreeDownloadQuotaService', () => {
       });
 
       expect(result.allowed).toBe(true);
-      expect(eventRepo.countSuccessfulDownloadsInWindow).toHaveBeenCalledTimes(1);
-      const arg = vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mock.calls[0][0];
+      expect(eventRepo.countFreeDownloadsInWindow).toHaveBeenCalledTimes(1);
+      const arg = vi.mocked(eventRepo.countFreeDownloadsInWindow).mock.calls[0][0];
       expect(arg.windowStart).toBeInstanceOf(Date);
     });
 
     it('uses a now-based reset when CapReached fires without an oldestInWindow', async () => {
-      vi.mocked(eventRepo.countSuccessfulDownloadsInWindow).mockResolvedValue({
+      vi.mocked(eventRepo.countFreeDownloadsInWindow).mockResolvedValue({
         count: FREE_DOWNLOAD_CAP,
         oldestInWindow: null,
       });

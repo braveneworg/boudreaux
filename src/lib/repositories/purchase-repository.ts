@@ -96,6 +96,25 @@ export class PurchaseRepository {
   }
 
   /**
+   * Charge the purchase throttle for one download (ADR-0018). `restart` is
+   * true when the gate saw that the idle window had elapsed: the count starts
+   * over at one instead of growing past the cap.
+   */
+  static async recordPurchasedDownload(
+    userId: string,
+    releaseId: string,
+    { restart, now }: { restart: boolean; now: Date }
+  ): Promise<void> {
+    await prisma.releaseDownload.upsert({
+      where: { userId_releaseId: { userId, releaseId } },
+      update: restart
+        ? { downloadCount: 1, lastDownloadedAt: now }
+        : { downloadCount: { increment: 1 }, lastDownloadedAt: now },
+      create: { userId, releaseId, downloadCount: 1, lastDownloadedAt: now },
+    });
+  }
+
+  /**
    * Atomically increment the download counter for a user+release pair.
    * Upserts the record if it does not yet exist.
    */

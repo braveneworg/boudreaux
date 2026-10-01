@@ -61,6 +61,28 @@ describe('UserDownloadQuotaRepository', () => {
     vi.mocked(prisma.userDownloadQuota.upsert).mockReset();
   });
 
+  describe('findReleaseIds', () => {
+    it('returns the stored release ids without creating a row', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(
+        createUserQuota({ uniqueReleaseIds: ['r1', 'r2'] })
+      );
+
+      const result = await repo.findReleaseIds(userSubject);
+
+      expect(result).toEqual(['r1', 'r2']);
+      expect(prisma.userDownloadQuota.create).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty list when the subject has no quota row yet', async () => {
+      vi.mocked(prisma.userDownloadQuota.findUnique).mockResolvedValue(null);
+
+      const result = await repo.findReleaseIds(userSubject);
+
+      expect(result).toEqual([]);
+      expect(prisma.userDownloadQuota.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findOrCreateBySubject', () => {
     it('returns existing user quota keyed by userId', async () => {
       const existing = createUserQuota();
