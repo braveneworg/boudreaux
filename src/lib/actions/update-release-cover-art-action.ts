@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { prisma } from '@/lib/prisma';
+import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { updateReleaseCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
@@ -38,10 +38,7 @@ export const updateReleaseCoverArtAction = async (
   }
 
   try {
-    await prisma.release.update({
-      where: { id: parsed.data.releaseId },
-      data: { coverArt: parsed.data.coverArt },
-    });
+    await ReleaseRepository.updateData(parsed.data.releaseId, { coverArt: parsed.data.coverArt });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update cover art';
     return { success: false, error: errorMessage };
