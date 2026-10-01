@@ -3,9 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 import type {
   AddPlaylistItemData,
   CreatePlaylistData,
@@ -18,6 +17,7 @@ import type {
 import { runQuery } from './_internal/map-prisma-error';
 
 import type { AssertExact, AssertExtends } from './_internal/drift';
+import type { Prisma } from '@prisma/client';
 
 // =============================================================================
 // Drift guards (hand-written domain types vs the Prisma scalar payloads)
@@ -192,10 +192,7 @@ export class PlaylistRepository {
           select: { itemCount: true },
         });
         if (!playlist) {
-          throw new Prisma.PrismaClientKnownRequestError('Playlist not found', {
-            code: 'P2025',
-            clientVersion: Prisma.prismaVersion.client,
-          });
+          throw new DataError('NOT_FOUND', 'Playlist not found');
         }
         const created = await tx.playlistItem.create({
           data: { ...data, playlistId, sortOrder: playlist.itemCount },

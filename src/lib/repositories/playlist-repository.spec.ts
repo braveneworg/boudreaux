@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 import type { AddPlaylistItemData, CreatePlaylistData } from '@/lib/types/domain/playlist';
 
 import { PlaylistRepository } from './playlist-repository';
@@ -363,9 +364,10 @@ describe('PlaylistRepository', () => {
     it('throws NOT_FOUND when the playlist is missing', async () => {
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(null);
 
-      await expect(PlaylistRepository.addItem('missing', trackItem)).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
+      const rejection = PlaylistRepository.addItem('missing', trackItem);
+
+      await expect(rejection).rejects.toBeInstanceOf(DataError);
+      await expect(rejection).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('returns the created item', async () => {
