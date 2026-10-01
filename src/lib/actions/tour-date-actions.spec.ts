@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import { DataError } from '@/lib/types/domain/errors';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
@@ -126,11 +127,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result.error).toBe('Failed to update set time');
     });
 
-    it('falls back to tourDate+artist lookup when P2025 is thrown and IDs are valid', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+    it('falls back to tourDate+artist lookup when the repository reports NOT_FOUND and IDs are valid', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockResolvedValue(
         true as never
       );
@@ -156,11 +155,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('returns failure when P2025 fallback finds no record', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+    it('returns failure when the NOT_FOUND fallback finds no record', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockResolvedValue(
         false as never
       );
@@ -175,11 +172,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: false, error: 'Failed to update set time' });
     });
 
-    it('returns failure when the P2025 fallback itself throws', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+    it('returns failure when the NOT_FOUND fallback itself throws', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).mockRejectedValue(
         new Error('fallback exploded')
       );
@@ -194,11 +189,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: false, error: 'Failed to update set time' });
     });
 
-    it('does not attempt fallback when P2025 fires but tourDateId/artistId are invalid', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(p2025);
+    it('does not attempt fallback when NOT_FOUND fires but tourDateId/artistId are invalid', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.updateHeadlinerSetTime).mockRejectedValue(notFound);
 
       const result = await updateHeadlinerSetTimeAction(
         validObjectId,
@@ -269,11 +262,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result.error).toBe('Failed to remove headliner');
     });
 
-    it('falls back to tourDate+artist removal when P2025 is thrown and IDs are valid', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+    it('falls back to tourDate+artist removal when the repository reports NOT_FOUND and IDs are valid', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockResolvedValue(
         true as never
       );
@@ -292,11 +283,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('returns failure when the P2025 fallback finds no record', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+    it('returns failure when the NOT_FOUND fallback finds no record', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockResolvedValue(
         false as never
       );
@@ -306,11 +295,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
     });
 
-    it('returns failure when the P2025 fallback itself throws', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+    it('returns failure when the NOT_FOUND fallback itself throws', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(notFound);
       vi.mocked(TourDateRepository.removeHeadlinerByTourDateAndArtist).mockRejectedValue(
         new Error('fallback exploded')
       );
@@ -320,11 +307,9 @@ describe('Tour Date Headliner Actions', () => {
       expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
     });
 
-    it('does not attempt fallback when P2025 fires but tourDateId/artistId are invalid', async () => {
-      const p2025: Error & { code?: string } = Object.assign(new Error('Not found'), {
-        code: 'P2025',
-      });
-      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(p2025);
+    it('does not attempt fallback when NOT_FOUND fires but tourDateId/artistId are invalid', async () => {
+      const notFound = new DataError('NOT_FOUND', 'Not found');
+      vi.mocked(TourDateRepository.removeHeadliner).mockRejectedValue(notFound);
 
       const result = await removeHeadlinerAction(validObjectId, 'invalid-id', validObjectId3);
 

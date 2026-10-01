@@ -6,6 +6,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import { DataError } from '@/lib/types/domain/errors';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
@@ -23,22 +24,19 @@ export const revalidateTourPaths = (): void => {
 };
 
 /**
- * True when `error` is a Prisma "record not found" error (`P2025`), i.e. the
- * headliner junction row could not be located by its id. Mirrors the prior
- * inline structural check exactly.
+ * True when `error` is the repository's "record not found" failure, i.e. the
+ * headliner junction row could not be located by its id. Repositories only
+ * ever surface `DataError`s (ADR-0001), so this branches on the code.
  */
 export const isRecordNotFoundError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  (error as { code?: string }).code === 'P2025';
+  error instanceof DataError && error.code === 'NOT_FOUND';
 
 /**
- * For a P2025 failure, resolve the validated `{ tourDateId, artistId }` to retry
- * the headliner operation by tour-date + artist, or `null` when a fallback is
- * not possible (not a P2025, missing ids, or non-ObjectId ids). Returning the
- * narrowed ids lets the caller pass them without re-checking `undefined`.
- * Mirrors the prior inline guard exactly.
+ * For a NOT_FOUND failure, resolve the validated `{ tourDateId, artistId }` to
+ * retry the headliner operation by tour-date + artist, or `null` when a
+ * fallback is not possible (not NOT_FOUND, missing ids, or non-ObjectId ids).
+ * Returning the narrowed ids lets the caller pass them without re-checking
+ * `undefined`.
  *
  * @param error - The error thrown by the primary (by-id) operation.
  * @param tourDateId - Candidate tour-date id from the caller, if provided.
@@ -70,7 +68,7 @@ interface SetTimeFallbackParams {
 
 /**
  * Retry the headliner set-time update by tour-date + artist after the by-id
- * update missed (P2025). On a matched record it audit-logs (with
+ * update missed (NOT_FOUND). On a matched record it audit-logs (with
  * `fallback: true`) and revalidates, returning `true`; a non-match returns
  * `false`, and a thrown fallback is logged and also returns `false`. Mirrors
  * the prior inline fallback block exactly.
@@ -114,7 +112,7 @@ interface RemoveFallbackParams {
 
 /**
  * Retry the headliner removal by tour-date + artist after the by-id removal
- * missed (P2025). On a matched record it audit-logs (with `fallback: true`) and
+ * missed (NOT_FOUND). On a matched record it audit-logs (with `fallback: true`) and
  * revalidates, returning `true`; a non-match returns `false`, and a thrown
  * fallback is logged and also returns `false`. Mirrors the prior inline
  * fallback block exactly.
