@@ -24,6 +24,7 @@ import { inProcessDownloadLock, type DownloadLock } from './lock';
 import type {
   Decision,
   Deliverable,
+  Denial,
   DownloadFacts,
   DownloadRequest,
   DownloadStatus,
@@ -53,6 +54,22 @@ export interface DownloadGateDeps {
 
 /** `Decision` plus the one answer the facts cannot give: the release is gone. */
 export type CheckResult = Decision | { kind: 'not-found' };
+
+/** One release of a multi-release download, granted. */
+export interface GrantedRelease {
+  request: DownloadRequest;
+  releaseId: string;
+  grant: Grant;
+  records: GateFormatRecord[];
+  facts: DownloadFacts;
+}
+
+export type ManyProducer<D extends Deliverable> = (grants: GrantedRelease[]) => Promise<D>;
+
+export type ManyOutcome<D extends Deliverable> =
+  | { ok: true; grants: GrantedRelease[]; deliverable: D }
+  | { ok: false; denial: Denial; releaseId: string }
+  | { ok: false; denial: null; reason: 'NOT_FOUND' | 'LOCK_HELD'; releaseId?: string };
 
 const STREAM_FAILED = 'STREAM_FAILED';
 
@@ -86,59 +103,139 @@ export class DownloadGate {
     produce: Producer<D>,
     audit: AuditContext
   ): Promise<Outcome<D>> {
-    const key = lockKey(request.subject);
+    const outcome = await this.downloadMany(
+      [request],
+      ([{ grant, records }]) => produce(grant, records),
+      audit
+    );
+    return outcome.ok
+      ? { ok: true, grant: outcome.grants[0].grant, deliverable: outcome.deliverable }
+      : outcome.denial === null
+        ? { ok: false, denial: null, reason: outcome.reason }
+        : { ok: false, denial: outcome.denial };
+  }
+
+  async checkMany(requests: DownloadRequest[]): Promise<CheckResult[]> {
+    return Promise.all(requests.map((request) => this.check(request)));
+  }
+
+  /**
+   * Several releases for one subject as one download (a playlist zip):
+   * one lock, every release decided before anything is produced, and
+   * all-or-nothing — a single refusal names its release and charges nothing.
+   */
+  async downloadMany<D extends Deliverable>(
+    requests: DownloadRequest[],
+    produce: ManyProducer<D>,
+    audit: AuditContext
+  ): Promise<ManyOutcome<D>> {
+    const [first] = requests;
+    const key = lockKey(first.subject);
     if (!this.deps.lock.acquire(key, this.deps.now().getTime())) {
       return { ok: false, denial: null, reason: 'LOCK_HELD' };
     }
     try {
-      const gathered = await this.gather(request);
-      if (gathered === null) {
-        return { ok: false, denial: null, reason: 'NOT_FOUND' };
-      }
-      const { facts, records } = gathered;
-      const decision = decide(facts);
-      if (decision.kind === 'denial') {
-        await this.deps.counters.recordFailure({
-          subject: request.subject,
-          releaseId: request.releaseId,
-          formats: request.formats,
-          errorCode: decision.reason,
-          mode: facts.entitled ? 'purchased' : 'free',
-          audit,
-        });
-        return { ok: false, denial: decision };
+      const grants: GrantedRelease[] = [];
+      for (const request of requests) {
+        const outcome = await this.decideRelease(request, audit);
+        if (outcome.kind === 'not-found') {
+          return { ok: false, denial: null, reason: 'NOT_FOUND', releaseId: request.releaseId };
+        }
+        if (outcome.kind === 'denied') {
+          return { ok: false, denial: outcome.denial, releaseId: request.releaseId };
+        }
+        grants.push(outcome.granted);
       }
 
-      const granted = decision.formats
-        .map(({ formatType }) => records.get(formatType))
-        .filter(isRecord);
-      let deliverable: D;
-      try {
-        deliverable = await produce(decision, granted);
-      } catch (error) {
+      // Every release was decided against the same uncharged lifetime state,
+      // so the set as a whole must also fit: three new releases with two
+      // slots left is refused outright rather than partially charged.
+      const overrun = lifetimeOverrun(grants);
+      if (overrun !== null) {
         await this.deps.counters.recordFailure({
-          subject: request.subject,
-          releaseId: request.releaseId,
-          formats: request.formats,
-          errorCode: STREAM_FAILED,
-          mode: decision.mode,
+          subject: overrun.request.subject,
+          releaseId: overrun.request.releaseId,
+          formats: overrun.request.formats,
+          errorCode: 'LIFETIME_CAP',
+          mode: 'free',
           audit,
         });
+        return {
+          ok: false,
+          denial: { kind: 'denial', reason: 'LIFETIME_CAP' },
+          releaseId: overrun.releaseId,
+        };
+      }
+
+      let deliverable: D;
+      try {
+        deliverable = await produce(grants);
+      } catch (error) {
+        await Promise.all(
+          grants.map(({ request, grant }) =>
+            this.deps.counters.recordFailure({
+              subject: request.subject,
+              releaseId: request.releaseId,
+              formats: request.formats,
+              errorCode: STREAM_FAILED,
+              mode: grant.mode,
+              audit,
+            })
+          )
+        );
         throw error;
       }
 
-      await this.deps.counters.commit({
-        subject: request.subject,
-        releaseId: request.releaseId,
-        grant: decision,
-        facts,
-        now: this.deps.now(),
-        audit,
-      });
-      return { ok: true, grant: decision, deliverable };
+      const now = this.deps.now();
+      for (const { request, grant, facts } of grants) {
+        await this.deps.counters.commit({
+          subject: request.subject,
+          releaseId: request.releaseId,
+          grant,
+          facts,
+          now,
+          audit,
+        });
+      }
+      return { ok: true, grants, deliverable };
     } finally {
       this.deps.lock.release(key);
     }
+  }
+
+  /** Facts → decision for one release, recording a denial as it goes. */
+  private async decideRelease(
+    request: DownloadRequest,
+    audit: AuditContext
+  ): Promise<
+    | { kind: 'not-found' }
+    | { kind: 'denied'; denial: Denial }
+    | { kind: 'granted'; granted: GrantedRelease }
+  > {
+    const gathered = await this.gather(request);
+    if (gathered === null) {
+      return { kind: 'not-found' };
+    }
+    const { facts, records } = gathered;
+    const decision = decide(facts);
+    if (decision.kind === 'denial') {
+      await this.deps.counters.recordFailure({
+        subject: request.subject,
+        releaseId: request.releaseId,
+        formats: request.formats,
+        errorCode: decision.reason,
+        mode: facts.entitled ? 'purchased' : 'free',
+        audit,
+      });
+      return { kind: 'denied', denial: decision };
+    }
+    const granted = decision.formats
+      .map(({ formatType }) => records.get(formatType))
+      .filter(isRecord);
+    return {
+      kind: 'granted',
+      granted: { request, releaseId: request.releaseId, grant: decision, records: granted, facts },
+    };
   }
 
   async status(subject: DownloadSubject, releaseId: string): Promise<DownloadStatus | null> {
@@ -221,6 +318,20 @@ export class DownloadGate {
 
 const isRecord = (record: GateFormatRecord | undefined): record is GateFormatRecord =>
   record !== undefined;
+
+/**
+ * The first granted release the set cannot afford: the lifetime charges it
+ * would make, counted together, exceed the slots the subject has left.
+ */
+const lifetimeOverrun = (grants: GrantedRelease[]): GrantedRelease | null => {
+  const charging = grants.filter(({ grant }) => grant.charge.lifetime);
+  const [first] = charging;
+  if (first === undefined || first.facts.lifetime === null) {
+    return null;
+  }
+  const remaining = MAX_FREE_DOWNLOAD_QUOTA - first.facts.lifetime.distinctReleases;
+  return charging.length > remaining ? (charging[remaining] ?? null) : null;
+};
 
 const formatRepository = new ReleaseDigitalFormatRepository();
 

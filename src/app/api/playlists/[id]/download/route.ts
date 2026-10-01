@@ -12,14 +12,15 @@ import { DOWNLOAD_LIMIT, downloadLimiter } from '@/lib/config/rate-limit-tiers';
 import type { FreeFormatType } from '@/lib/constants/digital-formats';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { extractClientIp } from '@/lib/decorators/with-rate-limit';
-import { freeDownloadLockService } from '@/lib/services/free-download-lock-service';
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
+import type { Deliverable, DownloadRequest } from '@/lib/services/download-gate/types';
 import { PlaylistService } from '@/lib/services/playlist-service';
 import type {
   PlaylistDownloadManifest,
   PlaylistDownloadTrack,
 } from '@/lib/services/playlist-service';
-import { QuotaEnforcementService } from '@/lib/services/quota-enforcement-service';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
+import { downloadRefusal } from '@/lib/utils/download-outcome-response';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
@@ -30,7 +31,6 @@ import {
   type ZipArchive,
 } from '@/lib/utils/zip-stream';
 import { playlistDownloadQuerySchema } from '@/lib/validation/playlist-schema';
-import type { DownloadSubject } from '@/types/download-subject';
 
 /** Allow up to 5 minutes for large playlists (matches the bundle route). */
 export const maxDuration = 300;
@@ -44,12 +44,6 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
  * bounds peak memory while still hiding S3 latency.
  */
 const PLAYLIST_PREFETCH_DEPTH = 4;
-
-/** Mutable lock handle so the outer `finally` always releases what was taken. */
-interface LockHandle {
-  key: string | null;
-  acquired: boolean;
-}
 
 // Rate limiting — skipped in E2E test mode to avoid 429s during test runs,
 // matching the sibling release-format download route.
@@ -147,102 +141,43 @@ const resolvePlaylistDownload = async (
   return { kind: 'ok', manifest, format: parsed.data.format, respondPreflight, playlistId };
 };
 
-/** Per-release AAC quota decision across the whole playlist. */
-interface AacQuotaDecision {
-  allowed: boolean;
-  chargeableReleaseIds: string[];
-}
-
-/**
- * All-or-nothing AAC quota check across every distinct release in the
- * playlist: each release goes through `checkFreeDownloadQuota`
- * (ALREADY_DOWNLOADED counts as allowed and is never charged). Because the
- * per-release checks all observe the same uncharged state, the decision also
- * requires enough remaining quota to cover EVERY not-yet-downloaded release
- * at once — 3 new releases with 2 slots left is rejected outright rather
- * than partially charged.
- */
-const checkAacQuota = async (
-  quotaService: QuotaEnforcementService,
+/** One gate request per distinct release in the manifest, all in the one format. */
+const gateRequests = (
   userId: string,
-  releaseIds: readonly string[]
-): Promise<AacQuotaDecision> => {
-  const subject: DownloadSubject = { kind: 'user', userId };
-  const checks = await Promise.all(
-    releaseIds.map(async (releaseId) => ({
-      releaseId,
-      result: await quotaService.checkFreeDownloadQuota(subject, releaseId),
-    }))
-  );
-  const chargeableReleaseIds = checks
-    .filter(({ result }) => result.allowed && result.reason === 'WITHIN_QUOTA')
-    .map(({ releaseId }) => releaseId);
-  const firstChargeable = checks.find(({ result }) => result.reason === 'WITHIN_QUOTA');
-  // A WITHIN_QUOTA result's `remainingQuota` is already decremented by one
-  // for that release; +1 restores the shared pre-charge remainder.
-  const remainingBefore = firstChargeable ? firstChargeable.result.remainingQuota + 1 : 0;
-  const everyReleaseAllowed = checks.every(({ result }) => result.allowed);
-  const allowed =
-    everyReleaseAllowed &&
-    (chargeableReleaseIds.length === 0 || chargeableReleaseIds.length <= remainingBefore);
-  return { allowed, chargeableReleaseIds };
-};
-
-/** Either the chargeable release set or an early quota/lock response. */
-type QuotaGate =
-  { kind: 'ok'; chargeableReleaseIds: string[] } | { kind: 'response'; response: NextResponse };
+  manifest: PlaylistDownloadManifest,
+  format: FreeFormatType
+): DownloadRequest[] =>
+  manifest.distinctReleaseIds.map((releaseId) => ({
+    subject: { kind: 'user', userId },
+    releaseId,
+    formats: [format],
+  }));
 
 /**
- * AAC gate: acquire the per-subject collision lock around the check-and-charge
- * (skipped for preflight — it never charges), then run the all-or-nothing quota
- * check. MP3 is free/unlimited and bypasses both.
+ * Preflight: every release decided by the gate, nothing locked or charged.
+ * A refusal answers 403 with the gate's error code (the dialog reads `ok`
+ * and the status), a missing release 404.
  */
-const gateAacQuota = async (args: {
-  userId: string;
-  format: FreeFormatType;
-  manifest: PlaylistDownloadManifest;
-  respondPreflight: boolean;
-  lock: LockHandle;
-}): Promise<QuotaGate> => {
-  const { userId, format, manifest, respondPreflight, lock } = args;
-  if (format !== 'AAC') {
-    return { kind: 'ok', chargeableReleaseIds: [] };
+const preflightResponse = async (
+  requests: DownloadRequest[],
+  manifest: PlaylistDownloadManifest
+): Promise<NextResponse> => {
+  const results = await downloadGate.checkMany(requests);
+  const refused = results.find((result) => result.kind !== 'grant');
+  if (refused !== undefined) {
+    const { status, body } =
+      refused.kind === 'not-found'
+        ? downloadRefusal({ ok: false, denial: null, reason: 'NOT_FOUND' })
+        : downloadRefusal({ ok: false, denial: refused });
+    return NextResponse.json(
+      { ok: false, reason: body.error },
+      { status, headers: NO_STORE_HEADERS }
+    );
   }
-  if (!respondPreflight) {
-    // #667: subject-only lock key — the freemium quota is per subject (5 unique
-    // releases), so serialize a subject's concurrent AAC downloads across ALL
-    // playlists/formats. A per-(playlist, format) key let different playlists
-    // race and each pass the shared all-or-nothing check, exceeding the cap.
-    lock.key = `user:${userId}`;
-    lock.acquired = freeDownloadLockService.acquire(lock.key);
-    if (!lock.acquired) {
-      return {
-        kind: 'response',
-        response: NextResponse.json(
-          {
-            errorCode: 'LOCK_HELD',
-            message: 'Another download is in progress. Please retry shortly.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        ),
-      };
-    }
-  }
-  const decision = await checkAacQuota(
-    new QuotaEnforcementService(),
-    userId,
-    manifest.distinctReleaseIds
+  return NextResponse.json(
+    { ok: true, trackCount: manifest.tracks.length, skippedCount: manifest.skippedCount },
+    { status: 200, headers: NO_STORE_HEADERS }
   );
-  if (!decision.allowed) {
-    return {
-      kind: 'response',
-      response: NextResponse.json(
-        { ok: false, reason: 'QUOTA_EXCEEDED' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-  return { kind: 'ok', chargeableReleaseIds: decision.chargeableReleaseIds };
 };
 
 /**
@@ -343,32 +278,27 @@ const toWebStream = ({ archive, responsePass }: ArchivePipeline): ReadableStream
     },
   });
 
+class NothingToDeliverError extends Error {
+  constructor() {
+    super('No track body could be fetched for the playlist');
+    this.name = 'NothingToDeliverError';
+  }
+}
+
 /**
- * Stream the zip. The quota charge lands only after the FIRST track body is
- * actually in hand (spec: charge after first prefetched buffer) — an
- * all-missing playlist yields an empty zip and must not consume quota. The
- * charge commits before the Response is returned, so the collision lock
- * (released by the caller's finally) covers the whole check-and-charge.
+ * The deliverable: a zip of every track, streamed. Resolves only once the
+ * FIRST track body is actually in hand, so the gate's charge lands after
+ * something exists to deliver; an all-failing fetch throws instead of
+ * shipping an empty zip.
  */
-const streamPlaylistZip = async (args: {
-  manifest: PlaylistDownloadManifest;
-  userId: string;
-  chargeableReleaseIds: string[];
-}): Promise<NextResponse> => {
-  const { manifest, userId, chargeableReleaseIds } = args;
+const producePlaylistZip = async (manifest: PlaylistDownloadManifest): Promise<Deliverable> => {
   const s3Client = getS3Client();
   const bucket = getS3BucketName();
   const keys = manifest.tracks.map(({ s3Key }) => s3Key);
   const inFlight = startBufferPrefetch(s3Client, bucket, keys, PLAYLIST_PREFETCH_DEPTH);
   const firstBuffer = await peekFirstBuffer(inFlight);
-
-  if (firstBuffer !== null && chargeableReleaseIds.length > 0) {
-    const quotaService = new QuotaEnforcementService();
-    await Promise.all(
-      chargeableReleaseIds.map((releaseId) =>
-        quotaService.incrementQuota({ kind: 'user', userId }, releaseId)
-      )
-    );
+  if (firstBuffer === null) {
+    throw new NothingToDeliverError();
   }
 
   const pipeline = createArchivePipeline();
@@ -383,7 +313,7 @@ const streamPlaylistZip = async (args: {
       .replace(/\s+/g, ' ')
       .replace(/[^\w .-]/g, '')
       .trim() || 'playlist';
-  return new NextResponse(toWebStream(pipeline), {
+  const response = new NextResponse(toWebStream(pipeline), {
     status: 200,
     headers: {
       'Content-Type': 'application/zip',
@@ -392,55 +322,59 @@ const streamPlaylistZip = async (args: {
       'X-Accel-Buffering': 'no',
     },
   });
+  return { kind: 'stream', response };
 };
 
 /**
  * GET /api/playlists/[id]/download?format=MP3_320KBPS|AAC[&respond=preflight]
  *
  * Zip the playlist's track items in the requested free format (videos and
- * unresolvable items are skipped). MP3 is free/unlimited; AAC enforces the
- * distinct-release freemium quota all-or-nothing before any byte streams.
- * Preflight reports counts (or the quota rejection) without downloading.
+ * unresolvable items are skipped). An adapter over the download gate
+ * (ADR-0018): every distinct release is decided as one all-or-nothing set —
+ * free formats all count alike — and charged once the first track body is
+ * in hand. Preflight reports counts (or the refusal) without downloading.
  */
-export const GET = withAuth<{ id: string }>(async (request, context, session) => {
-  const lock: LockHandle = { key: null, acquired: false };
-  try {
-    const setup = await resolvePlaylistDownload(request, context, session.user.id);
-    if (setup.kind === 'response') return setup.response;
-    const { manifest, format, respondPreflight } = setup;
+export const GET = withAuth<{ id: string }>(
+  async (request, context, session): Promise<NextResponse> => {
+    try {
+      const setup = await resolvePlaylistDownload(request, context, session.user.id);
+      if (setup.kind === 'response') return setup.response;
+      const { manifest, format, respondPreflight } = setup;
+      const requests = gateRequests(session.user.id, manifest, format);
 
-    const gate = await gateAacQuota({
-      userId: session.user.id,
-      format,
-      manifest,
-      respondPreflight,
-      lock,
-    });
-    if (gate.kind === 'response') return gate.response;
+      if (respondPreflight) {
+        return await preflightResponse(requests, manifest);
+      }
 
-    if (respondPreflight) {
+      const outcome = await downloadGate.downloadMany(
+        requests,
+        () => producePlaylistZip(manifest),
+        {
+          ipAddress: request.headers.get('x-forwarded-for') ?? 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+        }
+      );
+      if (!outcome.ok) {
+        const { status, body } = downloadRefusal(
+          outcome.denial === null
+            ? { ok: false, denial: null, reason: outcome.reason }
+            : { ok: false, denial: outcome.denial }
+        );
+        return NextResponse.json(
+          { ok: false, reason: body.error, errorCode: body.error, message: body.message },
+          { status, headers: NO_STORE_HEADERS }
+        );
+      }
+      if (outcome.deliverable.kind !== 'stream') {
+        throw new Error('playlist download produced a non-stream deliverable');
+      }
+      return outcome.deliverable.response;
+    } catch (error) {
+      loggers.downloads.error('Playlist download error', error);
       return NextResponse.json(
-        { ok: true, trackCount: manifest.tracks.length, skippedCount: manifest.skippedCount },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { error: error instanceof NothingToDeliverError ? 'STREAM_FAILED' : 'INTERNAL_ERROR' },
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
-
-    return await streamPlaylistZip({
-      manifest,
-      userId: session.user.id,
-      chargeableReleaseIds: gate.chargeableReleaseIds,
-    });
-  } catch (error) {
-    loggers.downloads.error('Playlist download error', error);
-    return NextResponse.json(
-      { error: 'INTERNAL_ERROR' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  } finally {
-    // Released as soon as the handler returns — the charge already committed
-    // pre-return, so the lock only needs to cover the check-and-charge.
-    if (lock.acquired && lock.key !== null) {
-      freeDownloadLockService.release(lock.key);
-    }
   }
-});
+);

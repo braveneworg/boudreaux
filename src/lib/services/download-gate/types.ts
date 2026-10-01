@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { NextResponse } from 'next/server';
+
 import type { DigitalFormatType, FreeFormatType } from '@/lib/constants/digital-formats';
 import type { DownloadSubject } from '@/types/download-subject';
 
@@ -104,7 +106,8 @@ export interface DownloadRequest {
 
 /** What the route produces for a Grant. Commit happens once this exists. */
 export type Deliverable =
-  { kind: 'url'; downloadUrl: string; fileName: string } | { kind: 'stream'; response: Response };
+  | { kind: 'url'; downloadUrl: string; fileName: string }
+  | { kind: 'stream'; response: NextResponse };
 
 export type Outcome<D extends Deliverable = Deliverable> =
   | { ok: true; grant: Grant; deliverable: D }

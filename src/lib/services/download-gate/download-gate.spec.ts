@@ -239,6 +239,112 @@ describe('DownloadGate.download', () => {
   });
 });
 
+describe('DownloadGate.downloadMany', () => {
+  const RELEASE_B = '507f1f77bcf86cd799439022';
+  const requests = (formats: ('AAC' | 'MP3_320KBPS')[] = ['AAC']) => [
+    { subject: user, releaseId: RELEASE, formats },
+    { subject: user, releaseId: RELEASE_B, formats },
+  ];
+
+  it('grants every release, produces once with all grants, and commits each', async () => {
+    const { gate, commits } = makeGate();
+    const produced: string[] = [];
+
+    const outcome = await gate.downloadMany(
+      requests(),
+      async (grants) => {
+        produced.push(...grants.map(({ releaseId, records }) => `${releaseId}:${records.length}`));
+        return urlDeliverable;
+      },
+      audit
+    );
+
+    expect(outcome).toMatchObject({ ok: true, deliverable: urlDeliverable });
+    expect(produced).toEqual([`${RELEASE}:1`, `${RELEASE_B}:1`]);
+    expect(commits.map(({ releaseId }) => releaseId)).toEqual([RELEASE, RELEASE_B]);
+  });
+
+  it('is all-or-nothing: one denied release refuses the whole download, charging nothing', async () => {
+    const { gate, commits, failures, deps } = makeGate({
+      facts: { lifetime: { distinctReleases: 4, includesThisRelease: false } },
+    });
+    // The second release is the one that tips the lifetime cap: the fake
+    // counters cannot grow between reads, so deny it by making it unlisted.
+    vi.mocked(deps.releaseIsListed).mockImplementation(
+      async (releaseId) => releaseId !== RELEASE_B
+    );
+    const produce = vi.fn();
+
+    const outcome = await gate.downloadMany(requests(), produce, audit);
+
+    expect(outcome).toEqual({ ok: false, denial: null, reason: 'NOT_FOUND', releaseId: RELEASE_B });
+    expect(produce).not.toHaveBeenCalled();
+    expect(commits).toEqual([]);
+    expect(failures).toEqual([]);
+  });
+
+  it('refuses a set that would overrun the lifetime cap together, though each release alone fits', async () => {
+    const RELEASE_C = '507f1f77bcf86cd799439033';
+    const { gate, commits } = makeGate({
+      facts: { lifetime: { distinctReleases: 3, includesThisRelease: false } },
+    });
+    const three = [RELEASE, RELEASE_B, RELEASE_C].map((releaseId) => ({
+      subject: user,
+      releaseId,
+      formats: ['AAC' as const],
+    }));
+
+    const outcome = await gate.downloadMany(three, vi.fn(), audit);
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      denial: { reason: 'LIFETIME_CAP' },
+      releaseId: RELEASE_C,
+    });
+    expect(commits).toEqual([]);
+  });
+
+  it('names the release behind a denial', async () => {
+    const { gate } = makeGate({ facts: { freeThrottle: { count: 3, oldestInWindow: NOW } } });
+
+    const outcome = await gate.downloadMany(requests(), vi.fn(), audit);
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      denial: { reason: 'THROTTLED' },
+      releaseId: RELEASE,
+    });
+  });
+
+  it('holds one lock for the whole set and refuses an overlapping single download', async () => {
+    const { gate } = makeGate();
+    let releaseAll: (deliverable: Deliverable) => void = () => {};
+    const held = new Promise<Deliverable>((resolve) => {
+      releaseAll = resolve;
+    });
+
+    const many = gate.downloadMany(requests(), () => held, audit);
+    const single = await gate.download(
+      { subject: user, releaseId: RELEASE, formats: ['AAC'] },
+      async () => urlDeliverable,
+      audit
+    );
+    releaseAll(urlDeliverable);
+
+    expect(single).toEqual({ ok: false, denial: null, reason: 'LOCK_HELD' });
+    expect((await many).ok).toBe(true);
+  });
+
+  it('checkMany decides every release without locking or charging', async () => {
+    const { gate, commits } = makeGate();
+
+    const results = await gate.checkMany(requests());
+
+    expect(results.map((r) => r.kind)).toEqual(['grant', 'grant']);
+    expect(commits).toEqual([]);
+  });
+});
+
 describe('DownloadGate.check', () => {
   it('decides without locking or charging', async () => {
     const { gate, commits, failures, deps } = makeGate();
