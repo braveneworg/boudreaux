@@ -133,6 +133,7 @@ pnpm run dev                  # Dev server (Turbopack)
 pnpm run build                # Production build (webpack)
 pnpm run test:run             # Unit tests once (test = watch mode)
 pnpm run test:shell           # Shell-script specs (CI runs them; local run skips them)
+pnpm run test:db              # DB contract specs on Docker Mongo 27018 (CI runs them; local run skips them)
 pnpm run test:coverage:check  # Coverage + regression check vs COVERAGE_METRICS.md
 pnpm run test:e2e             # Playwright E2E
 pnpm run e2e:docker:up        # Start isolated E2E Mongo (localhost:27018)

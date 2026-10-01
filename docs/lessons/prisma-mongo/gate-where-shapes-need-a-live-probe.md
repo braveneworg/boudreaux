@@ -58,12 +58,22 @@ Shapes the first probe confirmed:
   `releases: { some: { release: listedReleaseWhere } }`, works in `findMany`
   and in `updateMany`.
 
-Rules:
+Rules (updated 2026-10-01 — the probe is now a committed spec, not a script):
 
-- Before committing a new gate, create one row per combination of absent,
-  null and set for every nullable field it reads, and check each row lands
-  where the rule says.
-- Follow `e2e/AGENTS.md`: `env -i`, only `localhost:27018`, a URL guard at the
-  top of the script, prefixed rows, and delete them in `finally`.
-- Keep the probe script outside the tree. Import `@prisma/client` and the
-  `where` module by absolute path from the worktree.
+- Spell every null-safe clause with the kit in
+  `src/lib/repositories/_internal/where-kit.ts` (`isUnset`, `isPresent`,
+  `allOf`) inside a fragment module (`release-where`, `artist-where`,
+  `digital-format-where`, …). A repository method composes fragments; it
+  never writes `isSet` or a bare `{ field: null }` by hand.
+- Every fragment module has a `*.contract.spec.ts` beside it that seeds one
+  row per absent/null/set combination of each field it reads and asserts the
+  result set of each fragment on the Docker Mongo. `pnpm run test:db` runs
+  them (the `db-contract` vitest project, CI job `Database Contract Specs`);
+  the unit shards never see them. A new gate is not committed until its
+  contract case passes there.
+- Repository specs assert fragment identity (`toEqual(releaseWhere.listed)`),
+  not the `isSet` literal — the fragment's shape is the contract spec's job.
+- `pnpm run test:db` scopes `DATABASE_URL` to `localhost:27018`
+  (`boudreaux-contract`) and `setupTests.db.ts` refuses any other URL; rows
+  are prefixed with `__contract:<uuid>:` and deleted in `afterAll`. Follow
+  `e2e/AGENTS.md` for the Docker Mongo itself.
