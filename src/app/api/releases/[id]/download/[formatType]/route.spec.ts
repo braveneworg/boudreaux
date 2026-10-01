@@ -1,449 +1,173 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 import { NextRequest } from 'next/server';
+
+import { downloadGate } from '@/lib/services/download-gate/download-gate';
+import type { GateFormatRecord } from '@/lib/services/download-gate/download-gate';
+import type { Grant } from '@/lib/services/download-gate/types';
+import { generatePresignedDownloadUrl } from '@/lib/utils/s3-client';
 
 import { GET } from './route';
 
-vi.mock('@/lib/decorators/with-rate-limit', () => ({
-  extractClientIp: () => '127.0.0.1',
-}));
-const mockDownloadLimiterCheck = vi.fn().mockResolvedValue(undefined);
-vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  downloadLimiter: { check: (...args: unknown[]) => mockDownloadLimiterCheck(...args) },
-  DOWNLOAD_LIMIT: 10,
-}));
+vi.mock('server-only', () => ({}));
 
 const mockAuth = vi.fn();
-vi.mock('@/auth', () => ({
-  auth: () => mockAuth(),
+vi.mock('@/auth', () => ({ auth: () => mockAuth() }));
+vi.mock('@/lib/decorators/with-logging', () => ({
+  withLogging: () => (handler: unknown) => handler,
 }));
-
-const mockCheckFormatExists = vi.fn();
-const mockCheckPurchaseStatus = vi.fn();
-const mockCheckSoftDeleteGracePeriod = vi.fn();
-const mockGenerateDownloadUrl = vi.fn();
-vi.mock('@/lib/services/download-authorization-service', () => {
-  return {
-    DownloadAuthorizationService: class MockAuthService {
-      checkFormatExists = mockCheckFormatExists;
-      checkPurchaseStatus = mockCheckPurchaseStatus;
-      checkSoftDeleteGracePeriod = mockCheckSoftDeleteGracePeriod;
-      generateDownloadUrl = mockGenerateDownloadUrl;
-    },
-  };
-});
-
-const mockLogDownloadEvent = vi.fn();
-vi.mock('@/lib/repositories/download-event-repository', () => {
-  return {
-    DownloadEventRepository: class MockEventRepo {
-      logDownloadEvent = mockLogDownloadEvent;
-    },
-  };
-});
-
-const mockCheckFreeDownloadQuota = vi.fn();
-const mockIncrementQuota = vi.fn();
-vi.mock('@/lib/services/quota-enforcement-service', () => {
-  return {
-    QuotaEnforcementService: class MockQuotaService {
-      checkFreeDownloadQuota = mockCheckFreeDownloadQuota;
-      incrementQuota = mockIncrementQuota;
-    },
-  };
-});
-
-const mockLockAcquire = vi.fn().mockReturnValue(true);
-const mockLockRelease = vi.fn();
-vi.mock('@/lib/services/free-download-lock-service', () => ({
-  freeDownloadLockService: {
-    acquire: (...args: unknown[]) => mockLockAcquire(...args),
-    release: (...args: unknown[]) => mockLockRelease(...args),
-  },
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  DOWNLOAD_LIMIT: 10,
+  downloadLimiter: { check: vi.fn() },
 }));
+vi.mock('@/lib/services/download-gate/download-gate', () => ({
+  downloadGate: { download: vi.fn() },
+}));
+vi.mock('@/lib/utils/s3-client', () => ({ generatePresignedDownloadUrl: vi.fn() }));
 
-const makeRequest = (): NextRequest =>
-  new NextRequest(
-    'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS',
-    {
-      headers: {
-        'x-forwarded-for': '127.0.0.1',
-        'user-agent': 'test-agent',
-      },
-    }
-  );
+const RELEASE_ID = '507f1f77bcf86cd799439011';
+const USER = { user: { id: 'user-1', role: 'user' } };
 
-const makeParams = (id = '507f1f77bcf86cd799439011', formatType = 'MP3_320KBPS') => ({
+const request = (headers: Record<string, string> = { 'user-agent': 'spec' }) =>
+  new NextRequest(`http://localhost:3000/api/releases/${RELEASE_ID}/download/AAC`, { headers });
+const params = (formatType = 'AAC', id = RELEASE_ID) => ({
   params: Promise.resolve({ id, formatType }),
 });
 
-const mockFormat = {
-  id: 'format-1',
-  releaseId: '507f1f77bcf86cd799439011',
-  formatType: 'MP3_320KBPS',
-  s3Key: 'releases/507f1f77bcf86cd799439011/digital-formats/MP3_320KBPS/file.mp3',
-  fileName: 'album.mp3',
-  fileSize: BigInt(50000000),
-  mimeType: 'audio/mpeg',
-  deletedAt: null,
+const legacyRecord = (overrides: Partial<GateFormatRecord> = {}): GateFormatRecord =>
+  ({
+    id: 'fmt-1',
+    formatType: 'AAC',
+    s3Key: 'releases/r/aac.zip',
+    fileName: 'album-aac.zip',
+    deletedAt: null,
+    files: [],
+    ...overrides,
+  }) as unknown as GateFormatRecord;
+
+const grant: Grant = {
+  kind: 'grant',
+  mode: 'free',
+  formats: [{ formatType: 'AAC', withdrawn: false }],
+  charge: { lifetime: true, freeThrottle: true, purchaseThrottle: false },
 };
+
+/** Make the gate run the route's producer against `records` and return its outcome. */
+const gateGrants = (records: GateFormatRecord[]) =>
+  vi.mocked(downloadGate.download).mockImplementation(async (_request, produce) => ({
+    ok: true,
+    grant,
+    deliverable: await produce(grant, records),
+  }));
 
 describe('GET /api/releases/[id]/download/[formatType]', () => {
   beforeEach(() => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-123', role: 'user' } });
-    mockCheckFormatExists.mockResolvedValue(mockFormat);
-    mockCheckPurchaseStatus.mockResolvedValue(true);
-    mockGenerateDownloadUrl.mockResolvedValue('https://s3.example.com/download?signed=true');
-    mockLogDownloadEvent.mockResolvedValue(undefined);
+    mockAuth.mockResolvedValue(USER);
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.mocked(generatePresignedDownloadUrl).mockResolvedValue('https://s3/presigned');
   });
 
-  it('should return 401 when user is not authenticated (withAuth)', async () => {
+  it('returns 401 without a session (withAuth)', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await GET(request(), params());
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('Authentication required');
+    expect(downloadGate.download).not.toHaveBeenCalled();
   });
 
-  it('should return 401 when session has no user id (withAuth)', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
-
-    const response = await GET(makeRequest(), makeParams());
-
-    expect(response.status).toBe(401);
+  it('returns 400 for an invalid release id or format type', async () => {
+    expect((await GET(request(), params('AAC', 'nope'))).status).toBe(400);
+    expect((await GET(request(), params('MP3'))).status).toBe(400);
+    expect(downloadGate.download).not.toHaveBeenCalled();
   });
 
-  it('skips rate limiting in E2E test mode (E2E_MODE=true)', async () => {
-    vi.stubEnv('E2E_MODE', 'true');
+  it('asks the gate for the signed-in user and the one format, with the audit context', async () => {
+    gateGrants([legacyRecord()]);
 
-    const response = await GET(makeRequest(), makeParams());
+    await GET(request({ 'user-agent': 'spec', 'x-forwarded-for': '203.0.113.9' }), params());
 
-    // The limiter is never consulted in E2E mode, so retried downloads can't 429.
-    expect(mockDownloadLimiterCheck).not.toHaveBeenCalled();
-    expect(response.status).not.toBe(429);
-
-    vi.unstubAllEnvs();
+    const [gateRequest, , audit] = vi.mocked(downloadGate.download).mock.calls[0];
+    expect(gateRequest).toEqual({
+      subject: { kind: 'user', userId: 'user-1' },
+      releaseId: RELEASE_ID,
+      formats: ['AAC'],
+    });
+    expect(audit).toEqual({ ipAddress: '203.0.113.9', userAgent: 'spec' });
   });
 
-  it('should return 400 for an invalid release ID', async () => {
-    const response = await GET(makeRequest(), makeParams('not-an-object-id'));
+  it('returns a presigned URL for a legacy single-file format', async () => {
+    gateGrants([legacyRecord()]);
+
+    const response = await GET(request(), params());
     const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      success: true,
+      downloadUrl: 'https://s3/presigned',
+      fileName: 'album-aac.zip',
+    });
+    expect(typeof body.expiresAt).toBe('string');
+    expect(vi.mocked(generatePresignedDownloadUrl).mock.calls).toEqual([
+      ['releases/r/aac.zip', 'album-aac.zip'],
+    ]);
+  });
+
+  it("refuses a multi-track format: that is the bundle route's job", async () => {
+    gateGrants([legacyRecord({ s3Key: null, fileName: null, files: [{ id: 'f1' }] } as never)]);
+
+    const response = await GET(request(), params());
 
     expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_ID');
-    expect(mockCheckFormatExists).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ success: false, error: 'MULTI_TRACK' });
   });
 
-  it('should return 400 for invalid format type', async () => {
-    const response = await GET(
-      makeRequest(),
-      makeParams('507f1f77bcf86cd799439011', 'INVALID_FORMAT')
-    );
-    const body = await response.json();
+  it.each([
+    [{ ok: false, denial: null, reason: 'NOT_FOUND' }, 404, 'NOT_FOUND'],
+    [{ ok: false, denial: null, reason: 'LOCK_HELD' }, 409, 'LOCK_HELD'],
+    [
+      { ok: false, denial: { kind: 'denial', reason: 'PURCHASE_REQUIRED', formats: ['AAC'] } },
+      403,
+      'PURCHASE_REQUIRED',
+    ],
+    [{ ok: false, denial: { kind: 'denial', reason: 'LIFETIME_CAP' } }, 403, 'QUOTA_EXCEEDED'],
+    [
+      { ok: false, denial: { kind: 'denial', reason: 'THROTTLED', resetsAt: new Date() } },
+      403,
+      'CAP_REACHED',
+    ],
+    [
+      { ok: false, denial: { kind: 'denial', reason: 'DELETED', formats: ['AAC'] } },
+      410,
+      'DELETED',
+    ],
+  ] as const)('maps a refusal to its HTTP shape (%o → %i)', async (outcome, status, error) => {
+    vi.mocked(downloadGate.download).mockResolvedValue(outcome as never);
 
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_FORMAT');
+    const response = await GET(request(), params());
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ success: false, error });
   });
 
-  it('should return 404 when format does not exist', async () => {
-    mockCheckFormatExists.mockResolvedValue(null);
+  it('returns 429 when the rate limiter rejects outside E2E mode', async () => {
+    vi.stubEnv('E2E_MODE', '');
+    const { downloadLimiter } = await import('@/lib/config/rate-limit-tiers');
+    vi.mocked(downloadLimiter.check).mockRejectedValueOnce(new Error('limited'));
 
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await GET(request(), params());
 
-    expect(response.status).toBe(404);
-    expect(body.error).toBe('NOT_FOUND');
+    expect(response.status).toBe(429);
+    expect(downloadGate.download).not.toHaveBeenCalled();
   });
 
-  it('should return 403 when quota exceeded for non-purchaser', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
+  it('returns 500 when the gate throws', async () => {
+    vi.mocked(downloadGate.download).mockRejectedValue(new Error('boom'));
 
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body.error).toBe('QUOTA_EXCEEDED');
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, errorCode: 'QUOTA_EXCEEDED' })
-    );
-  });
-
-  it('should increment quota for non-purchaser within quota', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(mockIncrementQuota).toHaveBeenCalledWith(
-      { kind: 'user', userId: 'user-123' },
-      '507f1f77bcf86cd799439011'
-    );
-  });
-
-  it('should not increment quota when already downloaded', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'ALREADY_DOWNLOADED' });
-
-    await GET(makeRequest(), makeParams());
-
-    expect(mockIncrementQuota).not.toHaveBeenCalled();
-  });
-
-  // #666 — a non-purchaser may only pull free formats (MP3_320KBPS / AAC) via
-  // the freemium path. Lossless masters (FLAC/WAV/AIFF/ALAC) require a purchase.
-  it('should return 403 PURCHASE_REQUIRED when a non-purchaser requests a lossless format', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-
-    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'FLAC'));
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body.error).toBe('PURCHASE_REQUIRED');
-  });
-
-  it('does not consult the freemium quota for a lossless non-purchaser request', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-
-    await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'WAV'));
-
-    expect(mockCheckFreeDownloadQuota).not.toHaveBeenCalled();
-    expect(mockIncrementQuota).not.toHaveBeenCalled();
-  });
-
-  it('logs a failed download event for a lossless non-purchaser request', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-
-    await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'ALAC'));
-
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, errorCode: 'PURCHASE_REQUIRED' })
-    );
-  });
-
-  it('allows a non-purchaser to download a free lossy format (AAC)', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-
-    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'AAC'));
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  it('allows a purchaser to download a lossless format', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(true);
-
-    const response = await GET(makeRequest(), makeParams('507f1f77bcf86cd799439011', 'FLAC'));
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  // #667 — the freemium check-and-charge must be serialized per subject so N
-  // concurrent requests for distinct releases can't all read the same pre-charge
-  // count and each consume a quota slot.
-  it('serializes the freemium check-and-charge behind the subject lock', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-
-    await GET(makeRequest(), makeParams());
-
-    expect(mockLockAcquire).toHaveBeenCalledWith('user:user-123');
-    expect(mockLockRelease).toHaveBeenCalledWith('user:user-123');
-  });
-
-  it('returns 409 LOCK_HELD and does not charge when the subject lock is held', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockLockAcquire.mockReturnValueOnce(false);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body.error).toBe('LOCK_HELD');
-    expect(mockCheckFreeDownloadQuota).not.toHaveBeenCalled();
-    expect(mockIncrementQuota).not.toHaveBeenCalled();
-  });
-
-  it('releases the subject lock even when the quota is exceeded', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
-
-    await GET(makeRequest(), makeParams());
-
-    expect(mockLockRelease).toHaveBeenCalledWith('user:user-123');
-  });
-
-  it('does not acquire the subject lock for a purchaser', async () => {
-    mockCheckPurchaseStatus.mockResolvedValue(true);
-
-    await GET(makeRequest(), makeParams());
-
-    expect(mockLockAcquire).not.toHaveBeenCalled();
-  });
-
-  it('should return 410 for deleted format outside grace period for non-purchaser', async () => {
-    const deletedFormat = { ...mockFormat, deletedAt: new Date() };
-    mockCheckFormatExists.mockResolvedValue(deletedFormat);
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-    mockCheckSoftDeleteGracePeriod.mockResolvedValue(false);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(410);
-    expect(body.error).toBe('DELETED');
-  });
-
-  it('should allow downloaded of deleted format within grace period', async () => {
-    const deletedFormat = { ...mockFormat, deletedAt: new Date() };
-    mockCheckFormatExists.mockResolvedValue(deletedFormat);
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-    mockCheckSoftDeleteGracePeriod.mockResolvedValue(true);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  it('should allow purchaser to download deleted format beyond grace period', async () => {
-    const deletedFormat = { ...mockFormat, deletedAt: new Date() };
-    mockCheckFormatExists.mockResolvedValue(deletedFormat);
-    mockCheckPurchaseStatus.mockResolvedValue(true);
-    mockCheckSoftDeleteGracePeriod.mockResolvedValue(false);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  it('should return success with downloadUrl for purchaser', async () => {
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.downloadUrl).toBe('https://s3.example.com/download?signed=true');
-    expect(body.fileName).toBe('album.mp3');
-    expect(body.expiresAt).toBeDefined();
-  });
-
-  it('should log successful download event', async () => {
-    await GET(makeRequest(), makeParams());
-
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        success: true,
-        userId: 'user-123',
-        releaseId: '507f1f77bcf86cd799439011',
-      })
-    );
-  });
-
-  it('should return 500 when format has no s3Key', async () => {
-    const incompleteFormat = { ...mockFormat, s3Key: null };
-    mockCheckFormatExists.mockResolvedValue(incompleteFormat);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await GET(request(), params());
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe('INTERNAL_ERROR');
-    expect(body.message).toBe('Format file data is incomplete.');
-  });
-
-  it('should return 500 when format has no fileName', async () => {
-    const incompleteFormat = { ...mockFormat, fileName: null };
-    mockCheckFormatExists.mockResolvedValue(incompleteFormat);
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error).toBe('INTERNAL_ERROR');
-    expect(body.message).toBe('Format file data is incomplete.');
-  });
-
-  it('should use fallback values when headers are missing', async () => {
-    const req = new NextRequest(
-      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
-    );
-
-    await GET(req, makeParams());
-
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ipAddress: 'unknown',
-        userAgent: 'unknown',
-      })
-    );
-  });
-
-  it('should use fallback header values in quota exceeded log event', async () => {
-    const req = new NextRequest(
-      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
-    );
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: false, reason: 'QUOTA_EXCEEDED' });
-
-    await GET(req, makeParams());
-
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ipAddress: 'unknown',
-        userAgent: 'unknown',
-        errorCode: 'QUOTA_EXCEEDED',
-      })
-    );
-  });
-
-  it('should use fallback header values in deleted format log event', async () => {
-    const req = new NextRequest(
-      'http://localhost:3000/api/releases/507f1f77bcf86cd799439011/download/MP3_320KBPS'
-    );
-    const deletedFormat = { ...mockFormat, deletedAt: new Date() };
-    mockCheckFormatExists.mockResolvedValue(deletedFormat);
-    mockCheckPurchaseStatus.mockResolvedValue(false);
-    mockCheckFreeDownloadQuota.mockResolvedValue({ allowed: true, reason: 'WITHIN_QUOTA' });
-    mockCheckSoftDeleteGracePeriod.mockResolvedValue(false);
-
-    await GET(req, makeParams());
-
-    expect(mockLogDownloadEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ipAddress: 'unknown',
-        userAgent: 'unknown',
-        errorCode: 'DELETED',
-      })
-    );
-  });
-
-  it('should return 500 on unexpected error', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockCheckFormatExists.mockRejectedValue(new Error('DB error'));
-
-    const response = await GET(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error).toBe('INTERNAL_ERROR');
-
-    consoleSpy.mockRestore();
   });
 });
