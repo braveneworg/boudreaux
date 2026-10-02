@@ -18,6 +18,7 @@ import type {
   ReleaseForDeletion,
   ReleaseListFilters,
   ReleaseListItem,
+  ReleaseScalars,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 import { NO_CREDIT_DECISIONS, type CreditDecisions } from '@/lib/utils/credit-confirmation';
@@ -207,9 +208,10 @@ export class ReleaseService {
   /**
    * Delete a release by ID (hard delete).
    * Cascades to delete all related data EXCEPT Artist records.
-   * Deletes S3 objects for digital format files and images.
+   * Deletes S3 objects for digital format files and images. Returns the
+   * deleted release's scalars; its relations are gone with it.
    */
-  static async deleteRelease(id: string): Promise<ServiceResponse<Release>> {
+  static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseScalars>> {
     try {
       // Verify release exists and fetch related data for S3 cleanup
       const existing = await ReleaseRepository.findForDeletion(id);

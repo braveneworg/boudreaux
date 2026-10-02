@@ -477,12 +477,15 @@ export type ArtistSearchBioImage = Pick<
 >;
 
 /**
- * Public artist-search match: scalars plus the display-image candidates and
- * release joins carrying the narrow release projection the search consumes.
+ * Public artist-search match: the name fields and slug the dropdown shows,
+ * the display-image candidates behind its thumbnail, and release joins
+ * carrying the narrow release projection the search consumes. No other
+ * scalar is loaded (ADR-0007).
  */
-export interface ArtistSearchMatch extends ArtistScalars {
+export interface ArtistSearchMatch extends ArtistListingName {
+  slug: string;
   bioImages: ArtistSearchBioImage[];
-  releases: Array<ArtistReleaseScalars & { release: ArtistSearchReleaseRecord }>;
+  releases: Array<{ release: ArtistSearchReleaseRecord }>;
 }
 
 /** Narrow name projection used by the find-or-create-by-name flow. */

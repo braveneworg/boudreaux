@@ -210,21 +210,26 @@ const artistListingSelect = {
   },
 } as const satisfies Prisma.ArtistSelect;
 
-/** Public-search include — the display-image candidates behind the dropdown
- * thumbnail plus release joins carrying the narrow release projection the
- * search consumes. */
-const artistSearchInclude = {
+/**
+ * Public-search select (ADR-0007): the name fields and slug the dropdown
+ * shows, the display-image candidates behind its thumbnail, and release joins
+ * carrying the narrow release projection the search consumes — and nothing
+ * the public may not see.
+ */
+const artistSearchSelect = {
+  ...artistListingNameSelect,
+  slug: true,
   bioImages: {
     where: displayImageCandidateWhere,
     orderBy: { sortOrder: 'asc' },
     select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
   },
   releases: {
-    include: {
+    select: {
       release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
     },
   },
-} as const satisfies Prisma.ArtistInclude;
+} as const satisfies Prisma.ArtistSelect;
 
 /**
  * The media `Release` graph loaded behind every artist-detail release join,
@@ -285,7 +290,7 @@ type _ArtistWithReleaseGraphDrift = AssertExact<
 >;
 type _ArtistSearchMatchDrift = AssertExact<
   ArtistSearchMatch,
-  Prisma.ArtistGetPayload<{ include: typeof artistSearchInclude }>
+  Prisma.ArtistGetPayload<{ select: typeof artistSearchSelect }>
 >;
 const _artistDrift: _ArtistDrift = true;
 const _artistDetailDrift: _ArtistDetailDrift = true;
@@ -667,7 +672,7 @@ export class ArtistRepository {
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     const matches = await prisma.artist.findMany({
       where: buildListedWhere(search),
-      include: artistSearchInclude,
+      select: artistSearchSelect,
     });
     return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
   }
