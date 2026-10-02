@@ -10,6 +10,7 @@ import type {
   PublishedReleaseListing,
   PublishedReleaseFilters,
   Release,
+  ReleaseScalars,
   ReleaseCarouselItem,
   ReleaseCoverSource,
   ReleaseCountFilters,
@@ -235,6 +236,7 @@ type _ReleaseDrift = AssertExact<
   Release,
   Prisma.ReleaseGetPayload<{ include: typeof releaseDetailIncludeWithImages }>
 >;
+type _ReleaseScalarsDrift = AssertExact<ReleaseScalars, Prisma.ReleaseGetPayload<object>>;
 type _ReleaseListItemDrift = AssertExact<
   ReleaseListItem,
   Prisma.ReleaseGetPayload<{ include: typeof releaseListItemInclude }>
@@ -256,6 +258,7 @@ type _ReleaseForDeletionDrift = AssertExact<
   Prisma.ReleaseGetPayload<{ include: typeof releaseForDeletionInclude }>
 >;
 const _releaseDrift: _ReleaseDrift = true;
+const _releaseScalarsDrift: _ReleaseScalarsDrift = true;
 const _releaseListItemDrift: _ReleaseListItemDrift = true;
 const _publishedReleaseListingDrift: _PublishedReleaseListingDrift = true;
 const _publishedReleaseDetailDrift: _PublishedReleaseDetailDrift = true;
@@ -439,13 +442,14 @@ export class ReleaseRepository {
 
   /**
    * Apply a partial update (used by un-delete/publish and soft-delete flows)
-   * without re-hydrating relations. Returns the raw updated release.
+   * without re-hydrating relations. Returns the updated scalars — no
+   * relations are loaded, so none are claimed.
    */
-  static async updateData(id: string, data: UpdateReleaseData): Promise<Release> {
+  static async updateData(id: string, data: UpdateReleaseData): Promise<ReleaseScalars> {
     return prisma.release.update({
       where: { id },
       data: toPrismaUpdate(data),
-    }) as unknown as Promise<Release>;
+    });
   }
 
   /**
@@ -486,12 +490,11 @@ export class ReleaseRepository {
 
   /**
    * Hard delete a release by id (the final step of the delete cascade, after
-   * all related records have been removed).
+   * all related records have been removed). Returns the deleted scalars —
+   * its relations were removed by the cascade and are not claimed.
    */
-  static async delete(id: string): Promise<Release> {
-    return prisma.release.delete({
-      where: { id },
-    }) as unknown as Promise<Release>;
+  static async delete(id: string): Promise<ReleaseScalars> {
+    return prisma.release.delete({ where: { id } });
   }
 
   /**

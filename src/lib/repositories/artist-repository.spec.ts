@@ -412,7 +412,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('searchPublished', () => {
-    it('builds the public-search where with the lightweight include', async () => {
+    it('builds the public-search where with the narrow select', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
 
       const result = await ArtistRepository.searchPublished({ skip: 0, take: 50 });
@@ -423,11 +423,36 @@ describe('ArtistRepository', () => {
         ...publicArtistWhere,
         releases: { some: { release: releaseWhere.listed } },
       });
-      expect(arg?.include?.bioImages).toEqual({
+      expect(arg?.select?.bioImages).toEqual({
         where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
         orderBy: { sortOrder: 'asc' },
         select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
       });
+    });
+
+    // ADR-0007: a public read selects what it shows. The search dropdown
+    // shows a name, a slug, a thumbnail and release titles; an include would
+    // load every scalar — phone, email, the job tokens — into memory for the
+    // route to strip.
+    it('selects the public name fields and no private scalar', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.searchPublished({});
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg).not.toHaveProperty('include');
+      expect(Object.keys(arg?.select ?? {}).sort()).toEqual([
+        'bioImages',
+        'displayName',
+        'firstName',
+        'id',
+        'middleName',
+        'releases',
+        'slug',
+        'suffix',
+        'surname',
+        'title',
+      ]);
     });
 
     it('fetches every match instead of ordering and paging in the database', async () => {
