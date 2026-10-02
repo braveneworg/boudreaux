@@ -735,7 +735,7 @@ model ReleaseDigitalFormat {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   releaseId     String    @db.ObjectId
   release       Release   @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  formatType    String // Enum: MP3_V0, MP3_320KBPS, AAC, OGG_VORBIS, FLAC, ALAC, WAV, AIFF (matches existing Format enumeration)
+  formatType    String // One of VALID_FORMAT_TYPES (src/lib/constants/digital-formats.ts) — not the release-level Format enum, which lacks MP3_V0
   s3Key         String? // DEPRECATED: Legacy single-file S3 key (use files relation instead)
   fileName      String? // DEPRECATED: Legacy single-file name (use files relation instead)
   fileSize      BigInt? // DEPRECATED: Legacy single-file size (use totalFileSize instead)

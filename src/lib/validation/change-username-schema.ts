@@ -3,13 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import * as z from 'zod';
 
-const username = z
-  .string()
-  .min(2)
-  .max(100)
-  .regex(/^[a-zA-Z0-9_-]+$/, {
-    message: 'Invalid username. You can only use letters, numbers, underscores, and dashes.',
-  });
+import { username } from './primitives';
+
 export const changeUsernameSchema = z
   .object({
     username,

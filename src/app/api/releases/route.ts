@@ -6,14 +6,10 @@ import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
-import { withAdmin } from '@/lib/decorators/with-auth';
 import { ReleaseService } from '@/lib/services/release-service';
-import type { CreateReleaseData } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
-import { validateBody } from '@/lib/utils/validate-request';
-import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,33 +120,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-/**
- * POST /api/releases
- * Create a new release (admin only). The release is always created
- * unpublished, whatever `publishedAt` the body carries: its credits are stored
- * after it and must be confirmed before it is published (ADR-0015).
- */
-export const POST = withAdmin(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const validation = validateBody(createReleaseSchema, body);
-
-    if (!validation.success) {
-      return validation.response;
-    }
-
-    const result = await ReleaseService.createRelease(
-      validation.data as unknown as CreateReleaseData
-    );
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(result.data, { status: 201 });
-  } catch (error) {
-    loggers.media.error('Release POST error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-});

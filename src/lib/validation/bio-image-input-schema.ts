@@ -5,9 +5,9 @@ import { z } from 'zod';
 
 import { DISPLAY_IMAGE_CAP } from '@/lib/utils/display-images';
 
-/** A Mongo ObjectId (24 hex chars). */
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
+import { objectId } from './primitives';
 
+/** A Mongo ObjectId (24 hex chars). */
 /** Admin input for creating one bio image (manual upload / curated addition). */
 export const createBioImageInputSchema = z.object({
   artistId: objectId,

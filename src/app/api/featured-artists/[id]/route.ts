@@ -45,29 +45,3 @@ export const GET = withAdmin(
     }
   }
 );
-
-/**
- * DELETE /api/featured-artists/[id]
- * Delete a featured artist by ID
- */
-export const DELETE = withAdmin(
-  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-
-      const result = await FeaturedArtistsService.hardDeleteFeaturedArtist(id);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json({ message: 'Featured artist deleted successfully' });
-    } catch (error) {
-      loggers.media.error('FeaturedArtist DELETE error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);

@@ -11,6 +11,8 @@ import {
   MAX_TRACKS_PER_FORMAT,
 } from '@/lib/constants/digital-formats';
 
+import { digitalFormatTypeSchema } from './digital-format-type-schema';
+
 /**
  * Create a MIME type schema that accepts known MIME types OR an empty string.
  * Browsers may report an empty MIME type for files selected via folder picker.
@@ -183,16 +185,7 @@ export type DigitalFormatConfirmation = z.infer<typeof digitalFormatConfirmation
 export const multiTrackConfirmationSchema = z
   .object({
     releaseId: z.string().min(1, 'Release ID is required'),
-    formatType: z.enum([
-      'MP3_V0',
-      'MP3_320KBPS',
-      'AAC',
-      'OGG_VORBIS',
-      'FLAC',
-      'ALAC',
-      'WAV',
-      'AIFF',
-    ]),
+    formatType: digitalFormatTypeSchema,
     files: z
       .array(
         z.object({

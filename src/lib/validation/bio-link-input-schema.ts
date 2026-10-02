@@ -5,9 +5,9 @@ import { z } from 'zod';
 
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 
-/** A Mongo ObjectId (24 hex chars). */
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
+import { objectId } from './primitives';
 
+/** A Mongo ObjectId (24 hex chars). */
 // z.string().url() accepts javascript:/data: URLs; require an explicit http(s)
 // scheme (same approach as the bio-generation link schemas) so a custom link
 // can never become a script-bearing href.

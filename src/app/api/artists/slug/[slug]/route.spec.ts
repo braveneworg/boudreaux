@@ -344,5 +344,27 @@ describe('Artist by Slug API Route', () => {
       expect(response.status).toBe(400);
       expect(data).toEqual({ error: 'Invalid slug format' });
     });
+
+    // The route and the create schema share one `slug` primitive, so what
+    // can be saved can be served and nothing else: the 101-char and `a--b`
+    // slugs the route used to answer differently from the form.
+    it('refuses a slug longer than the one shared limit', async () => {
+      const slug = 'a'.repeat(101);
+      const response = await GET(
+        new NextRequest(`http://localhost:3000/api/artists/slug/${slug}`),
+        createParams(slug)
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it('refuses a doubled dash, as the create schema does', async () => {
+      const response = await GET(
+        new NextRequest('http://localhost:3000/api/artists/slug/john--doe'),
+        createParams('john--doe')
+      );
+
+      expect(response.status).toBe(400);
+    });
   });
 });

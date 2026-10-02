@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 
-import { GET, DELETE } from './route';
+import { GET } from './route';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -197,108 +197,6 @@ describe('Featured Artist by ID API Routes', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({ error: 'Invalid featured artist ID' });
-    });
-  });
-
-  describe('DELETE /api/featured-artists/[id]', () => {
-    it('should delete a featured artist successfully', async () => {
-      vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
-        success: true,
-        data: mockFeaturedArtist as never,
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ message: 'Featured artist deleted successfully' });
-      expect(FeaturedArtistsService.hardDeleteFeaturedArtist).toHaveBeenCalledWith(
-        '507f1f77bcf86cd799439011'
-      );
-    });
-
-    it('should return 404 when featured artist not found', async () => {
-      vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
-        success: false,
-        error: 'Featured artist not found',
-        code: 'NOT_FOUND',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439012',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439012'));
-      const data = await response.json();
-
-      expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Featured artist not found' });
-    });
-
-    it('should return 503 when database is unavailable', async () => {
-      vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
-        success: false,
-        error: 'Database unavailable',
-        code: 'UNAVAILABLE',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(503);
-      expect(data).toEqual({ error: 'Database unavailable' });
-    });
-
-    it('should return 500 for other service errors', async () => {
-      vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
-        success: false,
-        error: 'Failed to delete featured artist',
-        code: 'UNKNOWN',
-      });
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to delete featured artist' });
-    });
-
-    it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockRejectedValue(
-        Error('Unexpected error')
-      );
-
-      const request = new NextRequest(
-        'http://localhost:3000/api/featured-artists/507f1f77bcf86cd799439011',
-        {
-          method: 'DELETE',
-        }
-      );
-      const response = await DELETE(request, createParams('507f1f77bcf86cd799439011'));
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal server error' });
     });
   });
 });

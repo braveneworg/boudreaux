@@ -14,7 +14,7 @@ import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
+import { objectId } from './primitives';
 
 /** Shared 24-hex Mongo ObjectId schema, reused by sibling validation modules. */
 export const objectIdSchema = objectId;

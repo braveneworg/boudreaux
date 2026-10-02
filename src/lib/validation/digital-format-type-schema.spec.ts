@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
+import { FORMAT_SIZE_LIMITS, VALID_FORMAT_TYPES } from '@/lib/constants/digital-formats';
 
 import { digitalFormatTypeSchema } from './digital-format-type-schema';
 
@@ -16,5 +16,16 @@ describe('digitalFormatTypeSchema', () => {
 
   it('rejects a non-string value', () => {
     expect(() => digitalFormatTypeSchema.parse(123)).toThrow();
+  });
+
+  // Both directions: the schema offers exactly the list, and the list names
+  // exactly the formats the size table knows. A member added to one side
+  // alone fails here.
+  it('offers exactly VALID_FORMAT_TYPES', () => {
+    expect([...digitalFormatTypeSchema.options].sort()).toEqual([...VALID_FORMAT_TYPES].sort());
+  });
+
+  it('VALID_FORMAT_TYPES names exactly the formats the size limits know', () => {
+    expect([...VALID_FORMAT_TYPES].sort()).toEqual(Object.keys(FORMAT_SIZE_LIMITS).sort());
   });
 });

@@ -10,15 +10,11 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
-import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { validateBody } from '@/lib/utils/validate-request';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
-import { creditDecisionsSchema } from '@/lib/validation/credit-decisions-schema';
-import { updateReleaseSchema } from '@/lib/validation/update-schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,73 +84,3 @@ export const GET = withRateLimit<{ id: string }>(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
-
-/**
- * PATCH /api/releases/[id]
- * Partially update a release by ID. `creditDecisions` in the body carries the
- * admin's decisions for a publishing update; it is not release data.
- */
-export const PATCH = withAdmin(
-  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }, session) => {
-    try {
-      const { id } = await params;
-      const body = await request.json();
-      const validation = validateBody(updateReleaseSchema, body);
-
-      if (!validation.success) {
-        return validation.response;
-      }
-
-      // The admin's decisions for credits awaiting confirmation (ADR-0015).
-      // A publishing update with an undecided credit fails in the service.
-      const decisions = creditDecisionsSchema.safeParse(body?.creditDecisions ?? {});
-      if (!decisions.success) {
-        return NextResponse.json({ error: 'Invalid artist decisions' }, { status: 400 });
-      }
-
-      const result = await ReleaseService.updateRelease(
-        id,
-        validation.data as unknown as UpdateReleaseData,
-        { decisions: decisions.data, publishedBy: session.user.id }
-      );
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json(serializeForResponse(result.data));
-    } catch (error) {
-      loggers.media.error('Release PATCH error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);
-
-/**
- * DELETE /api/releases/[id]
- * Delete a release by ID (hard delete)
- */
-export const DELETE = withAdmin(
-  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
-      const { id } = await params;
-
-      const result = await ReleaseService.deleteRelease(id);
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error },
-          { status: httpStatusForCode(result.code) }
-        );
-      }
-
-      return NextResponse.json({ message: 'Release deleted successfully' });
-    } catch (error) {
-      loggers.media.error('Release DELETE error', error);
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-  }
-);

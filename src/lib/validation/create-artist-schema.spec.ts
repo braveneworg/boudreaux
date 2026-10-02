@@ -138,6 +138,22 @@ describe('createArtistSchema', () => {
     });
   });
 
+  describe('slug', () => {
+    // One shared `slug` primitive: the longest slug the form accepts is the
+    // longest slug the public route serves.
+    it('accepts a slug at the shared maximum', () => {
+      expect(createArtistSchema.safeParse({ ...validBase, slug: 'a'.repeat(100) }).success).toBe(
+        true
+      );
+    });
+
+    it('rejects a slug past the shared maximum', () => {
+      expect(createArtistSchema.safeParse({ ...validBase, slug: 'a'.repeat(101) }).success).toBe(
+        false
+      );
+    });
+  });
+
   describe('artistBaseSchema (no identity refinement)', () => {
     it('accepts a slug-only payload without requiring a name', () => {
       const result = artistBaseSchema.safeParse({ slug: 'slug-only' });

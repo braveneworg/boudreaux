@@ -113,9 +113,11 @@ export const PRESIGNED_URL_EXPIRATION = {
 export type DigitalFormatType = keyof typeof FORMAT_SIZE_LIMITS;
 
 /**
- * Valid digital format types (for runtime validation)
+ * The digital format types, spelled once. `digitalFormatTypeSchema` enums
+ * over this list and `ReleaseDigitalFormat.formatType` (a plain String in
+ * Prisma; not the release-level `Format` enum) stores one of these.
  */
-export const VALID_FORMAT_TYPES: ReadonlyArray<DigitalFormatType> = [
+export const VALID_FORMAT_TYPES = [
   'MP3_V0',
   'MP3_320KBPS',
   'AAC',
@@ -124,7 +126,7 @@ export const VALID_FORMAT_TYPES: ReadonlyArray<DigitalFormatType> = [
   'ALAC',
   'WAV',
   'AIFF',
-] as const;
+] as const satisfies ReadonlyArray<DigitalFormatType>;
 
 /**
  * Free formats (CONTEXT.md "digital format"): the encodings the free tier may

@@ -7,17 +7,13 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
-import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import type { CreateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
-import { validateBody } from '@/lib/utils/validate-request';
-import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,35 +132,6 @@ export const GET = withRateLimit(
       : await handleAdminListing(searchParams);
   } catch (error) {
     loggers.media.error('FeaturedArtist GET error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-});
-
-/**
- * POST /api/featured-artists
- * Create a new featured artist
- * Requires admin role
- */
-export const POST = await withAdmin(async (request: NextRequest) => {
-  try {
-    const body = await request.json();
-    const validation = validateBody(createFeaturedArtistSchema, body);
-
-    if (!validation.success) {
-      return validation.response;
-    }
-
-    const result = await FeaturedArtistsService.createFeaturedArtist(
-      validation.data as unknown as CreateFeaturedArtistData
-    );
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
-    }
-
-    return NextResponse.json(serializeForResponse(result.data), { status: 201 });
-  } catch (error) {
-    loggers.media.error('FeaturedArtist POST error', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

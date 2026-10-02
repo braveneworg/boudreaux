@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 
-import { GET, POST as postHandler } from './route';
+import { GET } from './route';
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -47,9 +47,6 @@ vi.mock('@/lib/services/featured-artists-service', () => ({
     hardDeleteFeaturedArtist: vi.fn(),
   },
 }));
-
-// Create POST reference after mocking
-const POST = postHandler;
 
 describe('Featured Artists API Routes', () => {
   const mockFeaturedArtist = {
@@ -405,118 +402,6 @@ describe('Featured Artists API Routes', () => {
         expect(response.status).toBe(500);
         expect(data).toEqual({ error: 'Failed to fetch artists' });
       });
-    });
-  });
-
-  describe('POST /api/featured-artists', () => {
-    const validPostBody = {
-      displayName: 'Featured Artist Name',
-      position: 1,
-      artistIds: ['507f1f77bcf86cd799439011'],
-      digitalFormatId: '507f1f77bcf86cd799439012',
-      releaseId: '507f1f77bcf86cd799439013',
-    };
-
-    it('should create a new featured artist', async () => {
-      vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
-        success: true,
-        data: mockFeaturedArtist as never,
-      });
-
-      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
-        method: 'POST',
-        body: JSON.stringify(validPostBody),
-      });
-
-      const response = await POST(request, { params: Promise.resolve({}) });
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
-      expect(data).toEqual(mockFeaturedArtist);
-    });
-
-    it('should return 400 when required fields are missing', async () => {
-      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
-        method: 'POST',
-        body: JSON.stringify({
-          displayName: 'Featured Artist Name',
-        }),
-      });
-
-      const response = await POST(request, { params: Promise.resolve({}) });
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Validation failed');
-      expect(data.details).toEqual(expect.any(Array));
-    });
-
-    it('should return 503 when database is unavailable on create', async () => {
-      vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
-        success: false,
-        error: 'Database unavailable',
-        code: 'UNAVAILABLE',
-      });
-
-      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
-        method: 'POST',
-        body: JSON.stringify(validPostBody),
-      });
-
-      const response = await POST(request, { params: Promise.resolve({}) });
-      const data = await response.json();
-
-      expect(response.status).toBe(503);
-      expect(data).toEqual({ error: 'Database unavailable' });
-    });
-
-    it('should return 500 for create errors', async () => {
-      vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockResolvedValue({
-        success: false,
-        error: 'Failed to create artist',
-        code: 'UNKNOWN',
-      });
-
-      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
-        method: 'POST',
-        body: JSON.stringify(validPostBody),
-      });
-
-      const response = await POST(request, { params: Promise.resolve({}) });
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to create artist' });
-    });
-
-    it('should handle unexpected errors in GET and return 500', async () => {
-      vi.mocked(FeaturedArtistsService.getAllFeaturedArtists).mockRejectedValue(
-        new Error('Unexpected error')
-      );
-
-      const request = new NextRequest('http://localhost:3000/api/featured-artists');
-      const response = await GET(request, dummyContext);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal server error' });
-    });
-
-    it('should handle unexpected errors in POST and return 500', async () => {
-      vi.mocked(FeaturedArtistsService.createFeaturedArtist).mockRejectedValue(
-        new Error('Unexpected error')
-      );
-
-      const request = new NextRequest('http://localhost:3000/api/featured-artists', {
-        method: 'POST',
-        body: JSON.stringify(validPostBody),
-      });
-
-      const response = await POST(request, { params: Promise.resolve({}) });
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal server error' });
     });
   });
 });

@@ -14,6 +14,7 @@ import { stripe } from '@/lib/stripe';
 import type { PurchaseRecord } from '@/lib/types/domain';
 import { DataError } from '@/lib/types/domain/errors';
 import { loggers } from '@/lib/utils/logger';
+import { objectId } from '@/lib/validation/primitives';
 
 import type Stripe from 'stripe';
 
@@ -23,11 +24,8 @@ const logger = loggers.stripe;
 
 /** Zod schema for validating webhook metadata on release purchases */
 const releaseMetadataSchema = z.object({
-  releaseId: z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid releaseId format'),
-  userId: z
-    .string()
-    .regex(/^[a-f0-9]{24}$/i, 'Invalid userId format')
-    .optional(),
+  releaseId: objectId,
+  userId: objectId.optional(),
   type: z.literal('release_purchase'),
 });
 

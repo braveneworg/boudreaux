@@ -437,7 +437,7 @@ describe('create-release-schema', () => {
         };
         const errors = errorResult.error.issues.filter((issue) => issue.path[0] === 'createdBy');
         expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toBe('Invalid MongoDB ObjectId format');
+        expect(errors[0].message).toBe('Invalid id');
       });
     });
   });
