@@ -38,6 +38,7 @@
     "images:cleanup-orphans": "pnpm exec tsx scripts/cleanup-orphan-images.ts",
     "pwa:generate-icons": "pnpm exec tsx scripts/generate-pwa-icons.ts",
     "backfill:coverart": "pnpm exec tsx scripts/backfill-coverart-urls.ts",
+    "backfill:credit-positions": "pnpm exec tsx scripts/backfill-credit-positions.ts",
     "docker:build:website": "docker build -t ghcr.io/braveneworg/boudreaux/website .",
     "docker:push:website": "docker push ghcr.io/braveneworg/boudreaux/website",
     "docker:build:nginx": "docker build -t ghcr.io/braveneworg/boudreaux/nginx .",
