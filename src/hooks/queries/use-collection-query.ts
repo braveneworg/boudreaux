@@ -24,14 +24,13 @@ interface CollectionResponse {
         altText: string | null;
         sortOrder: number;
       }>;
-      artistReleases: Array<{
-        artist: {
-          id: string;
-          firstName: string;
-          surname: string;
-          displayName: string | null;
-        };
-      }>;
+      /** The byline: the album artist when public, else null (ADR-0015). */
+      albumArtist: {
+        id: string;
+        firstName: string;
+        surname: string;
+        displayName: string | null;
+      } | null;
       digitalFormats: Array<{
         formatType: string;
         files: Array<{ fileName: string }>;
@@ -65,16 +64,14 @@ const collectionResponseSchema = z.object({
             sortOrder: z.number(),
           })
         ),
-        artistReleases: z.array(
-          z.object({
-            artist: z.object({
-              id: z.string(),
-              firstName: z.string(),
-              surname: z.string(),
-              displayName: z.string().nullable(),
-            }),
+        albumArtist: z
+          .object({
+            id: z.string(),
+            firstName: z.string(),
+            surname: z.string(),
+            displayName: z.string().nullable(),
           })
-        ),
+          .nullable(),
         digitalFormats: z.array(
           z.object({
             formatType: z.string(),

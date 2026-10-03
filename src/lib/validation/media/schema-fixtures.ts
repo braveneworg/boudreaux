@@ -259,6 +259,17 @@ export const featuredArtist = {
   },
 };
 
+/** A listing credit's artist with the public gate fields the byline rule reads. */
+export const publishedReleaseListingArtist = {
+  id: 'a1',
+  firstName: 'John',
+  surname: 'Doe',
+  displayName: null,
+  slug: 'john-doe',
+  publishedOn: ISO,
+  deletedOn: null,
+};
+
 export const publishedReleaseListing = {
   id: 'r1',
   title: 'Midnight',
@@ -268,11 +279,8 @@ export const publishedReleaseListing = {
   formats: ['DIGITAL', 'MP3_320KBPS'],
   catalogNumber: 'FF4-042',
   images: [{ src: null, altText: null }],
-  artistReleases: [
-    {
-      artist: { id: 'a1', firstName: 'John', surname: 'Doe', displayName: null, slug: 'john-doe' },
-    },
-  ],
+  artistReleases: [{ artist: publishedReleaseListingArtist }],
+  albumArtist: publishedReleaseListingArtist,
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://bc' } }],
   digitalFormats: [{ files: [{ s3Key: 'releases/r1/digital-formats/MP3_320KBPS/tracks/01.mp3' }] }],
 };
@@ -286,6 +294,8 @@ export const releaseDetailArtist = {
   displayName: null,
   title: null,
   suffix: null,
+  publishedOn: ISO,
+  deletedOn: null,
 };
 
 /** `PublishedReleaseDetail` wire shape — the `withTracks` release payload. */
@@ -293,6 +303,7 @@ export const publishedReleaseDetail = {
   ...releaseScalar,
   images: [image],
   artistReleases: [{ artist: releaseDetailArtist }],
+  albumArtist: releaseDetailArtist,
   digitalFormats: [digitalFormat],
   releaseUrls: [{ id: 'ru1', releaseId: 'r1', urlId: 'u1', url }],
 };

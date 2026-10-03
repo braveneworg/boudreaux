@@ -38,8 +38,9 @@ import type {
 } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
-import { isListable } from '@/lib/utils/artist-release-credits';
+import { isListable, publicAlbumArtistName } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
+import type { PublicArtistFields } from '@/lib/utils/is-public-artist';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 import { safeArchiveEntryName } from '@/lib/utils/zip-stream';
 import type { UpdatePlaylistInput } from '@/lib/validation/playlist-schema';
@@ -209,11 +210,13 @@ const attachPlaylistItemStreamUrls = (
 const deriveArtistName = ({ displayName, firstName, surname }: ArtistNameParts): string =>
   displayName ?? `${firstName} ${surname}`;
 
-/** Derive the display name of the FIRST artist join row, or null when none. */
-const firstArtistName = (artistReleases: Array<{ artist: ArtistNameParts }>): string | null => {
-  const [first] = artistReleases;
-  return first ? deriveArtistName(first.artist) : null;
-};
+/**
+ * The album artist's playlist display name, or null: the first credit in
+ * stored order when that artist is public, never the next credit (ADR-0015).
+ */
+const firstArtistName = (
+  artistReleases: Array<{ artist: ArtistNameParts & PublicArtistFields }>
+): string | null => publicAlbumArtistName(artistReleases, deriveArtistName);
 
 /** `NN - Artist - Title.ext`, sanitized as a whole via safeArchiveEntryName. */
 const buildEntryName = (
@@ -971,7 +974,7 @@ export class PlaylistService {
       .flatMap((detail) =>
         releaseDetailToSearchItems(detail, {
           context: detail.title,
-          artistName: firstArtistName(detail.artistReleases),
+          artistName: detail.albumArtist ? deriveArtistName(detail.albumArtist) : null,
         })
       )
       .slice(0, PLAYLIST_SEARCH_GROUP_LIMIT);

@@ -88,7 +88,22 @@ export const releaseCarouselItemSchema = releaseScalarSchema.extend({
   images: z.array(imageSchema),
 }) satisfies z.ZodType<ReleaseCarouselItem>;
 
-/** Published release listing projection for the public releases page rows. */
+/** A listing credit's artist: name fields, slug, and the public gate fields. */
+const publishedReleaseListingArtistSchema = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  surname: z.string(),
+  displayName: nullableString,
+  slug: z.string(),
+  publishedOn: date.nullable(),
+  deletedOn: date.nullable(),
+});
+
+/**
+ * Published release listing projection for the public releases page rows:
+ * the public credits plus the byline (`albumArtist`, null when the first
+ * credit is hidden — ADR-0015).
+ */
 export const publishedReleaseListingSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -98,37 +113,30 @@ export const publishedReleaseListingSchema = z.object({
   formats: z.array(formatSchema),
   catalogNumber: nullableString,
   images: z.array(z.object({ src: nullableString, altText: nullableString })),
-  artistReleases: z.array(
-    z.object({
-      artist: z.object({
-        id: z.string(),
-        firstName: z.string(),
-        surname: z.string(),
-        displayName: nullableString,
-        slug: z.string(),
-      }),
-    })
-  ),
+  artistReleases: z.array(z.object({ artist: publishedReleaseListingArtistSchema })),
+  albumArtist: publishedReleaseListingArtistSchema.nullable(),
   releaseUrls: z.array(z.object({ url: z.object({ platform: platformSchema, url: z.string() }) })),
   digitalFormats: z.array(z.object({ files: z.array(z.object({ s3Key: z.string() })) })),
 }) satisfies z.ZodType<PublishedReleaseListing>;
 
+/** A detail credit's artist: name parts and the public gate fields. */
+const publishedReleaseDetailArtistSchema = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  middleName: nullableString,
+  surname: z.string(),
+  displayName: nullableString,
+  title: nullableString,
+  suffix: nullableString,
+  publishedOn: date.nullable(),
+  deletedOn: date.nullable(),
+});
+
 /** Published release detail (media player page) — the `withTracks` release payload. */
 export const publishedReleaseDetailSchema = releaseScalarSchema.extend({
   images: z.array(imageSchema),
-  artistReleases: z.array(
-    z.object({
-      artist: z.object({
-        id: z.string(),
-        firstName: z.string(),
-        middleName: nullableString,
-        surname: z.string(),
-        displayName: nullableString,
-        title: nullableString,
-        suffix: nullableString,
-      }),
-    })
-  ),
+  artistReleases: z.array(z.object({ artist: publishedReleaseDetailArtistSchema })),
+  albumArtist: publishedReleaseDetailArtistSchema.nullable(),
   digitalFormats: z.array(digitalFormatWithFilesSchema),
   releaseUrls: z.array(
     z.object({

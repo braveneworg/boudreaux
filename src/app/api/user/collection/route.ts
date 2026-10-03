@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 
 import { withAuth } from '@/lib/decorators/with-auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { withPublicReleaseByline } from '@/lib/utils/artist-release-credits';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,9 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = withAuth(async (_request, _context, session) => {
   try {
-    const purchases = await PurchaseRepository.findAllByUser(session.user.id);
+    const purchases = (await PurchaseRepository.findAllByUser(session.user.id)).map(
+      withPublicReleaseByline
+    );
 
     return NextResponse.json({
       purchases,

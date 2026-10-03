@@ -147,13 +147,19 @@ export type ReleaseListItem = ReleaseScalars & {
   artistReleases: Array<ArtistReleaseScalars & { artist: ArtistScalars }>;
 };
 
-/** Narrow artist name projection consumed by the public releases listing card. */
+/**
+ * Narrow artist name projection consumed by the public releases listing card,
+ * plus the fields `isPublicArtist` reads so the service can apply the byline
+ * rule to the full credit order.
+ */
 export type PublishedReleaseListingArtist = {
   id: string;
   firstName: string;
   surname: string;
   displayName: string | null;
   slug: string;
+  publishedOn: Date | null;
+  deletedOn: Date | null;
 };
 
 /** A single image projected for the public listing (`src`/`altText` only). */
@@ -180,7 +186,7 @@ export type PublishedReleaseListingTrack = {
  * narrowed to the first MP3 track so the Play button can source-prime a media
  * element inside the click gesture. Mirrors `publishedReleaseListingSelect`.
  */
-export type PublishedReleaseListing = {
+export type PublishedReleaseListingRow = {
   id: string;
   title: string;
   coverArt: string;
@@ -189,12 +195,21 @@ export type PublishedReleaseListing = {
   formats: Format[];
   catalogNumber: string | null;
   images: PublishedReleaseListingImage[];
+  /** The full credit order; the service narrows it to the public credits. */
   artistReleases: Array<{ artist: PublishedReleaseListingArtist }>;
   releaseUrls: PublishedReleaseListingUrl[];
   digitalFormats: Array<{ files: PublishedReleaseListingTrack[] }>;
 };
 
-/** Narrow artist name-part projection for the media-player detail page. */
+/** The listing row as the public page receives it: public credits and the byline. */
+export type PublishedReleaseListing = PublishedReleaseListingRow & {
+  albumArtist: PublishedReleaseListingArtist | null;
+};
+
+/**
+ * Narrow artist name-part projection for the media-player detail page, plus
+ * the fields `isPublicArtist` reads.
+ */
 export type PublishedReleaseDetailArtist = {
   id: string;
   firstName: string;
@@ -203,6 +218,8 @@ export type PublishedReleaseDetailArtist = {
   displayName: string | null;
   title: string | null;
   suffix: string | null;
+  publishedOn: Date | null;
+  deletedOn: Date | null;
 };
 
 /**
@@ -210,11 +227,17 @@ export type PublishedReleaseDetailArtist = {
  * Includes digital format files for audio playback, unbounded images, narrowed
  * artist info, and release URLs. Mirrors `publishedReleaseDetailInclude`.
  */
-export type PublishedReleaseDetail = ReleaseScalars & {
+export type PublishedReleaseDetailRow = ReleaseScalars & {
   images: ImageRecord[];
+  /** The full credit order; the service narrows it to the public credits. */
   artistReleases: Array<{ artist: PublishedReleaseDetailArtist }>;
   digitalFormats: ReleaseDigitalFormatRecord[];
   releaseUrls: ReleaseUrlRecord[];
+};
+
+/** The detail row as the player page receives it: public credits and the byline. */
+export type PublishedReleaseDetail = PublishedReleaseDetailRow & {
+  albumArtist: PublishedReleaseDetailArtist | null;
 };
 
 /**

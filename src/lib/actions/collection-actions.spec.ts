@@ -38,10 +38,20 @@ describe('getCollectionAction', () => {
 
   it('returns purchases for the authenticated user', async () => {
     authMock.mockResolvedValue({ user: { id: 'u1' } });
-    const purchases = [{ id: 'p1' }, { id: 'p2' }];
+    const artist = { id: 'a1', publishedOn: new Date('2024-01-01'), deletedOn: null };
+    const purchases = [
+      { id: 'p1', release: { artistReleases: [{ artist }] } },
+      { id: 'p2', release: { artistReleases: [] } },
+    ];
     findAllByUserMock.mockResolvedValue(purchases);
     const result = await getCollectionAction();
-    expect(result).toEqual({ success: true, data: purchases });
+    expect(result).toEqual({
+      success: true,
+      data: [
+        { id: 'p1', release: { artistReleases: [{ artist }], albumArtist: artist } },
+        { id: 'p2', release: { artistReleases: [], albumArtist: null } },
+      ],
+    });
     expect(findAllByUserMock).toHaveBeenCalledWith('u1');
   });
 

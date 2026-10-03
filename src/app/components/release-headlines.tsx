@@ -58,7 +58,7 @@ export const ReleaseHeadlines = (): React.ReactElement => {
       >
         <ul className="space-y-7">
           {releases.map((release) => {
-            const artist = release.artistReleases[0]?.artist;
+            const artist = release.albumArtist;
             return (
               <li key={release.id}>
                 <Link

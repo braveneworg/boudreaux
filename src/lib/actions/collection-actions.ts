@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { auth } from '@/auth';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
+import { withPublicReleaseByline } from '@/lib/utils/artist-release-credits';
 import { loggers } from '@/lib/utils/logger';
 
 /**
@@ -23,7 +24,9 @@ export const getCollectionAction = async () => {
   }
 
   try {
-    const purchases = await PurchaseRepository.findAllByUser(session.user.id);
+    const purchases = (await PurchaseRepository.findAllByUser(session.user.id)).map(
+      withPublicReleaseByline
+    );
     return { success: true, data: purchases };
   } catch (error) {
     loggers.media.error('[getCollectionAction] Failed to fetch collection', error);

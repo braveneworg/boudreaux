@@ -350,7 +350,7 @@ export const ReleasePlayer = ({
     return resolveStreamUrl(currentFile);
   }, [currentFile]);
 
-  const primaryArtist = release.artistReleases.at(0)?.artist;
+  const primaryArtist = release.albumArtist ?? undefined;
   const artistName = primaryArtist ? getArtistDisplayName(primaryArtist) : null;
 
   const coverArtSrc = release.coverArt || release.images[0]?.src || '';

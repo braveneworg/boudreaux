@@ -66,14 +66,12 @@ interface CollectionPurchase {
       altText: string | null;
       sortOrder: number;
     }>;
-    artistReleases: Array<{
-      artist: {
-        id: string;
-        firstName: string;
-        surname: string;
-        displayName: string | null;
-      };
-    }>;
+    albumArtist: {
+      id: string;
+      firstName: string;
+      surname: string;
+      displayName: string | null;
+    } | null;
     digitalFormats: Array<{
       formatType: string;
       files: Array<{ fileName: string }>;
@@ -90,11 +88,11 @@ interface CollectionListProps {
   isAdmin: boolean;
 }
 
-/** The album artist's name, or `null` for a release with no public credit. */
+/** The album artist's name, or `null` when the byline is empty (ADR-0015). */
 const getArtistName = (purchase: CollectionPurchase): string | null => {
-  const artistRelease = purchase.release.artistReleases.at(0);
-  if (!artistRelease) return null;
-  const { displayName, firstName, surname } = artistRelease.artist;
+  const { albumArtist } = purchase.release;
+  if (!albumArtist) return null;
+  const { displayName, firstName, surname } = albumArtist;
   return displayName ?? [firstName, surname].filter(Boolean).join(' ');
 };
 

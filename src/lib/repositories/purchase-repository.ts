@@ -5,7 +5,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
-import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { purchaseWhere } from './_internal/purchase-where';
 import { allOf } from './_internal/where-kit';
@@ -140,17 +140,20 @@ export class PurchaseRepository {
             title: true,
             coverArt: true,
             images: true,
-            // Only public artists are named (ADR-0015); a release credited
-            // only to hidden artists is listed with no byline.
+            // The full credit order with each artist's gate fields; the
+            // collection read applies the byline rule (`withPublicByline`)
+            // so only public artists are named (ADR-0015).
             artistReleases: {
-              where: { artist: { is: publicArtistWhere } },
-              include: {
+              orderBy: creditOrderBy,
+              select: {
                 artist: {
                   select: {
                     id: true,
                     firstName: true,
                     surname: true,
                     displayName: true,
+                    publishedOn: true,
+                    deletedOn: true,
                   },
                 },
               },

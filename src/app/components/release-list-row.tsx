@@ -32,8 +32,8 @@ interface ReleaseListRowProps {
  * long-form release notes belong to the detail page, not this row.
  */
 export const ReleaseListRow = ({ release }: ReleaseListRowProps): ReactElement => {
-  // A release with no public credit is shown with no byline (ADR-0015).
-  const albumArtist = release.artistReleases.at(0)?.artist;
+  // The byline is the album artist when public, else empty (ADR-0015).
+  const { albumArtist } = release;
   const artistName = albumArtist ? getArtistDisplayNameForRelease(albumArtist) : null;
 
   return (

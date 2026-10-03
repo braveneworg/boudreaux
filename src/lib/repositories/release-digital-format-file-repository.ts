@@ -7,7 +7,7 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
-import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { releaseWhere } from './_internal/release-where';
 
@@ -40,16 +40,19 @@ const trackFileWithReleaseSelect = {
           title: true,
           coverArt: true,
           publishedAt: true,
-          // Only public artists are named (ADR-0015); a track of a release
-          // credited only to hidden artists is returned with no artist.
+          // The full credit order with each artist's gate fields; the
+          // playlist service names the album artist through the byline
+          // rule, so only a public artist is ever named (ADR-0015).
           artistReleases: {
-            where: { artist: { is: publicArtistWhere } },
+            orderBy: creditOrderBy,
             select: {
               artist: {
                 select: {
                   displayName: true,
                   firstName: true,
                   surname: true,
+                  publishedOn: true,
+                  deletedOn: true,
                 },
               },
             },

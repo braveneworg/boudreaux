@@ -894,6 +894,38 @@ describe('ReleaseService', () => {
       ],
     };
 
+    // ADR-0015: the album artist is the FIRST credit in stored order; when it
+    // is hidden the byline is empty — the next public credit is not promoted.
+    it('names the public album artist and drops hidden credits', async () => {
+      const pub = { id: 'a1', publishedOn: new Date('2024-01-01'), deletedOn: null };
+      const hidden = { id: 'a2', publishedOn: null, deletedOn: null };
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([
+        { ...mockPublishedRelease, artistReleases: [{ artist: pub }, { artist: hidden }] },
+      ] as never);
+
+      const result = await ReleaseService.getPublishedReleases({ search: 'x' });
+
+      expect(result).toMatchObject({
+        success: true,
+        data: [{ albumArtist: pub, artistReleases: [{ artist: pub }] }],
+      });
+    });
+
+    it('leaves the byline empty when the album artist is hidden', async () => {
+      const pub = { id: 'a1', publishedOn: new Date('2024-01-01'), deletedOn: null };
+      const hidden = { id: 'a2', publishedOn: null, deletedOn: null };
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([
+        { ...mockPublishedRelease, artistReleases: [{ artist: hidden }, { artist: pub }] },
+      ] as never);
+
+      const result = await ReleaseService.getPublishedReleases({ search: 'x' });
+
+      expect(result).toMatchObject({
+        success: true,
+        data: [{ albumArtist: null, artistReleases: [{ artist: pub }] }],
+      });
+    });
+
     it('should return published releases ordered by releasedOn desc', async () => {
       vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([mockPublishedRelease] as never);
 

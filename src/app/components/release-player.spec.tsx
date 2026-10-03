@@ -228,6 +228,21 @@ describe('ReleasePlayer', () => {
   const file1CdnUrl = 'https://cdn.example.com/releases/123/track1.mp3';
   const file2CdnUrl = 'https://cdn.example.com/releases/123/track2.mp3';
 
+  const PLAYER_ARTIST = {
+    id: 'artist-1',
+    firstName: 'John',
+    surname: 'Doe',
+    displayName: null,
+    title: null,
+    suffix: null,
+    middleName: null,
+    bio: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedOn: null,
+    publishedOn: new Date('2024-01-01'),
+  };
+
   const mockRelease = {
     id: 'release-1',
     title: 'Test Album',
@@ -239,24 +254,13 @@ describe('ReleasePlayer', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     images: [],
+    albumArtist: PLAYER_ARTIST,
     artistReleases: [
       {
         id: 'ar-1',
         artistId: 'artist-1',
         releaseId: 'release-1',
-        artist: {
-          id: 'artist-1',
-          firstName: 'John',
-          surname: 'Doe',
-          displayName: null,
-          title: null,
-          suffix: null,
-          middleName: null,
-          bio: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          deletedOn: null,
-        },
+        artist: PLAYER_ARTIST,
       },
     ],
     digitalFormats: [
@@ -618,7 +622,7 @@ describe('ReleasePlayer', () => {
   });
 
   describe('a release with no public credit (ADR-0015)', () => {
-    const uncredited = { ...mockRelease, artistReleases: [] };
+    const uncredited = { ...mockRelease, artistReleases: [], albumArtist: null };
 
     it('still plays', () => {
       render(<ReleasePlayer release={uncredited} releaseId="release-1" />);

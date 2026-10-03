@@ -37,7 +37,11 @@ import type {
 import { DataError } from '@/lib/types/domain/errors';
 import type { ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
-import { collectArtistReleases, summarizeListedReleases } from '@/lib/utils/artist-release-credits';
+import {
+  collectArtistReleases,
+  publicCredits,
+  summarizeListedReleases,
+} from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
   DISPLAY_IMAGE_CAP,
@@ -358,15 +362,8 @@ type CreditedReleaseRow = ArtistReleaseGraphRow & { credit: ReleaseCredit };
  * attribution to the next credit.
  */
 const withPublicCredits = (row: CreditedReleaseRow): ArtistPublishedReleaseRow => {
-  const albumArtist = row.release.artistReleases.at(0)?.artist;
-  return {
-    ...row,
-    albumArtist: albumArtist && isPublicArtist(albumArtist) ? albumArtist : null,
-    release: {
-      ...row.release,
-      artistReleases: row.release.artistReleases.filter(({ artist }) => isPublicArtist(artist)),
-    },
-  };
+  const { albumArtist, credits } = publicCredits(row.release.artistReleases);
+  return { ...row, albumArtist, release: { ...row.release, artistReleases: credits } };
 };
 
 /** Optional middleName spread: only include the field when a non-blank value is present. */

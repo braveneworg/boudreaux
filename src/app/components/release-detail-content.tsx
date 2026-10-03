@@ -24,9 +24,8 @@ interface ReleaseDetailContentProps {
 /** The resolved (non-null) release payload returned by {@link useReleaseQuery}. */
 type ReleaseData = NonNullable<ReturnType<typeof useReleaseQuery>['data']>;
 
-/** The primary (first) artist on a release, if any. */
-const getPrimaryArtist = (release: ReleaseData | null | undefined) =>
-  release?.artistReleases?.[0]?.artist ?? null;
+/** The album artist a public surface may name, if any (ADR-0015). */
+const getPrimaryArtist = (release: ReleaseData | null | undefined) => release?.albumArtist ?? null;
 
 /**
  * Client content wrapper for the release detail page.

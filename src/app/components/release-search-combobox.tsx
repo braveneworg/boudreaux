@@ -87,8 +87,8 @@ export const ReleaseSearchCombobox = () => {
       (releases ?? []).map((release) => ({
         release,
         coverArt: getReleaseCoverArt(release),
-        artistName: release.artistReleases[0]
-          ? getArtistDisplayNameForRelease(release.artistReleases[0].artist)
+        artistName: release.albumArtist
+          ? getArtistDisplayNameForRelease(release.albumArtist)
           : null,
       })),
     [releases]

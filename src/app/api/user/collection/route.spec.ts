@@ -45,9 +45,16 @@ describe('GET /api/user/collection', () => {
   });
 
   it('should return purchases for authenticated user', async () => {
+    const publicArtist = { id: 'a1', publishedOn: '2024-01-01T00:00:00.000Z', deletedOn: null };
+    const hiddenArtist = { id: 'a2', publishedOn: null, deletedOn: null };
     const mockPurchases = [
-      { id: 'purchase-1', releaseId: 'release-1' },
-      { id: 'purchase-2', releaseId: 'release-2' },
+      { id: 'purchase-1', release: { artistReleases: [{ artist: publicArtist }] } },
+      // A hidden album artist leaves the byline empty — the next credit is
+      // not promoted (ADR-0015).
+      {
+        id: 'purchase-2',
+        release: { artistReleases: [{ artist: hiddenArtist }, { artist: publicArtist }] },
+      },
     ];
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
     vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue(mockPurchases as never);
@@ -58,7 +65,16 @@ describe('GET /api/user/collection', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({
-      purchases: mockPurchases,
+      purchases: [
+        {
+          id: 'purchase-1',
+          release: { artistReleases: [{ artist: publicArtist }], albumArtist: publicArtist },
+        },
+        {
+          id: 'purchase-2',
+          release: { artistReleases: [{ artist: publicArtist }], albumArtist: null },
+        },
+      ],
       count: 2,
       isAdmin: false,
     });
