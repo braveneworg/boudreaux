@@ -104,13 +104,15 @@ admin's own filing vocabulary. See
 _Avoid_: keyword, label (a Label is a signed-artist entity).
 
 **Release** — a published body of work by an Artist, with tracks and
-**digital formats** available for download. Its first credited Artist is its
-**album artist**.
+**digital formats** available for download. Its credits have a stored order;
+the first is its **album artist**. A public surface names the album artist
+only while that Artist is a **public artist** — a hidden album artist leaves
+the byline empty, and no later credit takes its place.
 
 **release credit** — how a Release relates to the Artist whose page lists it:
 **primary** (the Artist is its album artist), **featured** (credited, but not
 first), or **member** (a release by a band the Artist belongs to). Derived
-from credit order and band membership when the page is built, never stored;
+from the stored credit order and band membership when the page is built;
 an Artist's page lists every release they hold a credit on, primary first.
 See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
