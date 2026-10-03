@@ -85,6 +85,7 @@ export const artistSchema = artistScalarSchema.extend({
       id: z.string(),
       artistId: z.string(),
       releaseId: z.string(),
+      position: z.number().int(),
       release: releaseScalarSchema,
     })
   ),
@@ -123,6 +124,7 @@ export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend
       id: z.string(),
       artistId: z.string(),
       releaseId: z.string(),
+      position: z.number().int(),
       release: publicArtistReleaseSchema,
       credit: z.enum(RELEASE_CREDITS),
       albumArtist: artistCreditScalarSchema.nullable(),

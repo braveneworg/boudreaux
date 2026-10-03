@@ -220,14 +220,16 @@ export const digitalFormat = {
 export const artist = {
   ...artistScalar,
   labels: [{ id: 'al1', artistId: 'a1', labelId: 'l1' }],
-  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release: releaseScalar }],
+  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, release: releaseScalar }],
   urls: [url],
 };
 
 export const release = {
   ...releaseScalar,
   images: [image],
-  artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistScalar }],
+  artistReleases: [
+    { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: artistScalar },
+  ],
   digitalFormats: [digitalFormat],
   releaseUrls: [{ id: 'ru1', releaseId: 'r1', urlId: 'u1', url }],
 };
@@ -251,7 +253,9 @@ export const featuredArtist = {
   release: {
     ...releaseScalar,
     images: [image],
-    artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistScalar }],
+    artistReleases: [
+      { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: artistScalar },
+    ],
   },
 };
 
@@ -342,6 +346,7 @@ export const artistWithPublishedReleases = {
       id: 'ar1',
       artistId: 'a1',
       releaseId: 'r1',
+      position: 0,
       release,
       credit: 'primary' as const,
       albumArtist: null,

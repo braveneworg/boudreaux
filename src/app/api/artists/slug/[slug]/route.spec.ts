@@ -173,11 +173,14 @@ describe('Artist by Slug API Route', () => {
           id: 'ar1',
           artistId: 'a1',
           releaseId: 'r1',
+          position: 0,
           credit: 'primary' as const,
           albumArtist: null,
           release: {
             ...release,
-            artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: mockArtist }],
+            artistReleases: [
+              { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: mockArtist },
+            ],
             digitalFormats: [
               { ...digitalFormat, files: [{ ...digitalFormatFile, fileSize: 42n }] },
             ],
@@ -238,6 +241,7 @@ describe('Artist by Slug API Route', () => {
                       id: 'ar2',
                       artistId: 'a3',
                       releaseId: 'r1',
+                      position: 0,
                       artist: { ...bioArtist, id: 'a3' },
                     },
                   ],

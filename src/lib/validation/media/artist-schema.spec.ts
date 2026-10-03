@@ -151,11 +151,14 @@ describe('artistWithPublishedReleasesSchema — public projection (#765)', () =>
         id: 'ar1',
         artistId: 'a1',
         releaseId: 'r1',
+        position: 0,
         credit: 'primary' as const,
         albumArtist: null,
         release: {
           ...release,
-          artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: leakyArtist }],
+          artistReleases: [
+            { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: leakyArtist },
+          ],
         },
       },
     ],
@@ -172,7 +175,13 @@ describe('artistWithPublishedReleasesSchema — public projection (#765)', () =>
           release: {
             ...release,
             artistReleases: [
-              { id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistPublicScalar },
+              {
+                id: 'ar1',
+                artistId: 'a1',
+                releaseId: 'r1',
+                position: 0,
+                artist: artistPublicScalar,
+              },
             ],
           },
         },
@@ -210,12 +219,19 @@ describe('artistWithPublishedReleasesSchema — nested artists carry no bio', ()
         id: 'ar1',
         artistId: 'a1',
         releaseId: 'r1',
+        position: 0,
         credit: 'primary' as const,
         albumArtist: null,
         release: {
           ...release,
           artistReleases: [
-            { id: 'ar2', artistId: 'a3', releaseId: 'r1', artist: { ...bioArtist, id: 'a3' } },
+            {
+              id: 'ar2',
+              artistId: 'a3',
+              releaseId: 'r1',
+              position: 0,
+              artist: { ...bioArtist, id: 'a3' },
+            },
           ],
         },
       },

@@ -96,6 +96,8 @@ export interface ArtistReleaseScalars {
   id: string;
   artistId: string;
   releaseId: string;
+  /** Credit order, dense from 0; position 0 is the album artist. */
+  position: number;
 }
 
 /**

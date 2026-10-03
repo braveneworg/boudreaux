@@ -21,6 +21,7 @@ import {
   hiddenCreditSelect,
   staysHiddenAmongWhere,
 } from './_internal/artist-where';
+import { runQuery } from './_internal/map-prisma-error';
 import { releaseWhere } from './_internal/release-where';
 
 import type { Prisma } from '@prisma/client';
@@ -116,50 +117,53 @@ export class ArtistCreditRepository {
   }
 
   /**
-   * Credit the given artists on a release, in the given order. Credit order is
-   * insertion order (ADR-0006), so the caller's array order is the credit order.
+   * Credit the given artists on a new release, in the given order: the
+   * array index is the stored credit position, so the first id is the album
+   * artist.
    */
   static async addCredits(releaseId: string, artistIds: string[]): Promise<void> {
     if (artistIds.length === 0) {
       return;
     }
     await prisma.artistRelease.createMany({
-      data: artistIds.map((artistId) => ({ artistId, releaseId })),
+      data: artistIds.map((artistId, position) => ({ artistId, releaseId, position })),
     });
   }
 
   /**
-   * Make a release's credits match `artistIds`: drop credits for artists no
-   * longer listed and add credits for artists not yet credited. Existing rows
-   * are kept, so re-ordering the list does not re-order existing credits
-   * (the ADR-0006 trade-off).
+   * Make a release's credits match `artistIds` in that order: drop credits
+   * for artists no longer listed, and upsert every listed artist with its
+   * index as position — so moving an artist to the front makes it the album
+   * artist, which the old insert-missing-only sync could not do (the ADR-0006
+   * trade-off, now closed). One transaction, so a reader never sees a
+   * half-renumbered release.
    */
   static async syncCredits(releaseId: string, artistIds: string[]): Promise<void> {
     const existing = await prisma.artistRelease.findMany({
       where: { releaseId },
       select: { id: true, artistId: true },
     });
-
-    const existingArtistIds = new Set(existing.map(({ artistId }) => artistId));
     const wantedArtistIds = new Set(artistIds);
-
     const toDelete = existing.filter(({ artistId }) => !wantedArtistIds.has(artistId));
-    const toCreate = artistIds.filter((artistId) => !existingArtistIds.has(artistId));
 
-    const ops: Promise<unknown>[] = [];
-    if (toDelete.length > 0) {
-      ops.push(
-        prisma.artistRelease.deleteMany({ where: { id: { in: toDelete.map(({ id }) => id) } } })
-      );
-    }
-    if (toCreate.length > 0) {
-      ops.push(
-        prisma.artistRelease.createMany({
-          data: toCreate.map((artistId) => ({ artistId, releaseId })),
-        })
-      );
-    }
-    await Promise.all(ops);
+    await runQuery(() =>
+      prisma.$transaction([
+        ...(toDelete.length > 0
+          ? [
+              prisma.artistRelease.deleteMany({
+                where: { id: { in: toDelete.map(({ id }) => id) } },
+              }),
+            ]
+          : []),
+        ...artistIds.map((artistId, position) =>
+          prisma.artistRelease.upsert({
+            where: { artistId_releaseId: { artistId, releaseId } },
+            create: { artistId, releaseId, position },
+            update: { position },
+          })
+        ),
+      ])
+    );
   }
 
   /**
