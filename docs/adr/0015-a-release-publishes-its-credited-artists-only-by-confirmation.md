@@ -146,6 +146,16 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   button set, so a later plain save does not publish by accident.
 - A release credited only to hidden artists is public with no byline, and
   its player runs without an album artist.
+- **A release whose album artist is hidden is public with no byline**
+  (2026-10-03). The album artist is the first credit in stored order; when
+  that artist is hidden the byline is empty — the next public credit is not
+  promoted. The artist page had always read it this way; the release
+  surfaces filtered hidden credits in the query and took whoever was left
+  first, so one release could show two different album artists. Every public
+  release read now loads the full credit order and applies `publicCredits`
+  (`src/lib/utils/artist-release-credits.ts`) before a row reaches a payload:
+  album artist from the full order first, hidden names dropped after. The
+  payload carries `albumArtist` (nullable) beside the public `artistReleases`.
 - The public listings are cached per process for ten minutes. The services
   clear them after every write that changes whether an artist is public. A
   script cannot, so bylines published by the backfill appear once the cache

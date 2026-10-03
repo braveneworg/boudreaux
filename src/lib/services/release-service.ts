@@ -21,6 +21,7 @@ import type {
   ReleaseScalars,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
+import { withPublicByline } from '@/lib/utils/artist-release-credits';
 import { NO_CREDIT_DECISIONS, type CreditDecisions } from '@/lib/utils/credit-confirmation';
 import {
   invalidatePublicNameCaches,
@@ -360,7 +361,7 @@ export class ReleaseService {
 
         return {
           success: true,
-          data: releases,
+          data: releases.map(withPublicByline),
         };
       } catch (error) {
         return failFromError(error, { UNKNOWN: 'Failed to fetch published releases' });
@@ -407,7 +408,7 @@ export class ReleaseService {
         return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
       }
 
-      return { success: true, data: release };
+      return { success: true, data: withPublicByline(release) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve release' });
     }

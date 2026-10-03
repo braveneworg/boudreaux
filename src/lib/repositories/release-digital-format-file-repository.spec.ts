@@ -4,7 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
-import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { releaseWhere } from './_internal/release-where';
 import {
@@ -241,14 +241,17 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             coverArt: true,
             publishedAt: true,
             artistReleases: {
-              // Only public artists are named (ADR-0015).
-              where: { artist: { is: publicArtistWhere } },
+              // The full credit order; the playlist service applies the
+              // byline rule (ADR-0015).
+              orderBy: creditOrderBy,
               select: {
                 artist: {
                   select: {
                     displayName: true,
                     firstName: true,
                     surname: true,
+                    publishedOn: true,
+                    deletedOn: true,
                   },
                 },
               },
@@ -281,6 +284,8 @@ describe('ReleaseDigitalFormatFileRepository', () => {
               displayName: 'Artist One',
               firstName: 'Artist',
               surname: 'One',
+              publishedOn: new Date('2024-01-01'),
+              deletedOn: null,
             },
           },
         ],

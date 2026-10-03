@@ -6,8 +6,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   CreateReleaseData,
-  PublishedReleaseDetail,
-  PublishedReleaseListing,
+  PublishedReleaseDetailRow,
+  PublishedReleaseListingRow,
   PublishedReleaseFilters,
   Release,
   ReleaseScalars,
@@ -22,6 +22,7 @@ import type {
 } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { isPresent } from './_internal/where-kit';
 
@@ -40,6 +41,7 @@ import type { Prisma } from '@prisma/client';
  */
 const releaseDetailInclude = {
   artistReleases: {
+    orderBy: creditOrderBy,
     include: {
       artist: true,
     },
@@ -73,6 +75,7 @@ const releaseDetailIncludeWithImages = {
 const releaseDetailIncludeUnorderedImages = {
   images: true,
   artistReleases: {
+    orderBy: creditOrderBy,
     include: {
       artist: true,
     },
@@ -100,6 +103,7 @@ const releaseListItemInclude = {
     take: 3,
   },
   artistReleases: {
+    orderBy: creditOrderBy,
     include: {
       artist: true,
     },
@@ -107,23 +111,49 @@ const releaseListItemInclude = {
 } as const satisfies Prisma.ReleaseInclude;
 
 /**
- * The credits a public read may show (ADR-0015): those whose artist is a
- * public artist. A hidden artist's name never reaches a public payload; a
- * release credited only to hidden artists is returned with no credits.
+ * Every credit load orders by {@link creditOrderBy}: position 0 is the album
+ * artist. Public reads load the FULL credit order with each artist's public
+ * gate fields, and the service applies the byline rule (`withPublicByline`)
+ * before a row reaches a payload — so a hidden album artist leaves the byline
+ * empty instead of handing it to the next credit (ADR-0015).
  */
-const publicCreditWhere = {
-  artist: { is: publicArtistWhere },
-} as const satisfies Prisma.ArtistReleaseWhereInput;
+const publicListingCredits = {
+  orderBy: creditOrderBy,
+  select: {
+    artist: {
+      // slug feeds the landing headlines' artist links.
+      select: {
+        id: true,
+        firstName: true,
+        surname: true,
+        displayName: true,
+        slug: true,
+        publishedOn: true,
+        deletedOn: true,
+      },
+    },
+  },
+} as const satisfies Prisma.Release$artistReleasesArgs;
 
-/**
- * Projection for the public releases page. Only the fields the listing UI
- * consumes (release rows + search combobox) are selected, keeping both the
- * Mongo read and the API payload small.
- * `description`/`formats`/`catalogNumber` feed the row info column;
- * `digitalFormats` is narrowed to the first MP3 track's key so the Play button
- * can source-prime playback inside the click gesture (MP3 320 is the public
- * unsigned CDN format).
- */
+const publicDetailCredits = {
+  orderBy: creditOrderBy,
+  select: {
+    artist: {
+      select: {
+        id: true,
+        firstName: true,
+        middleName: true,
+        surname: true,
+        displayName: true,
+        title: true,
+        suffix: true,
+        publishedOn: true,
+        deletedOn: true,
+      },
+    },
+  },
+} as const satisfies Prisma.Release$artistReleasesArgs;
+
 const publishedReleaseListingSelect = {
   id: true,
   title: true,
@@ -137,15 +167,7 @@ const publishedReleaseListingSelect = {
     take: 1,
     select: { src: true, altText: true },
   },
-  artistReleases: {
-    where: publicCreditWhere,
-    select: {
-      artist: {
-        // slug feeds the landing headlines' artist links.
-        select: { id: true, firstName: true, surname: true, displayName: true, slug: true },
-      },
-    },
-  },
+  artistReleases: publicListingCredits,
   releaseUrls: {
     select: {
       url: { select: { platform: true, url: true } },
@@ -168,22 +190,7 @@ const publishedReleaseDetailInclude = {
   images: {
     orderBy: { sortOrder: 'asc' },
   },
-  artistReleases: {
-    where: publicCreditWhere,
-    select: {
-      artist: {
-        select: {
-          id: true,
-          firstName: true,
-          middleName: true,
-          surname: true,
-          displayName: true,
-          title: true,
-          suffix: true,
-        },
-      },
-    },
-  },
+  artistReleases: publicDetailCredits,
   digitalFormats: {
     include: {
       files: {
@@ -242,11 +249,11 @@ type _ReleaseListItemDrift = AssertExact<
   Prisma.ReleaseGetPayload<{ include: typeof releaseListItemInclude }>
 >;
 type _PublishedReleaseListingDrift = AssertExact<
-  PublishedReleaseListing,
+  PublishedReleaseListingRow,
   Prisma.ReleaseGetPayload<{ select: typeof publishedReleaseListingSelect }>
 >;
 type _PublishedReleaseDetailDrift = AssertExact<
-  PublishedReleaseDetail,
+  PublishedReleaseDetailRow,
   Prisma.ReleaseGetPayload<{ include: typeof publishedReleaseDetailInclude }>
 >;
 type _ReleaseCarouselItemDrift = AssertExact<
@@ -536,7 +543,9 @@ export class ReleaseRepository {
    * building the `where` from an optional search term and using the listing
    * projection. Ordered by `releasedOn` desc.
    */
-  static async findPublished(filters: PublishedReleaseFilters): Promise<PublishedReleaseListing[]> {
+  static async findPublished(
+    filters: PublishedReleaseFilters
+  ): Promise<PublishedReleaseListingRow[]> {
     const { skip = 0, take = 24, search } = filters;
     return prisma.release.findMany({
       where: buildPublishedWhere(search),
@@ -544,18 +553,18 @@ export class ReleaseRepository {
       skip,
       take,
       select: publishedReleaseListingSelect,
-    }) as Promise<PublishedReleaseListing[]>;
+    }) as Promise<PublishedReleaseListingRow[]>;
   }
 
   /**
    * Fetch a single published, non-deleted release with the detail projection
    * (tracks ordered by trackNumber). Returns `null` when missing/unpublished.
    */
-  static async findPublishedWithTracks(id: string): Promise<PublishedReleaseDetail | null> {
+  static async findPublishedWithTracks(id: string): Promise<PublishedReleaseDetailRow | null> {
     return prisma.release.findFirst({
       where: { id, ...releaseWhere.listed },
       include: publishedReleaseDetailInclude,
-    }) as Promise<PublishedReleaseDetail | null>;
+    }) as Promise<PublishedReleaseDetailRow | null>;
   }
 
   /**

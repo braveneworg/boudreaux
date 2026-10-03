@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { ReleaseCredit } from '@/lib/types/domain/release';
+import { isPublicArtist, type PublicArtistFields } from '@/lib/utils/is-public-artist';
 
 /**
  * Every credit the artist page can assign to a release, in display order:
@@ -49,6 +50,78 @@ export interface ArtistReleaseGraph<TRow extends CreditableReleaseRow> {
  * credited anywhere but first is featured. A release with no credits at all is
  * treated as the artist's own so it is never hidden.
  */
+/** A credit row as every public read loads it: the artist with its public gate fields. */
+export interface PublicCreditRow {
+  artist: PublicArtistFields;
+}
+
+/** The credits a public surface may show, and who the byline names. */
+export interface PublicCredits<TRow extends PublicCreditRow> {
+  /**
+   * The album artist — the first credit in stored order — when public; null
+   * when the first credit is hidden. A hidden album artist leaves the byline
+   * empty rather than handing it to the next credit (ADR-0015).
+   */
+  albumArtist: TRow['artist'] | null;
+  /** The credits whose artist is public, in stored order. */
+  credits: TRow[];
+}
+
+/**
+ * Derive what a public surface shows from a release's FULL credit order:
+ * the album artist is read first, then hidden artists are dropped. Every
+ * public release read applies this before a row reaches a payload, so a
+ * hidden name never does.
+ */
+export const publicCredits = <TRow extends PublicCreditRow>(
+  credits: TRow[]
+): PublicCredits<TRow> => {
+  const first = credits.at(0)?.artist;
+  return {
+    albumArtist: first && isPublicArtist(first) ? first : null,
+    credits: credits.filter(({ artist }) => isPublicArtist(artist)),
+  };
+};
+
+/** A release row as a public read loads it: its full credit order, gate fields on each artist. */
+export interface PublicBylineSource<TRow extends PublicCreditRow> {
+  artistReleases: TRow[];
+}
+
+/** The same row as a public surface may show it: public credits plus the byline. */
+export type WithPublicByline<T extends PublicBylineSource<PublicCreditRow>> = T & {
+  albumArtist: T['artistReleases'][number]['artist'] | null;
+};
+
+/**
+ * Apply {@link publicCredits} to a release row: `artistReleases` keeps only
+ * the public credits and `albumArtist` names the byline (or null). Every
+ * service that hands a release to a public surface does this once.
+ */
+export const withPublicByline = <T extends PublicBylineSource<PublicCreditRow>>(
+  release: T
+): WithPublicByline<T> => {
+  const { albumArtist, credits } = publicCredits(release.artistReleases);
+  return { ...release, albumArtist, artistReleases: credits };
+};
+
+/** {@link withPublicByline} for a row that carries its release nested, like a purchase. */
+export const withPublicReleaseByline = <T extends { release: PublicBylineSource<PublicCreditRow> }>(
+  row: T
+): Omit<T, 'release'> & { release: WithPublicByline<T['release']> } => ({
+  ...row,
+  release: withPublicByline(row.release),
+});
+
+/** The album artist's display name for a credit list, or null when the byline is empty. */
+export const publicAlbumArtistName = <A extends PublicArtistFields>(
+  credits: Array<{ artist: A }>,
+  nameOf: (artist: A) => string
+): string | null => {
+  const { albumArtist } = publicCredits(credits);
+  return albumArtist ? nameOf(albumArtist) : null;
+};
+
 export const deriveOwnReleaseCredit = (
   artistId: string,
   { artistReleases }: Pick<CreditableRelease, 'artistReleases'>

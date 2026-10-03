@@ -220,14 +220,16 @@ export const digitalFormat = {
 export const artist = {
   ...artistScalar,
   labels: [{ id: 'al1', artistId: 'a1', labelId: 'l1' }],
-  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', release: releaseScalar }],
+  releases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, release: releaseScalar }],
   urls: [url],
 };
 
 export const release = {
   ...releaseScalar,
   images: [image],
-  artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistScalar }],
+  artistReleases: [
+    { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: artistScalar },
+  ],
   digitalFormats: [digitalFormat],
   releaseUrls: [{ id: 'ru1', releaseId: 'r1', urlId: 'u1', url }],
 };
@@ -251,8 +253,21 @@ export const featuredArtist = {
   release: {
     ...releaseScalar,
     images: [image],
-    artistReleases: [{ id: 'ar1', artistId: 'a1', releaseId: 'r1', artist: artistScalar }],
+    artistReleases: [
+      { id: 'ar1', artistId: 'a1', releaseId: 'r1', position: 0, artist: artistScalar },
+    ],
   },
+};
+
+/** A listing credit's artist with the public gate fields the byline rule reads. */
+export const publishedReleaseListingArtist = {
+  id: 'a1',
+  firstName: 'John',
+  surname: 'Doe',
+  displayName: null,
+  slug: 'john-doe',
+  publishedOn: ISO,
+  deletedOn: null,
 };
 
 export const publishedReleaseListing = {
@@ -264,11 +279,8 @@ export const publishedReleaseListing = {
   formats: ['DIGITAL', 'MP3_320KBPS'],
   catalogNumber: 'FF4-042',
   images: [{ src: null, altText: null }],
-  artistReleases: [
-    {
-      artist: { id: 'a1', firstName: 'John', surname: 'Doe', displayName: null, slug: 'john-doe' },
-    },
-  ],
+  artistReleases: [{ artist: publishedReleaseListingArtist }],
+  albumArtist: publishedReleaseListingArtist,
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://bc' } }],
   digitalFormats: [{ files: [{ s3Key: 'releases/r1/digital-formats/MP3_320KBPS/tracks/01.mp3' }] }],
 };
@@ -282,6 +294,8 @@ export const releaseDetailArtist = {
   displayName: null,
   title: null,
   suffix: null,
+  publishedOn: ISO,
+  deletedOn: null,
 };
 
 /** `PublishedReleaseDetail` wire shape — the `withTracks` release payload. */
@@ -289,6 +303,7 @@ export const publishedReleaseDetail = {
   ...releaseScalar,
   images: [image],
   artistReleases: [{ artist: releaseDetailArtist }],
+  albumArtist: releaseDetailArtist,
   digitalFormats: [digitalFormat],
   releaseUrls: [{ id: 'ru1', releaseId: 'r1', urlId: 'u1', url }],
 };
@@ -342,6 +357,7 @@ export const artistWithPublishedReleases = {
       id: 'ar1',
       artistId: 'a1',
       releaseId: 'r1',
+      position: 0,
       release,
       credit: 'primary' as const,
       albumArtist: null,

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { ReleaseRepository } from './release-repository';
 
@@ -45,7 +46,7 @@ describe('ReleaseRepository', () => {
   // Detail include with unordered images (create/softDelete/restore/update).
   const detailIncludeUnordered = {
     images: true,
-    artistReleases: { include: { artist: true } },
+    artistReleases: { orderBy: creditOrderBy, include: { artist: true } },
     digitalFormats: { include: { files: true } },
     releaseUrls: { include: { url: true } },
   };
@@ -54,18 +55,18 @@ describe('ReleaseRepository', () => {
   // (findById).
   const detailIncludeOrdered = {
     images: { orderBy: { sortOrder: 'asc' } },
-    artistReleases: { include: { artist: true } },
+    artistReleases: { orderBy: creditOrderBy, include: { artist: true } },
     digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
     releaseUrls: { include: { url: true } },
   };
 
   const listItemInclude = {
     images: { orderBy: { sortOrder: 'asc' }, take: 3 },
-    artistReleases: { include: { artist: true } },
+    artistReleases: { orderBy: creditOrderBy, include: { artist: true } },
   };
 
-  /** Only the credits whose artist is public are read (ADR-0015, ADR-0016). */
-  const PUBLIC_CREDITS = { artist: { is: publicArtistWhere } };
+  // Public reads load the full credit order with each artist's gate fields;
+  // the service applies the byline rule (ADR-0015).
 
   const listingSelect = {
     id: true,
@@ -77,10 +78,18 @@ describe('ReleaseRepository', () => {
     catalogNumber: true,
     images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
     artistReleases: {
-      where: PUBLIC_CREDITS,
+      orderBy: creditOrderBy,
       select: {
         artist: {
-          select: { id: true, firstName: true, surname: true, displayName: true, slug: true },
+          select: {
+            id: true,
+            firstName: true,
+            surname: true,
+            displayName: true,
+            slug: true,
+            publishedOn: true,
+            deletedOn: true,
+          },
         },
       },
     },
@@ -96,7 +105,7 @@ describe('ReleaseRepository', () => {
   const detailSelect = {
     images: { orderBy: { sortOrder: 'asc' } },
     artistReleases: {
-      where: PUBLIC_CREDITS,
+      orderBy: creditOrderBy,
       select: {
         artist: {
           select: {
@@ -107,6 +116,8 @@ describe('ReleaseRepository', () => {
             displayName: true,
             title: true,
             suffix: true,
+            publishedOn: true,
+            deletedOn: true,
           },
         },
       },

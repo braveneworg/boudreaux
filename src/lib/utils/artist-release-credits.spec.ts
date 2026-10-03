@@ -6,6 +6,7 @@ import {
   compareByCreditThenNewest,
   deriveOwnReleaseCredit,
   isListable,
+  publicCredits,
   summarizeListedReleases,
 } from './artist-release-credits';
 
@@ -298,5 +299,45 @@ describe('summarizeListedReleases', () => {
     expect(summarizeListedReleases(rows).newestRelease?.releasedOn).toEqual(
       new Date('2023-05-05T00:00:00.000Z')
     );
+  });
+});
+
+describe('publicCredits', () => {
+  const pub = (id: string) => ({ id, publishedOn: new Date('2026-01-01'), deletedOn: null });
+  const hidden = (id: string) => ({ id, publishedOn: null, deletedOn: null });
+  const credit = (artist: { id: string; publishedOn: Date | null; deletedOn: Date | null }) => ({
+    artist,
+  });
+
+  it('names the first credit as album artist and keeps every public credit, in order', () => {
+    const result = publicCredits([credit(pub('a')), credit(pub('b'))]);
+
+    expect(result.albumArtist?.id).toBe('a');
+    expect(result.credits.map(({ artist }) => artist.id)).toEqual(['a', 'b']);
+  });
+
+  it('leaves the byline empty when the album artist is hidden — the next credit is not promoted', () => {
+    const result = publicCredits([credit(hidden('a')), credit(pub('b'))]);
+
+    expect(result.albumArtist).toBeNull();
+    expect(result.credits.map(({ artist }) => artist.id)).toEqual(['b']);
+  });
+
+  it('drops hidden credits that are not first without touching the byline', () => {
+    const result = publicCredits([credit(pub('a')), credit(hidden('b')), credit(pub('c'))]);
+
+    expect(result.albumArtist?.id).toBe('a');
+    expect(result.credits.map(({ artist }) => artist.id)).toEqual(['a', 'c']);
+  });
+
+  it('is empty for a release credited only to hidden artists, and for one with no credits', () => {
+    expect(publicCredits([credit(hidden('a'))])).toEqual({ albumArtist: null, credits: [] });
+    expect(publicCredits([])).toEqual({ albumArtist: null, credits: [] });
+  });
+
+  it('keeps whatever else a credit row carries', () => {
+    const rows = [{ ...credit(pub('a')), position: 0, note: 'x' }];
+
+    expect(publicCredits(rows).credits).toEqual(rows);
   });
 });

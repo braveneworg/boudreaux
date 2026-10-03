@@ -4,7 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
-import { publicArtistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { purchaseWhere } from './_internal/purchase-where';
 import { allOf } from './_internal/where-kit';
@@ -220,16 +220,28 @@ describe('PurchaseRepository', () => {
   });
 
   describe('findAllByUser', () => {
-    it('reads only the credits whose artist is public (ADR-0015)', async () => {
+    it('reads the full credit order with the gate fields the byline rule needs (ADR-0015)', async () => {
       vi.mocked(prisma.releasePurchase.findMany).mockResolvedValueOnce([] as never);
 
       await PurchaseRepository.findAllByUser('user-123');
 
       const args = vi.mocked(prisma.releasePurchase.findMany).mock.calls.at(-1)?.[0] as {
-        include: { release: { select: { artistReleases: { where: unknown } } } };
+        include: { release: { select: { artistReleases: unknown } } };
       };
-      expect(args.include.release.select.artistReleases.where).toEqual({
-        artist: { is: publicArtistWhere },
+      expect(args.include.release.select.artistReleases).toEqual({
+        orderBy: creditOrderBy,
+        select: {
+          artist: {
+            select: {
+              id: true,
+              firstName: true,
+              surname: true,
+              displayName: true,
+              publishedOn: true,
+              deletedOn: true,
+            },
+          },
+        },
       });
     });
 

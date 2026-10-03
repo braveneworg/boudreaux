@@ -129,8 +129,35 @@ interface TrackFileOptions {
   releaseTitle?: string;
   coverArt?: string;
   publishedAt?: Date | null;
-  artists?: Array<{ displayName: string | null; firstName: string; surname: string }>;
+  artists?: Array<{
+    displayName: string | null;
+    firstName: string;
+    surname: string;
+    publishedOn: Date | null;
+    deletedOn: Date | null;
+  }>;
 }
+
+const LISTING_ARTIST = {
+  id: 'artist-1',
+  firstName: 'Kill',
+  surname: 'Trakz',
+  displayName: 'Killah Trakz',
+  slug: 'killah-trakz',
+  publishedOn: new Date('2024-01-01'),
+  deletedOn: null,
+};
+const DETAIL_ARTIST = {
+  id: 'artist-1',
+  firstName: 'Kill',
+  middleName: null,
+  surname: 'Trakz',
+  displayName: 'Killah Trakz',
+  title: null,
+  suffix: null,
+  publishedOn: new Date('2024-01-01'),
+  deletedOn: null,
+};
 
 const TRACK_FILE_DEFAULTS: Required<TrackFileOptions> = {
   id: 'file-1',
@@ -142,7 +169,15 @@ const TRACK_FILE_DEFAULTS: Required<TrackFileOptions> = {
   releaseTitle: 'Live Album',
   coverArt: 'https://cdn.test/covers/release-1.jpg',
   publishedAt: NOW,
-  artists: [{ displayName: 'Killah Trakz', firstName: 'Kill', surname: 'Trakz' }],
+  artists: [
+    {
+      displayName: 'Killah Trakz',
+      firstName: 'Kill',
+      surname: 'Trakz',
+      publishedOn: new Date('2024-01-01'),
+      deletedOn: null,
+    },
+  ],
 };
 
 const makeTrackFile = (options: TrackFileOptions = {}): TrackFileWithRelease => {
@@ -200,17 +235,8 @@ const makeListing = (id: string, title: string): PublishedReleaseListing => ({
   catalogNumber: null,
   digitalFormats: [],
   images: [],
-  artistReleases: [
-    {
-      artist: {
-        id: 'artist-1',
-        firstName: 'Kill',
-        surname: 'Trakz',
-        displayName: 'Killah Trakz',
-        slug: 'killah-trakz',
-      },
-    },
-  ],
+  artistReleases: [{ artist: LISTING_ARTIST }],
+  albumArtist: LISTING_ARTIST,
   releaseUrls: [],
 });
 
@@ -235,19 +261,8 @@ const makeReleaseDetail = (
     id,
     title,
     coverArt: `https://cdn.test/covers/${id}.jpg`,
-    artistReleases: [
-      {
-        artist: {
-          id: 'artist-1',
-          firstName: 'Kill',
-          middleName: null,
-          surname: 'Trakz',
-          displayName: 'Killah Trakz',
-          title: null,
-          suffix: null,
-        },
-      },
-    ],
+    artistReleases: [{ artist: DETAIL_ARTIST }],
+    albumArtist: DETAIL_ARTIST,
     digitalFormats: formats.map(({ formatType = 'MP3_320KBPS', files }) => ({
       formatType,
       files: files.map(({ id: fileId, title: fileTitle = `Track ${fileId}`, ...rest }) => ({
@@ -406,7 +421,17 @@ describe('PlaylistService', () => {
     it('derives the artist name from first/surname when displayName is null', async () => {
       mockPlaylistWithItems({}, [makeItem()]);
       trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
-        makeTrackFile({ artists: [{ displayName: null, firstName: 'Kill', surname: 'Trakz' }] }),
+        makeTrackFile({
+          artists: [
+            {
+              displayName: null,
+              firstName: 'Kill',
+              surname: 'Trakz',
+              publishedOn: new Date('2024-01-01'),
+              deletedOn: null,
+            },
+          ],
+        }),
       ]);
 
       const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
@@ -427,6 +452,34 @@ describe('PlaylistService', () => {
         duration: 111,
         available: true,
       });
+    });
+
+    it('falls back to the snapshot name when the album artist is hidden (ADR-0015)', async () => {
+      mockPlaylistWithItems({}, [makeItem()]);
+      trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([
+        makeTrackFile({
+          artists: [
+            {
+              displayName: 'Hidden',
+              firstName: 'Hid',
+              surname: 'Den',
+              publishedOn: null,
+              deletedOn: null,
+            },
+            {
+              displayName: 'Public',
+              firstName: 'Pub',
+              surname: 'Lic',
+              publishedOn: new Date('2024-01-01'),
+              deletedOn: null,
+            },
+          ],
+        }),
+      ]);
+
+      const detail = await PlaylistService.getOwnedOrPublicDetail(PLAYLIST_ID, OWNER_ID);
+
+      expect(detail?.items[0]?.artistName).toBe('Snapshot Artist');
     });
 
     it('falls back to the snapshot artist name when the live release has no artists', async () => {

@@ -18,7 +18,9 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
+      upsert: vi.fn(),
     },
+    $transaction: vi.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
     tourDateHeadliner: {
       findMany: vi.fn(),
     },
@@ -337,8 +339,8 @@ describe('ArtistCreditRepository', () => {
         [
           {
             data: [
-              { artistId: 'artist-b', releaseId: 'release-1' },
-              { artistId: 'artist-a', releaseId: 'release-1' },
+              { artistId: 'artist-b', releaseId: 'release-1', position: 0 },
+              { artistId: 'artist-a', releaseId: 'release-1', position: 1 },
             ],
           },
         ],
@@ -353,36 +355,73 @@ describe('ArtistCreditRepository', () => {
   });
 
   describe('syncCredits', () => {
-    it('deletes credits no longer wanted and creates the missing ones', async () => {
+    // The list's order is the credit order: every wanted credit is upserted
+    // with its index as position, so moving an artist to the front makes it
+    // the album artist, and credits no longer listed are dropped.
+    it('drops unlisted credits and stamps each listed one with its position', async () => {
       vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
         { id: 'row-a', artistId: 'artist-a' },
         { id: 'row-b', artistId: 'artist-b' },
       ] as never);
       vi.mocked(prisma.artistRelease.deleteMany).mockResolvedValueOnce({ count: 1 });
-      vi.mocked(prisma.artistRelease.createMany).mockResolvedValueOnce({ count: 1 });
+      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({} as never);
 
-      await ArtistCreditRepository.syncCredits('release-1', ['artist-b', 'artist-c']);
+      await ArtistCreditRepository.syncCredits('release-1', ['artist-c', 'artist-b']);
 
-      expect(vi.mocked(prisma.artistRelease.findMany).mock.calls).toEqual([
-        [{ where: { releaseId: 'release-1' }, select: { id: true, artistId: true } }],
-      ]);
       expect(vi.mocked(prisma.artistRelease.deleteMany).mock.calls).toEqual([
         [{ where: { id: { in: ['row-a'] } } }],
       ]);
-      expect(vi.mocked(prisma.artistRelease.createMany).mock.calls).toEqual([
-        [{ data: [{ artistId: 'artist-c', releaseId: 'release-1' }] }],
+      expect(vi.mocked(prisma.artistRelease.upsert).mock.calls).toEqual([
+        [
+          {
+            where: { artistId_releaseId: { artistId: 'artist-c', releaseId: 'release-1' } },
+            create: { artistId: 'artist-c', releaseId: 'release-1', position: 0 },
+            update: { position: 0 },
+          },
+        ],
+        [
+          {
+            where: { artistId_releaseId: { artistId: 'artist-b', releaseId: 'release-1' } },
+            create: { artistId: 'artist-b', releaseId: 'release-1', position: 1 },
+            update: { position: 1 },
+          },
+        ],
+      ]);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-stamps positions even when the set of credits already matches', async () => {
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
+        { id: 'row-a', artistId: 'artist-a' },
+        { id: 'row-b', artistId: 'artist-b' },
+      ] as never);
+      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({} as never);
+
+      await ArtistCreditRepository.syncCredits('release-1', ['artist-b', 'artist-a']);
+
+      expect(prisma.artistRelease.deleteMany).not.toHaveBeenCalled();
+      expect(
+        vi
+          .mocked(prisma.artistRelease.upsert)
+          .mock.calls.map(([arg]) => [arg.create.artistId, arg.update.position])
+      ).toEqual([
+        ['artist-b', 0],
+        ['artist-a', 1],
       ]);
     });
 
-    it('touches nothing when the credits already match', async () => {
+    it('drops every credit when the list is empty', async () => {
       vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
         { id: 'row-a', artistId: 'artist-a' },
       ] as never);
+      vi.mocked(prisma.artistRelease.deleteMany).mockResolvedValueOnce({ count: 1 });
 
-      await ArtistCreditRepository.syncCredits('release-1', ['artist-a']);
+      await ArtistCreditRepository.syncCredits('release-1', []);
 
-      expect(prisma.artistRelease.deleteMany).not.toHaveBeenCalled();
-      expect(prisma.artistRelease.createMany).not.toHaveBeenCalled();
+      expect(vi.mocked(prisma.artistRelease.deleteMany).mock.calls).toEqual([
+        [{ where: { id: { in: ['row-a'] } } }],
+      ]);
+      expect(prisma.artistRelease.upsert).not.toHaveBeenCalled();
     });
   });
 });

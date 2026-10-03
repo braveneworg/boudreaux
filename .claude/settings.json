@@ -26,6 +26,8 @@
       "Bash(pnpm mongo:restore *)",
       "Bash(pnpm run backfill:coverart *)",
       "Bash(pnpm backfill:coverart *)",
+      "Bash(pnpm run backfill:credit-positions *)",
+      "Bash(pnpm backfill:credit-positions *)",
       "Bash(pnpm run check:query-plans *)",
       "Bash(pnpm check:query-plans *)",
       "Bash(prisma db *)",

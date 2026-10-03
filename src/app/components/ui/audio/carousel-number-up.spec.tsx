@@ -191,6 +191,7 @@ describe('CarouselNumberUp', () => {
           id: 'artist-release-old',
           artistId: '1',
           releaseId: 'old-release',
+          position: 0,
           release: {
             id: 'old-release',
             title: 'Old Release',
@@ -229,6 +230,7 @@ describe('CarouselNumberUp', () => {
           id: 'artist-release-new',
           artistId: '1',
           releaseId: 'new-release',
+          position: 0,
           release: {
             id: 'new-release',
             title: 'New Release',

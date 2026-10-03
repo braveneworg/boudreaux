@@ -63,9 +63,17 @@ means removing the ordering and labels with it.
 
 ## Trade-offs accepted
 
-- Credit order depends on `ArtistRelease` insertion order. `syncArtistReleases`
+- ~~Credit order depends on `ArtistRelease` insertion order. `syncArtistReleases`
   only inserts missing rows, so reordering artists on an existing release does
-  not reorder existing rows; the admin listing shares this limitation.
+  not reorder existing rows; the admin listing shares this limitation.~~
+  **Closed 2026-10-03:** credit order is a stored fact. `ArtistRelease.position`
+  (dense from 0; position 0 is the album artist) is written whole by
+  `ArtistCreditRepository.syncCredits` from the form's list order, so moving
+  an artist to the front makes it the album artist, and every credit read
+  orders by `creditOrderBy` (`position`, then `id` for rows that predate the
+  field — their insertion order). `scripts/backfill-credit-positions.ts`
+  stamps the rows written before the field existed; until it runs, those
+  rows read in the order they always did.
 - There is no admin UI for `ArtistMember` rows yet; band membership is data
   entered by script. Until it exists, a member's page shows band releases only
   where that data has been entered.

@@ -47,16 +47,12 @@ const buildPurchase = (overrides: Record<string, unknown> = {}) => ({
     title: 'Test Album',
     coverArt: 'https://example.com/cover.jpg',
     images: [{ id: 'img-1', src: 'https://example.com/img.jpg', altText: 'Cover', sortOrder: 0 }],
-    artistReleases: [
-      {
-        artist: {
-          id: 'artist-1',
-          firstName: 'John',
-          surname: 'Doe',
-          displayName: 'JDoe',
-        },
-      },
-    ],
+    albumArtist: {
+      id: 'artist-1',
+      firstName: 'John',
+      surname: 'Doe',
+      displayName: 'JDoe' as string | null,
+    } as { id: string; firstName: string; surname: string; displayName: string | null } | null,
     digitalFormats: [
       { formatType: 'FLAC', files: [{ fileName: 'track.flac' }] },
       { formatType: 'WAV', files: [{ fileName: 'track.wav' }] },
@@ -125,16 +121,12 @@ describe('CollectionList', () => {
 
   it('falls back to firstName + surname when no displayName', () => {
     const purchase = buildPurchase();
-    purchase.release.artistReleases = [
-      {
-        artist: {
-          id: 'a-1',
-          firstName: 'John',
-          surname: 'Doe',
-          displayName: null as unknown as string,
-        },
-      },
-    ];
+    purchase.release.albumArtist = {
+      id: 'a-1',
+      firstName: 'John',
+      surname: 'Doe',
+      displayName: null,
+    };
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -143,9 +135,9 @@ describe('CollectionList', () => {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 
-  it('shows no byline for a release with no public credit', () => {
+  it('shows no byline when the album artist is hidden (ADR-0015)', () => {
     const purchase = buildPurchase();
-    purchase.release.artistReleases = [];
+    purchase.release.albumArtist = null;
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -156,7 +148,7 @@ describe('CollectionList', () => {
 
   it('never prints a placeholder artist', () => {
     const purchase = buildPurchase();
-    purchase.release.artistReleases = [];
+    purchase.release.albumArtist = null;
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),
@@ -321,16 +313,7 @@ describe('CollectionList', () => {
 
   it('uses firstName only when surname is empty', () => {
     const purchase = buildPurchase();
-    purchase.release.artistReleases = [
-      {
-        artist: {
-          id: 'a-1',
-          firstName: 'Jane',
-          surname: '',
-          displayName: null as unknown as string,
-        },
-      },
-    ];
+    purchase.release.albumArtist = { id: 'a-1', firstName: 'Jane', surname: '', displayName: null };
 
     render(<CollectionList purchases={[purchase]} isAdmin={false} />, {
       wrapper: createQueryWrapper(),

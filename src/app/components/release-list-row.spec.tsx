@@ -48,6 +48,16 @@ vi.mock('./release-card', () => ({
 
 const releasedOn = new Date(2024, 0, 5);
 
+const listingArtist = {
+  id: 'artist-1',
+  firstName: 'John',
+  surname: 'Doe',
+  displayName: 'JD the Great',
+  slug: 'jd-the-great',
+  publishedOn: new Date('2024-01-01'),
+  deletedOn: null,
+};
+
 const baseRelease: PublishedReleaseListing = {
   id: 'release-1',
   title: 'Midnight Serenade',
@@ -57,24 +67,15 @@ const baseRelease: PublishedReleaseListing = {
   formats: ['VINYL_12_INCH', 'MP3_320KBPS'],
   catalogNumber: 'FF4-042',
   images: [],
-  artistReleases: [
-    {
-      artist: {
-        id: 'artist-1',
-        firstName: 'John',
-        surname: 'Doe',
-        displayName: 'JD the Great',
-        slug: 'jd-the-great',
-      },
-    },
-  ],
+  artistReleases: [{ artist: listingArtist }],
+  albumArtist: listingArtist,
   releaseUrls: [{ url: { platform: 'BANDCAMP', url: 'https://label.bandcamp.com/album/x' } }],
   digitalFormats: [{ files: [{ s3Key: 'releases/r1/tracks/01.mp3' }] }],
 };
 
 describe('ReleaseListRow', () => {
   it('shows no byline for a release with no public credit', () => {
-    render(<ReleaseListRow release={{ ...baseRelease, artistReleases: [] }} />);
+    render(<ReleaseListRow release={{ ...baseRelease, artistReleases: [], albumArtist: null }} />);
 
     expect(screen.getByTestId('release-card')).toHaveAttribute('data-artist', '');
   });
