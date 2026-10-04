@@ -35,6 +35,7 @@ import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { playableFormats } from './_internal/playable-formats';
 import { releaseWhere } from './_internal/release-where';
+import { isUnsetOr } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -472,6 +473,25 @@ const compareByNewestRelease = (a: ArtistListingRecord, b: ArtistListingRecord):
 type GeneratedLinkInput = { label: string; url: string; kind: string | null; sortOrder: number };
 
 /**
+ * Genres are human-owned (ADR-0009): a bio generation job's genres fill only a
+ * field that is blank NOW. One conditional write decides it against the row as
+ * it is, not against the snapshot sent to the Lambda at dispatch, so an admin
+ * who set genres while the run was in flight keeps them, and a run that
+ * produced none clears nothing. Proved by `artist-bio-content.contract.spec.ts`.
+ */
+const fillBlankGenres = async (
+  tx: { artist: Pick<typeof prisma.artist, 'updateMany'> },
+  artistId: string,
+  genres: string | null
+): Promise<void> => {
+  if (!genres) return;
+  await tx.artist.updateMany({
+    where: { id: artistId, ...isUnsetOr('genres', '') },
+    data: { genres },
+  });
+};
+
+/**
  * Builds the generated bio-link rows to insert during a regeneration: drops any
  * whose URL matches a surviving custom row and any that repeats an earlier URL,
  * so the `@@unique([artistId, url])` index is never violated. Both checks are
@@ -751,8 +771,9 @@ export class ArtistRepository {
 
   /**
    * Replace an artist's AI-generated bio content in a single interactive
-   * transaction: overwrite the short/long/alt bio, genres, and provenance fields,
-   * then delete and recreate ONLY the generated media, preserving admin-authored
+   * transaction: overwrite the short/long/alt bio and provenance fields, fill
+   * genres only while the stored field is blank (ADR-0009), then delete and
+   * recreate ONLY the generated media, preserving admin-authored
    * (`origin: 'custom'`) images and links so a regeneration never destroys them.
    *
    * The transaction (a) reads the surviving custom rows, (b) deletes generated and
@@ -829,13 +850,15 @@ export class ArtistRepository {
               shortBio: content.shortBio,
               bio: content.bio,
               altBio: content.altBio,
-              genres: content.genres,
               bioModel: content.bioModel,
               bioGeneratedAt: new Date(),
               bioImages: { create: imagesToCreate },
               bioLinks: { create: linksToCreate },
             },
           });
+
+          // (d) Genres are human-owned (ADR-0009): fill only a blank field.
+          await fillBlankGenres(tx, artistId, content.genres);
         },
         // Regen payload scales with image/link volume; default 5s timeout is too tight.
         { timeout: 15_000, maxWait: 5_000 }
