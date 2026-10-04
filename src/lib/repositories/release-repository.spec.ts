@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import { CreditDecisionError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
@@ -13,8 +14,29 @@ import { ReleaseRepository } from './release-repository';
 
 vi.mock('server-only', () => ({}));
 
+// A transaction gets its own client, separate from the mocked `prisma`, so a
+// write that escapes the transaction shows up as a call on the outer client.
+const tx = vi.hoisted(() => ({
+  release: {
+    create: vi.fn(),
+    update: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
+  },
+  artist: {
+    findMany: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  artistRelease: {
+    findMany: vi.fn(),
+    createMany: vi.fn(),
+    deleteMany: vi.fn(),
+    upsert: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $transaction: vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
     release: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -30,8 +52,14 @@ vi.mock('@/lib/prisma', () => ({
     image: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    artist: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
     artistRelease: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      createMany: vi.fn(),
+      upsert: vi.fn(),
     },
     featuredArtist: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -44,7 +72,7 @@ describe('ReleaseRepository', () => {
 
   const mockRelease = { id: 'release-123', title: 'Test Album' };
 
-  // Detail include with unordered images (create/softDelete/restore/update).
+  // Detail include with unordered images (writes, softDelete, restore).
   const detailIncludeUnordered = {
     images: true,
     artistReleases: { orderBy: creditOrderBy, include: { artist: true } },
@@ -139,16 +167,170 @@ describe('ReleaseRepository', () => {
     formats: ['DIGITAL'],
   };
 
-  describe('create', () => {
-    it('creates a release with the unordered-images detail include', async () => {
-      vi.mocked(prisma.release.create).mockResolvedValue(mockRelease as never);
+  /** Every call the outer client saw: a transaction write must leave this empty. */
+  const outerWrites = (): unknown[] => [
+    ...vi.mocked(prisma.release.create).mock.calls,
+    ...vi.mocked(prisma.release.update).mock.calls,
+    ...vi.mocked(prisma.artist.updateMany).mock.calls,
+    ...vi.mocked(prisma.artistRelease.createMany).mock.calls,
+    ...vi.mocked(prisma.artistRelease.deleteMany).mock.calls,
+    ...vi.mocked(prisma.artistRelease.upsert).mock.calls,
+  ];
 
-      const result = await ReleaseRepository.create(createData);
+  const awaitingRow = (id: string) => ({
+    id,
+    slug: id,
+    displayName: id,
+    firstName: null,
+    middleName: null,
+    surname: null,
+    title: null,
+    suffix: null,
+    bio: null,
+    shortBio: null,
+    altBio: null,
+    bioGeneratedAt: null,
+    bioImages: [],
+  });
 
-      expect(result).toEqual(mockRelease);
-      expect(prisma.release.create).toHaveBeenCalledWith({
-        data: createData,
-        include: detailIncludeUnordered,
+  describe('transaction writes', () => {
+    const NOW = new Date('2026-10-04T12:00:00.000Z');
+
+    beforeEach(() => {
+      tx.release.create.mockResolvedValue({ id: 'release-123' });
+      tx.release.update.mockResolvedValue({ id: 'release-123' });
+      tx.release.findUniqueOrThrow.mockResolvedValue(mockRelease);
+      tx.artist.findMany.mockResolvedValue([]);
+      tx.artist.updateMany.mockResolvedValue({ count: 0 });
+      tx.artistRelease.findMany.mockResolvedValue([]);
+      tx.artistRelease.createMany.mockResolvedValue({ count: 0 });
+      tx.artistRelease.deleteMany.mockResolvedValue({ count: 0 });
+      tx.artistRelease.upsert.mockResolvedValue({});
+    });
+
+    describe('createWithCredits', () => {
+      it('creates the release and its credits in one transaction', async () => {
+        await ReleaseRepository.createWithCredits(createData, ['artist-b', 'artist-a']);
+
+        expect({
+          transactions: vi.mocked(prisma.$transaction).mock.calls.length,
+          created: tx.release.create.mock.calls,
+          credited: tx.artistRelease.createMany.mock.calls,
+          outer: outerWrites(),
+        }).toEqual({
+          transactions: 1,
+          created: [[{ data: createData, select: { id: true } }]],
+          credited: [
+            [
+              {
+                data: [
+                  { artistId: 'artist-b', releaseId: 'release-123', position: 0 },
+                  { artistId: 'artist-a', releaseId: 'release-123', position: 1 },
+                ],
+              },
+            ],
+          ],
+          outer: [],
+        });
+      });
+
+      it('returns the release as the transaction left it, with the detail include', async () => {
+        const result = await ReleaseRepository.createWithCredits(createData, []);
+
+        expect({ result, read: tx.release.findUniqueOrThrow.mock.calls }).toEqual({
+          result: mockRelease,
+          read: [[{ where: { id: 'release-123' }, include: detailIncludeUnordered }]],
+        });
+      });
+    });
+
+    describe('updateWithCredits', () => {
+      const publish = {
+        decisions: { publishArtistIds: ['artist-1'], keepHiddenArtistIds: [] },
+        publishedBy: 'admin-1',
+        now: NOW,
+      };
+
+      it('writes the release, its credits and its artists in one transaction', async () => {
+        tx.artist.findMany.mockResolvedValueOnce([awaitingRow('artist-1')]);
+
+        await ReleaseRepository.updateWithCredits(
+          'release-123',
+          { title: 'New', publishedAt: NOW },
+          { artistIds: ['artist-1'], publish }
+        );
+
+        expect({
+          transactions: vi.mocked(prisma.$transaction).mock.calls.length,
+          updated: tx.release.update.mock.calls,
+          credited: tx.artistRelease.upsert.mock.calls.length,
+          published: tx.artist.updateMany.mock.calls.length,
+          outer: outerWrites(),
+        }).toEqual({
+          transactions: 1,
+          updated: [
+            [
+              {
+                where: { id: 'release-123' },
+                data: { title: 'New', publishedAt: NOW },
+                select: { id: true },
+              },
+            ],
+          ],
+          credited: 1,
+          published: 1,
+          outer: [],
+        });
+      });
+
+      it('leaves the stored credits alone when the write lists none', async () => {
+        await ReleaseRepository.updateWithCredits('release-123', { title: 'New' }, {});
+
+        expect({
+          read: tx.artistRelease.findMany.mock.calls,
+          upserted: tx.artistRelease.upsert.mock.calls,
+        }).toEqual({ read: [], upserted: [] });
+      });
+
+      it('checks and publishes no artist when the write does not publish', async () => {
+        await ReleaseRepository.updateWithCredits(
+          'release-123',
+          { title: 'New' },
+          { artistIds: ['artist-1'] }
+        );
+
+        expect({
+          checked: tx.artist.findMany.mock.calls,
+          published: tx.artist.updateMany.mock.calls,
+        }).toEqual({ checked: [], published: [] });
+      });
+
+      it('fails, without a read-back, when a credit is undecided', async () => {
+        tx.artist.findMany.mockResolvedValueOnce([awaitingRow('artist-9')]);
+
+        await expect(
+          ReleaseRepository.updateWithCredits(
+            'release-123',
+            { publishedAt: NOW },
+            {
+              publish: { ...publish, decisions: { publishArtistIds: [], keepHiddenArtistIds: [] } },
+            }
+          )
+        ).rejects.toBeInstanceOf(CreditDecisionError);
+        expect(tx.release.findUniqueOrThrow.mock.calls).toEqual([]);
+      });
+
+      it('returns the release as the transaction left it, with the detail include', async () => {
+        const result = await ReleaseRepository.updateWithCredits(
+          'release-123',
+          { title: 'New' },
+          {}
+        );
+
+        expect({ result, read: tx.release.findUniqueOrThrow.mock.calls }).toEqual({
+          result: mockRelease,
+          read: [[{ where: { id: 'release-123' }, include: detailIncludeUnordered }]],
+        });
       });
     });
   });
@@ -304,21 +486,6 @@ describe('ReleaseRepository', () => {
 
       expect(prisma.release.count).toHaveBeenCalledWith({
         where: { AND: [releaseWhere.notDeleted, releaseWhere.unpublished] },
-      });
-    });
-  });
-
-  describe('update', () => {
-    it('updates with the unordered-images detail include', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
-
-      const result = await ReleaseRepository.update('release-123', { title: 'New' });
-
-      expect(result).toEqual(mockRelease);
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { title: 'New' },
-        include: detailIncludeUnordered,
       });
     });
   });

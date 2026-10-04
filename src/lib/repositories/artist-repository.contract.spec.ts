@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 
 import { ArtistCreditRepository } from './artist-credit-repository';
 import { ArtistRepository } from './artist-repository';
+import { ReleaseRepository } from './release-repository';
 
 // Contract: the artist page's read returns a release's credits in the stored
 // credit order, whatever order the rows were inserted in — the read that the
@@ -51,8 +52,18 @@ beforeAll(async () => {
   releaseId = release.id;
   // Inserted first-inserted then moved-to-front; an admin then reorders so
   // moved-to-front is the album artist (positions change, ids do not).
-  await ArtistCreditRepository.addCredits(releaseId, [firstInsertedId, movedToFrontId]);
-  await ArtistCreditRepository.syncCredits(releaseId, [movedToFrontId, firstInsertedId]);
+  await prisma.artistRelease.createMany({
+    data: [firstInsertedId, movedToFrontId].map((artistId, position) => ({
+      artistId,
+      releaseId,
+      position,
+    })),
+  });
+  await ReleaseRepository.updateWithCredits(
+    releaseId,
+    {},
+    { artistIds: [movedToFrontId, firstInsertedId] }
+  );
   await ArtistCreditRepository.creditOnRelease(releaseId, appendedId);
   await ArtistCreditRepository.creditOnRelease(releaseId, appendedId);
 });

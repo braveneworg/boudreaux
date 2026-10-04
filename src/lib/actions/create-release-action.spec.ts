@@ -4,7 +4,6 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
@@ -16,7 +15,6 @@ import { requireRole } from '@/utils/auth/require-role';
 import { createReleaseAction } from './create-release-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../repositories/artist-credit-repository');
 
 // Mock all dependencies
 vi.mock('next/cache');
@@ -102,14 +100,12 @@ describe('createReleaseAction', () => {
         success: true,
         data: { id: 'release-new' },
       } as never);
-      vi.mocked(ArtistCreditRepository.addCredits).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
       vi.mocked(CreditConfirmationService.check).mockReset();
       vi.mocked(ReleaseService.createRelease).mockReset();
       vi.mocked(ReleaseService.publishRelease).mockReset();
-      vi.mocked(ArtistCreditRepository.addCredits).mockReset();
     });
 
     it('checks the decisions against the artists the form credits before it writes', async () => {
@@ -118,7 +114,7 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, payloadWith(JSON.stringify(decisions)));
 
       expect(vi.mocked(CreditConfirmationService.check).mock.calls).toEqual([
-        [{ artistIds: [artistA, artistB] }, decisions],
+        [[artistA, artistB], decisions],
       ]);
     });
 
@@ -139,10 +135,11 @@ describe('createReleaseAction', () => {
       });
     });
 
-    it('publishes the release after its credits are stored', async () => {
+    it('creates the release with its credits, then publishes it', async () => {
       const order: string[] = [];
-      vi.mocked(ArtistCreditRepository.addCredits).mockImplementationOnce(async () => {
-        order.push('store credits');
+      vi.mocked(ReleaseService.createRelease).mockImplementationOnce(async (_data, artistIds) => {
+        order.push(`create with ${artistIds?.length ?? 0} credits`);
+        return { success: true, data: { id: 'release-new' } } as never;
       });
       vi.mocked(ReleaseService.publishRelease).mockImplementationOnce(async () => {
         order.push('publish');
@@ -152,7 +149,7 @@ describe('createReleaseAction', () => {
 
       await createReleaseAction(initialFormState, payloadWith(JSON.stringify(decisions)));
 
-      expect(order).toEqual(['store credits', 'publish']);
+      expect(order).toEqual(['create with 2 credits', 'publish']);
     });
 
     it("publishes with the admin's decisions and id", async () => {
@@ -329,15 +326,18 @@ describe('createReleaseAction', () => {
 
       const result = await createReleaseAction(initialFormState, mockFormData);
 
-      expect(ReleaseService.createRelease).toHaveBeenCalledWith({
-        title: 'Test Album',
-        releasedOn: expect.any(Date),
-        coverArt: 'https://example.com/cover.jpg',
-        formats: ['DIGITAL', 'VINYL'],
-        labels: ['Label 1', 'Label 2'],
-        catalogNumber: 'CAT-001',
-        description: 'A test album',
-      });
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        {
+          title: 'Test Album',
+          releasedOn: expect.any(Date),
+          coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL', 'VINYL'],
+          labels: ['Label 1', 'Label 2'],
+          catalogNumber: 'CAT-001',
+          description: 'A test album',
+        },
+        []
+      );
 
       expect(result.success).toBe(true);
       expect(result.data?.releaseId).toBe('release-123');
@@ -365,15 +365,18 @@ describe('createReleaseAction', () => {
 
       const result = await createReleaseAction(initialFormState, mockFormData);
 
-      expect(ReleaseService.createRelease).toHaveBeenCalledWith({
-        title: 'Test Album',
-        releasedOn: expect.any(Date),
-        coverArt: 'https://example.com/cover.jpg',
-        formats: ['DIGITAL'],
-        labels: [],
-        catalogNumber: undefined,
-        description: undefined,
-      });
+      expect(ReleaseService.createRelease).toHaveBeenCalledWith(
+        {
+          title: 'Test Album',
+          releasedOn: expect.any(Date),
+          coverArt: 'https://example.com/cover.jpg',
+          formats: ['DIGITAL'],
+          labels: [],
+          catalogNumber: undefined,
+          description: undefined,
+        },
+        []
+      );
 
       expect(result.success).toBe(true);
     });
@@ -403,7 +406,8 @@ describe('createReleaseAction', () => {
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
         expect.objectContaining({
           labels: ['Label 1', 'Label 2', 'Label 3'],
-        })
+        }),
+        expect.any(Array)
       );
     });
 
@@ -432,7 +436,8 @@ describe('createReleaseAction', () => {
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
         expect.objectContaining({
           labels: [],
-        })
+        }),
+        expect.any(Array)
       );
     });
 
@@ -561,7 +566,8 @@ describe('createReleaseAction', () => {
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
         expect.objectContaining({
           formats: ['DIGITAL'],
-        })
+        }),
+        expect.any(Array)
       );
     });
   });
@@ -825,8 +831,8 @@ describe('createReleaseAction', () => {
   });
 
   describe('Artist Associations', () => {
-    it('should create ArtistRelease associations when artistIds provided', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+    const parsedWithArtists = (artistIds?: string[]) =>
+      ({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -835,95 +841,35 @@ describe('createReleaseAction', () => {
             releasedOn: '2024-01-15',
             coverArt: 'https://example.com/cover.jpg',
             formats: ['DIGITAL'],
-            artistIds: ['artist-1', 'artist-2'],
+            ...(artistIds ? { artistIds } : {}),
           },
         },
-      } as never);
+      }) as never;
 
+    beforeEach(() => {
       vi.mocked(ReleaseService.createRelease).mockResolvedValue({
         success: true,
         data: { id: 'release-123' },
       } as never);
+    });
+
+    it('hands the service the artist ids to store with the release, in order', async () => {
+      vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-2', 'artist-1']));
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(vi.mocked(ArtistCreditRepository.addCredits).mock.calls).toEqual([
-        ['release-123', ['artist-1', 'artist-2']],
+      expect(vi.mocked(ReleaseService.createRelease).mock.calls[0][1]).toEqual([
+        'artist-2',
+        'artist-1',
       ]);
     });
 
-    it('should not create associations when artistIds is empty', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-            artistIds: [],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
-        success: true,
-        data: { id: 'release-123' },
-      } as never);
+    it('hands the service no artist ids when the form names none', async () => {
+      vi.mocked(getActionState).mockReturnValue(parsedWithArtists());
 
       await createReleaseAction(initialFormState, mockFormData);
 
-      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
-    });
-
-    it('should not create associations when release creation fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-            artistIds: ['artist-1'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
-        success: false,
-        error: 'Database error',
-      } as never);
-
-      await createReleaseAction(initialFormState, mockFormData);
-
-      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
-    });
-
-    it('should not create associations when artistIds is not provided', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Test Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.createRelease).mockResolvedValue({
-        success: true,
-        data: { id: 'release-123' },
-      } as never);
-
-      await createReleaseAction(initialFormState, mockFormData);
-
-      expect(ArtistCreditRepository.addCredits).not.toHaveBeenCalled();
+      expect(vi.mocked(ReleaseService.createRelease).mock.calls[0][1]).toEqual([]);
     });
   });
 
@@ -958,7 +904,8 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, formDataWithId);
 
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
-        expect.objectContaining({ id: validObjectId })
+        expect.objectContaining({ id: validObjectId }),
+        expect.any(Array)
       );
     });
 
@@ -991,7 +938,8 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, formDataWithBadId);
 
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
-        expect.not.objectContaining({ id: expect.anything() })
+        expect.not.objectContaining({ id: expect.anything() }),
+        expect.any(Array)
       );
     });
   });
@@ -1020,7 +968,8 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, mockFormData);
 
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
-        expect.objectContaining({ suggestedPrice: 999 })
+        expect.objectContaining({ suggestedPrice: 999 }),
+        expect.any(Array)
       );
     });
 
@@ -1047,7 +996,8 @@ describe('createReleaseAction', () => {
       await createReleaseAction(initialFormState, mockFormData);
 
       expect(ReleaseService.createRelease).toHaveBeenCalledWith(
-        expect.objectContaining({ suggestedPrice: undefined })
+        expect.objectContaining({ suggestedPrice: undefined }),
+        expect.any(Array)
       );
     });
   });

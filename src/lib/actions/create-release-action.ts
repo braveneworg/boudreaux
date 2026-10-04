@@ -7,7 +7,6 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
@@ -86,15 +85,6 @@ const applyServiceResponseToFormState = (
   formState.success = response.success;
 };
 
-const createArtistReleaseAssociations = async (
-  response: ServiceResponse<Release>,
-  artistIds: string[] | undefined
-): Promise<void> => {
-  if (response.success && response.data?.id && artistIds && artistIds.length > 0) {
-    await ArtistCreditRepository.addCredits(response.data.id, artistIds);
-  }
-};
-
 /**
  * Put a credit-confirmation failure on the form. Its message names the artists
  * that need a decision, so it is shown as written.
@@ -119,9 +109,10 @@ interface ReleaseCreateResult {
 }
 
 /**
- * Create the release, store its credits, then publish it when the form asked
- * for that. A release is created unpublished and published once its credits
- * are stored, so the decisions are checked before anything is written.
+ * Create the release with its credits in one write, then publish it when the
+ * form asked for that. A release is created unpublished and published once
+ * its credits are stored; the decisions are checked before anything is
+ * written, and checked again inside the publish against the stored credits.
  */
 const createAndPublish = async ({
   data,
@@ -131,19 +122,16 @@ const createAndPublish = async ({
 }: ReleaseCreate): Promise<ReleaseCreateResult> => {
   const publishes = Boolean(data.publishedAt);
   if (publishes) {
-    const checked = await CreditConfirmationService.check(
-      { artistIds: data.artistIds ?? [] },
-      decisions
-    );
+    const checked = await CreditConfirmationService.check(data.artistIds ?? [], decisions);
     if (!checked.success) {
       return { creditFailure: checked.error };
     }
   }
 
   const response = await ReleaseService.createRelease(
-    buildReleaseCreateInput(data, preGeneratedId)
+    buildReleaseCreateInput(data, preGeneratedId),
+    data.artistIds ?? []
   );
-  await createArtistReleaseAssociations(response, data.artistIds);
   if (!publishes || !response.success) {
     return { response };
   }

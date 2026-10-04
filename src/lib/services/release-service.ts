@@ -7,7 +7,8 @@ import { DownloadEventRepository } from '@/lib/repositories/download-event-repos
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { ReleaseRepository, type CreditPublication } from '@/lib/repositories/release-repository';
+import { CreditDecisionError } from '@/lib/types/domain/errors';
 import type {
   CreateReleaseData,
   PublishedReleaseDetail,
@@ -32,7 +33,6 @@ import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 import { cache, withCache } from '@/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
-import { CreditConfirmationService, type CreditSource } from './credit-confirmation-service';
 
 import type { ServiceResponse } from './service.types';
 
@@ -53,9 +53,9 @@ export interface CreditConfirmationInput {
   /** The admin who made the decisions. */
   publishedBy: string;
   /**
-   * The artists the caller is about to credit, when the credits are not stored
-   * yet. The check then reads these instead of the stored credits, and the
-   * caller publishes the confirmed artists itself once it has stored them.
+   * The credits the write stores, in order, in the same transaction as the
+   * release. The decisions are checked against them once they are stored.
+   * Absent, the stored credits stay as they are.
    */
   creditArtistIds?: string[];
 }
@@ -65,10 +65,23 @@ const NO_CONFIRMATION: CreditConfirmationInput = {
   publishedBy: '',
 };
 
-const creditSourceOf = (
-  releaseId: string,
-  { creditArtistIds }: CreditConfirmationInput
-): CreditSource => (creditArtistIds ? { artistIds: creditArtistIds } : { releaseId });
+const publicationOf = (
+  { decisions, publishedBy }: CreditConfirmationInput,
+  now: Date
+): CreditPublication => ({ decisions, publishedBy, now });
+
+/**
+ * Map a failed release write. A refused credit check keeps its message, which
+ * names the artists that need a decision; every other failure, a database's
+ * own `VALIDATION` included, gets the given user-facing message.
+ */
+const failFromReleaseWrite = (
+  error: unknown,
+  overrides: Parameters<typeof failFromError>[1]
+): ReturnType<typeof failFromError> =>
+  error instanceof CreditDecisionError
+    ? { success: false, code: error.code, error: error.message }
+    : failFromError(error, overrides);
 
 const digitalFormatRepository = new ReleaseDigitalFormatRepository();
 const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
@@ -104,14 +117,17 @@ const collectReleaseS3Keys = (release: ReleaseForDeletion): string[] => {
 
 export class ReleaseService {
   /**
-   * Create a new release. A release is always created unpublished: its
-   * credits are stored after it, and publishing needs them checked first
-   * (ADR-0015). Publish with {@link ReleaseService.publishRelease}.
+   * Create a new release with its credits, in order, in one write. A release
+   * is always created unpublished: publishing checks the stored credits
+   * first (ADR-0015). Publish with {@link ReleaseService.publishRelease}.
    */
-  static async createRelease(data: CreateReleaseData): Promise<ServiceResponse<Release>> {
+  static async createRelease(
+    data: CreateReleaseData,
+    artistIds: string[] = []
+  ): Promise<ServiceResponse<Release>> {
     try {
       const { publishedAt: _publishedAt, ...unpublished } = data;
-      const release = await ReleaseRepository.create(unpublished);
+      const release = await ReleaseRepository.createWithCredits(unpublished, artistIds);
       return { success: true, data: release };
     } catch (error) {
       return failFromError(error, {
@@ -163,7 +179,10 @@ export class ReleaseService {
   }
 
   /**
-   * Update a release by ID
+   * Update a release by ID. The credits the write names are stored, and, when
+   * the write publishes, the admin's decisions are checked against them and
+   * the confirmed artists published — all in the release's own transaction
+   * (ADR-0015), so a refused check or a failed write keeps none of it.
    */
   static async updateRelease(
     id: string,
@@ -171,34 +190,18 @@ export class ReleaseService {
     confirmation: CreditConfirmationInput = NO_CONFIRMATION
   ): Promise<ServiceResponse<Release>> {
     const publishes = Boolean(data.publishedAt);
-    if (publishes) {
-      const checked = await CreditConfirmationService.check(
-        creditSourceOf(id, confirmation),
-        confirmation.decisions
-      );
-      if (!checked.success) {
-        return checked;
-      }
-    }
-
     try {
-      const release = await ReleaseRepository.update(id, data);
-
-      // With credits still to store, the caller publishes the artists after.
-      if (publishes && !confirmation.creditArtistIds) {
-        const confirmed = await CreditConfirmationService.publishConfirmed({
-          releaseId: id,
-          decisions: confirmation.decisions,
-          publishedBy: confirmation.publishedBy,
-        });
-        if (!confirmed.success) {
-          return confirmed;
-        }
+      const release = await ReleaseRepository.updateWithCredits(id, data, {
+        artistIds: confirmation.creditArtistIds,
+        publish: publishes ? publicationOf(confirmation, new Date()) : undefined,
+      });
+      if (publishes) {
+        // A published release's credits name its bylines.
+        invalidatePublicNameCaches();
       }
-
       return { success: true, data: release };
     } catch (error) {
-      return failFromError(error, {
+      return failFromReleaseWrite(error, {
         NOT_FOUND: 'Release not found',
         DUPLICATE: 'Release with this title already exists',
         UNKNOWN: 'Failed to update release',
@@ -297,39 +300,26 @@ export class ReleaseService {
 
   /**
    * Publish a release by stamping `publishedAt`, and publish the credited
-   * artists the admin chose to publish. Every credit awaiting confirmation
-   * needs a decision, or this fails with `VALIDATION` and writes nothing
-   * (ADR-0015).
+   * artists the admin chose to publish, in one transaction. Every credit
+   * awaiting confirmation needs a decision, or this fails with `VALIDATION`
+   * and writes nothing (ADR-0015).
    */
   static async publishRelease(
     id: string,
     confirmation: CreditConfirmationInput = NO_CONFIRMATION
   ): Promise<ServiceResponse<Release>> {
-    const checked = await CreditConfirmationService.check(
-      { releaseId: id },
-      confirmation.decisions
-    );
-    if (!checked.success) {
-      return checked;
-    }
-
     try {
-      const release = await ReleaseRepository.update(id, { publishedAt: new Date() });
+      const now = new Date();
+      const release = await ReleaseRepository.updateWithCredits(
+        id,
+        { publishedAt: now },
+        { publish: publicationOf(confirmation, now) }
+      );
       // A newly listed release changes the public listings and their bylines.
       invalidatePublicNameCaches();
-
-      const confirmed = await CreditConfirmationService.publishConfirmed({
-        releaseId: id,
-        decisions: confirmation.decisions,
-        publishedBy: confirmation.publishedBy,
-      });
-      if (!confirmed.success) {
-        return confirmed;
-      }
-
       return { success: true, data: release };
     } catch (error) {
-      return failFromError(error, {
+      return failFromReleaseWrite(error, {
         NOT_FOUND: 'Release not found',
         UNKNOWN: 'Failed to publish release',
       });

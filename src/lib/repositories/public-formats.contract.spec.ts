@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
 
-import { ArtistCreditRepository } from './artist-credit-repository';
 import { ArtistRepository } from './artist-repository';
 import { ReleaseRepository } from './release-repository';
 
@@ -84,8 +83,13 @@ beforeAll(async () => {
   await createFormat(unplayableReleaseId, 'MP3_320KBPS', WITHDRAWN);
   await createFormat(unplayableReleaseId, 'FLAC');
 
-  await ArtistCreditRepository.addCredits(mixedReleaseId, [artistId]);
-  await ArtistCreditRepository.addCredits(unplayableReleaseId, [artistId]);
+  await prisma.artistRelease.createMany({
+    data: [mixedReleaseId, unplayableReleaseId].map((releaseId) => ({
+      artistId,
+      releaseId,
+      position: 0,
+    })),
+  });
 });
 
 afterAll(async () => {

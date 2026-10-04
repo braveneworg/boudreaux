@@ -38,3 +38,17 @@ export class DataError extends Error {
     this.name = 'DataError';
   }
 }
+
+/**
+ * A write refused because an admin's decisions do not cover the credits
+ * awaiting confirmation (ADR-0015). Raised inside the write's transaction, so
+ * nothing it would have written is kept. Its message names the artists that
+ * need a decision and is shown as written, unlike a database's own
+ * `VALIDATION` message.
+ */
+export class CreditDecisionError extends DataError {
+  constructor(message: string) {
+    super('VALIDATION', message);
+    this.name = 'CreditDecisionError';
+  }
+}

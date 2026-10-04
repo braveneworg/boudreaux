@@ -8,7 +8,6 @@ import type {
   CreditAwaitingConfirmation,
   CreditThatStaysHidden,
 } from '@/lib/utils/credit-confirmation';
-import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 
 import { CreditConfirmationService } from './credit-confirmation-service';
 
@@ -20,16 +19,9 @@ vi.mock('@/lib/repositories/artist-credit-repository', () => ({
     findThatStayHidden: vi.fn(),
     findAwaitingConfirmationAmong: vi.fn(),
     findThatStayHiddenAmong: vi.fn(),
-    publishCredited: vi.fn(),
     findPublishedWorkCreditedTo: vi.fn(),
   },
 }));
-
-vi.mock('@/lib/utils/public-name-caches', () => ({
-  invalidatePublicNameCaches: vi.fn(),
-}));
-
-const NOW = new Date('2026-09-27T12:00:00.000Z');
 
 const abel: CreditAwaitingConfirmation = {
   id: 'a',
@@ -44,17 +36,10 @@ const gone: CreditThatStaysHidden = { id: 'x', slug: 'gone', name: 'Gone', reaso
 
 describe('CreditConfirmationService', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
     vi.mocked(ArtistCreditRepository.findAwaitingConfirmation).mockResolvedValue([abel, bea]);
     vi.mocked(ArtistCreditRepository.findThatStayHidden).mockResolvedValue([gone]);
     vi.mocked(ArtistCreditRepository.findAwaitingConfirmationAmong).mockResolvedValue([abel]);
     vi.mocked(ArtistCreditRepository.findThatStayHiddenAmong).mockResolvedValue([]);
-    vi.mocked(ArtistCreditRepository.publishCredited).mockResolvedValue(1);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   describe('forRelease', () => {
@@ -105,20 +90,36 @@ describe('CreditConfirmationService', () => {
   });
 
   describe('check', () => {
-    it('passes when every awaiting credit of the release has a decision', async () => {
-      const result = await CreditConfirmationService.check(
-        { releaseId: 'release-1' },
-        { publishArtistIds: ['a'], keepHiddenArtistIds: ['b'] }
-      );
+    it('passes when every awaiting credit among the artists has a decision', async () => {
+      const result = await CreditConfirmationService.check(['a', 'c'], {
+        publishArtistIds: ['a'],
+        keepHiddenArtistIds: [],
+      });
 
       expect(result).toEqual({ success: true, data: undefined });
     });
 
+    it('reads the artists the write is about to credit', async () => {
+      await CreditConfirmationService.check(['a', 'c'], {
+        publishArtistIds: ['a'],
+        keepHiddenArtistIds: [],
+      });
+
+      expect(vi.mocked(ArtistCreditRepository.findAwaitingConfirmationAmong).mock.calls).toEqual([
+        [['a', 'c']],
+      ]);
+    });
+
     it('fails with VALIDATION naming the undecided credits', async () => {
-      const result = await CreditConfirmationService.check(
-        { releaseId: 'release-1' },
-        { publishArtistIds: ['a'], keepHiddenArtistIds: [] }
-      );
+      vi.mocked(ArtistCreditRepository.findAwaitingConfirmationAmong).mockResolvedValueOnce([
+        abel,
+        bea,
+      ]);
+
+      const result = await CreditConfirmationService.check(['a', 'b'], {
+        publishArtistIds: ['a'],
+        keepHiddenArtistIds: [],
+      });
 
       expect(result).toEqual({
         success: false,
@@ -127,69 +128,17 @@ describe('CreditConfirmationService', () => {
       });
     });
 
-    it('checks against the given artists when the credits are not stored yet', async () => {
-      const result = await CreditConfirmationService.check(
-        { artistIds: ['a', 'c'] },
-        { publishArtistIds: ['a'], keepHiddenArtistIds: [] }
+    it('fails with the data error code when the read fails', async () => {
+      vi.mocked(ArtistCreditRepository.findAwaitingConfirmationAmong).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'down')
       );
 
-      expect(result).toEqual({ success: true, data: undefined });
-    });
-  });
-
-  describe('publishConfirmed', () => {
-    const input = {
-      releaseId: 'release-1',
-      decisions: { publishArtistIds: ['a'], keepHiddenArtistIds: ['b'] },
-      publishedBy: 'admin-1',
-    };
-
-    it('publishes only the artists the admin chose to publish', async () => {
-      await CreditConfirmationService.publishConfirmed(input);
-
-      expect(vi.mocked(ArtistCreditRepository.publishCredited).mock.calls).toEqual([
-        [{ releaseId: 'release-1', artistIds: ['a'], publishedBy: 'admin-1', now: NOW }],
-      ]);
-    });
-
-    it('returns the number of artists published', async () => {
-      const result = await CreditConfirmationService.publishConfirmed(input);
-
-      expect(result).toEqual({ success: true, data: 1 });
-    });
-
-    it('clears the public name caches', async () => {
-      await CreditConfirmationService.publishConfirmed(input);
-
-      expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
-    });
-
-    it('fails with VALIDATION and writes nothing when a credit is undecided', async () => {
-      const result = await CreditConfirmationService.publishConfirmed({
-        ...input,
-        decisions: { publishArtistIds: ['a'], keepHiddenArtistIds: [] },
+      const result = await CreditConfirmationService.check(['a'], {
+        publishArtistIds: [],
+        keepHiddenArtistIds: [],
       });
 
-      expect({
-        result,
-        writes: vi.mocked(ArtistCreditRepository.publishCredited).mock.calls,
-      }).toEqual({
-        result: {
-          success: false,
-          code: 'VALIDATION',
-          error: 'Choose to publish or keep hidden: Bea',
-        },
-        writes: [],
-      });
-    });
-
-    it('writes nothing when every credit is kept hidden', async () => {
-      await CreditConfirmationService.publishConfirmed({
-        ...input,
-        decisions: { publishArtistIds: [], keepHiddenArtistIds: ['a', 'b'] },
-      });
-
-      expect(vi.mocked(ArtistCreditRepository.publishCredited).mock.calls).toEqual([]);
+      expect(result).toMatchObject({ success: false, code: 'UNAVAILABLE' });
     });
   });
 

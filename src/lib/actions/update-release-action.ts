@@ -7,8 +7,6 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
-import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import type { FormState } from '@/lib/types/form-state';
@@ -145,52 +143,30 @@ interface ReleaseWrite {
   adminUserId: string;
 }
 
-interface ReleaseWriteResult {
-  response: Awaited<ReturnType<typeof ReleaseService.updateRelease>>;
-  /** Set when the release was saved but publishing its artists failed. */
-  creditFailure?: string;
-}
+type ReleaseWriteResult = Awaited<ReturnType<typeof ReleaseService.updateRelease>>;
 
 /**
- * Save the release, store the form's credits, then publish the artists the
- * admin chose to publish. The service checks the decisions against the
- * artists the form credits before it writes; the artists are published last
- * because that write is gated on the stored credits.
+ * Save the release with its credits. The service stores the form's credits
+ * and, when the save publishes, checks the admin's decisions against them and
+ * publishes the confirmed artists, all in one transaction (ADR-0015).
  */
-const writeRelease = async ({
+const writeRelease = ({
   releaseId,
   data,
   decisions,
   adminUserId,
-}: ReleaseWrite): Promise<ReleaseWriteResult> => {
-  const input = buildReleaseUpdateInput(data);
-  const response = await ReleaseService.updateRelease(releaseId, input, {
+}: ReleaseWrite): Promise<ReleaseWriteResult> =>
+  ReleaseService.updateRelease(releaseId, buildReleaseUpdateInput(data), {
     decisions,
     publishedBy: adminUserId,
     creditArtistIds: data.artistIds,
   });
-  if (!response.success || !data.artistIds) {
-    return { response };
-  }
-
-  await ArtistCreditRepository.syncCredits(releaseId, data.artistIds);
-  if (!input.publishedAt) {
-    return { response };
-  }
-
-  const confirmed = await CreditConfirmationService.publishConfirmed({
-    releaseId,
-    decisions,
-    publishedBy: adminUserId,
-  });
-  return confirmed.success ? { response } : { response, creditFailure: confirmed.error };
-};
 
 /** Put the outcome of the write on the form and refresh the affected pages. */
 const applyWriteResult = (
   formState: FormState,
   releaseId: string,
-  { response, creditFailure }: ReleaseWriteResult
+  response: ReleaseWriteResult
 ): void => {
   if (response.success) {
     formState.errors = undefined;
@@ -207,11 +183,6 @@ const applyWriteResult = (
     revalidatePath('/releases');
     revalidatePath(`/releases/${releaseId}`);
     revalidatePath('/artists/[slug]', 'page');
-  }
-
-  // The release is saved; only publishing its artists failed.
-  if (creditFailure) {
-    applyCreditFailure(formState, creditFailure);
   }
 };
 
@@ -263,15 +234,15 @@ export const updateReleaseAction = async (
   }
 
   try {
-    const result = await writeRelease({
+    const response = await writeRelease({
       releaseId,
       data: parsed.data,
       decisions: credit.decisions,
       adminUserId: session.user.id,
     });
 
-    if (!result.response.success && result.response.code === 'VALIDATION') {
-      applyCreditFailure(formState, result.response.error);
+    if (!response.success && response.code === 'VALIDATION') {
+      applyCreditFailure(formState, response.error);
       return formState;
     }
 
@@ -283,11 +254,11 @@ export const updateReleaseAction = async (
         updatedFields: Object.keys(parsed.data).filter(
           (key) => parsed.data[key as keyof typeof parsed.data] !== undefined
         ),
-        success: result.response.success,
+        success: response.success,
       },
     });
 
-    applyWriteResult(formState, releaseId, result);
+    applyWriteResult(formState, releaseId, response);
   } catch {
     formState.success = false;
     setUnknownError(formState);

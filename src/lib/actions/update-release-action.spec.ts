@@ -4,8 +4,6 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
-import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -16,12 +14,10 @@ import { requireRole } from '@/utils/auth/require-role';
 import { updateReleaseAction } from './update-release-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../repositories/artist-credit-repository');
 
 // Mock all dependencies
 vi.mock('next/cache');
 vi.mock('../services/release-service');
-vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
@@ -95,17 +91,10 @@ describe('updateReleaseAction', () => {
         success: true,
         data: { id: mockReleaseId },
       } as never);
-      vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValue({
-        success: true,
-        data: 1,
-      });
-      vi.mocked(ArtistCreditRepository.syncCredits).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
       vi.mocked(ReleaseService.updateRelease).mockReset();
-      vi.mocked(CreditConfirmationService.publishConfirmed).mockReset();
-      vi.mocked(ArtistCreditRepository.syncCredits).mockReset();
     });
 
     it("hands the service the admin's decisions and the artists the form credits", async () => {
@@ -124,62 +113,40 @@ describe('updateReleaseAction', () => {
       });
     });
 
-    it('publishes the confirmed artists after the credits are stored', async () => {
-      const order: string[] = [];
-      vi.mocked(ArtistCreditRepository.syncCredits).mockImplementationOnce(async () => {
-        order.push('store credits');
-      });
-      vi.mocked(CreditConfirmationService.publishConfirmed).mockImplementationOnce(async () => {
-        order.push('publish artists');
-        return { success: true, data: 1 };
-      });
+    it('saves the release, its credits and its artists in one service write', async () => {
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
 
-      await updateReleaseAction(
+      const result = await updateReleaseAction(
         mockReleaseId,
         initialFormState,
         payloadWith(JSON.stringify(decisions))
       );
 
-      expect(order).toEqual(['store credits', 'publish artists']);
+      expect({
+        success: result.success,
+        writes: vi.mocked(ReleaseService.updateRelease).mock.calls.length,
+      }).toEqual({ success: true, writes: 1 });
     });
 
-    it('publishes the confirmed artists with the decisions and the admin id', async () => {
-      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
-
-      await updateReleaseAction(
-        mockReleaseId,
-        initialFormState,
-        payloadWith(JSON.stringify(decisions))
-      );
-
-      expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([
-        [{ releaseId: mockReleaseId, decisions, publishedBy: 'user-123' }],
-      ]);
-    });
-
-    it('publishes no artist for a release that stays unpublished', async () => {
-      parsedWith({ artistIds: [artistA] });
+    it('leaves the stored credits alone when the form names no artist', async () => {
+      parsedWith({ title: 'Album' });
 
       await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
 
-      expect(vi.mocked(CreditConfirmationService.publishConfirmed).mock.calls).toEqual([]);
+      expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]?.creditArtistIds).toBe(
+        undefined
+      );
     });
 
-    it('shows which artists need a decision and stores no credit', async () => {
+    it('shows which artists need a decision', async () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce(undecided);
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
 
-      expect({
-        success: result.success,
-        errors: result.errors,
-        stored: vi.mocked(ArtistCreditRepository.syncCredits).mock.calls,
-      }).toEqual({
+      expect({ success: result.success, errors: result.errors }).toEqual({
         success: false,
         errors: { general: ['Choose to publish or keep hidden: Bea'] },
-        stored: [],
       });
     });
 
@@ -200,22 +167,6 @@ describe('updateReleaseAction', () => {
         success: false,
         errors: { general: ['Invalid artist decisions'] },
         writes: [],
-      });
-    });
-
-    it('reports a failure to publish the confirmed artists', async () => {
-      vi.mocked(CreditConfirmationService.publishConfirmed).mockResolvedValueOnce(undecided);
-      parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
-
-      const result = await updateReleaseAction(
-        mockReleaseId,
-        initialFormState,
-        payloadWith(JSON.stringify(decisions))
-      );
-
-      expect({ success: result.success, errors: result.errors }).toEqual({
-        success: false,
-        errors: { general: ['Choose to publish or keep hidden: Bea'] },
       });
     });
   });
@@ -1138,7 +1089,7 @@ describe('updateReleaseAction', () => {
         },
       }) as never;
 
-    it('syncs the credits to the submitted artist ids after a successful update', async () => {
+    it('hands the service the submitted artist ids to store with the release', async () => {
       vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-2', 'artist-3']));
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: true,
@@ -1147,21 +1098,10 @@ describe('updateReleaseAction', () => {
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(vi.mocked(ArtistCreditRepository.syncCredits).mock.calls).toEqual([
-        [mockReleaseId, ['artist-2', 'artist-3']],
+      expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]?.creditArtistIds).toEqual([
+        'artist-2',
+        'artist-3',
       ]);
-    });
-
-    it('does not sync credits when the update fails', async () => {
-      vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-1']));
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
-        success: false,
-        error: 'Database error',
-      } as never);
-
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
-
-      expect(ArtistCreditRepository.syncCredits).not.toHaveBeenCalled();
     });
   });
 });

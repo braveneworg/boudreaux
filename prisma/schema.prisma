@@ -386,7 +386,7 @@ model ArtistRelease {
   // Credit order, dense 0..n-1 per release; position 0 is the album artist.
   // Rows that predate the field read as 0 and fall back to `id` order (the
   // insertion order they were written in) until `backfill-credit-positions`
-  // stamps them. Rewritten whole by `ArtistCreditRepository.syncCredits`.
+  // stamps them. Rewritten whole by every release save (`syncCredits`).
   position  Int     @default(0)
 
   @@unique([artistId, releaseId])
