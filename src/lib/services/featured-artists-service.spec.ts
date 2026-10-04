@@ -127,6 +127,38 @@ describe('FeaturedArtistsService', () => {
       );
     });
 
+    // A public payload carries only the playable format. The admin form links
+    // the MP3 format, but the actions accept any format id, and a linked
+    // format can be withdrawn later.
+    it('drops a linked format that is not the active playable one', async () => {
+      const format = (formatType: string, deletedAt: Date | null = null) => ({
+        id: `df-${formatType}`,
+        formatType,
+        deletedAt,
+        files: [],
+      });
+      mockFindFeatured.mockResolvedValue([
+        { ...mockFeaturedArtist, id: 'mp3', digitalFormat: format('MP3_320KBPS') },
+        { ...mockFeaturedArtist, id: 'flac', digitalFormat: format('FLAC') },
+        {
+          ...mockFeaturedArtist,
+          id: 'withdrawn',
+          digitalFormat: format('MP3_320KBPS', new Date('2026-01-01')),
+        },
+      ] as never);
+
+      const result = await FeaturedArtistsService.getFeaturedArtists(new Date());
+
+      expect(
+        result.success &&
+          result.data.map(({ id, digitalFormat }) => [id, digitalFormat?.id ?? null])
+      ).toEqual([
+        ['mp3', 'df-MP3_320KBPS'],
+        ['flac', null],
+        ['withdrawn', null],
+      ]);
+    });
+
     it('should use default limit of 10', async () => {
       mockFindFeatured.mockResolvedValue([]);
 

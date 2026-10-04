@@ -366,12 +366,8 @@ export const ReleaseForm = ({
     [releaseForm]
   );
 
-  const clearPublishedAt = useCallback(
-    (): void => releaseForm.setValue('publishedAt', '', { shouldDirty: true }),
-    [releaseForm]
-  );
   // A publishing save waits for the admin to decide each credited artist.
-  const creditGate = useReleaseCreditGate({ isPublished, clearPublishedAt });
+  const creditGate = useReleaseCreditGate({ isPublished });
   const { getDecisions } = creditGate;
 
   const createRelease = useCallback(
@@ -499,9 +495,15 @@ export const ReleaseForm = ({
 
   const submitForm = releaseForm.handleSubmit(onSubmitReleaseForm, onInvalidSubmit);
 
+  // The publish date goes into the submitted values, never into the form: a
+  // publish that fails validation, is cancelled at the credit confirmation, or
+  // is refused by the server leaves nothing for a later Save to send, and a
+  // successful one resets the form to the published values.
   const handleClickPublishButton = useCallback(() => {
-    releaseForm.setValue('publishedAt', new Date().toISOString(), { shouldDirty: true });
-    releaseForm.handleSubmit(onSubmitReleaseForm, onInvalidSubmit)();
+    void releaseForm.handleSubmit(
+      (data) => onSubmitReleaseForm({ ...data, publishedAt: new Date().toISOString() }),
+      onInvalidSubmit
+    )();
   }, [releaseForm, onSubmitReleaseForm, onInvalidSubmit]);
 
   const handleFormatChange = useCallback(

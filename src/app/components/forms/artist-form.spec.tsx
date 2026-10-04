@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
+import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
 import { useArtistPool } from './_hooks/use-artist-pool';
@@ -200,6 +201,23 @@ describe('ArtistForm', () => {
       render(<ArtistForm />);
 
       expect(screen.queryByRole('button', { name: 'Delete Artist' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('publishing', () => {
+    // The defect this guards: Publish wrote the publish date into the form
+    // before validating, a refused publish left it there (dirty), and the
+    // next plain Save — enabled by that dirty date — published the artist.
+    // An edit form with no name fails validation, so Publish is refused here.
+    it('leaves nothing for Save to send after a refused publish', async () => {
+      render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+      await user.click(screen.getByRole('button', { name: 'Publish' }));
+      await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalled());
+
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      expect(vi.mocked(updateArtistAction)).not.toHaveBeenCalled();
     });
   });
 

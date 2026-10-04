@@ -95,3 +95,19 @@ to both columns, so every writer that crosses the service seam stores the
 one form; the combobox's normalisation is a convenience, not the gate. The
 E2E seed carries the stored form. Rows written before this still hold a
 mix until each artist is saved again, as the consequence above says.
+
+## Enforcement (2026-10-04): the blank-fill rule decided at persist
+
+"A job suggests genres only into a blank field" lived only in the Lambda,
+against `existingGenres` — a snapshot taken when the run was dispatched. The
+app wrote back whatever the callback carried, unconditionally. An admin who
+set genres while a run was in flight (runs take minutes) lost them to the
+snapshot, and a run that produced no genres wrote `null` over curated ones.
+
+`ArtistRepository.replaceBioContent` no longer writes genres with the bios.
+Inside the same transaction, one conditional write fills them only while the
+stored field is blank — null, absent, or empty (`isUnsetOr('genres', '')`)
+— and a run that produced none writes nothing. The Lambda's precedence is
+now a convenience, not the gate, so an older Lambda build cannot bypass the
+rule either. Proved on Docker Mongo by `artist-bio-content.contract.spec.ts`
+for every stored form of a blank field, a curated field, and an empty run.

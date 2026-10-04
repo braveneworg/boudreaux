@@ -7,6 +7,7 @@ import type { CreateReleaseData } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
 import { creditOrderBy } from './_internal/credit-order';
+import { playableFormatWhere } from './_internal/playable-formats';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { ReleaseRepository } from './release-repository';
 
@@ -94,8 +95,9 @@ describe('ReleaseRepository', () => {
       },
     },
     releaseUrls: { select: { url: { select: { platform: true, url: true } } } },
+    // Public: only the active playable format (`playable-formats.ts`).
     digitalFormats: {
-      where: { formatType: 'MP3_320KBPS' },
+      where: playableFormatWhere,
       select: {
         files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
       },
@@ -122,7 +124,11 @@ describe('ReleaseRepository', () => {
         },
       },
     },
-    digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+    // Public: only the active playable format — never a paid or withdrawn one.
+    digitalFormats: {
+      where: playableFormatWhere,
+      include: { files: { orderBy: { trackNumber: 'asc' } } },
+    },
     releaseUrls: { include: { url: true } },
   };
 

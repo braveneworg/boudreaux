@@ -17,7 +17,6 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';
-import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { fetchApi } from '@/lib/utils/fetch-api';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
@@ -47,11 +46,10 @@ export default async function ReleasePlayerPage({ params, searchParams }: Releas
     notFound();
   }
 
-  // Match the API response shape: BigInt → Number, Date → string, plus stream URLs.
-  const releaseData = attachStreamUrls(
-    JSON.parse(
-      JSON.stringify(releaseResult.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-    )
+  // Match the API response shape: BigInt → Number, Date → string. The payload
+  // carries only the playable format, whose files are served unsigned.
+  const releaseData = JSON.parse(
+    JSON.stringify(releaseResult.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
   );
   queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
 

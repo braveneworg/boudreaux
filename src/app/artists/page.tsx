@@ -40,18 +40,25 @@ export default async function ArtistsIndexPage() {
   // the single projection both this prefetch and `/api/artists?listing=published`
   // ship, so the shapes cannot drift. Read the service directly instead of
   // self-fetching the API route — the internal HTTP roundtrip fails silently
-  // under load on the standalone server. A service failure degrades to an empty
-  // first page (the client refetches) rather than crashing the page.
+  // under load on the standalone server. A service failure fails the prefetch
+  // (no server retries, so the render is not held): a failed query is not
+  // dehydrated, so the client fetches on mount and can show its error state.
+  // It must not become an empty first page, which the client would treat as
+  // fresh data and show as "No artists have been published yet."
   await queryClient.prefetchInfiniteQuery({
     queryKey: queryKeys.artists.publishedInfinite('alpha', ''),
     initialPageParam: 0,
+    retry: false,
     queryFn: async () => {
       const result = await ArtistService.listPublishedArtists({
         sort: 'alpha',
         skip: 0,
         take: PUBLISHED_ARTISTS_PAGE_SIZE,
       });
-      const rows = result.success ? result.data : [];
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      const rows = result.data;
       return { rows, nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_ARTISTS_PAGE_SIZE) };
     },
   });

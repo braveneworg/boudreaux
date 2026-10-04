@@ -23,6 +23,7 @@ import type {
 
 import { publicArtistWhere } from './_internal/artist-where';
 import { orderedCredits } from './_internal/credit-order';
+import { playableFormats } from './_internal/playable-formats';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { isPresent } from './_internal/where-kit';
 
@@ -156,31 +157,32 @@ const publishedReleaseListingSelect = {
       url: { select: { platform: true, url: true } },
     },
   },
-  digitalFormats: {
-    where: { formatType: 'MP3_320KBPS' },
+  digitalFormats: playableFormats({
     select: {
       files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
     },
-  },
+  } as const),
 } as const satisfies Prisma.ReleaseSelect;
 
 /**
  * Include for the media player page at /releases/[releaseId]. Artist rows are
  * narrowed to the name-part set consumed by `getArtistDisplayName` — the player
- * never renders artist images/labels/urls or the artist's other releases.
+ * never renders artist images/labels/urls or the artist's other releases. The
+ * page is public, so it carries only the playable format (`playableFormats`);
+ * the download dialog reads the formats on offer from its own query.
  */
 const publishedReleaseDetailInclude = {
   images: {
     orderBy: { sortOrder: 'asc' },
   },
   artistReleases: publicDetailCredits,
-  digitalFormats: {
+  digitalFormats: playableFormats({
     include: {
       files: {
         orderBy: { trackNumber: 'asc' },
       },
     },
-  },
+  } as const),
   releaseUrls: {
     include: {
       url: true,

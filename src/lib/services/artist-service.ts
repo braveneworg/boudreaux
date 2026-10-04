@@ -230,6 +230,27 @@ const cleanupBioMediaObject = async (url: string | null): Promise<void> => {
   if (s3Key) await deleteS3Object(s3Key);
 };
 
+/**
+ * Remove a deleted artist's re-hosted bio images (and their thumbnails) from
+ * S3. Runs after the rows are gone, so a failure is logged and never fails or
+ * undoes the delete.
+ */
+const removeBioMediaObjects = async (
+  artistId: string,
+  images: ReadonlyArray<{ url: string; thumbnailUrl: string | null }>
+): Promise<void> => {
+  const results = await Promise.allSettled(
+    images.flatMap(({ url, thumbnailUrl }) => [
+      cleanupBioMediaObject(url),
+      cleanupBioMediaObject(thumbnailUrl),
+    ])
+  );
+  const failed = results.filter(({ status }) => status === 'rejected').length;
+  if (failed > 0) {
+    logger.warn('artist_delete_bio_media_cleanup_failed', { artistId, failed });
+  }
+};
+
 /** Pre-computed lookup keys for the find-or-create-by-name search order. */
 interface ArtistNameLookup {
   trimmed: string;
@@ -507,13 +528,32 @@ export class ArtistService {
   }
 
   /**
-   * Delete an artist by ID (hard delete). The repository cascade removes the
-   * artist row and everything referencing it in one transaction.
+   * Delete an artist by ID (hard delete) — only an archived artist: "archive
+   * first, then delete permanently" is a rule of the service, not of which
+   * button the admin list renders. The repository cascade removes the artist
+   * row and everything referencing it in one transaction; the artist's
+   * re-hosted bio images are then removed from S3, best-effort (a failed
+   * object delete is logged and never undoes or fails the delete).
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
+      const existing = await ArtistRepository.findById(id);
+      if (!existing) {
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+      }
+      if (!existing.deletedOn) {
+        return {
+          success: false,
+          error: 'Archive the artist before deleting it permanently.',
+          code: 'VALIDATION',
+        };
+      }
+      const bioImages = await ArtistBioImageRepository.findManyByArtist(id);
       const artist = await ArtistRepository.delete(id);
+      await removeBioMediaObjects(id, bioImages);
       invalidatePublicNameCaches();
+      // The vocabulary counts read only non-deleted artists.
+      ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -530,6 +570,8 @@ export class ArtistService {
     try {
       const artist = await ArtistRepository.archive(id);
       invalidatePublicNameCaches();
+      // The vocabulary counts read only non-deleted artists.
+      ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {
@@ -562,6 +604,8 @@ export class ArtistService {
     try {
       const artist = await ArtistRepository.update(id, { deletedOn: null });
       invalidatePublicNameCaches();
+      // The vocabulary counts read only non-deleted artists.
+      ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
     } catch (error) {
       return failFromError(error, {

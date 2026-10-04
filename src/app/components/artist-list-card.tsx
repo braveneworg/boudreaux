@@ -15,7 +15,6 @@ import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
 import { ArtistCardPhoto } from './artist-card-photo';
-import { BioHtml } from './bio-html';
 
 interface ArtistListCardProps {
   artist: ArtistListingRow;
@@ -207,19 +206,21 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
             </p>
           )}
 
-          {/* Wrapper, not a `BioHtml` prop: the clamp must stay on `BioHtml`'s
-              own box, since `line-clamp` only clamps the element it is applied
-              to. `max-w-prose` caps the measure at 65ch so a wide card does
-              not run the line out to 100+ characters. zinc-600 (#52525b) on
-              the white card is 7.73:1 — the muted token it replaced was
-              #71717b at 4.83:1, passing AA for 14px body text but with almost
-              no margin, and this is the longest run of prose on the card. */}
+          {/* The listing row's `shortBio` is plain text (tags stripped,
+              entities decoded for text rendering), so it is rendered as text —
+              never parsed as HTML, which would turn text stored escaped back
+              into live elements. The clamp sits on the paragraph itself, since
+              `line-clamp` only clamps the element it is applied to.
+              `max-w-prose` caps the measure at 65ch so a wide card does not
+              run the line out to 100+ characters. zinc-600 (#52525b) on the
+              white card is 7.73:1 — the muted token it replaced was #71717b
+              at 4.83:1, passing AA for 14px body text but with almost no
+              margin, and this is the longest run of prose on the card. */}
           {artist.shortBio && (
             <div data-slot="artist-short-bio" className="max-w-prose pt-1">
-              <BioHtml
-                html={artist.shortBio}
-                className="line-clamp-3 text-sm leading-relaxed text-zinc-600"
-              />
+              <p className="line-clamp-3 text-sm leading-relaxed text-zinc-600">
+                {artist.shortBio}
+              </p>
             </div>
           )}
 
