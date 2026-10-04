@@ -13,6 +13,7 @@ import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { releaseWhere } from './_internal/release-where';
+import { isUnsetOr } from './_internal/where-kit';
 import { ArtistRepository } from './artist-repository';
 
 vi.mock('server-only', () => ({}));
@@ -1301,7 +1302,10 @@ describe('ArtistRepository', () => {
         findMany: vi.fn().mockResolvedValue(survivors.links ?? []),
         deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
-      artist: { update: vi.fn().mockResolvedValue({ id: 'a1' }) },
+      artist: {
+        update: vi.fn().mockResolvedValue({ id: 'a1' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
     });
 
     it('reads the surviving custom rows inside the transaction', async () => {
@@ -1345,6 +1349,29 @@ describe('ArtistRepository', () => {
       expect(arg.data.shortBio).toBe('<p>short</p>');
       expect(arg.data.bioImages.create).toEqual([{ ...content.images[0], origin: 'generated' }]);
       expect(arg.data.bioLinks.create).toEqual([{ ...content.links[0], origin: 'generated' }]);
+    });
+
+    // Genres are human-owned (ADR-0009): the bios are overwritten, but genres
+    // are written only by a conditional write that matches a blank field.
+    it('writes genres only through a conditional write that matches a blank field', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', content);
+
+      expect(tx.artist.update.mock.calls[0][0].data).not.toHaveProperty('genres');
+      expect(tx.artist.updateMany.mock.calls).toEqual([
+        [{ where: { id: 'a1', ...isUnsetOr('genres', '') }, data: { genres: 'rock' } }],
+      ]);
+    });
+
+    it('writes no genres when the run produced none', async () => {
+      const tx = buildTx({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.replaceBioContent('a1', { ...content, genres: null });
+
+      expect(tx.artist.updateMany).not.toHaveBeenCalled();
     });
 
     // Display images are chosen by humans and survive regeneration (ADR-0008):
