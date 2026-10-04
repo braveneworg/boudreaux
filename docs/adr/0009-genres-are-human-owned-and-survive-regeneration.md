@@ -84,3 +84,14 @@ normalised form.**
   track. The Lambda must be redeployed for it to take effect; the app-side
   normalisation lands with the app.
 - No schema change and no `prisma db push`.
+
+## Enforcement (2026-10-03)
+
+The write-path rule above was aspirational until the service enforced it:
+`ArtistService.createArtist` / `updateArtist` passed `genres` and `tags`
+through as typed, so only the admin combobox and the generation job
+normalised. `sanitizeBioWriteFields` now applies `normalizeVocabularyList`
+to both columns, so every writer that crosses the service seam stores the
+one form; the combobox's normalisation is a convenience, not the gate. The
+E2E seed carries the stored form. Rows written before this still hold a
+mix until each artist is saved again, as the consequence above says.
