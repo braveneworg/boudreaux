@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types/domain/video';
 import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 
+import { mayBeginRunWhere } from './_internal/async-job-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
 
@@ -322,6 +323,25 @@ export class VideoRepository {
   /** Set (or clear, with null) the per-job async-callback token. */
   static async setEnrichmentJobToken(videoId: string, token: string | null): Promise<void> {
     await prisma.video.update({ where: { id: videoId }, data: { enrichmentJobToken: token } });
+  }
+
+  /**
+   * Begin an enrichment run with one conditional write: the job flips to
+   * `processing` and records its start unless it is already `processing` with
+   * a fresh start (`mayBeginRunWhere` — the runner gate as a `where`). The
+   * trigger action and the post-save dispatch can both reach the runner for
+   * one video; only one of them passes this write. Returns true iff THIS
+   * caller began it (mirrors `ArtistRepository.beginBioRun`).
+   */
+  static async beginEnrichmentRun(videoId: string, now: Date): Promise<boolean> {
+    const result = await prisma.video.updateMany({
+      where: {
+        id: videoId,
+        AND: [mayBeginRunWhere('enrichmentStatus', 'enrichmentStartedAt', now)],
+      },
+      data: { enrichmentStatus: 'processing', enrichmentStartedAt: now, enrichmentError: null },
+    });
+    return result.count === 1;
   }
 
   /**

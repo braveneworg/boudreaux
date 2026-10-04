@@ -21,6 +21,9 @@ const mockLoggerError = vi.hoisted(() => vi.fn());
 const sendMock = vi.hoisted(() => vi.fn());
 const findByIdMock = vi.hoisted(() => vi.fn());
 const setImageLinksStatusMock = vi.hoisted(() => vi.fn());
+const beginImageLinksRunMock = vi.hoisted(() =>
+  vi.fn((_id: string, _now: Date) => Promise.resolve(true))
+);
 const setImageLinksJobTokenMock = vi.hoisted(() => vi.fn());
 const claimImageLinksJobTokenMock = vi.hoisted(() => vi.fn());
 const getImageLinksJobStateMock = vi.hoisted(() => vi.fn());
@@ -53,6 +56,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     existsById: (id: string) => existsByIdMock(id),
     setImageLinksStatus: (id: string, status: string, opts: unknown) =>
       setImageLinksStatusMock(id, status, opts),
+    beginImageLinksRun: (id: string, now: Date) => beginImageLinksRunMock(id, now),
     setImageLinksJobToken: (id: string, token: string | null) =>
       setImageLinksJobTokenMock(id, token),
     claimImageLinksJobToken: (id: string, token: string) => claimImageLinksJobTokenMock(id, token),
@@ -243,11 +247,20 @@ describe('ImageLinksService.addSourceLink / removeSourceLink', () => {
 });
 
 describe('ImageLinksService.runJob', () => {
+  it('skips without invoking the Lambda when another runner already began the job', async () => {
+    beginImageLinksRunMock.mockResolvedValueOnce(false);
+
+    const result = await ImageLinksService.runJob('a1');
+
+    expect(result).toEqual({ status: 'skipped' });
+    expect(setImageLinksJobTokenMock).not.toHaveBeenCalled();
+  });
+
   it('flips to processing, mints a token and fires an Event invoke with the task payload', async () => {
     const result = await ImageLinksService.runJob('a1');
 
     expect(result).toEqual({ status: 'dispatched' });
-    expect(setImageLinksStatusMock.mock.calls[0]).toEqual(['a1', 'processing', undefined]);
+    expect(beginImageLinksRunMock).toHaveBeenCalledWith('a1', expect.any(Date));
     const token = setImageLinksJobTokenMock.mock.calls[0][1] as string;
     expect(token).toMatch(/^[0-9a-f-]{36}$/);
     const command = lastCommand();
@@ -396,10 +409,9 @@ describe('ImageLinksService.runJob', () => {
 
   it('never throws even when recording the failure itself fails', async () => {
     findImageSourcesMock.mockRejectedValueOnce(new Error('boom'));
-    // First call flips to processing; the second (failed) write is the one that breaks.
-    setImageLinksStatusMock
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('mongo down'));
+    // The run begins through the conditional write, so the first status
+    // write is the `failed` one — and it is the one that breaks.
+    setImageLinksStatusMock.mockRejectedValueOnce(new Error('mongo down'));
 
     await expect(ImageLinksService.runJob('a1')).resolves.toEqual({
       status: 'failed',
