@@ -556,7 +556,8 @@ export const persistGeneratedBio = async (
  * completion callback, whether the AWS invoke or the local adapter carried it;
  * a run that never got that far resolves to `failed` with a message.
  */
-export type RunGenerationJobResult = { status: 'dispatched' } | { status: 'failed'; error: string };
+export type RunGenerationJobResult =
+  { status: 'dispatched' } | { status: 'skipped' } | { status: 'failed'; error: string };
 
 /** The artist row, once loaded and known to exist. */
 type LoadedArtist = NonNullable<Awaited<ReturnType<typeof ArtistRepository.findById>>>;
@@ -779,7 +780,12 @@ export class BioGenerationService {
     artistId: string,
     opts: { links?: string[]; description?: string } = {}
   ): Promise<RunGenerationJobResult> {
-    await ArtistRepository.setBioStatus(artistId, 'processing');
+    // One conditional write begins the run; a second runner for the same job
+    // (the trigger and a retry, two admins) loses here instead of invoking
+    // the Lambda twice.
+    if (!(await ArtistRepository.beginBioRun(artistId, new Date()))) {
+      return { status: 'skipped' };
+    }
     try {
       const prepared = await prepareGeneration(artistId, opts);
       if (!prepared.ok) {

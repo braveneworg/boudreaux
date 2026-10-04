@@ -26,6 +26,7 @@ const sendMock = vi.hoisted(() => vi.fn());
 const findByIdMock = vi.hoisted(() => vi.fn());
 const replaceBioContentMock = vi.hoisted(() => vi.fn());
 const setBioStatusMock = vi.hoisted(() => vi.fn());
+const beginBioRunMock = vi.hoisted(() => vi.fn((_id: string, _now: Date) => Promise.resolve(true)));
 const setBioJobTokenMock = vi.hoisted(() => vi.fn());
 const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
 const setBioProgressMock = vi.hoisted(() => vi.fn());
@@ -64,6 +65,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findById: (id: string) => findByIdMock(id),
     replaceBioContent: (id: string, content: unknown) => replaceBioContentMock(id, content),
     setBioStatus: (id: string, status: string, opts: unknown) => setBioStatusMock(id, status, opts),
+    beginBioRun: (id: string, now: Date) => beginBioRunMock(id, now),
     setBioJobToken: (id: string, token: string | null) => setBioJobTokenMock(id, token),
     claimBioJobToken: (id: string, token: string) => claimBioJobTokenMock(id, token),
     setBioProgress: (id: string, progress: unknown) => setBioProgressMock(id, progress),
@@ -1405,8 +1407,18 @@ describe('BioGenerationService.runGenerationJob', () => {
     it('leaves the artist processing for the POSTed callback to finish', async () => {
       await BioGenerationService.runGenerationJob(artist.id);
 
-      const statuses = setBioStatusMock.mock.calls.map(([, status]) => status);
-      expect(statuses).toEqual(['processing']);
+      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
+      expect(setBioStatusMock).not.toHaveBeenCalled();
+    });
+
+    it('skips without invoking the Lambda when another runner already began the job', async () => {
+      beginBioRunMock.mockResolvedValueOnce(false);
+
+      const result = await BioGenerationService.runGenerationJob(artist.id);
+
+      expect(result).toEqual({ status: 'skipped' });
+      expect(setBioJobTokenMock).not.toHaveBeenCalled();
+      expect(setBioStatusMock).not.toHaveBeenCalled();
     });
 
     it('stores a job token exactly once without invoking the Lambda', async () => {
@@ -1503,7 +1515,7 @@ describe('BioGenerationService.runGenerationJob', () => {
       const result = await BioGenerationService.runGenerationJob(artist.id);
 
       expect(result).toEqual({ status: 'dispatched' });
-      expect(setBioStatusMock.mock.calls[0]).toEqual([artist.id, 'processing', undefined]);
+      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
       const [tokenId, token] = setBioJobTokenMock.mock.calls[0];
       expect(tokenId).toBe(artist.id);
       expect(token).toEqual(expect.any(String));
@@ -1570,8 +1582,8 @@ describe('BioGenerationService.runGenerationJob', () => {
     it('leaves the artist processing — no succeeded/failed flip, no persist', async () => {
       await BioGenerationService.runGenerationJob(artist.id);
 
-      const statuses = setBioStatusMock.mock.calls.map(([, status]) => status);
-      expect(statuses).toEqual(['processing']);
+      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
+      expect(setBioStatusMock).not.toHaveBeenCalled();
       expect(replaceBioContentMock).not.toHaveBeenCalled();
     });
 
@@ -1834,7 +1846,7 @@ describe('BioGenerationService.runGenerationJob', () => {
         status: 'failed',
         error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
       });
-      expect(setBioStatusMock.mock.calls[1]).toEqual([
+      expect(setBioStatusMock.mock.calls[0]).toEqual([
         artist.id,
         'failed',
         { error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)' },
@@ -1852,7 +1864,7 @@ describe('BioGenerationService.runGenerationJob', () => {
         status: 'failed',
         error: 'Bio generator callback URL is not configured',
       });
-      expect(setBioStatusMock.mock.calls[1]).toEqual([
+      expect(setBioStatusMock.mock.calls[0]).toEqual([
         artist.id,
         'failed',
         { error: 'Bio generator callback URL is not configured' },
@@ -1869,7 +1881,7 @@ describe('BioGenerationService.runGenerationJob', () => {
       const result = await BioGenerationService.runGenerationJob(artist.id);
 
       expect(result).toEqual({ status: 'failed', error: 'Artist not found.' });
-      expect(setBioStatusMock.mock.calls[1]).toEqual([
+      expect(setBioStatusMock.mock.calls[0]).toEqual([
         artist.id,
         'failed',
         { error: 'Artist not found.' },
@@ -1904,7 +1916,7 @@ describe('BioGenerationService.runGenerationJob', () => {
       const result = await BioGenerationService.runGenerationJob(artist.id);
 
       expect(result).toEqual({ status: 'failed', error: 'DB down' });
-      expect(setBioStatusMock.mock.calls[1]).toEqual([artist.id, 'failed', { error: 'DB down' }]);
+      expect(setBioStatusMock.mock.calls[0]).toEqual([artist.id, 'failed', { error: 'DB down' }]);
     });
 
     it('uses a default message when a non-Error value is thrown', async () => {

@@ -43,7 +43,8 @@ import {
 } from './lambda-dispatch';
 
 /** Outcome of {@link ImageLinksService.runJob}: dispatched across the seam, or failed early. */
-export type RunImageLinksJobResult = { status: 'dispatched' } | { status: 'failed'; error: string };
+export type RunImageLinksJobResult =
+  { status: 'dispatched' } | { status: 'skipped' } | { status: 'failed'; error: string };
 
 type InvokeAck = { ok: true } | { ok: false; error: string };
 
@@ -256,7 +257,11 @@ export class ImageLinksService {
    */
   static async runJob(artistId: string): Promise<RunImageLinksJobResult> {
     try {
-      await ArtistRepository.setImageLinksStatus(artistId, 'processing');
+      // One conditional write begins the run; a racing second runner loses
+      // here instead of invoking the Lambda twice.
+      if (!(await ArtistRepository.beginImageLinksRun(artistId, new Date()))) {
+        return { status: 'skipped' };
+      }
       const fail = async (error: string): Promise<RunImageLinksJobResult> => {
         await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error });
         return { status: 'failed', error };
