@@ -31,6 +31,7 @@ import { artistCreditSelect, artistPublicSelect } from './_internal/artist-publi
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { releaseWhere } from './_internal/release-where';
 
@@ -242,7 +243,7 @@ const artistSearchSelect = {
  */
 const releaseGraphInclude = {
   images: true,
-  artistReleases: { include: { artist: { select: artistCreditSelect } } },
+  artistReleases: orderedCredits({ include: { artist: { select: artistCreditSelect } } }),
   digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
   releaseUrls: { include: { url: true } },
 } as const satisfies Prisma.ReleaseInclude;
@@ -1027,18 +1028,6 @@ export class ArtistRepository {
           select: { id: true, label: true, url: true, kind: true, origin: true },
         },
       },
-    });
-  }
-
-  /**
-   * Idempotently connect an artist to a release via the ArtistRelease join
-   * table. Uses upsert to avoid duplicate constraint violations.
-   */
-  static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
-    await prisma.artistRelease.upsert({
-      where: { artistId_releaseId: { artistId, releaseId } },
-      update: {},
-      create: { artistId, releaseId },
     });
   }
 

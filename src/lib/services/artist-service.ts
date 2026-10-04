@@ -8,6 +8,7 @@ import {
   type BioImageRehostRow,
 } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import {
   ArtistRepository,
   type EnrichedArtistFieldUpdate,
@@ -762,13 +763,15 @@ export class ArtistService {
   }
 
   /**
-   * Idempotently connect an artist to a release via the ArtistRelease join table.
+   * Credit an artist on a release, after the credits it already has; a
+   * repeat is a no-op. Goes through the credit module so the stored credit
+   * order stays dense (ADR-0015).
    *
    * @param artistId - The Artist ID
    * @param releaseId - The Release ID
    */
-  static async connectToRelease(artistId: string, releaseId: string): Promise<void> {
-    await ArtistRepository.connectToRelease(artistId, releaseId);
+  static async creditOnRelease(artistId: string, releaseId: string): Promise<void> {
+    await ArtistCreditRepository.creditOnRelease(releaseId, artistId);
   }
 
   /** Removes a bio link from the reference list (admin palette X). A row that

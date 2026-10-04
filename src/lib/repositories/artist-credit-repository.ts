@@ -131,6 +131,25 @@ export class ArtistCreditRepository {
   }
 
   /**
+   * Credit one artist on an existing release, after every credit it already
+   * has, so the stored order stays dense and the album artist (position 0)
+   * is untouched; a repeat is a no-op. The metadata-driven find-or-create
+   * path credits one artist at a time this way — through here, not through
+   * an upsert of its own, so no writer stores a credit without a position.
+   */
+  static async creditOnRelease(releaseId: string, artistId: string): Promise<void> {
+    const existing = await prisma.artistRelease.findUnique({
+      where: { artistId_releaseId: { artistId, releaseId } },
+      select: { id: true },
+    });
+    if (existing) {
+      return;
+    }
+    const position = await prisma.artistRelease.count({ where: { releaseId } });
+    await runQuery(() => prisma.artistRelease.create({ data: { artistId, releaseId, position } }));
+  }
+
+  /**
    * Make a release's credits match `artistIds` in that order: drop credits
    * for artists no longer listed, and upsert every listed artist with its
    * index as position — so moving an artist to the front makes it the album
