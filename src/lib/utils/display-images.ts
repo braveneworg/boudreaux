@@ -126,3 +126,22 @@ export const orderBioImagesForPicker = <T extends DisplayImageCandidate>(
   const rest = rows.filter((row) => !isChosen(row) && !row.isPrimary);
   return [...chosen, ...suggested, ...rest];
 };
+
+/**
+ * The rule for a fresh upload into the pool: it joins the display images
+ * while the set has room and it is not already chosen, else it stays in the
+ * pool. Decided against the set as it is when the upload LANDS — the media
+ * manager once decided against the set as it was when the upload started,
+ * and a choice made during the seconds-long upload was then overwritten.
+ *
+ * @param chosenIds - The chosen ids, in order, right now.
+ * @param uploadedId - The row the upload just created.
+ * @returns The new ordered id list to write, or `null` to leave the set alone.
+ */
+export const decideUploadJoin = (
+  chosenIds: readonly string[],
+  uploadedId: string
+): string[] | null =>
+  chosenIds.length < DISPLAY_IMAGE_CAP && !chosenIds.includes(uploadedId)
+    ? [...chosenIds, uploadedId]
+    : null;

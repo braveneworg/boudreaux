@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Link2, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,12 +18,16 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
-import type { BioProgress, GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
-import { CLIENT_POLL_DEADLINE_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
+import type {
+  BioGenerationStatusResponse,
+  BioProgress,
+  GeneratedBioContent,
+} from '@/lib/validation/bio-generation-schema';
 
-import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
 import { useGenerateArtistBioMutation } from './_hooks/mutations/use-bio-mutations';
 import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
+import { useArtistPool } from './_hooks/use-artist-pool';
+import { useJobRun } from './_hooks/use-job-run';
 import { BioGenerationProgressTimeline } from './bio-generation-progress-timeline';
 
 interface ArtistBioGenerationSectionProps {
@@ -32,22 +36,29 @@ interface ArtistBioGenerationSectionProps {
   onGenerated: (content: GeneratedBioContent) => void;
 }
 
+/** A reference link added this session: the URL the next run reads, and the stored row it became. */
+interface ReferenceLink {
+  url: string;
+  /** The persisted palette row's id, once the create resolved. */
+  linkId: string | null;
+}
+
 interface ReferenceLinksListProps {
-  links: string[];
-  onRemove: (url: string) => void;
+  links: ReferenceLink[];
+  onRemove: (link: ReferenceLink) => void;
 }
 
 const ReferenceLinksList = ({ links, onRemove }: ReferenceLinksListProps) => (
   <ul className="flex flex-wrap gap-2">
-    {links.map((url) => (
-      <li key={url}>
+    {links.map((link) => (
+      <li key={link.url}>
         <Badge variant="secondary" className="gap-1">
           <Link2 className="size-3" aria-hidden />
-          <span className="max-w-48 truncate">{url}</span>
+          <span className="max-w-48 truncate">{link.url}</span>
           <button
             type="button"
-            onClick={() => onRemove(url)}
-            aria-label={`Remove ${url}`}
+            onClick={() => onRemove(link)}
+            aria-label={`Remove ${link.url}`}
             className="hover:text-destructive ml-1"
           >
             <X className="size-3" aria-hidden />
@@ -122,51 +133,47 @@ export const ArtistBioGenerationSection = ({
   artistId,
   onGenerated,
 }: ArtistBioGenerationSectionProps) => {
-  const [links, setLinks] = useState<string[]>([]);
+  const [links, setLinks] = useState<ReferenceLink[]>([]);
   const [linkDraft, setLinkDraft] = useState('');
   const [description, setDescription] = useState('');
   const [result, setResult] = useState<GeneratedBioContent | null>(null);
-  // `active` is true from the moment we trigger generation until we handle its
-  // terminal status — it both gates status polling and keeps the UI in the
-  // working state across the (minutes-long) background job.
-  const [active, setActive] = useState(false);
-  const { generateArtistBioAsync, isGeneratingArtistBio } = useGenerateArtistBioMutation();
-  const { createBioLink } = useCreateBioLinkMutation(artistId);
-  const status = useArtistBioGenerationStatusQuery(artistId, { enabled: active });
+  const { generateArtistBioAsync } = useGenerateArtistBioMutation();
+  const { addLink: addStoredLink, removeLink: removeStoredLink } = useArtistPool(artistId);
+  // Always enabled: a run in flight after a reload is found and resumed.
+  const status = useArtistBioGenerationStatusQuery(artistId);
 
-  // Generation runs in the background; surface its terminal status once. On
-  // success we populate the form from the polled content — which the job has
-  // already persisted, so there is nothing left to Save; on failure we toast.
-  useEffect(() => {
-    if (!active || !status.data) return;
-    if (status.data.status === 'succeeded' && status.data.content) {
-      setResult(status.data.content);
-      onGenerated(status.data.content);
-      toast.success('Bios generated and saved.');
-      setActive(false);
-    } else if (status.data.status === 'failed') {
-      toast.error(status.data.error || 'Bio generation failed.');
-      setActive(false);
-    }
-  }, [active, status.data, onGenerated]);
-
-  // Last-resort client stop: if a triggered run never reaches a terminal status
-  // (e.g. the status endpoint is unreachable), give up after the deadline so the
-  // form resolves instead of showing the working state and polling forever.
-  // Disabling `active` also stops the status query (it is `enabled: active`). The
-  // server's stale-job coercion normally flips the job to `failed` first (see
-  // STALE_JOB_MS); this only fires when no terminal status ever arrives.
-  useEffect(() => {
-    if (!active) return;
-    const timeoutId = setTimeout(() => {
-      toast.error(STALE_JOB_TIMEOUT_MESSAGE);
-      setActive(false);
-    }, CLIENT_POLL_DEADLINE_MS);
-    return () => clearTimeout(timeoutId);
-  }, [active]);
-
-  // Disable inputs while triggering or while a background job is in flight.
-  const isPending = isGeneratingArtistBio || active;
+  // Generation runs in the background; the tracker surfaces its terminal
+  // status once. On success we populate the form from the polled content —
+  // which the job has already persisted, so there is nothing left to Save;
+  // the parent toasts, naming any field it kept.
+  const onSucceeded = useCallback(
+    (data: BioGenerationStatusResponse): void => {
+      if (!data.content) return;
+      setResult(data.content);
+      onGenerated(data.content);
+    },
+    [onGenerated]
+  );
+  const onFailed = useCallback((message: string): void => {
+    toast.error(message);
+  }, []);
+  const trigger = useCallback(
+    () =>
+      generateArtistBioAsync({
+        artistId,
+        links: links.length ? links.map(({ url }) => url) : undefined,
+        description: description.trim() || undefined,
+      }),
+    [generateArtistBioAsync, artistId, links, description]
+  );
+  const run = useJobRun({
+    query: status,
+    trigger,
+    onSucceeded,
+    onFailed,
+    defaultFailure: 'Bio generation failed.',
+  });
+  const isPending = run.busy;
 
   const addLink = (): void => {
     const candidate = linkDraft.trim();
@@ -175,36 +182,30 @@ export const ArtistBioGenerationSection = ({
       toast.error('Links must start with http:// or https://');
       return;
     }
-    const isNew = !links.includes(candidate);
-    setLinks((prev) => (prev.includes(candidate) ? prev : [...prev, candidate]));
-    setLinkDraft('');
-    // Persist a genuinely new reference link as a custom palette row so it is
-    // draggable into the editors and survives reload; it still seeds the next
-    // generation via `links`. A dup URL is skipped here (the service also
-    // dedupes) and errors surface via the mutation hook's toast.
-    if (isNew) {
-      createBioLink({ artistId, label: deriveBioLinkLabel(candidate), url: candidate });
-    }
-  };
-
-  const removeLink = (url: string): void => {
-    setLinks((prev) => prev.filter((link) => link !== url));
-  };
-
-  const generate = async (): Promise<void> => {
-    const response = await generateArtistBioAsync({
-      artistId,
-      links: links.length ? links : undefined,
-      description: description.trim() || undefined,
-    });
-
-    if (!response.success) {
-      toast.error(response.error);
+    if (links.some(({ url }) => url === candidate)) {
+      setLinkDraft('');
       return;
     }
+    setLinks((prev) => [...prev, { url: candidate, linkId: null }]);
+    setLinkDraft('');
+    // Persist the reference link as a custom palette row so it is draggable
+    // into the editors and survives reload; it still seeds the next
+    // generation via `links`. The pill then IS that row: removing the pill
+    // removes the row. (The service dedupes; errors toast from the pool.)
+    void addStoredLink({ artistId, label: deriveBioLinkLabel(candidate), url: candidate }).then(
+      (row) => {
+        if (row) {
+          setLinks((prev) =>
+            prev.map((link) => (link.url === candidate ? { ...link, linkId: row.id } : link))
+          );
+        }
+      }
+    );
+  };
 
-    // Generation now runs in the background — start polling for completion.
-    setActive(true);
+  const removeLink = ({ url, linkId }: ReferenceLink): void => {
+    setLinks((prev) => prev.filter((link) => link.url !== url));
+    if (linkId) removeStoredLink(linkId);
   };
 
   return (
@@ -265,7 +266,7 @@ export const ArtistBioGenerationSection = ({
       <GenerateBioButton
         hasResult={result !== null}
         isPending={isPending}
-        onGenerate={() => void generate()}
+        onGenerate={() => void run.start()}
       />
 
       {isPending && <BioGeneratingSkeleton progress={status.data?.progress} />}

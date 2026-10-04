@@ -78,7 +78,10 @@ _Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
 **display images** — the ordered set of up to three bio images shown for an
 Artist on the public artist page and index cards. Chosen and ordered only by a
 human; a bio generation job may **suggest** images but never chooses or
-displaces a human's choice. While no human has chosen, the page shows the
+displaces a human's choice. On the admin surface the pool and this set are
+one client module, the **artist pool** (`useArtistPool`): every write to
+either goes through it, and an upload joins the set only if there is room
+when it lands. While no human has chosen, the page shows the
 suggested images that have alt text, or else the first pool images that have
 alt text; the admin marks those tiles **Shown**. An image without alt text is
 never shown unless a human chose it. See
@@ -275,8 +278,13 @@ the runner — `pending` is the handoff it consumes; collapsing the two
 deadlocks). An in-flight job older than the **stale window** (`STALE_JOB_MS`,
 above the Lambda's ceiling) is **stale-coerced** to `failed` on read, without
 writing; the **client poll deadline** (`CLIENT_POLL_DEADLINE_MS`) exceeds the
-stale window so the server's coercion resolves the UI first.
-_Defined in_ `src/lib/utils/async-job-lifecycle.ts`.
+stale window so the server's coercion resolves the UI first. Its client
+half, **job run** (`useJobRun`), tracks one run from its trigger to one
+surfaced outcome: it re-reads the status before tracking, so a terminal
+state cached from a previous run is never this run's result, and resumes a
+run found in flight after a reload.
+_Defined in_ `src/lib/utils/async-job-lifecycle.ts` and
+`src/app/components/forms/_hooks/use-job-run.ts`.
 
 **signed callback** — a Lambda → app callback or progress POST whose raw body
 is HMAC-signed in the `x-job-signature` header with a **job signing key**: a

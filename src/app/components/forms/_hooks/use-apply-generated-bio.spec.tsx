@@ -103,13 +103,31 @@ describe('useApplyGeneratedBio', () => {
     expect(getForm().getValues('bio')).toBe('<p>Generated long</p>');
   });
 
-  it('overwrites an unsaved hand edit to a bio field', async () => {
+  // A run finishes minutes after it started; a field the admin is editing
+  // keeps their text (the generated text is already persisted) and is named.
+  it('keeps an unsaved hand edit to a bio field and reports it', async () => {
     const { result, getForm } = renderApply();
     await act(async () => getForm().setValue('bio', 'hand edit', { shouldDirty: true }));
 
-    await act(async () => result.current.applyGeneratedBio(generated));
+    let applied: { kept: string[] } | undefined;
+    await act(async () => {
+      applied = result.current.applyGeneratedBio(generated);
+    });
 
-    expect(getForm().getValues('bio')).toBe('<p>Generated long</p>');
+    expect(getForm().getValues('bio')).toBe('hand edit');
+    expect(getForm().getValues('shortBio')).toBe('<p>Generated short</p>');
+    expect(applied?.kept).toEqual(['Bio']);
+  });
+
+  it('reports nothing kept when every field was clean', async () => {
+    const { result } = renderApply();
+
+    let applied: { kept: string[] } | undefined;
+    await act(async () => {
+      applied = result.current.applyGeneratedBio(generated);
+    });
+
+    expect(applied?.kept).toEqual([]);
   });
 
   it('keeps an unsaved edit to an unrelated field', async () => {

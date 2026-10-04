@@ -13,6 +13,20 @@ import type { UseFormReturn } from 'react-hook-form';
 
 type GeneratedBioFieldName = 'shortBio' | 'bio' | 'altBio' | 'genres';
 
+/** The form fields a generation may fill, in the order they are reported. */
+const GENERATED_FIELD_LABELS: ReadonlyMap<GeneratedBioFieldName, string> = new Map([
+  ['shortBio', 'Short Bio'],
+  ['bio', 'Bio'],
+  ['altBio', 'Alternative Bio'],
+  ['genres', 'Genres'],
+]);
+
+/** What a run adopted and what it left alone because the admin was editing it. */
+export interface AppliedGeneratedBio {
+  /** Labels of the fields kept as the admin's unsaved text. */
+  kept: string[];
+}
+
 interface UseApplyGeneratedBioOptions {
   form: UseFormReturn<ArtistFormData>;
   artistId: string | null;
@@ -27,9 +41,13 @@ interface UseApplyGeneratedBioOptions {
  * status endpoint ever reports `succeeded`, and the content it reports is read
  * back from that row. So nothing here writes to the server: each generated
  * field's value AND default are moved to the persisted value (`resetField`),
- * which leaves those fields clean. Unsaved edits to every other field are kept,
- * still dirty, and still wait for an explicit Save — an automatic full-form
- * submit would have committed them unasked.
+ * which leaves those fields clean. A generated value is adopted only into a
+ * field the admin has NOT edited since the last save: a run finishes minutes
+ * after it started, and a dirty field keeps the admin's text (the generated
+ * text is already persisted — Save writes the admin's version, a reload shows
+ * the generated one). Unsaved edits to every other field are kept, still
+ * dirty, and still wait for an explicit Save — an automatic full-form submit
+ * would have committed them unasked.
  *
  * The cached artist detail still holds the pre-generation bios; it is marked
  * stale WITHOUT refetching — a refetch would `reset` the whole form over those
@@ -43,18 +61,24 @@ interface UseApplyGeneratedBioOptions {
  * @param form - The artist form whose bio fields receive the content.
  * @param artistId - The persisted artist the run was for; `null` skips the
  * cache invalidation.
- * @returns A stable callback that applies one run's generated content.
+ * @returns A stable callback that applies one run's generated content and
+ * reports which fields were kept as the admin's unsaved text.
  */
 export const useApplyGeneratedBio = ({
   form,
   artistId,
-}: UseApplyGeneratedBioOptions): ((content: GeneratedBioContent) => void) => {
+}: UseApplyGeneratedBioOptions): ((content: GeneratedBioContent) => AppliedGeneratedBio) => {
   const queryClient = useQueryClient();
   const { setValue, resetField, getFieldState } = form;
 
   return useCallback(
-    (content: GeneratedBioContent): void => {
+    (content: GeneratedBioContent): AppliedGeneratedBio => {
+      const kept: string[] = [];
       const adoptPersisted = (name: GeneratedBioFieldName, value: string): void => {
+        if (getFieldState(name).isDirty) {
+          kept.push(GENERATED_FIELD_LABELS.get(name) ?? name);
+          return;
+        }
         setValue(name, value, { shouldDirty: true });
         resetField(name, { defaultValue: value });
       };
@@ -62,10 +86,9 @@ export const useApplyGeneratedBio = ({
       adoptPersisted('shortBio', content.shortBio);
       adoptPersisted('bio', content.longBio);
       adoptPersisted('altBio', content.altBio);
-      // Genres are human-owned (ADR-0009), and a generation can complete while
-      // an admin is mid-edit. Adopting then would replace their unsaved pills
-      // AND `resetField` would mark the form clean, so the loss is silent.
-      if (content.genres && !getFieldState('genres').isDirty) {
+      // Genres are human-owned (ADR-0009); a run that produced none leaves
+      // the curated field alone rather than clearing it.
+      if (content.genres) {
         adoptPersisted('genres', content.genres);
       }
 
@@ -75,6 +98,7 @@ export const useApplyGeneratedBio = ({
           refetchType: 'none',
         });
       }
+      return { kept };
     },
     [artistId, getFieldState, queryClient, resetField, setValue]
   );

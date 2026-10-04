@@ -12,18 +12,20 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { UploaderDropZone } from '@/app/components/ui/uploader-drop-zone';
 import { useUploaderDrag } from '@/app/components/ui/use-uploader-drag';
-import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 
 import {
+  type ArtistPool,
   BIO_IMAGE_UPLOAD_TYPES,
   MAX_BIO_IMAGE_SIZE_MB,
-  useBioImageUpload,
-} from './use-bio-image-upload';
+} from './_hooks/use-artist-pool';
 
 export interface BioImageUploadZoneProps {
-  artistId: string;
-  /** Called with the persisted row after a successful upload. */
-  onUploaded: (image: ArtistBioImageRecord) => void;
+  /** The pool's upload; resolves the persisted row, or null when it failed. */
+  onUpload: ArtistPool['add'];
+  /** True while an upload is in flight. */
+  isUploading?: boolean;
+  /** Why the last upload failed, phrased for the admin, or null. */
+  errorMessage?: string | null;
   disabled?: boolean;
 }
 
@@ -35,8 +37,9 @@ export interface BioImageUploadZoneProps {
  * presign → S3 → register → variants pipeline runs. Errors stay inline.
  */
 export const BioImageUploadZone = ({
-  artistId,
-  onUploaded,
+  onUpload,
+  isUploading = false,
+  errorMessage = null,
   disabled = false,
 }: BioImageUploadZoneProps): JSX.Element => {
   const inputId = useId();
@@ -45,22 +48,13 @@ export const BioImageUploadZone = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [alt, setAlt] = useState('');
   const [attribution, setAttribution] = useState('');
-  const {
-    upload: runUpload,
-    isUploading,
-    errorMessage,
-  } = useBioImageUpload({
-    artistId,
-    onUploaded,
-  });
-
   const upload = async (file: File): Promise<void> => {
     try {
-      const ok = await runUpload(file, {
+      const record = await onUpload(file, {
         attribution: attribution.trim(),
         alt: alt.trim() || null,
       });
-      if (ok) {
+      if (record) {
         setAlt('');
         setAttribution('');
       }

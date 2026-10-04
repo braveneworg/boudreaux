@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Loader2, Plus } from 'lucide-react';
@@ -13,14 +13,11 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { RemovablePill } from '@/app/components/ui/removable-pill';
-import { queryKeys } from '@/lib/query-keys';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
-import type { ImageSourceLink } from '@/lib/validation/image-links-schema';
-import {
-  CLIENT_POLL_DEADLINE_MS,
-  isInFlightJobStatus,
-  STALE_JOB_TIMEOUT_MESSAGE,
-} from '@/utils/async-job-lifecycle';
+import type {
+  ImageLinksStatusResponse,
+  ImageSourceLink,
+} from '@/lib/validation/image-links-schema';
 
 import {
   useAddImageSourceLinkMutation,
@@ -28,6 +25,8 @@ import {
   useRemoveImageSourceLinkMutation,
 } from './_hooks/mutations/use-image-source-link-mutations';
 import { useArtistImageLinksQuery } from './_hooks/use-artist-image-links-query';
+import { invalidateArtistPool } from './_hooks/use-artist-pool';
+import { useJobRun } from './_hooks/use-job-run';
 
 export interface ImageSourceLinksSectionProps {
   /** The artist whose image sources are edited. */
@@ -60,55 +59,33 @@ interface ImageLinksJob {
  */
 const useImageLinksJob = (artistId: string): ImageLinksJob => {
   const queryClient = useQueryClient();
-  // True from trigger (or observing an in-flight job) until the terminal
-  // status has been surfaced, so a stale `succeeded` never toasts on mount.
-  const [active, setActive] = useState(false);
   const status = useArtistImageLinksQuery(artistId);
   const { generateImagesFromLinksAsync, isTriggeringImagesFromLinks } =
     useGenerateImagesFromLinksMutation(artistId);
 
-  const jobStatus = status.data?.status ?? null;
-  const inFlight = isInFlightJobStatus(jobStatus);
+  const onSucceeded = useCallback(
+    (data: ImageLinksStatusResponse): void => {
+      toast.success(addedCopy(data.addedCount));
+      invalidateArtistPool(queryClient, artistId);
+    },
+    [queryClient, artistId]
+  );
+  const onFailed = useCallback((message: string): void => {
+    toast.error(message);
+  }, []);
+  const run = useJobRun({
+    query: status,
+    trigger: generateImagesFromLinksAsync,
+    onSucceeded,
+    onFailed,
+    defaultFailure: 'Image generation failed.',
+  });
 
-  useEffect(() => {
-    if (inFlight) setActive(true);
-  }, [inFlight]);
-
-  useEffect(() => {
-    if (!active || inFlight || !status.data) return;
-    if (jobStatus === 'succeeded') {
-      toast.success(addedCopy(status.data.addedCount));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.artists.bioGeneration(artistId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.artists.bioImages(artistId) });
-      setActive(false);
-    } else if (jobStatus === 'failed') {
-      toast.error(status.data.error || 'Image generation failed.');
-      setActive(false);
-    }
-  }, [active, inFlight, jobStatus, status.data, artistId, queryClient]);
-
-  useEffect(() => {
-    if (!active) return;
-    const timeoutId = setTimeout(() => {
-      toast.error(STALE_JOB_TIMEOUT_MESSAGE);
-      setActive(false);
-    }, CLIENT_POLL_DEADLINE_MS);
-    return () => clearTimeout(timeoutId);
-  }, [active]);
-
-  const generate = async (): Promise<void> => {
-    const response = await generateImagesFromLinksAsync();
-    if (!response.success) {
-      toast.error(response.error);
-      return;
-    }
-    // The cached status may still hold the previous run's terminal state;
-    // re-read it before tracking so that outcome is never surfaced as this run's.
-    await status.refetch();
-    setActive(true);
+  return {
+    links: status.data?.links ?? [],
+    busy: run.busy || isTriggeringImagesFromLinks,
+    generate: run.start,
   };
-
-  return { links: status.data?.links ?? [], busy: active || isTriggeringImagesFromLinks, generate };
 };
 
 interface ImageSourcePillsProps {
