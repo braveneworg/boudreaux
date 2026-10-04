@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
-import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
+import { useArtistPool } from './_hooks/use-artist-pool';
 import { ArtistForm } from './artist-form';
 
 /**
@@ -128,14 +128,13 @@ vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
   ),
 }));
 
-// The bio palettes keep the generation-status query mounted in edit mode;
-// stub the hook so this suite never issues a real fetch and renders no tiles.
-vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
-  useArtistBioGenerationStatusQuery: vi.fn(() => ({
-    data: undefined,
-    isPending: true,
-    error: Error('Unknown error'),
-    refetch: vi.fn(),
+// The form renders the artist pool module for the editors' image picker and
+// the editor upload; stub it so this suite never issues a real fetch.
+vi.mock('./_hooks/use-artist-pool', () => ({
+  useArtistPool: vi.fn(() => ({
+    images: [],
+    add: vi.fn().mockResolvedValue(null),
+    addError: null,
   })),
 }));
 
@@ -320,64 +319,33 @@ describe('ArtistForm', () => {
     });
   });
 
-  describe('bio editor images from library', () => {
-    /** Minimal succeeded-status response with one library image. */
-    const libraryStatusData = {
-      data: {
-        status: 'succeeded' as const,
-        error: null,
-        content: {
-          shortBio: '',
-          longBio: '',
-          altBio: '',
-          genres: null,
-          images: [
-            {
-              id: 'lib-1',
-              url: 'https://cdn/x.webp',
-              attribution: null,
-              isPrimary: false,
-              displayOrder: null,
-            },
-          ],
-          links: [],
-          model: 'gemini-2.5-flash',
-        },
-      },
-      isPending: false,
-      error: null,
-      refetch: vi.fn(),
-    };
-
-    it('passes persisted library images from the status query to bioEditorImages', () => {
-      vi.mocked(useArtistBioGenerationStatusQuery).mockReturnValue(libraryStatusData);
-
+  describe('bio editor images from the pool', () => {
+    it('offers every pool image to the bio editors, alt first then title', () => {
+      vi.mocked(useArtistPool).mockReturnValue({
+        images: [
+          { id: 'p-1', url: 'https://cdn/x.webp', alt: 'Alt text', title: 'Title' },
+          { id: 'p-2', url: 'https://cdn/y.webp', alt: null, title: 'Only title' },
+        ],
+        add: vi.fn().mockResolvedValue(null),
+        addError: null,
+      } as never);
       render(<ArtistForm artistId="artist-123" />);
-
       const stub = screen.getByTestId('artist-bio-section-stub');
-      const images = JSON.parse(stub.getAttribute('data-bio-editor-images') ?? '[]') as {
-        url: string;
-      }[];
-      expect(images.some((img) => img.url === 'https://cdn/x.webp')).toBe(true);
+      expect(JSON.parse(stub.getAttribute('data-bio-editor-images') ?? '[]')).toEqual([
+        { url: 'https://cdn/x.webp', alt: 'Alt text' },
+        { url: 'https://cdn/y.webp', alt: 'Only title' },
+      ]);
     });
+  });
 
-    it('deduplicates a URL present in both generated and library images', async () => {
-      vi.mocked(useArtistBioGenerationStatusQuery).mockReturnValue(libraryStatusData);
-
+  describe('a finished generation', () => {
+    it('toasts that the bios are saved once the generated content is adopted', async () => {
       render(<ArtistForm artistId="artist-123" />);
-
-      // The generated-bio trigger fires onBioGenerated with the same URL the
-      // library already holds; bioEditorImages must dedupe it to a single entry.
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       await user.click(screen.getByTestId('trigger-bio-generated'));
-
-      await waitFor(() => {
-        const stub = screen.getByTestId('artist-bio-section-stub');
-        const images = JSON.parse(stub.getAttribute('data-bio-editor-images') ?? '[]') as {
-          url: string;
-        }[];
-        expect(images.filter((img) => img.url === 'https://cdn/x.webp')).toHaveLength(1);
-      });
+      await waitFor(() =>
+        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Bios generated and saved.')
+      );
     });
   });
 });

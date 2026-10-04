@@ -21,7 +21,12 @@ Rules:
 
 - Before deleting an old spec, list its cases against the lines they cover.
   Every case whose code survives the change moves to the new spec, adapted
-  to the new seams; only the cases for removed code go.
+  to the new seams; only the cases for removed code go. Folding a module
+  into another is "code that survives": on 2026-10-04 five mutation hooks
+  and an upload hook moved into `useArtistPool`, their two specs were
+  deleted, and the refusal, rollback and fallback-copy cases went with
+  them — branch coverage fell to 94.98% at the pre-push hook until they
+  were ported into `use-artist-pool.spec.tsx`.
 - A new spec that is much shorter than the one it replaces is a signal, not
   a win. Compare case counts and ask what the missing ones covered.
 - Run `pnpm run test:coverage:check` on the branch before pushing a spec

@@ -4,15 +4,15 @@
 
 import type { ReactNode } from 'react';
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
+import { useArtistPool } from './_hooks/use-artist-pool';
 import { CustomLinkEditor } from './custom-link-editor';
 
-// Mock the mutation hook so the component test never touches TanStack Query.
-vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
-  useCreateBioLinkMutation: vi.fn(),
+// Mock the pool module so the component test never touches TanStack Query.
+vi.mock('./_hooks/use-artist-pool', () => ({
+  useArtistPool: vi.fn(),
 }));
 
 // Mock Radix Select with a native control so jsdom can drive value changes.
@@ -49,17 +49,20 @@ vi.mock('@/app/components/ui/select', () => {
 });
 
 const createBioLink = vi.fn();
-let capturedOnCreated: (() => void) | undefined;
+
+/** The pool slice the editor renders; `addLink` resolves a row so the fields reset. */
+const mockPool = (overrides: { isMutating?: boolean } = {}): void => {
+  vi.mocked(useArtistPool).mockReturnValue({
+    addLink: createBioLink,
+    isMutating: false,
+    ...overrides,
+  } as never);
+};
 
 beforeEach(() => {
   createBioLink.mockReset();
-  capturedOnCreated = undefined;
-  vi.mocked(useCreateBioLinkMutation).mockImplementation(
-    (_artistId: string, onCreated?: () => void) => {
-      capturedOnCreated = onCreated;
-      return { createBioLink, isCreatingBioLink: false };
-    }
-  );
+  createBioLink.mockResolvedValue({ id: 'l-new' });
+  mockPool();
 });
 
 describe('CustomLinkEditor', () => {
@@ -71,10 +74,10 @@ describe('CustomLinkEditor', () => {
     expect(screen.getByLabelText('Link kind')).toBeInTheDocument();
   });
 
-  it('wires the mutation to the given artist id', () => {
+  it('renders the pool for the given artist', () => {
     render(<CustomLinkEditor artistId="a1" />);
 
-    expect(useCreateBioLinkMutation).toHaveBeenCalledWith('a1', expect.any(Function));
+    expect(useArtistPool).toHaveBeenCalledWith('a1');
   });
 
   it('submits the entered label, url, and kind through the mutation', async () => {
@@ -115,7 +118,6 @@ describe('CustomLinkEditor', () => {
     await userEvent.type(label, 'Site');
     await userEvent.type(url, 'https://example.com');
     await userEvent.click(screen.getByRole('button', { name: 'Add link' }));
-    act(() => capturedOnCreated?.());
 
     await waitFor(() => expect(label).toHaveValue(''));
     expect(url).toHaveValue('');
@@ -157,10 +159,7 @@ describe('CustomLinkEditor', () => {
   });
 
   it('disables the submit button while a create is in flight', async () => {
-    vi.mocked(useCreateBioLinkMutation).mockReturnValue({
-      createBioLink,
-      isCreatingBioLink: true,
-    });
+    mockPool({ isMutating: true });
     render(<CustomLinkEditor artistId="a1" />);
 
     await userEvent.type(screen.getByLabelText('Link label'), 'Site');

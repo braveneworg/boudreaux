@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
+  decideUploadJoin,
   chosenDisplayImageIds,
   DISPLAY_IMAGE_CAP,
   isDisplayEligible,
@@ -257,5 +258,21 @@ describe('orderBioImagesForPicker', () => {
     const rows = [row('a'), row('b', { displayOrder: 0 }), row('c', { isPrimary: true })];
 
     expect(orderBioImagesForPicker(rows)).toHaveLength(3);
+  });
+});
+
+describe('decideUploadJoin', () => {
+  // The rule the media manager applies to a fresh upload — decided against the
+  // Shown set as it is when the upload LANDS, never the set when it started.
+  it('appends the upload while the set has room', () => {
+    expect(decideUploadJoin(['a', 'b'], 'n')).toEqual(['a', 'b', 'n']);
+  });
+
+  it('declines when the set is full', () => {
+    expect(decideUploadJoin(['a', 'b', 'c'], 'n')).toBeNull();
+  });
+
+  it('declines when the upload is already chosen', () => {
+    expect(decideUploadJoin(['a', 'n'], 'n')).toBeNull();
   });
 });

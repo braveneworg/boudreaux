@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -18,13 +17,9 @@ import { ArtistDetailsSection } from '@/app/components/forms/sections/artist-det
 import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-footer';
 import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
 import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
-import { uploadBioImage } from '@/app/components/forms/utils/upload-bio-image';
 import { HidingWarningDialog } from '@/app/components/hiding-warning-dialog';
 import { Form } from '@/app/components/ui/form';
-import type {
-  RichTextEditorImage,
-  RichTextEditorUploadHandler,
-} from '@/app/components/ui/rich-text-editor';
+import type { RichTextEditorUploadHandler } from '@/app/components/ui/rich-text-editor';
 import { Separator } from '@/app/components/ui/separator';
 import {
   useCreateArtistMutation,
@@ -32,7 +27,6 @@ import {
 } from '@/hooks/mutations/use-artist-mutations';
 import { useGuardedArtistArchive } from '@/hooks/use-guarded-artist-archive';
 import { useSession } from '@/hooks/use-session';
-import { queryKeys } from '@/lib/query-keys';
 import { type FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
 import { generateSlug } from '@/lib/utils/generate-slug';
@@ -44,7 +38,7 @@ import { isSlug } from '@/lib/validation/primitives';
 import { ZinePanel } from '@/ui/zine-panel';
 
 import { useApplyGeneratedBio } from './_hooks/use-apply-generated-bio';
-import { useArtistBioGenerationStatusQuery } from './_hooks/use-artist-bio-generation-status-query';
+import { useArtistPool } from './_hooks/use-artist-pool';
 import { type ArtistDetail, useArtistQuery } from './_hooks/use-artist-query';
 import { type SubmitMode, useEntitySubmit } from './_hooks/use-entity-submit';
 
@@ -155,32 +149,6 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
   publishedOn: '',
 });
 
-/**
- * Images selectable in the bio editor: freshly-generated bio picker images and
- * persisted library images from the status endpoint — deduped by URL (generated
- * first, then library; first wins).
- */
-const computeBioEditorImages = (
-  bioPickerImages: RichTextEditorImage[],
-  libraryImages: RichTextEditorImage[]
-): RichTextEditorImage[] => {
-  const seen = new Set<string>();
-  const collected: RichTextEditorImage[] = [];
-  for (const image of bioPickerImages) {
-    if (!seen.has(image.url)) {
-      seen.add(image.url);
-      collected.push(image);
-    }
-  }
-  for (const image of libraryImages) {
-    if (!seen.has(image.url)) {
-      seen.add(image.url);
-      collected.push(image);
-    }
-  }
-  return collected;
-};
-
 /** Derive the slug source from the name fields (display name wins). */
 const deriveSlugSource = (
   displayName: string | undefined,
@@ -235,9 +203,6 @@ export const ArtistForm = ({
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();
   // Archiving hides the artist: warn which public work loses the name first.
   const { archiveArtist, warning } = useGuardedArtistArchive();
-  // Freshly generated bio images offered in the rich-text editor's insert-image
-  // picker, merged with the persisted bio library from the status endpoint.
-  const [bioPickerImages, setBioPickerImages] = useState<RichTextEditorImage[]>([]);
   // artistId is set after artist creation or read from the URL param in edit mode.
   const [artistId, setArtistId] = useState<string | null>(initialArtistId || null);
   // Track if artist is published (publishedOn date exists)
@@ -249,44 +214,32 @@ export const ArtistForm = ({
   const { data: session } = useSession();
   const user = session?.user;
   const formRef = useRef<HTMLFormElement>(null);
-  const queryClient = useQueryClient();
 
-  // Persisted bio-library images from the generation status endpoint. Feeding
-  // this into the RTE picker completes the three-source merge (uploaded →
-  // generated picker → persisted library). The same query key is already
-  // mounted by the sidebar palette so TanStack dedupes the network request.
-  const statusQuery = useArtistBioGenerationStatusQuery(artistId ?? '', { enabled: !!artistId });
+  // The artist pool module: the one live pool (generated, linked and uploaded
+  // rows alike) that the editors' insert-image picker offers, and the one
+  // upload path — an editor upload joins the display images under the same
+  // rule as a manager upload. Disabled until the artist is persisted.
+  const pool = useArtistPool(artistId ?? '');
 
   const handleUploadBioImage = useCallback<RichTextEditorUploadHandler>(
     async (file, meta) => {
-      if (!artistId) return null;
-      const result = await uploadBioImage(file, {
-        artistId,
+      const record = await pool.add(file, {
+        alt: null,
         attribution: meta.attribution,
         title: meta.title,
       });
-      if (!result.success || !result.data) {
-        toast.error(result.error ?? 'Failed to upload image');
+      if (!record) {
+        toast.error(pool.addError ?? 'Failed to upload image');
         return null;
       }
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.artists.bioGeneration(artistId),
-      });
-      return { url: result.data.url, alt: result.data.alt ?? null };
+      return { url: record.url, alt: record.alt ?? null };
     },
-    [artistId, queryClient]
+    [pool]
   );
 
   const bioEditorImages = useMemo(
-    () =>
-      computeBioEditorImages(
-        bioPickerImages,
-        (statusQuery.data?.content?.images ?? []).map((image) => ({
-          url: image.url,
-          alt: image.alt ?? image.title ?? '',
-        }))
-      ),
-    [bioPickerImages, statusQuery.data]
+    () => pool.images.map((image) => ({ url: image.url, alt: image.alt ?? image.title ?? '' })),
+    [pool.images]
   );
 
   const artistForm = useForm<ArtistFormData>({
@@ -308,8 +261,14 @@ export const ArtistForm = ({
   // create mode there's nothing to load.
   const isLoadingArtist = !!initialArtistId && isArtistPending;
 
+  // Load the record into the form once per artist. A refetch of the SAME
+  // record (a reconnect, a cache marked stale by a finished generation) must
+  // not reset the form over the admin's unsaved edits.
+  const loadedArtistIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!initialArtistId || !artistData) return;
+    if (loadedArtistIdRef.current === artistData.id) return;
+    loadedArtistIdRef.current = artistData.id;
 
     artistForm.reset(mapArtistToFormValues(artistData, user?.id));
 
@@ -444,14 +403,17 @@ export const ArtistForm = ({
   );
 
   // The generation job has already persisted what it produced, so the form
-  // adopts it as saved content — no scroll-down-and-Save step.
+  // adopts it as saved content — no scroll-down-and-Save step — except into a
+  // field the admin is editing, which keeps their text and is named here.
   const applyGeneratedBio = useApplyGeneratedBio({ form: artistForm, artistId });
 
   const handleBioGenerated = useCallback(
     (content: GeneratedBioContent): void => {
-      applyGeneratedBio(content);
-      setBioPickerImages(
-        content.images.map((image) => ({ url: image.url, alt: image.title ?? '' }))
+      const { kept } = applyGeneratedBio(content);
+      toast.success(
+        kept.length === 0
+          ? 'Bios generated and saved.'
+          : `Bios generated and saved — your unsaved ${kept.join(', ')} ${kept.length === 1 ? 'edit was' : 'edits were'} kept.`
       );
     },
     [applyGeneratedBio]

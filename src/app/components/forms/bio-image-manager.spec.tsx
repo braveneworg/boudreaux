@@ -5,15 +5,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
 import { BioImageManager, type BioImageManagerProps } from './bio-image-manager';
-import { uploadBioImage } from './utils/upload-bio-image';
-
-// The strip's file drop runs the real upload hook; stub the pipeline itself.
-vi.mock('./utils/upload-bio-image', () => ({ uploadBioImage: vi.fn() }));
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -21,25 +16,32 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-// The upload zone owns the presign pipeline; stub it with a button that
-// reports a persisted row so auto-selection can be exercised here.
-const uploadedRecord = vi.hoisted(() => ({ current: null as ArtistBioImageRecord | null }));
+// The upload zone collects the fields; stub it with a button that hands one
+// file to the pool's upload so the manager's forwarding can be exercised.
 vi.mock('./bio-image-upload-zone', () => ({
   BioImageUploadZone: ({
-    artistId,
-    onUploaded,
+    onUpload,
     disabled,
+    isUploading,
+    errorMessage,
   }: {
-    artistId: string;
-    onUploaded: (image: ArtistBioImageRecord) => void;
+    onUpload: (file: File, fields: { alt: null; attribution: string }) => Promise<unknown>;
     disabled?: boolean;
+    isUploading?: boolean;
+    errorMessage?: string | null;
   }) => (
     <button
       type="button"
       data-testid="upload-zone-stub"
-      data-artist-id={artistId}
+      data-uploading={isUploading ? 'true' : 'false'}
+      data-error={errorMessage ?? ''}
       disabled={disabled}
-      onClick={() => uploadedRecord.current && onUploaded(uploadedRecord.current)}
+      onClick={() =>
+        void onUpload(new File(['x'], 'zone.jpg', { type: 'image/jpeg' }), {
+          alt: null,
+          attribution: '',
+        })
+      }
     >
       Simulate upload
     </button>
@@ -81,7 +83,7 @@ const renderManager = (overrides: Partial<BioImageManagerProps> = {}) => {
     onEditAttribution: vi.fn(),
     onEditAlt: vi.fn(),
     onSetDisplayImages: vi.fn(),
-    onUploaded: vi.fn(),
+    onUpload: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
   render(<BioImageManager {...props} />);
@@ -129,20 +131,12 @@ const shownBadgesOn = (name: string): string[] =>
     .queryAllByText(/^Shown/)
     .map((badge) => badge.textContent ?? '');
 
-beforeEach(() => {
-  uploadedRecord.current = null;
-  vi.mocked(uploadBioImage).mockReset();
-});
-
 describe('BioImageManager', () => {
   it('is a labelled region holding the strip, the upload zone, and the pool', () => {
     renderManager();
     const region = screen.getByRole('region', { name: 'Bio images' });
     expect(within(region).getByRole('list', { name: 'Display images' })).toBeInTheDocument();
-    expect(within(region).getByTestId('upload-zone-stub')).toHaveAttribute(
-      'data-artist-id',
-      'artist-1'
-    );
+    expect(within(region).getByTestId('upload-zone-stub')).toBeInTheDocument();
     expect(within(region).getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
   });
 
@@ -361,20 +355,23 @@ describe('BioImageManager', () => {
     expect(onEditAlt).toHaveBeenCalledWith('only', 'New alt');
   });
 
-  it('reports an upload and auto-selects it when there is room and it has alt text', async () => {
-    uploadedRecord.current = { id: 'new', alt: 'described' } as ArtistBioImageRecord;
-    const { onUploaded, onSetDisplayImages } = renderManager();
+  // Whether an upload joins the display images is the pool module's call
+  // (use-artist-pool.spec); the manager only forwards the file and shows the
+  // pool's upload state on both surfaces.
+  it('forwards a zone upload to the pool and never writes the display images itself', async () => {
+    const { onUpload, onSetDisplayImages } = renderManager();
     await userEvent.click(screen.getByTestId('upload-zone-stub'));
-    expect(onUploaded).toHaveBeenCalledWith(uploadedRecord.current);
-    expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
+    expect(vi.mocked(onUpload).mock.calls).toEqual([
+      [expect.any(File), { alt: null, attribution: '' }],
+    ]);
+    expect(onSetDisplayImages).not.toHaveBeenCalled();
   });
 
-  it('reports an upload and auto-selects it even without alt text', async () => {
-    uploadedRecord.current = { id: 'new', alt: null } as ArtistBioImageRecord;
-    const { onUploaded, onSetDisplayImages } = renderManager();
-    await userEvent.click(screen.getByTestId('upload-zone-stub'));
-    expect(onUploaded).toHaveBeenCalled();
-    expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
+  it('shows the pool’s upload state on the zone and the strip', () => {
+    renderManager({ isUploading: true, uploadError: 'S3 refused' });
+    expect(screen.getByTestId('upload-zone-stub')).toHaveAttribute('data-uploading', 'true');
+    expect(screen.getByTestId('upload-zone-stub')).toHaveAttribute('data-error', 'S3 refused');
+    expect(screen.getByRole('alert')).toHaveTextContent('S3 refused');
   });
 
   describe('display image drop target', () => {
@@ -404,48 +401,25 @@ describe('BioImageManager', () => {
       expect(onSetDisplayImages).not.toHaveBeenCalled();
     });
 
-    it('uploads a dropped file into the pool and then adds it to the display images', async () => {
-      const record = { id: 'new', alt: null } as ArtistBioImageRecord;
-      vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: true, data: record });
-      const { onUploaded, onSetDisplayImages } = renderManager();
+    it('hands a dropped file to the pool upload with blank fields', async () => {
+      const { onUpload, onSetDisplayImages } = renderManager();
 
       fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
 
-      await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(record));
-      expect(vi.mocked(uploadBioImage).mock.calls).toEqual([
-        [jpeg, { artistId: 'artist-1', attribution: '', alt: null }],
-      ]);
-      expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'new']);
-    });
-
-    it('shows a dropped file upload failure inline without touching the set', async () => {
-      vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: false, error: 'S3 refused' });
-      const { onSetDisplayImages } = renderManager();
-
-      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
-
-      expect(await screen.findByRole('alert')).toHaveTextContent('S3 refused');
+      await waitFor(() =>
+        expect(vi.mocked(onUpload).mock.calls).toEqual([[jpeg, { alt: null, attribution: '' }]])
+      );
       expect(onSetDisplayImages).not.toHaveBeenCalled();
     });
 
-    it('rejects a dropped non-image file without starting the pipeline', async () => {
-      const text = new File(['x'], 'notes.txt', { type: 'text/plain' });
-      renderManager();
+    // The type check, the pipeline and the failure copy are the pool's
+    // (use-artist-pool.spec); the strip only shows what the pool reports.
+    it('shows the pool’s upload failure on the strip without touching the set', () => {
+      const { onSetDisplayImages } = renderManager({ uploadError: 'S3 refused' });
 
-      fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [text] }) });
-
-      expect(await screen.findByRole('alert')).toHaveTextContent(/JPEG, PNG, or WebP/);
-      expect(uploadBioImage).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent('S3 refused');
+      expect(onSetDisplayImages).not.toHaveBeenCalled();
     });
-  });
-
-  it('reports an upload without selecting it when the cap is reached', async () => {
-    uploadedRecord.current = { id: 'new', alt: 'described' } as ArtistBioImageRecord;
-    const { onSetDisplayImages } = renderManager({
-      images: [...POOL, image('third', { displayOrder: 2, origin: 'custom' })],
-    });
-    await userEvent.click(screen.getByTestId('upload-zone-stub'));
-    expect(onSetDisplayImages).not.toHaveBeenCalled();
   });
 
   it('mounts with an empty pool and says so', () => {

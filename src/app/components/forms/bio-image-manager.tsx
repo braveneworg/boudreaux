@@ -11,7 +11,6 @@ import { Plus } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import {
   chosenDisplayImageIds,
   DISPLAY_IMAGE_CAP,
@@ -25,7 +24,8 @@ import { BioImageTile, resolveImageLabels } from './bio-image-tile';
 import { BioImageUploadZone } from './bio-image-upload-zone';
 import { DisplayImageStrip } from './display-image-strip';
 import { ImageSourceLinksSection } from './image-source-links-section';
-import { useBioImageUpload } from './use-bio-image-upload';
+
+import type { ArtistPool } from './_hooks/use-artist-pool';
 
 export interface BioImageManagerProps {
   artistId: string;
@@ -47,8 +47,12 @@ export interface BioImageManagerProps {
   onEditAlt: (imageId: string, alt: string) => void;
   /** Replaces the artist's display images with the given ordered ids. */
   onSetDisplayImages: (imageIds: string[]) => void;
-  /** Called after an upload lands in the pool (before any auto-selection). */
-  onUploaded: (image: ArtistBioImageRecord) => void;
+  /** Uploads one file into the pool; the pool decides whether it joins the display images. */
+  onUpload: ArtistPool['add'];
+  /** True while any upload is in flight (zone or strip drop). */
+  isUploading?: boolean;
+  /** Why the last upload failed, phrased for the admin, or null. */
+  uploadError?: string | null;
   disabled?: boolean;
 }
 
@@ -108,6 +112,31 @@ const PoolTileBadge = ({
   );
 };
 
+/** Everything the manager derives from the pool through the shared display-image rules. */
+const derivePoolView = (
+  images: BioStatusImage[],
+  filter: string
+): {
+  chosenIds: string[];
+  chosen: BioStatusImage[];
+  shownIds: Set<string>;
+  shownCopy: string | undefined;
+  pool: BioStatusImage[];
+} => {
+  const chosenIds = chosenDisplayImageIds(images);
+  // What the public page shows right now; the fallback tiers are marked on the
+  // tiles so the admin sees the same images the public does.
+  const { tier, images: shownImages } = resolveDisplayImageSet(images);
+  const lower = filter.trim().toLowerCase();
+  return {
+    chosenIds,
+    chosen: chosenIds.flatMap((id) => images.filter((image) => image.id === id)),
+    shownIds: new Set(shownImages.map(({ id }) => id)),
+    shownCopy: tier === 'chosen' ? undefined : SHOWN_COPY.get(tier),
+    pool: orderBioImagesForPicker(images).filter((image) => !lower || matchesFilter(image, lower)),
+  };
+};
+
 const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
   (image.title ?? '').toLowerCase().includes(lower) ||
   (image.attribution ?? '').toLowerCase().includes(lower) ||
@@ -126,7 +155,8 @@ const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
  * rows, the picker order, and the "Shown" badges on the images the page falls
  * back to while nothing is chosen are all derived from the pool through the
  * shared display-image rules, so this view never disagrees with the public
- * page.
+ * page. Every write — an upload included, and whether it joins the display
+ * images — is the artist pool module's; this is a render of it.
  */
 export const BioImageManager = ({
   artistId,
@@ -139,38 +169,19 @@ export const BioImageManager = ({
   onEditAttribution,
   onEditAlt,
   onSetDisplayImages,
-  onUploaded,
+  onUpload,
+  isUploading = false,
+  uploadError = null,
   disabled = false,
 }: BioImageManagerProps): JSX.Element => {
   const hintIdBase = useId();
   const [filter, setFilter] = useState('');
 
-  const chosenIds = chosenDisplayImageIds(images);
-  // What the public page shows right now; the fallback tiers are marked on the
-  // tiles so the admin sees the same images the public does.
-  const { tier, images: shownImages } = resolveDisplayImageSet(images);
-  const shownCopy = tier === 'chosen' ? undefined : SHOWN_COPY.get(tier);
-  const shownIds = new Set(shownImages.map(({ id }) => id));
-  const chosen = chosenIds.flatMap((id) => images.filter((image) => image.id === id));
-  const lower = filter.trim().toLowerCase();
-  const pool = orderBioImagesForPicker(images).filter(
-    (image) => !lower || matchesFilter(image, lower)
-  );
+  const { chosenIds, chosen, shownIds, shownCopy, pool } = derivePoolView(images, filter);
 
   const chooseImage = (image: BioStatusImage): void => {
     onSetDisplayImages([...chosenIds, image.id]);
   };
-
-  // A fresh upload joins the set while there is room; a blank alt is
-  // backfilled with the artist's name by the set action.
-  const handleUploaded = (record: ArtistBioImageRecord): void => {
-    onUploaded(record);
-    if (chosenIds.length < DISPLAY_IMAGE_CAP) {
-      onSetDisplayImages([...chosenIds, record.id]);
-    }
-  };
-
-  const dropUpload = useBioImageUpload({ artistId, onUploaded: handleUploaded });
 
   const handleDropPoolImage = (imageId: string): void => {
     if (chosenIds.includes(imageId) || chosenIds.length >= DISPLAY_IMAGE_CAP) return;
@@ -179,12 +190,17 @@ export const BioImageManager = ({
   };
 
   const handleDropFile = (file: File): void => {
-    void dropUpload.upload(file, { alt: null, attribution: '' });
+    void onUpload(file, { alt: null, attribution: '' });
   };
 
   return (
     <section aria-label="Bio images" className="space-y-4">
-      <BioImageUploadZone artistId={artistId} onUploaded={handleUploaded} disabled={disabled} />
+      <BioImageUploadZone
+        onUpload={onUpload}
+        isUploading={isUploading}
+        errorMessage={uploadError}
+        disabled={disabled}
+      />
 
       <DisplayImageStrip
         images={chosen}
@@ -192,8 +208,8 @@ export const BioImageManager = ({
         onRemove={(id) => onSetDisplayImages(chosenIds.filter((chosenId) => chosenId !== id))}
         onDropPoolImage={handleDropPoolImage}
         onDropFile={handleDropFile}
-        isUploading={dropUpload.isUploading}
-        uploadError={dropUpload.errorMessage}
+        isUploading={isUploading}
+        uploadError={uploadError}
         disabled={disabled}
       />
 

@@ -26,22 +26,30 @@ vi.mock('./_hooks/mutations/use-bio-mutations', () => ({
 }));
 
 const createBioLinkMock = vi.fn();
-vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
-  useCreateBioLinkMutation: () => ({
-    createBioLink: createBioLinkMock,
-    isCreatingBioLink: false,
-  }),
+const removeBioLinkMock = vi.fn();
+vi.mock('./_hooks/use-artist-pool', () => ({
+  useArtistPool: () => ({ addLink: createBioLinkMock, removeLink: removeBioLinkMock }),
 }));
 
-// The polled status drives completion. A module-level value lets each test set
-// the status the (enabled) query reports back after generation is triggered.
+// The polled status drives completion. `statusReturn` is what the (always
+// enabled) query reports now; `afterRefetch` is what the tracker's pre-run
+// refetch moves it to — a run starts from the status the trigger produced,
+// never from a result cached before it.
 let statusReturn: BioGenerationStatusResult = { status: null, error: null, content: null };
+let afterRefetch: BioGenerationStatusResult | null = null;
+const refetchMock = vi.fn(async () => {
+  if (afterRefetch) {
+    statusReturn = afterRefetch;
+    afterRefetch = null;
+  }
+  return { data: statusReturn };
+});
 vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: () => ({
     data: statusReturn,
     isPending: false,
     error: undefined,
-    refetch: vi.fn(),
+    refetch: refetchMock,
   }),
 }));
 
@@ -82,9 +90,13 @@ const ARTIST_ID = 'a'.repeat(24);
 beforeEach(() => {
   generateMock.mockReset();
   createBioLinkMock.mockReset();
+  createBioLinkMock.mockResolvedValue({ id: 'l-new' });
+  removeBioLinkMock.mockReset();
+  refetchMock.mockClear();
   toastError.mockClear();
   toastSuccess.mockClear();
   statusReturn = { status: null, error: null, content: null };
+  afterRefetch = null;
   generateMock.mockResolvedValue({ success: true, status: 'pending' });
 });
 
@@ -96,7 +108,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('populates the form and shows a preview when the job succeeds', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     const onGenerated = vi.fn();
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
@@ -107,17 +119,55 @@ describe('ArtistBioGenerationSection', () => {
     expect(screen.getByRole('button', { name: /regenerate bios/i })).toBeInTheDocument();
   });
 
-  it('announces the generated bios as already saved', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
-    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
+  it('leaves the saved-bios toast to the form, which names any field it kept', async () => {
+    afterRefetch = { status: 'succeeded', error: null, content };
+    const onGenerated = vi.fn();
+    render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
 
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Bios generated and saved.'));
+    await waitFor(() => expect(onGenerated).toHaveBeenCalledWith(content));
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  // The defect this guards: the status key is shared with the palettes and the
+  // form, so at Regenerate the cache still holds the PREVIOUS run's result.
+  it('does not adopt a result that was cached before the trigger', async () => {
+    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'processing', error: null, content: null };
+    const onGenerated = vi.fn();
+    const { rerender } = render(
+      <ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
+
+    await waitFor(() => expect(refetchMock).toHaveBeenCalledTimes(1));
+    expect(onGenerated).not.toHaveBeenCalled();
+    expect(screen.getByText(/can take a few minutes/i)).toBeInTheDocument();
+
+    statusReturn = { status: 'succeeded', error: null, content };
+    rerender(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
+
+    await waitFor(() => expect(onGenerated).toHaveBeenCalledTimes(1));
+  });
+
+  it('resumes a run found in flight on mount and adopts its result', async () => {
+    statusReturn = { status: 'processing', error: null, content: null };
+    const onGenerated = vi.fn();
+    const { rerender } = render(
+      <ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />
+    );
+    expect(screen.getByText(/can take a few minutes/i)).toBeInTheDocument();
+
+    statusReturn = { status: 'succeeded', error: null, content };
+    rerender(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
+
+    await waitFor(() => expect(onGenerated).toHaveBeenCalledWith(content));
   });
 
   it('does not tell the admin to save the form to keep the result', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
@@ -127,7 +177,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('shows an in-progress hint while the job is processing', async () => {
-    statusReturn = { status: 'processing', error: null, content: null };
+    afterRefetch = { status: 'processing', error: null, content: null };
     const onGenerated = vi.fn();
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
@@ -138,7 +188,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('renders the live stage timeline from the polled progress', async () => {
-    statusReturn = {
+    afterRefetch = {
       status: 'processing',
       error: null,
       content: null,
@@ -162,7 +212,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('toasts and does not populate when the job fails', async () => {
-    statusReturn = { status: 'failed', error: 'Bio generation failed.', content: null };
+    afterRefetch = { status: 'failed', error: 'Bio generation failed.', content: null };
     const onGenerated = vi.fn();
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={onGenerated} />);
 
@@ -173,7 +223,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('forwards added reference links to the trigger', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/reference links/i), 'https://artist.example');
@@ -248,7 +298,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('forwards the typed description to the trigger', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText(/additional description/i), 'Hometown hero');
@@ -265,7 +315,7 @@ describe('ArtistBioGenerationSection', () => {
   // `BioMediaPalettes` (bio-media-palettes.spec.tsx); the preview only keeps
   // the short bio and a note pointing at them.
   it('does not render discovered-media lists in the preview', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
@@ -275,7 +325,7 @@ describe('ArtistBioGenerationSection', () => {
   });
 
   it('points the regenerate note at the palettes', async () => {
-    statusReturn = { status: 'succeeded', error: null, content };
+    afterRefetch = { status: 'succeeded', error: null, content };
     render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate bios/i }));
@@ -308,7 +358,7 @@ describe('ArtistBioGenerationSection', () => {
     // show the working state and poll indefinitely.
     vi.useFakeTimers();
     try {
-      statusReturn = { status: 'processing', error: null, content: null };
+      afterRefetch = { status: 'processing', error: null, content: null };
       render(<ArtistBioGenerationSection artistId={ARTIST_ID} onGenerated={vi.fn()} />);
 
       fireEvent.click(screen.getByRole('button', { name: /generate bios/i }));

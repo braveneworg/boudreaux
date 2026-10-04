@@ -20,7 +20,7 @@ import {
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 import { BIO_LINK_KINDS, type BioLinkKind } from '@/lib/validation/bio-link-input-schema';
 
-import { useCreateBioLinkMutation } from './_hooks/mutations/use-bio-media-mutations';
+import { useArtistPool } from './_hooks/use-artist-pool';
 
 interface CustomLinkEditorProps {
   artistId: string;
@@ -48,7 +48,7 @@ export const CustomLinkEditor = ({ artistId }: CustomLinkEditorProps): JSX.Eleme
     setKind('');
   };
 
-  const { createBioLink, isCreatingBioLink } = useCreateBioLinkMutation(artistId, reset);
+  const { addLink, isMutating: isCreatingBioLink } = useArtistPool(artistId);
 
   const trimmedLabel = label.trim();
   const trimmedUrl = url.trim();
@@ -57,11 +57,13 @@ export const CustomLinkEditor = ({ artistId }: CustomLinkEditorProps): JSX.Eleme
 
   const submit = (): void => {
     if (!canSubmit) return;
-    createBioLink({
+    void addLink({
       artistId,
       label: trimmedLabel,
       url: trimmedUrl,
       ...(kind ? { kind } : {}),
+    }).then((row) => {
+      if (row) reset();
     });
   };
 

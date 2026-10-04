@@ -38,9 +38,11 @@ artist and release forms always offered nothing.
   replaces the whole set: the cap, uniqueness, ownership, and alt-text rules
   are properties of the set, so the service checks them atomically and a
   reorder is one round-trip.
-- Alt text is required to choose an image (service-enforced), because the
-  public page renders display images as content, not decoration. Attribution
-  and license stay optional so the label's own photos need no credit line.
+- Alt text is what makes a display image publishable, because the public
+  page renders display images as content, not decoration: a chosen image
+  with a blank alt is backfilled with the artist's name by the set action,
+  the same default an upload gets. Attribution and license stay optional so
+  the label's own photos need no credit line.
 - Resolution order, in one client-safe util used by every surface: chosen
   rows by position → suggested rows → first pool rows, capped. The listing
   select reads the chosen-or-suggested candidates with `displayOrder: { gte:
@@ -127,3 +129,22 @@ optional.
 - Still open: clearing alt on an already-chosen row is not guarded, and the
   detail page's biography gallery lists every pool row the header does not
   show, alt or not.
+
+## Enforcement (2026-10-04)
+
+The admin surface's writes to the pool and to the chosen set had no owner:
+the manager, the upload zone, the editor's upload path and nine one-caller
+mutation hooks each decided for themselves what joined the set and which
+caches learned of a change. Three stale-state defects followed — a choice
+made during an upload was overwritten when the upload landed (the manager
+decided against the set as it was when the upload _started_), the cover-art
+picker's pool was invalidated by two of nine writers, and the bio editor's
+image picker kept a frozen copy of the pool. `useArtistPool`
+(`src/app/components/forms/_hooks/use-artist-pool.ts`) is now the one
+client module for the pool and the Shown set: every surface renders it,
+"join the display images if there is room" is decided against the set as it
+is when the upload lands (`decideUploadJoin`), and one invalidation policy
+marks both pool keys stale after every write. The bio-generation and
+images-from-links sections track a run through one client tracker,
+`useJobRun`, the twin of `async-job-lifecycle.ts`: a terminal state cached
+before the trigger is never surfaced as the new run's outcome.

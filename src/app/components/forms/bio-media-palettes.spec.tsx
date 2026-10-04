@@ -2,10 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
+import { deleteArtistBioImageAction } from '@/lib/actions/delete-artist-bio-image-action';
+import { deleteArtistBioLinkAction } from '@/lib/actions/delete-artist-bio-link-action';
+import { setArtistDisplayImagesAction } from '@/lib/actions/set-artist-display-images-action';
+import { updateArtistBioImageAltAction } from '@/lib/actions/update-artist-bio-image-alt-action';
+import { updateArtistBioImageAttributionAction } from '@/lib/actions/update-artist-bio-image-attribution-action';
+import { queryKeys } from '@/lib/query-keys';
 import { HttpError } from '@/lib/utils/fetch-and-parse';
 import type {
   BioGenerationStatusResponse,
@@ -14,58 +21,64 @@ import type {
 } from '@/lib/validation/bio-generation-schema';
 
 import { BioMediaPalettes } from './bio-media-palettes';
+import { uploadBioImage } from './utils/upload-bio-image';
 
 import type { Editor } from '@tiptap/react';
 
 const statusMock = vi.hoisted(() => vi.fn());
 const refetchMock = vi.hoisted(() => vi.fn());
-const deleteBioLink = vi.hoisted(() => vi.fn());
-const deleteBioImage = vi.hoisted(() => vi.fn());
-const updateBioImageAttribution = vi.hoisted(() => vi.fn());
-const updateBioImageAlt = vi.hoisted(() => vi.fn());
-const setDisplayImages = vi.hoisted(() => vi.fn());
-const pending = vi.hoisted(() => ({
-  link: false,
-  image: false,
-  updating: false,
-  alt: false,
-  setting: false,
-}));
 /** Controls what `registry.getTarget()` returns for insert tests. */
 const mockGetTarget = vi.hoisted(() => vi.fn(() => null as Editor | null));
 
+// The palettes render the real artist pool module over a stubbed status
+// read and stubbed Server Actions, so these tests cover the wiring from a
+// click to the action the pool runs.
 vi.mock('./_hooks/use-artist-bio-generation-status-query', () => ({
   useArtistBioGenerationStatusQuery: (artistId: string) => statusMock(artistId),
 }));
-
-vi.mock('./_hooks/mutations/use-bio-media-mutations', () => ({
-  useDeleteBioLinkMutation: () => ({ deleteBioLink, isDeletingBioLink: pending.link }),
-  useDeleteBioImageMutation: () => ({ deleteBioImage, isDeletingBioImage: pending.image }),
-  useUpdateBioImageAttributionMutation: () => ({
-    updateBioImageAttribution,
-    isUpdatingBioImageAttribution: pending.updating,
-  }),
-  useUpdateBioImageAltMutation: () => ({
-    updateBioImageAlt,
-    isUpdatingBioImageAlt: pending.alt,
-  }),
-  useSetDisplayImagesMutation: () => ({
-    setDisplayImages,
-    isSettingDisplayImages: pending.setting,
-  }),
+vi.mock('./utils/upload-bio-image', () => ({ uploadBioImage: vi.fn() }));
+vi.mock('@/lib/actions/set-artist-display-images-action', () => ({
+  setArtistDisplayImagesAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/delete-artist-bio-image-action', () => ({
+  deleteArtistBioImageAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/delete-artist-bio-link-action', () => ({
+  deleteArtistBioLinkAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/create-artist-bio-link-action', () => ({
+  createArtistBioLinkAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/update-artist-bio-image-alt-action', () => ({
+  updateArtistBioImageAltAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/update-artist-bio-image-attribution-action', () => ({
+  updateArtistBioImageAttributionAction: vi.fn(),
 }));
 
 // The image-sources editor owns its own queries/mutations (covered by its own
-// spec); stub it so the wrapper renders without a QueryClient.
+// spec); stub it so the wrapper renders without its status query.
 vi.mock('./image-source-links-section', () => ({
   ImageSourceLinksSection: () => <div data-testid="image-sources-stub" />,
 }));
 
-// The upload zone owns the presign pipeline; stub it with a button that
-// reports a row so the wrapper's refetch wiring can be exercised.
+// The upload zone collects the fields; stub it with a button that hands one
+// file to the pool's upload so the wiring can be exercised.
 vi.mock('./bio-image-upload-zone', () => ({
-  BioImageUploadZone: ({ onUploaded }: { onUploaded: (image: { id: string }) => void }) => (
-    <button type="button" onClick={() => onUploaded({ id: 'new' })}>
+  BioImageUploadZone: ({
+    onUpload,
+  }: {
+    onUpload: (file: File, fields: { alt: null; attribution: string }) => Promise<unknown>;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        void onUpload(new File(['x'], 'new.jpg', { type: 'image/jpeg' }), {
+          alt: null,
+          attribution: '',
+        })
+      }
+    >
       Simulate upload
     </button>
   ),
@@ -84,8 +97,8 @@ vi.mock('./bio-editor-registry', () => ({
   useBioEditorRegistry: () => ({ getTarget: mockGetTarget }),
 }));
 
-// The custom link editor owns its own create mutation; stub it here so these
-// wiring tests stay focused on the palettes and never touch TanStack Query.
+// The custom link editor renders the pool too; stub it so these wiring tests
+// stay on the palettes.
 vi.mock('./custom-link-editor', () => ({
   CustomLinkEditor: ({ artistId }: { artistId: string }) => (
     <div data-testid="custom-link-editor" data-artist-id={artistId} />
@@ -142,42 +155,54 @@ const mockStatusError = (error: Error): void => {
   });
 };
 
+/** A Server Action stub that never settles, to hold a pool write in flight. */
+const neverSettles = () => new Promise<never>(() => {});
+
+const renderPalettes = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // The pool reads the chosen set back from the cache when it writes.
+  const status = statusMock('artist-1') as { data?: BioGenerationStatusResponse };
+  if (status.data) client.setQueryData(queryKeys.artists.bioGeneration('artist-1'), status.data);
+  return render(
+    <QueryClientProvider client={client}>
+      <BioMediaPalettes artistId="artist-1" />
+    </QueryClientProvider>
+  );
+};
+
 beforeEach(() => {
-  pending.link = false;
-  pending.image = false;
-  pending.updating = false;
-  pending.alt = false;
-  pending.setting = false;
   refetchMock.mockReset();
+  statusMock.mockReset();
   mockStatus({
     status: 'succeeded',
     error: null,
     content: contentWith([LINK_ROW], [IMAGE_ROW]),
   });
+  vi.mocked(setArtistDisplayImagesAction).mockResolvedValue({ success: true } as never);
+  vi.mocked(deleteArtistBioImageAction).mockResolvedValue({ success: true } as never);
+  vi.mocked(deleteArtistBioLinkAction).mockResolvedValue({ success: true } as never);
+  vi.mocked(updateArtistBioImageAltAction).mockResolvedValue({ success: true } as never);
+  vi.mocked(updateArtistBioImageAttributionAction).mockResolvedValue({ success: true } as never);
 });
 
 describe('BioMediaPalettes', () => {
   it('uses xl:grid-cols-1 so palettes stack in the sticky rail', () => {
-    const { container } = render(<BioMediaPalettes artistId="artist-1" />);
-
+    const { container } = renderPalettes();
     expect((container.firstChild as HTMLElement).className).toContain('xl:grid-cols-1');
   });
 
   it('reads the status for the given artist', () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(statusMock).toHaveBeenCalledWith('artist-1');
   });
 
   it('renders the link palette when generated content exists', () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('group', { name: 'Discovered links' })).toBeInTheDocument();
   });
 
   it('renders the image manager when generated content exists', () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
   });
@@ -185,36 +210,35 @@ describe('BioMediaPalettes', () => {
   // Uploading is the manager's job, so it mounts even before anything exists.
   it('mounts the manager with an empty pool when the artist has no generated content', () => {
     mockStatus({ status: null, error: null, content: null });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
     expect(screen.getByText(/No images yet/)).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
+  });
+
+  // Adding a custom link is the link palette's job too, so its editor mounts
+  // even before the artist has a single link.
+  it('mounts the link palette and its custom-link editor when the artist has no links', () => {
+    mockStatus({ status: null, error: null, content: null });
+    renderPalettes();
+    expect(screen.getByTestId('custom-link-editor')).toHaveAttribute('data-artist-id', 'artist-1');
   });
 
   it('mounts the manager with an empty pool while a generation job is still processing', () => {
     mockStatus({ status: 'processing', error: null, content: null });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
     expect(screen.getByText(/No images yet/)).toBeInTheDocument();
   });
 
   it('shows the manager loading state before the status query resolves', () => {
     mockStatus(undefined, true);
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('status')).toHaveTextContent('Loading images');
   });
 
   it('shows no load failure while the status query is still loading', () => {
     mockStatus(undefined, true);
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -222,9 +246,7 @@ describe('BioMediaPalettes', () => {
   // surface as a failure, never as an empty pool (nginx 429, 2026-09-21).
   it('explains a throttled status read as rate limiting', () => {
     mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('alert')).toHaveTextContent(
       "Couldn't load the image pool — the server is rate limiting requests, try again in a moment."
     );
@@ -232,9 +254,7 @@ describe('BioMediaPalettes', () => {
 
   it('shows the error message when the status read failed for another reason', () => {
     mockStatusError(new HttpError('Failed to fetch bio generation status', 500));
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('alert')).toHaveTextContent(
       "Couldn't load the image pool — Failed to fetch bio generation status."
     );
@@ -242,131 +262,120 @@ describe('BioMediaPalettes', () => {
 
   it('hides the empty-pool copy when the status read failed', () => {
     mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.queryByText(/No images yet/)).not.toBeInTheDocument();
   });
 
   it('refetches the status when Retry is pressed on the load failure', async () => {
     mockStatusError(new HttpError('Failed to fetch bio generation status', 429));
-
-    render(<BioMediaPalettes artistId="artist-1" />);
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
     expect(refetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('mounts the manager with an empty pool when the content has no links and no images', () => {
-    mockStatus({ status: 'succeeded', error: null, content: contentWith([], []) });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
-  });
-
-  it('omits the link palette when there are no links', () => {
-    mockStatus({ status: 'succeeded', error: null, content: contentWith([], [IMAGE_ROW]) });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.queryByRole('group', { name: 'Discovered links' })).not.toBeInTheDocument();
   });
 
   it('shows an empty pool when the artist has links but no images', () => {
     mockStatus({ status: 'succeeded', error: null, content: contentWith([LINK_ROW], []) });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('group', { name: 'Discovered links' })).toBeInTheDocument();
     expect(screen.getByText(/No images yet/)).toBeInTheDocument();
   });
 
-  it('routes "use as display image" through the set mutation', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('routes "use as display image" through the set action', async () => {
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Use Portrait as display image' }));
-
-    expect(setDisplayImages).toHaveBeenCalledWith([IMAGE_ROW.id]);
+    await waitFor(() =>
+      expect(setArtistDisplayImagesAction).toHaveBeenCalledWith({
+        artistId: 'artist-1',
+        imageIds: [IMAGE_ROW.id],
+      })
+    );
   });
 
-  it('routes an alt text edit through the alt mutation', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('routes an alt text edit through the alt action', async () => {
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Edit alt text for Portrait' }));
     const input = screen.getByRole('textbox', { name: 'Alt text' });
     await userEvent.clear(input);
     await userEvent.type(input, 'Portrait of X');
     await userEvent.click(screen.getByRole('button', { name: /save/i }));
-
-    expect(updateBioImageAlt).toHaveBeenCalledWith({ imageId: IMAGE_ROW.id, alt: 'Portrait of X' });
+    await waitFor(() =>
+      expect(updateArtistBioImageAltAction).toHaveBeenCalledWith({
+        imageId: IMAGE_ROW.id,
+        alt: 'Portrait of X',
+      })
+    );
   });
 
-  it('refetches the status after an upload so the new row joins the pool', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('hands an upload to the pool, which runs the pipeline for the artist', async () => {
+    vi.mocked(uploadBioImage).mockResolvedValueOnce({ success: false, error: 'S3 refused' });
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-
-    expect(refetchMock).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(uploadBioImage).toHaveBeenCalledWith(expect.any(File), {
+        artistId: 'artist-1',
+        alt: null,
+        attribution: '',
+      })
+    );
   });
 
-  it('disables the manager while a display-image write is pending', () => {
-    pending.setting = true;
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.getByRole('button', { name: 'Delete image Portrait' })).toBeDisabled();
+  it('disables the manager while a display-image write is pending', async () => {
+    vi.mocked(setArtistDisplayImagesAction).mockImplementationOnce(neverSettles);
+    renderPalettes();
+    await userEvent.click(screen.getByRole('button', { name: 'Use Portrait as display image' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Delete image Portrait' })).toBeDisabled()
+    );
   });
 
-  it('routes a link delete through the mutation', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('routes a link delete through the action', async () => {
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: `Delete link ${LINK_ROW.label}` }));
-
-    expect(deleteBioLink).toHaveBeenCalledWith(LINK_ROW.id);
+    await waitFor(() => expect(deleteArtistBioLinkAction).toHaveBeenCalledWith(LINK_ROW.id));
   });
 
-  it('routes an image delete through the mutation', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('routes an image delete through the action', async () => {
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Delete image Portrait' }));
-
-    expect(deleteBioImage).toHaveBeenCalledWith(IMAGE_ROW.id);
+    await waitFor(() => expect(deleteArtistBioImageAction).toHaveBeenCalledWith(IMAGE_ROW.id));
   });
 
-  it('disables image deletes while a link delete is pending', () => {
-    pending.link = true;
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.getByRole('button', { name: 'Delete image Portrait' })).toBeDisabled();
+  it('disables image deletes while a link delete is pending', async () => {
+    vi.mocked(deleteArtistBioLinkAction).mockImplementationOnce(neverSettles);
+    renderPalettes();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete link Wikipedia' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Delete image Portrait' })).toBeDisabled()
+    );
   });
 
-  it('disables link deletes while an image delete is pending', () => {
-    pending.image = true;
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.getByRole('button', { name: 'Delete link Wikipedia' })).toBeDisabled();
+  it('disables link deletes while an image delete is pending', async () => {
+    vi.mocked(deleteArtistBioImageAction).mockImplementationOnce(neverSettles);
+    renderPalettes();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete image Portrait' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Delete link Wikipedia' })).toBeDisabled()
+    );
   });
 
-  it('disables palette controls while an attribution update is pending', () => {
-    pending.updating = true;
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
-    expect(screen.getByRole('button', { name: 'Insert image Portrait' })).toBeDisabled();
+  // The old manager left the pool live during an upload, so a choice made
+  // then was overwritten when the upload landed; an upload now counts as a
+  // pool write like any other.
+  it('disables palette controls while an upload is in flight', async () => {
+    vi.mocked(uploadBioImage).mockImplementationOnce(neverSettles);
+    renderPalettes();
+    await userEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Insert image Portrait' })).toBeDisabled()
+    );
   });
 
   // ── insertLink ──────────────────────────────────────────────────────────────
 
   it('insertLink explains itself instead of silently doing nothing when no editor is focused', async () => {
     mockGetTarget.mockReturnValue(null);
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Insert link Wikipedia' }));
-
     expect(mockGetTarget).toHaveBeenCalled();
     expect(vi.mocked(toast.info)).toHaveBeenCalledWith(
       'Click into a bio editor first, then insert.'
@@ -378,10 +387,8 @@ describe('BioMediaPalettes', () => {
     const chain = { focus: vi.fn().mockReturnThis(), insertContent: vi.fn().mockReturnThis(), run };
     const fakeEditor = { chain: vi.fn().mockReturnValue(chain) } as unknown as Editor;
     mockGetTarget.mockReturnValue(fakeEditor);
-
-    render(<BioMediaPalettes artistId="artist-1" />);
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Insert link Wikipedia' }));
-
     expect(chain.insertContent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'bioLink',
@@ -398,10 +405,8 @@ describe('BioMediaPalettes', () => {
 
   it('insertImage explains itself instead of silently doing nothing when no editor is focused', async () => {
     mockGetTarget.mockReturnValue(null);
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Insert image Portrait' }));
-
     expect(mockGetTarget).toHaveBeenCalled();
     expect(vi.mocked(toast.info)).toHaveBeenCalledWith(
       'Click into a bio editor first, then insert.'
@@ -413,10 +418,8 @@ describe('BioMediaPalettes', () => {
     const chain = { focus: vi.fn().mockReturnThis(), insertContent: vi.fn().mockReturnThis(), run };
     const fakeEditor = { chain: vi.fn().mockReturnValue(chain) } as unknown as Editor;
     mockGetTarget.mockReturnValue(fakeEditor);
-
-    render(<BioMediaPalettes artistId="artist-1" />);
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Insert image Portrait' }));
-
     expect(chain.insertContent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'bioFigure' })
     );
@@ -428,7 +431,6 @@ describe('BioMediaPalettes', () => {
     const chain = { focus: vi.fn().mockReturnThis(), insertContent: vi.fn().mockReturnThis(), run };
     const fakeEditor = { chain: vi.fn().mockReturnValue(chain) } as unknown as Editor;
     mockGetTarget.mockReturnValue(fakeEditor);
-
     const imageNoAlt: BioStatusImage = {
       id: 'i2',
       url: 'https://upload.wikimedia.org/b.jpg',
@@ -438,20 +440,13 @@ describe('BioMediaPalettes', () => {
       isPrimary: false,
       displayOrder: null,
     };
-    statusMock.mockReturnValue({
-      data: {
-        status: 'succeeded',
-        error: null,
-        content: contentWith([LINK_ROW], [imageNoAlt]),
-      },
-      isPending: false,
+    mockStatus({
+      status: 'succeeded',
       error: null,
-      refetch: vi.fn(),
+      content: contentWith([LINK_ROW], [imageNoAlt]),
     });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
+    renderPalettes();
     await userEvent.click(screen.getByRole('button', { name: 'Insert image Fallback Title' }));
-
     // alt derived from title when image.alt is absent
     expect(chain.insertContent).toHaveBeenCalledWith(
       expect.objectContaining({ attrs: expect.objectContaining({ alt: 'Fallback Title' }) })
@@ -460,15 +455,12 @@ describe('BioMediaPalettes', () => {
 
   it('renders the pool when persisted content exists without a succeeded job', () => {
     mockStatus({ status: null, error: null, content: contentWith([LINK_ROW], [IMAGE_ROW]) });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+    renderPalettes();
     expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
   });
 
-  it('routes an image attribution edit through the mutation', async () => {
-    render(<BioMediaPalettes artistId="artist-1" />);
-
+  it('routes an image attribution edit through the action', async () => {
+    renderPalettes();
     await userEvent.click(
       screen.getByRole('button', { name: `Edit attribution for ${IMAGE_ROW.title}` })
     );
@@ -476,11 +468,12 @@ describe('BioMediaPalettes', () => {
     await userEvent.clear(input);
     await userEvent.type(input, 'New credit');
     await userEvent.click(screen.getByRole('button', { name: /save/i }));
-
-    expect(updateBioImageAttribution).toHaveBeenCalledWith({
-      imageId: IMAGE_ROW.id,
-      attribution: 'New credit',
-    });
+    await waitFor(() =>
+      expect(updateArtistBioImageAttributionAction).toHaveBeenCalledWith({
+        imageId: IMAGE_ROW.id,
+        attribution: 'New credit',
+      })
+    );
   });
 
   it('insertImage falls back to "Artist photo" when both alt and title are absent', async () => {
@@ -488,7 +481,6 @@ describe('BioMediaPalettes', () => {
     const chain = { focus: vi.fn().mockReturnThis(), insertContent: vi.fn().mockReturnThis(), run };
     const fakeEditor = { chain: vi.fn().mockReturnValue(chain) } as unknown as Editor;
     mockGetTarget.mockReturnValue(fakeEditor);
-
     const imageNoAltNoTitle: BioStatusImage = {
       id: 'i3',
       url: 'https://upload.wikimedia.org/c.jpg',
@@ -498,21 +490,14 @@ describe('BioMediaPalettes', () => {
       isPrimary: false,
       displayOrder: null,
     };
-    statusMock.mockReturnValue({
-      data: {
-        status: 'succeeded',
-        error: null,
-        content: contentWith([LINK_ROW], [imageNoAltNoTitle]),
-      },
-      isPending: false,
+    mockStatus({
+      status: 'succeeded',
       error: null,
-      refetch: vi.fn(),
+      content: contentWith([LINK_ROW], [imageNoAltNoTitle]),
     });
-
-    render(<BioMediaPalettes artistId="artist-1" />);
+    renderPalettes();
     // Image with no title renders with 'image' as previewLabel → button name 'Insert image image'
     await userEvent.click(screen.getByRole('button', { name: 'Insert image image' }));
-
     expect(chain.insertContent).toHaveBeenCalledWith(
       expect.objectContaining({ attrs: expect.objectContaining({ alt: 'Artist photo' }) })
     );
