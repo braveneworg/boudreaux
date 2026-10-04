@@ -8,15 +8,6 @@ import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/art
 
 import { ArtistListCard } from './artist-list-card';
 
-// Mock BioHtml so this spec stays on the fast vmThreads pool (the real BioHtml
-// pulls in html-react-parser, which requires the forks pool). BioHtml behavior
-// is covered in bio-html.spec; here we only need the teaser body to render.
-vi.mock('./bio-html', () => ({
-  BioHtml: ({ html, className }: { html: string; className?: string }) => (
-    <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
-  ),
-}));
-
 const name = (id: string, displayName: string): ArtistListingName => ({
   id,
   displayName,
@@ -454,6 +445,22 @@ describe('ArtistListCard', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 
     expect(container.querySelector('[data-slot="artist-short-bio"]')).toHaveClass('max-w-prose');
+  });
+
+  // The listing row's `shortBio` is plain text: tags stripped, entities
+  // DECODED for text rendering. Rendered as HTML, text stored escaped (a
+  // scraped `&lt;img …&gt;`) became live elements on the card.
+  it('renders the short bio as text, so markup in it is shown and never interpreted', () => {
+    const { container } = render(
+      <ArtistListCard
+        artist={{ ...baseArtist, shortBio: 'Fans of <img src="x"> and <b>loud</b> guitars.' }}
+      />
+    );
+
+    const bio = container.querySelector('[data-slot="artist-short-bio"]');
+
+    expect(bio?.querySelector('img, b')).toBeNull();
+    expect(bio).toHaveTextContent('Fans of <img src="x"> and <b>loud</b> guitars.');
   });
 
   it('omits the short bio slot when the artist has no short bio', () => {
