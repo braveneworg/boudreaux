@@ -23,20 +23,21 @@ const adminNav = (adminPage: Page) =>
   adminPage.getByRole('navigation', { name: /admin sections/i });
 
 test.describe('Admin persistent navigation', () => {
+  // `allTextContents()` does not wait: on a loaded CI runner it ran before the
+  // nav had rendered and returned `[]` (run 37177247759, docs-only PR). The
+  // auto-retrying `toHaveText` / `toHaveCount` expectations wait for the links.
   test('renders every section link in importance order, releases first', async ({ adminPage }) => {
     await adminPage.goto('/admin');
 
-    const labels = await adminNav(adminPage).getByRole('link').allTextContents();
-
-    expect(labels.map((label) => label.trim())).toEqual(NAV_ORDER);
+    await expect(adminNav(adminPage).getByRole('link')).toHaveText(NAV_ORDER);
   });
 
   test('places Videos immediately after Releases', async ({ adminPage }) => {
     await adminPage.goto('/admin');
 
-    const labels = (await adminNav(adminPage).getByRole('link').allTextContents()).map((label) =>
-      label.trim()
-    );
+    const links = adminNav(adminPage).getByRole('link');
+    await expect(links).toHaveCount(NAV_ORDER.length);
+    const labels = (await links.allTextContents()).map((label) => label.trim());
 
     expect(labels).toContain('Videos');
     expect(labels.indexOf('Videos')).toBe(labels.indexOf('Releases') + 1);
