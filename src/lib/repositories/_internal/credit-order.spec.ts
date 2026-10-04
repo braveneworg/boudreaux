@@ -10,7 +10,6 @@ const REPOSITORIES_DIR = join(__dirname, '..');
 
 /** Every non-spec TypeScript source under `src/lib/repositories`, recursively. */
 const repositorySources = (dir: string): string[] =>
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanning this repo's own sources
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return repositorySources(path);
@@ -62,7 +61,6 @@ describe('orderedCredits', () => {
 
   it('is the only way a repository loads artistReleases', () => {
     const unordered = repositorySources(REPOSITORIES_DIR).flatMap((path) =>
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanning this repo's own sources
       unorderedLoads(readFileSync(path, 'utf8')).map(
         (line) => `${path.replace(REPOSITORIES_DIR, '')}:${line}`
       )

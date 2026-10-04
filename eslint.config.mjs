@@ -479,6 +479,8 @@ const eslintConfig = [
       'src/test-utils/lazy-lucide-react.ts',
       // Reads the spec files named in SHELL_SCRIPT_SPECS to check they spawn a shell.
       'vitest.config.spec.ts',
+      // Scans the repositories' own sources for an unordered `artistReleases` load.
+      'src/lib/repositories/_internal/credit-order.spec.ts',
     ],
     rules: {
       'security/detect-non-literal-fs-filename': 'off',
