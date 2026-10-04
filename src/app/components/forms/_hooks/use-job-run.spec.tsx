@@ -75,6 +75,30 @@ describe('useJobRun', () => {
     expect(h.result.current.busy).toBe(false);
   });
 
+  it('falls back to the default failure copy when the job reports none', async () => {
+    const h = makeHarness({ status: null });
+    await act(async () => {
+      const started = h.result.current.start();
+      h.setData({ status: 'processing' });
+      await started;
+    });
+
+    act(() => h.setData({ status: 'failed', error: null }));
+
+    expect(h.onFailed).toHaveBeenCalledWith('Job failed.');
+  });
+
+  it('falls back to the default failure copy when a refused trigger gives no reason', async () => {
+    const h = makeHarness({ status: null });
+    h.trigger.mockResolvedValueOnce({ success: false } as never);
+
+    await act(async () => {
+      await h.result.current.start();
+    });
+
+    expect(h.onFailed).toHaveBeenCalledWith('Job failed.');
+  });
+
   it('resumes a run found in flight on mount and surfaces its outcome', () => {
     const h = makeHarness({ status: 'processing' });
 
