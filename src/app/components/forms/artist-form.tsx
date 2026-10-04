@@ -426,10 +426,15 @@ export const ArtistForm = ({
 
   const submitForm = artistForm.handleSubmit(onSubmitArtistForm, onInvalidSubmit);
 
-  // Handler for Create & Publish (create mode) or Publish (edit mode)
+  // Create & Publish (create mode) or Publish (edit mode). The publish date
+  // goes into the submitted values, never into the form: a publish that fails
+  // validation or is refused by the server leaves nothing for a later Save to
+  // send, and a successful one resets the form to the published values.
   const handleClickPublishButton = useCallback(() => {
-    artistForm.setValue('publishedOn', new Date().toISOString(), { shouldDirty: true });
-    artistForm.handleSubmit(onSubmitArtistForm, onInvalidSubmit)();
+    void artistForm.handleSubmit(
+      (data) => onSubmitArtistForm({ ...data, publishedOn: new Date().toISOString() }),
+      onInvalidSubmit
+    )();
   }, [artistForm, onSubmitArtistForm, onInvalidSubmit]);
 
   const isDirty = artistForm.formState.isDirty;

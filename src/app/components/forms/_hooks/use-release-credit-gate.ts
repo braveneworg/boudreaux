@@ -13,8 +13,6 @@ import type { CreditConfirmation, CreditDecisions } from '@/lib/utils/credit-con
 interface UseReleaseCreditGateOptions {
   /** Whether the release was already published before this save. */
   isPublished: boolean;
-  /** Take back the publication date the publish button put on the form. */
-  clearPublishedAt: () => void;
 }
 
 /** The form values the gate reads. */
@@ -52,23 +50,15 @@ const FALLBACK_ERROR = 'Failed to load the credited artists';
  * The form names the artists it will credit, so the question is asked about
  * those rather than the stored credits: they are not stored until the save.
  *
- * When the admin backs out of publishing a release that was not published,
- * the publication date the publish button set is taken back, so a later plain
- * save does not publish by accident.
+ * When the admin backs out of publishing, nothing needs taking back: the
+ * publish button puts the publication date on the submitted values, never on
+ * the form, so a later plain save cannot publish by accident.
  */
 export const useReleaseCreditGate = ({
   isPublished,
-  clearPublishedAt,
 }: UseReleaseCreditGateOptions): UseReleaseCreditGate => {
   const { requestDecisions, confirmation, confirm, cancel } = useCreditDecisions();
   const decisionsRef = useRef<CreditDecisions | undefined>(undefined);
-
-  const stop = useCallback((): boolean => {
-    if (!isPublished) {
-      clearPublishedAt();
-    }
-    return false;
-  }, [isPublished, clearPublishedAt]);
 
   const resolve = useCallback(
     async ({ publishedAt, artistIds = [] }: GatedReleaseValues): Promise<boolean> => {
@@ -80,16 +70,16 @@ export const useReleaseCreditGate = ({
       try {
         const decisions = await requestDecisions({ artistIds });
         if (!decisions) {
-          return stop();
+          return false;
         }
         decisionsRef.current = decisions;
         return true;
       } catch (error) {
         toast.error(error instanceof Error ? error.message : FALLBACK_ERROR);
-        return stop();
+        return false;
       }
     },
-    [requestDecisions, stop]
+    [requestDecisions]
   );
 
   const getDecisions = useCallback(() => decisionsRef.current, []);
