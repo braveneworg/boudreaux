@@ -201,6 +201,13 @@ See `docs/agents/triage-labels.md`.
 Single-context: `CONTEXT.md` at the root is the glossary; decisions live in
 `docs/adr/`. See `docs/agents/domain.md`.
 
+### Architecture review
+
+No card without a reachability proof: a review may claim a defect only
+with a call-site path, a Docker-Mongo repro, or a failing test, verified
+at `HEAD`; otherwise it is a shape card and says so.
+See `docs/agents/architecture-review.md`.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
