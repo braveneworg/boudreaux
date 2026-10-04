@@ -1827,6 +1827,52 @@ describe('ArtistService', () => {
     });
   });
 
+  // ADR-0009: the normalised form applies to the write path. The service is
+  // the seam every writer crosses, so it — not the admin combobox — is the
+  // gate; a payload that skipped the client's normalisation still stores the
+  // one storage form.
+  describe('vocabulary normalisation at the write seam (ADR-0009)', () => {
+    it('stores genres and tags in the normalised form on create', async () => {
+      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
+
+      await ArtistService.createArtist({
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        genres: 'Hip Hop, R&B, hip-hop',
+        tags: 'Synth Pop',
+      });
+
+      const [persisted] = vi.mocked(ArtistRepository.create).mock.calls.at(-1) ?? [];
+      expect(persisted?.genres).toBe('hip-hop,r-and-b');
+      expect(persisted?.tags).toBe('synth-pop');
+    });
+
+    it('stores genres and tags in the normalised form on update', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', {
+        genres: 'Experimental, Electronic',
+        tags: 'Lo-Fi',
+      });
+
+      const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
+      expect(persisted?.genres).toBe('experimental,electronic');
+      expect(persisted?.tags).toBe('lo-fi');
+    });
+
+    it('clears a column that normalises to nothing, and leaves an omitted one alone', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', { genres: ' , ' });
+
+      const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
+      expect(persisted?.genres).toBeNull();
+      expect(persisted).not.toHaveProperty('tags');
+    });
+  });
+
   describe('listPublishedArtists', () => {
     const listingName = (id: string, displayName: string) => ({
       id,

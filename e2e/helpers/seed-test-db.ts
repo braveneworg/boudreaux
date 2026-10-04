@@ -1118,7 +1118,7 @@ const seedTestDatabase = async () => {
           '<p><strong>E2E Artist</strong> makes immersive soundscapes.</p>' +
           '<p>Seeded long bio with an <a href="https://en.wikipedia.org/wiki/Music">inline link</a> for the full bio page.</p>' +
           '<p><img src="https://cdn.fakefourrecords.com/media/artists/e2e-artist/bio/inline.jpg" alt="E2E inline bio image" width="1200" height="800"></p>',
-        genres: 'Experimental, Electronic',
+        genres: 'experimental,electronic',
         bioModel: 'fake/deterministic',
         bioGeneratedAt: new Date(),
         // Two bio images: the job's suggestion (isPrimary) and a human's
@@ -1336,7 +1336,7 @@ const seedTestDatabase = async () => {
         displayName: 'E2E Band',
         publishedOn: new Date(),
         formedOn: new Date('2010-01-01'),
-        genres: 'Punk',
+        genres: 'punk',
         createdAt: new Date('2019-06-01T00:00:00Z'),
       },
     });
