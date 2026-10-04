@@ -6,43 +6,23 @@ import 'server-only';
 import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import {
   checkCreditDecisions,
-  type CreditAwaitingConfirmation,
   type CreditConfirmation,
   type CreditDecisions,
   type PublishedWorkCreditedTo,
 } from '@/lib/utils/credit-confirmation';
-import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 
 import { failFromError } from './_internal/map-data-error';
 
 import type { ServiceResponse } from './service.types';
 
-/**
- * Whose credits a check reads: a release's stored credits, or the artists a
- * write is about to credit (a release form whose credits are not stored yet).
- */
-export type CreditSource = { releaseId: string } | { artistIds: string[] };
-
-/** What {@link CreditConfirmationService.publishConfirmed} needs. */
-export interface PublishConfirmedInput {
-  releaseId: string;
-  decisions: CreditDecisions;
-  /** The admin who made the decisions. */
-  publishedBy: string;
-}
-
-const readAwaiting = (source: CreditSource): Promise<CreditAwaitingConfirmation[]> =>
-  'releaseId' in source
-    ? ArtistCreditRepository.findAwaitingConfirmation(source.releaseId)
-    : ArtistCreditRepository.findAwaitingConfirmationAmong(source.artistIds);
-
 const UNKNOWN_READ = { UNKNOWN: 'Failed to read the release credits' };
 
 /**
  * The rule that a release publishes its credited artists only by
- * confirmation (ADR-0015). Every write that publishes a release, or credits an
- * artist on a published one, goes through {@link check} before it writes and
- * {@link publishConfirmed} after its credits are stored.
+ * confirmation (ADR-0015): what a publish would make public, and a check a
+ * write can make before it creates anything. The check that decides is the
+ * one inside the release write's own transaction (`ReleaseService`), against
+ * the credits it has just stored.
  */
 export class CreditConfirmationService {
   /** A release's credits awaiting confirmation and those that stay hidden. */
@@ -72,53 +52,22 @@ export class CreditConfirmationService {
   }
 
   /**
-   * Check that every credit awaiting confirmation has a decision. Fails with
+   * Check that every one of the given artists awaiting confirmation has a
+   * decision, for a write whose credits are not stored yet. Fails with
    * `VALIDATION`, naming the artists, when one does not. Writes nothing.
    */
   static async check(
-    source: CreditSource,
+    artistIds: string[],
     decisions: CreditDecisions
   ): Promise<ServiceResponse<void>> {
     try {
-      const outcome = checkCreditDecisions(await readAwaiting(source), decisions);
+      const awaiting = await ArtistCreditRepository.findAwaitingConfirmationAmong(artistIds);
+      const outcome = checkCreditDecisions(awaiting, decisions);
       return outcome.ok
         ? { success: true, data: undefined }
         : { success: false, code: 'VALIDATION', error: outcome.error };
     } catch (error) {
       return failFromError(error, UNKNOWN_READ);
-    }
-  }
-
-  /**
-   * Publish the artists the admin chose to publish, once the release's credits
-   * are stored. Checks the decisions against the stored credits first, so a
-   * credit added since the admin decided stops the write.
-   *
-   * @returns The number of artists published.
-   */
-  static async publishConfirmed({
-    releaseId,
-    decisions,
-    publishedBy,
-  }: PublishConfirmedInput): Promise<ServiceResponse<number>> {
-    const checked = await CreditConfirmationService.check({ releaseId }, decisions);
-    if (!checked.success) {
-      return checked;
-    }
-    if (decisions.publishArtistIds.length === 0) {
-      return { success: true, data: 0 };
-    }
-    try {
-      const count = await ArtistCreditRepository.publishCredited({
-        releaseId,
-        artistIds: decisions.publishArtistIds,
-        publishedBy,
-        now: new Date(),
-      });
-      invalidatePublicNameCaches();
-      return { success: true, data: count };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to publish the credited artists' });
     }
   }
 

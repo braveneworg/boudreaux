@@ -23,7 +23,14 @@ import type {
 
 import { publicArtistWhere } from './_internal/artist-where';
 import { orderedCredits } from './_internal/credit-order';
+import { runQuery } from './_internal/map-prisma-error';
 import { playableFormats } from './_internal/playable-formats';
+import {
+  addCredits,
+  publishConfirmedCredits,
+  syncCredits,
+  type CreditPublication,
+} from './_internal/release-credits';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { isPresent } from './_internal/where-kit';
 
@@ -359,6 +366,19 @@ const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
   };
 };
 
+export type { CreditPublication } from './_internal/release-credits';
+
+/** What a release update writes with the release, in the same transaction. */
+export interface ReleaseCreditsWrite {
+  /**
+   * The credits to store, in order: the first is the album artist. Absent,
+   * the stored credits stay as they are.
+   */
+  artistIds?: string[];
+  /** Set when the update publishes the release: the admin's decisions. */
+  publish?: CreditPublication;
+}
+
 /**
  * Data-access layer for the Release model and its directly-owned relations
  * (ReleaseUrl, ArtistRelease, and FeaturedArtist cleanup on release delete).
@@ -370,14 +390,25 @@ const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
  */
 export class ReleaseRepository {
   /**
-   * Create a new release, returning it with the full detail include
+   * Create a release and credit the given artists on it, in order, in one
+   * transaction: a failure leaves no release behind, so a retry does not
+   * meet its own title. Returns the release with the full detail include
    * (images unbounded, plus artists, digital formats + files, and URLs).
    */
-  static async create(data: CreateReleaseData): Promise<Release> {
-    return prisma.release.create({
-      data: toPrismaCreate(data),
-      include: releaseDetailIncludeUnorderedImages,
-    }) as Promise<Release>;
+  static async createWithCredits(data: CreateReleaseData, artistIds: string[]): Promise<Release> {
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        const { id } = await tx.release.create({
+          data: toPrismaCreate(data),
+          select: { id: true },
+        });
+        await addCredits(tx, id, artistIds);
+        return tx.release.findUniqueOrThrow({
+          where: { id },
+          include: releaseDetailIncludeUnorderedImages,
+        });
+      })
+    ) as Promise<Release>;
   }
 
   /**
@@ -421,15 +452,37 @@ export class ReleaseRepository {
   }
 
   /**
-   * Update a release by id with the full detail include (images unbounded,
-   * unordered to match the prior payload shape).
+   * Update a release, store the credits the write names and publish the
+   * artists the admin confirmed, in one transaction (ADR-0015). A release is
+   * never left public with half of a save behind it: a failure anywhere,
+   * including a {@link CreditDecisionError} from the credit check, keeps
+   * none of the write. Returns the release as the transaction left it, with
+   * the full detail include (images unbounded, unordered).
    */
-  static async update(id: string, data: UpdateReleaseData): Promise<Release> {
-    return prisma.release.update({
-      where: { id },
-      data: toPrismaUpdate(data),
-      include: releaseDetailIncludeUnorderedImages,
-    }) as Promise<Release>;
+  static async updateWithCredits(
+    id: string,
+    data: UpdateReleaseData,
+    { artistIds, publish }: ReleaseCreditsWrite
+  ): Promise<Release> {
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.release.update({
+          where: { id },
+          data: toPrismaUpdate(data),
+          select: { id: true },
+        });
+        if (artistIds) {
+          await syncCredits(tx, id, artistIds);
+        }
+        if (publish) {
+          await publishConfirmedCredits(tx, id, publish);
+        }
+        return tx.release.findUniqueOrThrow({
+          where: { id },
+          include: releaseDetailIncludeUnorderedImages,
+        });
+      })
+    ) as Promise<Release>;
   }
 
   /**
