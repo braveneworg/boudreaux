@@ -33,6 +33,7 @@ import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
+import { playableFormats } from './_internal/playable-formats';
 import { releaseWhere } from './_internal/release-where';
 
 import type { AssertExact } from './_internal/drift';
@@ -239,12 +240,15 @@ const artistSearchSelect = {
  * scalars (#765) without the bio, plus the fields `isPublicArtist` reads. The
  * credits are read whole, hidden artists included: the service derives each
  * release's credit from the full credit order and drops the hidden artists
- * afterwards (ADR-0015).
+ * afterwards (ADR-0015). The artist page is public, so each release carries
+ * only the playable format (`playableFormats`).
  */
 const releaseGraphInclude = {
   images: true,
   artistReleases: orderedCredits({ include: { artist: { select: artistCreditSelect } } }),
-  digitalFormats: { include: { files: { orderBy: { trackNumber: 'asc' } } } },
+  digitalFormats: playableFormats({
+    include: { files: { orderBy: { trackNumber: 'asc' } } },
+  } as const),
   releaseUrls: { include: { url: true } },
 } as const satisfies Prisma.ReleaseInclude;
 

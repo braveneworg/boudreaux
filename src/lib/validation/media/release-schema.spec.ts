@@ -93,7 +93,10 @@ describe('publishedReleaseDetailSchema', () => {
     expect(() => publishedReleaseDetailSchema.parse(publishedReleaseDetail)).not.toThrow();
   });
 
-  it('preserves a runtime streamUrl signed onto a digital format file', () => {
+  // Nothing public is signed any more: a public payload carries only the MP3
+  // format, served unsigned. A signed URL that reached the payload anyway is
+  // stripped, not passed to the browser.
+  it('strips a streamUrl from a digital format file', () => {
     const withStream = {
       ...publishedReleaseDetail,
       digitalFormats: [
@@ -101,7 +104,7 @@ describe('publishedReleaseDetailSchema', () => {
       ],
     };
     expect(
-      publishedReleaseDetailSchema.parse(withStream).digitalFormats[0].files[0].streamUrl
-    ).toBe('https://cf/signed');
+      publishedReleaseDetailSchema.parse(withStream).digitalFormats[0].files[0]
+    ).not.toHaveProperty('streamUrl');
   });
 });

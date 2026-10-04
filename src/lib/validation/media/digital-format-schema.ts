@@ -22,10 +22,6 @@ const digitalFormatFileSchema = z.object({
   uploadedAt: date,
   createdAt: date,
   updatedAt: date,
-  // Runtime-only: `attachStreamUrls` signs a CloudFront URL for non-public
-  // formats. Absent for public (MP3 320) files. Preserved (not stripped) so
-  // the media player can read it; not part of the Prisma scalar type.
-  streamUrl: z.string().nullish(),
 });
 
 /** `ReleaseDigitalFormat` with its child files (`digitalFormats: { include: { files } }`). */

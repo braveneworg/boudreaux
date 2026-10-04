@@ -119,3 +119,32 @@ Guest identity resolution moves to its own module; `PurchaseService` keeps
 - **Let the client keep choosing `mode=free`.** Rejected: a buyer could spend
   the free throttle on purpose, and a guest could skip authentication by
   naming the mode. The gate derives the mode from entitlement.
+
+## Enforcement (2026-10-04)
+
+The gate had a side door. The public release page (`/releases/[id]` and
+`GET /api/releases/[id]?withTracks=true`), the public artist page
+(`GET /api/artists/slug/[slug]?withReleases=true`) and the featured artists
+(home page, `GET /api/featured-artists?active=true`) loaded every format of
+a release — withdrawn ones included — with every file, and
+`attachStreamUrls` signed a 24-hour CloudFront URL for every file outside
+`MP3_320KBPS`. The responses went to anonymous visitors, and the artist and
+release routes are shared-cacheable. By the code's own design — the signing
+existed so that the trusted key group on the lossless paths would accept the
+request — any visitor held 24 hours of access to the paid files of every
+release they could see, and the gate never saw the request. (Whether the
+production distribution honoured those URLs is a CloudFront setting outside
+this repository.) No public surface used those URLs: every player plays the MP3
+format, which is served unsigned, and the download dialog reads the formats
+on offer from its own query.
+
+A public read now loads only the **playable format** — the active
+`MP3_320KBPS` — through one fragment, `playableFormats`
+(`src/lib/repositories/_internal/playable-formats.ts`). A spec scans the
+repositories for any other format load and fails unless it is listed with
+its reason (admin detail, admin create/restore, deletion cleanup, the
+buyer's own collection). `public-formats.contract.spec.ts` runs the real
+public reads on Docker Mongo against a release holding MP3, FLAC and a
+withdrawn format. The public featured read drops a linked format that is
+not the active MP3. `attachStreamUrls` and the `streamUrl` field on audio
+files are deleted; videos keep their own signed URLs.

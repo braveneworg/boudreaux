@@ -87,10 +87,6 @@ vi.mock('@/lib/services/release-service', () => ({
   },
 }));
 
-vi.mock('@/lib/utils/attach-stream-urls', () => ({
-  attachStreamUrls: <T,>(payload: T): T => payload,
-}));
-
 // Mock child components
 vi.mock('@/ui/page-container', () => ({
   PageContainer: ({ children }: { children: React.ReactNode }) => (

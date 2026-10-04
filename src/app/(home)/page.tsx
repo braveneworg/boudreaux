@@ -14,7 +14,6 @@ import {
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import { computeNextSkip } from '@/lib/types/pagination';
-import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import {
   buildBannerPreloadSrcSet,
   buildImagePreloadSrcSet,
@@ -29,16 +28,10 @@ import { PageContainer } from '@/ui/page-container';
 /**
  * Force dynamic rendering on every request.
  *
- * The featured-artists payload contains short-lived CloudFront-signed
- * streaming URLs (~24h TTL) generated server-side by `attachStreamUrls`.
- * If Next.js statically generates this page (or caches the fetch via
- * `revalidate`), the dehydrated state ships with a signature created at
- * build time / cache-write time, which can be stale on the very first
- * request after a deploy or after the fetch cache rolls over — producing
- * 403s in the audio player until a refresh forces a fresh render.
- *
- * Forcing dynamic guarantees every request signs URLs with the current
- * server time, against the current env-provided key pair.
+ * The featured artists are chosen by today's date, and the banners and
+ * releases change as admins publish. A statically generated page would ship
+ * the set chosen at build time until the next deploy; the services' own
+ * `withCache` keeps the per-request cost low.
  */
 export const dynamic = 'force-dynamic';
 
@@ -95,8 +88,7 @@ export default async function Home() {
   // API routes over HTTP — same data, same shapes as the routes the client
   // hooks hit, minus a self-HTTP round-trip per query on this force-dynamic
   // page. Server-side caching is preserved: both services cache via
-  // `withCache`, and `attachStreamUrls` signs URLs at request time (see the
-  // `force-dynamic` comment above).
+  // `withCache` (see the `force-dynamic` comment above).
   await Promise.all([
     queryClient.prefetchQuery({
       queryKey: queryKeys.featuredArtists.active(),
@@ -105,10 +97,10 @@ export default async function Home() {
         if (!result.success) {
           throw new Error(result.error);
         }
-        // Mirror /api/featured-artists?active=true: BigInt → Number, then
-        // attach fresh CloudFront-signed stream URLs.
+        // Mirror /api/featured-artists?active=true: BigInt → Number. A featured
+        // row carries only the playable format, served unsigned.
         return {
-          featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
+          featuredArtists: serializeForResponse(result.data),
           count: result.data.length,
         };
       },
