@@ -168,6 +168,14 @@ test.describe('Admin video form — create', () => {
     await expect(artistOption).toBeVisible({ timeout: 5_000 });
     await artistOption.click();
 
+    // Picking the primary starts the review section's debounced name lookup
+    // (400 ms). In CI (run 37236836645) its result landed while the featured
+    // popover was open, and the popover closed under the click on "Add". Wait
+    // for the lookup to land before the featured popover is opened.
+    await expect(
+      adminPage.getByRole('link', { name: 'Links to existing artist Test Artist One' })
+    ).toBeVisible();
+
     // Now open the featured combobox and add a free-text featured artist name.
     // Stable accessible name via <label htmlFor> → "Featured artists".
     const featuredTrigger = adminPage.getByRole('combobox', { name: 'Featured artists' });
