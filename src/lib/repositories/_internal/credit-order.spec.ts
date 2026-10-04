@@ -1,20 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { lineOf, repositorySources } from '@/test-utils/repository-sources';
 
 import { creditOrderBy, orderedCredits } from './credit-order';
-
-const REPOSITORIES_DIR = join(__dirname, '..');
-
-/** Every non-spec TypeScript source under `src/lib/repositories`, recursively. */
-const repositorySources = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return repositorySources(path);
-    return entry.name.endsWith('.ts') && !entry.name.includes('.spec.') ? [path] : [];
-  });
 
 // A relation filter (`some` / `none` / `every`) is not a load and needs no
 // order; a bare identifier is allowed only when this file declares it as
@@ -31,7 +20,7 @@ const unorderedLoads = (source: string): number[] => {
       if (next === 'orderedCredits(' || /^\{\s*(?:some|none|every)\b/.test(next)) return false;
       return !ordered.has(next);
     })
-    .map((match) => source.slice(0, match.index).split('\n').length);
+    .map((match) => lineOf(source, match.index));
 };
 
 describe('orderedCredits', () => {
@@ -60,10 +49,8 @@ describe('orderedCredits', () => {
   });
 
   it('is the only way a repository loads artistReleases', () => {
-    const unordered = repositorySources(REPOSITORIES_DIR).flatMap((path) =>
-      unorderedLoads(readFileSync(path, 'utf8')).map(
-        (line) => `${path.replace(REPOSITORIES_DIR, '')}:${line}`
-      )
+    const unordered = repositorySources().flatMap(({ path, source }) =>
+      unorderedLoads(source).map((line) => `${path}:${line}`)
     );
 
     expect(unordered).toEqual([]);

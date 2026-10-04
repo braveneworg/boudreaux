@@ -10,7 +10,6 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { computeNextSkip } from '@/lib/types/pagination';
-import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
@@ -57,7 +56,7 @@ const handleActiveListing = async (searchParams: URLSearchParams): Promise<NextR
 
   return NextResponse.json(
     {
-      featuredArtists: attachStreamUrls(serializeForResponse(result.data)),
+      featuredArtists: serializeForResponse(result.data),
       count: result.data.length,
     },
     {

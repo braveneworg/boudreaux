@@ -174,6 +174,13 @@ encodings the **free tier** may take; every other format needs
 download it until it is hard-deleted, when its files are gone for good.
 _Avoid_: deleted format (ambiguous with hard delete).
 
+**playable format** — the one **digital format** a public surface plays:
+`MP3_320KBPS`, when it is not withdrawn. Its files are served openly and
+need no signature. A public page or payload carries this format and no
+other; every other format reaches a listener only through the **download
+gate**. A Release whose MP3 is withdrawn has nothing to play.
+_Avoid_: stream format, preview format.
+
 **download subject** — who is downloading: a signed-in User, or a **guest**
 identified by a visitor cookie together with a browser fingerprint. Every
 download rule is keyed on the subject.

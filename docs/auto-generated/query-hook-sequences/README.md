@@ -135,7 +135,7 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 
 ### 14. useActiveFeaturedArtistsQuery
 
-**Validated.** Public homepage spotlight (`home-content`), hitting `/api/featured-artists?active=true&limit=7`. The rate-limited route calls `FeaturedArtistsService.getFeaturedArtists` (a `withCache`-wrapped `findMany` filtered to published + within the featured window), then `serializeForResponse` + `attachStreamUrls`, returning CDN-cacheable JSON. Validates against inline `z.object({ featuredArtists: array(featuredArtistSchema), count })`. PDF page 14.
+**Validated.** Public homepage spotlight (`home-content`), hitting `/api/featured-artists?active=true&limit=7`. The rate-limited route calls `FeaturedArtistsService.getFeaturedArtists` (a `withCache`-wrapped `findMany` filtered to published + within the featured window, each row's linked format kept only if it is the active MP3 format), then `serializeForResponse`, returning CDN-cacheable JSON with nothing signed. Validates against inline `z.object({ featuredArtists: array(featuredArtistSchema), count })`. PDF page 14.
 
 ---
 

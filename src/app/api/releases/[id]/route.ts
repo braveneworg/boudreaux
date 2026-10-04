@@ -10,7 +10,6 @@ import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ReleaseService } from '@/lib/services/release-service';
-import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
@@ -42,7 +41,11 @@ const getAdminRelease = withAdmin(
   }
 );
 
-/** The public by-id read (`withTracks=true`): the published, narrow-projected player payload. */
+/**
+ * The public by-id read (`withTracks=true`): the published, narrow-projected
+ * player payload. It carries only the playable format, whose files are served
+ * unsigned, so nothing in it is signed.
+ */
 const getPublishedRelease = async (id: string): Promise<NextResponse> => {
   const result = await ReleaseService.getReleaseWithTracks(id);
 
@@ -50,7 +53,7 @@ const getPublishedRelease = async (id: string): Promise<NextResponse> => {
     return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
 
-  return NextResponse.json(attachStreamUrls(serializeForResponse(result.data)), {
+  return NextResponse.json(serializeForResponse(result.data), {
     headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL },
   });
 };

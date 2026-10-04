@@ -10,12 +10,19 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
+import { isPlayableFormat } from '@/lib/utils/playable-format';
 import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
 
 import type { ServiceResponse } from './service.types';
+
+/** A featured row as the public may see it: its linked format only if it is the active playable one. */
+const withPlayableFormatOnly = (artist: FeaturedArtist): FeaturedArtist =>
+  artist.digitalFormat && !isPlayableFormat(artist.digitalFormat)
+    ? { ...artist, digitalFormat: null }
+    : artist;
 
 export class FeaturedArtistsService {
   static async createFeaturedArtist(
@@ -42,7 +49,10 @@ export class FeaturedArtistsService {
         try {
           const artists = await FeaturedArtistRepository.findFeatured(currentDate, limit);
 
-          return { success: true as const, data: artists };
+          // A public payload carries only the playable format (the admin form
+          // links the MP3, but the actions accept any format id, and a linked
+          // format can be withdrawn later); anything else is dropped here.
+          return { success: true as const, data: artists.map(withPlayableFormatOnly) };
         } catch (error) {
           return failFromError(error, { UNKNOWN: 'Failed to fetch artists' });
         }

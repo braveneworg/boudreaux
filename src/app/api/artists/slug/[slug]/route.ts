@@ -7,7 +7,6 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
-import { attachStreamUrls } from '@/lib/utils/attach-stream-urls';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
@@ -50,10 +49,10 @@ export const GET = withRateLimit<{ slug: string }>(
     // the graph to its public scalars, and parsing through the public wire
     // schema — whose objects strip unknown keys — drops anything a future
     // include/select re-adds (contact PII, notes, audit actors, job tokens)
-    // before it can be serialised. Stream URLs are attached after the parse,
-    // which would otherwise strip them too.
+    // before it can be serialised. Each release carries only the playable
+    // format, whose files are served unsigned, so nothing in it is signed.
     const responseData = withReleases
-      ? attachStreamUrls(serializeForResponse(artistWithPublishedReleasesSchema.parse(result.data)))
+      ? serializeForResponse(artistWithPublishedReleasesSchema.parse(result.data))
       : serializeForResponse(artistPublicScalarSchema.parse(result.data));
 
     // The projected payload carries nothing private, so it may stay
