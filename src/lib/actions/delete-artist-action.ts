@@ -10,12 +10,13 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { runAdminEntityAction, type AdminActionResult } from './run-admin-entity-action';
 
 /**
- * Server action to hard-delete an artist. `ArtistService.deleteArtist` runs
- * the repository cascade (join rows, gallery images/urls, then the artist row
- * in one transaction) and best-effort deletes the gallery images from S3.
- * Distinct from {@link archiveArtistAction}, the soft delete the admin list
- * offers on active rows. Returns a plain result the
- * {@link useDeleteArtistMutation} hook maps to a toast.
+ * Server action to hard-delete an artist. `ArtistService.deleteArtist` refuses
+ * an artist that is not archived, runs the repository cascade (join rows, bio
+ * images and links, urls, then the artist row in one transaction), and then
+ * best-effort removes the artist's re-hosted bio images from S3. Distinct from
+ * {@link archiveArtistAction}, the soft delete the admin list offers on active
+ * rows. Returns a plain result the {@link useDeleteArtistMutation} hook maps to
+ * a toast.
  */
 export const deleteArtistAction = async (artistId: string): Promise<AdminActionResult> =>
   runAdminEntityAction({

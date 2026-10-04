@@ -132,6 +132,13 @@ describe('ArtistService', () => {
     });
 
     it('are cleared when an artist is deleted', async () => {
+      // Only an archived artist may be deleted permanently.
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce({
+        ...artist,
+        deletedOn: new Date('2026-01-01'),
+      } as never);
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValueOnce([]);
+
       await ArtistService.deleteArtist('artist-123');
 
       expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
@@ -691,7 +698,21 @@ describe('ArtistService', () => {
   });
 
   describe('deleteArtist', () => {
-    it('should delete an artist successfully', async () => {
+    const archivedArtist = { ...mockArtist, deletedOn: new Date('2026-01-01') };
+
+    beforeEach(() => {
+      vi.stubEnv('CDN_DOMAIN', 'cdn.example');
+      vi.mocked(ArtistRepository.findById).mockResolvedValue(archivedArtist as never);
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.mocked(ArtistRepository.findById).mockReset();
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockReset();
+    });
+
+    it('should delete an archived artist successfully', async () => {
       vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
 
       const result = await ArtistService.deleteArtist('artist-123');
@@ -700,13 +721,78 @@ describe('ArtistService', () => {
       expect(ArtistRepository.delete).toHaveBeenCalledWith('artist-123');
     });
 
+    // "Archive first, then delete permanently" was enforced only by which
+    // button the admin list renders; the service is the gate.
+    it('refuses to delete an artist that is not archived', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValue(mockArtist as never);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Archive the artist before deleting it permanently.',
+        code: 'VALIDATION',
+      });
+      expect(ArtistRepository.delete).not.toHaveBeenCalled();
+    });
+
     it('should return error when artist not found', async () => {
-      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
-      vi.mocked(ArtistRepository.delete).mockRejectedValue(notFoundError);
+      vi.mocked(ArtistRepository.findById).mockResolvedValue(null);
 
       const result = await ArtistService.deleteArtist('non-existent');
 
       expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+      expect(ArtistRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('reports not found when the artist is gone by the time it is deleted', async () => {
+      vi.mocked(ArtistRepository.delete).mockRejectedValue(
+        new DataError('NOT_FOUND', 'Record not found')
+      );
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+    });
+
+    // The re-hosted bio images live in our bucket; the row cascade removed
+    // their rows but left the objects behind.
+    it('removes the deleted artist’s re-hosted bio images from S3', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValue([
+        {
+          url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp',
+          thumbnailUrl: 'https://cdn.example/media/artists/a1/bio/thumbs/0-abc.webp',
+        },
+        { url: 'https://upload.wikimedia.org/external.jpg', thumbnailUrl: null },
+      ] as never);
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      await ArtistService.deleteArtist('artist-123');
+
+      expect(vi.mocked(deleteS3Object).mock.calls).toEqual([
+        ['media/artists/a1/bio/img/0-abc.webp'],
+        ['media/artists/a1/bio/thumbs/0-abc.webp'],
+      ]);
+    });
+
+    it('still reports the delete when an S3 cleanup fails', async () => {
+      vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValue([
+        { url: 'https://cdn.example/media/artists/a1/bio/img/0-abc.webp', thumbnailUrl: null },
+      ] as never);
+      vi.mocked(deleteS3Object).mockRejectedValueOnce(new Error('S3 down'));
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect(result).toMatchObject({ success: true, data: mockArtist });
+    });
+
+    it('drops the deleted artist’s terms from the vocabulary counts', async () => {
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      await ArtistService.deleteArtist('artist-123');
+
+      expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
 
     it('should return error when database is unavailable', async () => {
@@ -736,6 +822,15 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: archivedArtist });
       expect(ArtistRepository.archive).toHaveBeenCalledWith('artist-123');
+    });
+
+    // The vocabulary counts read only non-deleted artists.
+    it('drops the archived artist’s terms from the vocabulary counts', async () => {
+      vi.mocked(ArtistRepository.archive).mockResolvedValue(mockArtist);
+
+      await ArtistService.archiveArtist('artist-123');
+
+      expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
 
     it('should return error when artist not found', async () => {
@@ -820,6 +915,14 @@ describe('ArtistService', () => {
 
       expect(result).toMatchObject({ success: true, data: restoredArtist });
       expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', { deletedOn: null });
+    });
+
+    it('brings the restored artist’s terms back into the vocabulary counts', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist as never);
+
+      await ArtistService.restoreArtist('artist-123');
+
+      expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
 
     it('should return error when artist not found', async () => {
