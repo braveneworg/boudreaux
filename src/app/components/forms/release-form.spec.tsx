@@ -386,6 +386,25 @@ describe('ReleaseForm — publishing (ADR-0015)', () => {
 
     expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
   });
+
+  // The defect this guards: Publish wrote the publish date into the form, a
+  // refused write left it there, and the next plain Save published.
+  it('does not publish on the next Save after the server refuses a publish', async () => {
+    vi.mocked(updateReleaseAction).mockResolvedValueOnce({ fields: {}, success: false });
+    render(<ReleaseForm releaseId="rel-1" />);
+    const user = userEvent.setup({ delay: null });
+    await user.type(await screen.findByLabelText('Suggested price in dollars'), '9.99');
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(updateReleaseAction).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(updateReleaseAction).mock.calls[0][2].get('publishedAt')).toBeTruthy();
+
+    // The refused submit settles before Save reads "Save" again.
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(updateReleaseAction).toHaveBeenCalledTimes(2));
+
+    expect(vi.mocked(updateReleaseAction).mock.calls[1][2].get('publishedAt')).toBeFalsy();
+  });
 });
 
 describe('ReleaseForm — delete (hard)', () => {

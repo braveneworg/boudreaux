@@ -67,12 +67,12 @@ new entity CRUD forms should reach for first.
 It does **not** fit `video-form` or `featured-artist-form`, and they were
 deliberately left alone after the fit was checked:
 
-| Form                   | On success    | Failure handling                                    |
-| ---------------------- | ------------- | --------------------------------------------------- |
-| `artist-form`          | `reset`       | generic copy                                        |
-| `release-form`         | `reset`       | generic copy                                        |
-| `video-form`           | `router.push` | server message + `applyServerFieldErrors` per field |
-| `featured-artist-form` | `router.push` | `buildCreateErrorMessage` / server `error` body     |
+| Form                   | On success                                                      | Failure handling                                    |
+| ---------------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| `artist-form`          | `reset`; a create then navigates to the edit page or `returnTo` | generic copy                                        |
+| `release-form`         | `reset`                                                         | generic copy                                        |
+| `video-form`           | `router.push`                                                   | server message + `applyServerFieldErrors` per field |
+| `featured-artist-form` | `router.push`                                                   | `buildCreateErrorMessage` / server `error` body     |
 
 Both navigate away rather than resetting, so `reset` would be meaningless work.
 More importantly both carry **richer failure handling than the protocol
@@ -115,3 +115,24 @@ this ADR.
   give that form back a single line of `id ? update(...) : create(...)`. That is
   a pass-through wearing a hook's clothes, which is the thing this ADR exists to
   avoid.
+
+## Amendment (2026-10-04): Publish puts its date on the payload, not the form
+
+`artist-form` and `release-form` implemented Publish as "write the
+publication date into the form field, then submit". When that submit failed
+— the form did not validate, or the server refused the write — the date
+stayed in the field, dirty. Save is enabled by a dirty form, so the next
+plain Save sent the date and published. (`release-form` took the date back
+only when the admin cancelled the credit confirmation.)
+
+Both forms now submit the validated values with the date merged into the
+payload — `handleSubmit((data) => submit({ ...data, publishedOn: now }))` —
+and never write it to the form. A failed publish leaves nothing behind; a
+successful one resets the form to the submitted, published values through
+the protocol's own `reset`. The protocol's five members are unchanged.
+
+The table above also said `artist-form` stays on the page after a
+successful write; a create navigates to the new artist's edit page (or the
+`returnTo` page), so the create path's `reset` is the meaningless work the
+scope section describes. Moving `artist-form` off the protocol for creates
+is not worth a second submit path; the row now says what happens.

@@ -23,11 +23,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 const decisions = { publishArtistIds: ['a'], keepHiddenArtistIds: ['b'] };
 const publishing = { publishedAt: '2026-09-27T12:00:00.000Z', artistIds: ['a', 'b'] };
 
-const renderGate = (isPublished = false) => {
-  const clearPublishedAt = vi.fn();
-  const rendered = renderHook(() => useReleaseCreditGate({ isPublished, clearPublishedAt }));
-  return { ...rendered, clearPublishedAt };
-};
+const renderGate = (isPublished = false) => renderHook(() => useReleaseCreditGate({ isPublished }));
 
 describe('useReleaseCreditGate', () => {
   beforeEach(() => {
@@ -93,24 +89,6 @@ describe('useReleaseCreditGate', () => {
     const proceed = await act(() => result.current.resolve(publishing));
 
     expect(proceed).toBe(false);
-  });
-
-  it('takes back the publication date of a release that was not published', async () => {
-    creditDecisions.requestDecisions.mockResolvedValue(null);
-    const { result, clearPublishedAt } = renderGate(false);
-
-    await act(() => result.current.resolve(publishing));
-
-    expect(clearPublishedAt.mock.calls).toEqual([[]]);
-  });
-
-  it('keeps the publication date of a release that is already published', async () => {
-    creditDecisions.requestDecisions.mockResolvedValue(null);
-    const { result, clearPublishedAt } = renderGate(true);
-
-    await act(() => result.current.resolve(publishing));
-
-    expect(clearPublishedAt.mock.calls).toEqual([]);
   });
 
   it('stops the save and says why when the credits cannot be loaded', async () => {
