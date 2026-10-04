@@ -33,7 +33,16 @@ export const featuredArtistSchema = z.object({
       firstName: z.string(),
       surname: z.string(),
       slug: z.string(),
-      bioImages: z.array(z.object({ url: z.string() })),
+      // The artist's display images, resolved server-side (first = the image
+      // a human chose); the resolution fields travel with them.
+      bioImages: z.array(
+        z.object({
+          url: z.string(),
+          alt: nullableString,
+          isPrimary: z.boolean(),
+          displayOrder: z.number().nullable(),
+        })
+      ),
     })
   ),
   digitalFormat: digitalFormatWithFilesSchema.nullable(),

@@ -248,7 +248,14 @@ export const featuredArtist = {
   coverArt: null,
   featuredTrackNumber: null,
   releaseId: null,
-  artists: [{ ...artistScalar, bioImages: [{ url: 'https://cdn.example.com/bio.jpg' }] }],
+  artists: [
+    {
+      ...artistScalar,
+      bioImages: [
+        { url: 'https://cdn.example.com/bio.jpg', alt: 'Bio', isPrimary: false, displayOrder: 0 },
+      ],
+    },
+  ],
   digitalFormat,
   release: {
     ...releaseScalar,

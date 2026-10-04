@@ -10,12 +10,27 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
+import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
 
 import type { ServiceResponse } from './service.types';
+
+/**
+ * A featured row's artists with their images resolved to the display images
+ * (ADR-0008): the human's chosen rows by position, else the job's suggested
+ * rows that have alt text — so the cover fallback (`bioImages[0]`) is the
+ * image a human chose.
+ */
+const withDisplayImages = (featured: FeaturedArtist): FeaturedArtist => ({
+  ...featured,
+  artists: featured.artists.map((artist) => ({
+    ...artist,
+    bioImages: resolveDisplayImages(artist.bioImages),
+  })),
+});
 
 export class FeaturedArtistsService {
   static async createFeaturedArtist(
@@ -42,7 +57,9 @@ export class FeaturedArtistsService {
         try {
           const artists = await FeaturedArtistRepository.findFeatured(currentDate, limit);
 
-          return { success: true as const, data: artists };
+          // Each artist's images are resolved to its display images (a human's
+          // choice first), so a cover fallback reads the image a human chose.
+          return { success: true as const, data: artists.map(withDisplayImages) };
         } catch (error) {
           return failFromError(error, { UNKNOWN: 'Failed to fetch artists' });
         }

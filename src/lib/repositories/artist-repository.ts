@@ -30,7 +30,7 @@ import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
-import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { releaseWhere } from './_internal/release-where';
@@ -145,16 +145,6 @@ const artistListingNameSelect = {
 } as const satisfies Prisma.ArtistSelect;
 
 /**
- * Display-image candidates: the human's chosen rows (`displayOrder: { gte: 0 }`
- * matches only numbers — null and absent both fail) or the job's suggested
- * rows. No DB-level take: Mongo sorts nulls first, so a cap here would return
- * unchosen rows; the service resolves and caps after the read.
- */
-const displayImageCandidateWhere = {
-  OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }],
-} as const satisfies Prisma.ArtistBioImageWhereInput;
-
-/**
  * Public artists-index select — the identifying scalars only (this payload
  * leaves the server, so contact fields are never selected), the display-image
  * candidates, the band graph as name projections, and the artist's
@@ -178,7 +168,7 @@ const artistListingSelect = {
   diedOn: true,
   formedOn: true,
   bioImages: {
-    where: displayImageCandidateWhere,
+    where: bioImageWhere.displayCandidate,
     orderBy: { sortOrder: 'asc' },
     select: {
       id: true,
@@ -222,7 +212,7 @@ const artistSearchSelect = {
   ...artistListingNameSelect,
   slug: true,
   bioImages: {
-    where: displayImageCandidateWhere,
+    where: bioImageWhere.displayCandidate,
     orderBy: { sortOrder: 'asc' },
     select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
   },
