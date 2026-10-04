@@ -44,8 +44,8 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   the artists, when one has no decision, when an id to publish does not
   await confirmation, or when an id is in both lists. The dialogs are how
   the lists are built; they are not the gate.
-- **A release is always created unpublished.** Its credits are stored after
-  it, so `ReleaseService.createRelease` drops any publication date and
+- **A release is always created unpublished.** Publishing checks the stored
+  credits, so `ReleaseService.createRelease` drops any publication date and
   publishing goes through `publishRelease`, which checks the stored credits.
 - **Who decided is recorded.** `publishedBy` on each artist is the admin's id
   from the session, never a value from the request.
@@ -142,8 +142,9 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   unpublish action for artists, and permanently deleting an artist applies
   only to one already archived, so neither shows the warning.
 - A publishing save on the release form is held until the admin answers. If
-  the admin cancels, the form takes back the publication date the publish
-  button set, so a later plain save does not publish by accident.
+  the admin cancels, nothing is saved, and a later plain save does not
+  publish by accident: the publish button puts its date on the payload, never
+  on the form (ADR-0003, amended 2026-10-04).
 - A release credited only to hidden artists is public with no byline, and
   its player runs without an album artist.
 - **A release whose album artist is hidden is public with no byline**
@@ -164,3 +165,14 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   are no longer candidates.
 - A soft-deleted artist and its numbered successor can both exist. Restoring
   the deleted one leaves two artists for an admin to merge by hand.
+- **A release save is one transaction** (2026-10-04). The release's fields,
+  the credits the save names and the artists it publishes are written in
+  one MongoDB transaction, and the check runs inside it, against the credits
+  it has just stored (`ReleaseRepository.updateWithCredits`). They used to be
+  three writes: a failure after the first left the release public with stale
+  credits, or without the artists the admin had confirmed. A refused check
+  now keeps none of the save. A new release is created with its credits in
+  one transaction too (`createWithCredits`), so a failed credit write no
+  longer leaves an uncredited draft whose title blocks the retry. Publishing
+  a new release is still a second write; when it fails, the draft keeps its
+  credits and the form says why.

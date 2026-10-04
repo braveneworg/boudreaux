@@ -68,7 +68,8 @@ means removing the ordering and labels with it.
   not reorder existing rows; the admin listing shares this limitation.~~
   **Closed 2026-10-03:** credit order is a stored fact. `ArtistRelease.position`
   (dense from 0; position 0 is the album artist) is written whole by
-  `ArtistCreditRepository.syncCredits` from the form's list order, so moving
+  `syncCredits` from the form's list order (inside the release save's own
+  transaction since 2026-10-04, `_internal/release-credits.ts`), so moving
   an artist to the front makes it the album artist, and every credit read
   orders by `creditOrderBy` (`position`, then `id` for rows that predate the
   field — their insertion order). `scripts/backfill-credit-positions.ts`
