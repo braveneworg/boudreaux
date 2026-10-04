@@ -63,6 +63,7 @@ import {
   sanitizeBioText,
 } from '@/lib/utils/sanitize-bio-html';
 import { splitFullName } from '@/lib/utils/split-full-name';
+import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
@@ -88,6 +89,11 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
   if (typeof sanitized.shortBio === 'string')
     sanitized.shortBio = sanitizeBioHtmlNoImages(sanitized.shortBio);
   if (typeof sanitized.altBio === 'string') sanitized.altBio = sanitizeBioHtml(sanitized.altBio);
+  // Genres and tags have one storage form (ADR-0009). The admin combobox
+  // normalises as a convenience; this is the gate every writer crosses. An
+  // omitted field stays omitted so an update does not clear it.
+  if (sanitized.genres !== undefined) sanitized.genres = normalizeVocabularyList(sanitized.genres);
+  if (sanitized.tags !== undefined) sanitized.tags = normalizeVocabularyList(sanitized.tags);
   return sanitized;
 };
 

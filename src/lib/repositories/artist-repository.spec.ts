@@ -10,6 +10,7 @@ import {
 } from '@/lib/types/domain/artist';
 
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { releaseWhere } from './_internal/release-where';
 import { ArtistRepository } from './artist-repository';
@@ -1191,6 +1192,51 @@ describe('ArtistRepository', () => {
         where: { id: 'a1' },
         data: { bioJobToken: null },
       });
+    });
+  });
+
+  describe('beginBioRun', () => {
+    // One conditional write replaces read-then-write: the job begins unless it
+    // is `processing` with a fresh start, and the write stamps the start.
+    it('claims the run with the runner gate as the where and stamps the start', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+      const now = new Date('2026-10-03T12:00:00.000Z');
+
+      expect(await ArtistRepository.beginBioRun('a1', now)).toBe(true);
+
+      expect(prisma.artist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'a1', AND: [mayBeginRunWhere('bioStatus', 'bioStartedAt', now)] },
+        data: { bioStatus: 'processing', bioStartedAt: now, bioError: null },
+      });
+    });
+
+    it('returns false when another runner already began it', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      expect(await ArtistRepository.beginBioRun('a1', new Date())).toBe(false);
+    });
+  });
+
+  describe('beginImageLinksRun', () => {
+    it('claims the run with the runner gate as the where and stamps the start', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 1 } as never);
+      const now = new Date('2026-10-03T12:00:00.000Z');
+
+      expect(await ArtistRepository.beginImageLinksRun('a1', now)).toBe(true);
+
+      expect(prisma.artist.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'a1',
+          AND: [mayBeginRunWhere('imageLinksStatus', 'imageLinksStartedAt', now)],
+        },
+        data: { imageLinksStatus: 'processing', imageLinksStartedAt: now, imageLinksError: null },
+      });
+    });
+
+    it('returns false when another runner already began it', async () => {
+      vi.mocked(prisma.artist.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      expect(await ArtistRepository.beginImageLinksRun('a1', new Date())).toBe(false);
     });
   });
 

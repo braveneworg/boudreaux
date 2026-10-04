@@ -42,6 +42,7 @@ vi.mock('@/lib/repositories/video-repository', () => ({
   VideoRepository: {
     getEnrichmentState: vi.fn(),
     setEnrichmentStatus: vi.fn(),
+    beginEnrichmentRun: vi.fn(),
     setEnrichmentJobToken: vi.fn(),
     claimEnrichmentJobToken: vi.fn(),
     setEnrichmentProgress: vi.fn(),
@@ -146,6 +147,7 @@ beforeEach(() => {
   vi.mocked(VideoArtistRepository.replaceForVideo).mockResolvedValue(undefined);
   vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
   vi.mocked(VideoEnrichmentSuggestionRepository.replacePending).mockResolvedValue(undefined);
+  vi.mocked(VideoRepository.beginEnrichmentRun).mockResolvedValue(true);
   vi.mocked(VideoEnrichmentSuggestionRepository.findByVideoId).mockResolvedValue([]);
   vi.mocked(VideoEnrichmentSuggestionRepository.findExistingFacts).mockResolvedValue([]);
   vi.mocked(VideoEnrichmentSuggestionRepository.deletePendingForArtists).mockResolvedValue(
@@ -304,9 +306,7 @@ describe('runEnrichmentJob', () => {
 
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
 
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'processing', {
-      error: null,
-    });
+    expect(VideoRepository.beginEnrichmentRun).toHaveBeenCalledWith(VIDEO_ID, expect.any(Date));
     expect(sentPayload().category).toBe('INFORMATIONAL');
   });
 
@@ -315,17 +315,19 @@ describe('runEnrichmentJob', () => {
 
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
 
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(VideoRepository.beginEnrichmentRun).not.toHaveBeenCalled();
   });
 
-  it('refuses to double-dispatch while a processing job is fresh', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentStartedAt: new Date() })
-    );
+  // The runner gate is the conditional write: when another runner has already
+  // begun the job (the trigger action and the post-save dispatch can both reach
+  // here), this one loses the write and never invokes the Lambda.
+  it('refuses to double-dispatch when another runner already began the job', async () => {
+    vi.mocked(VideoRepository.beginEnrichmentRun).mockResolvedValueOnce(false);
 
     await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
 
     expect(sendMock).not.toHaveBeenCalled();
+    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
   });
 
   it('completes in-process from the fixture on the fake path', async () => {
