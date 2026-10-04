@@ -107,6 +107,13 @@ test.describe('Admin video artist-review — edit-page flow', () => {
     await expect(primaryOption).toBeVisible({ timeout: 5_000 });
     await primaryOption.click();
 
+    // Let the review lookup for the primary land before the featured popover
+    // opens: a lookup landing under the open popover closed it in CI (run
+    // 37236836645, admin-video-form.spec.ts).
+    await expect(
+      adminPage.getByRole('link', { name: `Links to existing artist ${EXISTING_ARTIST_NAME}` })
+    ).toBeVisible();
+
     // Add a free-text featured artist "Zora Quill Brandt" via the Featured
     // artists combobox. This composes the artist string to:
     //   "E2E Review Lead feat. Zora Quill Brandt"

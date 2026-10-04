@@ -10,6 +10,7 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
+import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { isPlayableFormat } from '@/lib/utils/playable-format';
 import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
@@ -23,6 +24,20 @@ const withPlayableFormatOnly = (artist: FeaturedArtist): FeaturedArtist =>
   artist.digitalFormat && !isPlayableFormat(artist.digitalFormat)
     ? { ...artist, digitalFormat: null }
     : artist;
+
+/**
+ * A featured row's artists with their images resolved to the display images
+ * (ADR-0008): the human's chosen rows by position, else the job's suggested
+ * rows that have alt text — so the cover fallback (`bioImages[0]`) is the
+ * image a human chose.
+ */
+const withDisplayImages = (featured: FeaturedArtist): FeaturedArtist => ({
+  ...featured,
+  artists: featured.artists.map((artist) => ({
+    ...artist,
+    bioImages: resolveDisplayImages(artist.bioImages),
+  })),
+});
 
 export class FeaturedArtistsService {
   static async createFeaturedArtist(
@@ -52,7 +67,12 @@ export class FeaturedArtistsService {
           // A public payload carries only the playable format (the admin form
           // links the MP3, but the actions accept any format id, and a linked
           // format can be withdrawn later); anything else is dropped here.
-          return { success: true as const, data: artists.map(withPlayableFormatOnly) };
+          // Each artist's images are resolved to its display images (a human's
+          // choice first), so a cover fallback reads the image a human chose.
+          return {
+            success: true as const,
+            data: artists.map((artist) => withDisplayImages(withPlayableFormatOnly(artist))),
+          };
         } catch (error) {
           return failFromError(error, { UNKNOWN: 'Failed to fetch artists' });
         }

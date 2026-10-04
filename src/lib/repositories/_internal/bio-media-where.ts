@@ -23,6 +23,21 @@ export const bioMediaWhere = {
 >;
 
 /**
+ * Bio-image `where` fragments. Proved by
+ * `bio-image-display-where.contract.spec.ts`.
+ */
+export const bioImageWhere = {
+  /**
+   * The rows display-image resolution can pick from: a human's chosen row
+   * (`displayOrder: { gte: 0 }` matches only numbers — null and absent both
+   * fail) or the job's suggested row. No DB-level take belongs beside it:
+   * Mongo sorts nulls first, so a cap would return unchosen rows; the service
+   * resolves and caps after the read (`resolveDisplayImages`).
+   */
+  displayCandidate: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
+} as const satisfies Record<string, Prisma.ArtistBioImageWhereInput>;
+
+/**
  * Bio-link `where` fragments. A link plays the **reference** role unless it
  * explicitly opted out (`reference: false`, an image-source-only row); legacy
  * rows have the field null or absent and read as reference links.
