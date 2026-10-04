@@ -5,7 +5,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
-import { creditOrderBy } from './_internal/credit-order';
+import { orderedCredits } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { purchaseWhere } from './_internal/purchase-where';
 import { allOf } from './_internal/where-kit';
@@ -143,8 +143,7 @@ export class PurchaseRepository {
             // The full credit order with each artist's gate fields; the
             // collection read applies the byline rule (`withPublicByline`)
             // so only public artists are named (ADR-0015).
-            artistReleases: {
-              orderBy: creditOrderBy,
+            artistReleases: orderedCredits({
               select: {
                 artist: {
                   select: {
@@ -157,7 +156,7 @@ export class PurchaseRepository {
                   },
                 },
               },
-            },
+            }),
             digitalFormats: {
               where: allOf(digitalFormatWhere.active, digitalFormatWhere.hasFiles),
               select: {

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
+import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import type { AssertExact } from '@/lib/types/assert';
 import type { ArtistDetail, CreateArtistData, UpdateArtistData } from '@/lib/types/domain/artist';
@@ -52,9 +53,12 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     archive: vi.fn(),
     existsById: vi.fn(),
     findNameById: vi.fn(),
-    connectToRelease: vi.fn(),
     updateEnrichedField: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/repositories/artist-credit-repository', () => ({
+  ArtistCreditRepository: { creditOnRelease: vi.fn() },
 }));
 
 vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
@@ -1750,33 +1754,6 @@ describe('ArtistService', () => {
     });
   });
 
-  describe('connectToRelease', () => {
-    it('should upsert an ArtistRelease join record', async () => {
-      vi.mocked(ArtistRepository.connectToRelease).mockResolvedValue({
-        id: 'join-1',
-        artistId: 'artist-1',
-        releaseId: 'release-1',
-      } as never);
-
-      await ArtistService.connectToRelease('artist-1', 'release-1');
-
-      expect(ArtistRepository.connectToRelease).toHaveBeenCalledWith('artist-1', 'release-1');
-    });
-
-    it('should be idempotent on duplicate calls', async () => {
-      vi.mocked(ArtistRepository.connectToRelease).mockResolvedValue({
-        id: 'join-1',
-        artistId: 'artist-1',
-        releaseId: 'release-1',
-      } as never);
-
-      await ArtistService.connectToRelease('artist-1', 'release-1');
-      await ArtistService.connectToRelease('artist-1', 'release-1');
-
-      expect(ArtistRepository.connectToRelease).toHaveBeenCalledTimes(2);
-    });
-  });
-
   describe('existsById', () => {
     it('should return true when the artist exists', async () => {
       vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-1' } as never);
@@ -1870,6 +1847,18 @@ describe('ArtistService', () => {
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.genres).toBeNull();
       expect(persisted).not.toHaveProperty('tags');
+    });
+  });
+
+  describe('creditOnRelease', () => {
+    it('credits through the credit module so the stored order stays dense', async () => {
+      vi.mocked(ArtistCreditRepository.creditOnRelease).mockResolvedValueOnce(undefined);
+
+      await ArtistService.creditOnRelease('artist-1', 'release-1');
+
+      expect(vi.mocked(ArtistCreditRepository.creditOnRelease).mock.calls).toEqual([
+        ['release-1', 'artist-1'],
+      ]);
     });
   });
 

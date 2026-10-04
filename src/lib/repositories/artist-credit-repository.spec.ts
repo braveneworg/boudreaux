@@ -16,6 +16,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     artistRelease: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
       upsert: vi.fn(),
@@ -326,6 +329,29 @@ describe('ArtistCreditRepository', () => {
         releases: [{ id: 'release-1', title: 'Broken Bone Ballads' }],
         tourDates: [{ id: 'date-1', startDate, tourId: 'tour-1', tourTitle: 'Fall Tour' }],
       });
+    });
+  });
+
+  describe('creditOnRelease', () => {
+    it('appends the artist after the credits the release already has', async () => {
+      vi.mocked(prisma.artistRelease.findUnique).mockResolvedValueOnce(null);
+      vi.mocked(prisma.artistRelease.count).mockResolvedValueOnce(2);
+      vi.mocked(prisma.artistRelease.create).mockResolvedValueOnce({} as never);
+
+      await ArtistCreditRepository.creditOnRelease('release-1', 'artist-c');
+
+      expect(vi.mocked(prisma.artistRelease.create).mock.calls).toEqual([
+        [{ data: { artistId: 'artist-c', releaseId: 'release-1', position: 2 } }],
+      ]);
+    });
+
+    it('is a no-op when the artist is already credited', async () => {
+      vi.mocked(prisma.artistRelease.findUnique).mockResolvedValueOnce({ id: 'ar-1' } as never);
+
+      await ArtistCreditRepository.creditOnRelease('release-1', 'artist-a');
+
+      expect(prisma.artistRelease.count).not.toHaveBeenCalled();
+      expect(prisma.artistRelease.create).not.toHaveBeenCalled();
     });
   });
 

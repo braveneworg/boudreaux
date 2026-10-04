@@ -7,7 +7,7 @@ import 'server-only';
 import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
-import { creditOrderBy } from './_internal/credit-order';
+import { orderedCredits } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { releaseWhere } from './_internal/release-where';
 
@@ -43,8 +43,7 @@ const trackFileWithReleaseSelect = {
           // The full credit order with each artist's gate fields; the
           // playlist service names the album artist through the byline
           // rule, so only a public artist is ever named (ADR-0015).
-          artistReleases: {
-            orderBy: creditOrderBy,
+          artistReleases: orderedCredits({
             select: {
               artist: {
                 select: {
@@ -56,7 +55,7 @@ const trackFileWithReleaseSelect = {
                 },
               },
             },
-          },
+          }),
         },
       },
     },

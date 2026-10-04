@@ -666,7 +666,7 @@ describe('findOrCreateReleaseAction', () => {
 
     it('credits the artist before it decides whether to publish', async () => {
       const order: string[] = [];
-      vi.mocked(ArtistService.connectToRelease).mockImplementationOnce(async () => {
+      vi.mocked(ArtistService.creditOnRelease).mockImplementationOnce(async () => {
         order.push('credit');
       });
       mockForRelease.mockImplementationOnce(async () => {
@@ -860,7 +860,7 @@ describe('findOrCreateReleaseAction', () => {
         success: true,
         data: { id: 'artist-99', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' },
       });
-      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+      vi.mocked(ArtistService.creditOnRelease).mockResolvedValue(undefined);
 
       const result = await findOrCreateReleaseAction({
         album: 'New Album',
@@ -870,7 +870,7 @@ describe('findOrCreateReleaseAction', () => {
       expect(result.success).toBe(true);
       expect(result.artistId).toBe('artist-99');
       expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Ceschi');
-      expect(ArtistService.connectToRelease).toHaveBeenCalledWith('artist-99', 'new-release-123');
+      expect(ArtistService.creditOnRelease).toHaveBeenCalledWith('artist-99', 'new-release-123');
     });
 
     it('should prefer albumArtist over artist', async () => {
@@ -883,7 +883,7 @@ describe('findOrCreateReleaseAction', () => {
           surname: 'Artist',
         },
       });
-      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+      vi.mocked(ArtistService.creditOnRelease).mockResolvedValue(undefined);
 
       await findOrCreateReleaseAction({
         album: 'New Album',
@@ -904,7 +904,7 @@ describe('findOrCreateReleaseAction', () => {
           surname: 'Artist',
         },
       });
-      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+      vi.mocked(ArtistService.creditOnRelease).mockResolvedValue(undefined);
 
       await findOrCreateReleaseAction({
         album: 'New Album',
@@ -963,7 +963,7 @@ describe('findOrCreateReleaseAction', () => {
         success: true,
         data: { id: 'artist-99', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' },
       });
-      vi.mocked(ArtistService.connectToRelease).mockResolvedValue(undefined);
+      vi.mocked(ArtistService.creditOnRelease).mockResolvedValue(undefined);
 
       const result = await findOrCreateReleaseAction({
         album: 'Existing Album',
@@ -972,7 +972,7 @@ describe('findOrCreateReleaseAction', () => {
 
       expect(result.success).toBe(true);
       expect(result.artistId).toBe('artist-99');
-      expect(ArtistService.connectToRelease).toHaveBeenCalledWith(
+      expect(ArtistService.creditOnRelease).toHaveBeenCalledWith(
         'artist-99',
         'existing-release-456'
       );

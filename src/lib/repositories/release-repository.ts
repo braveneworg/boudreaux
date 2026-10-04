@@ -22,7 +22,7 @@ import type {
 } from '@/lib/types/domain/release';
 
 import { publicArtistWhere } from './_internal/artist-where';
-import { creditOrderBy } from './_internal/credit-order';
+import { orderedCredits } from './_internal/credit-order';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { isPresent } from './_internal/where-kit';
 
@@ -40,12 +40,7 @@ import type { Prisma } from '@prisma/client';
  * detail views), so it is excluded here.
  */
 const releaseDetailInclude = {
-  artistReleases: {
-    orderBy: creditOrderBy,
-    include: {
-      artist: true,
-    },
-  },
+  artistReleases: orderedCredits({ include: { artist: true } }),
   digitalFormats: {
     include: {
       files: {
@@ -74,12 +69,7 @@ const releaseDetailIncludeWithImages = {
  */
 const releaseDetailIncludeUnorderedImages = {
   images: true,
-  artistReleases: {
-    orderBy: creditOrderBy,
-    include: {
-      artist: true,
-    },
-  },
+  artistReleases: orderedCredits({ include: { artist: true } }),
   digitalFormats: {
     include: {
       files: true,
@@ -102,23 +92,17 @@ const releaseListItemInclude = {
     orderBy: { sortOrder: 'asc' },
     take: 3,
   },
-  artistReleases: {
-    orderBy: creditOrderBy,
-    include: {
-      artist: true,
-    },
-  },
+  artistReleases: orderedCredits({ include: { artist: true } }),
 } as const satisfies Prisma.ReleaseInclude;
 
 /**
- * Every credit load orders by {@link creditOrderBy}: position 0 is the album
+ * Every credit load is built from {@link orderedCredits}: position 0 is the album
  * artist. Public reads load the FULL credit order with each artist's public
  * gate fields, and the service applies the byline rule (`withPublicByline`)
  * before a row reaches a payload — so a hidden album artist leaves the byline
  * empty instead of handing it to the next credit (ADR-0015).
  */
-const publicListingCredits = {
-  orderBy: creditOrderBy,
+const publicListingCredits = orderedCredits({
   select: {
     artist: {
       // slug feeds the landing headlines' artist links.
@@ -133,10 +117,9 @@ const publicListingCredits = {
       },
     },
   },
-} as const satisfies Prisma.Release$artistReleasesArgs;
+} as const);
 
-const publicDetailCredits = {
-  orderBy: creditOrderBy,
+const publicDetailCredits = orderedCredits({
   select: {
     artist: {
       select: {
@@ -152,7 +135,7 @@ const publicDetailCredits = {
       },
     },
   },
-} as const satisfies Prisma.Release$artistReleasesArgs;
+} as const);
 
 const publishedReleaseListingSelect = {
   id: true,
