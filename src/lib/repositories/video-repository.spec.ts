@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
+import { mayBeginRunWhere } from './_internal/async-job-where';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
 import { VideoRepository, type VideoSummary } from './video-repository';
 
@@ -657,6 +658,29 @@ describe('VideoRepository', () => {
         where: { id: 'video-123' },
         data: { enrichmentJobToken: null },
       });
+    });
+  });
+
+  describe('beginEnrichmentRun', () => {
+    it('claims the run with the runner gate as the where and stamps the start', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 1 });
+      const now = new Date('2026-10-03T12:00:00.000Z');
+
+      expect(await VideoRepository.beginEnrichmentRun('video-123', now)).toBe(true);
+
+      expect(prisma.video.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'video-123',
+          AND: [mayBeginRunWhere('enrichmentStatus', 'enrichmentStartedAt', now)],
+        },
+        data: { enrichmentStatus: 'processing', enrichmentStartedAt: now, enrichmentError: null },
+      });
+    });
+
+    it('returns false when another runner already began it', async () => {
+      vi.mocked(prisma.video.updateMany).mockResolvedValue({ count: 0 });
+
+      expect(await VideoRepository.beginEnrichmentRun('video-123', new Date())).toBe(false);
     });
   });
 

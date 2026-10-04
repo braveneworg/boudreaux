@@ -29,6 +29,7 @@ import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { releaseWhere } from './_internal/release-where';
@@ -878,6 +879,21 @@ export class ArtistRepository {
   }
 
   /**
+   * Begin a bio-generation run with one conditional write: the job flips to
+   * `processing` and records its start unless it is already `processing` with
+   * a fresh start (`mayBeginRunWhere` — the runner gate as a `where`). Two
+   * runners racing for one job both pass a read; only one passes this write.
+   * Returns true iff THIS caller began it.
+   */
+  static async beginBioRun(artistId: string, now: Date): Promise<boolean> {
+    const result = await prisma.artist.updateMany({
+      where: { id: artistId, AND: [mayBeginRunWhere('bioStatus', 'bioStartedAt', now)] },
+      data: { bioStatus: 'processing', bioStartedAt: now, bioError: null },
+    });
+    return result.count === 1;
+  }
+
+  /**
    * Atomically claim the async bio job iff the stored token matches AND the job
    * is still processing, clearing the token so only ONE concurrent callback wins.
    * Returns true iff THIS caller claimed it (updateMany count === 1).
@@ -918,6 +934,18 @@ export class ArtistRepository {
   /** Set (or clear, with null) the per-job callback token of the images-from-links job. */
   static async setImageLinksJobToken(artistId: string, token: string | null): Promise<void> {
     await prisma.artist.update({ where: { id: artistId }, data: { imageLinksJobToken: token } });
+  }
+
+  /** Begin an images-from-links run with one conditional write; see {@link beginBioRun}. */
+  static async beginImageLinksRun(artistId: string, now: Date): Promise<boolean> {
+    const result = await prisma.artist.updateMany({
+      where: {
+        id: artistId,
+        AND: [mayBeginRunWhere('imageLinksStatus', 'imageLinksStartedAt', now)],
+      },
+      data: { imageLinksStatus: 'processing', imageLinksStartedAt: now, imageLinksError: null },
+    });
+    return result.count === 1;
   }
 
   /**

@@ -53,7 +53,6 @@ import { splitFeaturedArtists } from '@/utils/artist-name-split';
 import {
   isInFlightJobStatus,
   resolveStaleJobView,
-  runnerShouldSkip,
   toAsyncJobStatus,
 } from '@/utils/async-job-lifecycle';
 
@@ -668,11 +667,10 @@ export class VideoEnrichmentService {
     try {
       const state = await VideoRepository.getEnrichmentState(videoId);
       if (!state || !isEnrichmentEligible(state)) return;
-      if (runnerShouldSkip(toAsyncJobStatus(state.enrichmentStatus), state.enrichmentStartedAt)) {
-        return;
-      }
-
-      await VideoRepository.setEnrichmentStatus(videoId, 'processing', { error: null });
+      // One conditional write begins the run (the runner gate as a `where`):
+      // the trigger action and the post-save dispatch can both reach here for
+      // one video, and only one of them invokes the Lambda.
+      if (!(await VideoRepository.beginEnrichmentRun(videoId, new Date()))) return;
       const rows = await VideoArtistRepository.findByVideoId(videoId);
 
       if (process.env.BIO_GENERATOR_FAKE === 'true') {
