@@ -1084,20 +1084,6 @@ describe('ArtistRepository', () => {
     });
   });
 
-  describe('connectToRelease', () => {
-    it('upserts an ArtistRelease join record', async () => {
-      vi.mocked(prisma.artistRelease.upsert).mockResolvedValue({} as never);
-
-      await ArtistRepository.connectToRelease('artist-1', 'release-1');
-
-      expect(prisma.artistRelease.upsert).toHaveBeenCalledWith({
-        where: { artistId_releaseId: { artistId: 'artist-1', releaseId: 'release-1' } },
-        update: {},
-        create: { artistId: 'artist-1', releaseId: 'release-1' },
-      });
-    });
-  });
-
   describe('setBioStatus', () => {
     it('updates only the status when no options are given', async () => {
       vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);

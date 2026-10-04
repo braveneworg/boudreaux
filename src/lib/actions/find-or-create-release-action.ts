@@ -125,7 +125,7 @@ const connectArtistFromMetadata = async (
   try {
     const result = await ArtistService.findOrCreateByName(artistName);
     if (result.success) {
-      await ArtistService.connectToRelease(result.data.id, releaseId);
+      await ArtistService.creditOnRelease(result.data.id, releaseId);
       return result.data.id;
     }
   } catch (err) {
