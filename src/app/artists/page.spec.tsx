@@ -20,11 +20,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock TanStack Query SSR utilities — execute the queryFn so coverage sees it.
+// Like the real `prefetch*`, it never throws: a failing queryFn leaves the
+// query in error (and undehydrated) instead of failing the render.
 const mockPrefetchInfiniteQuery = vi
   .fn()
   .mockImplementation(async (opts: { queryFn?: () => unknown | Promise<unknown> }) => {
     if (opts.queryFn) {
-      await Promise.resolve(opts.queryFn());
+      await Promise.resolve(opts.queryFn()).catch(() => undefined);
     }
   });
 const mockDehydratedState = { queries: [], mutations: [] };
@@ -205,13 +207,21 @@ describe('ArtistsIndexPage', () => {
     await expect(opts.queryFn()).resolves.toEqual({ rows: [mockRow], nextSkip: null });
   });
 
-  it('should degrade to an empty first page when the service fails', async () => {
+  // A failed read used to become an empty first page, dehydrated as a
+  // successful query: the client treated it as fresh for minutes and showed
+  // "No artists have been published yet." A failed prefetch is not
+  // dehydrated, so the client fetches on mount and can show its error state.
+  it('fails the prefetch when the service fails, so no empty page is cached', async () => {
     mockListPublishedArtists.mockResolvedValue({ success: false, error: 'Database unavailable' });
 
     await ArtistsIndexPage();
 
-    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
-    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [
+      { queryFn: () => Promise<unknown>; retry?: unknown },
+    ];
+    await expect(opts.queryFn()).rejects.toThrow('Database unavailable');
+    // A failing server read must not hold the render through retries.
+    expect(opts.retry).toBe(false);
   });
 
   it('should render ArtistsContent within the hydration boundary', async () => {
