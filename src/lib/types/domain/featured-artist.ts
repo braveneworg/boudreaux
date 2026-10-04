@@ -44,7 +44,16 @@ export type FeaturedArtistArtist = {
   firstName: string;
   surname: string;
   slug: string;
-  bioImages: Array<{ url: string }>;
+  /**
+   * The display-image candidates as read; the public featured read resolves
+   * them (`resolveDisplayImages`) so the first is the artist's display image.
+   */
+  bioImages: Array<{
+    url: string;
+    alt: string | null;
+    isPrimary: boolean;
+    displayOrder: number | null;
+  }>;
 };
 
 /** Narrow release projection on a featured artist (cover-art/title display). */

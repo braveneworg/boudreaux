@@ -13,6 +13,7 @@ import type {
 } from '@/lib/types/domain/featured-artist';
 
 import { publicArtistWhere } from './_internal/artist-where';
+import { bioImageWhere } from './_internal/bio-media-where';
 import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
 
 import type { AssertExact } from './_internal/drift';
@@ -41,11 +42,15 @@ export const featuredArtistInclude = {
       firstName: true,
       surname: true,
       slug: true,
+      // The display-image candidates (a human's chosen rows, else the job's
+      // suggested ones) with what resolution reads; the service resolves and
+      // caps them (ADR-0008). This read used to take the job's suggestion
+      // (`isPrimary`) alone, so a featured row's cover fallback ignored the
+      // image a human chose.
       bioImages: {
-        where: { isPrimary: true },
+        where: bioImageWhere.displayCandidate,
         orderBy: { sortOrder: 'asc' },
-        take: 1,
-        select: { url: true },
+        select: { url: true, alt: true, isPrimary: true, displayOrder: true },
       },
     },
   },

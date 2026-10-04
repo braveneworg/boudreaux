@@ -90,6 +90,43 @@ describe('FeaturedArtistsService', () => {
       expect(mockFindFeatured).toHaveBeenCalledWith(currentDate, 5);
     });
 
+    // A featured row without its own cover art falls back to the artist's
+    // first image. It must be the display image a human chose (ADR-0008), not
+    // the job's suggestion — the read used to load `isPrimary` rows only.
+    it("puts the artist's chosen display image first, ahead of the job's suggestion", async () => {
+      const image = (url: string, isPrimary: boolean, displayOrder: number | null) => ({
+        url,
+        alt: `Alt ${url}`,
+        isPrimary,
+        displayOrder,
+      });
+      mockFindFeatured.mockResolvedValue([
+        {
+          ...mockFeaturedArtist,
+          artists: [
+            {
+              id: 'a1',
+              displayName: 'Artist',
+              firstName: 'A',
+              surname: 'B',
+              slug: 'artist',
+              bioImages: [
+                image('suggested', true, null),
+                image('chosen-second', false, 1),
+                image('chosen-first', false, 0),
+              ],
+            },
+          ],
+        },
+      ] as never);
+
+      const result = await FeaturedArtistsService.getFeaturedArtists(new Date());
+
+      expect(result.success && result.data[0]?.artists[0]?.bioImages.map(({ url }) => url)).toEqual(
+        ['chosen-first', 'chosen-second']
+      );
+    });
+
     // A public payload carries only the playable format. The admin form links
     // the MP3 format, but the actions accept any format id, and a linked
     // format can be withdrawn later.
