@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.404.0] - 2026-10-05
+
+### Fixed
+
+- fix(artists): 🐛 publishing an artist is one-way in the types; the album-artist refusal points at the byline list (#833)
+
 ## [4.403.0] - 2026-10-05
 
 ### Added
