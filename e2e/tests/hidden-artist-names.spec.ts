@@ -266,6 +266,26 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
     expect(body).not.toContain(HIDDEN_NAME);
   });
 
+  // #813: the album artist is the first credit in stored order. When it is
+  // hidden the byline stays empty; the next, public credit is not promoted.
+  test('leaves the byline empty when the first credit is hidden, though a later one is public', async ({
+    page,
+  }) => {
+    const listing = await page.request.get(
+      `/api/releases?listing=published&search=${encodeURIComponent(RELEASE_TITLE)}`
+    );
+    const detail = await page.request.get(`/api/releases/${seeded.releaseId}?withTracks=true`);
+    const { rows } = (await listing.json()) as {
+      rows: Array<{ id: string; albumArtist: unknown }>;
+    };
+    const { albumArtist } = (await detail.json()) as { albumArtist: unknown };
+
+    expect({
+      listing: rows.find(({ id }) => id === seeded.releaseId)?.albumArtist ?? null,
+      detail: albumArtist ?? null,
+    }).toEqual({ listing: null, detail: null });
+  });
+
   test('drops a tour date whose headliners are all hidden', async ({ page }) => {
     const response = await page.request.get(`/api/tours/${seeded.tourId}`);
     const { tour } = (await response.json()) as { tour: { tourDates: unknown[] } };
