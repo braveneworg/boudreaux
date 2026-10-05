@@ -34,9 +34,16 @@ Wait for the run of the merge commit itself:
 
 ```bash
 sha=$(gh pr view <n> --json mergeCommit --jq .mergeCommit.oid)
-until gh run list --branch main --workflow "CI/CD - Build, Publish, Deploy" \
-  --json headSha,status --jq ".[] | select(.headSha == \"$sha\") | .status" \
+until gh run list --limit 20 --json name,headSha,status \
+  --jq ".[] | select(.name == \"CI/CD - Build, Publish, Deploy\" and .headSha == \"$sha\") | .status" \
   | grep -q completed; do sleep 30; done
 ```
 
 Then read that run's `conclusion` before calling the merge deployed.
+
+List the recent runs unfiltered and match the workflow and commit in
+`jq`. The same day, `gh run list --branch main --workflow "CI/CD - Build,
+Publish, Deploy"` returned runs from August while the unfiltered list
+showed #834's runs finished and green, so a loop on the filtered list
+waited 40 minutes for a run that had already passed. The `head_sha`
+query on the runs API returned nothing for the same commit.
