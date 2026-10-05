@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { artistWhere } from './_internal/artist-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { releaseWhere } from './_internal/release-where';
 import { ArtistCreditRepository } from './artist-credit-repository';
 
@@ -272,6 +273,48 @@ describe('ArtistCreditRepository', () => {
         releases: [{ id: 'release-1', title: 'Broken Bone Ballads' }],
         tourDates: [{ id: 'date-1', startDate, tourId: 'tour-1', tourTitle: 'Fall Tour' }],
       });
+    });
+  });
+
+  describe('findReleasesLedBy', () => {
+    const credit = (id: string, title: string, firstArtistId: string) => ({
+      release: { id, title, artistReleases: [{ artistId: firstArtistId }] },
+    });
+
+    it('reads each credited release with its first credit in stored order', async () => {
+      await ArtistCreditRepository.findReleasesLedBy('artist-1');
+
+      expect(vi.mocked(prisma.artistRelease.findMany).mock.calls).toEqual([
+        [
+          {
+            where: { artistId: 'artist-1' },
+            select: {
+              release: {
+                select: {
+                  id: true,
+                  title: true,
+                  artistReleases: {
+                    orderBy: creditOrderBy,
+                    take: 1,
+                    select: { artistId: true },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      ]);
+    });
+
+    it('returns only the releases whose first credit is the artist', async () => {
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
+        credit('r1', 'Led', 'artist-1'),
+        credit('r2', 'Featured on', 'artist-9'),
+      ] as never);
+
+      const led = await ArtistCreditRepository.findReleasesLedBy('artist-1');
+
+      expect(led).toEqual([{ id: 'r1', title: 'Led' }]);
     });
   });
 

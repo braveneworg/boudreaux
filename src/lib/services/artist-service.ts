@@ -424,16 +424,59 @@ const buildArtistCreateData = ({
 const adoptAsReference = async (row: ArtistBioLinkRecord): Promise<ArtistBioLinkRecord> =>
   row.reference === false ? ArtistBioLinkRepository.restoreReference(row.id) : row;
 
+type ServiceFailure = Extract<ServiceResponse<never>, { success: false }>;
+
+const listTitles = (releases: Array<{ title: string }>): string =>
+  releases
+    .map(({ title }) => title)
+    .sort((a, b) => a.localeCompare(b))
+    .join(', ');
+
+/**
+ * Why an artist cannot be hard-deleted yet, or null when it can: it must
+ * exist, be archived, and be the album artist of no release.
+ */
+const refuseHardDelete = async (
+  id: string,
+  existing: ArtistDetail | null
+): Promise<ServiceFailure | null> => {
+  if (!existing) {
+    return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+  }
+  if (!existing.deletedOn) {
+    return {
+      success: false,
+      error: 'Archive the artist before deleting it permanently.',
+      code: 'VALIDATION',
+    };
+  }
+  const led = await ArtistCreditRepository.findReleasesLedBy(id);
+  if (led.length > 0) {
+    return {
+      success: false,
+      error: `This artist is the album artist of ${listTitles(led)}. Move or remove that credit on each release first.`,
+      code: 'VALIDATION',
+    };
+  }
+  return null;
+};
+
 export class ArtistService {
   /**
-   * Create a new artist
+   * Create a new artist. An artist created published records the admin as
+   * its publisher (ADR-0015); a caller's own `publishedBy` is never stored.
    */
-  static async createArtist(data: CreateArtistData): Promise<ServiceResponse<Artist>> {
+  static async createArtist(
+    data: CreateArtistData,
+    adminId: string
+  ): Promise<ServiceResponse<Artist>> {
     try {
+      const { publishedBy: _callerPublisher, ...rest } = data;
+      const toCreate = rest.publishedOn ? { ...rest, publishedBy: adminId } : rest;
       // Bio-image finalization (finalizeBioImages) is intentionally skipped on
       // create: a new artist has no generated bio rows, and a manually pasted
       // external image finalizes on the first update.
-      const artist = await ArtistRepository.create(sanitizeBioWriteFields(data));
+      const artist = await ArtistRepository.create(sanitizeBioWriteFields(toCreate));
       // New genres/tags change the suggestion counts this process serves.
       ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
@@ -506,13 +549,20 @@ export class ArtistService {
   }
 
   /**
-   * Update an artist by ID
+   * Update an artist by ID. A write that first publishes the artist records
+   * the admin as its publisher (ADR-0015); a caller's own `publishedBy` is
+   * never stored.
    */
-  static async updateArtist(id: string, data: UpdateArtistData): Promise<ServiceResponse<Artist>> {
+  static async updateArtist(
+    id: string,
+    data: UpdateArtistData,
+    adminId: string
+  ): Promise<ServiceResponse<Artist>> {
     try {
-      const sanitized = sanitizeBioWriteFields(data);
+      const { publishedBy: _callerPublisher, ...rest } = data;
+      const sanitized = sanitizeBioWriteFields(rest);
       const finalized = await finalizeBioImages(id, sanitized);
-      const artist = await ArtistRepository.update(id, finalized);
+      const artist = await ArtistRepository.update(id, finalized, { publishedBy: adminId });
       // Edited genres/tags change the suggestion counts this process serves.
       ArtistVocabularyService.invalidate();
       // An edit can rename the artist or change whether it is public.
@@ -530,23 +580,19 @@ export class ArtistService {
   /**
    * Delete an artist by ID (hard delete) — only an archived artist: "archive
    * first, then delete permanently" is a rule of the service, not of which
-   * button the admin list renders. The repository cascade removes the artist
+   * button the admin list renders. Nor the album artist of any release: the
+   * next credit would silently become the album artist and the byline, so
+   * the admin moves or removes that credit first. The repository cascade
+   * removes the artist
    * row and everything referencing it in one transaction; the artist's
    * re-hosted bio images are then removed from S3, best-effort (a failed
    * object delete is logged and never undoes or fails the delete).
    */
   static async deleteArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
     try {
-      const existing = await ArtistRepository.findById(id);
-      if (!existing) {
-        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
-      }
-      if (!existing.deletedOn) {
-        return {
-          success: false,
-          error: 'Archive the artist before deleting it permanently.',
-          code: 'VALIDATION',
-        };
+      const refusal = await refuseHardDelete(id, await ArtistRepository.findById(id));
+      if (refusal) {
+        return refusal;
       }
       const bioImages = await ArtistBioImageRepository.findManyByArtist(id);
       const artist = await ArtistRepository.delete(id);
@@ -582,11 +628,16 @@ export class ArtistService {
   }
 
   /**
-   * Publish an artist by stamping `publishedOn` with the current time.
+   * Publish an artist by stamping `publishedOn` with the current time, and
+   * record the admin as its publisher when this is its first publish.
    */
-  static async publishArtist(id: string): Promise<ServiceResponse<Artist>> {
+  static async publishArtist(id: string, adminId: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = await ArtistRepository.update(id, { publishedOn: new Date() });
+      const artist = await ArtistRepository.update(
+        id,
+        { publishedOn: new Date() },
+        { publishedBy: adminId }
+      );
       invalidatePublicNameCaches();
       return { success: true, data: artist };
     } catch (error) {

@@ -100,7 +100,8 @@ export const updateArtistAction = async (
   try {
     const response = await ArtistService.updateArtist(
       artistId,
-      buildArtistUpdatePayload(parsed.data)
+      buildArtistUpdatePayload(parsed.data),
+      session.user.id
     );
 
     logSecurityEvent({

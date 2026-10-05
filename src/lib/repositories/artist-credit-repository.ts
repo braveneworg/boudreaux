@@ -19,6 +19,7 @@ import {
   hiddenCreditSelect,
   staysHiddenAmongWhere,
 } from './_internal/artist-where';
+import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { byDisplayedName, readAwaitingConfirmation } from './_internal/release-credits';
 import { releaseWhere } from './_internal/release-where';
@@ -71,6 +72,30 @@ export class ArtistCreditRepository {
    */
   static async findThatStayHidden(releaseId: string): Promise<CreditThatStaysHidden[]> {
     return readThatStayHidden(creditThatStaysHiddenWhere({ releaseId }));
+  }
+
+  /**
+   * The releases an artist is the album artist of: those whose first credit
+   * in stored order is the artist (ADR-0015). Every release, draft or
+   * published, since a draft's byline goes public with it.
+   */
+  static async findReleasesLedBy(artistId: string): Promise<Array<{ id: string; title: string }>> {
+    const credits = await prisma.artistRelease.findMany({
+      where: { artistId },
+      select: {
+        release: {
+          select: {
+            id: true,
+            title: true,
+            artistReleases: orderedCredits({ take: 1, select: { artistId: true } }),
+          },
+        },
+      },
+    });
+    return credits
+      .map(({ release }) => release)
+      .filter((release) => release.artistReleases.at(0)?.artistId === artistId)
+      .map(({ id, title }) => ({ id, title }));
   }
 
   /**

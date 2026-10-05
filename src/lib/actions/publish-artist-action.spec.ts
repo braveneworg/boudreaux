@@ -47,7 +47,7 @@ describe('publishArtistAction', () => {
   it('publishes the artist via the service', async () => {
     await publishArtistAction(artistId);
 
-    expect(ArtistService.publishArtist).toHaveBeenCalledWith(artistId);
+    expect(ArtistService.publishArtist).toHaveBeenCalledWith(artistId, 'user-123');
   });
 
   it('returns success when the publish succeeds', async () => {

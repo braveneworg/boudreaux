@@ -17,7 +17,7 @@ export const publishArtistAction = async (artistId: string): Promise<AdminAction
   runAdminEntityAction({
     id: artistId,
     entityLabel: 'artist',
-    perform: (id) => ArtistService.publishArtist(id),
+    perform: (id, adminId) => ArtistService.publishArtist(id, adminId),
     event: 'media.artist.published',
     metadataKey: 'artistId',
     revalidate: ['/admin/artists', '/artists'],

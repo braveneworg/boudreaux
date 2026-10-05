@@ -11,6 +11,7 @@ import {
 } from '@/lib/utils/credit-confirmation';
 
 import { creditAwaitingConfirmationWhere, creditConfirmationSelect } from './artist-where';
+import { creditOrderBy } from './credit-order';
 
 import type { Prisma } from '@prisma/client';
 
@@ -91,6 +92,25 @@ export const syncCredits = async (
       create: { artistId, releaseId, position },
       update: { position },
     });
+  }
+};
+
+/**
+ * Re-stamp a release's credits 0..n-1 in their stored order, after a credit
+ * was removed (a hard-deleted artist's). Writes only the rows whose position
+ * moves, one after another: a MongoDB transaction takes no parallel
+ * operations.
+ */
+export const renumberCredits = async (client: CreditClient, releaseId: string): Promise<void> => {
+  const rows = await client.artistRelease.findMany({
+    where: { releaseId },
+    orderBy: creditOrderBy,
+    select: { id: true, position: true },
+  });
+  for (const [position, row] of rows.entries()) {
+    if (row.position !== position) {
+      await client.artistRelease.update({ where: { id: row.id }, data: { position } });
+    }
   }
 };
 

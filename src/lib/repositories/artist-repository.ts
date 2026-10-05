@@ -34,6 +34,7 @@ import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-medi
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { playableFormats } from './_internal/playable-formats';
+import { renumberCredits } from './_internal/release-credits';
 import { releaseWhere } from './_internal/release-where';
 import { isUnsetOr } from './_internal/where-kit';
 
@@ -505,6 +506,11 @@ const buildGeneratedLinks = (
     .map((link) => ({ ...link, origin: 'generated' }));
 };
 
+/** Who an update records as the artist's publisher, on its first publish. */
+export interface ArtistPublisher {
+  publishedBy?: string;
+}
+
 /**
  * Data-access layer for the Artist and ArtistRelease models. The only layer that
  * touches Prisma for artists: it owns the query shapes (includes/where DSL),
@@ -616,13 +622,38 @@ export class ArtistRepository {
     return prisma.artist.count({ where: { AND: and } });
   }
 
-  /** Update an artist by id, returning the full admin payload. */
-  static async update(id: string, data: UpdateArtistData): Promise<Artist> {
-    return prisma.artist.update({
-      where: { id },
-      data: toPrismaUpdate(data),
-      include: artistAdminInclude,
-    }) as Promise<Artist>;
+  /**
+   * Update an artist by id, returning the full admin payload. When the write
+   * sets `publishedOn`, `publishedBy` records the given admin, but only if the
+   * stored artist is not published yet: a save of a public artist sends its
+   * date again and must not change who published it (ADR-0015). The stamp and
+   * the update share one transaction.
+   */
+  static async update(
+    id: string,
+    data: UpdateArtistData,
+    { publishedBy }: ArtistPublisher = {}
+  ): Promise<Artist> {
+    if (!data.publishedOn || !publishedBy) {
+      return prisma.artist.update({
+        where: { id },
+        data: toPrismaUpdate(data),
+        include: artistAdminInclude,
+      }) as Promise<Artist>;
+    }
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.artist.updateMany({
+          where: { id, ...artistWhere.unpublished },
+          data: { publishedBy },
+        });
+        return tx.artist.update({
+          where: { id },
+          data: toPrismaUpdate(data),
+          include: artistAdminInclude,
+        });
+      })
+    ) as Promise<Artist>;
   }
 
   /**
@@ -631,7 +662,9 @@ export class ArtistRepository {
    * links, urls, bio images/links, video credits), band memberships in both
    * directions, and artist-scoped gallery Image/Url rows. Prisma emulates
    * `onDelete: Restrict` on MongoDB, so a bare `artist.delete` throws while
-   * any required back-relation row still references the artist.
+   * any required back-relation row still references the artist. Each
+   * release the artist was credited on keeps its remaining credits numbered
+   * 0..n-1.
    * (`TourDateHeadliner` declares `onDelete: Cascade` and is emulated by the
    * client on the final delete.)
    */
@@ -640,7 +673,14 @@ export class ArtistRepository {
       prisma.$transaction(async (tx) => {
         await tx.artistMember.deleteMany({ where: { OR: [{ artistId: id }, { memberId: id }] } });
         await tx.artistLabel.deleteMany({ where: { artistId: id } });
+        const credited = await tx.artistRelease.findMany({
+          where: { artistId: id },
+          select: { releaseId: true },
+        });
         await tx.artistRelease.deleteMany({ where: { artistId: id } });
+        for (const { releaseId } of credited) {
+          await renumberCredits(tx, releaseId);
+        }
         await tx.artistFeaturedArtist.deleteMany({ where: { artistId: id } });
         await tx.artistUrl.deleteMany({ where: { artistId: id } });
         await tx.artistBioImage.deleteMany({ where: { artistId: id } });

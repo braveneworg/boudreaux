@@ -221,24 +221,28 @@ describe('updateArtistAction', () => {
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith(mockArtistId, {
-        firstName: 'John',
-        surname: 'Doe',
-        slug: 'john-doe',
-        middleName: 'M',
-        displayName: 'Johnny Doe',
-        title: 'Dr.',
-        suffix: 'Jr.',
-        akaNames: 'JD',
-        bio: 'A talented artist',
-        shortBio: 'Talented artist',
-        altBio: 'Alternative bio',
-        genres: 'Jazz, Blues',
-        tags: 'saxophone, piano',
-        bornOn: expect.any(Date),
-        diedOn: expect.any(Date),
-        publishedOn: expect.any(Date),
-      });
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        {
+          firstName: 'John',
+          surname: 'Doe',
+          slug: 'john-doe',
+          middleName: 'M',
+          displayName: 'Johnny Doe',
+          title: 'Dr.',
+          suffix: 'Jr.',
+          akaNames: 'JD',
+          bio: 'A talented artist',
+          shortBio: 'Talented artist',
+          altBio: 'Alternative bio',
+          genres: 'Jazz, Blues',
+          tags: 'saxophone, piano',
+          bornOn: expect.any(Date),
+          diedOn: expect.any(Date),
+          publishedOn: expect.any(Date),
+        },
+        'user-123'
+      );
 
       expect(result.success).toBe(true);
       expect(result.errors).toBeUndefined();
@@ -265,24 +269,28 @@ describe('updateArtistAction', () => {
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
-      expect(ArtistService.updateArtist).toHaveBeenCalledWith(mockArtistId, {
-        firstName: 'John',
-        surname: 'Doe',
-        slug: 'john-doe',
-        middleName: undefined,
-        displayName: undefined,
-        title: undefined,
-        suffix: undefined,
-        akaNames: undefined,
-        bio: undefined,
-        shortBio: undefined,
-        altBio: undefined,
-        genres: undefined,
-        tags: undefined,
-        bornOn: undefined,
-        diedOn: undefined,
-        publishedOn: undefined,
-      });
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        {
+          firstName: 'John',
+          surname: 'Doe',
+          slug: 'john-doe',
+          middleName: undefined,
+          displayName: undefined,
+          title: undefined,
+          suffix: undefined,
+          akaNames: undefined,
+          bio: undefined,
+          shortBio: undefined,
+          altBio: undefined,
+          genres: undefined,
+          tags: undefined,
+          bornOn: undefined,
+          diedOn: undefined,
+          publishedOn: undefined,
+        },
+        'user-123'
+      );
 
       expect(result.success).toBe(true);
     });
@@ -521,7 +529,8 @@ describe('updateArtistAction', () => {
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
-        expect.objectContaining({ firstName: '' })
+        expect.objectContaining({ firstName: '' }),
+        'user-123'
       );
     });
 
@@ -547,7 +556,8 @@ describe('updateArtistAction', () => {
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
-        expect.objectContaining({ surname: '' })
+        expect.objectContaining({ surname: '' }),
+        'user-123'
       );
     });
 
@@ -574,7 +584,8 @@ describe('updateArtistAction', () => {
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
-        expect.objectContaining({ formedOn: new Date('2005-03-15') })
+        expect.objectContaining({ formedOn: new Date('2005-03-15') }),
+        'user-123'
       );
     });
 
