@@ -15,13 +15,19 @@ export const queryKeys = {
     all: ['releases'] as const,
     publishedInfinite: (search: string) =>
       [...queryKeys.releases.all, 'publishedInfinite', search.trim().toLowerCase()] as const,
-    adminInfinite: (params: { search: string; published: boolean | null; deleted: boolean }) =>
+    adminInfinite: (params: {
+      search: string;
+      published: boolean | null;
+      deleted: boolean;
+      withoutByline?: boolean;
+    }) =>
       [
         ...queryKeys.releases.all,
         'adminInfinite',
         params.search.trim().toLowerCase(),
         params.published,
         params.deleted,
+        params.withoutByline ?? false,
       ] as const,
     detail: (id: string) => [...queryKeys.releases.all, 'detail', id] as const,
     adminDetail: (id: string) => [...queryKeys.releases.all, 'adminDetail', id] as const,

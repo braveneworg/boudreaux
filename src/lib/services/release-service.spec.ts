@@ -23,6 +23,7 @@ vi.mock('@/lib/repositories/release-repository', () => ({
     createWithCredits: vi.fn(),
     findById: vi.fn(),
     findMany: vi.fn(),
+    findIdsWithoutByline: vi.fn(),
     updateWithCredits: vi.fn(),
     updateData: vi.fn(),
     softDelete: vi.fn(),
@@ -391,6 +392,34 @@ describe('ReleaseService', () => {
         catalogNumber: 'TEST-002',
       },
     ];
+
+    // The dashboard links here: only published releases whose byline names
+    // nobody, whatever the list's published/deleted toggles say.
+    it('lists only the published releases without a byline when asked', async () => {
+      vi.mocked(ReleaseRepository.findIdsWithoutByline).mockResolvedValueOnce(['r1']);
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValueOnce([] as never);
+
+      await ReleaseService.getReleases({
+        search: 'x',
+        skip: 0,
+        take: 10,
+        published: false,
+        deleted: true,
+        withoutByline: true,
+      });
+
+      expect(vi.mocked(ReleaseRepository.findMany).mock.calls).toEqual([
+        [{ search: 'x', skip: 0, take: 10, ids: ['r1'] }],
+      ]);
+    });
+
+    it('reads no byline ids for an ordinary listing', async () => {
+      vi.mocked(ReleaseRepository.findMany).mockResolvedValueOnce([] as never);
+
+      await ReleaseService.getReleases({ published: true });
+
+      expect(vi.mocked(ReleaseRepository.findIdsWithoutByline).mock.calls).toEqual([]);
+    });
 
     it('should retrieve all releases, forwarding default (empty) filters', async () => {
       vi.mocked(ReleaseRepository.findMany).mockResolvedValue(mockReleases as never);

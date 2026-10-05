@@ -60,6 +60,7 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
   const artistIds = searchParams.getAll('artistIds');
   const published = searchParams.get('published');
   const deleted = searchParams.get('deleted') === 'true';
+  const withoutByline = searchParams.get('withoutByline') === 'true';
 
   const session = await auth();
   const authError = requireAdmin(session);
@@ -76,6 +77,7 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
     ...(artistIds.length > 0 && { artistIds }),
     ...(published !== null && { published: published === 'true' }),
     ...(deleted && { deleted }),
+    ...(withoutByline && { withoutByline }),
   };
 
   const result = await ReleaseService.getReleases(params);
@@ -105,7 +107,8 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  *
  * Query params:
  *   listing    – When "published", returns public published releases via `getPublishedReleases()`.
- *   skip, take, search, artistIds, published – Pagination/filter params for admin listing mode.
+ *   skip, take, search, artistIds, published, deleted – Pagination/filter params for admin listing mode.
+ *   withoutByline – "true" lists only the published releases whose byline names nobody.
  */
 export async function GET(request: NextRequest) {
   try {

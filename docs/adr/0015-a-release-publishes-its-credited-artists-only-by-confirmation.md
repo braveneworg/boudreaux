@@ -73,7 +73,12 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   the archive goes ahead without it: a takedown must not depend on a read.
 - **A published release with no byline is a legitimate state.** "A published
   release has only public credits" is not an invariant. Filtering hidden
-  artists out of every public read is what guarantees rule 2.
+  artists out of every public read is what guarantees rule 2. It is never
+  silent (2026-10-04): the admin dashboard's Releases tile counts the
+  published releases whose byline names nobody, by the same rule the public
+  reads apply, and links to the list of them (`/admin/releases?byline=missing`).
+  Hiding an artist still always succeeds; the count is how the state is
+  noticed afterwards.
 - **The name lookup never returns a soft-deleted artist.** When one still
   owns the slug, the new artist takes a numbered slug (`name-2`).
 - **Existing data is backfilled by the same rule.**

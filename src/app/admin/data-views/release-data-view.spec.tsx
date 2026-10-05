@@ -41,10 +41,11 @@ vi.mock('@/hooks/use-credit-decisions', () => ({
 }));
 
 // Mock next/navigation
+const routerReplace = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
-    replace: vi.fn(),
+    replace: routerReplace,
   }),
 }));
 
@@ -484,5 +485,64 @@ describe('ReleaseDataView', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => expect(deleteReleaseAction).toHaveBeenCalledWith('release-123'));
+  });
+
+  // The dashboard's Releases tile links to `/admin/releases?byline=missing`:
+  // the published releases whose byline names nobody (ADR-0015).
+  describe('without a byline', () => {
+    beforeEach(() => {
+      vi.mocked(useInfiniteReleasesQuery).mockReturnValue(toInfiniteResult([]) as never);
+    });
+
+    it('asks only for the published releases without a byline', () => {
+      render(<ReleaseDataView withoutByline />, { wrapper: createWrapper() });
+
+      expect(vi.mocked(useInfiniteReleasesQuery).mock.calls.at(-1)?.[0]).toEqual({
+        search: '',
+        published: true,
+        deleted: false,
+        withoutByline: true,
+      });
+    });
+
+    it('says what the list shows and links back to every release', () => {
+      render(<ReleaseDataView withoutByline />, { wrapper: createWrapper() });
+
+      expect({
+        title: screen.getByText('Published releases without a byline'),
+        back: screen.getByRole('link', { name: 'Show all releases' }).getAttribute('href'),
+      }).toEqual({ title: expect.anything(), back: '/admin/releases' });
+    });
+
+    it('shows the toggles the list applies: published only', () => {
+      render(<ReleaseDataView withoutByline />, { wrapper: createWrapper() });
+
+      expect({
+        published: screen
+          .getByRole('switch', { name: 'Show published' })
+          .getAttribute('aria-checked'),
+        unpublished: screen
+          .getByRole('switch', { name: 'Show unpublished' })
+          .getAttribute('aria-checked'),
+      }).toEqual({ published: 'true', unpublished: 'false' });
+    });
+
+    it('leaves the view when a toggle changes', async () => {
+      const user = userEvent.setup();
+      render(<ReleaseDataView withoutByline />, { wrapper: createWrapper() });
+
+      await user.click(screen.getByRole('switch', { name: 'Show unpublished' }));
+
+      expect(routerReplace.mock.calls).toEqual([['/admin/releases']]);
+    });
+
+    it('is off by default', () => {
+      render(<ReleaseDataView />, { wrapper: createWrapper() });
+
+      expect({
+        asked: vi.mocked(useInfiniteReleasesQuery).mock.calls.at(-1)?.[0].withoutByline,
+        notice: screen.queryByText('Published releases without a byline'),
+      }).toEqual({ asked: false, notice: null });
+    });
   });
 });

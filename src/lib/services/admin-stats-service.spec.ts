@@ -15,7 +15,7 @@ import { AdminStatsService } from './admin-stats-service';
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/repositories/release-repository', () => ({
-  ReleaseRepository: { count: vi.fn() },
+  ReleaseRepository: { count: vi.fn(), findIdsWithoutByline: vi.fn() },
 }));
 vi.mock('@/lib/repositories/featured-artist-repository', () => ({
   FeaturedArtistRepository: { count: vi.fn() },
@@ -43,6 +43,7 @@ describe('AdminStatsService.getStats', () => {
   beforeEach(() => {
     // ReleaseRepository.count: first call = total, second = published
     vi.mocked(ReleaseRepository.count).mockResolvedValueOnce(10).mockResolvedValueOnce(7);
+    vi.mocked(ReleaseRepository.findIdsWithoutByline).mockResolvedValueOnce(['r1', 'r2']);
     // ArtistRepository.count: first = total, second = published
     vi.mocked(ArtistRepository.count).mockResolvedValueOnce(20).mockResolvedValueOnce(12);
     vi.mocked(FeaturedArtistRepository.count).mockResolvedValue(3);
@@ -58,7 +59,7 @@ describe('AdminStatsService.getStats', () => {
   it('reports release totals and derives the draft count', async () => {
     const stats = await AdminStatsService.getStats();
 
-    expect(stats.releases).toEqual({ total: 10, published: 7, draft: 3 });
+    expect(stats.releases).toEqual({ total: 10, published: 7, draft: 3, withoutByline: 2 });
   });
 
   it('reports featured artist totals', async () => {

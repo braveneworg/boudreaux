@@ -371,6 +371,26 @@ describe('ReleaseRepository', () => {
       expect(arg?.include).toEqual(listItemInclude);
     });
 
+    it('restricts the listing to the given ids', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ ids: ['r1', 'r2'] });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [releaseWhere.notDeleted, { id: { in: ['r1', 'r2'] } }],
+      });
+    });
+
+    it('matches nothing for an empty id list', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+
+      await ReleaseRepository.findMany({ ids: [] });
+
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({ AND: [releaseWhere.notDeleted, { id: { in: [] } }] });
+    });
+
     it('excludes soft-deleted releases by default (Mongo null-safe)', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
 
@@ -454,6 +474,51 @@ describe('ReleaseRepository', () => {
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
       expect(arg?.skip).toBe(10);
       expect(arg?.take).toBe(5);
+    });
+  });
+
+  describe('findIdsWithoutByline', () => {
+    const head = (id: string, artist?: { publishedOn: Date | null; deletedOn: Date | null }) => ({
+      id,
+      artistReleases: artist ? [{ artist }] : [],
+    });
+    const PUBLISHED = new Date('2026-01-01');
+
+    it("reads each listed release's first credit in stored order with its gate fields", async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValueOnce([] as never);
+
+      await ReleaseRepository.findIdsWithoutByline();
+
+      expect(vi.mocked(prisma.release.findMany).mock.calls).toEqual([
+        [
+          {
+            where: releaseWhere.listed,
+            select: {
+              id: true,
+              artistReleases: {
+                orderBy: creditOrderBy,
+                take: 1,
+                select: { artist: { select: { publishedOn: true, deletedOn: true } } },
+              },
+            },
+          },
+        ],
+      ]);
+    });
+
+    // The byline rule is the public one (publicCredits): a hidden first
+    // credit, or no credit at all, leaves the byline empty.
+    it('returns the releases whose album artist is hidden or missing', async () => {
+      vi.mocked(prisma.release.findMany).mockResolvedValueOnce([
+        head('public-lead', { publishedOn: PUBLISHED, deletedOn: null }),
+        head('archived-lead', { publishedOn: PUBLISHED, deletedOn: PUBLISHED }),
+        head('unpublished-lead', { publishedOn: null, deletedOn: null }),
+        head('no-credits'),
+      ] as never);
+
+      const ids = await ReleaseRepository.findIdsWithoutByline();
+
+      expect(ids).toEqual(['archived-lead', 'unpublished-lead', 'no-credits']);
     });
   });
 

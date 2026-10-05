@@ -10,7 +10,14 @@ import { ReleaseDataView } from '../data-views/release-data-view';
 
 export const dynamic = 'force-dynamic';
 
-export default function ReleasesPage() {
+interface ReleasesPageProps {
+  searchParams: Promise<{ byline?: string | string[] }>;
+}
+
+export default async function ReleasesPage({ searchParams }: ReleasesPageProps) {
+  // The dashboard's Releases tile links here with `?byline=missing`.
+  const { byline } = await searchParams;
+
   return (
     <ZinePanel
       accent="storm"
@@ -26,7 +33,7 @@ export default function ReleasesPage() {
         title="Releases"
         helpText="Create, publish, and manage music releases and their digital formats. Use the toggles to filter by published, unpublished, or deleted."
       />
-      <ReleaseDataView />
+      <ReleaseDataView withoutByline={byline === 'missing'} />
     </ZinePanel>
   );
 }
