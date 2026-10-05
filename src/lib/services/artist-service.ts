@@ -454,7 +454,7 @@ const refuseHardDelete = async (
   if (led.length > 0) {
     return {
       success: false,
-      error: `This artist is the album artist of ${listTitles(led)}. Move or remove that credit on each release first.`,
+      error: `This artist is the album artist of ${listTitles(led)}. Move or remove that credit on each release first; the published ones are listed from the dashboard’s Releases tile.`,
       code: 'VALIDATION',
     };
   }

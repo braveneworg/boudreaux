@@ -28,6 +28,14 @@ type GetArtistByIdSuccessData = Extract<
 type _GetArtistByIdIsArtistDetail = AssertExact<GetArtistByIdSuccessData, ArtistDetail>;
 const _getArtistByIdIsArtistDetail: _GetArtistByIdIsArtistDetail = true;
 
+// A write can publish an artist or leave its publication alone, never clear
+// it: an artist is hidden by archiving, which warns about the bylines it
+// empties (ADR-0015). Clearing publishedOn would empty them silently.
+type _UpdateNeverUnpublishes = AssertExact<UpdateArtistData['publishedOn'], Date | undefined>;
+const _updateNeverUnpublishes: _UpdateNeverUnpublishes = true;
+type _CreateNeverUnpublishes = AssertExact<CreateArtistData['publishedOn'], Date | undefined>;
+const _createNeverUnpublishes: _CreateNeverUnpublishes = true;
+
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
@@ -842,7 +850,7 @@ describe('ArtistService', () => {
           success: false,
           code: 'VALIDATION',
           error:
-            'This artist is the album artist of Alpha, Beta. Move or remove that credit on each release first.',
+            'This artist is the album artist of Alpha, Beta. Move or remove that credit on each release first; the published ones are listed from the dashboard’s Releases tile.',
         },
         deleted: [],
       });

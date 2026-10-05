@@ -527,7 +527,12 @@ export interface ArtistWritableData {
   bornOn?: Date | null;
   diedOn?: Date | null;
   formedOn?: Date | null;
-  publishedOn?: Date | null;
+  /**
+   * Set to publish the artist; never cleared. An artist is hidden by
+   * archiving, which warns about the bylines it empties (ADR-0015);
+   * clearing this would empty them silently.
+   */
+  publishedOn?: Date;
   publishedBy?: string | null;
   createdBy?: string | null;
   deletedOn?: Date | null;
