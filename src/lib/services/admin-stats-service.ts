@@ -14,7 +14,13 @@ import { VideoRepository } from '@/lib/repositories/video-repository';
 
 /** Aggregated counts powering the admin dashboard overview. */
 export interface AdminStats {
-  releases: { total: number; published: number; draft: number };
+  releases: {
+    total: number;
+    published: number;
+    draft: number;
+    /** Published releases whose byline names nobody (ADR-0015). */
+    withoutByline: number;
+  };
   featuredArtists: { total: number };
   artists: { total: number; published: number };
   notifications: { activeSlots: number };
@@ -44,6 +50,7 @@ export class AdminStatsService {
       upcomingDates,
       videosTotal,
       videosPublished,
+      releasesWithoutByline,
     ] = await Promise.all([
       ReleaseRepository.count(),
       ReleaseRepository.count({ published: true }),
@@ -57,6 +64,7 @@ export class AdminStatsService {
       TourDateRepository.countUpcoming(),
       VideoRepository.count(),
       VideoRepository.count({ published: true }),
+      ReleaseRepository.findIdsWithoutByline(),
     ]);
 
     return {
@@ -64,6 +72,7 @@ export class AdminStatsService {
         total: releasesTotal,
         published: releasesPublished,
         draft: releasesTotal - releasesPublished,
+        withoutByline: releasesWithoutByline.length,
       },
       featuredArtists: { total: featuredTotal },
       artists: { total: artistsTotal, published: artistsPublished },

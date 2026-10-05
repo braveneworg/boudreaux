@@ -31,7 +31,7 @@ vi.mock('./components/dashboard-charts', () => ({
 }));
 
 const stats: AdminStats = {
-  releases: { total: 10, published: 7, draft: 3 },
+  releases: { total: 10, published: 7, draft: 3, withoutByline: 0 },
   featuredArtists: { total: 3 },
   artists: { total: 20, published: 12 },
   notifications: { activeSlots: 2 },
@@ -65,6 +65,27 @@ describe('AdminDashboardPage', () => {
     render(await AdminDashboardPage());
 
     expect(screen.getByText('7 published · 3 draft')).toBeInTheDocument();
+  });
+
+  // A published release whose album artist is hidden shows no byline
+  // (ADR-0015): legitimate, but never silent.
+  it('warns about published releases without a byline, linking to them', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      ...stats,
+      releases: { ...stats.releases, withoutByline: 2 },
+    });
+
+    render(await AdminDashboardPage());
+
+    expect(
+      screen.getByRole('link', { name: '2 published without a byline' }).getAttribute('href')
+    ).toBe('/admin/releases?byline=missing');
+  });
+
+  it('shows no byline warning when every published release has one', async () => {
+    render(await AdminDashboardPage());
+
+    expect(screen.queryByRole('link', { name: /without a byline/ })).toBeNull();
   });
 
   it('shows tour upcoming dates', async () => {

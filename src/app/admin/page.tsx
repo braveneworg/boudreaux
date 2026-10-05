@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Link from 'next/link';
 
-import { LayoutDashboard } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard } from 'lucide-react';
 
 import { Card, CardContent } from '@/app/components/ui/card';
 import { SectionHeader } from '@/app/components/ui/section-header';
@@ -20,6 +20,8 @@ interface StatTile {
   href: string;
   primary: string;
   secondary: string;
+  /** A count that needs the admin's attention, linking to the rows behind it. */
+  warning?: { href: string; text: string };
 }
 
 /** Map the aggregated stats onto a tile for each admin section (importance order). */
@@ -28,6 +30,14 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     href: '/admin/releases',
     primary: `${stats.releases.total}`,
     secondary: `${stats.releases.published} published · ${stats.releases.draft} draft`,
+    // A published release with no byline is legitimate (ADR-0015) but never
+    // silent: the tile names how many there are.
+    ...(stats.releases.withoutByline > 0 && {
+      warning: {
+        href: '/admin/releases?byline=missing',
+        text: `${stats.releases.withoutByline} published without a byline`,
+      },
+    }),
   },
   '/admin/videos': {
     href: '/admin/videos',
@@ -117,6 +127,15 @@ export default async function AdminDashboardPage() {
                       {tile.primary}
                     </p>
                     <p className="text-muted-foreground text-sm">{tile.secondary}</p>
+                    {tile.warning && (
+                      <Link
+                        href={tile.warning.href}
+                        className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-amber-800 hover:underline"
+                      >
+                        <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+                        {tile.warning.text}
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>

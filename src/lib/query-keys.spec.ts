@@ -386,7 +386,18 @@ describe('queryKeys', () => {
     it('includes search and filter flags in the admin releases infinite key', () => {
       expect(
         queryKeys.releases.adminInfinite({ search: 'Doe', published: true, deleted: false })
-      ).toEqual(['releases', 'adminInfinite', 'doe', true, false]);
+      ).toEqual(['releases', 'adminInfinite', 'doe', true, false, false]);
+    });
+
+    it('keys the admin releases listing of releases without a byline apart', () => {
+      expect(
+        queryKeys.releases.adminInfinite({
+          search: '',
+          published: true,
+          deleted: false,
+          withoutByline: true,
+        })
+      ).toEqual(['releases', 'adminInfinite', '', true, false, true]);
     });
 
     it('includes search and filter flags in the admin artists infinite key', () => {

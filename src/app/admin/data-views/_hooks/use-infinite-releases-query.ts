@@ -16,6 +16,8 @@ export interface ReleasesQueryParams {
   search: string;
   published: boolean | null;
   deleted: boolean;
+  /** Only the published releases whose byline names nobody (ADR-0015). */
+  withoutByline?: boolean;
 }
 
 /** One skip/offset page of releases returned by `/api/releases`. */
@@ -52,6 +54,7 @@ const fetchReleases = async (
   if (params.search) searchParams.set('search', params.search);
   if (params.published !== null) searchParams.set('published', String(params.published));
   if (params.deleted) searchParams.set('deleted', 'true');
+  if (params.withoutByline) searchParams.set('withoutByline', 'true');
 
   return fetchAndParse(
     `/api/releases?${searchParams.toString()}`,
@@ -67,7 +70,7 @@ const fetchReleases = async (
  * React Query infinite hook for the admin releases listing.
  *
  * Pages through `/api/releases` via skip/offset, accumulating results for
- * infinite scroll. Search, published, and deleted filters are applied
+ * infinite scroll. Search, published, deleted, and without-byline filters are applied
  * server-side and are part of the query key, so changing any of them resets
  * pagination. `keepPreviousData` keeps the current results visible during a
  * filter transition. Cancellation is automatic via the forwarded `AbortSignal`.

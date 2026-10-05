@@ -196,6 +196,20 @@ describe('Release API Routes', () => {
       );
     });
 
+    it('passes withoutByline=true when requested', async () => {
+      vi.mocked(ReleaseService.getReleases).mockResolvedValue({
+        success: true,
+        data: [mockRelease] as never,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/releases?withoutByline=true');
+      await GET(request);
+
+      expect(ReleaseService.getReleases).toHaveBeenCalledWith(
+        expect.objectContaining({ withoutByline: true })
+      );
+    });
+
     it('should handle multiple query parameters', async () => {
       vi.mocked(ReleaseService.getReleases).mockResolvedValue({
         success: true,

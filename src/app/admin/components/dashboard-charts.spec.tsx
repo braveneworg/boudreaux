@@ -19,7 +19,7 @@ vi.mock('recharts', async () => {
 });
 
 const stats: AdminStats = {
-  releases: { total: 10, published: 7, draft: 3 },
+  releases: { total: 10, published: 7, draft: 3, withoutByline: 0 },
   featuredArtists: { total: 3 },
   artists: { total: 20, published: 12 },
   notifications: { activeSlots: 2 },
@@ -43,7 +43,7 @@ describe('DashboardCharts', () => {
 
   it('does not throw when all counts are zero', () => {
     const empty: AdminStats = {
-      releases: { total: 0, published: 0, draft: 0 },
+      releases: { total: 0, published: 0, draft: 0, withoutByline: 0 },
       featuredArtists: { total: 0 },
       artists: { total: 0, published: 0 },
       notifications: { activeSlots: 0 },

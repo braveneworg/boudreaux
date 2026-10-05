@@ -17,7 +17,7 @@ import type {
   Release,
   ReleaseCarouselItem,
   ReleaseForDeletion,
-  ReleaseListFilters,
+  ReleaseListQuery,
   ReleaseListItem,
   ReleaseScalars,
   UpdateReleaseData,
@@ -166,12 +166,19 @@ export class ReleaseService {
    * - `published === false` → only releases without a `publishedAt` date.
    * - `published == null` → no publish filter.
    * - `deleted` falsy → exclude soft-deleted releases; `deleted === true` → include them.
+   * - `withoutByline === true` → only the published releases whose byline
+   *   names nobody (ADR-0015); `published` and `deleted` do not apply.
    */
   static async getReleases(
-    params?: ReleaseListFilters
+    params: ReleaseListQuery = {}
   ): Promise<ServiceResponse<ReleaseListItem[]>> {
     try {
-      const releases = await ReleaseRepository.findMany(params ?? {});
+      const { withoutByline, published, deleted, ...rest } = params;
+      const releases = await ReleaseRepository.findMany(
+        withoutByline
+          ? { ...rest, ids: await ReleaseRepository.findIdsWithoutByline() }
+          : { ...rest, published, deleted }
+      );
       return { success: true, data: releases };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve releases' });

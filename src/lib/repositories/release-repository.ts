@@ -20,6 +20,7 @@ import type {
   ReleaseLinkSource,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
+import { publicCredits } from '@/lib/utils/artist-release-credits';
 
 import { publicArtistWhere } from './_internal/artist-where';
 import { orderedCredits } from './_internal/credit-order';
@@ -286,11 +287,14 @@ const containsInsensitive = (value: string) => ({ contains: value, mode: 'insens
  * (Prisma 6 + MongoDB null-safe pattern).
  */
 const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput => {
-  const { search, artistIds, published, deleted } = filters;
+  const { search, artistIds, published, deleted, ids } = filters;
   const and: Prisma.ReleaseWhereInput[] = [];
 
   if (!deleted) {
     and.push(releaseWhere.notDeleted);
+  }
+  if (ids) {
+    and.push({ id: { in: ids } });
   }
   if (published !== undefined) {
     and.push(releasePublishedFilter(published));
@@ -437,6 +441,30 @@ export class ReleaseRepository {
       orderBy: { createdAt: 'desc' },
       include: releaseListItemInclude,
     }) as Promise<ReleaseListItem[]>;
+  }
+
+  /**
+   * The listed releases whose byline names nobody: the first credit in stored
+   * order is a hidden artist, or there is no credit at all. Decided by
+   * `publicCredits`, the rule every public release read applies (ADR-0015),
+   * so the admin sees exactly the releases the public sees without a byline.
+   * Read in memory because "first in stored order" is not a `where`; only
+   * each release's id and first credit's gate fields are loaded.
+   */
+  static async findIdsWithoutByline(): Promise<string[]> {
+    const releases = await prisma.release.findMany({
+      where: releaseWhere.listed,
+      select: {
+        id: true,
+        artistReleases: orderedCredits({
+          take: 1,
+          select: { artist: { select: { publishedOn: true, deletedOn: true } } },
+        }),
+      },
+    });
+    return releases
+      .filter(({ artistReleases }) => publicCredits(artistReleases).albumArtist === null)
+      .map(({ id }) => id);
   }
 
   /**

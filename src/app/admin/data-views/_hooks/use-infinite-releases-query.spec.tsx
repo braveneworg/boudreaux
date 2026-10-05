@@ -39,7 +39,7 @@ describe('useInfiniteReleasesQuery', () => {
   it('keys the query by the admin-infinite params and starts at skip 0', () => {
     const opts = getOptions({ search: 'Album', published: null, deleted: false });
 
-    expect(opts.queryKey).toEqual(['releases', 'adminInfinite', 'album', null, false]);
+    expect(opts.queryKey).toEqual(['releases', 'adminInfinite', 'album', null, false, false]);
     expect(opts.initialPageParam).toBe(0);
   });
 
@@ -78,6 +78,21 @@ describe('useInfiniteReleasesQuery', () => {
       `/api/releases?skip=0&take=${RELEASES_PAGE_SIZE}&search=Test&published=true&deleted=true`,
       { signal: undefined }
     );
+  });
+
+  it('keys and asks for the releases without a byline when set', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions({ search: '', published: true, deleted: false, withoutByline: true });
+
+    await opts.queryFn({ pageParam: 0 });
+
+    expect({ key: opts.queryKey, url: fetchMock.mock.calls[0][0] }).toEqual({
+      key: ['releases', 'adminInfinite', '', true, false, true],
+      url: `/api/releases?skip=0&take=${RELEASES_PAGE_SIZE}&published=true&withoutByline=true`,
+    });
   });
 
   it('throws when the response is not ok', async () => {

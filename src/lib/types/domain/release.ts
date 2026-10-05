@@ -329,6 +329,17 @@ export interface ReleaseListFilters {
   artistIds?: string[];
   published?: boolean;
   deleted?: boolean;
+  /** Restrict the listing to these releases; an empty list matches nothing. */
+  ids?: string[];
+}
+
+/** What the admin listing may ask the service for. */
+export interface ReleaseListQuery extends Omit<ReleaseListFilters, 'ids'> {
+  /**
+   * Only the published releases whose byline names nobody (ADR-0015). The
+   * published and deleted filters do not apply alongside it.
+   */
+  withoutByline?: boolean;
 }
 
 /** Pagination + optional search for the public published-releases listing. */
