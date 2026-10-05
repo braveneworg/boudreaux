@@ -48,7 +48,11 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   credits, so `ReleaseService.createRelease` drops any publication date and
   publishing goes through `publishRelease`, which checks the stored credits.
 - **Who decided is recorded.** `publishedBy` on each artist is the admin's id
-  from the session, never a value from the request.
+  from the session, never a value from the request. Since 2026-10-04 this
+  holds for every way an artist is published (the release confirmation, the
+  Publish button, the artist form, an artist created published): the write
+  that first publishes the artist records its admin, and a later save of a
+  public artist leaves the record alone.
 - **A credit awaits confirmation** when stamping `publishedOn` would make its
   artist public: no `publishedOn`, current or alumni, not deleted.
 - **A credit stays hidden** when publishing cannot make it public: the artist
@@ -141,6 +145,12 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
 - Archiving is the only way the admin UI hides an artist. There is no
   unpublish action for artists, and permanently deleting an artist applies
   only to one already archived, so neither shows the warning.
+- **The album artist of a release cannot be deleted permanently**
+  (2026-10-04). Deleting it would make the next credit the album artist and
+  the byline, a choice nobody made. `ArtistService.deleteArtist` refuses,
+  naming the releases, until the admin moves or removes that credit on each
+  of them. Deleting any other credited artist renumbers the credits it leaves
+  behind, 0..n-1, in the delete's own transaction.
 - A publishing save on the release form is held until the admin answers. If
   the admin cancels, nothing is saved, and a later plain save does not
   publish by accident: the publish button puts its date on the payload, never
