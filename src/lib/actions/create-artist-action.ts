@@ -40,15 +40,18 @@ export const createArtistAction = async (
         parsed.data;
 
       // Create artist in database
-      const response = await ArtistService.createArtist({
-        firstName: firstName || '',
-        surname: surname || '',
-        slug,
-        middleName,
-        displayName,
-        publishedOn: publishedOn ? new Date(publishedOn) : undefined,
-        formedOn: formedOn ? new Date(formedOn) : undefined,
-      });
+      const response = await ArtistService.createArtist(
+        {
+          firstName: firstName || '',
+          surname: surname || '',
+          slug,
+          middleName,
+          displayName,
+          publishedOn: publishedOn ? new Date(publishedOn) : undefined,
+          formedOn: formedOn ? new Date(formedOn) : undefined,
+        },
+        session.user.id
+      );
 
       // Log artist creation for security audit
       logSecurityEvent({

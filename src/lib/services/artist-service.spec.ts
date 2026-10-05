@@ -58,7 +58,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
 }));
 
 vi.mock('@/lib/repositories/artist-credit-repository', () => ({
-  ArtistCreditRepository: { creditOnRelease: vi.fn() },
+  ArtistCreditRepository: { creditOnRelease: vi.fn(), findReleasesLedBy: vi.fn() },
 }));
 
 vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
@@ -120,7 +120,7 @@ describe('ArtistService', () => {
     });
 
     it('are cleared when an artist is published', async () => {
-      await ArtistService.publishArtist('artist-123');
+      await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
     });
@@ -138,6 +138,7 @@ describe('ArtistService', () => {
         deletedOn: new Date('2026-01-01'),
       } as never);
       vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValueOnce([]);
+      vi.mocked(ArtistCreditRepository.findReleasesLedBy).mockResolvedValueOnce([]);
 
       await ArtistService.deleteArtist('artist-123');
 
@@ -151,7 +152,7 @@ describe('ArtistService', () => {
     });
 
     it('are cleared when an artist is updated', async () => {
-      await ArtistService.updateArtist('artist-123', { displayName: 'New Name' });
+      await ArtistService.updateArtist('artist-123', { displayName: 'New Name' }, 'admin-1');
 
       expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
     });
@@ -161,7 +162,7 @@ describe('ArtistService', () => {
         new DataError('NOT_FOUND', 'Record not found')
       );
 
-      await ArtistService.publishArtist('artist-123');
+      await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([]);
     });
@@ -238,7 +239,7 @@ describe('ArtistService', () => {
     it('invalidates the vocabulary cache after a successful create', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      await ArtistService.createArtist(createInput);
+      await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
@@ -246,15 +247,37 @@ describe('ArtistService', () => {
     it('does not invalidate the vocabulary cache when the create fails', async () => {
       vi.mocked(ArtistRepository.create).mockRejectedValueOnce(Error('boom'));
 
-      await ArtistService.createArtist(createInput);
+      await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(ArtistVocabularyService.invalidate).not.toHaveBeenCalled();
+    });
+
+    // Who published an artist is recorded on every publish (ADR-0015), and
+    // the service decides it: a caller's own publishedBy is never stored.
+    it('records the admin as publisher when the artist is created published', async () => {
+      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
+      const publishedOn = new Date('2026-10-04');
+
+      await ArtistService.createArtist({ ...createInput, publishedOn }, 'admin-1');
+
+      expect(vi.mocked(ArtistRepository.create).mock.calls[0][0]).toMatchObject({
+        publishedOn,
+        publishedBy: 'admin-1',
+      });
+    });
+
+    it('records no publisher for an artist created unpublished', async () => {
+      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
+
+      await ArtistService.createArtist({ ...createInput, publishedBy: 'forged' }, 'admin-1');
+
+      expect(vi.mocked(ArtistRepository.create).mock.calls[0][0]).not.toHaveProperty('publishedBy');
     });
 
     it('should create an artist successfully', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      const result = await ArtistService.createArtist(createInput);
+      const result = await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(ArtistRepository.create).toHaveBeenCalledWith(createInput);
@@ -264,7 +287,7 @@ describe('ArtistService', () => {
       const prismaError = new DataError('DUPLICATE', 'Unique constraint failed');
       vi.mocked(ArtistRepository.create).mockRejectedValue(prismaError);
 
-      const result = await ArtistService.createArtist(createInput);
+      const result = await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(result).toMatchObject({
         success: false,
@@ -276,7 +299,7 @@ describe('ArtistService', () => {
       const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ArtistRepository.create).mockRejectedValue(initError);
 
-      const result = await ArtistService.createArtist(createInput);
+      const result = await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
@@ -284,7 +307,7 @@ describe('ArtistService', () => {
     it('should handle unknown errors', async () => {
       vi.mocked(ArtistRepository.create).mockRejectedValue(Error('Unknown error'));
 
-      const result = await ArtistService.createArtist(createInput);
+      const result = await ArtistService.createArtist(createInput, 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to create artist' });
     });
@@ -473,7 +496,7 @@ describe('ArtistService', () => {
     it('invalidates the vocabulary cache after a successful update', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', updateData);
+      await ArtistService.updateArtist('artist-123', updateData, 'admin-1');
 
       expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
@@ -481,7 +504,7 @@ describe('ArtistService', () => {
     it('does not invalidate the vocabulary cache when the update fails', async () => {
       vi.mocked(ArtistRepository.update).mockRejectedValueOnce(Error('boom'));
 
-      await ArtistService.updateArtist('artist-123', updateData);
+      await ArtistService.updateArtist('artist-123', updateData, 'admin-1');
 
       expect(ArtistVocabularyService.invalidate).not.toHaveBeenCalled();
     });
@@ -490,28 +513,57 @@ describe('ArtistService', () => {
       const updatedArtist = { ...mockArtist, displayName: 'John Updated Doe' };
       vi.mocked(ArtistRepository.update).mockResolvedValue(updatedArtist);
 
-      const result = await ArtistService.updateArtist('artist-123', updateData);
+      const result = await ArtistService.updateArtist('artist-123', updateData, 'admin-1');
 
       expect(result).toMatchObject({ success: true, data: updatedArtist });
-      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', updateData);
+      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', updateData, {
+        publishedBy: 'admin-1',
+      });
+    });
+
+    it("ignores a caller's publishedBy: the repository records the admin", async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist(
+        'artist-123',
+        { publishedOn: new Date('2026-10-04'), publishedBy: 'forged' },
+        'admin-1'
+      );
+
+      expect(vi.mocked(ArtistRepository.update).mock.calls[0].slice(1)).toEqual([
+        { publishedOn: new Date('2026-10-04') },
+        { publishedBy: 'admin-1' },
+      ]);
     });
 
     it('sanitizes the bio HTML before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', {
-        bio: '<p>Hi</p><script>alert(1)</script>',
-      });
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          bio: '<p>Hi</p><script>alert(1)</script>',
+        },
+        'admin-1'
+      );
 
-      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', { bio: '<p>Hi</p>' });
+      expect(ArtistRepository.update).toHaveBeenCalledWith(
+        'artist-123',
+        { bio: '<p>Hi</p>' },
+        { publishedBy: 'admin-1' }
+      );
     });
 
     it('strips a disallowed image host from the bio on write', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', {
-        altBio: '<p>x<img src="javascript:alert(1)"></p>',
-      });
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          altBio: '<p>x<img src="javascript:alert(1)"></p>',
+        },
+        'admin-1'
+      );
 
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.altBio).not.toContain('javascript:');
@@ -520,9 +572,13 @@ describe('ArtistService', () => {
     it('strips <img> from shortBio on admin save regardless of the image source', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', {
-        shortBio: '<p>Intro. <img src="https://cdn.example/a.webp" alt="a"> Outro.</p>',
-      });
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          shortBio: '<p>Intro. <img src="https://cdn.example/a.webp" alt="a"> Outro.</p>',
+        },
+        'admin-1'
+      );
 
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.shortBio).not.toContain('<img');
@@ -534,7 +590,7 @@ describe('ArtistService', () => {
       const notFoundError = new DataError('NOT_FOUND', 'Record not found');
       vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);
 
-      const result = await ArtistService.updateArtist('non-existent', updateData);
+      const result = await ArtistService.updateArtist('non-existent', updateData, 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
@@ -543,7 +599,11 @@ describe('ArtistService', () => {
       const uniqueError = new DataError('DUPLICATE', 'Unique constraint failed');
       vi.mocked(ArtistRepository.update).mockRejectedValue(uniqueError);
 
-      const result = await ArtistService.updateArtist('artist-123', { slug: 'existing-slug' });
+      const result = await ArtistService.updateArtist(
+        'artist-123',
+        { slug: 'existing-slug' },
+        'admin-1'
+      );
 
       expect(result).toMatchObject({
         success: false,
@@ -555,7 +615,7 @@ describe('ArtistService', () => {
       const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
 
-      const result = await ArtistService.updateArtist('artist-123', updateData);
+      const result = await ArtistService.updateArtist('artist-123', updateData, 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
@@ -563,7 +623,7 @@ describe('ArtistService', () => {
     it('should handle unknown errors', async () => {
       vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
 
-      const result = await ArtistService.updateArtist('artist-123', updateData);
+      const result = await ArtistService.updateArtist('artist-123', updateData, 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to update artist' });
     });
@@ -599,7 +659,11 @@ describe('ArtistService', () => {
     it('re-hosts a thumbnail src to full variants and rewrites the html', async () => {
       vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([thumbnailRow]);
 
-      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+      await ArtistService.updateArtist(
+        'a1',
+        { bio: `<p><img src="${THUMB}" alt="x" /></p>` },
+        'admin-1'
+      );
 
       const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
       expect(updateData.bio).toContain(FULL);
@@ -608,7 +672,11 @@ describe('ArtistService', () => {
     it('upgrades the matching bio image row url', async () => {
       vi.mocked(ArtistBioImageRepository.findForRehost).mockResolvedValue([thumbnailRow]);
 
-      await ArtistService.updateArtist('a1', { bio: `<p><img src="${THUMB}" alt="x" /></p>` });
+      await ArtistService.updateArtist(
+        'a1',
+        { bio: `<p><img src="${THUMB}" alt="x" /></p>` },
+        'admin-1'
+      );
 
       expect(vi.mocked(ArtistBioImageRepository.updateUrl)).toHaveBeenCalledWith('img-1', FULL);
     });
@@ -616,15 +684,23 @@ describe('ArtistService', () => {
     it('skips an external src that resolves to a private address', async () => {
       vi.mocked(isPubliclyRoutableUrl).mockResolvedValue(false);
 
-      await ArtistService.updateArtist('a1', {
-        bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>',
-      });
+      await ArtistService.updateArtist(
+        'a1',
+        {
+          bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>',
+        },
+        'admin-1'
+      );
 
       expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
     });
 
     it('leaves a fully re-hosted CDN src untouched', async () => {
-      await ArtistService.updateArtist('a1', { bio: `<p><img src="${FULL}" alt="" /></p>` });
+      await ArtistService.updateArtist(
+        'a1',
+        { bio: `<p><img src="${FULL}" alt="" /></p>` },
+        'admin-1'
+      );
 
       expect(vi.mocked(BioImageService.rehostWithVariants)).not.toHaveBeenCalled();
     });
@@ -632,15 +708,19 @@ describe('ArtistService', () => {
     it('saves with the original src when re-hosting throws', async () => {
       vi.mocked(BioImageService.rehostWithVariants).mockRejectedValue(new Error('s3 down'));
 
-      const result = await ArtistService.updateArtist('a1', {
-        bio: `<p><img src="${THUMB}" alt="" /></p>`,
-      });
+      const result = await ArtistService.updateArtist(
+        'a1',
+        {
+          bio: `<p><img src="${THUMB}" alt="" /></p>`,
+        },
+        'admin-1'
+      );
 
       expect(result.success).toBe(true);
     });
 
     it('skips finalization entirely when no bio fields are updated', async () => {
-      await ArtistService.updateArtist('a1', { displayName: 'X' });
+      await ArtistService.updateArtist('a1', { displayName: 'X' }, 'admin-1');
 
       expect(vi.mocked(ArtistBioImageRepository.findForRehost)).not.toHaveBeenCalled();
     });
@@ -663,9 +743,13 @@ describe('ArtistService', () => {
         .mockResolvedValueOnce(true)
         .mockRejectedValueOnce(new Error('dns exploded'));
 
-      await ArtistService.updateArtist('a1', {
-        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
-      });
+      await ArtistService.updateArtist(
+        'a1',
+        {
+          bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+        },
+        'admin-1'
+      );
 
       // The first image's row was upgraded to FULL, so the persisted html must
       // carry FULL too — no row/html divergence.
@@ -688,9 +772,13 @@ describe('ArtistService', () => {
         .mockResolvedValueOnce(true)
         .mockRejectedValueOnce(new Error('dns exploded'));
 
-      await ArtistService.updateArtist('a1', {
-        bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
-      });
+      await ArtistService.updateArtist(
+        'a1',
+        {
+          bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
+        },
+        'admin-1'
+      );
 
       const updateData = vi.mocked(ArtistRepository.update).mock.calls[0][1];
       expect(updateData.bio).toContain(THUMB2);
@@ -704,12 +792,14 @@ describe('ArtistService', () => {
       vi.stubEnv('CDN_DOMAIN', 'cdn.example');
       vi.mocked(ArtistRepository.findById).mockResolvedValue(archivedArtist as never);
       vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValue([]);
+      vi.mocked(ArtistCreditRepository.findReleasesLedBy).mockResolvedValue([]);
     });
 
     afterEach(() => {
       vi.unstubAllEnvs();
       vi.mocked(ArtistRepository.findById).mockReset();
       vi.mocked(ArtistBioImageRepository.findManyByArtist).mockReset();
+      vi.mocked(ArtistCreditRepository.findReleasesLedBy).mockReset();
     });
 
     it('should delete an archived artist successfully', async () => {
@@ -734,6 +824,38 @@ describe('ArtistService', () => {
         code: 'VALIDATION',
       });
       expect(ArtistRepository.delete).not.toHaveBeenCalled();
+    });
+
+    // Deleting a release's album artist would make the next credit the
+    // album artist and the byline, a choice nobody made; the admin moves or
+    // removes that credit first.
+    it('refuses to delete the album artist of a release, naming the releases', async () => {
+      vi.mocked(ArtistCreditRepository.findReleasesLedBy).mockResolvedValueOnce([
+        { id: 'r1', title: 'Beta' },
+        { id: 'r2', title: 'Alpha' },
+      ]);
+
+      const result = await ArtistService.deleteArtist('artist-123');
+
+      expect({ result, deleted: vi.mocked(ArtistRepository.delete).mock.calls }).toEqual({
+        result: {
+          success: false,
+          code: 'VALIDATION',
+          error:
+            'This artist is the album artist of Alpha, Beta. Move or remove that credit on each release first.',
+        },
+        deleted: [],
+      });
+    });
+
+    it('reads the releases the artist leads', async () => {
+      vi.mocked(ArtistRepository.delete).mockResolvedValue(mockArtist);
+
+      await ArtistService.deleteArtist('artist-123');
+
+      expect(vi.mocked(ArtistCreditRepository.findReleasesLedBy).mock.calls).toEqual([
+        ['artist-123'],
+      ]);
     });
 
     it('should return error when artist not found', async () => {
@@ -868,12 +990,14 @@ describe('ArtistService', () => {
       const publishedArtist = { ...mockArtist, publishedOn: new Date('2024-12-13') };
       vi.mocked(ArtistRepository.update).mockResolvedValue(publishedArtist);
 
-      const result = await ArtistService.publishArtist('artist-123');
+      const result = await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(result).toMatchObject({ success: true, data: publishedArtist });
-      expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', {
-        publishedOn: expect.any(Date),
-      });
+      expect(ArtistRepository.update).toHaveBeenCalledWith(
+        'artist-123',
+        { publishedOn: expect.any(Date) },
+        { publishedBy: 'admin-1' }
+      );
     });
 
     it('should return error when artist not found', async () => {
@@ -881,7 +1005,7 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.update).mockReset();
       vi.mocked(ArtistRepository.update).mockRejectedValue(notFoundError);
 
-      const result = await ArtistService.publishArtist('non-existent');
+      const result = await ArtistService.publishArtist('non-existent', 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Artist not found' });
     });
@@ -891,7 +1015,7 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.update).mockReset();
       vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
 
-      const result = await ArtistService.publishArtist('artist-123');
+      const result = await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
@@ -900,7 +1024,7 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.update).mockReset();
       vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
 
-      const result = await ArtistService.publishArtist('artist-123');
+      const result = await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to publish artist' });
     });
@@ -1898,9 +2022,13 @@ describe('ArtistService', () => {
     it('sanitizes a string shortBio before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', {
-        shortBio: '<p>Hi</p><script>alert(1)</script>',
-      });
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          shortBio: '<p>Hi</p><script>alert(1)</script>',
+        },
+        'admin-1'
+      );
 
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.shortBio).toBe('<p>Hi</p>');
@@ -1915,14 +2043,17 @@ describe('ArtistService', () => {
     it('stores genres and tags in the normalised form on create', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      await ArtistService.createArtist({
-        firstName: 'John',
-        surname: 'Doe',
-        displayName: 'John Doe',
-        slug: 'john-doe',
-        genres: 'Hip Hop, R&B, hip-hop',
-        tags: 'Synth Pop',
-      });
+      await ArtistService.createArtist(
+        {
+          firstName: 'John',
+          surname: 'Doe',
+          displayName: 'John Doe',
+          slug: 'john-doe',
+          genres: 'Hip Hop, R&B, hip-hop',
+          tags: 'Synth Pop',
+        },
+        'admin-1'
+      );
 
       const [persisted] = vi.mocked(ArtistRepository.create).mock.calls.at(-1) ?? [];
       expect(persisted?.genres).toBe('hip-hop,r-and-b');
@@ -1932,10 +2063,14 @@ describe('ArtistService', () => {
     it('stores genres and tags in the normalised form on update', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', {
-        genres: 'Experimental, Electronic',
-        tags: 'Lo-Fi',
-      });
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          genres: 'Experimental, Electronic',
+          tags: 'Lo-Fi',
+        },
+        'admin-1'
+      );
 
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.genres).toBe('experimental,electronic');
@@ -1945,7 +2080,7 @@ describe('ArtistService', () => {
     it('clears a column that normalises to nothing, and leaves an omitted one alone', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
-      await ArtistService.updateArtist('artist-123', { genres: ' , ' });
+      await ArtistService.updateArtist('artist-123', { genres: ' , ' }, 'admin-1');
 
       const [, persisted] = vi.mocked(ArtistRepository.update).mock.calls.at(-1) ?? [];
       expect(persisted?.genres).toBeNull();

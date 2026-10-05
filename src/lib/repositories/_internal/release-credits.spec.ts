@@ -4,9 +4,11 @@
 import { CreditDecisionError } from '@/lib/types/domain/errors';
 
 import { artistWhere } from './artist-where';
+import { creditOrderBy } from './credit-order';
 import {
   addCredits,
   publishConfirmedCredits,
+  renumberCredits,
   syncCredits,
   type CreditClient,
 } from './release-credits';
@@ -26,6 +28,7 @@ const buildClient = () => ({
     createMany: vi.fn().mockResolvedValue({ count: 0 }),
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     upsert: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue({}),
   },
 });
 
@@ -149,6 +152,47 @@ describe('release credits', () => {
         deleted: [[{ where: { id: { in: ['row-a'] } } }]],
         upserted: [],
       });
+    });
+  });
+
+  describe('renumberCredits', () => {
+    it("re-stamps a release's credits 0..n-1 in their stored order", async () => {
+      client.artistRelease.findMany.mockResolvedValueOnce([
+        { id: 'c1', position: 1 },
+        { id: 'c3', position: 3 },
+      ]);
+
+      await renumberCredits(asClient(client), 'release-1');
+
+      expect({
+        read: client.artistRelease.findMany.mock.calls,
+        written: client.artistRelease.update.mock.calls,
+      }).toEqual({
+        read: [
+          [
+            {
+              where: { releaseId: 'release-1' },
+              orderBy: creditOrderBy,
+              select: { id: true, position: true },
+            },
+          ],
+        ],
+        written: [
+          [{ where: { id: 'c1' }, data: { position: 0 } }],
+          [{ where: { id: 'c3' }, data: { position: 1 } }],
+        ],
+      });
+    });
+
+    it('writes nothing when the positions are already dense', async () => {
+      client.artistRelease.findMany.mockResolvedValueOnce([
+        { id: 'c0', position: 0 },
+        { id: 'c1', position: 1 },
+      ]);
+
+      await renumberCredits(asClient(client), 'release-1');
+
+      expect(client.artistRelease.update.mock.calls).toEqual([]);
     });
   });
 

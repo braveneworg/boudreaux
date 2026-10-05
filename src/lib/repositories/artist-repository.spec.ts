@@ -277,13 +277,59 @@ describe('ArtistRepository', () => {
         include: adminInclude,
       });
     });
+
+    it('writes no publisher, and opens no transaction, for an update that does not publish', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.update('a', { displayName: 'New' }, { publishedBy: 'admin-1' });
+
+      expect({
+        transactions: vi.mocked(prisma.$transaction).mock.calls.length,
+        stamped: vi.mocked(prisma.artist.updateMany).mock.calls,
+      }).toEqual({ transactions: 0, stamped: [] });
+    });
+
+    // A save of a public artist sends its publishedOn again; the publisher is
+    // recorded only on the write that first publishes it, so the stamp is
+    // gated on the stored artist being unpublished, in the update's own
+    // transaction.
+    it('records the publisher only where the artist is not yet published', async () => {
+      const publishedOn = new Date('2026-10-04');
+      const tx = {
+        artist: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          update: vi.fn().mockResolvedValue({ id: 'a' }),
+        },
+      };
+      vi.mocked(prisma.$transaction).mockImplementationOnce(async (callback) =>
+        callback(tx as never)
+      );
+
+      await ArtistRepository.update('a', { publishedOn }, { publishedBy: 'admin-1' });
+
+      expect({
+        stamped: tx.artist.updateMany.mock.calls,
+        updated: tx.artist.update.mock.calls,
+        outer: vi.mocked(prisma.artist.update).mock.calls,
+      }).toEqual({
+        stamped: [
+          [{ where: { id: 'a', ...artistWhere.unpublished }, data: { publishedBy: 'admin-1' } }],
+        ],
+        updated: [[{ where: { id: 'a' }, data: { publishedOn }, include: adminInclude }]],
+        outer: [],
+      });
+    });
   });
 
   describe('delete', () => {
     const buildDeleteTx = () => ({
       artistMember: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       artistLabel: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-      artistRelease: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistRelease: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        update: vi.fn().mockResolvedValue({}),
+      },
       artistFeaturedArtist: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       artistUrl: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       artistBioImage: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -318,6 +364,28 @@ describe('ArtistRepository', () => {
       expect(tx.artistBioImage.deleteMany).toHaveBeenCalledWith(byArtist);
       expect(tx.artistBioLink.deleteMany).toHaveBeenCalledWith(byArtist);
       expect(tx.videoArtist.deleteMany).toHaveBeenCalledWith(byArtist);
+    });
+
+    // Positions stay dense (0..n-1) on every release the artist was credited
+    // on. The service refuses to delete a release's album artist, so only a
+    // later credit is ever removed here.
+    it('renumbers the remaining credits of each release the artist was credited on', async () => {
+      const tx = buildDeleteTx();
+      tx.artistRelease.findMany.mockResolvedValueOnce([{ releaseId: 'r1' }]).mockResolvedValueOnce([
+        { id: 'c0', position: 0 },
+        { id: 'c2', position: 2 },
+      ]);
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(tx as never));
+
+      await ArtistRepository.delete('a');
+
+      expect({
+        credited: tx.artistRelease.findMany.mock.calls[0][0],
+        renumbered: tx.artistRelease.update.mock.calls,
+      }).toEqual({
+        credited: { where: { artistId: 'a' }, select: { releaseId: true } },
+        renumbered: [[{ where: { id: 'c2' }, data: { position: 1 } }]],
+      });
     });
 
     it('deletes band-membership rows in both directions', async () => {
