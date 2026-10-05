@@ -120,13 +120,22 @@ export class ArtistCreditRepository {
   /**
    * The public work that carries an artist's name: the listed releases the
    * artist is credited on and the tour dates the artist headlines. Hiding the
-   * artist removes the name from all of it.
+   * artist removes the name from all of it, and leaves each release whose
+   * first credit it is (its album artist) with no byline.
    */
   static async findPublishedWorkCreditedTo(artistId: string): Promise<PublishedWorkCreditedTo> {
     const [credits, headliners] = await Promise.all([
       prisma.artistRelease.findMany({
         where: { artistId, release: releaseWhere.listed },
-        select: { release: { select: { id: true, title: true } } },
+        select: {
+          release: {
+            select: {
+              id: true,
+              title: true,
+              artistReleases: orderedCredits({ take: 1, select: { artistId: true } }),
+            },
+          },
+        },
       }),
       prisma.tourDateHeadliner.findMany({
         where: { artistId },
@@ -138,7 +147,11 @@ export class ArtistCreditRepository {
       }),
     ]);
     return {
-      releases: credits.map(({ release }) => release),
+      releases: credits.map(({ release: { id, title, artistReleases } }) => ({
+        id,
+        title,
+        leavesNoByline: artistReleases.at(0)?.artistId === artistId,
+      })),
       tourDates: headliners.map(({ tourDate: { id, startDate, tour } }) => ({
         id,
         startDate,

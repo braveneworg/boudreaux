@@ -11,8 +11,8 @@ import { HidingWarningDialog } from './hiding-warning-dialog';
 
 const work: PublishedWorkCreditedTo = {
   releases: [
-    { id: 'r1', title: 'Broken Bone Ballads' },
-    { id: 'r2', title: 'Sad, Fat Luck' },
+    { id: 'r1', title: 'Broken Bone Ballads', leavesNoByline: false },
+    { id: 'r2', title: 'Sad, Fat Luck', leavesNoByline: false },
   ],
   tourDates: [
     {
@@ -71,6 +71,44 @@ describe('HidingWarningDialog', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'They stay public, without this artist’s name.'
     );
+  });
+
+  // The artist is the first credit (album artist) of a release it leads;
+  // hiding it leaves that release with no byline (ADR-0015).
+  describe('releases the artist leads', () => {
+    const leading: PublishedWorkCreditedTo = {
+      releases: [
+        { id: 'r1', title: 'Broken Bone Ballads', leavesNoByline: true },
+        { id: 'r2', title: 'Sad, Fat Luck', leavesNoByline: false },
+      ],
+      tourDates: [],
+    };
+
+    it('lists them apart, as left without a byline', () => {
+      renderDialog(leading);
+
+      expect({
+        noByline: screen
+          .getByRole('region', { name: 'Left without a byline' })
+          .querySelectorAll('li').length,
+        named: screen.getAllByTestId(/^hidden-release-/).map((item) => item.textContent),
+        lost: screen.getAllByTestId(/^byline-lost-release-/).map((item) => item.textContent),
+      }).toEqual({ noByline: 1, named: ['Sad, Fat Luck'], lost: ['Broken Bone Ballads'] });
+    });
+
+    it('says the dashboard lists them afterwards', () => {
+      renderDialog(leading);
+
+      expect(screen.getByRole('region', { name: 'Left without a byline' })).toHaveTextContent(
+        'The dashboard lists them until a public artist leads each one.'
+      );
+    });
+
+    it('leaves the section out when the artist leads none', () => {
+      renderDialog();
+
+      expect(screen.queryByRole('region', { name: 'Left without a byline' })).toBeNull();
+    });
   });
 
   it('confirms hiding the artist', async () => {

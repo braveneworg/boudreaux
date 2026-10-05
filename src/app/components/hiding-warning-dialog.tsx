@@ -29,16 +29,19 @@ const SHOW_DATE = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZo
 
 interface WorkSectionProps {
   heading: string;
+  /** A line under the heading saying what happens to this work. */
+  note?: string;
   children: React.ReactNode;
 }
 
-const WorkSection = ({ heading, children }: WorkSectionProps): React.JSX.Element => {
+const WorkSection = ({ heading, note, children }: WorkSectionProps): React.JSX.Element => {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId}>
       <h3 id={headingId} className="text-sm font-semibold">
         {heading}
       </h3>
+      {note && <p className="text-sm text-zinc-700">{note}</p>}
       <ul className="max-h-[25vh] overflow-y-auto text-sm text-zinc-700">{children}</ul>
     </section>
   );
@@ -68,6 +71,11 @@ export const HidingWarningDialog = ({
   const handleConfirm = useCallback(() => onConfirm(), [onConfirm]);
   const handleCancel = useCallback(() => onCancel(), [onCancel]);
 
+  // A release the artist leads loses its byline, not only a name.
+  const releases = work?.releases ?? [];
+  const noByline = releases.filter(({ leavesNoByline }) => leavesNoByline);
+  const named = releases.filter(({ leavesNoByline }) => !leavesNoByline);
+
   return (
     <Dialog open={work !== null} onOpenChange={handleOpenChange}>
       <DialogContent className="min-w-0 sm:max-w-md">
@@ -79,9 +87,22 @@ export const HidingWarningDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        {work && work.releases.length > 0 && (
+        {noByline.length > 0 && (
+          <WorkSection
+            heading="Left without a byline"
+            note="This artist is their first credit, so they will name no artist. The dashboard lists them until a public artist leads each one."
+          >
+            {noByline.map(({ id, title }) => (
+              <li key={id} data-testid={`byline-lost-release-${id}`}>
+                {title}
+              </li>
+            ))}
+          </WorkSection>
+        )}
+
+        {named.length > 0 && (
           <WorkSection heading="Releases">
-            {work.releases.map(({ id, title }) => (
+            {named.map(({ id, title }) => (
               <li key={id} data-testid={`hidden-release-${id}`}>
                 {title}
               </li>
