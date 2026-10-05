@@ -66,14 +66,14 @@ describe('creditConfirmationSchema', () => {
 describe('publishedWorkSchema', () => {
   it('parses releases and tour dates and revives the start date', () => {
     const parsed = publishedWorkSchema.parse({
-      releases: [{ id: 'r', title: 'Album' }],
+      releases: [{ id: 'r', title: 'Album', leavesNoByline: true }],
       tourDates: [
         { id: 'd', startDate: '2026-11-01T00:00:00.000Z', tourId: 't', tourTitle: 'Fall Tour' },
       ],
     });
 
     expect(parsed).toEqual({
-      releases: [{ id: 'r', title: 'Album' }],
+      releases: [{ id: 'r', title: 'Album', leavesNoByline: true }],
       tourDates: [
         {
           id: 'd',

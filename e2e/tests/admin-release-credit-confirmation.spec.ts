@@ -184,7 +184,11 @@ test.describe('Credit confirmation (ADR-0015)', () => {
       name: 'This artist is credited on public work',
     });
     await expect(warning).toBeVisible({ timeout: 15_000 });
-    await expect(warning.getByText(release.title)).toBeVisible();
+    // The artist is the release's only credit, so its album artist: hiding
+    // it leaves the release with no byline, and the warning says so.
+    await expect(
+      warning.getByRole('region', { name: 'Left without a byline' }).getByText(release.title)
+    ).toBeVisible();
 
     await warning.getByRole('button', { name: 'Hide artist', exact: true }).click();
 

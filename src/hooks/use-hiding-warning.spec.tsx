@@ -24,7 +24,7 @@ vi.mock('@/utils/fetch-and-parse', () => ({ fetchAndParse: vi.fn() }));
 
 const signal = new AbortController().signal;
 const nothing = { releases: [], tourDates: [] };
-const work = { releases: [{ id: 'r', title: 'Album' }], tourDates: [] };
+const work = { releases: [{ id: 'r', title: 'Album', leavesNoByline: false }], tourDates: [] };
 
 describe('useHidingWarning', () => {
   beforeEach(() => {

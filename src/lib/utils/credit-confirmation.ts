@@ -88,7 +88,15 @@ export type CreditDecisionCheck = { ok: true } | { ok: false; error: string };
 
 /** The public work that carries an artist's name, listed before hiding it. */
 export interface PublishedWorkCreditedTo {
-  releases: Array<{ id: string; title: string }>;
+  releases: Array<{
+    id: string;
+    title: string;
+    /**
+     * The artist is the release's first credit (its album artist), so hiding
+     * the artist leaves the release with no byline (ADR-0015).
+     */
+    leavesNoByline: boolean;
+  }>;
   tourDates: Array<{ id: string; startDate: Date; tourId: string; tourTitle: string }>;
 }
 
