@@ -148,7 +148,8 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   screen sends `publish: true` with an upload, so this is a server rule with
   no dialog of its own.
 - Archiving is the only way the admin UI hides an artist. There is no
-  unpublish action for artists, and permanently deleting an artist applies
+  unpublish action for artists (since 2026-10-04 the write types allow
+  `publishedOn` only to be set, never cleared), and permanently deleting an artist applies
   only to one already archived, so neither shows the warning.
 - **The album artist of a release cannot be deleted permanently**
   (2026-10-04). Deleting it would make the next credit the album artist and
