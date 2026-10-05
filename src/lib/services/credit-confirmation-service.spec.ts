@@ -144,7 +144,10 @@ describe('CreditConfirmationService', () => {
 
   describe('publishedWorkCreditedTo', () => {
     it('returns the public work that carries the artist name', async () => {
-      const work = { releases: [{ id: 'r', title: 'Album' }], tourDates: [] };
+      const work = {
+        releases: [{ id: 'r', title: 'Album', leavesNoByline: false }],
+        tourDates: [],
+      };
       vi.mocked(ArtistCreditRepository.findPublishedWorkCreditedTo).mockResolvedValueOnce(work);
 
       const result = await CreditConfirmationService.publishedWorkCreditedTo('artist-1');

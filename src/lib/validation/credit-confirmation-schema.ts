@@ -30,7 +30,7 @@ export const creditConfirmationSchema = z.object({
 
 /** The response of `/api/artists/[id]/published-work`. */
 export const publishedWorkSchema = z.object({
-  releases: z.array(z.object({ id: z.string(), title: z.string() })),
+  releases: z.array(z.object({ id: z.string(), title: z.string(), leavesNoByline: z.boolean() })),
   tourDates: z.array(
     z.object({
       id: z.string(),

@@ -69,7 +69,9 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
   already public, the upload still publishes in one call.
 - **Hiding an artist always succeeds.** Archiving an artist is never blocked
   by the work that credits it. The confirmation lists the published releases
-  and tour dates that will lose the name. When that list cannot be loaded
+  and tour dates that will lose the name. Since 2026-10-04 it lists apart
+  the releases the artist leads (it is their first credit): those are left
+  with no byline, not only without a name. When that list cannot be loaded
   the archive goes ahead without it: a takedown must not depend on a read.
 - **A published release with no byline is a legitimate state.** "A published
   release has only public credits" is not an invariant. Filtering hidden

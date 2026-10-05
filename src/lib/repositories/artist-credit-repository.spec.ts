@@ -231,7 +231,19 @@ describe('ArtistCreditRepository', () => {
               artistId: 'artist-1',
               release: releaseWhere.listed,
             },
-            select: { release: { select: { id: true, title: true } } },
+            select: {
+              release: {
+                select: {
+                  id: true,
+                  title: true,
+                  artistReleases: {
+                    orderBy: creditOrderBy,
+                    take: 1,
+                    select: { artistId: true },
+                  },
+                },
+              },
+            },
           },
         ],
       ]);
@@ -261,7 +273,13 @@ describe('ArtistCreditRepository', () => {
     it('returns the releases and tour dates flattened', async () => {
       const startDate = new Date('2026-11-01T00:00:00.000Z');
       vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
-        { release: { id: 'release-1', title: 'Broken Bone Ballads' } },
+        {
+          release: {
+            id: 'release-1',
+            title: 'Broken Bone Ballads',
+            artistReleases: [{ artistId: 'artist-9' }],
+          },
+        },
       ] as never);
       vi.mocked(prisma.tourDateHeadliner.findMany).mockResolvedValueOnce([
         { tourDate: { id: 'date-1', startDate, tour: { id: 'tour-1', title: 'Fall Tour' } } },
@@ -270,9 +288,25 @@ describe('ArtistCreditRepository', () => {
       const work = await ArtistCreditRepository.findPublishedWorkCreditedTo('artist-1');
 
       expect(work).toEqual({
-        releases: [{ id: 'release-1', title: 'Broken Bone Ballads' }],
+        releases: [{ id: 'release-1', title: 'Broken Bone Ballads', leavesNoByline: false }],
         tourDates: [{ id: 'date-1', startDate, tourId: 'tour-1', tourTitle: 'Fall Tour' }],
       });
+    });
+
+    // The album artist is the first credit in stored order; hiding it leaves
+    // the release with no byline (ADR-0015), which the warning says.
+    it('marks the releases the artist leads as left without a byline', async () => {
+      vi.mocked(prisma.artistRelease.findMany).mockResolvedValueOnce([
+        { release: { id: 'led', title: 'Led', artistReleases: [{ artistId: 'artist-1' }] } },
+        { release: { id: 'guest', title: 'Guest', artistReleases: [{ artistId: 'artist-9' }] } },
+      ] as never);
+
+      const { releases } = await ArtistCreditRepository.findPublishedWorkCreditedTo('artist-1');
+
+      expect(releases).toEqual([
+        { id: 'led', title: 'Led', leavesNoByline: true },
+        { id: 'guest', title: 'Guest', leavesNoByline: false },
+      ]);
     });
   });
 
