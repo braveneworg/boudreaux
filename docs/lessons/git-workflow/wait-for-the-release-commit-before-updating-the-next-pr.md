@@ -20,3 +20,23 @@ gh run list --branch main --limit 2 --json status,name \
 Wait until no `CI/CD - Build, Publish, Deploy` run is `in_progress`, then
 `git fetch origin main`, confirm `origin/main` tip is the `chore(release)`
 commit, and only then merge it in and push. One cycle instead of three.
+
+## "Nothing in progress" is not "deployed"
+
+Right after `gh pr merge`, GitHub has not created the merge commit's runs
+yet, so a check for runs that are not `completed` finds none and passes at
+once. On 2026-10-05 a merge chain slept 30 seconds, saw no run in
+progress, and reported #833 settled while its CI had not started; its
+worktree was removed before the deploy ran, against the rule to remove a
+worktree only once merged and deployed.
+
+Wait for the run of the merge commit itself:
+
+```bash
+sha=$(gh pr view <n> --json mergeCommit --jq .mergeCommit.oid)
+until gh run list --branch main --workflow "CI/CD - Build, Publish, Deploy" \
+  --json headSha,status --jq ".[] | select(.headSha == \"$sha\") | .status" \
+  | grep -q completed; do sleep 30; done
+```
+
+Then read that run's `conclusion` before calling the merge deployed.
