@@ -48,7 +48,9 @@ export const MAX_ARTIST_LINK_URL_LENGTH = 2048;
 export const MAX_ARTIST_LINKS_PER_SECTION = 200;
 export const MAX_ARTIST_LINK_GROUPS = 50;
 
-const label = z.string().trim().max(MAX_ARTIST_LINK_LABEL_LENGTH, 'Label is too long').default('');
+// Optional rather than defaulted: a default would give the form schema
+// different input and output types, which the form's resolver typing rejects.
+const label = z.string().trim().max(MAX_ARTIST_LINK_LABEL_LENGTH, 'Label is too long').optional();
 
 const url = z
   .string()

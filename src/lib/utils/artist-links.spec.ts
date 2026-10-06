@@ -2,8 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
+  composeArtistLinks,
   isRenderableArtistLinkHref,
   normalizeArtistLinks,
+  sanitizeArtistLinks,
   toArtistLinksFormValues,
   toContactHref,
 } from './artist-links';
@@ -116,6 +118,57 @@ describe('normalizeArtistLinks', () => {
         contactLinkGroups: [{ heading: 'Booking', links: [] }],
       })
     ).toBeNull();
+  });
+});
+
+describe('composeArtistLinks', () => {
+  it('maps the form arrays to the stored shape as typed, empty labels as null', () => {
+    expect(
+      composeArtistLinks({
+        websiteLinks: [{ label: '', url: ' https://example.com ' }],
+        socialLinks: [],
+        contactLinkGroups: [
+          { heading: 'Booking', links: [{ label: 'Agent', url: 'agent@example.com' }] },
+        ],
+      })
+    ).toEqual({
+      websites: [{ label: null, url: ' https://example.com ' }],
+      social: [],
+      contact: [{ heading: 'Booking', links: [{ label: 'Agent', url: 'agent@example.com' }] }],
+    });
+  });
+});
+
+describe('sanitizeArtistLinks', () => {
+  it('is what the service applies to any stored shape it is handed', () => {
+    expect(
+      sanitizeArtistLinks({
+        websites: [{ label: '<b>Site</b>', url: ' https://example.com ' }],
+        social: [],
+        contact: [
+          { heading: ' Booking ', links: [{ label: null, url: 'agent@example.com' }] },
+          { heading: 'Merch', links: [] },
+        ],
+      })
+    ).toEqual({
+      websites: [{ label: 'Site', url: 'https://example.com' }],
+      social: [],
+      contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:agent@example.com' }] }],
+    });
+  });
+
+  it('leaves an already sanitised composite unchanged', () => {
+    const links = {
+      websites: [{ label: 'Site', url: 'https://example.com' }],
+      social: [{ label: null, url: 'https://www.instagram.com/x' }],
+      contact: [{ heading: 'Booking', links: [{ label: null, url: 'tel:+18605550134' }] }],
+    };
+
+    expect(sanitizeArtistLinks(links)).toEqual(links);
+  });
+
+  it('is null when nothing is left', () => {
+    expect(sanitizeArtistLinks({ websites: [], social: [], contact: [] })).toBeNull();
   });
 });
 

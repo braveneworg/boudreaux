@@ -40,6 +40,7 @@ import type {
 import { DataError } from '@/lib/types/domain/errors';
 import type { ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
+import { sanitizeArtistLinks } from '@/lib/utils/artist-links';
 import {
   collectArtistReleases,
   publicCredits,
@@ -97,6 +98,9 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
   // omitted field stays omitted so an update does not clear it.
   if (sanitized.genres !== undefined) sanitized.genres = normalizeVocabularyList(sanitized.genres);
   if (sanitized.tags !== undefined) sanitized.tags = normalizeVocabularyList(sanitized.tags);
+  // The links composite has one stored form too (ADR-0020): plain-text
+  // labels, normalised contact hrefs, no empty groups, `null` when empty.
+  if (sanitized.links) sanitized.links = sanitizeArtistLinks(sanitized.links);
   return sanitized;
 };
 

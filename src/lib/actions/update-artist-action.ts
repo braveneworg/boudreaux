@@ -11,6 +11,7 @@ import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import type { FormState } from '@/lib/types/form-state';
+import { normalizeArtistLinks } from '@/lib/utils/artist-links';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
@@ -37,12 +38,29 @@ const PERMITTED_FIELD_NAMES = [
   'diedOn',
   'formedOn',
   'publishedOn',
+  'websiteLinks',
+  'socialLinks',
+  'contactLinkGroups',
 ] as const;
 
 type ParsedArtistData = ReturnType<typeof createArtistSchema.parse>;
 
 const toOptionalDate = (value: string | undefined): Date | undefined =>
   value ? new Date(value) : undefined;
+
+/**
+ * The links composite the form's three arrays compose (ADR-0020), or nothing
+ * when the form did not send them, so an older client's save leaves the
+ * stored links alone.
+ */
+const toLinksPayload = ({
+  websiteLinks,
+  socialLinks,
+  contactLinkGroups,
+}: ParsedArtistData): Pick<UpdateArtistData, 'links'> =>
+  websiteLinks && socialLinks && contactLinkGroups
+    ? { links: normalizeArtistLinks({ websiteLinks, socialLinks, contactLinkGroups }) }
+    : {};
 
 const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({
   firstName: data.firstName || '',
@@ -62,6 +80,7 @@ const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => (
   diedOn: toOptionalDate(data.diedOn),
   formedOn: toOptionalDate(data.formedOn),
   publishedOn: toOptionalDate(data.publishedOn),
+  ...toLinksPayload(data),
 });
 
 const applyServiceErrorToFormState = (formState: FormState, errorMessage: string): void => {

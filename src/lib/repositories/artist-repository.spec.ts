@@ -296,6 +296,31 @@ describe('ArtistRepository', () => {
       });
     });
 
+    // ADR-0020: the composite is written whole; `null` means "none", which
+    // Prisma spells as `unset` on an optional composite.
+    it('writes a links composite whole', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+      const links = {
+        websites: [{ label: null, url: 'https://example.com' }],
+        social: [],
+        contact: [],
+      };
+
+      await ArtistRepository.update('a', { links });
+
+      expect(vi.mocked(prisma.artist.update).mock.calls[0][0]?.data).toEqual({ links });
+    });
+
+    it('unsets the links composite for a null', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.update('a', { links: null });
+
+      expect(vi.mocked(prisma.artist.update).mock.calls[0][0]?.data).toEqual({
+        links: { unset: true },
+      });
+    });
+
     it('writes no publisher, and opens no transaction, for an update that does not publish', async () => {
       vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
 

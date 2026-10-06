@@ -24,9 +24,8 @@ describe('artistLinksSchema (stored shape)', () => {
 });
 
 describe('httpLinkInputSchema', () => {
-  it('accepts an http(s) link and defaults a missing label to an empty string', () => {
+  it('accepts an http(s) link without a label', () => {
     expect(httpLinkInputSchema.parse({ url: 'https://example.com' })).toEqual({
-      label: '',
       url: 'https://example.com',
     });
   });

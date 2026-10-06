@@ -615,6 +615,64 @@ describe('ArtistService', () => {
       });
     });
 
+    // ADR-0020: the service is the gate every link writer crosses.
+    it('sanitises the links composite before persisting', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist(
+        'artist-123',
+        {
+          links: {
+            websites: [{ label: '<b>Site</b>', url: ' https://example.com ' }],
+            social: [],
+            contact: [
+              { heading: ' Booking ', links: [{ label: null, url: 'agent@example.com' }] },
+              { heading: 'Merch', links: [] },
+            ],
+          },
+        },
+        'admin-1'
+      );
+
+      expect(ArtistRepository.update).toHaveBeenCalledWith(
+        'artist-123',
+        {
+          links: {
+            websites: [{ label: 'Site', url: 'https://example.com' }],
+            social: [],
+            contact: [
+              { heading: 'Booking', links: [{ label: null, url: 'mailto:agent@example.com' }] },
+            ],
+          },
+        },
+        { publishedBy: 'admin-1' }
+      );
+    });
+
+    it('clears the links composite when nothing is left after sanitising', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist(
+        'artist-123',
+        { links: { websites: [], social: [], contact: [{ heading: 'Booking', links: [] }] } },
+        'admin-1'
+      );
+
+      expect(ArtistRepository.update).toHaveBeenCalledWith(
+        'artist-123',
+        { links: null },
+        { publishedBy: 'admin-1' }
+      );
+    });
+
+    it('leaves the links alone when the update does not carry them', async () => {
+      vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+      await ArtistService.updateArtist('artist-123', { displayName: 'Only this' }, 'admin-1');
+
+      expect(vi.mocked(ArtistRepository.update).mock.calls[0][1]).not.toHaveProperty('links');
+    });
+
     it('sanitizes the bio HTML before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 

@@ -320,9 +320,11 @@ const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
 /** Build a Prisma create payload from domain create data. */
 const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
-  const { urls, ...scalars } = data;
+  const { urls, links, ...scalars } = data;
   return {
     ...scalars,
+    // A composite is created whole or not at all; `null` means none.
+    ...(links ? { links } : {}),
     ...(urls && {
       urls: {
         connectOrCreate: urls.map((url) => ({
@@ -338,8 +340,18 @@ const toPrismaCreate = (data: CreateArtistData): Prisma.ArtistCreateInput => {
   };
 };
 
-/** Build a Prisma update payload from domain update data. */
-const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => ({ ...data });
+/**
+ * Build a Prisma update payload from domain update data. The links composite
+ * is written whole; a `null` is Prisma's `unset` on an optional composite,
+ * and an omitted field stays omitted so the update does not touch it.
+ */
+const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => {
+  const { links, ...rest } = data;
+  return {
+    ...rest,
+    ...(links === undefined ? {} : { links: links ?? { unset: true } }),
+  };
+};
 
 /** Case-insensitive substring filter for one search token. */
 const containsToken = (token: string) => ({ contains: token, mode: 'insensitive' as const });

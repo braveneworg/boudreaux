@@ -67,47 +67,72 @@ const toLabel = (label: string): string | null => {
   return text === '' ? null : text;
 };
 
-const toHttpLink = ({ label, url }: ArtistLinksFormValues['websiteLinks'][number]): ArtistLink => ({
-  label: toLabel(label),
-  url: url.trim(),
-});
-
-const toContactLink = ({
+const toStoredLink = ({
   label,
   url,
 }: ArtistLinksFormValues['websiteLinks'][number]): ArtistLink => ({
-  label: toLabel(label),
-  url: toContactHref(url) ?? url.trim(),
-});
-
-const toGroup = ({
-  heading,
-  links,
-}: ArtistLinksFormValues['contactLinkGroups'][number]): ArtistLinkGroup => ({
-  heading: sanitizeBioText(heading),
-  links: links.map(toContactLink),
+  label: label || null,
+  url,
 });
 
 /**
- * The composite to store for the form's three arrays: labels and headings
- * sanitised to plain text (an empty label is `null`), contact hrefs in their
- * stored form, groups with no links dropped (the editor's prefilled headings
- * are not saved while empty), and the admin's order kept. `null` when every
- * section is empty, so such an artist stores no composite at all.
+ * The form's three arrays in the stored shape, as typed: an empty label is
+ * `null`, nothing else changes. {@link sanitizeArtistLinks} is what makes
+ * the result storable.
  */
-export const normalizeArtistLinks = ({
+export const composeArtistLinks = ({
   websiteLinks,
   socialLinks,
   contactLinkGroups,
-}: ArtistLinksFormValues): ArtistLinks | null => {
+}: ArtistLinksFormValues): ArtistLinks => ({
+  websites: websiteLinks.map(toStoredLink),
+  social: socialLinks.map(toStoredLink),
+  contact: contactLinkGroups.map(({ heading, links }) => ({
+    heading,
+    links: links.map(toStoredLink),
+  })),
+});
+
+const sanitizeHttpLink = ({ label, url }: ArtistLink): ArtistLink => ({
+  label: toLabel(label ?? ''),
+  url: url.trim(),
+});
+
+const sanitizeContactLink = ({ label, url }: ArtistLink): ArtistLink => ({
+  label: toLabel(label ?? ''),
+  url: toContactHref(url) ?? url.trim(),
+});
+
+const sanitizeGroup = ({ heading, links }: ArtistLinkGroup): ArtistLinkGroup => ({
+  heading: sanitizeBioText(heading),
+  links: links.map(sanitizeContactLink),
+});
+
+/**
+ * The one stored form of a links composite, applied by the service to
+ * whatever it is handed (ADR-0020): labels and headings sanitised to plain
+ * text (an empty label is `null`), contact hrefs in their stored form,
+ * groups with no links dropped (the editor's prefilled headings are not
+ * saved while empty), and the admin's order kept. `null` when every section
+ * is empty, so such an artist stores no composite at all. Idempotent.
+ */
+export const sanitizeArtistLinks = ({
+  websites,
+  social,
+  contact,
+}: ArtistLinks): ArtistLinks | null => {
   const links: ArtistLinks = {
-    websites: websiteLinks.map(toHttpLink),
-    social: socialLinks.map(toHttpLink),
-    contact: contactLinkGroups.map(toGroup).filter((group) => group.links.length > 0),
+    websites: websites.map(sanitizeHttpLink),
+    social: social.map(sanitizeHttpLink),
+    contact: contact.map(sanitizeGroup).filter((group) => group.links.length > 0),
   };
   const isEmpty = links.websites.length + links.social.length + links.contact.length === 0;
   return isEmpty ? null : links;
 };
+
+/** The composite to store for the form's three arrays: {@link composeArtistLinks}, sanitised. */
+export const normalizeArtistLinks = (form: ArtistLinksFormValues): ArtistLinks | null =>
+  sanitizeArtistLinks(composeArtistLinks(form));
 
 const toFormLink = ({ label, url }: ArtistLink): ArtistLinksFormValues['websiteLinks'][number] => ({
   label: label ?? '',

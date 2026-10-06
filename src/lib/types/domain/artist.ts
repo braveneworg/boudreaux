@@ -571,6 +571,8 @@ export interface ArtistWritableData {
   publishedBy?: string | null;
   createdBy?: string | null;
   deletedOn?: Date | null;
+  /** The curated links, written whole; `null` clears them (ADR-0020). */
+  links?: ArtistLinks | null;
 }
 
 /** Data accepted by the repository to create an artist. */
