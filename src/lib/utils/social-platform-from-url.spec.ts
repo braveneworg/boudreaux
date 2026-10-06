@@ -15,6 +15,12 @@ describe('socialPlatformFromUrl', () => {
     ['https://www.tiktok.com/@margueriteash', 'tiktok'],
     ['https://open.spotify.com/artist/0000000000', 'spotify'],
     ['https://www.discogs.com/artist/0000-Marguerite-Ash', 'discogs'],
+    ['https://soundcloud.com/margueriteash', 'soundcloud'],
+    ['https://music.apple.com/us/artist/marguerite-ash/1', 'apple-music'],
+    ['https://bsky.app/profile/margueriteash.example.com', 'bluesky'],
+    ['https://www.threads.net/@margueriteash', 'threads'],
+    ['https://www.threads.com/@margueriteash', 'threads'],
+    ['https://www.patreon.com/margueriteash', 'patreon'],
   ])('%s is %s', (url, platform) => {
     expect(socialPlatformFromUrl(url)).toBe(platform);
   });
@@ -22,6 +28,10 @@ describe('socialPlatformFromUrl', () => {
   it('matches the host at a dot boundary, so a look-alike host is not a platform', () => {
     expect(socialPlatformFromUrl('https://notinstagram.com/x')).toBeNull();
     expect(socialPlatformFromUrl('https://instagram.com.example.org/x')).toBeNull();
+  });
+
+  it('is Apple Music only for the music host, not for apple.com at large', () => {
+    expect(socialPlatformFromUrl('https://www.apple.com/music/')).toBeNull();
   });
 
   it('is null for a host nobody recognises', () => {

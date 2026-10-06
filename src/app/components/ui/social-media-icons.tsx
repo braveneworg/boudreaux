@@ -120,3 +120,82 @@ export const DiscogsIcon = ({ className, size = 24 }: IconProps) => (
     <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm0 3.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm0 1.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z" />
   </svg>
 );
+
+/** A cloud with the bars SoundCloud draws under it (no official glyph is bundled). */
+export const SoundCloudIcon = ({ className, size = 24 }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M1.5 13.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 .75-.75zm2.5-1.5a.75.75 0 0 1 .75.75v4a.75.75 0 0 1-1.5 0v-4a.75.75 0 0 1 .75-.75zm2.5-1.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0v-5.5a.75.75 0 0 1 .75-.75zm2.5-1a.75.75 0 0 1 .75.75v6.5a.75.75 0 0 1-1.5 0v-6.5a.75.75 0 0 1 .75-.75zm2.75-3.25a4.75 4.75 0 0 1 4.6 3.6 3.5 3.5 0 1 1 .65 6.9H11.75a.75.75 0 0 1-.75-.75V7a.75.75 0 0 1 .75-.75z" />
+  </svg>
+);
+
+/** A single eighth note for Apple Music (no official glyph is bundled). */
+export const AppleMusicIcon = ({ className, size = 24 }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M17.5 2.5a.75.75 0 0 0-.9-.73l-8 1.75a.75.75 0 0 0-.6.73v10.5a3.5 3.5 0 1 0 1.5 2.87V8.86l6.5-1.42v5.31a3.5 3.5 0 1 0 1.5 2.87V2.5z" />
+  </svg>
+);
+
+/** A butterfly for Bluesky (no official glyph is bundled). */
+export const BlueskyIcon = ({ className, size = 24 }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M5.2 3.6C7.6 5.4 10.2 9 12 11.6c1.8-2.6 4.4-6.2 6.8-8 1.7-1.3 4.5-2.3 4.5 .9 0 .6-.4 5.3-.6 6.1-.7 2.7-3.3 3.4-5.6 3 4 .7 5 2.9 2.8 5.2-4.2 4.3-6-1.1-7.6-2.5-.3-.3-.4-.4-.3-.2 0-.2-.1-.1-.3.2-1.6 1.4-3.4 6.8-7.6 2.5-2.2-2.3-1.2-4.5 2.8-5.2-2.3.4-4.9-.3-5.6-3-.2-.8-.6-5.5-.6-6.1 0-3.2 2.8-2.2 4.5-.9z" />
+  </svg>
+);
+
+/** The at-sign loop of Threads (no official glyph is bundled). */
+export const ThreadsIcon = ({ className, size = 24 }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
+    <path d="M15.5 8.5v4.5a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-3.4 6.3" />
+  </svg>
+);
+
+/** The circle-and-bar mark of Patreon (no official glyph is bundled). */
+export const PatreonIcon = ({ className, size = 24 }: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M15 3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM2.5 3h3.5v18H2.5z" />
+  </svg>
+);

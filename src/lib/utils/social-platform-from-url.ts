@@ -4,7 +4,19 @@
 
 /** A platform the site has a brand icon for. */
 export type SocialPlatform =
-  'facebook' | 'instagram' | 'youtube' | 'bandcamp' | 'x' | 'tiktok' | 'spotify' | 'discogs';
+  | 'facebook'
+  | 'instagram'
+  | 'youtube'
+  | 'bandcamp'
+  | 'x'
+  | 'tiktok'
+  | 'spotify'
+  | 'discogs'
+  | 'soundcloud'
+  | 'apple-music'
+  | 'bluesky'
+  | 'threads'
+  | 'patreon';
 
 /** The hosts of each platform; a subdomain of one matches too. */
 const SOCIAL_PLATFORM_HOSTS: ReadonlyArray<readonly [SocialPlatform, readonly string[]]> = [
@@ -16,6 +28,12 @@ const SOCIAL_PLATFORM_HOSTS: ReadonlyArray<readonly [SocialPlatform, readonly st
   ['tiktok', ['tiktok.com']],
   ['spotify', ['spotify.com']],
   ['discogs', ['discogs.com']],
+  ['soundcloud', ['soundcloud.com']],
+  // Only the music host: apple.com at large is not a listening page.
+  ['apple-music', ['music.apple.com']],
+  ['bluesky', ['bsky.app']],
+  ['threads', ['threads.net', 'threads.com']],
+  ['patreon', ['patreon.com']],
 ];
 
 /**

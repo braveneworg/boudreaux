@@ -9,11 +9,16 @@ import type { ArtistLinkSection } from '@/lib/utils/artist-links';
 import { socialPlatformFromUrl, type SocialPlatform } from '@/lib/utils/social-platform-from-url';
 
 import {
+  AppleMusicIcon,
   BandcampIcon,
+  BlueskyIcon,
   DiscogsIcon,
   FacebookIcon,
   InstagramIcon,
+  PatreonIcon,
+  SoundCloudIcon,
   SpotifyIcon,
+  ThreadsIcon,
   TikTokIcon,
   XIcon,
   YouTubeIcon,
@@ -30,6 +35,11 @@ const ICONS = new Map<ArtistLinkIconKind, IconComponent>([
   ['tiktok', TikTokIcon],
   ['spotify', SpotifyIcon],
   ['discogs', DiscogsIcon],
+  ['soundcloud', SoundCloudIcon],
+  ['apple-music', AppleMusicIcon],
+  ['bluesky', BlueskyIcon],
+  ['threads', ThreadsIcon],
+  ['patreon', PatreonIcon],
   ['mail', Mail],
   ['phone', Phone],
   ['globe', Globe],

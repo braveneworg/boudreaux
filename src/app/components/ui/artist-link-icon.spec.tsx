@@ -20,6 +20,17 @@ describe('ArtistLinkIcon', () => {
     expect(iconOf('https://www.discogs.com/artist/1')).toHaveAttribute('data-icon', 'discogs');
   });
 
+  it.each([
+    ['https://soundcloud.com/x', 'soundcloud'],
+    ['https://music.apple.com/us/artist/x/1', 'apple-music'],
+    ['https://bsky.app/profile/x', 'bluesky'],
+    ['https://www.threads.net/@x', 'threads'],
+    ['https://www.patreon.com/x', 'patreon'],
+  ])('shows a brand icon for %s', (href, kind) => {
+    expect(iconOf(href)).toHaveAttribute('data-icon', kind);
+    expect(iconOf(href)?.querySelector('svg')).not.toBeNull();
+  });
+
   it('shows a mail icon for a mailto: contact link', () => {
     expect(iconOf('mailto:a@example.com', 'contact')).toHaveAttribute('data-icon', 'mail');
   });
