@@ -11,7 +11,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Link2Off } from 'lucide-react';
 
-import { BioHtml } from '@/app/components/bio-html';
+import { BIO_PROSE_CLASS, BioHtml } from '@/app/components/bio-html';
 import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
@@ -420,10 +420,8 @@ export const RichTextEditor = ({
       </div>
       {previewOpen && (
         <div role="region" aria-label={`${ariaLabel ?? 'Bio editor'} preview`}>
-          <BioHtml
-            html={value}
-            className="min-h-40 max-w-none px-3 py-2 [&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h3]:mt-6"
-          />
+          {/* The page's prose treatment, so the preview is what the page shows. */}
+          <BioHtml html={value} className={cn(BIO_PROSE_CLASS, 'min-h-40 max-w-none px-3 py-2')} />
         </div>
       )}
       <LinkDialog
