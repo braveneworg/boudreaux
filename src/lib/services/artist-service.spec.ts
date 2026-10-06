@@ -1454,6 +1454,53 @@ describe('ArtistService', () => {
       ]);
     });
 
+    // The page leads with the newest release the artist holds a direct credit
+    // on — own or featured, never a band's — summarised like the index does.
+    it('summarises the newest listed direct release, ignoring band releases', async () => {
+      const own = publishedRelease('own', [mockArtist.id], '2010-01-01');
+      const guest = publishedRelease('guest', ['artist-other', mockArtist.id], '2024-01-01');
+      const bandLp = publishedRelease('band-lp', ['band-1'], '2025-01-01');
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
+        ...mockArtist,
+        members: [],
+        releases: [joinRow(mockArtist.id, own), joinRow(mockArtist.id, guest)],
+        memberOf: [
+          {
+            id: 'am-1',
+            artistId: 'band-1',
+            memberId: mockArtist.id,
+            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', bandLp)] },
+          },
+        ],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success && result.data.newestRelease).toEqual({
+        id: 'guest',
+        title: 'guest',
+        releasedOn: new Date('2024-01-01'),
+      });
+    });
+
+    it('has no newest release when every direct credit is unlisted', async () => {
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
+        ...mockArtist,
+        members: [],
+        memberOf: [],
+        releases: [
+          joinRow(mockArtist.id, {
+            ...publishedRelease('draft', [mockArtist.id], '2024-01-01'),
+            publishedAt: null,
+          }),
+        ],
+      } as never);
+
+      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
+
+      expect(result.success && result.data.newestRelease).toBeNull();
+    });
+
     describe('hidden credited artists (ADR-0015)', () => {
       interface CreditedRow {
         releaseId: string;

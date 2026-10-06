@@ -816,6 +816,10 @@ export class ArtistService {
       // redisplay is safe regardless of how it was authored (generated bios
       // are also sanitized at write time).
       const { memberOf, members, ...publicArtist } = artist;
+      const credited = collectArtistReleases({
+        ...artist,
+        memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
+      });
       const filteredArtist: ArtistWithPublishedReleases = {
         ...publicArtist,
         bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
@@ -824,10 +828,12 @@ export class ArtistService {
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
         members: members.filter(({ member }) => isPublicArtist(member)),
-        releases: collectArtistReleases({
-          ...artist,
-          memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
-        }).map(withPublicCredits),
+        releases: credited.map(withPublicCredits),
+        // The page leads with the newest release the artist holds a direct
+        // credit on — own or featured, never a band's — summarised as the
+        // artists index does (ADR-0006).
+        newestRelease: summarizeListedReleases(credited.filter(({ credit }) => credit !== 'member'))
+          .newestRelease,
       };
 
       return { success: true, data: filteredArtist };

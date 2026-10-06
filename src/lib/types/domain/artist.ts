@@ -371,6 +371,12 @@ export interface ArtistWithPublishedReleases extends Omit<
   'memberOf' | 'releases'
 > {
   releases: ArtistPublishedReleaseRow[];
+  /**
+   * The newest listed release the artist holds a direct credit on (own or
+   * featured, never a band's), as the artists index summarises it; the page
+   * leads with it (ADR-0006). `null` when there is none.
+   */
+  newestRelease: ArtistListingNewestRelease | null;
 }
 
 /**

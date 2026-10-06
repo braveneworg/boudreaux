@@ -373,4 +373,5 @@ export const artistWithPublishedReleases = {
       albumArtist: null,
     },
   ],
+  newestRelease: { id: 'r1', title: release.title, releasedOn: ISO },
 };

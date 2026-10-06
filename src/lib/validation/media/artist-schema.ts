@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { ArtistDetail, ArtistListItem } from '@/lib/types/domain/artist';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { RELEASE_CREDITS } from '@/lib/utils/artist-release-credits';
+import { artistListingNewestReleaseSchema } from '@/lib/validation/artist-listing-schema';
 
 import { publicArtistReleaseSchema } from './release-schema';
 import {
@@ -127,6 +128,7 @@ export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend
   bioImages: z.array(artistBioImageSchema),
   bioLinks: z.array(artistBioLinkSchema),
   members: z.array(artistMemberSchema),
+  newestRelease: artistListingNewestReleaseSchema,
   releases: z.array(
     z.object({
       id: z.string(),

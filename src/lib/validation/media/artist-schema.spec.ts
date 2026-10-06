@@ -43,6 +43,19 @@ describe('artistListItemSchema', () => {
 });
 
 describe('artistWithPublishedReleasesSchema', () => {
+  it('parses the newest direct release the page leads with', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
+
+    expect(parsed.newestRelease?.releasedOn).toBeInstanceOf(Date);
+    expect(parsed.newestRelease?.title).toBe(artistWithPublishedReleases.newestRelease.title);
+  });
+
+  it('rejects a payload without the newest release', () => {
+    const { newestRelease: _omit, ...invalid } = artistWithPublishedReleases;
+
+    expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
+  });
+
   it('parses an artist-with-releases payload including the members relation', () => {
     expect(() =>
       artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases)
