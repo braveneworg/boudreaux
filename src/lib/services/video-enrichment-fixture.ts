@@ -6,6 +6,8 @@ import type { VideoCategory } from '@/lib/types/domain/video';
 import type { VideoEnrichmentData } from '@/lib/validation/video-enrichment-schema';
 import type { NormalizedProbe } from '@/lib/video-probe/normalize';
 
+import { fakeReleaseDay } from './fake-release-day';
+
 /**
  * Deterministic ffprobe output used when `BIO_GENERATOR_FAKE=true` (E2E and
  * local dev without ffprobe/S3). A plain 1080p h264/aac MP4.
@@ -92,17 +94,19 @@ export const INFORMATIONAL_FIXTURE_DESCRIPTION =
  * shaped per category to mirror the Lambda. MUSIC emits, per artist: a
  * high-confidence bornOn (1985-03-15) and a medium-confidence akaNames
  * ('E2E Alias'); plus video-level facts (a medium-confidence release date
- * 2020-06-01, a synthesized description, and one discovered featured artist
+ * 2020-06-01 (today for a title carrying E2E_TODAY_RELEASE_MARKER), a
+ * synthesized description, and one discovered featured artist
  * 'E2E Discovered Feature') so E2E can assert the full run → suggest → apply
  * flow. INFORMATIONAL emits no artist rows and only the description.
  */
 export const videoEnrichmentFixture = (input: {
   artists: Array<{ artistId: string }>;
   category: VideoCategory;
+  title: string;
 }): VideoEnrichmentData =>
   input.category === 'INFORMATIONAL'
     ? informationalEnrichmentFixture()
-    : musicEnrichmentFixture(input.artists);
+    : musicEnrichmentFixture(input.artists, fakeReleaseDay(input.title));
 
 /** The INFORMATIONAL result: description only, as the Lambda's flow returns it. */
 const informationalEnrichmentFixture = (): VideoEnrichmentData => ({
@@ -119,7 +123,10 @@ const informationalEnrichmentFixture = (): VideoEnrichmentData => ({
 });
 
 /** The MUSIC result: per-artist identity facts plus every video-level fact. */
-const musicEnrichmentFixture = (artists: Array<{ artistId: string }>): VideoEnrichmentData => ({
+const musicEnrichmentFixture = (
+  artists: Array<{ artistId: string }>,
+  releaseDay: string
+): VideoEnrichmentData => ({
   artists: artists.map(({ artistId }) => ({
     artistId,
     suggestions: [
@@ -141,7 +148,7 @@ const musicEnrichmentFixture = (artists: Array<{ artistId: string }>): VideoEnri
   })),
   video: {
     releasedOn: {
-      value: '2020-06-01',
+      value: releaseDay,
       confidence: 'medium',
       sources: [{ url: 'https://musicbrainz.org/release/e2e-fixture', label: 'MusicBrainz' }],
       note: 'Deterministic fixture release date (E2E).',

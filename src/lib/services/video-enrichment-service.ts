@@ -528,6 +528,7 @@ const runFakeEnrichment = async (
   const data = videoEnrichmentFixture({
     artists: rows.map(({ artistId }) => ({ artistId })),
     category: state.category,
+    title: state.title,
   });
   await VideoEnrichmentService.completeCallback(state.id, { ok: true, data });
 };

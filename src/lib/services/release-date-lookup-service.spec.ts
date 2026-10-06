@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { E2E_TODAY_RELEASE_MARKER } from './fake-release-day';
 import { ReleaseDateLookupService } from './release-date-lookup-service';
 
 vi.mock('server-only', () => ({}));
@@ -35,6 +36,15 @@ describe('ReleaseDateLookupService.lookup', () => {
     expect(result?.confidence).toBe('medium');
     expect(result?.sources).toEqual(['https://musicbrainz.org/']);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('finds nothing on the fake path for a title the fake dates today', async () => {
+    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+    const result = await ReleaseDateLookupService.lookup(
+      `Song ${E2E_TODAY_RELEASE_MARKER}`,
+      'Band'
+    );
+    expect(result).toBeNull();
   });
 
   it('invokes the Lambda and parses a found result on the real path', async () => {

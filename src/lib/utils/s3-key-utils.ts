@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+import { localSinkKey } from './local-upload-sink';
 /** Entity namespaces media keys are filed under. */
 export type MediaEntityType =
   | 'artists'
@@ -121,6 +123,12 @@ const extractKeyFromS3Host = (host: string, key: string): string | null => {
 export const extractS3KeyFromUrl = (url: string): string | null => {
   if (!url || url === 'pending://upload') {
     return null;
+  }
+
+  // E2E: the local upload sink stands in for the CDN.
+  const sinkKey = localSinkKey(url);
+  if (sinkKey !== null) {
+    return sinkKey;
   }
 
   const cdnDomainRaw = process.env.CDN_DOMAIN;

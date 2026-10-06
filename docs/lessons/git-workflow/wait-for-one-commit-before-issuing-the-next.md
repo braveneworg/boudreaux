@@ -30,3 +30,11 @@ Rules:
   `git reset --soft <parent>`, `git reset` to unstage, and rebuild the
   commits one at a time. See
   [`never-amend-to-recover-a-rejected-commit.md`](never-amend-to-recover-a-rejected-commit.md).
+
+It happened again on 2026-10-05, inside one shell command:
+`git add A && git commit …; git add B && git commit …`. The first commit
+failed commitlint (a 51-character header), its files stayed staged, and
+the `;` ran the second, so a `fix(videos)` commit for one hook also took
+the seven files of a fake-mode `test(e2e)` change. A rejected commit
+leaves its files staged; the next commit takes them. One commit per
+command, read the result, then the next.
