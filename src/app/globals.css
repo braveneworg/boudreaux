@@ -27,6 +27,16 @@
   --color-rebecca-purple: rebeccapurple;
   --font-family-fake-four-cutout: 'FakeFourCutout', sans-serif;
 
+  /* Site text is Jost. The layout defines `--font-jost` on <html> (next/font's
+     `variable` class); Tailwind's preflight reads `--font-sans` for the
+     document default, so every page inherits it and the `font-sans` utility
+     (ContentContainer) resolves to the same stack. The tail stays after Jost
+     because the bundled face is the latin subset: non-Latin text and emoji
+     fall through to a declared generic and the platform emoji faces. */
+  --font-sans:
+    var(--font-jost), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+
   /* Handwritten nav-label "tape" palette — dominant non-black colors lifted
      from the colored-paper menu labels. Each ramp darkens 100 → 400 and every
      shade clears WCAG AA (>= 4.5:1) against black and bg-zinc-950. */
@@ -171,16 +181,6 @@
   }
   html {
     height: 100%;
-    font-family:
-      'Jost',
-      sans-serif,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif;
     overflow-wrap: break-word;
     word-wrap: break-word;
     text-wrap: wrap;

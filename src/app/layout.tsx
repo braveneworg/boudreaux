@@ -34,6 +34,12 @@ import './globals.css';
 // to Jost when the font is fetched, and `next/font`'s automatic
 // `adjustFontFallback` (size-adjust descriptors on an Arial fallback)
 // prevents the swap from causing layout shift.
+//
+// Only `jost.variable` is used, on <html>: it defines `--font-jost`, which
+// globals.css's `@theme` reads for `--font-sans`, and Tailwind's preflight
+// reads `--font-sans` for the document default. That one path covers every
+// page and the `font-sans` utility alike; `jost.className` would be a second,
+// competing mechanism (and `font-sans` subtrees would override it anyway).
 const jost = localFont({
   src: [
     { path: './fonts/jost-latin-wght-normal.woff2', weight: '100 900', style: 'normal' },
@@ -111,7 +117,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={jost.variable} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://cdn.fakefourrecords.com" />
         <link rel="dns-prefetch" href="https://cdn.fakefourrecords.com" />
@@ -128,7 +134,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${jost.className} xl:zine-desk flex min-h-screen max-w-full flex-col overflow-x-clip antialiased`}
+        className="xl:zine-desk flex min-h-screen max-w-full flex-col overflow-x-clip antialiased"
         suppressHydrationWarning
       >
         <Providers>
