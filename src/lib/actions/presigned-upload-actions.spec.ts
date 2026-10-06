@@ -70,6 +70,40 @@ describe('presigned-upload-actions', () => {
   });
 
   describe('getPresignedUploadUrlsAction', () => {
+    // E2E stand-in: no bucket, no credentials, no signing.
+    describe('in E2E mode', () => {
+      beforeEach(() => {
+        vi.stubEnv('E2E_MODE', 'true');
+        vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'http://127.0.0.1:3099');
+        vi.stubEnv('S3_BUCKET', '');
+      });
+
+      it('hands out the local upload sink instead of signing an S3 PUT', async () => {
+        const result = await getPresignedUploadUrlsAction('videos', 'video-123', [
+          { fileName: 'poster.jpg', contentType: 'image/jpeg', fileSize: 1024 },
+        ]);
+
+        expect(result.success).toBe(true);
+        const [upload] = result.data ?? [];
+        const query = `?key=${encodeURIComponent(upload.s3Key)}`;
+        expect(upload.s3Key).toMatch(/^media\/videos\/video-123\//);
+        // Absolute like a real presigned URL: the uploader parses it with new URL().
+        expect(upload.uploadUrl).toBe(`http://127.0.0.1:3099/api/test-harness/upload-sink${query}`);
+        expect(upload.cdnUrl).toBe(upload.uploadUrl);
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
+      });
+
+      it('still requires an admin', async () => {
+        vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+
+        const result = await getPresignedUploadUrlsAction('videos', 'video-123', [
+          { fileName: 'poster.jpg', contentType: 'image/jpeg', fileSize: 1024 },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
     describe('authorization', () => {
       it('should require admin role', async () => {
         vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));

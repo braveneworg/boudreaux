@@ -14,6 +14,8 @@ import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 
+import { isLocalUpload, localObjectUrl } from './upload-local-adapter';
+
 const logger = loggers.presignedUrls;
 
 /**
@@ -246,6 +248,16 @@ export const getPresignedUploadUrlsAction = async (
 
     const validationError = validateAllFiles(files);
     if (validationError) return validationError;
+
+    if (isLocalUpload()) {
+      // E2E: upload to the local sink, no bucket or signing (upload-local-adapter.ts).
+      const data = files.map((file) => {
+        const s3Key = resolveS3Key(file, entityType, entityId);
+        const url = localObjectUrl(s3Key);
+        return { uploadUrl: url, s3Key, cdnUrl: url };
+      });
+      return { success: true, data };
+    }
 
     const s3Client = getS3Client();
     const s3Bucket = getS3BucketName();

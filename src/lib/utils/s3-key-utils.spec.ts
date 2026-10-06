@@ -6,6 +6,24 @@ import { buildMediaS3Key, extractS3KeyFromUrl } from './s3-key-utils';
 describe('extractS3KeyFromUrl', () => {
   // Per-test env stubs are restored by the global afterEach in setupTests.ts.
 
+  // E2E: the local upload sink stands in for the CDN (upload-local-adapter.ts).
+  describe('local upload-sink URLs', () => {
+    const sinkUrl = `http://127.0.0.1:3099/api/test-harness/upload-sink?key=${encodeURIComponent(
+      'media/videos/abc123/poster-candidate-1.jpg'
+    )}`;
+
+    it('resolves to the key it carries in E2E mode', () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      expect(extractS3KeyFromUrl(sinkUrl)).toBe('media/videos/abc123/poster-candidate-1.jpg');
+    });
+
+    it('resolves to nothing outside E2E mode', () => {
+      vi.stubEnv('E2E_MODE', '');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+      expect(extractS3KeyFromUrl(sinkUrl)).toBeNull();
+    });
+  });
+
   describe('CDN URLs', () => {
     it('should extract S3 key from a CDN URL', () => {
       vi.stubEnv('CDN_DOMAIN', 'cdn.example.com');

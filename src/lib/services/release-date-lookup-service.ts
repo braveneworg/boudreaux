@@ -10,6 +10,8 @@ import { z } from 'zod';
 import { loggers } from '@/lib/utils/logger';
 import { isTodayUtc } from '@/lib/utils/validation/iso-date';
 
+import { fakeReleaseDay } from './fake-release-day';
+
 const logger = loggers.media;
 const INVOKE_REQUEST_TIMEOUT_MS = 25_000;
 
@@ -26,11 +28,11 @@ const lambdaEnvelopeSchema = z.union([
 
 export type ReleaseDateLookup = z.infer<typeof lookupResultSchema>;
 
-const FAKE_RESULT: ReleaseDateLookup = {
-  releasedOn: '2020-06-01',
+const fakeResult = (title: string): ReleaseDateLookup => ({
+  releasedOn: fakeReleaseDay(title),
   confidence: 'medium',
   sources: ['https://musicbrainz.org/'],
-};
+});
 
 let lambdaClient: LambdaClient | null = null;
 
@@ -74,7 +76,7 @@ export class ReleaseDateLookupService {
     title: string,
     artist?: string
   ): Promise<ReleaseDateLookup | null> {
-    if (process.env.BIO_GENERATOR_FAKE === 'true') return FAKE_RESULT;
+    if (process.env.BIO_GENERATOR_FAKE === 'true') return fakeResult(title);
 
     const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
     if (!functionName) {

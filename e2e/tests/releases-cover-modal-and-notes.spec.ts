@@ -4,6 +4,7 @@
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/base.fixture';
+import { blockAutoplayWithoutGesture, isAnyMediaPlaying } from '../helpers/strict-autoplay';
 
 /**
  * E2E coverage for the public releases listing + detail:
@@ -41,6 +42,26 @@ test.afterAll(async () => {
 });
 
 test.describe('Releases — cover dialog + release notes', () => {
+  // #720: Play starts the audio at once, even where play() needs a user
+  // gesture, and closing the dialog leaves nothing playing.
+  test('Play starts the release audio and Escape stops it', async ({ page }) => {
+    await blockAutoplayWithoutGesture(page);
+    await page.goto('/releases');
+    await page.getByRole('button', { name: `Play ${RELEASE_TITLE}` }).click();
+
+    const audio = page.getByRole('dialog').locator('audio.vjs-tech');
+    await expect(audio).toBeAttached({ timeout: 10_000 });
+    await expect
+      .poll(() => audio.evaluate((element) => (element as HTMLAudioElement).currentTime), {
+        timeout: 5_000,
+      })
+      .toBeGreaterThan(0);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect.poll(() => isAnyMediaPlaying(page)).toBe(false);
+  });
+
   test('clicking an album cover opens a dialog with the release info', async ({ page }) => {
     await page.goto('/releases');
 

@@ -7,6 +7,8 @@ import { useEffect, useRef } from 'react';
 
 import { useWatch, type Control } from 'react-hook-form';
 
+import { decideEnrichmentAutoApply } from '@/lib/services/video-editorial-rules';
+import { isReleaseDay, todayUtcIsoDate } from '@/lib/utils/validation/iso-date';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import type {
   VideoEnrichmentStatusResult,
@@ -50,7 +52,10 @@ export const findReleaseDateSuggestion = (
  * The guard is emptiness, not dirtiness: a date already in the form (typed,
  * found by the automatic lookup, or loaded from the row) is never overwritten
  * — the found date stays, and the suggestion remains a pending card with
- * "Use this date" for the admin to choose. Each suggestion fills at most once
+ * "Use this date" for the admin to choose. A suggestion dated today's UTC
+ * day never fills either: the same editorial rule keeps it a pending card,
+ * because today is only a release date when a human picks it. Each suggestion
+ * fills at most once
  * per mount, so a later clear is never re-filled by a status poll. The fill is
  * ALSO resolved server-side via `onResolve` (marks the suggestion applied,
  * resolve-only — the form autosaves the value itself): the in-session guard
@@ -72,6 +77,17 @@ export const useAutoApplyReleaseDateSuggestion = ({
     const suggestion = findReleaseDateSuggestion(suggestions);
     if (!suggestion || appliedIds.current.has(suggestion.id)) return;
     if (!isEmpty) return;
+    // The same rule the enrichment callback asks: today's UTC day is never
+    // filled by itself, so it stays a pending card for a human to take.
+    const { releasedOn: autoApplied } = decideEnrichmentAutoApply({
+      state: { releasedOn: null, description: null },
+      offered: {
+        releasedOn: isReleaseDay(suggestion.value) ? suggestion.value : null,
+        description: null,
+      },
+      today: todayUtcIsoDate(),
+    });
+    if (autoApplied === null) return;
     appliedIds.current.add(suggestion.id);
     onApply('releasedOn', suggestion.value);
     onResolve(suggestion.id);
