@@ -6,6 +6,7 @@ import { videoEnrichmentDataSchema } from '@/lib/validation/video-enrichment-sch
 import { normalizeProbe } from '@/lib/video-probe/normalize';
 import { extractProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
+import { E2E_TODAY_RELEASE_MARKER } from './fake-release-day';
 import {
   INFORMATIONAL_FIXTURE_DESCRIPTION,
   videoEnrichmentFixture,
@@ -64,13 +65,21 @@ describe('videoProbeFixture', () => {
 
 describe('videoEnrichmentFixture', () => {
   it('validates against the enrichment data schema', () => {
-    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(videoEnrichmentDataSchema.safeParse(data).success).toBe(true);
   });
 
   it('emits a high-confidence bornOn and a medium akaNames per artist', () => {
-    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(data.artists[0].suggestions).toEqual([
       expect.objectContaining({ field: 'bornOn', value: '1985-03-15', confidence: 'high' }),
@@ -82,19 +91,38 @@ describe('videoEnrichmentFixture', () => {
     const data = videoEnrichmentFixture({
       artists: [{ artistId: ARTIST_ID }, { artistId: OTHER_ID }],
       category: 'MUSIC',
+      title: 'Song',
     });
 
     expect(data.artists.map(({ artistId }) => artistId)).toEqual([ARTIST_ID, OTHER_ID]);
   });
 
   it('emits a medium-confidence video release date of 2020-06-01', () => {
-    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(data.video?.releasedOn).toMatchObject({ value: '2020-06-01', confidence: 'medium' });
   });
 
+  it('dates the release today for a title carrying the today marker', () => {
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: `Song ${E2E_TODAY_RELEASE_MARKER}`,
+    });
+
+    expect(data.video?.releasedOn?.value).toBe(new Date().toISOString().slice(0, 10));
+  });
+
   it('emits the deterministic video-level description', () => {
-    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(data.video?.description).toMatchObject({
       value: 'A deterministic E2E description of the track, its artists, and its release context.',
@@ -103,7 +131,11 @@ describe('videoEnrichmentFixture', () => {
   });
 
   it('emits one discovered featured artist', () => {
-    const data = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const data = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(data.video?.featuredArtists).toEqual([
       expect.objectContaining({ value: 'E2E Discovered Feature', confidence: 'medium' }),
@@ -111,8 +143,16 @@ describe('videoEnrichmentFixture', () => {
   });
 
   it('is deterministic across calls', () => {
-    const a = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
-    const b = videoEnrichmentFixture({ artists: [{ artistId: ARTIST_ID }], category: 'MUSIC' });
+    const a = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
+    const b = videoEnrichmentFixture({
+      artists: [{ artistId: ARTIST_ID }],
+      category: 'MUSIC',
+      title: 'Song',
+    });
 
     expect(a).toEqual(b);
   });
@@ -122,6 +162,7 @@ describe('videoEnrichmentFixture', () => {
       const data = videoEnrichmentFixture({
         artists: [{ artistId: ARTIST_ID }],
         category: 'INFORMATIONAL',
+        title: 'Song',
       });
 
       expect(videoEnrichmentDataSchema.safeParse(data).success).toBe(true);
@@ -131,6 +172,7 @@ describe('videoEnrichmentFixture', () => {
       const data = videoEnrichmentFixture({
         artists: [{ artistId: ARTIST_ID }],
         category: 'INFORMATIONAL',
+        title: 'Song',
       });
 
       expect(data).toEqual({
