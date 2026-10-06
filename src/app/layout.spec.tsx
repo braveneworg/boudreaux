@@ -5,13 +5,28 @@ import { render, screen } from '@testing-library/react';
 
 import RootLayout, { dynamic, metadata, viewport } from './layout';
 
-// Mock next/font/local
+// Mock next/font/local. The two class names are deliberately distinct:
+// `variable` defines `--font-jost` (the theme's `--font-sans` reads it, so it
+// belongs on <html>); `className` would set font-family directly and must not
+// be used, or the theme and the class would be two competing mechanisms.
 vi.mock('next/font/local', () => ({
   default: () => ({
-    variable: '--font-jost',
-    className: 'font-jost',
+    variable: 'mock-jost-variable',
+    className: 'mock-jost-font',
   }),
 }));
+
+/** The <body> element of the rendered layout tree. */
+const findBody = (jsx: React.JSX.Element): React.JSX.Element => {
+  const children = jsx.props.children;
+  return Array.isArray(children)
+    ? children.find((c: React.JSX.Element) => c.type === 'body')
+    : children;
+};
+
+/** The class list of an element, split on whitespace. */
+const classesOf = (element: React.JSX.Element): string[] =>
+  String(element.props.className ?? '').split(/\s+/);
 
 // Mock env-validation dynamic import
 vi.mock('@/lib/config/env-validation', () => ({
@@ -170,20 +185,13 @@ describe('RootLayout', () => {
 
     it('renders body with overflow-x-clip class', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const children = jsx.props.children;
-      const body = Array.isArray(children)
-        ? children.find((c: React.JSX.Element) => c.type === 'body')
-        : children;
 
-      expect(body.props.className).toContain('overflow-x-clip');
+      expect(findBody(jsx).props.className).toContain('overflow-x-clip');
     });
 
     it('renders body with layout classes', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const children = jsx.props.children;
-      const body = Array.isArray(children)
-        ? children.find((c: React.JSX.Element) => c.type === 'body')
-        : children;
+      const body = findBody(jsx);
 
       expect(body.props.className).toContain('antialiased');
       expect(body.props.className).toContain('flex');
@@ -191,12 +199,24 @@ describe('RootLayout', () => {
       expect(body.props.className).toContain('min-h-screen');
     });
 
+    // The theme's `--font-sans` reads `--font-jost`, and Tailwind's preflight
+    // reads `--font-sans` from `:root`, so the variable must be defined on
+    // <html>: on <body> it is undefined where the root default resolves.
+    it('defines the Jost CSS variable on the html element', async () => {
+      const jsx = await RootLayout({ children: <div>Test</div> });
+
+      expect(classesOf(jsx)).toContain('mock-jost-variable');
+    });
+
+    it('does not set the font with the loader class on body (the theme is the one mechanism)', async () => {
+      const jsx = await RootLayout({ children: <div>Test</div> });
+
+      expect(classesOf(findBody(jsx))).not.toContain('mock-jost-font');
+    });
+
     it('renders body with suppressHydrationWarning', async () => {
       const jsx = await RootLayout({ children: <div>Test</div> });
-      const children = jsx.props.children;
-      const body = Array.isArray(children)
-        ? children.find((c: React.JSX.Element) => c.type === 'body')
-        : children;
+      const body = findBody(jsx);
 
       expect(body.props.suppressHydrationWarning).toBe(true);
     });
