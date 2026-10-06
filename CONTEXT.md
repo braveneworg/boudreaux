@@ -109,6 +109,22 @@ admin's own filing vocabulary. See
 [ADR-0009](docs/adr/0009-genres-are-human-owned-and-survive-regeneration.md).
 _Avoid_: keyword, label (a Label is a signed-artist entity).
 
+**artist link** — one curated `{ label?, url }` an admin files on an Artist,
+shown on that Artist's own page with the label beside the link. Websites and
+social links are `http(s)`; a contact link may also be an email (`mailto:`) or
+a phone number (`tel:`), stored normalised. The icon derives from the href at
+render; no platform is stored. Human-owned: a bio generation job never writes
+one. See [ADR-0020](docs/adr/0020-artist-links-are-one-composite-on-the-artist.md).
+_Avoid_: URL (the `Url` model carries a platform enum and is not this),
+reference link / bio link (an `ArtistBioLink`, discovered by a job).
+
+**link section** — one of the three parts of `Artist.links`: **Websites** and
+**Social Media**, flat lists of **artist links**, and **Contact & Misc**, a
+list of admin-defined **link groups** (a heading over its links, e.g.
+Booking, Merch). Written whole and kept in the admin's order; an empty
+section is not shown. See
+[ADR-0020](docs/adr/0020-artist-links-are-one-composite-on-the-artist.md).
+
 **Release** — a published body of work by an Artist, with tracks and
 **digital formats** available for download. Its credits have a stored order;
 the first is its **album artist**. A public surface names the album artist
