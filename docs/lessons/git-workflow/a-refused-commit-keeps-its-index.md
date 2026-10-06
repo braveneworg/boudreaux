@@ -19,8 +19,11 @@ Rules:
   belongs to the refused change, or fix and recommit that change first.
 - Count a header mechanically before committing and keep a margin: the
   gitmoji counts as two characters, and a variation selector (`♻️`) makes
-  the count differ from a naive one. The python one-liner in the session
-  notes is the reference; commitlint is the judge.
+  the count differ from a naive one. Printing the count in the same
+  command as the commit is not a gate — it happened again within the hour,
+  three refusals in a row, each sweeping its files into the next commit.
+  Gate the commit on the count: `test "$(count)" -le 50 && git commit …`,
+  or commit only after reading the count in an earlier command.
 - After every commit, read `git show --stat --format= HEAD | tail -1` and
   compare the file count with what you meant to commit. A count that is too
   high is this mistake.
