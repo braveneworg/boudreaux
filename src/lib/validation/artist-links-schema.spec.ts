@@ -57,8 +57,18 @@ describe('contactLinkInputSchema', () => {
 });
 
 describe('artistLinkGroupInputSchema', () => {
-  it('requires a heading', () => {
-    expect(artistLinkGroupInputSchema.safeParse({ heading: ' ', links: [] }).success).toBe(false);
+  it('requires a heading once the group has a link', () => {
+    const result = artistLinkGroupInputSchema.safeParse({
+      heading: ' ',
+      links: [{ url: 'https://example.com' }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  // An added-then-abandoned group is dropped on save, so it must not block it.
+  it('accepts an empty group without a heading', () => {
+    expect(artistLinkGroupInputSchema.safeParse({ heading: '', links: [] }).success).toBe(true);
   });
 
   it('accepts a heading with no links yet', () => {

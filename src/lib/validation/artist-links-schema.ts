@@ -76,15 +76,21 @@ export const contactLinkInputSchema = z.object({
   ),
 });
 
-/** A Contact & Misc group: a heading over its rows (a prefilled heading may have none yet). */
-export const artistLinkGroupInputSchema = z.object({
-  heading: z
-    .string()
-    .trim()
-    .min(1, 'Enter a heading')
-    .max(MAX_ARTIST_LINK_HEADING_LENGTH, 'Heading is too long'),
-  links: z.array(contactLinkInputSchema).max(MAX_ARTIST_LINKS_PER_SECTION, 'Too many links'),
-});
+/**
+ * A Contact & Misc group: a heading over its rows. The heading is required
+ * only once the group has a link — a group with none (a prefilled heading, or
+ * one added and abandoned) is dropped on save, so it must not block the save.
+ */
+export const artistLinkGroupInputSchema = z
+  .object({
+    heading: z.string().trim().max(MAX_ARTIST_LINK_HEADING_LENGTH, 'Heading is too long'),
+    links: z.array(contactLinkInputSchema).max(MAX_ARTIST_LINKS_PER_SECTION, 'Too many links'),
+  })
+  .superRefine(({ heading, links }, ctx) => {
+    if (links.length > 0 && heading === '') {
+      ctx.addIssue({ code: 'custom', path: ['heading'], message: 'Enter a heading' });
+    }
+  });
 
 /** The form's three link arrays; the Server Action composes `Artist.links` from them. */
 export const artistLinksFormSchema = z.object({
