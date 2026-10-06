@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, ImagePlus, X } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { moveByOne } from '@/lib/utils/move-by-one';
 import { BIO_IMAGE_DRAG_MIME, bioImageDragPayloadSchema } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
@@ -63,16 +64,6 @@ const readDroppedPoolImageId = (transfer: DataTransfer): string | null => {
   } catch {
     return null;
   }
-};
-
-/** Move the item at `index` one step in `direction`, or return `null` at the edge. */
-const moved = (ids: string[], index: number, direction: -1 | 1): string[] | null => {
-  const target = index + direction;
-  if (target < 0 || target >= ids.length) return null;
-  const next = [...ids];
-  const [item] = next.splice(index, 1);
-  next.splice(target, 0, item);
-  return next;
 };
 
 interface DisplayImageDropTargetProps {
@@ -247,7 +238,7 @@ export const DisplayImageStrip = ({
   const ids = images.map(({ id }) => id);
 
   const move = (index: number, direction: -1 | 1): void => {
-    const next = moved(ids, index, direction);
+    const next = moveByOne(ids, index, direction);
     const image = images.at(index);
     if (!next || !image) return;
     const { previewLabel } = resolveImageLabels(image);
