@@ -225,6 +225,30 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(cardTitles(userPage)).toHaveCount(7);
   });
 
+  // #709: toggling the sort after scrolling restarts paging, so no card of
+  // the newest-first pages survives. With the page scrolled down, the
+  // sentinel may load the next oldest-first page straight away, so the list
+  // is checked as a prefix of the oldest-first order.
+  test('the sort toggle restarts paging after a scroll', async ({ userPage }) => {
+    const oldestFirst = ['Golf', 'Foxtrot', 'Echo', 'Delta', 'Charlie', 'Bravo', 'Alpha'].map(
+      (name) => `E2E Video ${name}`
+    );
+    await userPage.goto('/videos');
+    await expect(cardTitles(userPage)).toHaveCount(PAGE_ONE_TITLES.length);
+    await expect(async () => {
+      await cardByTitle(userPage, 'E2E Video Echo').scrollIntoViewIfNeeded();
+    }).toPass({ timeout: 15_000 });
+    await expect(cardTitles(userPage)).toHaveCount(7);
+
+    await userPage.getByRole('radio', { name: 'Oldest first' }).click();
+
+    await expect(async () => {
+      const titles = await cardTitles(userPage).allTextContents();
+      expect(titles.length).toBeGreaterThanOrEqual(PAGE_ONE_TITLES.length);
+      expect(titles).toEqual(oldestFirst.slice(0, titles.length));
+    }).toPass({ timeout: 15_000 });
+  });
+
   test('the sort toggle flips the listing to oldest-first (Golf leads)', async ({ userPage }) => {
     await userPage.goto('/videos');
 

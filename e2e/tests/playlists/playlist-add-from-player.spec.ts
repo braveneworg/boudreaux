@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { resolve } from 'node:path';
+
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../../fixtures/base.fixture';
@@ -99,6 +101,89 @@ const expectPanelInsidePopover = async (page: Page): Promise<void> => {
 };
 
 test.describe('Add to a playlist from a player', () => {
+  // #736: the kebab's lazy panel suspended up to the route loading boundary,
+  // which hid the page and re-created the playing player. The bug lives in
+  // the shared add-to-playlist menu, so the release page's player (which has
+  // a track) exercises it as the home player would.
+  test('opening the kebab keeps the page and the playing audio', async ({ userPage }) => {
+    await userPage.goto(`/releases/${releaseId}`);
+    const audio = userPage.locator('[data-vjs-player] audio.vjs-tech').first();
+    await expect(audio).toBeAttached({ timeout: 15_000 });
+    await userPage.getByRole('button', { name: 'Play', exact: true }).first().click();
+    await expect
+      .poll(() => audio.evaluate((element) => (element as HTMLAudioElement).currentTime), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThan(0);
+
+    await audio.evaluate((element) => {
+      const watched = window as unknown as { e2ePlayer: Element; e2eHidden: boolean };
+      watched.e2ePlayer = element;
+      watched.e2eHidden = false;
+      new MutationObserver(() => {
+        const player = watched.e2ePlayer.closest('[data-vjs-player]');
+        if (!player?.isConnected || !player.checkVisibility()) {
+          watched.e2eHidden = true;
+        }
+      }).observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'hidden'],
+      });
+    });
+
+    await addToPlaylistTrigger(userPage).click();
+    await expect(playlistPicker(userPage)).toBeVisible();
+
+    const state = await userPage.evaluate(() => {
+      const watched = window as unknown as { e2ePlayer: HTMLMediaElement; e2eHidden: boolean };
+      return {
+        hidden: watched.e2eHidden,
+        connected: watched.e2ePlayer.isConnected,
+        paused: watched.e2ePlayer.paused,
+      };
+    });
+    expect(state).toEqual({ hidden: false, connected: true, paused: false });
+  });
+
+  // #737: a video poster has no width variants, so its thumbnail must use the
+  // poster itself. The search answer gets a poster for one real video row,
+  // which is what the service sends for a video with `posterUrl`.
+  test('video results in the create dialog show their poster', async ({ userPage }) => {
+    const poster = `/media/videos/e2e/e2e-playlist-poster-${Date.now()}.jpg`;
+    await userPage.route('**/media/videos/e2e/e2e-playlist-poster-*', (route) =>
+      route.fulfill({ path: resolve('public/icons/icon-192.png'), contentType: 'image/png' })
+    );
+    await userPage.route('**/api/playlists/media-search**', async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as {
+        groups: Array<{ key: string; items: Array<{ coverArt: string | null }> }>;
+      };
+      const firstVideo = body.groups.find(({ key }) => key === 'videos')?.items[0];
+      if (firstVideo) firstVideo.coverArt = poster;
+      await route.fulfill({ response, json: body });
+    });
+
+    await userPage.goto(`/releases/${releaseId}`);
+    await addToPlaylistTrigger(userPage).click();
+    await userPage.getByRole('button', { name: 'Create playlist' }).click();
+    const createDialog = userPage.getByRole('dialog', { name: 'Create playlist' });
+    await createDialog.getByRole('combobox', { name: 'Search songs and videos' }).fill('E2E');
+
+    const thumb = createDialog
+      .getByRole('group', { name: 'Videos' })
+      .getByRole('option')
+      .first()
+      .locator('img');
+    await expect.poll(() => thumb.getAttribute('src')).toContain(poster);
+    expect(await thumb.getAttribute('src')).not.toMatch(/_w\d+/);
+    expect(await thumb.getAttribute('srcset')).not.toMatch(/_w\d+/);
+    await expect
+      .poll(() => thumb.evaluate((element) => (element as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+  });
+
   test('hides the kebab from a signed-out visitor on a release page', async ({ page }) => {
     await page.goto(`/releases/${releaseId}`);
 

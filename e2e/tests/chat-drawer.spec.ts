@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { resolve } from 'node:path';
+
 import { test as baseTest } from '@playwright/test';
 
 import { expect, test } from '../fixtures/auth.fixture';
@@ -51,6 +53,42 @@ baseTest.describe('Chat drawer — anonymous', () => {
 });
 
 test.describe('Chat drawer — authenticated', () => {
+  // #716: Gravatar hashes are SHA-256 (64 hex), not MD5 (32 hex). Gravatar
+  // is answered locally so the test stays offline and the images load.
+  test('chat and menu avatars use SHA-256 Gravatar hashes', async ({ userPage }) => {
+    await userPage.route('https://www.gravatar.com/avatar/**', (route) =>
+      route.fulfill({ path: resolve('public/icons/icon-192.png'), contentType: 'image/png' })
+    );
+    const sha256Avatar = /^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{64}\?/;
+
+    await userPage.goto('/');
+    await userPage.getByRole('button', { name: /open chat/i }).click();
+    const composer = userPage.getByLabel('Chat message');
+    const body = `e2e-avatar-${Date.now()}`;
+    await composer.fill(body);
+    await expect(composer).toHaveValue(body);
+    await composer.press('Enter');
+    await expect(userPage.getByText(body)).toBeVisible({ timeout: 10_000 });
+
+    const chatAvatars = userPage.getByRole('dialog').getByRole('img', { name: 'User Avatar' });
+    await expect(chatAvatars.first()).toBeVisible({ timeout: 10_000 });
+    for (const src of await chatAvatars.evaluateAll((images) =>
+      images.map((image) => image.getAttribute('src'))
+    )) {
+      expect(src).toMatch(sha256Avatar);
+    }
+    await userPage.keyboard.press('Escape');
+
+    // The signed-in toolbar lives in the phone menu.
+    await userPage.setViewportSize({ width: 390, height: 844 });
+    await userPage.reload();
+    await userPage.getByRole('button', { name: /open menu/i }).click();
+    const menuAvatar = userPage
+      .getByRole('dialog', { name: 'Navigation menu' })
+      .getByRole('img', { name: 'User Avatar' });
+    await expect(menuAvatar).toHaveAttribute('src', sha256Avatar);
+  });
+
   test('opens the drawer, shows the empty state, and accepts a sent message', async ({
     userPage,
   }) => {

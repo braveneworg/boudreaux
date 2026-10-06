@@ -49,7 +49,7 @@ export const VideoPlayDialog = ({
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-3 p-4 sm:max-w-3xl lg:max-w-5xl">
       <DialogHeader className="pr-8">
-        <DialogTitle className="font-fake-four-cutout text-xl break-words text-zinc-950 sm:text-2xl">
+        <DialogTitle className="font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl">
           {title}
         </DialogTitle>
         <DialogDescription className="text-zinc-600">{artist}</DialogDescription>
