@@ -152,9 +152,8 @@ test.describe('Admin video poster capture', () => {
       expect(before.posterCandidates).toHaveLength(CAPTURED_FRAMES);
     }).toPass({ timeout: 30_000 });
 
-    // On a fresh visit: the edit form remounts a few seconds after the draft
-    // is created, and drops a file picked before that.
-    await adminPage.goto(`/admin/videos/${id}`);
+    // Still on the page that created the draft: the form survives the swap to
+    // the edit URL (#842), so a file picked now is kept.
     await replaceSource(adminPage, 'Swap Two');
     await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES, { timeout: 30_000 });
     await replaceSource(adminPage, 'Swap Three');
@@ -178,10 +177,8 @@ test.describe('Admin video poster capture', () => {
     const id = await uploadSource(adminPage, 'Manual');
     const frames = adminPage.getByRole('radiogroup', { name: 'Captured poster frames' });
     await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES, { timeout: 30_000 });
-    // On a fresh visit: the edit form remounts a few seconds after the draft
-    // is created, and drops a poster uploaded before that.
-    await adminPage.goto(`/admin/videos/${id}`);
-    await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES, { timeout: 15_000 });
+    // Still on the page that created the draft: the form survives the swap to
+    // the edit URL (#842), so a poster uploaded now is kept.
     await uploadManualPoster(adminPage);
     await expect(adminPage.getByRole('img', { name: 'Video poster' })).toHaveAttribute(
       'src',
