@@ -48,6 +48,11 @@ const NEW_FEATURED_ARTIST_NAME = 'Zora Quill Brandt';
 const VALID_OID = REVIEW_VIDEO_ID;
 
 test.describe('Admin video artist-review — edit-page flow', () => {
+  // Both tests edit the one seeded review video. fullyParallel would run them
+  // in two workers, and the chip-only test fails if it loads the page while
+  // the matched-chip test's saved featured artist is still on the row.
+  test.describe.configure({ mode: 'default' });
+
   /** The review video's seeded `artist` string, captured to restore after each test. */
   let seededReviewArtist: string;
 
@@ -63,9 +68,7 @@ test.describe('Admin video artist-review — edit-page flow', () => {
   // the server sync creates a 'Zora Quill Brandt' shell. Restore both so
   // repeat-each stress runs (and any same-DB rerun) start from seeded state —
   // without this, later runs see an exact-match artist, the combobox suppresses
-  // its `Add "…"` option, and the test false-flakes. NOTE: concurrent repeats of
-  // THIS test on parallel workers still interfere (they share the seeded video
-  // row) — stress this file with --workers=1.
+  // its `Add "…"` option, and the test false-flakes.
   test.afterEach(async () => {
     const created = await prisma.artist.findMany({
       where: { displayName: NEW_FEATURED_ARTIST_NAME },
