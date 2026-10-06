@@ -15,6 +15,9 @@ import type { Page } from '@playwright/test';
 const gotoHome = async (page: Page): Promise<void> => {
   await page.goto('/');
   await expect(page.locator('[aria-roledescription="carousel"]')).toHaveCount(1);
+  // The dot tabs render after the carousel shell; a test that counts them
+  // must not count before they exist (tabs.count() does not wait).
+  await expect(page.getByRole('tab').nth(1)).toBeVisible();
 };
 
 test.describe('Notification Banner Carousel', () => {
