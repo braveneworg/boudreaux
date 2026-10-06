@@ -197,7 +197,7 @@ describe('ArtistNavSearchCombobox', () => {
     expect(mockPush).toHaveBeenCalledWith('/artists/ceschi');
   });
 
-  it('goes to the release on the artist page when a release is picked', async () => {
+  it('goes to the release page when a release is picked', async () => {
     stubSearchReturning([ceschi]);
     const user = setup();
     renderCombobox();
@@ -206,7 +206,8 @@ describe('ArtistNavSearchCombobox', () => {
     settleDebounce();
     await user.click(await screen.findByRole('option', { name: 'Broken Bone Ballads' }));
 
-    expect(mockPush).toHaveBeenCalledWith('/artists/ceschi?release=r-1');
+    // A release pick goes to the release page; the artist page no longer takes `?release=`.
+    expect(mockPush).toHaveBeenCalledWith('/releases/r-1');
   });
 
   it('closes and clears the query after a pick', async () => {
