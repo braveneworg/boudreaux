@@ -40,7 +40,6 @@ import type {
 import { DataError } from '@/lib/types/domain/errors';
 import type { ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
-import { sanitizeArtistLinks } from '@/lib/utils/artist-links';
 import {
   collectArtistReleases,
   publicCredits,
@@ -61,6 +60,7 @@ import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+import { sanitizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
 import {
   sanitizeBioHtml,
   sanitizeBioHtmlNoImages,

@@ -17,6 +17,7 @@ import { ArtistDetailsSection } from '@/app/components/forms/sections/artist-det
 import { ArtistFormFooter } from '@/app/components/forms/sections/artist-form-footer';
 import { ArtistFormHeader } from '@/app/components/forms/sections/artist-form-header';
 import { ArtistFormSkeleton } from '@/app/components/forms/sections/artist-form-skeleton';
+import { ArtistLinksSection } from '@/app/components/forms/sections/artist-links-section';
 import { HidingWarningDialog } from '@/app/components/hiding-warning-dialog';
 import { Form } from '@/app/components/ui/form';
 import type { RichTextEditorUploadHandler } from '@/app/components/ui/rich-text-editor';
@@ -28,6 +29,7 @@ import {
 import { useGuardedArtistArchive } from '@/hooks/use-guarded-artist-archive';
 import { useSession } from '@/hooks/use-session';
 import { type FormState } from '@/lib/types/form-state';
+import { toArtistLinksFormValues } from '@/lib/utils/artist-links';
 import { error } from '@/lib/utils/console-logger';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
@@ -41,6 +43,8 @@ import { useApplyGeneratedBio } from './_hooks/use-apply-generated-bio';
 import { useArtistPool } from './_hooks/use-artist-pool';
 import { type ArtistDetail, useArtistQuery } from './_hooks/use-artist-query';
 import { type SubmitMode, useEntitySubmit } from './_hooks/use-entity-submit';
+
+import type { Control } from 'react-hook-form';
 
 type FormFieldName = keyof ArtistFormData;
 
@@ -102,6 +106,7 @@ const mapArtistToFormValues = (
     formedOn,
     publishedOn,
     createdBy,
+    links,
   }: ArtistDetail,
   userId?: string
 ): ArtistFormData => ({
@@ -125,6 +130,8 @@ const mapArtistToFormValues = (
   formedOn: formatDateForForm(formedOn),
   publishedOn: formatDateForForm(publishedOn),
   createdBy: createdBy || userId,
+  // The stored links composite as the three editor arrays (ADR-0020).
+  ...toArtistLinksFormValues(links),
 });
 
 /** Build the create-mode default form values (only `createdBy` is dynamic). */
@@ -148,6 +155,21 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
   createdBy: userId,
   publishedOn: '',
 });
+
+/** Links hang off a persisted artist row, like images (ADR-0020): edit mode only. */
+const EditModeLinks = ({
+  control,
+  isEditMode,
+}: {
+  control: Control<ArtistFormData>;
+  isEditMode: boolean;
+}): React.ReactElement | null =>
+  isEditMode ? (
+    <>
+      <Separator />
+      <ArtistLinksSection control={control} />
+    </>
+  ) : null;
 
 /** Derive the slug source from the name fields (display name wins). */
 const deriveSlugSource = (
@@ -476,6 +498,8 @@ export const ArtistForm = ({
                 onBioGenerated={handleBioGenerated}
                 onUploadImage={artistId ? handleUploadBioImage : undefined}
               />
+
+              <EditModeLinks control={control} isEditMode={isEditMode} />
 
               <Separator />
 

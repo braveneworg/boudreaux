@@ -95,6 +95,11 @@ vi.mock('@/app/components/forms/utils/upload-bio-image', () => ({
 // tree (which needs next/dynamic + tiptap). Exposes bioEditorImages so tests
 // can assert which images the picker is seeded with, and a trigger button that
 // fires `onBioGenerated` so the generated-image source can be exercised.
+// The link editors have their own specs; here only their presence per mode matters.
+vi.mock('@/app/components/forms/sections/artist-links-section', () => ({
+  ArtistLinksSection: () => <div data-testid="artist-links-section-stub" />,
+}));
+
 vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
   ArtistBioSection: ({
     onUploadImage,
@@ -180,6 +185,13 @@ describe('ArtistForm', () => {
       expect(screen.getByTestId('text-field-slug')).toBeInTheDocument();
     });
 
+    // ADR-0020: links hang off a persisted artist, so the create form has no editors.
+    it('does not render the links section', () => {
+      render(<ArtistForm />);
+
+      expect(screen.queryByTestId('artist-links-section-stub')).not.toBeInTheDocument();
+    });
+
     it('does not render the removed artist images section', () => {
       render(<ArtistForm />);
 
@@ -205,6 +217,14 @@ describe('ArtistForm', () => {
       render(<ArtistForm />);
 
       expect(screen.queryByRole('button', { name: 'Delete Artist' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('links (ADR-0020)', () => {
+    it('renders the links section in edit mode', () => {
+      render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
+
+      expect(screen.getByTestId('artist-links-section-stub')).toBeInTheDocument();
     });
   });
 
