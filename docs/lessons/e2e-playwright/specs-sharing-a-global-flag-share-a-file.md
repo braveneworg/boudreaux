@@ -41,3 +41,19 @@ Giving each test its own image row did not help, because the rows were never
 the shared thing: the list was. Keep tests that write the same whole value in
 one worker with `test.describe.configure({ mode: 'default' })`, or give each
 its own parent row.
+
+## The same holds for one seeded row two tests edit
+
+`admin-video-artist-review.spec.ts` has two tests on the one seeded review
+video. The first saves `E2E Review Lead feat. Zora Quill Brandt` onto it and
+restores the row in `afterEach`. The second expects the row to hold only the
+seeded lead. In two workers, the second sometimes loaded the page between
+the first test's save and its restore, saw an unmatched featured artist, and
+showed the new-artist block. It failed in 2 of 2 runs of the video specs
+with their neighbours on 2026-10-05 (4 workers, dev server). It passed when
+the file ran alone, because the second test then finished before the first
+one saved. A probe that put the first test's saved string on the row failed
+the second test every time.
+
+A row that more than one test of a file writes is a value of its own. Set
+`test.describe.configure({ mode: 'default' })` on that describe.
