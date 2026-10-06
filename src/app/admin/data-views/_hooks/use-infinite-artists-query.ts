@@ -5,9 +5,9 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
 import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
-import type { Artist } from '@/lib/types/media-models';
+import type { ArtistListItem } from '@/lib/types/domain/artist';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { artistSchema } from '@/lib/validation/media/artist-schema';
+import { artistListItemSchema } from '@/lib/validation/media/artist-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
@@ -19,13 +19,13 @@ export interface ArtistsQueryParams {
 }
 
 /** One skip/offset page of artists returned by `/api/artists`. */
-export type ArtistsPaginatedResponse = PaginatedResponse<Artist>;
+export type ArtistsPaginatedResponse = PaginatedResponse<ArtistListItem>;
 
 /** Page size requested per fetch. */
 export const ARTISTS_PAGE_SIZE = 10;
 
 /** Strict schema for one `/api/artists` page. */
-const artistsPaginatedResponseSchema = paginatedResponseSchema(artistSchema);
+const artistsPaginatedResponseSchema = paginatedResponseSchema(artistListItemSchema);
 
 /**
  * Fetches one page of artists from the `/api/artists` route handler.

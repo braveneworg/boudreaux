@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistDetail } from '@/lib/types/domain/artist';
+import type { ArtistDetail, ArtistListItem } from '@/lib/types/domain/artist';
 import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import { RELEASE_CREDITS } from '@/lib/utils/artist-release-credits';
 
@@ -91,6 +91,14 @@ export const artistSchema = artistScalarSchema.extend({
   ),
   urls: z.array(urlSchema),
 }) satisfies z.ZodType<Artist>;
+
+/**
+ * An admin listing row as returned by `GET /api/artists`: the admin `Artist`
+ * plus whether a display image is chosen (ADR-0019).
+ */
+export const artistListItemSchema = artistSchema.extend({
+  hasDisplayImage: z.boolean(),
+}) satisfies z.ZodType<ArtistListItem>;
 
 /**
  * `Artist` as returned by `GET /api/artists/[id]` — scalars only (see

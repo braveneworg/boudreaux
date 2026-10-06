@@ -9,6 +9,7 @@ import type {
   Artist,
   ArtistDetail,
   ArtistListFilters,
+  ArtistListItem,
   ArtistListingFilters,
   ArtistListingRecord,
   ArtistNameRecord,
@@ -129,12 +130,29 @@ export interface ImageLinksJobStateRecord {
 // Query shapes (single source of truth for both the query and the drift check)
 // =============================================================================
 
-/** Admin listing include — release scalars, labels, urls. */
+/** Admin payload include — release scalars, labels, urls. */
 const artistAdminInclude = {
   labels: true,
   urls: true,
   releases: { include: { release: true } },
 } as const satisfies Prisma.ArtistInclude;
+
+/**
+ * Admin listing include: the admin payload plus one chosen display image, if
+ * any, so the list can say whether the artist may be published (ADR-0019).
+ */
+const artistListInclude = {
+  ...artistAdminInclude,
+  bioImages: { where: bioImageWhere.chosen, select: { id: true }, take: 1 },
+} as const satisfies Prisma.ArtistInclude;
+
+type ArtistListRow = Prisma.ArtistGetPayload<{ include: typeof artistListInclude }>;
+
+/** The listing row as the admin sees it: the one chosen image becomes a flag. */
+const toArtistListItem = ({ bioImages, ...artist }: ArtistListRow): ArtistListItem => ({
+  ...artist,
+  hasDisplayImage: bioImages.length > 0,
+});
 
 /** Name projection of a related artist (band member / band) on a listing row. */
 const artistListingNameSelect = {
@@ -594,18 +612,20 @@ export class ArtistRepository {
   }
 
   /**
-   * List artists for the admin listing with the full include shape required by
-   * `artistSchema`. Builds the filter `where` from domain filters.
+   * List artists for the admin listing in the shape `artistListItemSchema`
+   * parses: the full admin include plus the display-image flag (ADR-0019).
+   * Builds the filter `where` from domain filters.
    */
-  static async findMany(filters: ArtistListFilters): Promise<Artist[]> {
+  static async findMany(filters: ArtistListFilters): Promise<ArtistListItem[]> {
     const { skip = 0, take = 50 } = filters;
-    return prisma.artist.findMany({
+    const rows = await prisma.artist.findMany({
       where: buildListWhere(filters),
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: artistAdminInclude,
-    }) as Promise<Artist[]>;
+      include: artistListInclude,
+    });
+    return rows.map(toArtistListItem);
   }
 
   /**

@@ -85,6 +85,24 @@ describe('DataView create button', () => {
   });
 });
 
+describe('DataView row badges', () => {
+  const rows = [
+    { id: 'a-1', firstName: 'Jane', hasDisplayImage: false },
+    { id: 'a-2', firstName: 'Joe', hasDisplayImage: true },
+  ];
+
+  it('renders the badges the wrapper supplies for a row', () => {
+    renderDataView({
+      data: { artists: rows },
+      renderBadges: (item) => (item.hasDisplayImage ? null : <span>No display image</span>),
+    });
+
+    const cards = screen.getAllByRole('listitem');
+    expect(cards[0]).toHaveTextContent('No display image');
+    expect(cards[1]).not.toHaveTextContent('No display image');
+  });
+});
+
 describe('DataView entity mutations', () => {
   const activeArtist = { id: 'a-1', firstName: 'Jane', displayName: 'Jane Doe', deletedOn: null };
   const deletedArtist = {

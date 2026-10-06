@@ -11,7 +11,7 @@ import {
 
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
-import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { releaseWhere } from './_internal/release-where';
 import { isUnsetOr } from './_internal/where-kit';
 import { ArtistRepository } from './artist-repository';
@@ -145,16 +145,34 @@ describe('ArtistRepository', () => {
 
   describe('findMany', () => {
     it('uses the full admin include and default pagination', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      const result = await ArtistRepository.findMany({});
+      await ArtistRepository.findMany({});
 
-      expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.skip).toBe(0);
       expect(arg?.take).toBe(50);
       expect(arg?.orderBy).toEqual({ createdAt: 'desc' });
-      expect(arg?.include).toEqual(adminInclude);
+      expect(arg?.include).toEqual({
+        ...adminInclude,
+        bioImages: { where: bioImageWhere.chosen, select: { id: true }, take: 1 },
+      });
+    });
+
+    // ADR-0019: the listing says whether a display image is chosen, from the
+    // one chosen row the include pulls; the row itself stays in the repository.
+    it('maps the chosen display image to a flag', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        { id: 'a', bioImages: [] },
+        { id: 'b', bioImages: [{ id: 'img' }] },
+      ] as never);
+
+      const result = await ArtistRepository.findMany({});
+
+      expect(result).toEqual([
+        { id: 'a', hasDisplayImage: false },
+        { id: 'b', hasDisplayImage: true },
+      ]);
     });
 
     it('excludes soft-deleted artists by default (Mongo null-safe)', async () => {

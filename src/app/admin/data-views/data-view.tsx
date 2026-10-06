@@ -4,7 +4,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -61,6 +61,7 @@ interface DataViewBodyProps<T extends Record<string, unknown>> {
   pagination?: DataViewProps<T>['pagination'];
   showRefreshSkeleton: boolean;
   resolveDisplayName: (item: T) => string;
+  renderBadges?: (item: T) => ReactNode;
   onPublish: (item: T) => void;
   onDelete: (item: T) => void;
   onRestore: (item: T) => void;
@@ -86,6 +87,7 @@ const DataViewBody = <T extends Record<string, unknown>>({
   pagination,
   showRefreshSkeleton,
   resolveDisplayName,
+  renderBadges,
   onPublish,
   onDelete,
   onRestore,
@@ -109,6 +111,7 @@ const DataViewBody = <T extends Record<string, unknown>>({
                 canRestore={canRestore}
                 canHardDelete={canHardDelete}
                 resolveDisplayName={resolveDisplayName}
+                badges={renderBadges?.(item)}
                 onPublish={onPublish}
                 onDelete={onDelete}
                 onRestore={onRestore}
@@ -155,6 +158,7 @@ export const DataView = <T extends Record<string, unknown>>({
   forceHardDelete = false,
   canCreate = true,
   getItemDisplayName,
+  renderBadges,
   mutations,
   filters,
   pagination,
@@ -273,6 +277,7 @@ export const DataView = <T extends Record<string, unknown>>({
           pagination={pagination}
           showRefreshSkeleton={showRefreshSkeleton}
           resolveDisplayName={resolveDisplayName}
+          renderBadges={renderBadges}
           onPublish={handlePublish}
           onDelete={handleDelete}
           onRestore={handleRestore}

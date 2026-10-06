@@ -3,7 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
-import { artistSchema, artistWithPublishedReleasesSchema } from './artist-schema';
+import {
+  artistListItemSchema,
+  artistSchema,
+  artistWithPublishedReleasesSchema,
+} from './artist-schema';
 import {
   artist,
   artistBioValues,
@@ -22,6 +26,19 @@ describe('artistSchema', () => {
   it('rejects an artist missing a required scalar', () => {
     const { surname: _omit, ...invalid } = artist;
     expect(() => artistSchema.parse(invalid)).toThrow();
+  });
+});
+
+// ADR-0019: the admin listing says whether a display image is chosen.
+describe('artistListItemSchema', () => {
+  it('parses a listing row with its display-image flag', () => {
+    expect(artistListItemSchema.parse({ ...artist, hasDisplayImage: false })).toMatchObject({
+      hasDisplayImage: false,
+    });
+  });
+
+  it('rejects a listing row without the flag', () => {
+    expect(() => artistListItemSchema.parse(artist)).toThrow();
   });
 });
 

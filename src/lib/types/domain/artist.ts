@@ -295,6 +295,12 @@ export type Artist = ArtistScalars & {
 };
 
 /**
+ * An admin listing row: the admin payload plus whether a display image is
+ * chosen, which publishing needs (ADR-0019).
+ */
+export type ArtistListItem = Artist & { hasDisplayImage: boolean };
+
+/**
  * The media `Release` graph as the public artist-detail page loads it: every
  * credited artist on the release carries only its {@link ArtistCreditScalars}.
  */

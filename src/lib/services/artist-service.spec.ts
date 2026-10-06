@@ -397,10 +397,13 @@ describe('ArtistService', () => {
   });
 
   describe('getArtists', () => {
+    // Listing rows carry the display-image flag (ADR-0019).
+    const listedArtist = { ...mockArtist, hasDisplayImage: true };
     const mockArtists = [
-      mockArtist,
+      listedArtist,
       {
         ...mockArtist,
+        hasDisplayImage: false,
         id: 'artist-456',
         firstName: 'Jane',
         surname: 'Smith',
@@ -419,7 +422,7 @@ describe('ArtistService', () => {
     });
 
     it('should retrieve artists with custom pagination', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       const result = await ArtistService.getArtists({ skip: 10, take: 5 });
 
@@ -428,7 +431,7 @@ describe('ArtistService', () => {
     });
 
     it('should search across multiple fields', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       const result = await ArtistService.getArtists({ search: 'john' });
 
@@ -437,7 +440,7 @@ describe('ArtistService', () => {
     });
 
     it('should combine pagination and search', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       const result = await ArtistService.getArtists({
         skip: 5,
@@ -450,7 +453,7 @@ describe('ArtistService', () => {
     });
 
     it('should add publishedOn filter when published=true', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       await ArtistService.getArtists({ published: true });
 
@@ -458,7 +461,7 @@ describe('ArtistService', () => {
     });
 
     it('should add unpublished filter when published=false', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       await ArtistService.getArtists({ published: false });
 
@@ -466,7 +469,7 @@ describe('ArtistService', () => {
     });
 
     it('should omit the deletedOn constraint when deleted=true', async () => {
-      vi.mocked(ArtistRepository.findMany).mockResolvedValue([mockArtist]);
+      vi.mocked(ArtistRepository.findMany).mockResolvedValue([listedArtist]);
 
       await ArtistService.getArtists({ deleted: true });
 

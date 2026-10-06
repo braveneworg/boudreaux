@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import Link from 'next/link';
 
@@ -36,6 +36,8 @@ interface DataViewCardProps<T extends Record<string, unknown>> {
   /** Whether a permanent-delete handler is wired (shown on archived rows only). */
   canHardDelete: boolean;
   resolveDisplayName: (item: T) => string;
+  /** Entity-specific status badges, shown above the fields. */
+  badges?: ReactNode;
   onPublish: (item: T) => void;
   onDelete: (item: T) => void;
   onRestore: (item: T) => void;
@@ -55,6 +57,7 @@ export const DataViewCard = <T extends Record<string, unknown>>({
   canRestore,
   canHardDelete,
   resolveDisplayName,
+  badges,
   onPublish,
   onDelete,
   onRestore,
@@ -82,6 +85,7 @@ export const DataViewCard = <T extends Record<string, unknown>>({
         <Link href={`/admin/${entityUrlPath}/${id}`}>View more info</Link>
       </div>
       <Separator className="mt-0 mb-2 border-[0.5px] border-zinc-300" />
+      {badges && <div className="mb-2 flex flex-wrap justify-center gap-2">{badges}</div>}
       <EntityFieldList
         item={item}
         fieldsToShow={fieldsToShow}

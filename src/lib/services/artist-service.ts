@@ -20,6 +20,7 @@ import type {
   ArtistBioLinkRecord,
   ArtistDetail,
   ArtistListFilters,
+  ArtistListItem,
   ArtistListingFilters,
   ArtistListingName,
   ArtistListingRecord,
@@ -591,7 +592,7 @@ export class ArtistService {
    * - `published == null` → no publish filter.
    * - `deleted` falsy → exclude soft-deleted artists; `deleted === true` → include them.
    */
-  static async getArtists(params?: ArtistListFilters): Promise<ServiceResponse<Artist[]>> {
+  static async getArtists(params?: ArtistListFilters): Promise<ServiceResponse<ArtistListItem[]>> {
     try {
       const artists = await ArtistRepository.findMany(params ?? {});
       return { success: true, data: artists };
