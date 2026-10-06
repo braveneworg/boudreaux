@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { E2E_AUTH_SECRET } from './auth-constants';
 import { createStorageState } from './auth-helpers';
+import { ensureModelCollections } from './e2e-collections';
 
 import type { TestUser } from './auth-helpers';
 
@@ -789,6 +790,10 @@ const seedTestDatabase = async () => {
   try {
     // Wait for the replica set to be ready before proceeding
     await waitForReplicaSet(prisma);
+
+    // Every collection exists before any spec writes, so no transaction
+    // races the write that would create one.
+    await ensureModelCollections(prisma);
 
     // Clear all collections in dependency-safe order. Playlist items reference
     // Playlist and Playlist references User, so both go before the users.
