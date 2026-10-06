@@ -95,10 +95,11 @@ test('the cover-art picker lists the display images first, in order', async ({ a
 
   const options = adminPage.getByRole('option');
   await expect(options).toHaveCount(4, { timeout: 15_000 });
-  await expect(options).toHaveText([
-    new RegExp(`Display A ${STAMP}`),
-    new RegExp(`Display B ${STAMP}`),
-    new RegExp(`Suggestion ${STAMP}`),
-    new RegExp(`Pool ${STAMP}`),
+  // With the count pinned, an array of substrings checks the order.
+  await expect(options).toContainText([
+    `Display A ${STAMP}`,
+    `Display B ${STAMP}`,
+    `Suggestion ${STAMP}`,
+    `Pool ${STAMP}`,
   ]);
 });
