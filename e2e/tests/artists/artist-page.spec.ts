@@ -57,6 +57,26 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('link', { name: /read full bio/i })).toHaveCount(0);
     });
 
+    // #797: the header photo enlarges in place, like the index card's.
+    test('clicking the header photo enlarges it in a dialog without leaving the page', async ({
+      page,
+    }) => {
+      await page.goto('/artists/e2e-artist');
+      const photo = page
+        .locator('[data-slot="artist-display-images"]')
+        .getByRole('button', { name: 'Expand image: E2E Artist chosen portrait' });
+      await expect(photo).toBeVisible({ timeout: 15_000 });
+
+      await photo.click();
+
+      const dialog = page.getByRole('dialog', { name: 'E2E Artist' });
+      await expect(dialog).toBeVisible();
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(photo).toBeFocused();
+    });
+
     // The seed carries a suggested (isPrimary) portrait and a human-chosen
     // display image; the page shows the chosen one only (ADR-0008).
     test('shows the chosen display image instead of the suggested one', async ({ page }) => {
@@ -275,6 +295,31 @@ test.describe('Artist Page', () => {
       await expect(page.getByRole('option')).toHaveCount(1, { timeout: 10_000 });
       await expect(page.getByRole('option')).toContainText('E2E Artist');
       await expect(cards(page)).toHaveCount(1);
+    });
+
+    // #746: typing narrows the grid in place; it never flashes the
+    // "No artists match" state while the narrowed results are on their way.
+    test('narrows the grid without flashing the empty state', async ({ page }) => {
+      await page.goto('/artists');
+      await expect(cards(page).first()).toBeVisible({ timeout: 15_000 });
+      await page.evaluate(() => {
+        const flags = globalThis as unknown as { __emptyFlash?: boolean };
+        flags.__emptyFlash = false;
+        new MutationObserver(() => {
+          if (document.body.textContent?.includes('No artists match')) {
+            flags.__emptyFlash = true;
+          }
+        }).observe(document.body, { childList: true, subtree: true, characterData: true });
+      });
+
+      await (await openSearch(page)).fill('Album Three');
+
+      await expect(cards(page)).toHaveCount(1, { timeout: 10_000 });
+      expect(
+        await page.evaluate(
+          () => (globalThis as unknown as { __emptyFlash?: boolean }).__emptyFlash
+        )
+      ).toBe(false);
     });
 
     test('matches artists by genre', async ({ page }) => {
