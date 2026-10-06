@@ -10,13 +10,11 @@
  * that source-primes the first MP3 track inside the click gesture and opens
  * the {@link ReleasePlayDialog} listening-station modal.
  */
-import { useState } from 'react';
-
 import Link from 'next/link';
 
 import { Music2 } from 'lucide-react';
 
-import { usePrimedAudioHandoff } from '@/hooks/use-primed-audio-handoff';
+import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
 
 import { DeferredDownloadDialog } from './deferred-download-dialog';
@@ -56,30 +54,16 @@ export const ReleaseCard = ({
   bandcampUrl,
   playSrc,
 }: ReleaseCardProps) => {
-  const [playerOpen, setPlayerOpen] = useState(false);
-  const [prefetchPlayer, setPrefetchPlayer] = useState(false);
-  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedAudioHandoff();
-
-  const openPlayer = (): void => {
-    if (!playSrc) return;
-    // Start playback of the real first track inside the click gesture —
-    // allowed by every autoplay policy, unlike the modal player's deferred
-    // play(), which strict profiles and extensions can reject.
-    primeMediaEl(playSrc);
-    setPlayerOpen(true);
-  };
-
-  const handlePlayerOpenChange = (open: boolean): void => {
-    if (!open) {
-      // Closed before the player adopted the element — stop it, or the
-      // gesture-started audio keeps playing with no UI attached.
-      discardMediaEl();
-    }
-    setPlayerOpen(open);
-  };
-
-  /** Pre-warm the modal's release-detail fetch on hover/focus intent. */
-  const warmPlayer = (): void => setPrefetchPlayer(true);
+  // The /releases Play flow — prime track 1 in the click, open the modal,
+  // discard on an early close — lives in useReleasePlayDialog.
+  const {
+    playerOpen,
+    prefetchPlayer,
+    openPlayer,
+    handlePlayerOpenChange,
+    warmPlayer,
+    takeMediaEl,
+  } = useReleasePlayDialog(playSrc);
 
   return (
     <div className="shadow-zine-sm relative flex flex-col gap-2 border-2 border-black bg-white p-3 transition-transform duration-200 md:hover:z-10 md:hover:scale-[1.03]">
