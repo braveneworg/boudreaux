@@ -23,18 +23,25 @@ export const bioMediaWhere = {
 >;
 
 /**
+ * A row a human has chosen as a display image: `displayOrder: { gte: 0 }`
+ * matches only numbers — null and absent both fail (ADR-0008).
+ */
+const chosen = { displayOrder: { gte: 0 } } as const satisfies Prisma.ArtistBioImageWhereInput;
+
+/**
  * Bio-image `where` fragments. Proved by
  * `bio-image-display-where.contract.spec.ts`.
  */
 export const bioImageWhere = {
+  /** The human's chosen rows — what the publish gate counts (ADR-0019). */
+  chosen,
   /**
-   * The rows display-image resolution can pick from: a human's chosen row
-   * (`displayOrder: { gte: 0 }` matches only numbers — null and absent both
-   * fail) or the job's suggested row. No DB-level take belongs beside it:
-   * Mongo sorts nulls first, so a cap would return unchosen rows; the service
-   * resolves and caps after the read (`resolveDisplayImages`).
+   * The rows display-image resolution can pick from: a human's chosen row or
+   * the job's suggested row. No DB-level take belongs beside it: Mongo sorts
+   * nulls first, so a cap would return unchosen rows; the service resolves
+   * after the read (`resolveDisplayImages`).
    */
-  displayCandidate: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
+  displayCandidate: { OR: [chosen, { isPrimary: true }] },
 } as const satisfies Record<string, Prisma.ArtistBioImageWhereInput>;
 
 /**

@@ -11,7 +11,15 @@ import type {
   CreateArtistBioImageData,
 } from '@/lib/types/domain/artist';
 
+import { bioImageWhere } from './_internal/bio-media-where';
 import { runQuery } from './_internal/map-prisma-error';
+
+/** What the delete guard reads about a row: its position and its artist's publish state. */
+export interface BioImageDisplayState {
+  artistId: string;
+  displayOrder: number | null;
+  artist: { publishedOn: Date | null };
+}
 
 /** Bio image row projection used by the save-time full re-host pass. */
 export interface BioImageRehostRow {
@@ -148,6 +156,19 @@ export class ArtistBioImageRepository {
         ? [{ url, contentHash: contentHash ?? null, perceptualHash: perceptualHash ?? null }]
         : []
     );
+  }
+
+  /** How many of the artist's rows a human has chosen — the publish gate's read (ADR-0019). */
+  static async countChosen(artistId: string): Promise<number> {
+    return prisma.artistBioImage.count({ where: { artistId, AND: [bioImageWhere.chosen] } });
+  }
+
+  /** The row's chosen position and its artist's publish state, or null when the row is unknown. */
+  static async findDisplayState(imageId: string): Promise<BioImageDisplayState | null> {
+    return prisma.artistBioImage.findUnique({
+      where: { id: imageId },
+      select: { artistId: true, displayOrder: true, artist: { select: { publishedOn: true } } },
+    });
   }
 
   /** Deletes a single discovered bio image row (palette X) and returns its
