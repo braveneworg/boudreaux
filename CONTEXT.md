@@ -75,16 +75,19 @@ image makes it custom. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
 
-**display images** — the ordered set of up to three bio images shown for an
-Artist on the public artist page and index cards. Chosen and ordered only by a
-human; a bio generation job may **suggest** images but never chooses or
-displaces a human's choice. On the admin surface the pool and this set are
-one client module, the **artist pool** (`useArtistPool`): every write to
-either goes through it, and an upload joins the set only if there is room
-when it lands. While no human has chosen, the page shows the
-suggested images that have alt text, or else the first pool images that have
-alt text; the admin marks those tiles **Shown**. An image without alt text is
-never shown unless a human chose it. See
+**display images** — the ordered set of bio images shown for an Artist: all
+of them as a collage on the public artist page, the first one on its index
+card. There is no cap. Chosen and ordered only by a human; a bio generation
+job may **suggest** images but never chooses or displaces a human's choice.
+On the admin surface the pool and this set are one client module, the
+**artist pool** (`useArtistPool`): every write to either goes through it, a
+media manager upload joins the set (last), and a bio editor upload stays in
+the pool. Publishing an Artist needs at least one chosen display image
+([ADR-0019](docs/adr/0019-publishing-an-artist-needs-a-chosen-display-image.md)).
+While no human has chosen, a published Artist's page shows up to three
+suggested images that have alt text, or else the first three pool images
+that have alt text; the admin marks those tiles **Shown**. An image without
+alt text is never shown unless a human chose it. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: primary images, hero image, featured images (featured is a release
 credit).
@@ -155,7 +158,9 @@ _Avoid_: pending artist, unconfirmed artist.
 **credit decision** — an admin's choice for one **credit awaiting
 confirmation**: publish the Artist with the Release, or keep it hidden.
 Publishing a Release needs a decision for every such credit; none is made by
-omission. The admin who decided is recorded on each Artist published.
+omission. An Artist with no chosen **display image** can only be kept hidden
+([ADR-0019](docs/adr/0019-publishing-an-artist-needs-a-chosen-display-image.md)).
+The admin who decided is recorded on each Artist published.
 _Avoid_: confirmation (the whole step, not one artist's choice), approval.
 
 **credit that stays hidden** — a **hidden artist** credited on a Release whom

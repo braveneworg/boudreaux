@@ -1,6 +1,7 @@
 # ADR-0008: Display images are chosen by humans and survive regeneration
 
-- **Status**: Accepted; amended 2026-09-26 (see the addendum, #767)
+- **Status**: Accepted; amended 2026-09-26 (see the addendum, #767) and
+  2026-10-06 (the set is uncapped; see the second addendum)
 - **Date**: 2026-09-17
 
 ## Context
@@ -126,9 +127,59 @@ optional.
   shows no image on its index card while the detail page may show pool
   images. This divergence predates the change (no suggestions → the same
   split) and is left as it is.
-- Still open: clearing alt on an already-chosen row is not guarded, and the
-  detail page's biography gallery lists every pool row the header does not
-  show, alt or not.
+- Still open: clearing alt on an already-chosen row is not guarded. The
+  detail page's biography gallery, which listed every pool row the header
+  did not show, alt or not, is removed by the second addendum.
+
+## Addendum (2026-10-06): the set is uncapped and the page shows all of it
+
+### Context
+
+The artist page is being redesigned around the display images: a collage of
+the chosen set, not three thumbnails beside a teaser. Three was the number
+of slots the old header had, not a property of the set. Admins choosing a
+fourth image hit the cap, and the pool rows the header did not show reached
+the public page through the biography gallery, which ignored the alt rule.
+
+### Decision
+
+- **The chosen set has no cap.** `DISPLAY_IMAGE_CAP` becomes
+  `FALLBACK_DISPLAY_IMAGE_CAP = 3` and applies to the two fallback tiers
+  only; the chosen tier is returned whole, in position order.
+- **The public artist page shows the chosen set as one collage.** It has
+  layouts for one to seven tiles; from eight images up, the seventh tile
+  shows image seven under "+N more". Every tile opens the lightbox at the
+  image it shows, and the lightbox steps through all of them.
+- **The first display image is the index card's photo**
+  (`CARD_DISPLAY_IMAGE_COUNT = 1`); listing and featured payloads carry only
+  that many.
+- **The biography gallery is gone.** A pool row that is not chosen is not
+  shown on the public page, which closes the alt gap above.
+- **A media manager upload joins the chosen set**, appended last. The bio
+  editor's inline upload stays pool-only: it exists to place an image in the
+  prose, not to put it on the page.
+- **Publishing an artist needs at least one chosen display image.** The rule
+  and its guards are [ADR-0019](0019-publishing-an-artist-needs-a-chosen-display-image.md).
+- **Grandfathered artists keep the fallback.** A published artist with no
+  chosen image still renders the ADR-0008 fallback tiers (up to three), or
+  one inert placeholder tile when nothing is eligible; the admin list badges
+  it "No display image".
+
+### Alternatives rejected
+
+- **A higher cap (seven, matching the collage).** It would be the same
+  arbitrary number one size up, and the "+N more" tile already answers "what
+  about the rest".
+- **Keeping the gallery for the remaining pool rows.** It is what put
+  alt-less images on the page; the pool is an admin's working material.
+
+### Consequences
+
+- The set action's request is still bounded, by a generous size guard
+  rather than a product cap, so a hostile payload cannot carry thousands of
+  ids.
+- An artist with many chosen images costs one lightbox with many slides;
+  the page loads the collage's tiles only.
 
 ## Enforcement (2026-10-04)
 
@@ -142,9 +193,11 @@ picker's pool was invalidated by two of nine writers, and the bio editor's
 image picker kept a frozen copy of the pool. `useArtistPool`
 (`src/app/components/forms/_hooks/use-artist-pool.ts`) is now the one
 client module for the pool and the Shown set: every surface renders it,
-"join the display images if there is room" is decided against the set as it
-is when the upload lands (`decideUploadJoin`), and one invalidation policy
-marks both pool keys stale after every write. The bio-generation and
+whether an upload joins the display images is decided against the set as it
+is when the upload lands (`decideUploadJoin`; since 2026-10-06 a media
+manager upload always joins, appended last, and a bio-editor upload never
+does), and one invalidation policy marks both pool keys stale after every
+write. The bio-generation and
 images-from-links sections track a run through one client tracker,
 `useJobRun`, the twin of `async-job-lifecycle.ts`: a terminal state cached
 before the trigger is never surfaced as the new run's outcome.
