@@ -21,7 +21,7 @@ import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
 import { BioImageTile, resolveImageLabels } from './bio-image-tile';
 import { BioImageUploadZone } from './bio-image-upload-zone';
-import { DisplayImageStrip } from './display-image-strip';
+import { DisplayImageStrip, LAST_IMAGE_REASON } from './display-image-strip';
 import { ImageSourceLinksSection } from './image-source-links-section';
 
 import type { ArtistPool } from './_hooks/use-artist-pool';
@@ -53,6 +53,8 @@ export interface BioImageManagerProps {
   /** Why the last upload failed, phrased for the admin, or null. */
   uploadError?: string | null;
   disabled?: boolean;
+  /** A published artist keeps at least one display image (ADR-0019): its last chosen image stays. */
+  isPublished: boolean;
 }
 
 /**
@@ -151,6 +153,17 @@ const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
  * page. Every write — an upload included, and whether it joins the display
  * images — is the artist pool module's; this is a render of it.
  */
+/**
+ * Why a pool tile cannot be deleted, or `null`: a published artist keeps its
+ * last chosen image (ADR-0019), from the pool as from the strip.
+ */
+const deleteDisabledReasonFor = (
+  imageId: string,
+  chosenIds: string[],
+  isPublished: boolean
+): string | null =>
+  isPublished && chosenIds.length === 1 && chosenIds[0] === imageId ? LAST_IMAGE_REASON : null;
+
 export const BioImageManager = ({
   artistId,
   images,
@@ -166,6 +179,7 @@ export const BioImageManager = ({
   isUploading = false,
   uploadError = null,
   disabled = false,
+  isPublished,
 }: BioImageManagerProps): JSX.Element => {
   const hintIdBase = useId();
   const [filter, setFilter] = useState('');
@@ -204,6 +218,7 @@ export const BioImageManager = ({
         isUploading={isUploading}
         uploadError={uploadError}
         disabled={disabled}
+        isPublished={isPublished}
       />
 
       <div className="space-y-2">
@@ -252,6 +267,7 @@ export const BioImageManager = ({
                     onEditAttribution={onEditAttribution}
                     onEditAlt={onEditAlt}
                     disabled={disabled}
+                    deleteDisabledReason={deleteDisabledReasonFor(image.id, chosenIds, isPublished)}
                     badges={
                       <PoolTileBadge
                         position={position}

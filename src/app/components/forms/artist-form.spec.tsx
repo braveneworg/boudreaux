@@ -134,6 +134,7 @@ vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
 vi.mock('./_hooks/use-artist-pool', () => ({
   useArtistPool: vi.fn(() => ({
     images: [],
+    chosenIds: [],
     add: vi.fn().mockResolvedValue(null),
     addError: null,
   })),
@@ -191,10 +192,13 @@ describe('ArtistForm', () => {
       expect(screen.getByTestId('breadcrumb-menu')).toBeInTheDocument();
     });
 
-    it('renders the Create & Publish action button', () => {
+    // An artist is created unpublished and published once it has a chosen
+    // display image (ADR-0019): there is no create-and-publish button.
+    it('offers no Create & Publish button', () => {
       render(<ArtistForm />);
 
-      expect(screen.getByRole('button', { name: /create & publish/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /publish/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
     });
 
     it('does not render a delete button in create mode', () => {
@@ -210,6 +214,12 @@ describe('ArtistForm', () => {
     // next plain Save — enabled by that dirty date — published the artist.
     // An edit form with no name fails validation, so Publish is refused here.
     it('leaves nothing for Save to send after a refused publish', async () => {
+      vi.mocked(useArtistPool).mockReturnValue({
+        images: [],
+        chosenIds: ['img-1'],
+        add: vi.fn().mockResolvedValue(null),
+        addError: null,
+      } as never);
       render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
 
@@ -218,6 +228,27 @@ describe('ArtistForm', () => {
 
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
       expect(vi.mocked(updateArtistAction)).not.toHaveBeenCalled();
+    });
+
+    // ADR-0019: publishing needs a chosen display image; the button says why.
+    it('disables Publish with the reason while no display image is chosen', () => {
+      render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
+
+      const publish = screen.getByRole('button', { name: 'Publish' });
+      expect(publish).toBeDisabled();
+      expect(publish).toHaveAccessibleDescription(/display image/i);
+    });
+
+    it('enables Publish once a display image is chosen', () => {
+      vi.mocked(useArtistPool).mockReturnValue({
+        images: [],
+        chosenIds: ['img-1'],
+        add: vi.fn().mockResolvedValue(null),
+        addError: null,
+      } as never);
+      render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
+
+      expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
     });
   });
 
@@ -344,6 +375,7 @@ describe('ArtistForm', () => {
           { id: 'p-1', url: 'https://cdn/x.webp', alt: 'Alt text', title: 'Title' },
           { id: 'p-2', url: 'https://cdn/y.webp', alt: null, title: 'Only title' },
         ],
+        chosenIds: [],
         add: vi.fn().mockResolvedValue(null),
         addError: null,
       } as never);

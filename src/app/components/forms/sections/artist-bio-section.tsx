@@ -95,6 +95,8 @@ interface ArtistBioSectionProps {
   control: Control<ArtistFormData>;
   isEditMode: boolean;
   artistId: string | null;
+  /** A published artist keeps at least one display image (ADR-0019). */
+  isPublished?: boolean;
   bioEditorImages: RichTextEditorImage[];
   onBioGenerated: (content: GeneratedBioContent) => void;
   onUploadImage?: RichTextEditorUploadHandler;
@@ -104,6 +106,7 @@ export const ArtistBioSection = ({
   control,
   isEditMode,
   artistId,
+  isPublished = false,
   bioEditorImages,
   onBioGenerated,
   onUploadImage,
@@ -126,7 +129,7 @@ export const ArtistBioSection = ({
           className="xl:sticky xl:top-24 xl:order-2 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
         >
           {isEditMode && artistId ? (
-            <BioMediaPalettes artistId={artistId} />
+            <BioMediaPalettes artistId={artistId} isPublished={isPublished} />
           ) : (
             // Images (and their display-image choice) hang off a persisted
             // artist row, so create mode explains the wait instead of hiding it.

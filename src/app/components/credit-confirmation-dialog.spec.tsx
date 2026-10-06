@@ -23,7 +23,7 @@ const bea = {
   name: 'Bea',
   bioState: 'none' as const,
   bioGeneratedAt: null,
-  displayImageCount: 0,
+  displayImageCount: 1,
 };
 const gone = { id: 'x', slug: 'gone', name: 'Gone', reason: 'deleted' as const };
 
@@ -88,6 +88,16 @@ describe('CreditConfirmationDialog', () => {
     renderDialog();
 
     expect(screen.getByTestId('credit-a')).toHaveTextContent('2 display images');
+  });
+
+  // ADR-0019: an artist with no chosen display image can only be kept hidden.
+  it('disables the publish toggle of an artist with no display image, with the reason', () => {
+    renderDialog({ awaiting: [abel, { ...bea, displayImageCount: 0 }], stayHidden: [] });
+
+    const toggle = screen.getByRole('switch', { name: 'Publish Bea' });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAccessibleDescription(/no display image/i);
+    expect(screen.getByRole('switch', { name: 'Publish Abel' })).toBeEnabled();
   });
 
   it('links each artist to its admin page in a new tab', () => {

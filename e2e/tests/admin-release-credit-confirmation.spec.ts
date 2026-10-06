@@ -127,6 +127,9 @@ test.describe('Credit confirmation (ADR-0015)', () => {
     const keptToggle = dialog.getByRole('switch', { name: `Publish ${keptHidden.displayName}` });
     await expect(chosenToggle).toHaveAttribute('aria-checked', 'false');
     await expect(keptToggle).toHaveAttribute('aria-checked', 'false');
+    // ADR-0019: with no display image the credit can only be kept hidden.
+    await expect(keptToggle).toBeDisabled();
+    await expect(keptToggle).toHaveAccessibleDescription(/no display image/i);
 
     await chosenToggle.click();
     await dialog.getByRole('button', { name: 'Publish release', exact: true }).click();

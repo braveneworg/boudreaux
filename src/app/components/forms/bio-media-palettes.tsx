@@ -18,6 +18,8 @@ import { BioLinkPalette } from './bio-link-palette';
 
 interface BioMediaPalettesProps {
   artistId: string;
+  /** A published artist keeps at least one display image (ADR-0019). */
+  isPublished?: boolean;
 }
 
 /** Shown when an insert button is pressed while no bio editor holds the cursor. */
@@ -35,8 +37,12 @@ const NO_EDITOR_TARGET_COPY = 'Click into a bio editor first, then insert.';
  * included — every control is disabled.
  *
  * @param artistId - The artist whose media to manage (edit mode only).
+ * @param isPublished - Whether the artist is published (its last display image then stays).
  */
-export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Element => {
+export const BioMediaPalettes = ({
+  artistId,
+  isPublished = false,
+}: BioMediaPalettesProps): JSX.Element => {
   const pool = useArtistPool(artistId);
   const registry = useBioEditorRegistry();
 
@@ -107,6 +113,7 @@ export const BioMediaPalettes = ({ artistId }: BioMediaPalettesProps): JSX.Eleme
         isUploading={pool.isAdding}
         uploadError={pool.addError}
         disabled={pool.isMutating}
+        isPublished={isPublished}
       />
     </div>
   );

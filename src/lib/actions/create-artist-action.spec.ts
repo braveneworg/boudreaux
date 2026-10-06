@@ -109,7 +109,7 @@ describe('createArtistAction', () => {
 
       expect(getActionState).toHaveBeenCalledWith(
         mockFormData,
-        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'publishedOn', 'formedOn'],
+        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'formedOn'],
         expect.anything()
       );
     });
@@ -587,7 +587,7 @@ describe('createArtistAction', () => {
       );
     });
 
-    it('should convert publishedOn string to Date when provided', async () => {
+    it('never forwards a publish date to the service', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -603,8 +603,10 @@ describe('createArtistAction', () => {
 
       await createArtistAction(initialFormState, mockFormData);
 
-      expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        expect.objectContaining({ publishedOn: new Date('2024-06-01') })
+      // ADR-0019: an artist is created unpublished; the create action never
+      // forwards a publish date, whatever the request carries.
+      expect(vi.mocked(ArtistService.createArtist).mock.calls[0][0]).not.toHaveProperty(
+        'publishedOn'
       );
     });
 
