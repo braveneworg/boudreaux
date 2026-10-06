@@ -7,53 +7,78 @@ import { scrollToLoad } from '../../helpers/infinite-scroll';
 import type { Page } from '@playwright/test';
 
 test.describe('Artist Page', () => {
-  test.describe('Release Combobox', () => {
-    test('should display the artist page with the release combobox', async ({ page }) => {
+  // The page leads with the newest release the artist holds a direct credit
+  // on (ADR-0006 amendment); every release lives on /artists/[slug]/releases.
+  test.describe('Latest release', () => {
+    test('leads with the newest release and links to every release', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
 
-      // The artist name should be visible (use .first() — text appears in breadcrumb and ticker)
-      await expect(page.getByText('E2E Artist').first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { level: 1, name: 'E2E Artist' })).toBeVisible({
+        timeout: 15_000,
+      });
+      // "E2E Album Three" (Sep 2024) is the newest of the artist's own albums.
+      const latest = page.getByRole('link', { name: 'E2E Album Three' });
+      await expect(latest).toHaveAttribute('href', /^\/releases\/[a-f0-9]{24}$/);
 
-      // The release combobox replaces the old carousel. It can momentarily
-      // appear twice during the SSR → client hydration handoff; settle to one
-      // before the strict-mode visibility assertion.
-      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
-      await expect(combobox).toHaveCount(1, { timeout: 10_000 });
-      await expect(combobox).toBeVisible();
+      await page.getByRole('link', { name: 'All releases' }).click();
+
+      await expect(page).toHaveURL(/\/artists\/e2e-artist\/releases$/, { timeout: 15_000 });
+      await expect(page.getByRole('heading', { level: 1, name: 'E2E Artist' })).toBeVisible();
     });
 
-    test('should default to the newest release', async ({ page }) => {
-      await page.goto('/artists/e2e-artist');
-
-      // Releases are sorted newest-first, so "E2E Album Three" (Sep 2024) shows
-      // in the combobox trigger by default.
-      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
-      await expect(combobox).toContainText('E2E Album Three', { timeout: 15_000 });
-    });
-
-    test('should switch releases via the combobox', async ({ page }) => {
-      await page.goto('/artists/e2e-artist');
-
-      const combobox = page.getByRole('combobox', { name: /select a release by e2e artist/i });
-      await expect(combobox).toHaveCount(1, { timeout: 10_000 });
-      await combobox.click();
-
-      // Selecting an option loads and streams it immediately — verify the track
-      // name updates to the chosen release's track.
-      await page.getByRole('option', { name: /e2e album two/i }).click();
-      await expect(page.getByText('E2E Track Beta')).toBeVisible({ timeout: 5_000 });
-    });
-  });
-
-  test.describe('Bio surfaces', () => {
-    test('should show the short bio and genres, with no link away to a bio page', async ({
+    test('plays the latest release in place on a click, and returns focus on close', async ({
       page,
     }) => {
       await page.goto('/artists/e2e-artist');
 
-      await expect(page.getByText(/genre-blurring act/i)).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('Experimental')).toBeVisible();
-      // The biography is on this page now, so nothing links away to it.
+      const latest = page.getByRole('link', { name: 'E2E Album Three' });
+      // The click is intercepted only once hydrated: the popup marker says so.
+      await expect(latest).toHaveAttribute('aria-haspopup', 'dialog', { timeout: 15_000 });
+      await latest.click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('heading', { name: 'E2E Album Three' })).toBeVisible();
+      // Codec-agnostic: either terminal state of the player, never one path
+      // (docs/lessons/e2e-playwright/codec-agnostic-media-assertions.md).
+      await expect(
+        dialog.locator('.video-js').or(dialog.getByText(/no playable tracks/i))
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
+
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(latest).toBeFocused();
+    });
+
+    test('"View all releases" in the modal closes it and opens the releases page', async ({
+      page,
+    }) => {
+      await page.goto('/artists/e2e-artist');
+      const latest = page.getByRole('link', { name: 'E2E Album Three' });
+      await expect(latest).toHaveAttribute('aria-haspopup', 'dialog', { timeout: 15_000 });
+      await latest.click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+
+      await dialog.getByRole('link', { name: 'View all releases' }).click();
+
+      await expect(page).toHaveURL(/\/artists\/e2e-artist\/releases$/, { timeout: 15_000 });
+    });
+  });
+
+  test.describe('Bio surfaces', () => {
+    // The short-bio teaser left the page (it stays the meta description); the
+    // genres and the full biography are here, and nothing links away to a bio.
+    test('shows the genres and the biography, with no teaser and no link away', async ({
+      page,
+    }) => {
+      await page.goto('/artists/e2e-artist');
+
+      await expect(
+        page.getByRole('list', { name: 'Genres' }).getByText('Experimental')
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('article', { name: 'Biography' })).toBeVisible();
+      await expect(page.getByText(/genre-blurring act/i)).toHaveCount(0);
       await expect(page.getByRole('link', { name: /read full bio/i })).toHaveCount(0);
     });
 
