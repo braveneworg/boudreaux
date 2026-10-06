@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { PrismaClient } from '@prisma/client';
+
 import { expect, test } from '../fixtures/auth.fixture';
 import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helpers/e2e-db';
 
@@ -34,6 +36,15 @@ import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helper
  * tolerate via `toPass` reload loops. The row is hard-deleted in `finally` via
  * deleteVideoCascade so nothing survives the run.
  */
+
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
+
+const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+
+test.afterAll(async () => {
+  await prisma.$disconnect();
+});
 
 /** The apply-button accessible name is the aria-label `Apply <field label> suggestion`. */
 const APPLY_FEATURED_ARTIST = 'Apply Featured artist suggestion';
@@ -209,6 +220,73 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       if (videoId) {
         await deleteVideoCascade(videoId);
       }
+    }
+  });
+
+  // The draft swaps the URL to the edit route in place. A later server action
+  // that revalidates (the release-date autosave does) returns the tree of the
+  // current URL, which is now the edit route, and the router renders it. The
+  // form must survive that: it used to remount, dropping whatever the admin
+  // had done since the swap.
+  test('the form survives the refresh that follows the draft', async ({ adminPage }) => {
+    test.slow();
+    const artist = `ZZ E2E Survive Artist ${Date.now()}`;
+    let videoId: string | undefined;
+    try {
+      await adminPage.goto('/admin/videos/new');
+      // The autosave's server action posts to the current URL, the edit route.
+      const editRouteAction = adminPage.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          /^\/admin\/videos\/[0-9a-f]{24}$/.test(new URL(response.url()).pathname),
+        { timeout: 60_000 }
+      );
+      await adminPage
+        .getByTestId('video-dropzone')
+        .locator('input[type="file"]')
+        .setInputFiles({
+          name: `${artist} - E2E Survive Song.mp4`,
+          mimeType: 'video/mp4',
+          buffer: Buffer.from('e2e-not-a-real-video'),
+        });
+      await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/, { timeout: 30_000 });
+      videoId = adminPage.url().split('/').pop();
+
+      const title = adminPage.getByLabel('Title');
+      await title.fill('E2E Survive Song (typed)');
+      await title.evaluate((element) => {
+        (window as unknown as { e2eTitle: Element }).e2eTitle = element;
+      });
+
+      // The autosave posts once the date is found and the draft exists; its
+      // response carries the edit route's tree, inline. Wait for it and the
+      // stored date, then give the router a moment to render that tree.
+      await editRouteAction;
+      await expect
+        .poll(async () => {
+          const response = await adminPage.request.get(`/api/videos/${videoId}`);
+          return ((await response.json()) as { releasedOn?: string | null }).releasedOn ?? '';
+        })
+        .toMatch(/^2020-06-01/);
+      // Asserting that nothing remounts needs a bounded wait.
+      await adminPage.waitForTimeout(1_000);
+      await expect(title).toHaveValue('E2E Survive Song (typed)');
+      expect(
+        await adminPage.evaluate(
+          () => (window as unknown as { e2eTitle: Element }).e2eTitle.isConnected
+        )
+      ).toBe(true);
+    } finally {
+      if (videoId) {
+        const id = videoId;
+        // The draft's artist sync runs after the response and links a
+        // VideoArtist; delete only once it has, or the link lands mid-cascade.
+        await expect
+          .poll(() => prisma.videoArtist.count({ where: { videoId: id } }), { timeout: 15_000 })
+          .toBeGreaterThan(0);
+        await deleteVideoCascade(id);
+      }
+      await deleteUnlinkedArtistByDisplayName(artist);
     }
   });
 });
