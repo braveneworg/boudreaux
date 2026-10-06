@@ -48,6 +48,7 @@ export const artistPublicSelect = {
   isPseudonymous: true,
   instruments: true,
   featuredArtistId: true,
+  links: true,
 } as const satisfies Prisma.ArtistSelect;
 
 type _ArtistPublicScalarsDrift = AssertExact<

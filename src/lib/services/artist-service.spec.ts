@@ -236,6 +236,7 @@ describe('ArtistService', () => {
     instruments: null,
     trackId: null,
     featuredArtistId: null,
+    links: null,
     images: [],
     labels: [],
     releases: [],

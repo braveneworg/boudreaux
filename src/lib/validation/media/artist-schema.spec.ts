@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_OWN_PAGE_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import {
   artistListItemSchema,
@@ -255,7 +255,7 @@ describe('artistWithPublishedReleasesSchema — nested artists carry no bio', ()
     ],
   };
 
-  it.each(ARTIST_BIO_FIELDS)('strips %s from every nested artist', (field) => {
+  it.each(ARTIST_OWN_PAGE_FIELDS)('strips %s from every nested artist', (field) => {
     const parsed = artistWithPublishedReleasesSchema.parse(payload);
     const nested = [
       ...parsed.members.map(({ member }) => member),

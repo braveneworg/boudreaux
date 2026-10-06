@@ -4,7 +4,7 @@
 
 import type { AssertExact } from '@/lib/types/assert';
 import {
-  ARTIST_BIO_FIELDS,
+  ARTIST_OWN_PAGE_FIELDS,
   ARTIST_PRIVATE_FIELDS,
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
@@ -1089,7 +1089,7 @@ describe('ArtistRepository', () => {
 
       // Nothing gates a nested artist on publication, so a draft artist
       // credited on a release, or in the band, must not carry its bio.
-      it.each(ARTIST_BIO_FIELDS)('omits %s from every nested artist level', async (field) => {
+      it.each(ARTIST_OWN_PAGE_FIELDS)('omits %s from every nested artist level', async (field) => {
         const selects = await artistSelects();
         const nested = selects.filter(([path]) => path !== 'artist');
 

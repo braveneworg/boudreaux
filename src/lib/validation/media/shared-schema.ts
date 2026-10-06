@@ -4,7 +4,7 @@
 import { z } from 'zod';
 
 import {
-  ARTIST_BIO_FIELD_MASK,
+  ARTIST_OWN_PAGE_FIELD_MASK,
   ARTIST_PRIVATE_FIELD_MASK,
   type ArtistCreditScalars,
   type ArtistPublicScalars,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/types/domain/artist';
 import type { Format, Platform } from '@/lib/types/media-models';
 import { FORMATS } from '@/lib/types/media-models';
+import { artistLinksSchema } from '@/lib/validation/artist-links-schema';
 import { jsonValueSchema } from '@/lib/validation/json-schema';
 
 /**
@@ -136,6 +137,7 @@ export const artistScalarSchema = z.object({
   isPseudonymous: z.boolean(),
   instruments: nullableString,
   featuredArtistId: nullableString,
+  links: artistLinksSchema.nullable(),
 }) satisfies z.ZodType<ArtistScalars>;
 
 /**
@@ -156,7 +158,7 @@ export const artistPublicScalarSchema = artistScalarSchema.omit(
  * serialising it.
  */
 export const artistCreditScalarSchema = artistPublicScalarSchema.omit(
-  ARTIST_BIO_FIELD_MASK
+  ARTIST_OWN_PAGE_FIELD_MASK
 ) satisfies z.ZodType<ArtistCreditScalars>;
 
 /** All scalar fields of the `Release` model (no relations included). */

@@ -95,6 +95,7 @@ describe('getArtistDisplayNameForTour', () => {
     isPseudonymous: false,
     instruments: null,
     featuredArtistId: null,
+    links: null,
   };
 
   describe('Fallback Algorithm', () => {
