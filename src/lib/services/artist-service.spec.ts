@@ -2398,12 +2398,85 @@ describe('ArtistService', () => {
   });
 
   describe('deleteBioImage', () => {
+    const unchosenOfUnpublished = {
+      artistId: 'a1',
+      displayOrder: null,
+      artist: { publishedOn: null },
+    };
+    const chosenOfPublished = {
+      artistId: 'a1',
+      displayOrder: 0,
+      artist: { publishedOn: new Date('2026-01-01') },
+    };
+
     beforeEach(() => {
       vi.stubEnv('CDN_DOMAIN', 'cdn.example');
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockResolvedValue(unchosenOfUnpublished);
     });
 
     afterEach(() => {
       vi.unstubAllEnvs();
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockReset();
+      vi.mocked(ArtistBioImageRepository.countChosen).mockReset();
+    });
+
+    // The guard (ADR-0019): a published artist's chosen set never becomes
+    // empty, so its last chosen image cannot be deleted.
+    it("refuses to delete a published artist's last chosen image", async () => {
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockResolvedValueOnce(chosenOfPublished);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
+
+      const result = await ArtistService.deleteBioImage('img-1');
+
+      expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+      expect(ArtistBioImageRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it("deletes a published artist's chosen image while another remains", async () => {
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockResolvedValueOnce(chosenOfPublished);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(2);
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
+        url: 'https://upload.wikimedia.org/photo.jpg',
+        thumbnailUrl: null,
+      });
+
+      const result = await ArtistService.deleteBioImage('img-1');
+
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(ArtistBioImageRepository.delete).toHaveBeenCalledWith('img-1');
+    });
+
+    it("deletes a published artist's unchosen image without counting", async () => {
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockResolvedValueOnce({
+        ...chosenOfPublished,
+        displayOrder: null,
+      });
+      vi.mocked(ArtistBioImageRepository.delete).mockResolvedValue({
+        url: 'https://upload.wikimedia.org/photo.jpg',
+        thumbnailUrl: null,
+      });
+
+      await ArtistService.deleteBioImage('img-1');
+
+      expect(ArtistBioImageRepository.countChosen).not.toHaveBeenCalled();
+      expect(ArtistBioImageRepository.delete).toHaveBeenCalledWith('img-1');
+    });
+
+    it('returns NOT_FOUND for an unknown image', async () => {
+      vi.mocked(ArtistBioImageRepository.findDisplayState).mockResolvedValueOnce(null);
+
+      const result = await ArtistService.deleteBioImage('missing');
+
+      expect(result).toMatchObject({ success: false, code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('maps a repository failure to a failed response', async () => {
+      vi.mocked(ArtistBioImageRepository.delete).mockRejectedValueOnce(Error('boom'));
+
+      const result = await ArtistService.deleteBioImage('img-1');
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to delete bio image' });
     });
 
     it('removes the CDN bio thumbnail after deleting the row', async () => {
@@ -2441,7 +2514,10 @@ describe('ArtistService', () => {
         thumbnailUrl: null,
       });
       vi.mocked(deleteS3Object).mockResolvedValue(false);
-      await expect(ArtistService.deleteBioImage('img-1')).resolves.toBeUndefined();
+      await expect(ArtistService.deleteBioImage('img-1')).resolves.toEqual({
+        success: true,
+        data: undefined,
+      });
     });
   });
 
@@ -2644,6 +2720,20 @@ describe('ArtistService', () => {
         'img-1',
         'img-2',
       ]);
+    });
+
+    it('refuses to clear the set of a published artist (ADR-0019)', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce({
+        id: 'a1',
+        slug: 'ceschi',
+        displayName: 'Ceschi',
+        publishedOn: new Date('2026-01-01'),
+      } as never);
+
+      const result = await ArtistService.setDisplayImages('a1', []);
+
+      expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
     });
 
     it('clears every display image when given an empty list', async () => {

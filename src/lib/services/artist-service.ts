@@ -5,6 +5,7 @@ import 'server-only';
 
 import {
   ArtistBioImageRepository,
+  type BioImageEligibilityRow,
   type BioImageRehostRow,
 } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
@@ -463,6 +464,31 @@ const refuseHardDelete = async (
 
 /** The publish gate's refusal (ADR-0019): copy the admin UI shows as-is. */
 const NO_DISPLAY_IMAGE_MESSAGE = 'Choose at least one display image before publishing';
+/** The non-empty-set guard's refusal (ADR-0019), for clearing and for deleting the last one. */
+const LAST_DISPLAY_IMAGE_MESSAGE = 'A published artist keeps at least one display image';
+
+/**
+ * Every chosen image needs alt text (the public page renders it as content).
+ * A blank alt is backfilled with the artist's display name, the same default
+ * an upload gets; only an artist with no name at all is refused.
+ */
+const backfillMissingAlt = async (
+  rows: BioImageEligibilityRow[],
+  fallbackAlt: string
+): Promise<ServiceResponse<never> | null> => {
+  const altless = rows.filter((row) => !isDisplayEligible(row));
+  if (altless.length > 0 && !fallbackAlt) {
+    return {
+      success: false,
+      error: 'Add alt text before using an image as a display image',
+      code: 'VALIDATION',
+    };
+  }
+  for (const row of altless) {
+    await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
+  }
+  return null;
+};
 
 /**
  * The publish gate (ADR-0019): a first publish needs at least one chosen
@@ -909,12 +935,33 @@ export class ArtistService {
     await ArtistBioLinkRepository.removeReference(linkId);
   }
 
-  /** Deletes a single discovered bio image row (admin palette X) and performs
-   *  best-effort cleanup of its CDN thumbnail. */
-  static async deleteBioImage(imageId: string): Promise<void> {
-    const removed = await ArtistBioImageRepository.delete(imageId);
-    await cleanupBioMediaObject(removed.url);
-    await cleanupBioMediaObject(removed.thumbnailUrl);
+  /**
+   * Deletes a single bio image row (admin palette X) with best-effort cleanup
+   * of its CDN objects. Refuses a published artist's last chosen display image
+   * (ADR-0019): its set never becomes empty. Keyed on `publishedOn`, the
+   * field the public reads key on.
+   */
+  static async deleteBioImage(imageId: string): Promise<ServiceResponse<void>> {
+    try {
+      const state = await ArtistBioImageRepository.findDisplayState(imageId);
+      if (!state) return { success: false, error: 'Bio image not found', code: 'NOT_FOUND' };
+      const isChosen = typeof state.displayOrder === 'number';
+      if (isChosen && state.artist.publishedOn) {
+        const chosen = await ArtistBioImageRepository.countChosen(state.artistId);
+        if (chosen <= 1) {
+          return { success: false, error: LAST_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
+        }
+      }
+      const removed = await ArtistBioImageRepository.delete(imageId);
+      await cleanupBioMediaObject(removed.url);
+      await cleanupBioMediaObject(removed.thumbnailUrl);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Bio image not found',
+        UNKNOWN: 'Failed to delete bio image',
+      });
+    }
   }
 
   /** Persists one manually-added bio image and returns the created row. */
@@ -955,6 +1002,10 @@ export class ArtistService {
       if (!artist) {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
+      // A published artist's chosen set never becomes empty (ADR-0019).
+      if (imageIds.length === 0 && artist.publishedOn) {
+        return { success: false, error: LAST_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
+      }
 
       // An empty list clears the set; there is nothing to look up or gate.
       const rows =
@@ -968,18 +1019,8 @@ export class ArtistService {
           code: 'NOT_FOUND',
         };
       }
-      const altless = rows.filter((row) => !isDisplayEligible(row));
-      const fallbackAlt = deriveArtistDisplayName(artist);
-      if (altless.length > 0 && !fallbackAlt) {
-        return {
-          success: false,
-          error: 'Add alt text before using an image as a display image',
-          code: 'VALIDATION',
-        };
-      }
-      for (const row of altless) {
-        await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
-      }
+      const altRefusal = await backfillMissingAlt(rows, deriveArtistDisplayName(artist));
+      if (altRefusal) return altRefusal;
 
       await ArtistBioImageRepository.setDisplayOrder(artistId, imageIds);
       return { success: true, data: { slug: artist.slug } };
