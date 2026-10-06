@@ -68,12 +68,23 @@ export interface ArtistPool {
   /** What the public page shows right now, with the tier it came from. */
   shown: DisplayImageSet<BioStatusImage>;
   /**
-   * Uploads one file into the pool. When the set has room once the upload
-   * lands, the new image joins the display images; a blank alt is backfilled
-   * with the artist's name by the set action. Resolves the persisted row, or
-   * null when the upload failed (the reason is in `addError`).
+   * Uploads one file into the pool and leaves the chosen set alone — the bio
+   * editor's inline upload, which exists to place an image in the prose.
+   * Resolves the persisted row, or null when the upload failed (the reason
+   * is in `addError`).
    */
   add: (file: File, fields: BioImageUploadFields) => Promise<ArtistBioImageRecord | null>;
+  /**
+   * Uploads one file into the pool and appends it to the display images —
+   * the media manager's upload zone and strip drop. The join is decided
+   * against the set as it is when the upload lands; a blank alt is
+   * backfilled with the artist's name by the set action. Resolves like
+   * {@link ArtistPool.add}.
+   */
+  addAsDisplayImage: (
+    file: File,
+    fields: BioImageUploadFields
+  ) => Promise<ArtistBioImageRecord | null>;
   isAdding: boolean;
   addError: string | null;
   /** Replaces the chosen set with these ordered ids (reorder, drop, choose). */
@@ -261,9 +272,10 @@ const useCurrentChosenIds = (artistId: string): (() => string[]) => {
 };
 
 /**
- * One upload into the pool. Once the row exists the pool is re-read, and only
- * then is "join the display images if there is room" decided — against the
- * set as it is at that moment, not as it was when the upload started.
+ * Uploads into the pool. Once the row exists the pool is re-read; a manager
+ * upload (`addAsDisplayImage`) then joins the display images, decided
+ * against the set as it is at that moment, not as it was when the upload
+ * started. A bio-editor upload (`add`) only refreshes the picker pool.
  */
 const useAddToPool = (artistId: string, setDisplayImages: (imageIds: string[]) => void) => {
   const queryClient = useQueryClient();
@@ -272,8 +284,12 @@ const useAddToPool = (artistId: string, setDisplayImages: (imageIds: string[]) =
   const [uploadsInFlight, setUploadsInFlight] = useState(0);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const add = useCallback(
-    async (file: File, fields: BioImageUploadFields): Promise<ArtistBioImageRecord | null> => {
+  const upload = useCallback(
+    async (
+      file: File,
+      fields: BioImageUploadFields,
+      onLanded: (uploadedId: string) => void
+    ): Promise<ArtistBioImageRecord | null> => {
       if (!(BIO_IMAGE_UPLOAD_TYPES as readonly string[]).includes(file.type)) {
         setAddError(WRONG_TYPE_MESSAGE);
         return null;
@@ -287,21 +303,39 @@ const useAddToPool = (artistId: string, setDisplayImages: (imageIds: string[]) =
           return null;
         }
         await queryClient.invalidateQueries({ queryKey: statusKey });
-        const joined = decideUploadJoin(currentChosenIds(), result.data.id);
-        if (joined) {
-          setDisplayImages(joined);
-        } else {
-          void queryClient.invalidateQueries({ queryKey: queryKeys.artists.bioImages(artistId) });
-        }
+        onLanded(result.data.id);
         return result.data;
       } finally {
         setUploadsInFlight((count) => count - 1);
       }
     },
-    [artistId, queryClient, statusKey, currentChosenIds, setDisplayImages]
+    [artistId, queryClient, statusKey]
   );
 
-  return { add, isAdding: uploadsInFlight > 0, addError };
+  const refreshPickerPool = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: queryKeys.artists.bioImages(artistId) }),
+    [artistId, queryClient]
+  );
+
+  const add = useCallback(
+    (file: File, fields: BioImageUploadFields) => upload(file, fields, refreshPickerPool),
+    [upload, refreshPickerPool]
+  );
+
+  const addAsDisplayImage = useCallback(
+    (file: File, fields: BioImageUploadFields) =>
+      upload(file, fields, (uploadedId) => {
+        const joined = decideUploadJoin(currentChosenIds(), uploadedId);
+        if (joined) {
+          setDisplayImages(joined);
+        } else {
+          refreshPickerPool();
+        }
+      }),
+    [upload, currentChosenIds, setDisplayImages, refreshPickerPool]
+  );
+
+  return { add, addAsDisplayImage, isAdding: uploadsInFlight > 0, addError };
 };
 
 /**
@@ -319,7 +353,7 @@ export const useArtistPool = (artistId: string): ArtistPool => {
   const writes = usePoolWrites(artistId);
   const { setDisplayImages, addLinkAsync } = writes;
   const currentChosenIds = useCurrentChosenIds(artistId);
-  const { add, isAdding, addError } = useAddToPool(artistId, setDisplayImages);
+  const { add, addAsDisplayImage, isAdding, addError } = useAddToPool(artistId, setDisplayImages);
 
   const images = status.data?.content?.images ?? [];
   const links = status.data?.content?.links ?? [];
@@ -344,6 +378,7 @@ export const useArtistPool = (artistId: string): ArtistPool => {
     chosenIds: chosenDisplayImageIds(images),
     shown: resolveDisplayImageSet(images),
     add,
+    addAsDisplayImage,
     isAdding,
     addError,
     setDisplayImages,
