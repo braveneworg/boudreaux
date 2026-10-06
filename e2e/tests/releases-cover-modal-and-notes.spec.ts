@@ -139,5 +139,7 @@ test.describe('Releases — listing rows + play modal', () => {
 
     await expect(dialog).not.toBeVisible();
     await expect(page.locator('.video-js')).toHaveCount(0);
+    // Focus comes back to the control that opened the modal.
+    await expect(page.getByRole('button', { name: `Play ${RELEASE_TITLE}` })).toBeFocused();
   });
 });

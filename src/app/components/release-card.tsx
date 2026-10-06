@@ -10,6 +10,8 @@
  * that source-primes the first MP3 track inside the click gesture and opens
  * the {@link ReleasePlayDialog} listening-station modal.
  */
+import { useRef } from 'react';
+
 import Link from 'next/link';
 
 import { Music2 } from 'lucide-react';
@@ -64,6 +66,13 @@ export const ReleaseCard = ({
     warmPlayer,
     takeMediaEl,
   } = useReleasePlayDialog(playSrc);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
+
+  /** Closing the modal puts focus back on the Play button that opened it. */
+  const returnFocusToPlay = (event: Event): void => {
+    event.preventDefault();
+    playButtonRef.current?.focus();
+  };
 
   return (
     <div className="shadow-zine-sm relative flex flex-col gap-2 border-2 border-black bg-white p-3 transition-transform duration-200 md:hover:z-10 md:hover:scale-[1.03]">
@@ -85,6 +94,7 @@ export const ReleaseCard = ({
       {/* Actions — wraps inside the narrow row column */}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <button
+          ref={playButtonRef}
           type="button"
           aria-label={`Play ${title}`}
           disabled={!playSrc}
@@ -132,6 +142,7 @@ export const ReleaseCard = ({
           onOpenChange={handlePlayerOpenChange}
           takeMediaEl={takeMediaEl}
           prefetch={prefetchPlayer}
+          onCloseAutoFocus={returnFocusToPlay}
         />
       ) : null}
     </div>
