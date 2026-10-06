@@ -1126,6 +1126,34 @@ describe('ArtistRepository', () => {
 
         expect(pageArtist).toMatchObject({ bio: true, shortBio: true, altBio: true });
       });
+
+      // The page and the releases page read only track 1 of each release (the
+      // listening modal loads the rest itself), on the artist's own releases
+      // and on its bands' alike.
+      it('loads one file per playable format on both release graphs', async () => {
+        vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+        await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+        const select = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select as {
+          releases: { include: { release: { include: { digitalFormats: unknown } } } };
+          memberOf: {
+            include: {
+              artist: {
+                select: {
+                  releases: { include: { release: { include: { digitalFormats: unknown } } } };
+                };
+              };
+            };
+          };
+        };
+        const files = { orderBy: { trackNumber: 'asc' }, take: 1 };
+
+        expect(select.releases.include.release.include.digitalFormats).toMatchObject({
+          include: { files },
+        });
+        expect(
+          select.memberOf.include.artist.select.releases.include.release.include.digitalFormats
+        ).toMatchObject({ include: { files } });
+      });
     });
   });
 

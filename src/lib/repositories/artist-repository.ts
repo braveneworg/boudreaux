@@ -256,8 +256,10 @@ const artistSearchSelect = {
 const releaseGraphInclude = {
   images: true,
   artistReleases: orderedCredits({ include: { artist: { select: artistCreditSelect } } }),
+  // Track 1 only: the page's latest-release line and the releases page prime
+  // the first MP3 track; the listening modal loads the full track list itself.
   digitalFormats: playableFormats({
-    include: { files: { orderBy: { trackNumber: 'asc' } } },
+    include: { files: { orderBy: { trackNumber: 'asc' }, take: 1 } },
   } as const),
   releaseUrls: { include: { url: true } },
 } as const satisfies Prisma.ReleaseInclude;
