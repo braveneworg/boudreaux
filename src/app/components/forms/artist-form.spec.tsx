@@ -95,10 +95,18 @@ vi.mock('@/app/components/forms/utils/upload-bio-image', () => ({
 // tree (which needs next/dynamic + tiptap). Exposes bioEditorImages so tests
 // can assert which images the picker is seeded with, and a trigger button that
 // fires `onBioGenerated` so the generated-image source can be exercised.
-// The link editors have their own specs; here only their presence per mode matters.
-vi.mock('@/app/components/forms/sections/artist-links-section', () => ({
-  ArtistLinksSection: () => <div data-testid="artist-links-section-stub" />,
-}));
+// The link editors have their own specs; here only their presence per mode
+// and the arrays the form hands them matter.
+vi.mock('@/app/components/forms/sections/artist-links-section', async () => {
+  const { useWatch } = await import('react-hook-form');
+  const ArtistLinksSection = ({ control }: { control: never }) => (
+    <div
+      data-testid="artist-links-section-stub"
+      data-groups={JSON.stringify(useWatch({ control, name: 'contactLinkGroups' }) ?? null)}
+    />
+  );
+  return { ArtistLinksSection };
+});
 
 vi.mock('@/app/components/forms/sections/artist-bio-section', () => ({
   ArtistBioSection: ({
@@ -225,6 +233,20 @@ describe('ArtistForm', () => {
       render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
 
       expect(screen.getByTestId('artist-links-section-stub')).toBeInTheDocument();
+    });
+
+    // The update action composes `links` only when all three arrays arrive;
+    // the form's own defaults must carry them, so a save in the moment
+    // between a create and the loaded edit form never drops a link.
+    it('seeds the three link arrays before the artist has loaded', () => {
+      render(<ArtistForm artistId="507f1f77bcf86cd799439011" />);
+
+      expect(
+        JSON.parse(screen.getByTestId('artist-links-section-stub').dataset.groups ?? 'null')
+      ).toEqual([
+        { heading: 'Booking', links: [] },
+        { heading: 'Merch', links: [] },
+      ]);
     });
   });
 

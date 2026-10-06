@@ -154,6 +154,10 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
   formedOn: '',
   createdBy: userId,
   publishedOn: '',
+  // The link arrays are always present (the update action composes `links`
+  // only from all three), so a save in the moment between a create and the
+  // loaded edit form never drops a link; the create action ignores them.
+  ...toArtistLinksFormValues(null),
 });
 
 /** Links hang off a persisted artist row, like images (ADR-0020): edit mode only. */
