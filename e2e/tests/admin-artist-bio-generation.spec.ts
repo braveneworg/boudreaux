@@ -1,9 +1,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { randomUUID } from 'node:crypto';
+
+import { PrismaClient } from '@prisma/client';
+
 import { expect, test } from '../fixtures/auth.fixture';
 
 import type { Page } from '@playwright/test';
+
+const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 /**
  * E2E coverage for the admin AI Bio Generation flow. The web server runs with
@@ -158,5 +165,123 @@ test.describe('Admin AI bio generation', () => {
       timeout: 15_000,
     });
     await expect(adminPage.getByRole('button', { name: 'Numbered list' }).first()).toBeVisible();
+  });
+});
+
+// These were manual smokes after #749, #753 and #772. Each test generates for
+// its own artist, stamped per worker, named to file after every seeded artist
+// and removed by id, so no two tests generate for the same artist.
+test.describe('Admin AI bio generation, per artist', () => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  const stamp = randomUUID().slice(0, 8);
+  const made: string[] = [];
+
+  const createArtist = async (label: string): Promise<string> => {
+    const { id } = await prisma.artist.create({
+      data: {
+        firstName: 'ZZ',
+        surname: `E2E Bio ${label} ${stamp}`,
+        displayName: `ZZ E2E Bio ${label} ${stamp}`,
+        slug: `e2e-bio-${label.toLowerCase()}-${stamp}`,
+        publishedOn: new Date('2000-01-01T00:00:00.000Z'),
+      },
+      select: { id: true },
+    });
+    made.push(id);
+    return id;
+  };
+
+  const generateBios = async (page: Page, button: RegExp): Promise<void> => {
+    await page.getByRole('button', { name: button }).click();
+    await expect(page.getByText(/bios generated and saved/i)).toBeVisible({ timeout: 30_000 });
+  };
+
+  test.afterAll(async () => {
+    await prisma.artistBioImage.deleteMany({ where: { artistId: { in: made } } });
+    await prisma.artistBioLink.deleteMany({ where: { artistId: { in: made } } });
+    await prisma.artist.deleteMany({ where: { id: { in: made } } });
+    await prisma.$disconnect();
+  });
+
+  // #753: generation saves only what it generated; an edit the admin was
+  // making elsewhere on the form is still there, unsaved, afterwards.
+  test('an unrelated unsaved edit survives Generate', async ({ adminPage }) => {
+    test.slow();
+    const id = await createArtist('Edit');
+    await adminPage.goto(`/admin/artists/${id}`);
+    const aka = adminPage.locator('[name="akaNames"]');
+    await expect(aka).toBeVisible({ timeout: 15_000 });
+    await aka.fill('E2E Also Known');
+
+    await generateBios(adminPage, /generate bios/i);
+
+    await expect(aka).toHaveValue('E2E Also Known');
+    const save = adminPage.getByRole('button', { name: 'Save', exact: true });
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(adminPage.getByText(/saved successfully/i)).toBeVisible({ timeout: 15_000 });
+    await adminPage.reload();
+    await expect(aka).toHaveValue('E2E Also Known', { timeout: 15_000 });
+  });
+
+  // #749: regenerating replaces the generated pool, but an image the admin
+  // chose to show stays shown; choosing it made it the admin's (Custom).
+  test('a chosen generated image stays shown after Regenerate', async ({ adminPage }) => {
+    test.slow();
+    const id = await createArtist('Keep');
+    await adminPage.goto(`/admin/artists/${id}`);
+    await expect(adminPage.getByRole('button', { name: /generate bios/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await generateBios(adminPage, /generate bios/i);
+
+    const use = adminPage.getByRole('button', { name: /^Use .+ as display image$/ }).first();
+    await expect(use).toBeEnabled({ timeout: 15_000 });
+    const title = ((await use.getAttribute('aria-label')) ?? (await use.textContent()) ?? '')
+      .replace(/^Use /, '')
+      .replace(/ as display image$/, '');
+    await use.click();
+    const strip = adminPage.getByRole('list', { name: 'Display images' });
+    const chosen = strip.getByRole('listitem', { name: `${title}, display image` });
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+    await expect(adminPage.getByText(/bios generated and saved/i)).toBeHidden({
+      timeout: 15_000,
+    });
+
+    await generateBios(adminPage, /regenerate bios/i);
+
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+    const tile = adminPage
+      .getByRole('group', { name: 'Image pool' })
+      .getByRole('listitem')
+      .filter({ has: adminPage.getByRole('button', { name: `Preview ${title}`, exact: true }) });
+    await expect(tile.getByText('Custom', { exact: true })).toBeVisible();
+  });
+
+  // #772: image-source links feed the image pool only. They never become
+  // reference links for the bio, nor tiles in the link palette.
+  test('image-source links pull images without becoming reference links', async ({ adminPage }) => {
+    const id = await createArtist('Sources');
+    const urls = [
+      `https://example.com/e2e-press-${stamp}`,
+      `https://example.com/e2e-gallery-${stamp}`,
+    ];
+    await adminPage.goto(`/admin/artists/${id}`);
+    const sources = adminPage.getByRole('region', { name: 'Image sources' });
+    await expect(sources).toBeVisible({ timeout: 15_000 });
+    for (const url of urls) {
+      await sources.getByPlaceholder('https://example.com/press').fill(url);
+      await sources.getByRole('button', { name: 'Add' }).click();
+      await expect(sources.getByText(url)).toBeVisible({ timeout: 15_000 });
+    }
+
+    await sources.getByRole('button', { name: 'Generate images' }).click();
+
+    await expect(adminPage.getByText('No new images found on those pages.')).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const url of urls) {
+      await expect(adminPage.getByText(url)).toHaveCount(1);
+    }
   });
 });

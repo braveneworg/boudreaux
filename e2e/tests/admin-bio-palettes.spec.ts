@@ -201,6 +201,101 @@ test.describe('Admin bio palettes', () => {
     await expect(use).toBeEnabled();
   });
 
+  // #749: the strip's order is the page's order, and it can be rearranged.
+  test('display images can be reordered, and the order survives reload', async ({ adminPage }) => {
+    const first = `E2E order A ${randomUUID().slice(0, 8)}`;
+    const second = `E2E order B ${randomUUID().slice(0, 8)}`;
+    await createBioPaletteImageRow(first, `${first} described`);
+    await createBioPaletteImageRow(second, `${second} described`);
+
+    await gotoArtistEdit(adminPage);
+    const strip = adminPage.getByRole('list', { name: 'Display images' });
+    const ours = strip.getByRole('listitem', { name: /E2E order [AB]/ });
+    for (const title of [first, second]) {
+      const use = adminPage.getByRole('button', { name: `Use ${title} as display image` });
+      await expect(use).toBeEnabled({ timeout: 15_000 });
+      await use.click();
+      await expect(strip.getByRole('listitem', { name: `${title}, display image` })).toBeVisible({
+        timeout: 15_000,
+      });
+    }
+
+    await adminPage.getByRole('button', { name: `Move ${second} earlier` }).click();
+    await adminPage.reload();
+
+    await expect(ours).toHaveCount(2, { timeout: 15_000 });
+    const names = await ours.evaluateAll((items) =>
+      items.map((item) => item.getAttribute('aria-label') ?? '')
+    );
+    expect(names.map((name) => name.split(',')[0])).toEqual([second, first]);
+
+    for (const title of [first, second]) {
+      await adminPage.getByRole('button', { name: `Remove ${title} from display images` }).click();
+      await expect(strip.getByRole('listitem', { name: `${title}, display image` })).toHaveCount(
+        0,
+        { timeout: 15_000 }
+      );
+    }
+  });
+
+  // #794: a pool tile dragged onto "Add a display image" joins the strip.
+  test('dragging a pool tile onto the drop target adds it to the strip', async ({ adminPage }) => {
+    const title = `E2E dragged ${randomUUID().slice(0, 8)}`;
+    await createBioPaletteImageRow(title, `${title} described`);
+
+    await gotoArtistEdit(adminPage);
+    const tile = adminPage
+      .getByRole('group', { name: 'Image pool' })
+      .getByRole('listitem')
+      .filter({ has: adminPage.getByRole('button', { name: `Preview ${title}`, exact: true }) });
+    await expect(tile).toHaveCount(1, { timeout: 15_000 });
+
+    // The tile's dragstart writes the payload; the target's drop reads it.
+    // Dispatched with one real DataTransfer: a mouse drag would have to scroll
+    // between the pool and the target mid-gesture, which is not reliable.
+    const dataTransfer = await adminPage.evaluateHandle(() => new DataTransfer());
+    const target = adminPage.getByRole('group', { name: 'Add a display image' });
+    await tile.dispatchEvent('dragstart', { dataTransfer });
+    await target.dispatchEvent('dragover', { dataTransfer });
+    await target.dispatchEvent('drop', { dataTransfer });
+
+    const chosen = adminPage
+      .getByRole('list', { name: 'Display images' })
+      .getByRole('listitem', { name: `${title}, display image` });
+    await expect(chosen).toBeVisible({ timeout: 15_000 });
+    await adminPage.getByRole('button', { name: `Remove ${title} from display images` }).click();
+    await expect(chosen).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  // #794: a tab left open across a deploy calls a server action the server no
+  // longer has; the admin is told to reload instead of meeting a console error.
+  test('a stale tab asks for a reload instead of failing silently', async ({ adminPage }) => {
+    const title = `E2E stale ${randomUUID().slice(0, 8)}`;
+    await createBioPaletteImageRow(title, `${title} described`);
+    const pageErrors: string[] = [];
+    adminPage.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await gotoArtistEdit(adminPage);
+    const use = adminPage.getByRole('button', { name: `Use ${title} as display image` });
+    await expect(use).toBeEnabled({ timeout: 15_000 });
+    // What the server answers for an action id it does not know.
+    await adminPage.route('**/*', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST' && request.headers()['next-action']) {
+        await route.fulfill({ status: 404, headers: { 'x-nextjs-action-not-found': '1' } });
+        return;
+      }
+      await route.fallback();
+    });
+    await use.click();
+
+    await expect(
+      adminPage.getByText('This page is out of date after a deploy. Reload the page and try again.')
+    ).toBeVisible({ timeout: 15_000 });
+    expect(pageErrors).toEqual([]);
+    await adminPage.unroute('**/*');
+  });
+
   test('deleting a palette link removes the tile', async ({ adminPage }) => {
     // A uniquely-labelled row per run (and per retry) keeps this destructive
     // test from racing the shared seeded rows other tests assert on.
