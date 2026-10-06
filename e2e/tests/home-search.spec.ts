@@ -45,7 +45,7 @@ test('the home search groups releases under their artist and opens a pick', asyn
   expect(releaseIndent).toBeGreaterThan(artistIndent);
 
   await releaseRow.click();
-  await page.waitForURL(
-    (url) => url.pathname.startsWith('/artists/') && url.searchParams.get('release') === release.id
-  );
+  // A release pick opens the release page; the artist page leads with its
+  // latest release and lists the rest under /releases (ADR-0006 amendment).
+  await page.waitForURL((url) => url.pathname === `/releases/${release.id}`);
 });
