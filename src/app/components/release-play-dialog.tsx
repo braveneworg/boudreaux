@@ -76,7 +76,7 @@ export const ReleasePlayDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] gap-3 overflow-y-auto p-4 sm:max-w-md lg:max-w-lg">
         <DialogHeader className="pr-8">
-          <DialogTitle className="font-fake-four-cutout text-xl break-words text-zinc-950 sm:text-2xl">
+          <DialogTitle className="font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl">
             {title}
           </DialogTitle>
           <DialogDescription className="text-zinc-600">
