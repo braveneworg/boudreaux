@@ -29,7 +29,8 @@ const abel: CreditAwaitingConfirmation = {
   name: 'Abel',
   bioState: 'none',
   bioGeneratedAt: null,
-  displayImageCount: 0,
+  // A chosen display image: publishing needs one (ADR-0019).
+  displayImageCount: 1,
 };
 const bea: CreditAwaitingConfirmation = { ...abel, id: 'b', slug: 'bea', name: 'Bea' };
 const gone: CreditThatStaysHidden = { id: 'x', slug: 'gone', name: 'Gone', reason: 'deleted' };

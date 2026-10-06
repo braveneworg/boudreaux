@@ -39,6 +39,9 @@ const createArtist = async (label: string, publishedOn: Date | null): Promise<st
       surname: label,
       slug: `${prefix}${label}`,
       publishedOn,
+      // A chosen display image: a credit decision can publish only such an
+      // artist (ADR-0019), and this spec is about the decisions, not the gate.
+      bioImages: { create: { url: `${prefix}${label}`, alt: label, displayOrder: 0 } },
     },
     select: { id: true },
   });
@@ -137,6 +140,7 @@ afterAll(async () => {
   const releaseIds = releases.map(({ id }) => id);
   await prisma.artistRelease.deleteMany({ where: { releaseId: { in: releaseIds } } });
   await prisma.release.deleteMany({ where: { id: { in: releaseIds } } });
+  await prisma.artistBioImage.deleteMany({ where: { artistId: { in: artistIds } } });
   await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
   await prisma.$disconnect();
 });

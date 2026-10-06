@@ -48,7 +48,8 @@ const awaitingRow = (id: string, displayName: string) => ({
   shortBio: null,
   altBio: null,
   bioGeneratedAt: null,
-  bioImages: [],
+  // A chosen display image: publishing needs one (ADR-0019).
+  bioImages: [{ isPrimary: false, displayOrder: 0, alt: 'portrait' }],
 });
 
 describe('release credits', () => {

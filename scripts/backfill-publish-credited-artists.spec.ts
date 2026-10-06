@@ -43,7 +43,8 @@ const awaitingRow = (id: string, firstName: string) => ({
   shortBio: null,
   altBio: null,
   bioGeneratedAt: NOW,
-  bioImages: [{ isPrimary: true, displayOrder: null, alt: 'On stage' }],
+  // A chosen display image: publishing needs one (ADR-0019).
+  bioImages: [{ isPrimary: false, displayOrder: 0, alt: 'On stage' }],
   releases: [
     { release: { title: 'Listed Album', publishedAt: NOW, deletedOn: null } },
     { release: { title: 'Draft Album', publishedAt: null, deletedOn: null } },
@@ -79,11 +80,11 @@ interface Harness {
   log: ReturnType<typeof vi.fn>;
 }
 
-const makeHarness = (idsFile = ''): Harness => {
-  const findMany = vi
-    .fn()
-    .mockResolvedValueOnce([awaitingRow(ID_B, 'Zed'), awaitingRow(ID_A, 'Abel')])
-    .mockResolvedValueOnce([hiddenRow]);
+const makeHarness = (
+  idsFile = '',
+  { candidates = [awaitingRow(ID_B, 'Zed'), awaitingRow(ID_A, 'Abel')] as unknown[] } = {}
+): Harness => {
+  const findMany = vi.fn().mockResolvedValueOnce(candidates).mockResolvedValueOnce([hiddenRow]);
   const updateMany = vi.fn().mockResolvedValue({ count: 1 });
   const writeFile = vi.fn();
   const log = vi.fn();
@@ -227,6 +228,23 @@ describe('backfill-publish-credited-artists', () => {
           },
         ],
       ]);
+    });
+
+    // ADR-0019: an artist with no chosen display image can only stay hidden.
+    it('refuses the whole run when a reviewed id has no display image', async () => {
+      const { deps, updateMany } = makeHarness(`${ID_A}\n`, {
+        candidates: [
+          {
+            ...awaitingRow(ID_A, 'Abel'),
+            bioImages: [{ isPrimary: true, displayOrder: null, alt: 'x' }],
+          },
+        ],
+      });
+
+      await expect(backfillPublishCreditedArtists(args, deps)).rejects.toThrow(
+        '1 id(s) have no display image and can only stay hidden: abel'
+      );
+      expect(updateMany.mock.calls).toEqual([]);
     });
 
     it('refuses the whole run when an id is not a current candidate', async () => {

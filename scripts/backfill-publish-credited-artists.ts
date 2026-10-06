@@ -225,11 +225,23 @@ const execute = async (
   }
 
   const ids = parseIdsFile(readFile(idsPath));
-  const { publishIds, unknownIds } = planPublish(ids, await loadCandidates(prisma));
+  const candidates = await loadCandidates(prisma);
+  const { publishIds, unknownIds } = planPublish(ids, candidates);
   if (unknownIds.length > 0) {
     throw new Error(
       `${TAG} ${unknownIds.length} id(s) are not unpublished credits on a published release: ` +
         `${unknownIds.join(', ')}. Nothing was written.`
+    );
+  }
+  // ADR-0019: publishing needs a chosen display image; the file keeps a
+  // human in the loop, the script keeps the rule.
+  const imageless = candidates.filter(
+    ({ id, displayImageCount }) => publishIds.includes(id) && displayImageCount === 0
+  );
+  if (imageless.length > 0) {
+    throw new Error(
+      `${TAG} ${imageless.length} id(s) have no display image and can only stay hidden: ` +
+        `${imageless.map(({ slug }) => slug).join(', ')}. Nothing was written.`
     );
   }
   if (publishIds.length === 0) {

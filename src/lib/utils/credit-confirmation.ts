@@ -15,7 +15,7 @@
  * backfill script all describe a credit through here.
  */
 
-import { resolveDisplayImages, type DisplayImageCandidate } from './display-images';
+import { countChosenDisplayImages, type DisplayImageCandidate } from './display-images';
 import { getArtistDisplayName, type ArtistNameFields } from './get-artist-display-name';
 
 /** What kind of bio goes public with an artist. */
@@ -131,7 +131,9 @@ export const toCreditAwaitingConfirmation = (
     name: getArtistDisplayName(row),
     bioState,
     bioGeneratedAt: bioState === 'generated' ? row.bioGeneratedAt : null,
-    displayImageCount: resolveDisplayImages(row.bioImages).length,
+    // Chosen images only (ADR-0019): a suggestion the fallback would show is
+    // not a human's choice and does not make the artist publishable.
+    displayImageCount: countChosenDisplayImages(row.bioImages),
   };
 };
 
@@ -179,6 +181,19 @@ export const checkCreditDecisions = (
     return {
       ok: false,
       error: `These artists cannot be published with this release: ${outside.join(', ')}`,
+    };
+  }
+
+  // ADR-0019: publishing needs a chosen display image; such a credit can
+  // only be kept hidden. Checked here so the release save's own transaction
+  // refuses it too (publishConfirmedCredits runs this against stored rows).
+  const imageless = awaiting.filter(
+    ({ id, displayImageCount }) => publish.has(id) && displayImageCount === 0
+  );
+  if (imageless.length > 0) {
+    return {
+      ok: false,
+      error: `These artists have no display image and can only be kept hidden: ${names(imageless)}`,
     };
   }
 
