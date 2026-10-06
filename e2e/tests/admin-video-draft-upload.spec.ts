@@ -135,6 +135,12 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       await adminPage.getByRole('button', { name: 'Save', exact: true }).click();
       await adminPage.waitForURL(/\/admin\/videos$/, { timeout: 30_000 });
 
+      // #744: the description the run filled in is saved with the video.
+      const saved = await adminPage.request.get(`/api/videos/${videoId}`);
+      expect(((await saved.json()) as { description?: string }).description ?? '').toMatch(
+        /deterministic E2E description/
+      );
+
       // The applied featured artist became a linked FEATURED shell — artist sync
       // runs server-side post-response, so poll the artists search endpoint.
       await expect(async () => {

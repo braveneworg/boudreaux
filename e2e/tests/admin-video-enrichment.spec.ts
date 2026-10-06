@@ -94,6 +94,15 @@ test.describe('Admin video enrichment', () => {
     await expect(descriptionEditor).toHaveValue(/deterministic E2E description/);
     await expect(descriptionCard.getByText('Applied', { exact: true })).toBeVisible();
 
+    // #744: editing the applied text takes the badge away and offers the
+    // suggestion again, so the admin can restore it.
+    await descriptionEditor.press('End');
+    await descriptionEditor.type(' edited');
+    await expect(descriptionCard.getByText('Applied', { exact: true })).toHaveCount(0);
+    await expect(
+      descriptionCard.getByRole('button', { name: 'Use this description' })
+    ).toBeEnabled();
+
     // Dismissing the featured-artist card IS server-side for video-level fields;
     // the row collapses to its muted dismissed one-liner.
     await featuredCard.getByRole('button', { name: 'Dismiss Featured artist suggestion' }).click();
