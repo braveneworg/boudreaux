@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
 
+import type { Page } from '@playwright/test';
+
 /**
  * E2E coverage for the new admin delete flows wired to TanStack Query mutation
  * hooks → Server Actions:
@@ -152,7 +154,7 @@ test.describe('Admin entity delete flows', () => {
     };
 
     /** Open the archived row and confirm its permanent delete. */
-    const deleteForever = async (page: import('@playwright/test').Page, displayName: string) => {
+    const deleteForever = async (page: Page, displayName: string) => {
       await page.goto('/admin/artists');
       await page.getByRole('switch', { name: /show deleted/i }).click();
       await page.getByPlaceholder(/search artists/i).fill(displayName);
