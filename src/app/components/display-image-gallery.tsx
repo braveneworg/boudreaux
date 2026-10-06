@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { JSX } from 'react';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -62,22 +62,25 @@ export const DisplayImageGallery = ({
   const count = images.length;
   const image = images.at(index);
 
+  /** One step either way, wrapping at both ends; the buttons and the keys share it. */
+  const step = useCallback(
+    (delta: number): void => onIndexChange((index + delta + count) % count),
+    [count, index, onIndexChange]
+  );
+
   useEffect(() => {
     if (count < 2) return undefined;
-    const step = (delta: number): void => onIndexChange((index + delta + count) % count);
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isEditableTarget(event.target)) return;
       if (event.key === 'ArrowLeft') step(-1);
       if (event.key === 'ArrowRight') step(1);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [count, index, onIndexChange]);
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
+  }, [count, step]);
 
   if (!image) return null;
-
-  const step = (delta: number): void => onIndexChange((index + delta + count) % count);
 
   return (
     <figure className="flex flex-col gap-3">
