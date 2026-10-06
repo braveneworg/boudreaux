@@ -122,8 +122,9 @@ describe('FeaturedArtistsService', () => {
 
       const result = await FeaturedArtistsService.getFeaturedArtists(new Date());
 
+      // Only the card count travels: the player reads bioImages[0].
       expect(result.success && result.data[0]?.artists[0]?.bioImages.map(({ url }) => url)).toEqual(
-        ['chosen-first', 'chosen-second']
+        ['chosen-first']
       );
     });
 

@@ -12,7 +12,6 @@ import { ChevronLeft, ChevronRight, ImagePlus, X } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { DISPLAY_IMAGE_CAP } from '@/lib/utils/display-images';
 import { BIO_IMAGE_DRAG_MIME, bioImageDragPayloadSchema } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
@@ -59,7 +58,6 @@ const moved = (ids: string[], index: number, direction: -1 | 1): string[] | null
 };
 
 interface DisplayImageDropTargetProps {
-  atCap: boolean;
   canDrop: boolean;
   onDropPoolImage: (imageId: string) => void;
   onDropFile: (file: File) => void;
@@ -67,11 +65,10 @@ interface DisplayImageDropTargetProps {
 
 /**
  * The dashed target under the strip: a pool tile drops in by the id in its
- * drag payload, anything else with a file drops in as an upload. Explains the
- * cap instead of inviting a drop once the set is full.
+ * drag payload, anything else with a file drops in as an upload. The set has
+ * no cap, so it always invites a drop while the strip is enabled.
  */
 const DisplayImageDropTarget = ({
-  atCap,
   canDrop,
   onDropPoolImage,
   onDropFile,
@@ -119,21 +116,19 @@ const DisplayImageDropTarget = ({
     >
       <ImagePlus className="mb-1 size-5 text-zinc-600" aria-hidden />
       <p className="text-xs text-zinc-950">
-        {atCap
-          ? `Remove a display image first (limit ${DISPLAY_IMAGE_CAP}).`
-          : 'Drop a pool image or an image file here to add a display image.'}
+        Drop a pool image or an image file here to add a display image.
       </p>
     </div>
   );
 };
 
 /**
- * The artist's chosen display images: an ordered strip of up to
- * {@link DISPLAY_IMAGE_CAP} thumbnails with move-earlier / move-later /
- * remove controls (the arrow keys also move the image while either move
- * button has focus), a polite live region announcing the new position, and
- * a drop target that takes a pool tile (by the id in its drag payload) or an
- * image file from the desktop (uploaded, then added) while there is room.
+ * The artist's chosen display images: an ordered strip of thumbnails (no
+ * cap — ADR-0008, second addendum) with move-earlier / move-later / remove
+ * controls (the arrow keys also move the image while either move button has
+ * focus), a polite live region announcing the new position, and a drop
+ * target that takes a pool tile (by the id in its drag payload) or an image
+ * file from the desktop (uploaded, then added).
  * Thumbnails stay `unoptimized` because a fresh upload's srcset variants are
  * generated asynchronously.
  */
@@ -149,7 +144,6 @@ export const DisplayImageStrip = ({
 }: DisplayImageStripProps): JSX.Element => {
   const [announcement, setAnnouncement] = useState('');
   const ids = images.map(({ id }) => id);
-  const atCap = images.length >= DISPLAY_IMAGE_CAP;
 
   const move = (index: number, direction: -1 | 1): void => {
     const next = moved(ids, index, direction);
@@ -176,11 +170,10 @@ export const DisplayImageStrip = ({
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold">
-        Display images ({images.length}/{DISPLAY_IMAGE_CAP})
-      </h3>
+      <h3 className="text-sm font-semibold">Display images ({images.length})</h3>
       <p className="text-muted-foreground text-xs">
-        Shown beside the short bio on the artist page and the artists index.
+        All of them make the artist page’s collage, in this order; the first is the artists index
+        photo.
       </p>
       {images.length === 0 ? (
         <p className="text-muted-foreground text-xs">
@@ -249,8 +242,7 @@ export const DisplayImageStrip = ({
         </ol>
       )}
       <DisplayImageDropTarget
-        atCap={atCap}
-        canDrop={!disabled && !atCap && !isUploading}
+        canDrop={!disabled && !isUploading}
         onDropPoolImage={onDropPoolImage}
         onDropFile={onDropFile}
       />

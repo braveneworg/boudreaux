@@ -221,20 +221,24 @@ export class ArtistBioImageRepository {
    * index as `displayOrder` and is promoted to `origin: 'custom'` so a bio
    * regeneration keeps it (`ArtistRepository.replaceBioContent` deletes only
    * non-custom rows). The `where` carries `artistId` so a foreign row id can
-   * never be written. Callers validate the cap, uniqueness, ownership, and
-   * alt-text eligibility before reaching here.
+   * never be written. Callers validate uniqueness, ownership, and alt-text
+   * eligibility before reaching here. The set is uncapped, so the transaction
+   * carries an explicit timeout: one update per chosen row.
    */
   static async setDisplayOrder(artistId: string, orderedIds: string[]): Promise<void> {
     await runQuery(() =>
-      prisma.$transaction(async (tx) => {
-        await tx.artistBioImage.updateMany({ where: { artistId }, data: { displayOrder: null } });
-        for (const [displayOrder, id] of orderedIds.entries()) {
-          await tx.artistBioImage.update({
-            where: { id, artistId },
-            data: { displayOrder, origin: 'custom' },
-          });
-        }
-      })
+      prisma.$transaction(
+        async (tx) => {
+          await tx.artistBioImage.updateMany({ where: { artistId }, data: { displayOrder: null } });
+          for (const [displayOrder, id] of orderedIds.entries()) {
+            await tx.artistBioImage.update({
+              where: { id, artistId },
+              data: { displayOrder, origin: 'custom' },
+            });
+          }
+        },
+        { timeout: 15_000, maxWait: 5_000 }
+      )
     );
   }
 }

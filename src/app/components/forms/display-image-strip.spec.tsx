@@ -79,9 +79,9 @@ describe('DisplayImageStrip', () => {
     ]);
   });
 
-  it('shows the count against the cap', () => {
+  it('shows the count with no cap', () => {
     renderStrip();
-    expect(screen.getByRole('heading', { name: 'Display images (3/3)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Display images (3)' })).toBeInTheDocument();
   });
 
   it('renders the thumbnail with the image alt text', () => {
@@ -223,15 +223,15 @@ describe('DisplayImageStrip', () => {
       expect(dropTarget()).toHaveAttribute('data-drag-over', 'false');
     });
 
-    it('explains the cap and refuses drops once the set is full', () => {
+    it('keeps accepting drops past three — the set has no cap', () => {
       const { onDropPoolImage, onDropFile } = renderStrip();
-      expect(dropTarget()).toHaveTextContent(/Remove a display image first \(limit 3\)/);
+      expect(dropTarget()).not.toHaveTextContent(/limit/);
 
       fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload: poolPayload('d') }) });
       fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
 
-      expect(onDropPoolImage).not.toHaveBeenCalled();
-      expect(onDropFile).not.toHaveBeenCalled();
+      expect(onDropPoolImage).toHaveBeenCalledWith('d');
+      expect(onDropFile).toHaveBeenCalledWith(jpeg);
     });
 
     it('refuses drops while disabled', () => {

@@ -233,7 +233,7 @@ describe('useArtistPool', () => {
     expect(result.current.addError).toBe('Failed to upload image');
   });
 
-  it('leaves a full set alone and still refreshes the picker pool', async () => {
+  it('appends an upload past three — the chosen set has no cap', async () => {
     const content = seededContent();
     serverStatus = {
       ...serverStatus,
@@ -243,9 +243,8 @@ describe('useArtistPool', () => {
       success: true,
       data: { id: 'n', url: 'https://cdn.example.com/n.jpg' } as never,
     });
-    const { client, result } = renderPool();
+    const { result } = renderPool();
     await waitFor(() => expect(result.current.chosenIds).toEqual(['a', 'x', 'y']));
-    const invalidate = vi.spyOn(client, 'invalidateQueries');
 
     await act(async () => {
       await result.current.add(new File(['x'], 'p.jpg', { type: 'image/jpeg' }), {
@@ -254,9 +253,10 @@ describe('useArtistPool', () => {
       });
     });
 
-    expect(setArtistDisplayImagesAction).not.toHaveBeenCalled();
-    const keys = invalidate.mock.calls.map(([options]) => JSON.stringify(options?.queryKey));
-    expect(keys).toContain(JSON.stringify(queryKeys.artists.bioImages(ARTIST_ID)));
+    expect(setArtistDisplayImagesAction).toHaveBeenCalledWith({
+      artistId: ARTIST_ID,
+      imageIds: ['a', 'x', 'y', 'n'],
+    });
   });
 
   // ── the display-set write ─────────────────────────────────────────────────

@@ -2254,8 +2254,9 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.listPublishedArtists(filters);
 
+      // A card shows the first display image only (CARD_DISPLAY_IMAGE_COUNT).
       const ids = result.success ? result.data[0]?.bioImages.map(({ id }) => id) : result;
-      expect(ids).toEqual(['first', 'second']);
+      expect(ids).toEqual(['first']);
     });
 
     it('flattens the bands the artist belongs to', async () => {
@@ -2591,11 +2592,16 @@ describe('ArtistService', () => {
       expect(ArtistBioImageRepository.setDisplayOrder).toHaveBeenCalledWith('a1', []);
     });
 
-    it('rejects more than the cap with LIMIT_EXCEEDED', async () => {
-      const result = await ArtistService.setDisplayImages('a1', ['i1', 'i2', 'i3', 'i4']);
+    it('accepts more than three ids — the chosen set has no cap', async () => {
+      const ids = ['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8', 'i9'];
+      vi.mocked(ArtistBioImageRepository.findManyByIds).mockResolvedValueOnce(
+        ids.map((id) => ({ id, alt: 'alt', origin: 'custom' }))
+      );
 
-      expect(result).toMatchObject({ success: false, code: 'LIMIT_EXCEEDED' });
-      expect(ArtistBioImageRepository.setDisplayOrder).not.toHaveBeenCalled();
+      const result = await ArtistService.setDisplayImages('a1', ids);
+
+      expect(result).toMatchObject({ success: true });
+      expect(ArtistBioImageRepository.setDisplayOrder).toHaveBeenCalledWith('a1', ids);
     });
 
     it('rejects a repeated id with VALIDATION', async () => {

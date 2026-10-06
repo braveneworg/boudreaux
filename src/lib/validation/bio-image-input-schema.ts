@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import { DISPLAY_IMAGE_CAP } from '@/lib/utils/display-images';
-
 import { objectId } from './primitives';
 
 /** A Mongo ObjectId (24 hex chars). */
@@ -40,15 +38,22 @@ export const updateBioImageAltInputSchema = z.object({
 export type UpdateBioImageAltInput = z.infer<typeof updateBioImageAltInputSchema>;
 
 /**
+ * A request-size guard, not a product cap: the chosen set is uncapped
+ * (ADR-0008, second addendum), and no artist's pool approaches this many
+ * rows. It only keeps a hostile payload from carrying thousands of ids.
+ */
+export const MAX_DISPLAY_IMAGE_IDS_PER_REQUEST = 200;
+
+/**
  * The full replacement of an artist's display images: the chosen bio image
- * ids in display order, at most {@link DISPLAY_IMAGE_CAP}, each at most once.
- * An empty list clears every display image.
+ * ids in display order, each at most once. An empty list clears every
+ * display image.
  */
 export const setDisplayImagesInputSchema = z.object({
   artistId: objectId,
   imageIds: z
     .array(objectId)
-    .max(DISPLAY_IMAGE_CAP, `Choose at most ${DISPLAY_IMAGE_CAP} display images`)
+    .max(MAX_DISPLAY_IMAGE_IDS_PER_REQUEST, 'Too many display images in one request')
     .refine((ids) => new Set(ids).size === ids.length, {
       message: 'Each image can be chosen only once',
     }),

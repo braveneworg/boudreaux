@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
-  decideUploadJoin,
+  CARD_DISPLAY_IMAGE_COUNT,
   chosenDisplayImageIds,
-  DISPLAY_IMAGE_CAP,
+  countChosenDisplayImages,
+  decideUploadJoin,
+  FALLBACK_DISPLAY_IMAGE_CAP,
   isDisplayEligible,
   orderBioImagesForPicker,
   resolveDisplayImages,
@@ -29,9 +31,35 @@ const row = (id: string, overrides: Partial<Omit<Row, 'id'>> = {}): Row => ({
 
 const ids = (rows: Row[]): string[] => rows.map(({ id }) => id);
 
-describe('DISPLAY_IMAGE_CAP', () => {
-  it('is three, the number of slots the public artist page renders', () => {
-    expect(DISPLAY_IMAGE_CAP).toBe(3);
+describe('FALLBACK_DISPLAY_IMAGE_CAP', () => {
+  it('is three, the number of fallback tiles a page shows while nothing is chosen', () => {
+    expect(FALLBACK_DISPLAY_IMAGE_CAP).toBe(3);
+  });
+});
+
+describe('CARD_DISPLAY_IMAGE_COUNT', () => {
+  it('is one: an index card shows the first display image', () => {
+    expect(CARD_DISPLAY_IMAGE_COUNT).toBe(1);
+  });
+});
+
+describe('countChosenDisplayImages', () => {
+  it('counts the rows a human has chosen, whatever the pool holds', () => {
+    const rows = [
+      row('s', { isPrimary: true }),
+      row('a', { displayOrder: 0 }),
+      row('b', { displayOrder: 3 }),
+    ];
+
+    expect(countChosenDisplayImages(rows)).toBe(2);
+  });
+
+  it('is zero while nothing is chosen', () => {
+    expect(countChosenDisplayImages([row('s', { isPrimary: true }), row('x')])).toBe(0);
+  });
+
+  it('treats an absent position as not chosen', () => {
+    expect(countChosenDisplayImages([{ isPrimary: true }])).toBe(0);
   });
 });
 
@@ -63,10 +91,12 @@ describe('resolveDisplayImages', () => {
     expect(ids(resolveDisplayImages(rows))).toEqual(['early', 'late']);
   });
 
-  it('truncates more than the cap of chosen rows to the first positions', () => {
-    const rows = [0, 1, 2, 3].map((position) => row(`p${position}`, { displayOrder: position }));
+  it('returns every chosen row — the chosen set has no cap', () => {
+    const rows = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((position) =>
+      row(`p${position}`, { displayOrder: position })
+    );
 
-    expect(ids(resolveDisplayImages(rows))).toEqual(['p0', 'p1', 'p2']);
+    expect(ids(resolveDisplayImages(rows))).toEqual(rows.map(({ id }) => id));
   });
 
   it('falls back to the suggested rows in pool order while nothing is chosen', () => {
@@ -264,12 +294,12 @@ describe('orderBioImagesForPicker', () => {
 describe('decideUploadJoin', () => {
   // The rule the media manager applies to a fresh upload — decided against the
   // Shown set as it is when the upload LANDS, never the set when it started.
-  it('appends the upload while the set has room', () => {
+  it('appends the upload to the chosen set', () => {
     expect(decideUploadJoin(['a', 'b'], 'n')).toEqual(['a', 'b', 'n']);
   });
 
-  it('declines when the set is full', () => {
-    expect(decideUploadJoin(['a', 'b', 'c'], 'n')).toBeNull();
+  it('appends past three — the chosen set has no cap', () => {
+    expect(decideUploadJoin(['a', 'b', 'c'], 'n')).toEqual(['a', 'b', 'c', 'n']);
   });
 
   it('declines when the upload is already chosen', () => {

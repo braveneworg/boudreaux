@@ -13,7 +13,6 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import {
   chosenDisplayImageIds,
-  DISPLAY_IMAGE_CAP,
   type DisplayImageTier,
   orderBioImagesForPicker,
   resolveDisplayImageSet,
@@ -61,16 +60,10 @@ export interface BioImageManagerProps {
  * missing alt is not a reason: the set action backfills it with the artist's
  * name, the same default an upload gets.
  */
-const disabledReasonFor = (image: BioStatusImage, chosenIds: string[]): 'chosen' | 'cap' | null => {
-  if (chosenIds.includes(image.id)) return 'chosen';
-  if (chosenIds.length >= DISPLAY_IMAGE_CAP) return 'cap';
-  return null;
-};
+const disabledReasonFor = (image: BioStatusImage, chosenIds: string[]): 'chosen' | null =>
+  chosenIds.includes(image.id) ? 'chosen' : null;
 
-const REASON_COPY = new Map<'chosen' | 'cap', string>([
-  ['chosen', 'Already a display image'],
-  ['cap', `Remove a display image first (limit ${DISPLAY_IMAGE_CAP})`],
-]);
+const REASON_COPY = new Map<'chosen', string>([['chosen', 'Already a display image']]);
 
 /**
  * Badge copy for a tile the public page shows from a fallback tier — only
@@ -184,7 +177,7 @@ export const BioImageManager = ({
   };
 
   const handleDropPoolImage = (imageId: string): void => {
-    if (chosenIds.includes(imageId) || chosenIds.length >= DISPLAY_IMAGE_CAP) return;
+    if (chosenIds.includes(imageId)) return;
     const image = images.find((candidate) => candidate.id === imageId);
     if (image) chooseImage(image);
   };

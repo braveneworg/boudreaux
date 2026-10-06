@@ -45,7 +45,7 @@ import {
 } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
-  DISPLAY_IMAGE_CAP,
+  CARD_DISPLAY_IMAGE_COUNT,
   isDisplayEligible,
   orderBioImagesForPicker,
   resolveDisplayImages,
@@ -702,7 +702,8 @@ export class ArtistService {
   }: ArtistListingRecord): ArtistListingRow {
     return {
       ...artist,
-      bioImages: resolveDisplayImages(artist.bioImages),
+      // A card shows the first display image only; the page shows them all.
+      bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
@@ -895,7 +896,8 @@ export class ArtistService {
 
   /**
    * Replace an artist's display images with `imageIds`, in display order. The
-   * rules of the set live here: at most {@link DISPLAY_IMAGE_CAP}, each id once,
+   * rules of the set live here: no cap (ADR-0008, second addendum; the action's
+   * schema bounds the request size), each id once,
    * every id one of the artist's own bio images, and every chosen image with
    * alt text (the public page renders them as content) — a blank alt is
    * backfilled with the artist's display name, the same default an upload
@@ -911,13 +913,6 @@ export class ArtistService {
     artistId: string,
     imageIds: string[]
   ): Promise<ServiceResponse<{ slug: string }>> {
-    if (imageIds.length > DISPLAY_IMAGE_CAP) {
-      return {
-        success: false,
-        error: `Choose at most ${DISPLAY_IMAGE_CAP} display images`,
-        code: 'LIMIT_EXCEEDED',
-      };
-    }
     if (new Set(imageIds).size !== imageIds.length) {
       return { success: false, error: 'Each image can be chosen only once', code: 'VALIDATION' };
     }
