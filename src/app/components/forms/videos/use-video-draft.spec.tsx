@@ -79,6 +79,34 @@ describe('useVideoDraft', () => {
     expect(historySpy).toHaveBeenCalledWith(null, '', `/admin/videos/${ID}`);
   });
 
+  // The editor host keeps this form mounted when the router renders the
+  // draft's edit route, so it must learn the id before the URL changes.
+  it('reports the draft id before it swaps the URL', async () => {
+    vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
+    const order: string[] = [];
+    vi.spyOn(globalThis.history, 'replaceState').mockImplementation(() => {
+      order.push('replaceState');
+    });
+    const onDraftCreated = vi.fn((videoId: string) => order.push(`draft ${videoId}`));
+    const form = buildForm();
+
+    const { result } = renderHook(() =>
+      useVideoDraft({
+        form: form.current,
+        preGeneratedId: ID,
+        isEditMode: false,
+        getArtistDetails: () => [],
+        getPosterFields: async () => ({}),
+        onDraftCreated,
+      })
+    );
+
+    act(() => result.current.handleUploadComplete());
+
+    await waitFor(() => expect(result.current.draftId).toBe(ID));
+    expect(order).toEqual([`draft ${ID}`, 'replaceState']);
+  });
+
   it('includes non-empty optional fields and artist details in the snapshot', async () => {
     vi.mocked(createVideoDraftAction).mockResolvedValue({ success: true, videoId: ID });
     const form = buildForm({ title: 'My Clip', artist: 'The Artist' });

@@ -60,6 +60,8 @@ type SubmitIntent = 'save' | 'publish';
 
 export interface VideoFormProps {
   videoId?: string;
+  /** Told a new video's draft id before the URL swaps to its edit route. */
+  onDraftCreated?: (videoId: string) => void;
 }
 
 interface SubmitVideoDeps {
@@ -293,7 +295,7 @@ const EnrichmentPanelMount = ({
     </VideoEnrichmentErrorBoundary>
   ) : null;
 
-export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
+export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.ReactElement => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
   const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
@@ -342,6 +344,7 @@ export const VideoForm = ({ videoId }: VideoFormProps): React.ReactElement => {
     isEditMode,
     getArtistDetails: buildArtistDetails,
     getPosterFields,
+    onDraftCreated,
   });
 
   const { isPersisted, effectiveVideoId } = resolvePersistedRow(videoId, isEditMode, draftId);

@@ -24,6 +24,8 @@ interface UseVideoDraftArgs {
   isEditMode: boolean;
   getArtistDetails: () => VideoArtistDetail[];
   getPosterFields: () => Promise<DraftPosterFields>;
+  /** Told the draft's id before the URL swaps to its edit route. */
+  onDraftCreated?: (videoId: string) => void;
 }
 
 export interface UseVideoDraftResult {
@@ -87,8 +89,10 @@ const buildDraftInput = (
  * values (corrections made during the upload ride along), await the settled
  * poster-candidate fan-out, create the unpublished draft row carrying that
  * captured poster set, then swap the URL to the edit route WITHOUT navigating
- * (history.replaceState keeps the mounted form alive; a refresh resumes on
- * the edit page). On success, a resolved `posterUrl` is written back into RHF
+ * (history.replaceState; a reload resumes on the edit page). The router
+ * renders the edit route at its next refresh, so the form lives in the
+ * editor layout's `VideoEditorHost`, which keeps it mounted for the draft id
+ * reported through `onDraftCreated`. On success, a resolved `posterUrl` is written back into RHF
  * with `shouldDirty: false` so the Save-time fallback sees the field as
  * already-set and never re-uploads the blob — unless a manual poster upload
  * owns the field, which outranks the frame both in the payload and on the
@@ -102,6 +106,7 @@ export const useVideoDraft = ({
   isEditMode,
   getArtistDetails,
   getPosterFields,
+  onDraftCreated,
 }: UseVideoDraftArgs): UseVideoDraftResult => {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftCandidateUrls, setDraftCandidateUrls] = useState<string[]>([]);
@@ -121,8 +126,9 @@ export const useVideoDraft = ({
     }
     setDraftCandidateUrls((posterFields.posterCandidates ?? []).map(({ url }) => url));
     setDraftId(result.videoId);
+    onDraftCreated?.(result.videoId);
     globalThis.history.replaceState(null, '', `/admin/videos/${result.videoId}`);
-  }, [form, preGeneratedId, getArtistDetails, getPosterFields]);
+  }, [form, preGeneratedId, getArtistDetails, getPosterFields, onDraftCreated]);
 
   const handleUploadComplete = useCallback((): void => {
     if (isEditMode || draftId !== null || inFlightRef.current) return;
