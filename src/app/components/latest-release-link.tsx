@@ -72,7 +72,10 @@ export const LatestReleaseLink = ({
     openPlayer();
   };
 
+  // A plain click closes the modal first, then navigates; a modified click
+  // (a new tab) is the browser's and leaves the music playing here.
   const viewAllReleases = (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (!isPlainLeftClick(event)) return;
     event.preventDefault();
     handlePlayerOpenChange(false);
     router.push(allReleasesHref);

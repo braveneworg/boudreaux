@@ -176,6 +176,20 @@ describe('LatestReleaseLink', () => {
     expect(push).toHaveBeenCalledWith('/artists/marguerite-ash/releases');
   });
 
+  it('leaves a modified click on "View all releases" to the browser, keeping the player open', async () => {
+    dialog.playerOpen = true;
+    const user = renderLink();
+
+    await user.keyboard('{Meta>}');
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('link', { name: 'View all releases' })
+    );
+    await user.keyboard('{/Meta}');
+
+    expect(dialog.handlePlayerOpenChange).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it('returns focus to the title link when the player closes', async () => {
     dialog.playerOpen = true;
     const user = renderLink();
