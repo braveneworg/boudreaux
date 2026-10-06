@@ -34,6 +34,30 @@ describe('LinkSection', () => {
   });
 });
 
+describe('LinkSection keys', () => {
+  // Nothing forbids two rows with the same URL (two labels for one shop
+  // page), so the list must not key its rows by URL alone.
+  it('renders two links to the same URL as two rows, without a key collision', () => {
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <LinkSection
+        heading="Websites"
+        section="websites"
+        links={[
+          { label: 'Shop', url: 'https://band.example.com' },
+          { label: 'Tour', url: 'https://band.example.com' },
+        ]}
+      />
+    );
+
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getByText('Shop')).toBeInTheDocument();
+    expect(screen.getByText('Tour')).toBeInTheDocument();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
 describe('LinkItem', () => {
   it('shows the label beside the link and the host as the link text', () => {
     render(
@@ -107,6 +131,22 @@ describe('ContactLinkSection', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders two groups with the same heading, without a key collision', () => {
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <ContactLinkSection
+        groups={[
+          { heading: 'Booking', links: [{ label: 'US', url: 'mailto:us@example.com' }] },
+          { heading: 'Booking', links: [{ label: 'EU', url: 'mailto:eu@example.com' }] },
+        ]}
+      />
+    );
+
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('is the Contact & Misc section with a subheading per group that has links', () => {

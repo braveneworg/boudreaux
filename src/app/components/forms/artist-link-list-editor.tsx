@@ -9,7 +9,7 @@ import type { JSX, KeyboardEvent } from 'react';
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useFieldArray, useWatch } from 'react-hook-form';
 
-import { ArtistLinkIcon } from '@/app/components/ui/artist-link-icon';
+import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
 import { Button } from '@/app/components/ui/button';
 import { FormControl, FormField, FormItem, FormMessage } from '@/app/components/ui/form';
 import { Input } from '@/app/components/ui/input';

@@ -22,7 +22,7 @@ import {
   TikTokIcon,
   XIcon,
   YouTubeIcon,
-} from './social-media-icons';
+} from './ui/social-media-icons';
 
 type IconComponent = ComponentType<{ className?: string; size?: number }>;
 

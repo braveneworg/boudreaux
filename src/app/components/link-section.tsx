@@ -4,7 +4,7 @@
 import { useId } from 'react';
 import type { JSX } from 'react';
 
-import { ArtistLinkIcon } from '@/app/components/ui/artist-link-icon';
+import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
 import type { ArtistLink, ArtistLinkGroup } from '@/lib/types/domain/artist';
 import { isRenderableArtistLinkHref, type ArtistLinkSection } from '@/lib/utils/artist-links';
 
@@ -30,6 +30,21 @@ export const linkText = (url: string): string => {
 };
 
 const isHttp = (url: string): boolean => /^https?:/i.test(url);
+
+/**
+ * React keys for rows that may repeat a value (two labels for one URL, two
+ * groups with one heading): the value plus how often it has appeared so far,
+ * so duplicates never collide and a row keeps its key when others move.
+ */
+const keyedBy = <T,>(items: T[], valueOf: (item: T) => string): Array<{ key: string; item: T }> => {
+  const seen = new Map<string, number>();
+  return items.map((item) => {
+    const value = valueOf(item);
+    const occurrence = seen.get(value) ?? 0;
+    seen.set(value, occurrence + 1);
+    return { key: `${value}#${occurrence}`, item };
+  });
+};
 
 interface LinkItemProps {
   link: ArtistLink;
@@ -89,8 +104,8 @@ export const LinkSection = ({ heading, section, links }: LinkSectionProps): JSX.
         {heading}
       </h2>
       <ul className="space-y-1">
-        {links.map((link) => (
-          <LinkItem key={link.url} link={link} section={section} />
+        {keyedBy(links, (link) => link.url).map(({ key, item }) => (
+          <LinkItem key={key} link={item} section={section} />
         ))}
       </ul>
     </section>
@@ -106,8 +121,8 @@ export const LinkGroup = ({ group }: LinkGroupProps): JSX.Element => (
   <div className="space-y-1">
     <h3 className="text-sm font-semibold text-zinc-800">{group.heading}</h3>
     <ul className="space-y-1">
-      {group.links.map((link) => (
-        <LinkItem key={link.url} link={link} section="contact" />
+      {keyedBy(group.links, (link) => link.url).map(({ key, item }) => (
+        <LinkItem key={key} link={item} section="contact" />
       ))}
     </ul>
   </div>
@@ -127,8 +142,8 @@ export const ContactLinkSection = ({ groups }: ContactLinkSectionProps): JSX.Ele
       <h2 id={headingId} className={HEADING_CLASS}>
         Contact &amp; Misc
       </h2>
-      {filled.map((group) => (
-        <LinkGroup key={group.heading} group={group} />
+      {keyedBy(filled, (group) => group.heading).map(({ key, item }) => (
+        <LinkGroup key={key} group={item} />
       ))}
     </section>
   );
