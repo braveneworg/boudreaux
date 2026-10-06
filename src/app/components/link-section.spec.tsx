@@ -1,0 +1,130 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { render, screen, within } from '@testing-library/react';
+
+import { ContactLinkSection, LinkItem, LinkSection } from './link-section';
+
+describe('LinkSection', () => {
+  it('renders nothing for an empty section', () => {
+    const { container } = render(<LinkSection heading="Websites" section="websites" links={[]} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('is a section named by its heading, one row per link in order', () => {
+    render(
+      <LinkSection
+        heading="Websites"
+        section="websites"
+        links={[
+          { label: 'Official site', url: 'https://margueriteash.example.com' },
+          { label: null, url: 'https://margueriteash.bandcamp.com' },
+        ]}
+      />
+    );
+
+    const section = screen.getByRole('region', { name: 'Websites' });
+    expect(within(section).getByRole('heading', { level: 2 })).toHaveTextContent('Websites');
+    const links = within(section).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual([
+      'margueriteash.example.com',
+      'margueriteash.bandcamp.com',
+    ]);
+  });
+});
+
+describe('LinkItem', () => {
+  it('shows the label beside the link and the host as the link text', () => {
+    render(
+      <LinkItem
+        section="websites"
+        link={{ label: 'Official site', url: 'https://www.example.com/x' }}
+      />
+    );
+
+    expect(screen.getByText('Official site')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'example.com' })).toHaveAttribute(
+      'href',
+      'https://www.example.com/x'
+    );
+  });
+
+  it('hardens an external link', () => {
+    render(<LinkItem section="websites" link={{ label: null, url: 'https://example.com' }} />);
+
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('rel', 'nofollow noopener noreferrer');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('shows the address of a mailto: contact link, same tab', () => {
+    render(<LinkItem section="contact" link={{ label: 'Agent', url: 'mailto:a@example.com' }} />);
+
+    const link = screen.getByRole('link', { name: 'a@example.com' });
+    expect(link).toHaveAttribute('href', 'mailto:a@example.com');
+    expect(link).not.toHaveAttribute('target');
+  });
+
+  it('shows the number of a tel: contact link', () => {
+    render(<LinkItem section="contact" link={{ label: null, url: 'tel:+18605550134' }} />);
+
+    expect(screen.getByRole('link', { name: '+18605550134' })).toHaveAttribute(
+      'href',
+      'tel:+18605550134'
+    );
+  });
+
+  it('shows the icon the href resolves to', () => {
+    const { container } = render(
+      <LinkItem section="social" link={{ label: null, url: 'https://www.instagram.com/x' }} />
+    );
+
+    expect(container.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'instagram');
+  });
+
+  // ADR-0020: the rule, not the write, is what the page trusts.
+  it('renders a stored href that fails the rule as text, never as a link', () => {
+    render(<LinkItem section="websites" link={{ label: 'Odd', url: 'javascript:alert(1)' }} />);
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+  });
+
+  it('does not repeat a label that is the link text', () => {
+    render(
+      <LinkItem section="websites" link={{ label: 'example.com', url: 'https://example.com' }} />
+    );
+
+    expect(screen.getAllByText('example.com')).toHaveLength(1);
+  });
+});
+
+describe('ContactLinkSection', () => {
+  it('renders nothing when no group has a link', () => {
+    const { container } = render(
+      <ContactLinkSection groups={[{ heading: 'Booking', links: [] }]} />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('is the Contact & Misc section with a subheading per group that has links', () => {
+    render(
+      <ContactLinkSection
+        groups={[
+          { heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:a@example.com' }] },
+          { heading: 'Merch', links: [] },
+          { heading: 'Press', links: [{ label: null, url: 'https://example.com/press' }] },
+        ]}
+      />
+    );
+
+    const section = screen.getByRole('region', { name: 'Contact & Misc' });
+    expect(
+      within(section)
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent)
+    ).toEqual(['Booking', 'Press']);
+  });
+});
