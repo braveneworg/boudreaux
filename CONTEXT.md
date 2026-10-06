@@ -135,9 +135,20 @@ the byline empty, and no later credit takes its place.
 **primary** (the Artist is its album artist), **featured** (credited, but not
 first), or **member** (a release by a band the Artist belongs to). Derived
 from the stored credit order and band membership when the page is built;
-an Artist's page lists every release they hold a credit on, primary first.
+an Artist's page leads with its **latest release** and lists every release
+they hold a credit on, primary first, at `/artists/[slug]/releases`.
 See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
+
+**latest release** — the newest listed Release an Artist holds a direct
+**release credit** on (primary or featured, never member), by release date:
+the one the Artist's page leads with and the artists index card names. A
+featured one is shown "by" its album artist when that Artist is public.
+Playable (an MP3 track) → its line opens the listening modal in place; else
+it links to the release page. See the 2026-10-06 amendment of
+[ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
+_Avoid_: newest release (the summary field is named `newestRelease`, but the
+page concept is this), featured release.
 
 **listed artist** — an Artist shown on the public artists index and found by
 its search: published, not deleted, and directly credited (primary or

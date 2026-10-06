@@ -201,3 +201,13 @@ write. The bio-generation and
 images-from-links sections track a run through one client tracker,
 `useJobRun`, the twin of `async-job-lifecycle.ts`: a terminal state cached
 before the trigger is never surfaced as the new run's outcome.
+
+## Gallery gap closed (2026-10-06)
+
+The first addendum left one gap open: the biography's gallery of the pool
+images the header did not show, rendered without an alt-text rule. That
+gallery is gone with the redesign. The page shows the display images and
+nothing else from the pool: the chosen set (uncapped, second addendum), or
+for a grandfathered artist with none chosen the fallback tiers of the first
+addendum, which already require alt text. Every image on the public page now
+passes through one rule.
