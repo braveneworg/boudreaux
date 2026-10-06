@@ -925,6 +925,27 @@ describe('updateArtistAction', () => {
       );
     });
 
+    // A form whose other arrays are still empty omits them from the request
+    // (an empty array is skipped by the form-data encoder's caller only when
+    // undefined, but a missing one must not void the arrays that did arrive).
+    it('composes the links when only some of the arrays arrive, the rest as empty', async () => {
+      stubParsed({ ...parsedBase, websiteLinks: [{ label: '', url: 'https://example.com' }] });
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({
+          links: {
+            websites: [{ label: null, url: 'https://example.com' }],
+            social: [],
+            contact: [],
+          },
+        }),
+        'user-123'
+      );
+    });
+
     it('leaves the links alone when the form did not send the arrays', async () => {
       stubParsed(parsedBase);
 

@@ -58,8 +58,17 @@ const toLinksPayload = ({
   socialLinks,
   contactLinkGroups,
 }: ParsedArtistData): Pick<UpdateArtistData, 'links'> =>
-  websiteLinks && socialLinks && contactLinkGroups
-    ? { links: normalizeArtistLinks({ websiteLinks, socialLinks, contactLinkGroups }) }
+  // Any array present means the form has link editors: the ones it did not
+  // send are empty, not "leave alone". Only a request with none at all (an
+  // older client, the create form) leaves the stored links untouched.
+  websiteLinks || socialLinks || contactLinkGroups
+    ? {
+        links: normalizeArtistLinks({
+          websiteLinks: websiteLinks ?? [],
+          socialLinks: socialLinks ?? [],
+          contactLinkGroups: contactLinkGroups ?? [],
+        }),
+      }
     : {};
 
 const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({

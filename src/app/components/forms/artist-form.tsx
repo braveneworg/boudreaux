@@ -154,10 +154,10 @@ const buildArtistDefaults = (userId: string | undefined): ArtistFormData => ({
   formedOn: '',
   createdBy: userId,
   publishedOn: '',
-  // The link arrays are always present (the update action composes `links`
-  // only from all three), so a save in the moment between a create and the
-  // loaded edit form never drops a link; the create action ignores them.
-  ...toArtistLinksFormValues(null),
+  // No link arrays here: a default field array the loaded artist shrinks
+  // leaves ghost rows registered, which then fail validation on every save
+  // (docs/lessons/react-nextjs/field-array-defaults-must-not-outgrow-the-loaded-row.md).
+  // The update action composes `links` from whatever arrays arrive instead.
 });
 
 /** Links hang off a persisted artist row, like images (ADR-0020): edit mode only. */
