@@ -90,6 +90,23 @@ describe('useAutoApplyReleaseDateSuggestion', () => {
     expect(onApply).toHaveBeenCalledWith('releasedOn', '2019-05-01');
   });
 
+  // #810: today's UTC day is never filled by itself; it stays a pending
+  // "Use this date" card for a human to take.
+  it("neither fills nor resolves a suggestion dated today's UTC day", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T01:30:00.000Z'));
+    try {
+      const { onApply, onResolve } = renderHarness([releaseDateSuggestion('2026-10-06')], '');
+
+      await act(async () => {});
+
+      expect(onApply).not.toHaveBeenCalled();
+      expect(onResolve).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fills a date that was cleared after mount', async () => {
     const { onApply, rerender, getForm } = renderHarness([]);
 
