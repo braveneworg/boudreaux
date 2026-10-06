@@ -461,22 +461,48 @@ const refuseHardDelete = async (
   return null;
 };
 
+/** The publish gate's refusal (ADR-0019): copy the admin UI shows as-is. */
+const NO_DISPLAY_IMAGE_MESSAGE = 'Choose at least one display image before publishing';
+
+/**
+ * The publish gate (ADR-0019): a first publish needs at least one chosen
+ * display image. Returns the refusal to send back, or `null` when the write
+ * may go ahead — because the stored artist is already published (a save
+ * re-sends its date and is not re-checked) or has a chosen image.
+ */
+const refuseFirstPublishWithoutDisplayImage = async (
+  artistId: string
+): Promise<ServiceResponse<never> | null> => {
+  const stored = await ArtistRepository.findById(artistId);
+  if (!stored) return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+  if (stored.publishedOn) return null;
+  const chosen = await ArtistBioImageRepository.countChosen(artistId);
+  return chosen > 0
+    ? null
+    : { success: false, error: NO_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
+};
+
 export class ArtistService {
   /**
-   * Create a new artist. An artist created published records the admin as
-   * its publisher (ADR-0015); a caller's own `publishedBy` is never stored.
+   * Create a new artist. An artist is always created unpublished (ADR-0019):
+   * it is published once it has a chosen display image, through
+   * {@link updateArtist} or {@link publishArtist}, which record the admin as
+   * its publisher (ADR-0015).
    */
-  static async createArtist(
-    data: CreateArtistData,
-    adminId: string
-  ): Promise<ServiceResponse<Artist>> {
+  static async createArtist(data: CreateArtistData): Promise<ServiceResponse<Artist>> {
     try {
-      const { publishedBy: _callerPublisher, ...rest } = data;
-      const toCreate = rest.publishedOn ? { ...rest, publishedBy: adminId } : rest;
+      const { publishedBy: _callerPublisher, publishedOn, ...rest } = data;
+      if (publishedOn) {
+        return {
+          success: false,
+          error: 'An artist is created unpublished; choose a display image, then publish',
+          code: 'VALIDATION',
+        };
+      }
       // Bio-image finalization (finalizeBioImages) is intentionally skipped on
       // create: a new artist has no generated bio rows, and a manually pasted
       // external image finalizes on the first update.
-      const artist = await ArtistRepository.create(sanitizeBioWriteFields(toCreate));
+      const artist = await ArtistRepository.create(sanitizeBioWriteFields(rest));
       // New genres/tags change the suggestion counts this process serves.
       ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
@@ -560,6 +586,10 @@ export class ArtistService {
   ): Promise<ServiceResponse<Artist>> {
     try {
       const { publishedBy: _callerPublisher, ...rest } = data;
+      if (rest.publishedOn) {
+        const refusal = await refuseFirstPublishWithoutDisplayImage(id);
+        if (refusal) return refusal;
+      }
       const sanitized = sanitizeBioWriteFields(rest);
       const finalized = await finalizeBioImages(id, sanitized);
       const artist = await ArtistRepository.update(id, finalized, { publishedBy: adminId });
@@ -629,10 +659,13 @@ export class ArtistService {
 
   /**
    * Publish an artist by stamping `publishedOn` with the current time, and
-   * record the admin as its publisher when this is its first publish.
+   * record the admin as its publisher when this is its first publish. A
+   * first publish needs a chosen display image (ADR-0019).
    */
   static async publishArtist(id: string, adminId: string): Promise<ServiceResponse<Artist>> {
     try {
+      const refusal = await refuseFirstPublishWithoutDisplayImage(id);
+      if (refusal) return refusal;
       const artist = await ArtistRepository.update(
         id,
         { publishedOn: new Date() },

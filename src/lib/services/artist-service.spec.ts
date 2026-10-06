@@ -71,8 +71,10 @@ vi.mock('@/lib/repositories/artist-credit-repository', () => ({
 
 vi.mock('@/lib/repositories/artist-bio-image-repository', () => ({
   ArtistBioImageRepository: {
+    countChosen: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+    findDisplayState: vi.fn(),
     findForRehost: vi.fn(),
     findCustomUrls: vi.fn(),
     findManyByArtist: vi.fn(),
@@ -128,6 +130,9 @@ describe('ArtistService', () => {
     });
 
     it('are cleared when an artist is published', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(mockArtist as never);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
+
       await ArtistService.publishArtist('artist-123', 'admin-1');
 
       expect(vi.mocked(invalidatePublicNameCaches).mock.calls).toEqual([[]]);
@@ -247,7 +252,7 @@ describe('ArtistService', () => {
     it('invalidates the vocabulary cache after a successful create', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      await ArtistService.createArtist(createInput, 'admin-1');
+      await ArtistService.createArtist(createInput);
 
       expect(ArtistVocabularyService.invalidate).toHaveBeenCalled();
     });
@@ -255,29 +260,27 @@ describe('ArtistService', () => {
     it('does not invalidate the vocabulary cache when the create fails', async () => {
       vi.mocked(ArtistRepository.create).mockRejectedValueOnce(Error('boom'));
 
-      await ArtistService.createArtist(createInput, 'admin-1');
+      await ArtistService.createArtist(createInput);
 
       expect(ArtistVocabularyService.invalidate).not.toHaveBeenCalled();
     });
 
-    // Who published an artist is recorded on every publish (ADR-0015), and
-    // the service decides it: a caller's own publishedBy is never stored.
-    it('records the admin as publisher when the artist is created published', async () => {
-      vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
-      const publishedOn = new Date('2026-10-04');
-
-      await ArtistService.createArtist({ ...createInput, publishedOn }, 'admin-1');
-
-      expect(vi.mocked(ArtistRepository.create).mock.calls[0][0]).toMatchObject({
-        publishedOn,
-        publishedBy: 'admin-1',
+    // An artist is created unpublished and published once it has a chosen
+    // display image (ADR-0019): there is no create-and-publish path.
+    it('refuses to create an artist published', async () => {
+      const result = await ArtistService.createArtist({
+        ...createInput,
+        publishedOn: new Date('2026-10-04'),
       });
+
+      expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+      expect(ArtistRepository.create).not.toHaveBeenCalled();
     });
 
     it('records no publisher for an artist created unpublished', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      await ArtistService.createArtist({ ...createInput, publishedBy: 'forged' }, 'admin-1');
+      await ArtistService.createArtist({ ...createInput, publishedBy: 'forged' });
 
       expect(vi.mocked(ArtistRepository.create).mock.calls[0][0]).not.toHaveProperty('publishedBy');
     });
@@ -285,7 +288,7 @@ describe('ArtistService', () => {
     it('should create an artist successfully', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      const result = await ArtistService.createArtist(createInput, 'admin-1');
+      const result = await ArtistService.createArtist(createInput);
 
       expect(result).toMatchObject({ success: true, data: mockArtist });
       expect(ArtistRepository.create).toHaveBeenCalledWith(createInput);
@@ -295,7 +298,7 @@ describe('ArtistService', () => {
       const prismaError = new DataError('DUPLICATE', 'Unique constraint failed');
       vi.mocked(ArtistRepository.create).mockRejectedValue(prismaError);
 
-      const result = await ArtistService.createArtist(createInput, 'admin-1');
+      const result = await ArtistService.createArtist(createInput);
 
       expect(result).toMatchObject({
         success: false,
@@ -307,7 +310,7 @@ describe('ArtistService', () => {
       const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ArtistRepository.create).mockRejectedValue(initError);
 
-      const result = await ArtistService.createArtist(createInput, 'admin-1');
+      const result = await ArtistService.createArtist(createInput);
 
       expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
     });
@@ -315,7 +318,7 @@ describe('ArtistService', () => {
     it('should handle unknown errors', async () => {
       vi.mocked(ArtistRepository.create).mockRejectedValue(Error('Unknown error'));
 
-      const result = await ArtistService.createArtist(createInput, 'admin-1');
+      const result = await ArtistService.createArtist(createInput);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to create artist' });
     });
@@ -530,6 +533,10 @@ describe('ArtistService', () => {
     });
 
     it("ignores a caller's publishedBy: the repository records the admin", async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce({
+        ...mockArtist,
+        publishedOn: new Date('2026-01-01'),
+      } as never);
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
       await ArtistService.updateArtist(
@@ -544,14 +551,72 @@ describe('ArtistService', () => {
       ]);
     });
 
+    // The publish gate (ADR-0019): a first publish needs a chosen display
+    // image; a save of an already published artist re-sends its date and is
+    // not re-checked; a save without a date never reads the gate.
+    describe('publish gate', () => {
+      const unpublished = { ...mockArtist, publishedOn: null } as never;
+      const published = { ...mockArtist, publishedOn: new Date('2026-01-01') } as never;
+      const firstPublish: UpdateArtistData = { publishedOn: new Date('2026-10-06') };
+
+      it('refuses a first publish while no display image is chosen', async () => {
+        vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(unpublished);
+        vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(0);
+
+        const result = await ArtistService.updateArtist('artist-123', firstPublish, 'admin-1');
+
+        expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+        expect(ArtistRepository.update).not.toHaveBeenCalled();
+      });
+
+      it('publishes once a display image is chosen', async () => {
+        vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(unpublished);
+        vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
+        vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+        const result = await ArtistService.updateArtist('artist-123', firstPublish, 'admin-1');
+
+        expect(result).toMatchObject({ success: true });
+        expect(ArtistRepository.update).toHaveBeenCalledWith('artist-123', firstPublish, {
+          publishedBy: 'admin-1',
+        });
+      });
+
+      it('does not re-check a save of an already published artist', async () => {
+        vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(published);
+        vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+        await ArtistService.updateArtist('artist-123', firstPublish, 'admin-1');
+
+        expect(ArtistBioImageRepository.countChosen).not.toHaveBeenCalled();
+        expect(ArtistRepository.update).toHaveBeenCalled();
+      });
+
+      it('never reads the gate for a save without a publish date', async () => {
+        vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
+
+        await ArtistService.updateArtist('artist-123', { displayName: 'JD' }, 'admin-1');
+
+        expect(ArtistRepository.findById).not.toHaveBeenCalled();
+        expect(ArtistBioImageRepository.countChosen).not.toHaveBeenCalled();
+      });
+
+      it('returns NOT_FOUND for a first publish of an unknown artist', async () => {
+        vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(null);
+
+        const result = await ArtistService.updateArtist('missing', firstPublish, 'admin-1');
+
+        expect(result).toMatchObject({ success: false, code: 'NOT_FOUND' });
+        expect(ArtistRepository.update).not.toHaveBeenCalled();
+      });
+    });
+
     it('sanitizes the bio HTML before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
 
       await ArtistService.updateArtist(
         'artist-123',
-        {
-          bio: '<p>Hi</p><script>alert(1)</script>',
-        },
+        { bio: '<p>Hi</p><script>alert(1)</script>' },
         'admin-1'
       );
 
@@ -567,9 +632,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'artist-123',
-        {
-          altBio: '<p>x<img src="javascript:alert(1)"></p>',
-        },
+        { altBio: '<p>x<img src="javascript:alert(1)"></p>' },
         'admin-1'
       );
 
@@ -582,9 +645,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'artist-123',
-        {
-          shortBio: '<p>Intro. <img src="https://cdn.example/a.webp" alt="a"> Outro.</p>',
-        },
+        { shortBio: '<p>Intro. <img src="https://cdn.example/a.webp" alt="a"> Outro.</p>' },
         'admin-1'
       );
 
@@ -694,9 +755,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'a1',
-        {
-          bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>',
-        },
+        { bio: '<p><img src="https://internal.example/x.jpg" alt="" /></p>' },
         'admin-1'
       );
 
@@ -718,9 +777,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.updateArtist(
         'a1',
-        {
-          bio: `<p><img src="${THUMB}" alt="" /></p>`,
-        },
+        { bio: `<p><img src="${THUMB}" alt="" /></p>` },
         'admin-1'
       );
 
@@ -753,9 +810,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'a1',
-        {
-          bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
-        },
+        { bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>` },
         'admin-1'
       );
 
@@ -782,9 +837,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'a1',
-        {
-          bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>`,
-        },
+        { bio: `<p><img src="${THUMB}" alt="" /><img src="${THUMB2}" alt="" /></p>` },
         'admin-1'
       );
 
@@ -994,7 +1047,19 @@ describe('ArtistService', () => {
   });
 
   describe('publishArtist', () => {
+    it('refuses to publish while no display image is chosen (ADR-0019)', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(mockArtist as never);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(0);
+
+      const result = await ArtistService.publishArtist('artist-123', 'admin-1');
+
+      expect(result).toMatchObject({ success: false, code: 'VALIDATION' });
+      expect(ArtistRepository.update).not.toHaveBeenCalled();
+    });
+
     it('should publish an artist by stamping publishedOn', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(mockArtist as never);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
       const publishedArtist = { ...mockArtist, publishedOn: new Date('2024-12-13') };
       vi.mocked(ArtistRepository.update).mockResolvedValue(publishedArtist);
 
@@ -1019,6 +1084,8 @@ describe('ArtistService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(mockArtist as never);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
       const initError = new DataError('UNAVAILABLE', 'Connection failed');
       vi.mocked(ArtistRepository.update).mockReset();
       vi.mocked(ArtistRepository.update).mockRejectedValue(initError);
@@ -1029,6 +1096,8 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
+      vi.mocked(ArtistRepository.findById).mockResolvedValueOnce(mockArtist as never);
+      vi.mocked(ArtistBioImageRepository.countChosen).mockResolvedValueOnce(1);
       vi.mocked(ArtistRepository.update).mockReset();
       vi.mocked(ArtistRepository.update).mockRejectedValue(Error('Unknown error'));
 
@@ -2032,9 +2101,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'artist-123',
-        {
-          shortBio: '<p>Hi</p><script>alert(1)</script>',
-        },
+        { shortBio: '<p>Hi</p><script>alert(1)</script>' },
         'admin-1'
       );
 
@@ -2051,17 +2118,14 @@ describe('ArtistService', () => {
     it('stores genres and tags in the normalised form on create', async () => {
       vi.mocked(ArtistRepository.create).mockResolvedValue(mockArtist);
 
-      await ArtistService.createArtist(
-        {
-          firstName: 'John',
-          surname: 'Doe',
-          displayName: 'John Doe',
-          slug: 'john-doe',
-          genres: 'Hip Hop, R&B, hip-hop',
-          tags: 'Synth Pop',
-        },
-        'admin-1'
-      );
+      await ArtistService.createArtist({
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        genres: 'Hip Hop, R&B, hip-hop',
+        tags: 'Synth Pop',
+      });
 
       const [persisted] = vi.mocked(ArtistRepository.create).mock.calls.at(-1) ?? [];
       expect(persisted?.genres).toBe('hip-hop,r-and-b');
@@ -2073,10 +2137,7 @@ describe('ArtistService', () => {
 
       await ArtistService.updateArtist(
         'artist-123',
-        {
-          genres: 'Experimental, Electronic',
-          tags: 'Lo-Fi',
-        },
+        { genres: 'Experimental, Electronic', tags: 'Lo-Fi' },
         'admin-1'
       );
 
