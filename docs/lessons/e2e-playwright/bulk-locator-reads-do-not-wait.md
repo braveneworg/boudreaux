@@ -15,3 +15,10 @@ take a bulk read if the assertion needs the raw array. Before blaming CI,
 download the run's `playwright-results-*` artifact: the `error-context.md`
 snapshot and `trace.zip`'s `*.network` say whether the page was still
 loading or something returned 4xx.
+
+The same held for `notification-banner.spec.ts` "should support keyboard
+navigation with arrow keys" on 2026-10-05 (#837, shard 3): it read
+`tabs.count()` once after `gotoHome`, which waited for the carousel shell
+but not its dot tabs. The count was 0, so `(before + 1) % count` was `NaN`
+and the assertion waited on `getByRole('tab').nth(NaN)`. `gotoHome` now
+waits for the second tab before any test reads them.
