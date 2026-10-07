@@ -102,13 +102,14 @@ describe('LatestReleaseLink', () => {
     );
   });
 
-  it('offers every release beneath the line', () => {
+  it('offers every release beneath the line, with an eye icon ahead of the words', () => {
     renderLink();
 
-    expect(screen.getByRole('link', { name: 'All releases' })).toHaveAttribute(
-      'href',
-      '/artists/marguerite-ash/releases'
-    );
+    const link = screen.getByRole('link', { name: 'View all releases' });
+    expect(link).toHaveAttribute('href', '/artists/marguerite-ash/releases');
+    const icon = link.querySelector('svg');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon?.nextSibling).toHaveTextContent('View all releases');
   });
 
   it('announces the dialog once hydrated, when the release is playable', () => {
