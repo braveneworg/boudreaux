@@ -133,8 +133,20 @@ export const LightboxImage = ({ src, alt, className }: LightboxImageProps): Reac
 );
 
 interface ResponsiveLightboxProps {
-  /** The element that opens the lightbox — normally a `LightboxTrigger`. */
-  trigger: ReactElement;
+  /**
+   * The element that opens the lightbox — normally a `LightboxTrigger`.
+   * Omitted when the caller opens the lightbox itself (controlled mode).
+   */
+  trigger?: ReactElement;
+  /**
+   * Controlled open state. When given, the lightbox never changes it on
+   * its own: a close is reported through `onOpenChange` for the caller to
+   * apply. Omit both for the self-contained trigger-and-open behaviour.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Radix's close hook: where focus returns once the surface has closed. */
+  onCloseAutoFocus?: (event: Event) => void;
   /** Names the surface for assistive tech; hide it with `titleClassName="sr-only"`. */
   title: ReactNode;
   /** Describes the surface; hide it with `descriptionClassName="sr-only"`. */
@@ -154,6 +166,9 @@ interface ResponsiveLightboxProps {
  */
 export const ResponsiveLightbox = ({
   trigger,
+  open: controlledOpen,
+  onOpenChange,
+  onCloseAutoFocus,
   title,
   description,
   titleClassName,
@@ -161,14 +176,20 @@ export const ResponsiveLightbox = ({
   dialogClassName,
   children,
 }: ResponsiveLightboxProps): ReactElement => {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (next: boolean): void => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={setOpen} direction="bottom">
-        <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-        <DrawerContent>
+        {trigger && <DrawerTrigger asChild>{trigger}</DrawerTrigger>}
+        <DrawerContent onCloseAutoFocus={onCloseAutoFocus}>
           <DrawerClose
             className={cn(
               'absolute top-4 right-4 opacity-70 transition-opacity hover:opacity-100',
@@ -190,8 +211,11 @@ export const ResponsiveLightbox = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className={cn('max-w-3xl sm:max-w-3xl', dialogClassName)}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent
+        className={cn('max-w-3xl sm:max-w-3xl', dialogClassName)}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <div className="flex min-w-0 flex-col gap-4">
           <DialogTitle className={titleClassName}>{title}</DialogTitle>
           <DialogDescription className={descriptionClassName}>{description}</DialogDescription>

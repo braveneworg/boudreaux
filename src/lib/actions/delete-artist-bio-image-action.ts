@@ -19,10 +19,9 @@ export const deleteArtistBioImageAction = async (imageId: string): Promise<Admin
   runAdminEntityAction({
     id: imageId,
     entityLabel: 'artist bio image',
-    perform: async (id) => {
-      await ArtistService.deleteBioImage(id);
-      return { success: true };
-    },
+    // The service refuses a published artist's last display image (ADR-0019);
+    // its reason travels to the admin's toast as-is.
+    perform: (id) => ArtistService.deleteBioImage(id),
     event: 'media.artist_bio_image.deleted',
     metadataKey: 'artistBioImageId',
     revalidate: ['/admin/artists'],

@@ -80,3 +80,23 @@ means removing the ordering and labels with it.
   where that data has been entered.
 - A release with no playable MP3 tracks is still hidden by the player's
   playable-track filter, unchanged by this decision.
+
+## Amendment (2026-10-06): the page leads with the latest release
+
+The artist page redesign (ADR-0019, ADR-0020) keeps every rule above and
+moves where the list lives. The page itself leads with one release: the
+newest listed release the artist holds a **direct** credit on (`primary` or
+`featured`), summarised by `summarizeListedReleases` exactly as the artists
+index card is, as `newestRelease` on the artist graph. Its line links to the
+release page; when the release is playable a plain left click primes track 1
+in the gesture and opens the listening modal instead (the `/releases` Play
+flow), and the modal's footer and the line beneath both lead to the full
+list. A featured credit names the album artist ("by …"), and a hidden album
+artist leaves that empty (ADR-0015).
+
+The full list — every credit, in the order above, under a heading per credit
+group when there is more than one — is `/artists/[slug]/releases`, a Server
+Component over the same cached read, rendering `ReleaseCard`s with the same
+Play flow. The release picker and the artist player are gone, and so is the
+`?release=` query the nav search used to deep-link into the picker: a
+release picked in the search opens the release page.

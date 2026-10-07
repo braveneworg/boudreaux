@@ -109,7 +109,7 @@ describe('createArtistAction', () => {
 
       expect(getActionState).toHaveBeenCalledWith(
         mockFormData,
-        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'publishedOn', 'formedOn'],
+        ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'formedOn'],
         expect.anything()
       );
     });
@@ -156,16 +156,13 @@ describe('createArtistAction', () => {
 
       const result = await createArtistAction(initialFormState, mockFormData);
 
-      expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        {
-          firstName: 'John',
-          surname: 'Doe',
-          slug: 'john-doe',
-          middleName: 'M',
-          displayName: 'Johnny Doe',
-        },
-        'user-123'
-      );
+      expect(ArtistService.createArtist).toHaveBeenCalledWith({
+        firstName: 'John',
+        surname: 'Doe',
+        slug: 'john-doe',
+        middleName: 'M',
+        displayName: 'Johnny Doe',
+      });
 
       expect(result.success).toBe(true);
       expect(result.errors).toBeUndefined();
@@ -191,14 +188,11 @@ describe('createArtistAction', () => {
 
       const result = await createArtistAction(initialFormState, mockFormData);
 
-      expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        {
-          firstName: 'John',
-          surname: 'Doe',
-          slug: 'john-doe',
-        },
-        'user-123'
-      );
+      expect(ArtistService.createArtist).toHaveBeenCalledWith({
+        firstName: 'John',
+        surname: 'Doe',
+        slug: 'john-doe',
+      });
 
       expect(result.success).toBe(true);
     });
@@ -569,8 +563,7 @@ describe('createArtistAction', () => {
       await createArtistAction(initialFormState, mockFormData);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        expect.objectContaining({ firstName: '', surname: 'Doe' }),
-        'user-123'
+        expect.objectContaining({ firstName: '', surname: 'Doe' })
       );
     });
 
@@ -590,12 +583,11 @@ describe('createArtistAction', () => {
       await createArtistAction(initialFormState, mockFormData);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        expect.objectContaining({ firstName: 'John', surname: '' }),
-        'user-123'
+        expect.objectContaining({ firstName: 'John', surname: '' })
       );
     });
 
-    it('should convert publishedOn string to Date when provided', async () => {
+    it('never forwards a publish date to the service', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -611,9 +603,10 @@ describe('createArtistAction', () => {
 
       await createArtistAction(initialFormState, mockFormData);
 
-      expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        expect.objectContaining({ publishedOn: new Date('2024-06-01') }),
-        'user-123'
+      // ADR-0019: an artist is created unpublished; the create action never
+      // forwards a publish date, whatever the request carries.
+      expect(vi.mocked(ArtistService.createArtist).mock.calls[0][0]).not.toHaveProperty(
+        'publishedOn'
       );
     });
 
@@ -634,8 +627,7 @@ describe('createArtistAction', () => {
       await createArtistAction(initialFormState, mockFormData);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
-        expect.objectContaining({ formedOn: new Date('2020-03-15') }),
-        'user-123'
+        expect.objectContaining({ formedOn: new Date('2020-03-15') })
       );
     });
   });

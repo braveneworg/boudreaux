@@ -75,16 +75,19 @@ image makes it custom. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: artist image, photo, `Image` (the legacy table nothing public reads).
 
-**display images** — the ordered set of up to three bio images shown for an
-Artist on the public artist page and index cards. Chosen and ordered only by a
-human; a bio generation job may **suggest** images but never chooses or
-displaces a human's choice. On the admin surface the pool and this set are
-one client module, the **artist pool** (`useArtistPool`): every write to
-either goes through it, and an upload joins the set only if there is room
-when it lands. While no human has chosen, the page shows the
-suggested images that have alt text, or else the first pool images that have
-alt text; the admin marks those tiles **Shown**. An image without alt text is
-never shown unless a human chose it. See
+**display images** — the ordered set of bio images shown for an Artist: all
+of them as a collage on the public artist page, the first one on its index
+card. There is no cap. Chosen and ordered only by a human; a bio generation
+job may **suggest** images but never chooses or displaces a human's choice.
+On the admin surface the pool and this set are one client module, the
+**artist pool** (`useArtistPool`): every write to either goes through it, a
+media manager upload joins the set (last), and a bio editor upload stays in
+the pool. Publishing an Artist needs at least one chosen display image
+([ADR-0019](docs/adr/0019-publishing-an-artist-needs-a-chosen-display-image.md)).
+While no human has chosen, a published Artist's page shows up to three
+suggested images that have alt text, or else the first three pool images
+that have alt text; the admin marks those tiles **Shown**. An image without
+alt text is never shown unless a human chose it. See
 [ADR-0008](docs/adr/0008-display-images-are-chosen-by-humans-and-survive-regeneration.md).
 _Avoid_: primary images, hero image, featured images (featured is a release
 credit).
@@ -106,6 +109,22 @@ admin's own filing vocabulary. See
 [ADR-0009](docs/adr/0009-genres-are-human-owned-and-survive-regeneration.md).
 _Avoid_: keyword, label (a Label is a signed-artist entity).
 
+**artist link** — one curated `{ label?, url }` an admin files on an Artist,
+shown on that Artist's own page with the label beside the link. Websites and
+social links are `http(s)`; a contact link may also be an email (`mailto:`) or
+a phone number (`tel:`), stored normalised. The icon derives from the href at
+render; no platform is stored. Human-owned: a bio generation job never writes
+one. See [ADR-0020](docs/adr/0020-artist-links-are-one-composite-on-the-artist.md).
+_Avoid_: URL (the `Url` model carries a platform enum and is not this),
+reference link / bio link (an `ArtistBioLink`, discovered by a job).
+
+**link section** — one of the three parts of `Artist.links`: **Websites** and
+**Social Media**, flat lists of **artist links**, and **Contact & Misc**, a
+list of admin-defined **link groups** (a heading over its links, e.g.
+Booking, Merch). Written whole and kept in the admin's order; an empty
+section is not shown. See
+[ADR-0020](docs/adr/0020-artist-links-are-one-composite-on-the-artist.md).
+
 **Release** — a published body of work by an Artist, with tracks and
 **digital formats** available for download. Its credits have a stored order;
 the first is its **album artist**. A public surface names the album artist
@@ -116,9 +135,20 @@ the byline empty, and no later credit takes its place.
 **primary** (the Artist is its album artist), **featured** (credited, but not
 first), or **member** (a release by a band the Artist belongs to). Derived
 from the stored credit order and band membership when the page is built;
-an Artist's page lists every release they hold a credit on, primary first.
+an Artist's page leads with its **latest release** and lists every release
+they hold a credit on, primary first, at `/artists/[slug]/releases`.
 See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
+
+**latest release** — the newest listed Release an Artist holds a direct
+**release credit** on (primary or featured, never member), by release date:
+the one the Artist's page leads with and the artists index card names. A
+featured one is shown "by" its album artist when that Artist is public.
+Playable (an MP3 track) → its line opens the listening modal in place; else
+it links to the release page. See the 2026-10-06 amendment of
+[ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
+_Avoid_: newest release (the summary field is named `newestRelease`, but the
+page concept is this), featured release.
 
 **listed artist** — an Artist shown on the public artists index and found by
 its search: published, not deleted, and directly credited (primary or
@@ -155,7 +185,9 @@ _Avoid_: pending artist, unconfirmed artist.
 **credit decision** — an admin's choice for one **credit awaiting
 confirmation**: publish the Artist with the Release, or keep it hidden.
 Publishing a Release needs a decision for every such credit; none is made by
-omission. The admin who decided is recorded on each Artist published.
+omission. An Artist with no chosen **display image** can only be kept hidden
+([ADR-0019](docs/adr/0019-publishing-an-artist-needs-a-chosen-display-image.md)).
+The admin who decided is recorded on each Artist published.
 _Avoid_: confirmation (the whole step, not one artist's choice), approval.
 
 **credit that stays hidden** — a **hidden artist** credited on a Release whom

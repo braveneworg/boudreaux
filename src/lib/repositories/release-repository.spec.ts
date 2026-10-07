@@ -190,7 +190,8 @@ describe('ReleaseRepository', () => {
     shortBio: null,
     altBio: null,
     bioGeneratedAt: null,
-    bioImages: [],
+    // A chosen display image: a credit decision publishes only such an artist (ADR-0019).
+    bioImages: [{ isPrimary: false, displayOrder: 0, alt: 'portrait' }],
   });
 
   describe('transaction writes', () => {

@@ -121,7 +121,6 @@ export const queryKeys = {
         params.published,
         params.deleted,
       ] as const,
-    bySlug: (slug: string) => [...queryKeys.artists.all, 'bySlug', slug] as const,
     /** The credit confirmation for artists a release is about to credit; order-free. */
     credits: (artistIds: string[]) =>
       [...queryKeys.artists.all, 'credits', [...artistIds].sort().join(',')] as const,

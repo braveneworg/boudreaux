@@ -78,6 +78,7 @@ const renderManager = (overrides: Partial<BioImageManagerProps> = {}) => {
   const props: BioImageManagerProps = {
     artistId: 'artist-1',
     images: POOL,
+    isPublished: false,
     onDelete: vi.fn(),
     onInsert: vi.fn(),
     onEditAttribution: vi.fn(),
@@ -310,13 +311,30 @@ describe('BioImageManager', () => {
     expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'bare']);
   });
 
-  it('disables "use" everywhere once the cap is reached, with the reason', () => {
-    renderManager({
+  it('keeps "use" enabled past three — the chosen set has no cap', async () => {
+    const { onSetDisplayImages } = renderManager({
       images: [...POOL, image('third', { displayOrder: 2, origin: 'custom' })],
     });
     const button = useButton('suggested');
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription(/Remove a display image first/);
+    expect(button).toBeEnabled();
+
+    await userEvent.click(button);
+
+    expect(onSetDisplayImages).toHaveBeenCalledWith(['first', 'second', 'third', 'suggested']);
+  });
+
+  // ADR-0019: a published artist's chosen set never becomes empty, so its
+  // last chosen image cannot be deleted from the pool either.
+  it("disables deleting a published artist's last chosen image, with the reason", () => {
+    renderManager({
+      images: [image('first', { displayOrder: 0, origin: 'custom' }), image('rest')],
+      isPublished: true,
+    });
+
+    const deleteFirst = screen.getByRole('button', { name: 'Delete image first' });
+    expect(deleteFirst).toBeDisabled();
+    expect(deleteFirst).toHaveAccessibleDescription(/at least one display image/i);
+    expect(screen.getByRole('button', { name: 'Delete image rest' })).toBeEnabled();
   });
 
   it('removes from the chosen set through the strip', async () => {

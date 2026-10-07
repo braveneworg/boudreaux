@@ -102,6 +102,7 @@ vi.mock('./release-play-dialog', () => ({
     artistName,
     open,
     onOpenChange,
+    onCloseAutoFocus,
     takeMediaEl: dialogTakeMediaEl,
     prefetch,
   }: {
@@ -110,6 +111,7 @@ vi.mock('./release-play-dialog', () => ({
     artistName: string | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onCloseAutoFocus?: (event: Event) => void;
     takeMediaEl: () => HTMLAudioElement | null;
     prefetch?: boolean;
   }) => (
@@ -124,6 +126,13 @@ vi.mock('./release-play-dialog', () => ({
     >
       <button type="button" data-testid="close-play-dialog" onClick={() => onOpenChange(false)}>
         Close
+      </button>
+      <button
+        type="button"
+        data-testid="close-auto-focus"
+        onClick={() => onCloseAutoFocus?.(new Event('focusScope.autoFocusOnUnmount'))}
+      >
+        Return focus
       </button>
     </div>
   ),
@@ -221,6 +230,16 @@ describe('ReleaseCard', () => {
 
     expect(discardMediaEl).toHaveBeenCalled();
     expect(screen.getByTestId('release-play-dialog')).toHaveAttribute('data-open', 'false');
+  });
+
+  it('returns focus to the Play button when the modal closes', () => {
+    render(<ReleaseCard {...defaultProps} />);
+    const play = screen.getByRole('button', { name: /play midnight serenade/i });
+
+    fireEvent.click(play);
+    fireEvent.click(screen.getByTestId('close-auto-focus'));
+
+    expect(play).toHaveFocus();
   });
 
   it('disables Play and skips the dialog when the release has no playable track', () => {

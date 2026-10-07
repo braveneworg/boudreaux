@@ -35,7 +35,15 @@ interface SeededArtist {
   displayName: string;
 }
 
-const seedArtist = async (label: string, publishedOn?: Date): Promise<SeededArtist> => {
+/**
+ * Seed one credited artist. `withDisplayImage` gives it a chosen display
+ * image, which publishing needs (ADR-0019); an artist without one can only
+ * be kept hidden.
+ */
+const seedArtist = async (
+  label: string,
+  { publishedOn, withDisplayImage = true }: { publishedOn?: Date; withDisplayImage?: boolean } = {}
+): Promise<SeededArtist> => {
   const stamp = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
   const displayName = `E2E Credit ${label} ${stamp}`;
   const artist = await prisma.artist.create({
@@ -45,6 +53,18 @@ const seedArtist = async (label: string, publishedOn?: Date): Promise<SeededArti
       slug: `${PREFIX}-${label.toLowerCase()}-${stamp}`,
       displayName,
       ...(publishedOn ? { publishedOn } : {}),
+      ...(withDisplayImage
+        ? {
+            bioImages: {
+              create: {
+                url: `https://picsum.photos/seed/${PREFIX}-${stamp}/400/400`,
+                alt: displayName,
+                origin: 'custom',
+                displayOrder: 0,
+              },
+            },
+          }
+        : {}),
     },
   });
   created.artistIds.push(artist.id);
@@ -80,13 +100,14 @@ test.describe('Credit confirmation (ADR-0015)', () => {
       where: { OR: [{ artistId: { in: artistIds } }, { releaseId: { in: releaseIds } }] },
     });
     await prisma.release.deleteMany({ where: { id: { in: releaseIds } } });
+    await prisma.artistBioImage.deleteMany({ where: { artistId: { in: artistIds } } });
     await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
     await prisma.$disconnect();
   });
 
   test('publishing a release publishes only the artists the admin chose', async ({ adminPage }) => {
     const chosen = await seedArtist('Chosen');
-    const keptHidden = await seedArtist('Kept');
+    const keptHidden = await seedArtist('Kept', { withDisplayImage: false });
     const release = await seedRelease('Publish', [chosen, keptHidden]);
 
     await adminPage.goto('/admin/releases');
@@ -106,6 +127,9 @@ test.describe('Credit confirmation (ADR-0015)', () => {
     const keptToggle = dialog.getByRole('switch', { name: `Publish ${keptHidden.displayName}` });
     await expect(chosenToggle).toHaveAttribute('aria-checked', 'false');
     await expect(keptToggle).toHaveAttribute('aria-checked', 'false');
+    // ADR-0019: with no display image the credit can only be kept hidden.
+    await expect(keptToggle).toBeDisabled();
+    await expect(keptToggle).toHaveAccessibleDescription(/no display image/i);
 
     await chosenToggle.click();
     await dialog.getByRole('button', { name: 'Publish release', exact: true }).click();
@@ -153,7 +177,7 @@ test.describe('Credit confirmation (ADR-0015)', () => {
   });
 
   test('a release whose artists are all public publishes without asking', async ({ adminPage }) => {
-    const artist = await seedArtist('Public', new Date());
+    const artist = await seedArtist('Public', { publishedOn: new Date() });
     const release = await seedRelease('Direct', [artist]);
 
     await adminPage.goto('/admin/releases');
@@ -173,7 +197,7 @@ test.describe('Credit confirmation (ADR-0015)', () => {
   });
 
   test('archiving an artist warns which public work loses the name', async ({ adminPage }) => {
-    const artist = await seedArtist('Hide', new Date());
+    const artist = await seedArtist('Hide', { publishedOn: new Date() });
     const release = await seedRelease('Hidden Byline', [artist], new Date());
 
     await adminPage.goto(`/admin/artists/${artist.id}`);

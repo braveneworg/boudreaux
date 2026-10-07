@@ -78,6 +78,11 @@ const AwaitingCreditRow = ({
     [credit.id, onPublishChange]
   );
 
+  // ADR-0019: publishing needs a chosen display image; without one the
+  // credit can only be kept hidden, and the toggle says why.
+  const canPublish = credit.displayImageCount > 0;
+  const reasonId = `credit-${credit.id}-reason`;
+
   return (
     <li
       data-testid={`credit-${credit.id}`}
@@ -88,6 +93,11 @@ const AwaitingCreditRow = ({
         <p className="text-sm text-zinc-700">
           {bioLabel(credit)} · {imagesLabel(credit.displayImageCount)}
         </p>
+        {!canPublish && (
+          <p id={reasonId} className="text-sm text-zinc-700">
+            No display image: choose one on the artist page before this credit can be published.
+          </p>
+        )}
         <Link
           href={`/admin/artists/${credit.id}`}
           target="_blank"
@@ -101,7 +111,9 @@ const AwaitingCreditRow = ({
       <Switch
         checked={publish}
         onCheckedChange={handleCheckedChange}
+        disabled={!canPublish}
         aria-label={`Publish ${credit.name}`}
+        aria-describedby={canPublish ? undefined : reasonId}
       />
     </li>
   );

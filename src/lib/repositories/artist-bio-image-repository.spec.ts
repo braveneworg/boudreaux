@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { bioImageWhere } from './_internal/bio-media-where';
 import { ArtistBioImageRepository } from './artist-bio-image-repository';
 
 vi.mock('server-only', () => ({}));
@@ -10,8 +11,10 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: vi.fn(),
     artistBioImage: {
+      count: vi.fn(),
       delete: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
       create: vi.fn(),
@@ -25,6 +28,47 @@ const { prisma } = await import('@/lib/prisma');
 
 describe('ArtistBioImageRepository', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  describe('countChosen', () => {
+    it('counts the artist rows matching the chosen fragment (the publish gate)', async () => {
+      vi.mocked(prisma.artistBioImage.count).mockResolvedValue(2);
+
+      const count = await ArtistBioImageRepository.countChosen('a1');
+
+      expect(prisma.artistBioImage.count).toHaveBeenCalledWith({
+        where: { artistId: 'a1', AND: [bioImageWhere.chosen] },
+      });
+      expect(count).toBe(2);
+    });
+  });
+
+  describe('findDisplayState', () => {
+    it('reads the row’s position and its artist’s publish state', async () => {
+      vi.mocked(prisma.artistBioImage.findUnique).mockResolvedValue({
+        artistId: 'a1',
+        displayOrder: 0,
+        artist: { publishedOn: new Date('2026-01-01') },
+      } as never);
+
+      const state = await ArtistBioImageRepository.findDisplayState('img-1');
+
+      expect(prisma.artistBioImage.findUnique).toHaveBeenCalledWith({
+        where: { id: 'img-1' },
+        select: { artistId: true, displayOrder: true, artist: { select: { publishedOn: true } } },
+      });
+      expect(state).toEqual({
+        artistId: 'a1',
+        displayOrder: 0,
+        artist: { publishedOn: new Date('2026-01-01') },
+      });
+    });
+
+    it('returns null for an unknown row', async () => {
+      vi.mocked(prisma.artistBioImage.findUnique).mockResolvedValue(null);
+
+      expect(await ArtistBioImageRepository.findDisplayState('missing')).toBeNull();
+    });
+  });
 
   describe('create', () => {
     it('appends a new bio image row after the current max sortOrder', async () => {

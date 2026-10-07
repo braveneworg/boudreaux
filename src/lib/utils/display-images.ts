@@ -3,23 +3,30 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Display images — the ordered set of up to {@link DISPLAY_IMAGE_CAP} bio
- * images shown for an Artist on the public artist page and index cards.
+ * Display images — the ordered set of bio images shown for an Artist: all of
+ * them on the public artist page, the first one on its index card.
  *
- * Chosen and ordered only by a human (`displayOrder`); the bio generation job
- * may *suggest* images (`isPrimary`) but never chooses or displaces a human's
- * choice. While no human has chosen, the page shows the suggested images that
- * have alt text, else the first pool images that have alt text — an image
- * without alt is never rendered as a display image unless a human chose it
- * (ADR-0008, addendum for #767).
+ * Chosen and ordered only by a human (`displayOrder`), with no cap; the bio
+ * generation job may *suggest* images (`isPrimary`) but never chooses or
+ * displaces a human's choice. While no human has chosen, the page shows up to
+ * {@link FALLBACK_DISPLAY_IMAGE_CAP} suggested images that have alt text, else
+ * the first pool images that have alt text — an image without alt is never
+ * rendered as a display image unless a human chose it (ADR-0008 and its
+ * addenda).
  *
  * Pure and client-safe: the public page, the listing service, the admin media
  * manager, and the cover-art picker all resolve through here so every surface
  * agrees on which images are the display images.
  */
 
-/** Number of display-image slots the public artist page renders. */
-export const DISPLAY_IMAGE_CAP = 3;
+/**
+ * How many tiles the fallback tiers show while nothing is chosen. The chosen
+ * tier has no cap (ADR-0008, second addendum).
+ */
+export const FALLBACK_DISPLAY_IMAGE_CAP = 3;
+
+/** How many display images an index card shows: the first one. */
+export const CARD_DISPLAY_IMAGE_COUNT = 1;
 
 /** The fields display-image resolution reads off a bio image row. */
 export interface DisplayImageCandidate {
@@ -70,36 +77,42 @@ export const isDisplayEligible = (row: { alt?: string | null }): boolean =>
  * the order every repository projection returns them in.
  *
  * Precedence: the human's chosen rows by position → the job's suggested rows
- * that have alt text → the first pool rows that have alt text. Each tier is
- * sliced to {@link DISPLAY_IMAGE_CAP}; a gap left by a deleted chosen row
+ * that have alt text → the first pool rows that have alt text. The chosen
+ * tier is returned whole; each fallback tier is sliced to
+ * {@link FALLBACK_DISPLAY_IMAGE_CAP}. A gap left by a deleted chosen row
  * keeps the remaining relative order. Chosen rows are not re-checked for alt:
  * the set-display-images service backfills a missing one with the artist's
  * name before it saves the choice.
  *
  * @param rows - The artist's bio images in pool order.
- * @returns The tier and its display images (never more than the cap); the
- *   tier is `'pool'` when nothing is eligible. Never mutates `rows`.
+ * @returns The tier and its display images; the tier is `'pool'` when
+ *   nothing is eligible. Never mutates `rows`.
  */
 export const resolveDisplayImageSet = <T extends DisplayImageCandidate>(
   rows: readonly T[]
 ): DisplayImageSet<T> => {
   const chosen = chosenInOrder(rows);
-  if (chosen.length > 0) return { tier: 'chosen', images: chosen.slice(0, DISPLAY_IMAGE_CAP) };
+  if (chosen.length > 0) return { tier: 'chosen', images: chosen };
 
   const eligible = rows.filter(isDisplayEligible);
   const suggested = eligible.filter((row) => row.isPrimary);
   if (suggested.length > 0) {
-    return { tier: 'suggested', images: suggested.slice(0, DISPLAY_IMAGE_CAP) };
+    return { tier: 'suggested', images: suggested.slice(0, FALLBACK_DISPLAY_IMAGE_CAP) };
   }
-  return { tier: 'pool', images: eligible.slice(0, DISPLAY_IMAGE_CAP) };
+  return { tier: 'pool', images: eligible.slice(0, FALLBACK_DISPLAY_IMAGE_CAP) };
 };
+
+/** How many bio images a human has chosen — the publish gate's count (ADR-0019). */
+export const countChosenDisplayImages = <T extends DisplayImageCandidate>(
+  rows: readonly T[]
+): number => rows.filter(isChosen).length;
 
 /**
  * Resolve an artist's display images — {@link resolveDisplayImageSet}
  * without the tier, for surfaces that only render them.
  *
  * @param rows - The artist's bio images in pool order.
- * @returns The display images, never more than the cap; never mutates `rows`.
+ * @returns The display images; never mutates `rows`.
  */
 export const resolveDisplayImages = <T extends DisplayImageCandidate>(rows: readonly T[]): T[] =>
   resolveDisplayImageSet(rows).images;
@@ -128,11 +141,11 @@ export const orderBioImagesForPicker = <T extends DisplayImageCandidate>(
 };
 
 /**
- * The rule for a fresh upload into the pool: it joins the display images
- * while the set has room and it is not already chosen, else it stays in the
- * pool. Decided against the set as it is when the upload LANDS — the media
- * manager once decided against the set as it was when the upload started,
- * and a choice made during the seconds-long upload was then overwritten.
+ * The rule for a fresh media-manager upload: it joins the display images,
+ * appended last, unless it is already chosen. Decided against the set as it
+ * is when the upload LANDS — the media manager once decided against the set
+ * as it was when the upload started, and a choice made during the
+ * seconds-long upload was then overwritten.
  *
  * @param chosenIds - The chosen ids, in order, right now.
  * @param uploadedId - The row the upload just created.
@@ -141,7 +154,4 @@ export const orderBioImagesForPicker = <T extends DisplayImageCandidate>(
 export const decideUploadJoin = (
   chosenIds: readonly string[],
   uploadedId: string
-): string[] | null =>
-  chosenIds.length < DISPLAY_IMAGE_CAP && !chosenIds.includes(uploadedId)
-    ? [...chosenIds, uploadedId]
-    : null;
+): string[] | null => (chosenIds.includes(uploadedId) ? null : [...chosenIds, uploadedId]);

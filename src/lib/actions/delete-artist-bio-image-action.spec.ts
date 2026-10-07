@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(requireRole).mockResolvedValue(mockSession as never);
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.deleteBioImage).mockResolvedValue(undefined as never);
+  vi.mocked(ArtistService.deleteBioImage).mockResolvedValue({ success: true, data: undefined });
 });
 
 describe('deleteArtistBioImageAction', () => {
@@ -70,6 +70,22 @@ describe('deleteArtistBioImageAction', () => {
     await deleteArtistBioImageAction(imageId);
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
+  });
+
+  it("surfaces the service's refusal with its reason (a published artist's last display image)", async () => {
+    vi.mocked(ArtistService.deleteBioImage).mockResolvedValue({
+      success: false,
+      error: 'A published artist keeps at least one display image',
+      code: 'VALIDATION',
+    });
+
+    const result = await deleteArtistBioImageAction(imageId);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'A published artist keeps at least one display image',
+    });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it('handles an unexpected service error', async () => {

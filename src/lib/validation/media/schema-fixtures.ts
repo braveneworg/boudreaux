@@ -89,6 +89,7 @@ export const artistScalar = {
   isPseudonymous: false,
   instruments: null,
   featuredArtistId: null,
+  links: null,
 };
 
 /**
@@ -139,9 +140,11 @@ export const artistBioValues = {
   bioGeneratedAt: ISO,
   bioModel: 'gemini-2.5-pro',
   bioStatus: 'succeeded',
+  // Own-page like the bio (ADR-0020): a nested artist never carries links.
+  links: { websites: [{ label: null, url: 'https://example.com' }], social: [], contact: [] },
 };
 
-/** {@link artistPublicScalar} with every bio field removed — a nested artist's wire shape. */
+/** {@link artistPublicScalar} with every own-page field removed — a nested artist's wire shape. */
 export const artistCreditScalar = Object.fromEntries(
   Object.entries(artistPublicScalar).filter(([key]) => !(key in artistBioValues))
 );
@@ -370,4 +373,5 @@ export const artistWithPublishedReleases = {
       albumArtist: null,
     },
   ],
+  newestRelease: { id: 'r1', title: release.title, releasedOn: ISO },
 };

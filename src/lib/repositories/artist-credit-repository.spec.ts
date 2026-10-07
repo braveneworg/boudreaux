@@ -94,7 +94,8 @@ describe('ArtistCreditRepository', () => {
           shortBio: null,
           altBio: null,
           bioGeneratedAt: NOW,
-          bioImages: [{ isPrimary: true, displayOrder: null, alt: 'On stage' }],
+          // Chosen (ADR-0019 counts chosen images only).
+          bioImages: [{ isPrimary: false, displayOrder: 0, alt: 'On stage' }],
         },
       ] as never);
 

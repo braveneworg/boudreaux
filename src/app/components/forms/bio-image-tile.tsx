@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { DragEvent, JSX, ReactNode } from 'react';
 
 import Image from 'next/image';
@@ -61,6 +61,8 @@ export interface BioImageTileProps {
   /** When given, the tile shows the alt text with an inline editor (display images need alt). */
   onEditAlt?: (imageId: string, alt: string) => void;
   disabled: boolean;
+  /** Why the delete button is disabled (shown as its description), or null when deletable. */
+  deleteDisabledReason?: string | null;
   /** Extra controls rendered in the tile's action row, before the delete button. */
   actions?: ReactNode;
   /** Extra badges rendered beside the license and face badges. */
@@ -68,6 +70,44 @@ export interface BioImageTileProps {
 }
 
 type EditingField = 'attribution' | 'alt' | null;
+
+interface DeleteButtonProps {
+  label: string;
+  disabled: boolean;
+  /** When given, the button is disabled and this is its accessible description. */
+  disabledReason: string | null;
+  onClick: () => void;
+}
+
+/** The tile's pool-delete control; a reason both disables it and describes why. */
+const DeleteButton = ({
+  label,
+  disabled,
+  disabledReason,
+  onClick,
+}: DeleteButtonProps): JSX.Element => {
+  const reasonId = useId();
+  return (
+    <>
+      {disabledReason && (
+        <span id={reasonId} className="sr-only">
+          {disabledReason}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={disabled || disabledReason !== null}
+        onClick={onClick}
+        aria-label={label}
+        aria-describedby={disabledReason ? reasonId : undefined}
+        title={disabledReason ?? 'Delete from the pool'}
+        className="hover:text-destructive ml-auto p-0.5 disabled:opacity-40"
+      >
+        <X className="size-3.5" aria-hidden />
+      </button>
+    </>
+  );
+};
 
 interface EditableTextRowProps {
   /** Accessible name of the editor input, e.g. "Attribution". */
@@ -144,6 +184,7 @@ export const BioImageTile = ({
   onEditAttribution,
   onEditAlt,
   disabled,
+  deleteDisabledReason = null,
   actions,
   badges,
 }: BioImageTileProps): JSX.Element => {
@@ -275,16 +316,12 @@ export const BioImageTile = ({
           <TextCursorInput className="size-3.5" aria-hidden />
         </button>
         {actions}
-        <button
-          type="button"
+        <DeleteButton
+          label={`Delete image ${deleteLabel}`}
           disabled={disabled}
+          disabledReason={deleteDisabledReason}
           onClick={() => onDelete(image.id)}
-          aria-label={`Delete image ${deleteLabel}`}
-          title="Delete from the pool"
-          className="hover:text-destructive ml-auto p-0.5"
-        >
-          <X className="size-3.5" aria-hidden />
-        </button>
+        />
       </div>
     </li>
   );

@@ -72,11 +72,6 @@ describe('queryKeys', () => {
       expect(queryKeys.artists.all).toEqual(['artists']);
     });
 
-    it('should return bySlug key with slug', () => {
-      const key = queryKeys.artists.bySlug('test-artist');
-      expect(key).toEqual(['artists', 'bySlug', 'test-artist']);
-    });
-
     it('should return search key with query', () => {
       const key = queryKeys.artists.search('rock');
       expect(key).toEqual(['artists', 'search', 'rock']);

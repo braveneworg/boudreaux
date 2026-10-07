@@ -15,6 +15,7 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
+import { normalizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
@@ -37,12 +38,38 @@ const PERMITTED_FIELD_NAMES = [
   'diedOn',
   'formedOn',
   'publishedOn',
+  'websiteLinks',
+  'socialLinks',
+  'contactLinkGroups',
 ] as const;
 
 type ParsedArtistData = ReturnType<typeof createArtistSchema.parse>;
 
 const toOptionalDate = (value: string | undefined): Date | undefined =>
   value ? new Date(value) : undefined;
+
+/**
+ * The links composite the form's three arrays compose (ADR-0020), or nothing
+ * when the form did not send them, so an older client's save leaves the
+ * stored links alone.
+ */
+const toLinksPayload = ({
+  websiteLinks,
+  socialLinks,
+  contactLinkGroups,
+}: ParsedArtistData): Pick<UpdateArtistData, 'links'> =>
+  // Any array present means the form has link editors: the ones it did not
+  // send are empty, not "leave alone". Only a request with none at all (an
+  // older client, the create form) leaves the stored links untouched.
+  websiteLinks || socialLinks || contactLinkGroups
+    ? {
+        links: normalizeArtistLinks({
+          websiteLinks: websiteLinks ?? [],
+          socialLinks: socialLinks ?? [],
+          contactLinkGroups: contactLinkGroups ?? [],
+        }),
+      }
+    : {};
 
 const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => ({
   firstName: data.firstName || '',
@@ -62,6 +89,7 @@ const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => (
   diedOn: toOptionalDate(data.diedOn),
   formedOn: toOptionalDate(data.formedOn),
   publishedOn: toOptionalDate(data.publishedOn),
+  ...toLinksPayload(data),
 });
 
 const applyServiceErrorToFormState = (formState: FormState, errorMessage: string): void => {

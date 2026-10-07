@@ -1,52 +1,39 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
-/**
- * Artist detail page at `/artists/[slug]`.
- * Server Component that prefetches artist data for SSR,
- * then hydrates client components for interactivity.
- */
-
 import { notFound } from 'next/navigation';
 
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-
-import { ArtistDetailContent } from '@/app/components/artist-detail-content';
+import { ArtistBio } from '@/app/components/artist-bio';
+import { DisplayImageCollage } from '@/app/components/display-image-collage';
+import { LatestReleaseLink } from '@/app/components/latest-release-link';
+import { ContactLinkSection, LinkSection } from '@/app/components/link-section';
+import { Badge } from '@/app/components/ui/badge';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
-import { queryKeys } from '@/lib/query-keys';
-import { ArtistService } from '@/lib/services/artist-service';
+import { ZineHeading } from '@/app/components/ui/zine-heading';
+import { ZinePanel } from '@/app/components/ui/zine-panel';
+import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
-import { getQueryClient } from '@/lib/utils/get-query-client';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
-import { artistWithPublishedReleasesSchema } from '@/lib/validation/media/artist-schema';
+import { splitList } from '@/lib/utils/split-list';
+import { formatVocabularyTerm } from '@/utils/vocabulary-term';
+
+import { getPublicArtist } from './get-public-artist';
+import { toLatestRelease } from './latest-release';
 
 import type { Metadata } from 'next';
 
 interface ArtistDetailPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/**
- * Generate dynamic metadata for SEO using the artist name and bio.
- * Uses ArtistService directly (server-only code, not a component).
- */
 export async function generateMetadata({ params }: ArtistDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const result = await ArtistService.getArtistBySlugWithReleases(slug);
-
-  if (!result.success) {
-    return { title: 'Artist Not Found' };
-  }
-
-  const artist = result.data;
+  const artist = await getPublicArtist(slug);
+  if (!artist) return { title: 'Artist Not Found' };
   const displayName = getArtistDisplayName(artist);
-
-  // shortBio is now rich HTML; strip tags for the plain-text meta description.
+  // The short bio is rich HTML; the meta description takes its text.
   const shortBioText = artist.shortBio ? sanitizeBioText(artist.shortBio) : '';
-
   return {
     title: displayName,
     description: shortBioText || `Listen to releases by ${displayName}.`,
@@ -54,44 +41,84 @@ export async function generateMetadata({ params }: ArtistDetailPageProps): Promi
 }
 
 /**
- * Artist detail page — prefetches artist data with releases,
- * then hydrates the client content component.
+ * The artist page, design A ("contact sheet"): the proof-sheet collage of
+ * the display images, the genres and the curated link sections in the left
+ * third; the name, the latest release and the biography on the right. A
+ * Server Component: the graph is read once per request (shared with the
+ * metadata) and parsed to the public wire shape; the collage and the
+ * latest-release line are the only client islands. On a phone the order is
+ * name, filmstrip, genres and links, then the biography.
  */
-export default async function ArtistDetailPage({ params, searchParams }: ArtistDetailPageProps) {
+export default async function ArtistDetailPage({ params }: ArtistDetailPageProps) {
   const { slug } = await params;
-  const resolvedSearchParams = await searchParams;
-  const initialReleaseId =
-    typeof resolvedSearchParams.release === 'string' ? resolvedSearchParams.release : undefined;
+  const artist = await getPublicArtist(slug);
+  if (!artist) notFound();
 
-  const queryClient = getQueryClient();
-
-  // Fetch artist directly via service (Server Component → service is server-only).
-  // This avoids an internal HTTP roundtrip (SSRF-safe) and works regardless of
-  // how the standalone server's network/host is configured.
-  const result = await ArtistService.getArtistBySlugWithReleases(slug);
-
-  if (!result.success) {
-    notFound();
-  }
-
-  // The dehydrated query state is serialised into the HTML, so it passes the
-  // same public-schema guard as the API route (#765) — anything private a
-  // future query re-selects is stripped here. Then round-trip through JSON to
-  // normalize Date → string and BigInt → Number (matches the API response
-  // shape that the client query consumer expects).
-  const publicArtist = artistWithPublishedReleasesSchema.parse(result.data);
-  const artistData = JSON.parse(
-    JSON.stringify(publicArtist, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  queryClient.setQueryData(queryKeys.artists.bySlug(slug), artistData);
+  const displayName = getArtistDisplayName(artist);
+  const genres = splitList(artist.genres);
+  // The chosen display images in order; a grandfathered artist with none
+  // chosen keeps the ADR-0008 fallback tiers (decision 5).
+  const images = resolveDisplayImages(artist.bioImages);
+  const latest = toLatestRelease(artist);
+  const { links } = artist;
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <PageContainer>
-        <ContentContainer>
-          <ArtistDetailContent slug={slug} initialReleaseId={initialReleaseId} />
-        </ContentContainer>
-      </PageContainer>
-    </HydrationBoundary>
+    <PageContainer>
+      <ContentContainer>
+        <ZinePanel
+          chat
+          accent="orange"
+          tape={false}
+          breadcrumbs={[
+            { anchorText: 'Artists', url: '/artists', isActive: false },
+            {
+              anchorText: displayName,
+              url: `/artists/${slug}`,
+              isActive: true,
+              className: 'max-w-[200px] truncate sm:max-w-none sm:overflow-visible',
+            },
+          ]}
+          contentClassName="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr]"
+        >
+          <header className="space-y-3 lg:col-start-2 lg:row-start-1">
+            <ZineHeading level={1} className="mb-2">
+              {displayName}
+            </ZineHeading>
+            {latest ? (
+              <LatestReleaseLink
+                release={latest}
+                artistName={displayName}
+                slug={slug}
+                className="text-lg"
+              />
+            ) : (
+              <p className="text-zinc-700">No releases yet.</p>
+            )}
+          </header>
+
+          <aside className="space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+            <DisplayImageCollage images={images} displayName={displayName} />
+            {genres.length > 0 && (
+              <ul aria-label="Genres" className="flex flex-wrap gap-1.5">
+                {genres.map((genre) => (
+                  <li key={genre}>
+                    <Badge variant="secondary">{formatVocabularyTerm(genre)}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {links ? (
+              <>
+                <LinkSection heading="Websites" section="websites" links={links.websites} />
+                <LinkSection heading="Social Media" section="social" links={links.social} />
+                <ContactLinkSection groups={links.contact} />
+              </>
+            ) : null}
+          </aside>
+
+          <ArtistBio html={artist.bio} className="lg:col-start-2 lg:row-start-2" />
+        </ZinePanel>
+      </ContentContainer>
+    </PageContainer>
   );
 }

@@ -23,35 +23,31 @@ export const createArtistAction = async (
 ): Promise<FormState> => {
   const session = await requireRole('admin');
 
+  // No `publishedOn`: an artist is created unpublished and published from
+  // the edit form once it has a chosen display image (ADR-0019).
   const permittedFieldNames = [
     'firstName',
     'surname',
     'slug',
     'displayName',
     'middleName',
-    'publishedOn',
     'formedOn',
   ] as const;
   const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
 
   if (parsed.success) {
     try {
-      const { firstName, surname, slug, middleName, displayName, publishedOn, formedOn } =
-        parsed.data;
+      const { firstName, surname, slug, middleName, displayName, formedOn } = parsed.data;
 
       // Create artist in database
-      const response = await ArtistService.createArtist(
-        {
-          firstName: firstName || '',
-          surname: surname || '',
-          slug,
-          middleName,
-          displayName,
-          publishedOn: publishedOn ? new Date(publishedOn) : undefined,
-          formedOn: formedOn ? new Date(formedOn) : undefined,
-        },
-        session.user.id
-      );
+      const response = await ArtistService.createArtist({
+        firstName: firstName || '',
+        surname: surname || '',
+        slug,
+        middleName,
+        displayName,
+        formedOn: formedOn ? new Date(formedOn) : undefined,
+      });
 
       // Log artist creation for security audit
       logSecurityEvent({

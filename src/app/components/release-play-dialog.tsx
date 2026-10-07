@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import {
   Dialog,
@@ -35,6 +35,14 @@ export interface ReleasePlayDialogProps {
    * hover/focus of the Play button) so the player mounts without a skeleton.
    */
   prefetch?: boolean;
+  /**
+   * Radix's close hook: the opener decides where focus returns (its Play
+   * button, the artist page's latest-release link) instead of wherever the
+   * document's focus happened to sit when the dialog opened.
+   */
+  onCloseAutoFocus?: (event: Event) => void;
+  /** Rendered under the player, e.g. a "View all releases" link. */
+  footer?: ReactNode;
 }
 
 /** Loading placeholder shaped like the player: square cover + controls bar. */
@@ -65,6 +73,8 @@ export const ReleasePlayDialog = ({
   onOpenChange,
   takeMediaEl,
   prefetch = false,
+  onCloseAutoFocus,
+  footer,
 }: ReleasePlayDialogProps): ReactElement => {
   const {
     isPending,
@@ -74,7 +84,10 @@ export const ReleasePlayDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] gap-3 overflow-y-auto p-4 sm:max-w-md lg:max-w-lg">
+      <DialogContent
+        className="max-h-[90dvh] gap-3 overflow-y-auto p-4 sm:max-w-md lg:max-w-lg"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader className="pr-8">
           <DialogTitle className="font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl">
             {title}
@@ -98,6 +111,13 @@ export const ReleasePlayDialog = ({
             takeMediaEl={takeMediaEl}
           />
         )}
+        {footer ? (
+          // min-w-0: a grid child's intrinsic width would otherwise widen the
+          // dialog (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
+          <div data-slot="release-play-dialog-footer" className="min-w-0 text-sm">
+            {footer}
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

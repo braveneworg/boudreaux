@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
   createBioImageInputSchema,
+  MAX_DISPLAY_IMAGE_IDS_PER_REQUEST,
   setDisplayImagesInputSchema,
   updateBioImageAltInputSchema,
   updateBioImageAttributionInputSchema,
@@ -89,16 +90,24 @@ describe('setDisplayImagesInputSchema', () => {
   const artistId = '507f1f77bcf86cd799439011';
   const ids = ['665f1f77bcf86cd799439021', '665f1f77bcf86cd799439022', '665f1f77bcf86cd799439023'];
 
-  it('accepts up to the cap of unique image ids', () => {
+  it('accepts unique image ids', () => {
     expect(setDisplayImagesInputSchema.safeParse({ artistId, imageIds: ids }).success).toBe(true);
+  });
+
+  it('accepts more than three ids — the chosen set has no product cap', () => {
+    const nine = Array.from({ length: 9 }, (_, i) => `665f1f77bcf86cd79943903${i}`);
+    expect(setDisplayImagesInputSchema.safeParse({ artistId, imageIds: nine }).success).toBe(true);
   });
 
   it('accepts an empty list (clearing every display image)', () => {
     expect(setDisplayImagesInputSchema.safeParse({ artistId, imageIds: [] }).success).toBe(true);
   });
 
-  it('rejects more ids than the cap', () => {
-    const tooMany = [...ids, '665f1f77bcf86cd799439024'];
+  it('rejects a request past the size guard', () => {
+    const tooMany = Array.from(
+      { length: MAX_DISPLAY_IMAGE_IDS_PER_REQUEST + 1 },
+      (_, i) => `665f1f77bcf86cd79${String(i).padStart(7, '0')}`
+    );
     expect(setDisplayImagesInputSchema.safeParse({ artistId, imageIds: tooMany }).success).toBe(
       false
     );

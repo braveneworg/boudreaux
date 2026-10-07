@@ -68,11 +68,18 @@ type EntityMutations = {
   hardDelete?: EntityMutation;
 };
 
+interface DataViewMockRow {
+  id: string;
+  hasDisplayImage?: boolean;
+}
+
 interface DataViewMockProps {
   mutations: EntityMutations;
   filters: DataViewFilters;
   entity: unknown;
   imageField: unknown;
+  data: { artists: DataViewMockRow[] };
+  renderBadges?: (item: DataViewMockRow) => ReactNode;
 }
 
 // DataView is mocked to a stub exposing the injected mutation callbacks as
@@ -88,6 +95,11 @@ vi.mock('./data-view', () => ({
         data-image-field={String(props.imageField)}
       >
         DataView
+        {props.data.artists.map((row) => (
+          <span key={row.id} data-testid={`badges-${row.id}`}>
+            {props.renderBadges?.(row)}
+          </span>
+        ))}
         <button
           type="button"
           data-testid="toggle-unpublished"
@@ -179,6 +191,29 @@ describe('ArtistDataView', () => {
 
     render(<ArtistDataView />);
     expect(screen.getByTestId('data-view')).toBeInTheDocument();
+  });
+
+  // ADR-0019: the listing flags an artist that cannot be published yet.
+  it('badges an artist with no display image', () => {
+    mockUseArtistsQuery.mockReturnValue({
+      ...baseInfiniteResult,
+      data: {
+        pages: [
+          {
+            rows: [
+              { id: '1', firstName: 'Bare', hasDisplayImage: false },
+              { id: '2', firstName: 'Imaged', hasDisplayImage: true },
+            ],
+            nextSkip: null,
+          },
+        ],
+      },
+    });
+
+    render(<ArtistDataView />);
+
+    expect(screen.getByTestId('badges-1')).toHaveTextContent('No display image');
+    expect(screen.getByTestId('badges-2')).toBeEmptyDOMElement();
   });
 
   it('passes no legacy image field, since artists no longer carry images', () => {

@@ -51,7 +51,7 @@ const artistListingBioImageSchema = z.object({
 }) satisfies z.ZodType<ArtistListingBioImage>;
 
 /** The newest listed release credited to the artist, or `null`. */
-const artistListingNewestReleaseSchema = z
+export const artistListingNewestReleaseSchema = z
   .object({ id: z.string(), title: z.string(), releasedOn: date })
   .nullable();
 

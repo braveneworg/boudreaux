@@ -130,7 +130,7 @@ describe('useArtistPool', () => {
   // The defect this guards: the old manager decided "join the set if there is
   // room" against the chosen ids captured when the upload STARTED, so a choice
   // made during the upload was overwritten when it landed.
-  it('adds an upload to the display images as the set is when the upload lands', async () => {
+  it('adds a manager upload to the display images as the set is when the upload lands', async () => {
     let finishUpload!: (value: UploadBioImageResult) => void;
     vi.mocked(uploadBioImage).mockReturnValueOnce(
       new Promise((resolve) => {
@@ -142,7 +142,7 @@ describe('useArtistPool', () => {
 
     let adding!: Promise<unknown>;
     act(() => {
-      adding = result.current.add(new File(['x'], 'n.jpg', { type: 'image/jpeg' }), {
+      adding = result.current.addAsDisplayImage(new File(['x'], 'n.jpg', { type: 'image/jpeg' }), {
         alt: null,
         attribution: '',
       });
@@ -233,7 +233,7 @@ describe('useArtistPool', () => {
     expect(result.current.addError).toBe('Failed to upload image');
   });
 
-  it('leaves a full set alone and still refreshes the picker pool', async () => {
+  it('appends a manager upload past three — the chosen set has no cap', async () => {
     const content = seededContent();
     serverStatus = {
       ...serverStatus,
@@ -243,8 +243,31 @@ describe('useArtistPool', () => {
       success: true,
       data: { id: 'n', url: 'https://cdn.example.com/n.jpg' } as never,
     });
-    const { client, result } = renderPool();
+    const { result } = renderPool();
     await waitFor(() => expect(result.current.chosenIds).toEqual(['a', 'x', 'y']));
+
+    await act(async () => {
+      await result.current.addAsDisplayImage(new File(['x'], 'p.jpg', { type: 'image/jpeg' }), {
+        alt: null,
+        attribution: '',
+      });
+    });
+
+    expect(setArtistDisplayImagesAction).toHaveBeenCalledWith({
+      artistId: ARTIST_ID,
+      imageIds: ['a', 'x', 'y', 'n'],
+    });
+  });
+
+  // The bio editor's inline upload exists to place an image in the prose; it
+  // stays in the pool and never touches the chosen set (ADR-0008, addendum 2).
+  it('keeps a bio-editor upload (add) out of the chosen set and refreshes the picker pool', async () => {
+    vi.mocked(uploadBioImage).mockResolvedValueOnce({
+      success: true,
+      data: { id: 'n', url: 'https://cdn.example.com/n.jpg' } as never,
+    });
+    const { client, result } = renderPool();
+    await waitFor(() => expect(result.current.chosenIds).toEqual(['a']));
     const invalidate = vi.spyOn(client, 'invalidateQueries');
 
     await act(async () => {

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { usePlayerPrefs } from './use-player-prefs';
 
@@ -50,6 +50,20 @@ const stopMediaEl = (el: HTMLAudioElement): void => {
  */
 export const usePrimedAudioHandoff = (): PrimedAudioHandoff => {
   const primedElRef = useRef<HTMLAudioElement | null>(null);
+
+  // An owner that unmounts between the gesture and the player's mount (a
+  // navigation, a route change under the modal) would otherwise strand a
+  // playing element with no UI. Priming happens on a click, after mount, so
+  // StrictMode's mount/cleanup/mount in dev never sees a primed element here.
+  useEffect(
+    () => () => {
+      if (primedElRef.current) {
+        stopMediaEl(primedElRef.current);
+        primedElRef.current = null;
+      }
+    },
+    []
+  );
 
   const primeMediaEl = (src: string): void => {
     // Never leak a previous unclaimed element — it is audibly playing.

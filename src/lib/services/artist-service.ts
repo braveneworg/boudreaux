@@ -5,6 +5,7 @@ import 'server-only';
 
 import {
   ArtistBioImageRepository,
+  type BioImageEligibilityRow,
   type BioImageRehostRow,
 } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
@@ -19,6 +20,7 @@ import type {
   ArtistBioLinkRecord,
   ArtistDetail,
   ArtistListFilters,
+  ArtistListItem,
   ArtistListingFilters,
   ArtistListingName,
   ArtistListingRecord,
@@ -45,7 +47,7 @@ import {
 } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import {
-  DISPLAY_IMAGE_CAP,
+  CARD_DISPLAY_IMAGE_COUNT,
   isDisplayEligible,
   orderBioImagesForPicker,
   resolveDisplayImages,
@@ -58,6 +60,7 @@ import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+import { sanitizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
 import {
   sanitizeBioHtml,
   sanitizeBioHtmlNoImages,
@@ -95,6 +98,9 @@ const sanitizeBioWriteFields = <T extends CreateArtistData | UpdateArtistData>(d
   // omitted field stays omitted so an update does not clear it.
   if (sanitized.genres !== undefined) sanitized.genres = normalizeVocabularyList(sanitized.genres);
   if (sanitized.tags !== undefined) sanitized.tags = normalizeVocabularyList(sanitized.tags);
+  // The links composite has one stored form too (ADR-0020): plain-text
+  // labels, normalised contact hrefs, no empty groups, `null` when empty.
+  if (sanitized.links) sanitized.links = sanitizeArtistLinks(sanitized.links);
   return sanitized;
 };
 
@@ -461,22 +467,73 @@ const refuseHardDelete = async (
   return null;
 };
 
+/** The publish gate's refusal (ADR-0019): copy the admin UI shows as-is. */
+const NO_DISPLAY_IMAGE_MESSAGE = 'Choose at least one display image before publishing';
+/** The non-empty-set guard's refusal (ADR-0019), for clearing and for deleting the last one. */
+const LAST_DISPLAY_IMAGE_MESSAGE = 'A published artist keeps at least one display image';
+
+/**
+ * Every chosen image needs alt text (the public page renders it as content).
+ * A blank alt is backfilled with the artist's display name, the same default
+ * an upload gets; only an artist with no name at all is refused.
+ */
+const backfillMissingAlt = async (
+  rows: BioImageEligibilityRow[],
+  fallbackAlt: string
+): Promise<ServiceResponse<never> | null> => {
+  const altless = rows.filter((row) => !isDisplayEligible(row));
+  if (altless.length > 0 && !fallbackAlt) {
+    return {
+      success: false,
+      error: 'Add alt text before using an image as a display image',
+      code: 'VALIDATION',
+    };
+  }
+  for (const row of altless) {
+    await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
+  }
+  return null;
+};
+
+/**
+ * The publish gate (ADR-0019): a first publish needs at least one chosen
+ * display image. Returns the refusal to send back, or `null` when the write
+ * may go ahead — because the stored artist is already published (a save
+ * re-sends its date and is not re-checked) or has a chosen image.
+ */
+const refuseFirstPublishWithoutDisplayImage = async (
+  artistId: string
+): Promise<ServiceResponse<never> | null> => {
+  const stored = await ArtistRepository.findById(artistId);
+  if (!stored) return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+  if (stored.publishedOn) return null;
+  const chosen = await ArtistBioImageRepository.countChosen(artistId);
+  return chosen > 0
+    ? null
+    : { success: false, error: NO_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
+};
+
 export class ArtistService {
   /**
-   * Create a new artist. An artist created published records the admin as
-   * its publisher (ADR-0015); a caller's own `publishedBy` is never stored.
+   * Create a new artist. An artist is always created unpublished (ADR-0019):
+   * it is published once it has a chosen display image, through
+   * {@link updateArtist} or {@link publishArtist}, which record the admin as
+   * its publisher (ADR-0015).
    */
-  static async createArtist(
-    data: CreateArtistData,
-    adminId: string
-  ): Promise<ServiceResponse<Artist>> {
+  static async createArtist(data: CreateArtistData): Promise<ServiceResponse<Artist>> {
     try {
-      const { publishedBy: _callerPublisher, ...rest } = data;
-      const toCreate = rest.publishedOn ? { ...rest, publishedBy: adminId } : rest;
+      const { publishedBy: _callerPublisher, publishedOn, ...rest } = data;
+      if (publishedOn) {
+        return {
+          success: false,
+          error: 'An artist is created unpublished; choose a display image, then publish',
+          code: 'VALIDATION',
+        };
+      }
       // Bio-image finalization (finalizeBioImages) is intentionally skipped on
       // create: a new artist has no generated bio rows, and a manually pasted
       // external image finalizes on the first update.
-      const artist = await ArtistRepository.create(sanitizeBioWriteFields(toCreate));
+      const artist = await ArtistRepository.create(sanitizeBioWriteFields(rest));
       // New genres/tags change the suggestion counts this process serves.
       ArtistVocabularyService.invalidate();
       return { success: true, data: artist };
@@ -539,7 +596,7 @@ export class ArtistService {
    * - `published == null` → no publish filter.
    * - `deleted` falsy → exclude soft-deleted artists; `deleted === true` → include them.
    */
-  static async getArtists(params?: ArtistListFilters): Promise<ServiceResponse<Artist[]>> {
+  static async getArtists(params?: ArtistListFilters): Promise<ServiceResponse<ArtistListItem[]>> {
     try {
       const artists = await ArtistRepository.findMany(params ?? {});
       return { success: true, data: artists };
@@ -560,6 +617,10 @@ export class ArtistService {
   ): Promise<ServiceResponse<Artist>> {
     try {
       const { publishedBy: _callerPublisher, ...rest } = data;
+      if (rest.publishedOn) {
+        const refusal = await refuseFirstPublishWithoutDisplayImage(id);
+        if (refusal) return refusal;
+      }
       const sanitized = sanitizeBioWriteFields(rest);
       const finalized = await finalizeBioImages(id, sanitized);
       const artist = await ArtistRepository.update(id, finalized, { publishedBy: adminId });
@@ -629,10 +690,13 @@ export class ArtistService {
 
   /**
    * Publish an artist by stamping `publishedOn` with the current time, and
-   * record the admin as its publisher when this is its first publish.
+   * record the admin as its publisher when this is its first publish. A
+   * first publish needs a chosen display image (ADR-0019).
    */
   static async publishArtist(id: string, adminId: string): Promise<ServiceResponse<Artist>> {
     try {
+      const refusal = await refuseFirstPublishWithoutDisplayImage(id);
+      if (refusal) return refusal;
       const artist = await ArtistRepository.update(
         id,
         { publishedOn: new Date() },
@@ -702,7 +766,8 @@ export class ArtistService {
   }: ArtistListingRecord): ArtistListingRow {
     return {
       ...artist,
-      bioImages: resolveDisplayImages(artist.bioImages),
+      // A card shows the first display image only; the page shows them all.
+      bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
@@ -751,6 +816,10 @@ export class ArtistService {
       // redisplay is safe regardless of how it was authored (generated bios
       // are also sanitized at write time).
       const { memberOf, members, ...publicArtist } = artist;
+      const credited = collectArtistReleases({
+        ...artist,
+        memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
+      });
       const filteredArtist: ArtistWithPublishedReleases = {
         ...publicArtist,
         bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
@@ -759,10 +828,12 @@ export class ArtistService {
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
         members: members.filter(({ member }) => isPublicArtist(member)),
-        releases: collectArtistReleases({
-          ...artist,
-          memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
-        }).map(withPublicCredits),
+        releases: credited.map(withPublicCredits),
+        // The page leads with the newest release the artist holds a direct
+        // credit on — own or featured, never a band's — summarised as the
+        // artists index does (ADR-0006).
+        newestRelease: summarizeListedReleases(credited.filter(({ credit }) => credit !== 'member'))
+          .newestRelease,
       };
 
       return { success: true, data: filteredArtist };
@@ -875,12 +946,33 @@ export class ArtistService {
     await ArtistBioLinkRepository.removeReference(linkId);
   }
 
-  /** Deletes a single discovered bio image row (admin palette X) and performs
-   *  best-effort cleanup of its CDN thumbnail. */
-  static async deleteBioImage(imageId: string): Promise<void> {
-    const removed = await ArtistBioImageRepository.delete(imageId);
-    await cleanupBioMediaObject(removed.url);
-    await cleanupBioMediaObject(removed.thumbnailUrl);
+  /**
+   * Deletes a single bio image row (admin palette X) with best-effort cleanup
+   * of its CDN objects. Refuses a published artist's last chosen display image
+   * (ADR-0019): its set never becomes empty. Keyed on `publishedOn`, the
+   * field the public reads key on.
+   */
+  static async deleteBioImage(imageId: string): Promise<ServiceResponse<void>> {
+    try {
+      const state = await ArtistBioImageRepository.findDisplayState(imageId);
+      if (!state) return { success: false, error: 'Bio image not found', code: 'NOT_FOUND' };
+      const isChosen = typeof state.displayOrder === 'number';
+      if (isChosen && state.artist.publishedOn) {
+        const chosen = await ArtistBioImageRepository.countChosen(state.artistId);
+        if (chosen <= 1) {
+          return { success: false, error: LAST_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
+        }
+      }
+      const removed = await ArtistBioImageRepository.delete(imageId);
+      await cleanupBioMediaObject(removed.url);
+      await cleanupBioMediaObject(removed.thumbnailUrl);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Bio image not found',
+        UNKNOWN: 'Failed to delete bio image',
+      });
+    }
   }
 
   /** Persists one manually-added bio image and returns the created row. */
@@ -895,7 +987,8 @@ export class ArtistService {
 
   /**
    * Replace an artist's display images with `imageIds`, in display order. The
-   * rules of the set live here: at most {@link DISPLAY_IMAGE_CAP}, each id once,
+   * rules of the set live here: no cap (ADR-0008, second addendum; the action's
+   * schema bounds the request size), each id once,
    * every id one of the artist's own bio images, and every chosen image with
    * alt text (the public page renders them as content) — a blank alt is
    * backfilled with the artist's display name, the same default an upload
@@ -911,13 +1004,6 @@ export class ArtistService {
     artistId: string,
     imageIds: string[]
   ): Promise<ServiceResponse<{ slug: string }>> {
-    if (imageIds.length > DISPLAY_IMAGE_CAP) {
-      return {
-        success: false,
-        error: `Choose at most ${DISPLAY_IMAGE_CAP} display images`,
-        code: 'LIMIT_EXCEEDED',
-      };
-    }
     if (new Set(imageIds).size !== imageIds.length) {
       return { success: false, error: 'Each image can be chosen only once', code: 'VALIDATION' };
     }
@@ -926,6 +1012,10 @@ export class ArtistService {
       const artist = await ArtistRepository.findById(artistId);
       if (!artist) {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+      }
+      // A published artist's chosen set never becomes empty (ADR-0019).
+      if (imageIds.length === 0 && artist.publishedOn) {
+        return { success: false, error: LAST_DISPLAY_IMAGE_MESSAGE, code: 'VALIDATION' };
       }
 
       // An empty list clears the set; there is nothing to look up or gate.
@@ -940,18 +1030,8 @@ export class ArtistService {
           code: 'NOT_FOUND',
         };
       }
-      const altless = rows.filter((row) => !isDisplayEligible(row));
-      const fallbackAlt = deriveArtistDisplayName(artist);
-      if (altless.length > 0 && !fallbackAlt) {
-        return {
-          success: false,
-          error: 'Add alt text before using an image as a display image',
-          code: 'VALIDATION',
-        };
-      }
-      for (const row of altless) {
-        await ArtistBioImageRepository.updateAlt(row.id, fallbackAlt);
-      }
+      const altRefusal = await backfillMissingAlt(rows, deriveArtistDisplayName(artist));
+      if (altRefusal) return altRefusal;
 
       await ArtistBioImageRepository.setDisplayOrder(artistId, imageIds);
       return { success: true, data: { slug: artist.slug } };
