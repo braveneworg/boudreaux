@@ -31,7 +31,9 @@ export const BIO_PROSE_CLASS = cn(
   '[&_p]:my-4 [&_li]:my-1',
   '[&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6',
   '[&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h2]:text-2xl [&_h2]:font-semibold',
-  '[&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:mt-5 [&_h4]:font-semibold',
+  // The h3 is the bio's own "Biography" strip in the cutout face; the h4 is
+  // the section heading beneath it, in Jost.
+  '[&_h3]:font-fake-four-cutout [&_h3]:mt-6 [&_h3]:text-2xl [&_h4]:mt-5 [&_h4]:font-semibold',
   '[&_a]:underline [&_a]:underline-offset-4 [&_figure]:my-4'
 );
 

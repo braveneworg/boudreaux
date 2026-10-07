@@ -85,6 +85,18 @@ describe('ArtistBioSection', () => {
     expect(screen.queryByTestId('bio-media-palettes-artist-1')).not.toBeInTheDocument();
   });
 
+  it('tells the author which heading levels the bio takes, just above the first editor', async () => {
+    render(<ArtistBioSection {...editModeProps} />);
+
+    const note = screen.getByText(/"Biography" heading as Heading 3/);
+    expect(note).toHaveTextContent('Heading 4');
+    // The editor is a next/dynamic import: await it (see the upload tests).
+    const [firstEditor] = await screen.findAllByTestId('rich-text-editor-stub');
+    const FOLLOWING = 4;
+    expect(note.compareDocumentPosition(firstEditor) & FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('bio-editors-column')).toContainElement(note);
+  });
+
   it('always renders the editors column', () => {
     render(<ArtistBioSection {...editModeProps} isEditMode={false} artistId={null} />);
 

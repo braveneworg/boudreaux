@@ -163,8 +163,8 @@ const selectToolbarState = ({ editor: instance }: { editor: Editor | null }): To
   isItalic: isActive(instance, 'italic'),
   isLink: isActive(instance, 'bioLink'),
   isImage: isActive(instance, 'bioFigure'),
-  isHeading2: isActive(instance, 'heading', { level: 2 }),
   isHeading3: isActive(instance, 'heading', { level: 3 }),
+  isHeading4: isActive(instance, 'heading', { level: 4 }),
   isBulletList: isActive(instance, 'bulletList'),
   isOrderedList: isActive(instance, 'orderedList'),
 });
@@ -175,8 +175,8 @@ const INACTIVE_TOOLBAR: ToolbarState = {
   isItalic: false,
   isLink: false,
   isImage: false,
-  isHeading2: false,
   isHeading3: false,
+  isHeading4: false,
   isBulletList: false,
   isOrderedList: false,
 };
@@ -231,6 +231,7 @@ export const RichTextEditor = ({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
+        // Level 2 stays parseable so older bios load intact; the toolbar offers 3 and 4.
         heading: { levels: [2, 3, 4] },
         link: false,
       }),

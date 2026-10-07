@@ -8,8 +8,8 @@ import type { JSX } from 'react';
 import {
   Bold,
   Eye,
-  Heading2,
   Heading3,
+  Heading4,
   ImageIcon,
   Italic,
   Link2,
@@ -44,8 +44,8 @@ export interface ToolbarState {
   isItalic: boolean;
   isLink: boolean;
   isImage: boolean;
-  isHeading2: boolean;
   isHeading3: boolean;
+  isHeading4: boolean;
   isBulletList: boolean;
   isOrderedList: boolean;
 }
@@ -108,22 +108,22 @@ export const RichTextEditorToolbar = ({
       <Button
         type="button"
         size="icon"
-        variant={activeVariant(toolbarState.isHeading2)}
-        aria-label="Heading 2"
-        aria-pressed={toolbarState.isHeading2}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-      >
-        <Heading2 className="size-4" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        size="icon"
         variant={activeVariant(toolbarState.isHeading3)}
         aria-label="Heading 3"
         aria-pressed={toolbarState.isHeading3}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       >
         <Heading3 className="size-4" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant={activeVariant(toolbarState.isHeading4)}
+        aria-label="Heading 4"
+        aria-pressed={toolbarState.isHeading4}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+      >
+        <Heading4 className="size-4" aria-hidden />
       </Button>
 
       <Button
