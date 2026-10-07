@@ -1,330 +1,219 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import React from 'react';
+import { render, screen, within } from '@testing-library/react';
 
-import { render, screen } from '@testing-library/react';
-
-import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
-import {
-  artistPrivateValues,
-  artistWithPublishedReleases,
-} from '@/lib/validation/media/schema-fixtures';
+import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
+import { artistWithPublishedReleases } from '@/lib/validation/media/schema-fixtures';
 
 import ArtistDetailPage, { generateMetadata } from './page';
 
 vi.mock('server-only', () => ({}));
 
-// Mock notFound
-const mockNotFound = vi.fn();
+// Like Next's own, the mock throws: nothing after a `notFound()` runs.
+const notFound = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
-  notFound: () => mockNotFound(),
-}));
-
-// Mock ArtistService (still used by generateMetadata)
-const mockGetArtistBySlugWithReleases = vi.fn();
-vi.mock('@/lib/services/artist-service', () => ({
-  ArtistService: {
-    getArtistBySlugWithReleases: (...args: unknown[]) => mockGetArtistBySlugWithReleases(...args),
+  notFound: () => {
+    notFound();
+    throw new Error('NEXT_NOT_FOUND');
   },
 }));
 
-vi.mock('@/lib/utils/get-artist-display-name', () => ({
-  getArtistDisplayName: (artist: {
-    displayName?: string | null;
-    firstName: string;
-    surname: string;
-  }) => artist.displayName ?? `${artist.firstName} ${artist.surname}`,
+const getPublicArtist = vi.hoisted(() => vi.fn());
+vi.mock('./get-public-artist', () => ({
+  getPublicArtist: (slug: string) => getPublicArtist(slug),
 }));
 
-// Mock TanStack Query SSR utilities
-const mockSetQueryData = vi.fn();
-const mockDehydratedState = { queries: [], mutations: [] };
-vi.mock('@tanstack/react-query', () => ({
-  dehydrate: () => mockDehydratedState,
-  HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('@/lib/utils/get-query-client', () => ({
-  getQueryClient: () => ({
-    setQueryData: mockSetQueryData,
-  }),
-}));
-
-vi.mock('@/lib/utils/get-internal-api-url', () => ({
-  getInternalApiUrl: (path: string) => `http://localhost:3000${path}`,
-}));
-
-// Mock child components
-vi.mock('@/app/components/ui/page-container', () => ({
-  PageContainer: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="page-container">{children}</div>
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
   ),
 }));
 
-vi.mock('@/app/components/ui/content-container', () => ({
-  ContentContainer: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="content-container">{children}</div>
-  ),
-}));
-
-vi.mock('@/app/components/artist-detail-content', () => ({
-  ArtistDetailContent: ({
-    slug,
-    initialReleaseId,
+vi.mock('@/app/components/ui/zine-panel', () => ({
+  ZinePanel: ({
+    children,
+    breadcrumbs,
   }: {
-    slug: string;
-    initialReleaseId?: string;
+    children: React.ReactNode;
+    breadcrumbs?: { anchorText: string }[];
   }) => (
     <div
-      data-testid="artist-detail-content"
-      data-slug={slug}
-      data-initial-release-id={initialReleaseId ?? ''}
+      data-testid="zine-panel"
+      data-breadcrumbs={breadcrumbs?.map((b) => b.anchorText).join('>')}
     >
-      Artist Detail
+      {children}
     </div>
   ),
 }));
 
-// Mock global fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// The two client islands have their own specs; here only what they receive matters.
+vi.mock('@/app/components/display-image-collage', () => ({
+  DisplayImageCollage: ({
+    images,
+    displayName,
+  }: {
+    images: { id: string }[];
+    displayName: string;
+  }) => (
+    <div
+      data-testid="collage"
+      data-ids={images.map(({ id }) => id).join(',')}
+      data-display-name={displayName}
+    />
+  ),
+}));
+
+vi.mock('@/app/components/latest-release-link', () => ({
+  LatestReleaseLink: ({
+    release,
+    slug,
+  }: {
+    release: { id: string; byName: string | null };
+    slug: string;
+  }) => (
+    <div
+      data-testid="latest-release"
+      data-release-id={release.id}
+      data-by-name={release.byName ?? ''}
+      data-slug={slug}
+    />
+  ),
+}));
+
+const params = Promise.resolve({ slug: 'marguerite-ash' });
+
+const image = (id: string, displayOrder: number | null) => ({
+  ...artistWithPublishedReleases.bioImages[0],
+  id,
+  url: `https://cdn.example/${id}.jpg`,
+  alt: `${id} described`,
+  isPrimary: false,
+  displayOrder,
+});
+
+const graph = (overrides: Partial<ArtistWithPublishedReleases> = {}): ArtistWithPublishedReleases =>
+  ({
+    ...artistWithPublishedReleases,
+    displayName: 'Marguerite Ash',
+    shortBio: '<p>A <b>genre-blurring</b> act.</p>',
+    bio: '<p>Born in a van.</p>',
+    genres: 'experimental,noise-rock',
+    bioImages: [image('pool', null), image('second', 1), image('first', 0)],
+    links: null,
+    newestRelease: null,
+    ...overrides,
+  }) as ArtistWithPublishedReleases;
+
+const renderPage = async (overrides: Partial<ArtistWithPublishedReleases> = {}) => {
+  getPublicArtist.mockResolvedValueOnce(graph(overrides));
+  render(await ArtistDetailPage({ params }));
+};
 
 describe('ArtistDetailPage', () => {
-  /** The public artist-detail wire shape, as the page dehydrates it. */
-  const mockArtistData = {
-    ...artistWithPublishedReleases,
-    shortBio: 'A talented musician',
-  };
+  it('shows 404 when there is no public artist', async () => {
+    getPublicArtist.mockResolvedValueOnce(null);
 
-  const defaultParams = Promise.resolve({ slug: 'john-doe' });
-  const defaultSearchParams = Promise.resolve({} as Record<string, string | string[] | undefined>);
+    await expect(ArtistDetailPage({ params })).rejects.toThrow('NEXT_NOT_FOUND');
 
-  beforeEach(() => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve(mockArtistData),
-    });
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: true,
-      data: mockArtistData,
-    });
+    expect(notFound).toHaveBeenCalled();
   });
 
-  it('should render page structure', async () => {
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
+  it('is headed by the artist, under the artists breadcrumb', async () => {
+    await renderPage();
 
-    expect(screen.getByTestId('page-container')).toBeInTheDocument();
-    expect(screen.getByTestId('content-container')).toBeInTheDocument();
-  });
-
-  it('should call ArtistService.getArtistBySlugWithReleases with the slug', async () => {
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    expect(mockGetArtistBySlugWithReleases).toHaveBeenCalledWith('john-doe');
-  });
-
-  it('should set query data on successful fetch', async () => {
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
-
-    expect(mockSetQueryData).toHaveBeenCalledWith(
-      ['artists', 'bySlug', 'john-doe'],
-      expect.objectContaining({ id: mockArtistData.id, slug: mockArtistData.slug })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Marguerite Ash');
+    expect(screen.getByTestId('zine-panel')).toHaveAttribute(
+      'data-breadcrumbs',
+      'Artists>Marguerite Ash'
     );
   });
 
-  // The dehydrated query state is serialised into the HTML, so it is as public
-  // as the API response (#765).
-  it.each(ARTIST_PRIVATE_FIELDS)(
-    'never dehydrates the private field %s, even when the service returns it',
-    async (field) => {
-      mockGetArtistBySlugWithReleases.mockResolvedValueOnce({
-        success: true,
-        data: { ...mockArtistData, ...artistPrivateValues },
-      });
+  it('hands the collage the display images in their chosen order', async () => {
+    await renderPage();
 
-      await ArtistDetailPage({ params: defaultParams, searchParams: defaultSearchParams });
-
-      const [[, dehydrated]] = mockSetQueryData.mock.calls;
-      expect(dehydrated).not.toHaveProperty(field);
-    }
-  );
-
-  it('should call notFound when artist service returns failure', async () => {
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: false,
-      error: 'Artist not found',
-    });
-
-    try {
-      await ArtistDetailPage({ params: defaultParams, searchParams: defaultSearchParams });
-    } catch {
-      // notFound() throws in production; tolerate downstream JSON.parse error here
-    }
-
-    expect(mockNotFound).toHaveBeenCalledOnce();
+    const collage = screen.getByTestId('collage');
+    expect(collage).toHaveAttribute('data-ids', 'first,second');
+    expect(collage).toHaveAttribute('data-display-name', 'Marguerite Ash');
   });
 
-  it('should not set query data when service returns failure', async () => {
-    mockGetArtistBySlugWithReleases.mockResolvedValue({
-      success: false,
-      error: 'Database unavailable',
+  it('leads with the latest release', async () => {
+    await renderPage({
+      newestRelease: { id: 'r1', title: 'Release', releasedOn: new Date('2024-01-01') },
     });
 
-    try {
-      const Page = await ArtistDetailPage({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
-      render(Page);
-    } catch {
-      // notFound() may throw in production; ignore in test
-    }
-
-    expect(mockSetQueryData).not.toHaveBeenCalled();
+    const latest = screen.getByTestId('latest-release');
+    expect(latest).toHaveAttribute('data-release-id', 'r1');
+    expect(latest).toHaveAttribute('data-slug', 'marguerite-ash');
   });
 
-  it('should render ArtistDetailContent with slug', async () => {
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
+  it('says when there is no release yet', async () => {
+    await renderPage({ newestRelease: null });
 
-    const content = screen.getByTestId('artist-detail-content');
-    expect(content).toHaveAttribute('data-slug', 'john-doe');
+    expect(screen.getByText('No releases yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('latest-release')).not.toBeInTheDocument();
   });
 
-  it('should pass initialReleaseId from search params', async () => {
-    const releaseSearchParams = Promise.resolve({
-      release: 'release-2',
-    } as Record<string, string | string[] | undefined>);
+  it('lists the genres, formatted', async () => {
+    await renderPage();
 
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: releaseSearchParams,
-    });
-    render(Page);
-
-    expect(screen.getByTestId('artist-detail-content')).toHaveAttribute(
-      'data-initial-release-id',
-      'release-2'
-    );
+    const genres = screen.getByRole('list', { name: 'Genres' });
+    expect(
+      within(genres)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+    ).toEqual(['Experimental', 'Noise Rock']);
   });
 
-  it('should not pass initialReleaseId when release param is missing', async () => {
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: defaultSearchParams,
+  it('shows the link sections that have links and none of the others', async () => {
+    await renderPage({
+      links: {
+        websites: [{ label: null, url: 'https://margueriteash.example.com' }],
+        social: [],
+        contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:a@example.com' }] }],
+      },
     });
-    render(Page);
 
-    expect(screen.getByTestId('artist-detail-content')).toHaveAttribute(
-      'data-initial-release-id',
-      ''
-    );
+    expect(screen.getByRole('region', { name: 'Websites' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Contact & Misc' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Social Media' })).not.toBeInTheDocument();
   });
 
-  it('should ignore non-string release search param', async () => {
-    const arraySearchParams = Promise.resolve({
-      release: ['release-1', 'release-2'],
-    } as Record<string, string | string[] | undefined>);
+  it('shows no link section for an artist without links', async () => {
+    await renderPage({ links: null });
 
-    const Page = await ArtistDetailPage({
-      params: defaultParams,
-      searchParams: arraySearchParams,
-    });
-    render(Page);
-
-    expect(screen.getByTestId('artist-detail-content')).toHaveAttribute(
-      'data-initial-release-id',
-      ''
-    );
+    expect(screen.queryByRole('region', { name: 'Websites' })).not.toBeInTheDocument();
   });
 
-  it('should pass the slug to the service unchanged', async () => {
-    const specialParams = Promise.resolve({ slug: 'artist/special&slug' });
-    const Page = await ArtistDetailPage({
-      params: specialParams,
-      searchParams: defaultSearchParams,
-    });
-    render(Page);
+  it('carries the biography on the page, without the short-bio teaser', async () => {
+    await renderPage();
 
-    expect(mockGetArtistBySlugWithReleases).toHaveBeenCalledWith('artist/special&slug');
+    expect(screen.getByRole('article', { name: 'Biography' })).toHaveTextContent('Born in a van.');
+    expect(screen.queryByText(/genre-blurring/)).not.toBeInTheDocument();
   });
 
   describe('generateMetadata', () => {
-    it('should return artist name as title', async () => {
-      const metadata = await generateMetadata({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
+    it('titles the page with the artist and describes it with the short bio as text', async () => {
+      getPublicArtist.mockResolvedValueOnce(graph());
 
-      expect(metadata.title).toBe('John Doe');
+      expect(await generateMetadata({ params })).toEqual({
+        title: 'Marguerite Ash',
+        description: 'A genre-blurring act.',
+      });
     });
 
-    it('should return shortBio as description', async () => {
-      const metadata = await generateMetadata({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
+    it('falls back to a listening line without a short bio', async () => {
+      getPublicArtist.mockResolvedValueOnce(graph({ shortBio: null }));
 
-      expect(metadata.description).toBe('A talented musician');
+      expect(await generateMetadata({ params })).toMatchObject({
+        description: 'Listen to releases by Marguerite Ash.',
+      });
     });
 
-    it('should return fallback description when shortBio is missing', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: { ...mockArtistData, shortBio: null },
-      });
+    it('titles a missing artist as not found', async () => {
+      getPublicArtist.mockResolvedValueOnce(null);
 
-      const metadata = await generateMetadata({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
-
-      expect(metadata.description).toBe('Listen to releases by John Doe.');
-    });
-
-    it('should return fallback description when shortBio is empty string', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: true,
-        data: { ...mockArtistData, shortBio: '' },
-      });
-
-      const metadata = await generateMetadata({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
-
-      expect(metadata.description).toBe('Listen to releases by John Doe.');
-    });
-
-    it('should return "Artist Not Found" when service fails', async () => {
-      mockGetArtistBySlugWithReleases.mockResolvedValue({
-        success: false,
-        error: 'Artist not found',
-      });
-
-      const metadata = await generateMetadata({
-        params: defaultParams,
-        searchParams: defaultSearchParams,
-      });
-
-      expect(metadata.title).toBe('Artist Not Found');
+      expect(await generateMetadata({ params })).toEqual({ title: 'Artist Not Found' });
     });
   });
 });

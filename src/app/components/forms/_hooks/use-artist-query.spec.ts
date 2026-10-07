@@ -67,6 +67,7 @@ const artistResponse = {
   isPseudonymous: false,
   instruments: null,
   featuredArtistId: null,
+  links: null,
 };
 
 describe('useArtistQuery', () => {

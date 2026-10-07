@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import { ReleasePlayDialog } from './release-play-dialog';
 
@@ -65,6 +65,53 @@ const defaultProps = {
 };
 
 describe('ReleasePlayDialog', () => {
+  it('lets the opener decide where focus returns when the dialog closes', async () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+    const onCloseAutoFocus = vi.fn();
+    const { rerender } = render(
+      <ReleasePlayDialog {...defaultProps} onCloseAutoFocus={onCloseAutoFocus} />
+    );
+
+    rerender(
+      <ReleasePlayDialog {...defaultProps} open={false} onCloseAutoFocus={onCloseAutoFocus} />
+    );
+
+    // Radix fires it (asynchronously) when the content unmounts; the opener
+    // (a card, the artist page's latest-release link) uses it to put focus
+    // back on the control that opened us.
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledTimes(1));
+  });
+
+  it('renders a footer slot after the player, shrinkable inside the dialog grid', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(
+      <ReleasePlayDialog
+        {...defaultProps}
+        footer={<a href="/artists/jd/releases">View all releases</a>}
+      />
+    );
+
+    const footer = screen.getByRole('link', { name: 'View all releases' }).parentElement;
+    expect(footer).toHaveClass('min-w-0');
+    expect(
+      screen.getByTestId('release-player').compareDocumentPosition(footer as HTMLElement) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('renders no footer element when none is given', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    expect(document.querySelector('[data-slot="release-play-dialog-footer"]')).toBeNull();
+  });
+
   it('does not fetch while closed', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 

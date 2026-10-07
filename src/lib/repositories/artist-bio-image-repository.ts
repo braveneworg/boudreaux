@@ -11,7 +11,15 @@ import type {
   CreateArtistBioImageData,
 } from '@/lib/types/domain/artist';
 
+import { bioImageWhere } from './_internal/bio-media-where';
 import { runQuery } from './_internal/map-prisma-error';
+
+/** What the delete guard reads about a row: its position and its artist's publish state. */
+export interface BioImageDisplayState {
+  artistId: string;
+  displayOrder: number | null;
+  artist: { publishedOn: Date | null };
+}
 
 /** Bio image row projection used by the save-time full re-host pass. */
 export interface BioImageRehostRow {
@@ -150,6 +158,19 @@ export class ArtistBioImageRepository {
     );
   }
 
+  /** How many of the artist's rows a human has chosen — the publish gate's read (ADR-0019). */
+  static async countChosen(artistId: string): Promise<number> {
+    return prisma.artistBioImage.count({ where: { artistId, AND: [bioImageWhere.chosen] } });
+  }
+
+  /** The row's chosen position and its artist's publish state, or null when the row is unknown. */
+  static async findDisplayState(imageId: string): Promise<BioImageDisplayState | null> {
+    return prisma.artistBioImage.findUnique({
+      where: { id: imageId },
+      select: { artistId: true, displayOrder: true, artist: { select: { publishedOn: true } } },
+    });
+  }
+
   /** Deletes a single discovered bio image row (palette X) and returns its
    *  stored URLs so the caller can clean up the CDN thumbnail. */
   static async delete(imageId: string): Promise<{ url: string; thumbnailUrl: string | null }> {
@@ -221,20 +242,24 @@ export class ArtistBioImageRepository {
    * index as `displayOrder` and is promoted to `origin: 'custom'` so a bio
    * regeneration keeps it (`ArtistRepository.replaceBioContent` deletes only
    * non-custom rows). The `where` carries `artistId` so a foreign row id can
-   * never be written. Callers validate the cap, uniqueness, ownership, and
-   * alt-text eligibility before reaching here.
+   * never be written. Callers validate uniqueness, ownership, and alt-text
+   * eligibility before reaching here. The set is uncapped, so the transaction
+   * carries an explicit timeout: one update per chosen row.
    */
   static async setDisplayOrder(artistId: string, orderedIds: string[]): Promise<void> {
     await runQuery(() =>
-      prisma.$transaction(async (tx) => {
-        await tx.artistBioImage.updateMany({ where: { artistId }, data: { displayOrder: null } });
-        for (const [displayOrder, id] of orderedIds.entries()) {
-          await tx.artistBioImage.update({
-            where: { id, artistId },
-            data: { displayOrder, origin: 'custom' },
-          });
-        }
-      })
+      prisma.$transaction(
+        async (tx) => {
+          await tx.artistBioImage.updateMany({ where: { artistId }, data: { displayOrder: null } });
+          for (const [displayOrder, id] of orderedIds.entries()) {
+            await tx.artistBioImage.update({
+              where: { id, artistId },
+              data: { displayOrder, origin: 'custom' },
+            });
+          }
+        },
+        { timeout: 15_000, maxWait: 5_000 }
+      )
     );
   }
 }

@@ -1,9 +1,13 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_OWN_PAGE_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
-import { artistSchema, artistWithPublishedReleasesSchema } from './artist-schema';
+import {
+  artistListItemSchema,
+  artistSchema,
+  artistWithPublishedReleasesSchema,
+} from './artist-schema';
 import {
   artist,
   artistBioValues,
@@ -25,7 +29,33 @@ describe('artistSchema', () => {
   });
 });
 
+// ADR-0019: the admin listing says whether a display image is chosen.
+describe('artistListItemSchema', () => {
+  it('parses a listing row with its display-image flag', () => {
+    expect(artistListItemSchema.parse({ ...artist, hasDisplayImage: false })).toMatchObject({
+      hasDisplayImage: false,
+    });
+  });
+
+  it('rejects a listing row without the flag', () => {
+    expect(() => artistListItemSchema.parse(artist)).toThrow();
+  });
+});
+
 describe('artistWithPublishedReleasesSchema', () => {
+  it('parses the newest direct release the page leads with', () => {
+    const parsed = artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases);
+
+    expect(parsed.newestRelease?.releasedOn).toBeInstanceOf(Date);
+    expect(parsed.newestRelease?.title).toBe(artistWithPublishedReleases.newestRelease.title);
+  });
+
+  it('rejects a payload without the newest release', () => {
+    const { newestRelease: _omit, ...invalid } = artistWithPublishedReleases;
+
+    expect(() => artistWithPublishedReleasesSchema.parse(invalid)).toThrow();
+  });
+
   it('parses an artist-with-releases payload including the members relation', () => {
     expect(() =>
       artistWithPublishedReleasesSchema.parse(artistWithPublishedReleases)
@@ -238,7 +268,7 @@ describe('artistWithPublishedReleasesSchema — nested artists carry no bio', ()
     ],
   };
 
-  it.each(ARTIST_BIO_FIELDS)('strips %s from every nested artist', (field) => {
+  it.each(ARTIST_OWN_PAGE_FIELDS)('strips %s from every nested artist', (field) => {
     const parsed = artistWithPublishedReleasesSchema.parse(payload);
     const nested = [
       ...parsed.members.map(({ member }) => member),

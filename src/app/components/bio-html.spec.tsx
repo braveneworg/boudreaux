@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import { BioHtml } from './bio-html';
+import { BIO_PROSE_CLASS, BioHtml } from './bio-html';
 
 vi.mock('next/image', () => ({
   default: ({
@@ -294,5 +294,44 @@ describe('BioHtml', () => {
       <BioHtml html='<figure class="bio-figure bio-figure--left" style="width: 20%"><img src="https://cdn/x.jpg" alt="a" /><figcaption class="bio-figure-caption"><span class="bio-figure-attribution">via zine</span></figcaption></figure>' />
     );
     expect(document.querySelector('figcaption')?.className).toContain('text-[11px]');
+  });
+});
+
+// Render-time tidy: the editor and the generator both leave empty paragraphs
+// and runs of line breaks behind; the page drops them instead of styling
+// around them.
+describe('BioHtml tidy', () => {
+  it('drops an empty paragraph', () => {
+    const { container } = render(<BioHtml html="<p>One</p><p></p><p>Two</p>" />);
+
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
+
+  it('drops a paragraph holding only a line break or whitespace', () => {
+    const { container } = render(
+      <BioHtml html="<p>One</p><p><br></p><p> </p><p>&nbsp;</p><p>Two</p>" />
+    );
+
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
+
+  it('collapses a run of line breaks to one', () => {
+    const { container } = render(<BioHtml html="<p>One<br><br><br>Two</p>" />);
+
+    expect(container.querySelectorAll('br')).toHaveLength(1);
+  });
+
+  it('keeps a paragraph with text', () => {
+    render(<BioHtml html="<p>Kept</p>" />);
+
+    expect(screen.getByText('Kept')).toBeInTheDocument();
+  });
+});
+
+describe('BIO_PROSE_CLASS', () => {
+  it('sets the measure, the body size and the heading rhythm the page and the preview share', () => {
+    expect(BIO_PROSE_CLASS).toContain('max-w-[68ch]');
+    expect(BIO_PROSE_CLASS).toContain('[&_h2]:mt-10');
+    expect(BIO_PROSE_CLASS).toContain('[&_p]:my-4');
   });
 });

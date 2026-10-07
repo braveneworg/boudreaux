@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
-import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_OWN_PAGE_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { TourRepository } from './tour-repository';
 
@@ -72,7 +72,7 @@ describe('TourRepository', () => {
 
     // Nothing gates a headliner on publication, so a draft headliner's bio
     // must never ride along on the public tour payload.
-    it.each(ARTIST_BIO_FIELDS)('findAll never selects the bio field %s', async (field) => {
+    it.each(ARTIST_OWN_PAGE_FIELDS)('findAll never selects the bio field %s', async (field) => {
       vi.mocked(prisma.tour.findMany).mockResolvedValueOnce([] as never);
 
       await TourRepository.findAll();
@@ -82,7 +82,7 @@ describe('TourRepository', () => {
       ).not.toHaveProperty(field);
     });
 
-    it.each(ARTIST_BIO_FIELDS)('findById never selects the bio field %s', async (field) => {
+    it.each(ARTIST_OWN_PAGE_FIELDS)('findById never selects the bio field %s', async (field) => {
       vi.mocked(prisma.tour.findUnique).mockResolvedValueOnce(null);
 
       await TourRepository.findById('507f1f77bcf86cd799439011');

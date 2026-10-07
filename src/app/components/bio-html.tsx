@@ -1,8 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-'use client';
-
 import type { JSX } from 'react';
 
 import Image from 'next/image';
@@ -21,6 +19,48 @@ interface BioHtmlProps {
   html: string;
   className?: string;
 }
+
+/**
+ * The prose treatment of a biography, shared by the artist page and the
+ * editor's preview so what the admin previews is what the page shows: a
+ * readable measure, a 17px body on a 28px rhythm, spaced paragraphs and
+ * lists, section headings with a rule above, underlined links.
+ */
+export const BIO_PROSE_CLASS = cn(
+  'max-w-[68ch] text-[17px] leading-7 text-zinc-900',
+  '[&_p]:my-4 [&_li]:my-1',
+  '[&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6',
+  '[&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h2]:text-2xl [&_h2]:font-semibold',
+  '[&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:mt-5 [&_h4]:font-semibold',
+  '[&_a]:underline [&_a]:underline-offset-4 [&_figure]:my-4'
+);
+
+/** Whitespace as the editor leaves it: spaces, newlines and non-breaking spaces (`\s` covers U+00A0). */
+const BLANK_TEXT = /^\s*$/;
+
+/**
+ * A text node, by shape: the parser's nodes are not instances of the `Text`
+ * class this package re-exports, so an `instanceof` check never matches.
+ */
+const isBlankText = (node: unknown): boolean =>
+  typeof node === 'object' &&
+  node !== null &&
+  (node as { type?: string }).type === 'text' &&
+  BLANK_TEXT.test((node as { data?: string }).data ?? '');
+
+const isBreak = (node: unknown): boolean => node instanceof Element && node.name === 'br';
+
+/** A paragraph the editor or the generator left behind: nothing in it but breaks and whitespace. */
+const isBlankParagraph = (domNode: Element): boolean =>
+  domNode.name === 'p' && domNode.children.every((child) => isBlankText(child) || isBreak(child));
+
+/** A `<br>` straight after another `<br>` (whitespace between them aside): a run collapses to one. */
+const isRepeatedBreak = (domNode: Element): boolean => {
+  if (domNode.name !== 'br') return false;
+  let previous = domNode.prev;
+  while (previous && isBlankText(previous)) previous = previous.prev;
+  return isBreak(previous);
+};
 
 /** Fallback intrinsic size for inline bio images that omit width/height. */
 const DEFAULT_IMAGE_WIDTH = 1200;
@@ -129,6 +169,10 @@ const renderFigcaption = (domNode: Element, options: HTMLReactParserOptions): JS
 const replace: HTMLReactParserOptions['replace'] = (domNode) => {
   if (!(domNode instanceof Element)) return undefined;
 
+  // Render-time tidy: an empty paragraph or a repeated line break renders
+  // as nothing, so stored markup needs no cleaning pass.
+  if (isBlankParagraph(domNode) || isRepeatedBreak(domNode)) return <></>;
+
   const options: HTMLReactParserOptions = { replace };
 
   if (domNode.name === 'a') return renderAnchor(domNode, options);
@@ -143,6 +187,8 @@ const replace: HTMLReactParserOptions['replace'] = (domNode) => {
  * Renders sanitized bio HTML with Next.js primitives instead of
  * `dangerouslySetInnerHTML`. The input must already be sanitized
  * (`sanitizeBioHtml`); this component only maps trusted tags to components.
+ * No hooks, so it renders on the server for the artist page and inside the
+ * client editor for its preview.
  *
  * @param html - Sanitized bio HTML string.
  * @param className - Optional wrapper class (e.g. prose styles).

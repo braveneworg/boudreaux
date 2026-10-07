@@ -10,6 +10,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
+import { CARD_DISPLAY_IMAGE_COUNT } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
@@ -24,12 +25,12 @@ interface ArtistListCardProps {
 const MAX_GENRES = 3;
 
 /**
- * How many photos a card shows. The listing row already arrives resolved —
- * the human's chosen rows, else the job's suggestions, else pool order, capped
- * at `DISPLAY_IMAGE_CAP` — so the first row is the one worth showing, and the
- * rest belong to the artist page's gallery.
+ * The listing row already arrives resolved — the human's chosen rows, else
+ * the job's suggestions, else pool order — and sliced to the card count by
+ * the service, so the first row is the one worth showing; the rest belong to
+ * the artist page's collage.
  */
-const MAX_CARD_IMAGES = 1;
+const MAX_CARD_IMAGES = CARD_DISPLAY_IMAGE_COUNT;
 
 /**
  * The photo frame at each breakpoint, as one class string so the photo, the

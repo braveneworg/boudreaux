@@ -10,7 +10,7 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
-import { resolveDisplayImages } from '@/lib/utils/display-images';
+import { CARD_DISPLAY_IMAGE_COUNT, resolveDisplayImages } from '@/lib/utils/display-images';
 import { isPlayableFormat } from '@/lib/utils/playable-format';
 import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
@@ -29,13 +29,13 @@ const withPlayableFormatOnly = (artist: FeaturedArtist): FeaturedArtist =>
  * A featured row's artists with their images resolved to the display images
  * (ADR-0008): the human's chosen rows by position, else the job's suggested
  * rows that have alt text — so the cover fallback (`bioImages[0]`) is the
- * image a human chose.
+ * image a human chose. Only the card count travels: the player reads one.
  */
 const withDisplayImages = (featured: FeaturedArtist): FeaturedArtist => ({
   ...featured,
   artists: featured.artists.map((artist) => ({
     ...artist,
-    bioImages: resolveDisplayImages(artist.bioImages),
+    bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
   })),
 });
 

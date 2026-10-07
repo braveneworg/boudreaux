@@ -45,6 +45,30 @@ describe('usePrimedAudioHandoff', () => {
     expect(primed?.muted).toBe(true);
   });
 
+  it('stops an unclaimed primed element when the owner unmounts', () => {
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+    const { result, unmount } = renderHook(() => usePrimedAudioHandoff());
+
+    result.current.primeMediaEl(TRACK_URL);
+    unmount();
+
+    // A surface that navigates away mid-gesture (the modal never mounted)
+    // must not leave gesture-started audio playing with no UI attached.
+    expect(pauseSpy).toHaveBeenCalled();
+  });
+
+  it('leaves a claimed element playing when the owner unmounts', () => {
+    const { result, unmount } = renderHook(() => usePrimedAudioHandoff());
+
+    result.current.primeMediaEl(TRACK_URL);
+    const primed = result.current.takeMediaEl();
+    const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+    unmount();
+
+    expect(primed?.paused).toBe(false);
+    expect(pauseSpy).not.toHaveBeenCalled();
+  });
+
   it('stops a primed element when discarded before handoff', () => {
     const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
     const { result } = renderHook(() => usePrimedAudioHandoff());

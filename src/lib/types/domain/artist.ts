@@ -77,7 +77,32 @@ export type ArtistScalars = {
   isPseudonymous: boolean;
   instruments: string | null;
   featuredArtistId: string | null;
+  /** Curated links in their sections, or `null` when the artist has none (ADR-0020). */
+  links: ArtistLinks | null;
 };
+
+/** One curated link: an optional label beside its href (ADR-0020). */
+export interface ArtistLink {
+  label: string | null;
+  url: string;
+}
+
+/** An admin-defined heading over its links in the Contact & Misc section. */
+export interface ArtistLinkGroup {
+  heading: string;
+  links: ArtistLink[];
+}
+
+/**
+ * An artist's curated links, as stored: the `Artist.links` composite. Written
+ * whole and kept in the admin's order; a section an older document lacks
+ * reads as `[]`.
+ */
+export interface ArtistLinks {
+  websites: ArtistLink[];
+  social: ArtistLink[];
+  contact: ArtistLinkGroup[];
+}
 
 /**
  * The artist scalars that must never leave the server on a public surface:
@@ -131,37 +156,41 @@ export const ARTIST_PRIVATE_FIELDS = Object.keys(
 export type ArtistPublicScalars = Omit<ArtistScalars, ArtistPrivateField>;
 
 /**
- * The bio text and its generation metadata. Public, but only for an artist the
- * public may see: a bio is released when its artist is published and not
- * deleted, and it has no release state of its own. Only the page artist reads
- * them. An artist reached through another record — a release credit, a band
- * member or band, a tour headliner — is a public artist too (ADR-0015), but
- * no surface shows its bio there, so its projection leaves every one of these
- * out. Keyed as a `true` mask like
+ * The fields shown only on an artist's own page: the bio text with its
+ * generation metadata, and the curated links (ADR-0020). Public, but only
+ * for an artist the public may see: they are released when the artist is
+ * published and not deleted, and have no release state of their own. Only
+ * the page artist reads them. An artist reached through another record — a
+ * release credit, a band member or band, a tour headliner — is a public
+ * artist too (ADR-0015), but no surface shows its bio or links there, so
+ * its projection leaves every one of these out. Keyed as a `true` mask like
  * {@link ARTIST_PRIVATE_FIELD_MASK}.
  */
-export const ARTIST_BIO_FIELD_MASK = {
+export const ARTIST_OWN_PAGE_FIELD_MASK = {
   bio: true,
   shortBio: true,
   altBio: true,
   bioGeneratedAt: true,
   bioModel: true,
   bioStatus: true,
+  links: true,
 } as const satisfies Partial<Record<keyof ArtistPublicScalars, true>>;
 
-/** A bio field — see {@link ARTIST_BIO_FIELD_MASK}. */
-export type ArtistBioField = keyof typeof ARTIST_BIO_FIELD_MASK;
+/** An own-page field — see {@link ARTIST_OWN_PAGE_FIELD_MASK}. */
+export type ArtistOwnPageField = keyof typeof ARTIST_OWN_PAGE_FIELD_MASK;
 
-/** Every bio field, in mask order. */
-export const ARTIST_BIO_FIELDS = Object.keys(ARTIST_BIO_FIELD_MASK) as readonly ArtistBioField[];
+/** Every own-page field, in mask order. */
+export const ARTIST_OWN_PAGE_FIELDS = Object.keys(
+  ARTIST_OWN_PAGE_FIELD_MASK
+) as readonly ArtistOwnPageField[];
 
 /**
  * The scalars of an artist reached through another record (a release credit,
  * a band member or band, a tour headliner): {@link ArtistPublicScalars} minus
- * every {@link ArtistBioField}. It keeps `publishedOn` and `deletedOn`, which
- * the visibility filter needs.
+ * every {@link ArtistOwnPageField}. It keeps `publishedOn` and `deletedOn`,
+ * which the visibility filter needs.
  */
-export type ArtistCreditScalars = Omit<ArtistPublicScalars, ArtistBioField>;
+export type ArtistCreditScalars = Omit<ArtistPublicScalars, ArtistOwnPageField>;
 
 /** Scalar fields of the Prisma `ArtistLabel` join model (`labels: true`). */
 export interface ArtistLabelRecord {
@@ -295,6 +324,12 @@ export type Artist = ArtistScalars & {
 };
 
 /**
+ * An admin listing row: the admin payload plus whether a display image is
+ * chosen, which publishing needs (ADR-0019).
+ */
+export type ArtistListItem = Artist & { hasDisplayImage: boolean };
+
+/**
  * The media `Release` graph as the public artist-detail page loads it: every
  * credited artist on the release carries only its {@link ArtistCreditScalars}.
  */
@@ -311,7 +346,7 @@ export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArti
  * the artist's own release joins, and — via `memberOf` — the release joins of
  * every band the artist belongs to, all carrying the public media release
  * graph. No artist anywhere in it carries an {@link ArtistPrivateField}, and
- * no nested artist carries an {@link ArtistBioField}.
+ * no nested artist carries an {@link ArtistOwnPageField}.
  * The service flattens this into {@link ArtistWithPublishedReleases}.
  */
 export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
@@ -336,6 +371,12 @@ export interface ArtistWithPublishedReleases extends Omit<
   'memberOf' | 'releases'
 > {
   releases: ArtistPublishedReleaseRow[];
+  /**
+   * The newest listed release the artist holds a direct credit on (own or
+   * featured, never a band's), as the artists index summarises it; the page
+   * leads with it (ADR-0006). `null` when there is none.
+   */
+  newestRelease: ArtistListingNewestRelease | null;
 }
 
 /**
@@ -536,6 +577,8 @@ export interface ArtistWritableData {
   publishedBy?: string | null;
   createdBy?: string | null;
   deletedOn?: Date | null;
+  /** The curated links, written whole; `null` clears them (ADR-0020). */
+  links?: ArtistLinks | null;
 }
 
 /** Data accepted by the repository to create an artist. */

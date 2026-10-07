@@ -5,6 +5,7 @@
 
 import { useMemo } from 'react';
 
+import { Badge } from '@/app/components/ui/badge';
 import { HidingWarningDialog } from '@/components/hiding-warning-dialog';
 import {
   useDeleteArtistMutation,
@@ -14,11 +15,19 @@ import {
 import { useDebounce } from '@/hooks/use-debounce';
 import { useGuardedArtistArchive } from '@/hooks/use-guarded-artist-archive';
 import { ENTITIES } from '@/lib/constants';
-import type { Artist } from '@/lib/types/media-models';
+import type { ArtistListItem } from '@/lib/types/domain/artist';
 
 import { useInfiniteArtistsQuery } from './_hooks/use-infinite-artists-query';
 import { DataView } from './data-view';
 import { useDataViewFilters, useDataViewFiltersHydration } from './use-data-view-filters';
+
+/**
+ * Publishing needs a chosen display image (ADR-0019); the list flags an
+ * artist that has none, published or not, so the admin sees it before the
+ * Publish action refuses.
+ */
+const artistBadges = ({ hasDisplayImage }: ArtistListItem) =>
+  hasDisplayImage ? null : <Badge variant="outline">No display image</Badge>;
 
 export const ArtistDataView = () => {
   const { publishArtistAsync } = usePublishArtistMutation();
@@ -75,11 +84,12 @@ export const ArtistDataView = () => {
   return (
     <>
       <HidingWarningDialog {...warning} />
-      <DataView<Artist>
+      <DataView<ArtistListItem>
         entity={ENTITIES.artist}
         data={{ artists: rows }}
         fieldsToShow={fieldsToShow}
         canCreate={false}
+        renderBadges={artistBadges}
         mutations={{
           publish: (id) => publishArtistAsync({ artistId: id }),
           delete: archiveArtist,

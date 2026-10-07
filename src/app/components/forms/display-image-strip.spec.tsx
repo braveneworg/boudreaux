@@ -32,6 +32,7 @@ const IMAGES = [image('a', 'Alpha'), image('b', 'Bravo'), image('c', 'Charlie')]
 const renderStrip = (overrides: Partial<DisplayImageStripProps> = {}) => {
   const props: DisplayImageStripProps = {
     images: IMAGES,
+    isPublished: false,
     onReorder: vi.fn(),
     onRemove: vi.fn(),
     onDropPoolImage: vi.fn(),
@@ -67,6 +68,27 @@ const transfer = ({ payload, files = [] }: { payload?: string; files?: File[] })
 const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
 
 describe('DisplayImageStrip', () => {
+  // ADR-0019: a published artist's chosen set never becomes empty.
+  it("disables removing a published artist's last display image, with the reason", () => {
+    renderStrip({ images: [IMAGES[0]], isPublished: true });
+
+    const remove = screen.getByRole('button', { name: 'Remove Alpha from display images' });
+    expect(remove).toBeDisabled();
+    expect(remove).toHaveAccessibleDescription(/at least one display image/i);
+  });
+
+  it('lets a published artist drop a display image while another remains', () => {
+    renderStrip({ images: IMAGES.slice(0, 2), isPublished: true });
+
+    expect(screen.getByRole('button', { name: 'Remove Alpha from display images' })).toBeEnabled();
+  });
+
+  it('lets an unpublished artist drop its only display image', () => {
+    renderStrip({ images: [IMAGES[0]] });
+
+    expect(screen.getByRole('button', { name: 'Remove Alpha from display images' })).toBeEnabled();
+  });
+
   it('renders the chosen images in order with their positions', () => {
     renderStrip();
     const items = within(screen.getByRole('list', { name: 'Display images' })).getAllByRole(
@@ -79,9 +101,9 @@ describe('DisplayImageStrip', () => {
     ]);
   });
 
-  it('shows the count against the cap', () => {
+  it('shows the count with no cap', () => {
     renderStrip();
-    expect(screen.getByRole('heading', { name: 'Display images (3/3)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Display images (3)' })).toBeInTheDocument();
   });
 
   it('renders the thumbnail with the image alt text', () => {
@@ -223,15 +245,15 @@ describe('DisplayImageStrip', () => {
       expect(dropTarget()).toHaveAttribute('data-drag-over', 'false');
     });
 
-    it('explains the cap and refuses drops once the set is full', () => {
+    it('keeps accepting drops past three — the set has no cap', () => {
       const { onDropPoolImage, onDropFile } = renderStrip();
-      expect(dropTarget()).toHaveTextContent(/Remove a display image first \(limit 3\)/);
+      expect(dropTarget()).not.toHaveTextContent(/limit/);
 
       fireEvent.drop(dropTarget(), { dataTransfer: transfer({ payload: poolPayload('d') }) });
       fireEvent.drop(dropTarget(), { dataTransfer: transfer({ files: [jpeg] }) });
 
-      expect(onDropPoolImage).not.toHaveBeenCalled();
-      expect(onDropFile).not.toHaveBeenCalled();
+      expect(onDropPoolImage).toHaveBeenCalledWith('d');
+      expect(onDropFile).toHaveBeenCalledWith(jpeg);
     });
 
     it('refuses drops while disabled', () => {

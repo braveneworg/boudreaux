@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import type { ReactNode } from 'react';
+
 import type { AdminEntity } from '@/app/admin/types';
 
 /** Plain result returned by the injected entity mutation callbacks. */
@@ -100,6 +102,8 @@ export interface DataViewProps<T extends Record<string, unknown>> {
   canCreate?: boolean;
   /** Custom display name resolver for entity-specific name formatting. */
   getItemDisplayName?: (item: T) => string;
+  /** Entity-specific status badges for a row, shown on its card above the fields. */
+  renderBadges?: (item: T) => ReactNode;
   /** Publish/delete/restore callbacks injected by the wrapper. */
   mutations: EntityMutations;
   /** Controlled search + visibility filters. */

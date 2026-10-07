@@ -4,14 +4,14 @@
 
 import type { AssertExact } from '@/lib/types/assert';
 import {
-  ARTIST_BIO_FIELDS,
+  ARTIST_OWN_PAGE_FIELDS,
   ARTIST_PRIVATE_FIELDS,
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
 
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
-import { bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { releaseWhere } from './_internal/release-where';
 import { isUnsetOr } from './_internal/where-kit';
 import { ArtistRepository } from './artist-repository';
@@ -145,16 +145,34 @@ describe('ArtistRepository', () => {
 
   describe('findMany', () => {
     it('uses the full admin include and default pagination', async () => {
-      vi.mocked(prisma.artist.findMany).mockResolvedValue([{ id: 'a' }] as never);
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
-      const result = await ArtistRepository.findMany({});
+      await ArtistRepository.findMany({});
 
-      expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.skip).toBe(0);
       expect(arg?.take).toBe(50);
       expect(arg?.orderBy).toEqual({ createdAt: 'desc' });
-      expect(arg?.include).toEqual(adminInclude);
+      expect(arg?.include).toEqual({
+        ...adminInclude,
+        bioImages: { where: bioImageWhere.chosen, select: { id: true }, take: 1 },
+      });
+    });
+
+    // ADR-0019: the listing says whether a display image is chosen, from the
+    // one chosen row the include pulls; the row itself stays in the repository.
+    it('maps the chosen display image to a flag', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        { id: 'a', bioImages: [] },
+        { id: 'b', bioImages: [{ id: 'img' }] },
+      ] as never);
+
+      const result = await ArtistRepository.findMany({});
+
+      expect(result).toEqual([
+        { id: 'a', hasDisplayImage: false },
+        { id: 'b', hasDisplayImage: true },
+      ]);
     });
 
     it('excludes soft-deleted artists by default (Mongo null-safe)', async () => {
@@ -275,6 +293,31 @@ describe('ArtistRepository', () => {
         where: { id: 'a' },
         data: { displayName: 'New' },
         include: adminInclude,
+      });
+    });
+
+    // ADR-0020: the composite is written whole; `null` means "none", which
+    // Prisma spells as `unset` on an optional composite.
+    it('writes a links composite whole', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+      const links = {
+        websites: [{ label: null, url: 'https://example.com' }],
+        social: [],
+        contact: [],
+      };
+
+      await ArtistRepository.update('a', { links });
+
+      expect(vi.mocked(prisma.artist.update).mock.calls[0][0]?.data).toEqual({ links });
+    });
+
+    it('unsets the links composite for a null', async () => {
+      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
+
+      await ArtistRepository.update('a', { links: null });
+
+      expect(vi.mocked(prisma.artist.update).mock.calls[0][0]?.data).toEqual({
+        links: { unset: true },
       });
     });
 
@@ -1071,7 +1114,7 @@ describe('ArtistRepository', () => {
 
       // Nothing gates a nested artist on publication, so a draft artist
       // credited on a release, or in the band, must not carry its bio.
-      it.each(ARTIST_BIO_FIELDS)('omits %s from every nested artist level', async (field) => {
+      it.each(ARTIST_OWN_PAGE_FIELDS)('omits %s from every nested artist level', async (field) => {
         const selects = await artistSelects();
         const nested = selects.filter(([path]) => path !== 'artist');
 
@@ -1082,6 +1125,34 @@ describe('ArtistRepository', () => {
         const [[, pageArtist]] = await artistSelects();
 
         expect(pageArtist).toMatchObject({ bio: true, shortBio: true, altBio: true });
+      });
+
+      // The page and the releases page read only track 1 of each release (the
+      // listening modal loads the rest itself), on the artist's own releases
+      // and on its bands' alike.
+      it('loads one file per playable format on both release graphs', async () => {
+        vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+        await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+        const select = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select as {
+          releases: { include: { release: { include: { digitalFormats: unknown } } } };
+          memberOf: {
+            include: {
+              artist: {
+                select: {
+                  releases: { include: { release: { include: { digitalFormats: unknown } } } };
+                };
+              };
+            };
+          };
+        };
+        const files = { orderBy: { trackNumber: 'asc' }, take: 1 };
+
+        expect(select.releases.include.release.include.digitalFormats).toMatchObject({
+          include: { files },
+        });
+        expect(
+          select.memberOf.include.artist.select.releases.include.release.include.digitalFormats
+        ).toMatchObject({ include: { files } });
       });
     });
   });

@@ -70,9 +70,9 @@ export const ArtistNavSearchCombobox = (): ReactElement => {
           isError={!isDebouncing && error !== null}
           results={data?.results ?? []}
           onArtistSelect={(artistSlug) => goTo(`/artists/${artistSlug}`)}
-          onReleaseSelect={(artistSlug, releaseId) =>
-            goTo(`/artists/${artistSlug}?release=${releaseId}`)
-          }
+          // A release pick goes to the release page itself; the artist page
+          // leads with its latest release and lists the rest under /releases.
+          onReleaseSelect={(_artistSlug, releaseId) => goTo(`/releases/${releaseId}`)}
         />
       </PopoverContent>
     </Popover>

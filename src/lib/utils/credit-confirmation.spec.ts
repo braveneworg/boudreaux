@@ -44,13 +44,13 @@ const hiddenRow = (over: Partial<HiddenCreditRow> = {}): HiddenCreditRow => ({
   ...over,
 });
 
-const awaiting = (id: string, name: string): CreditAwaitingConfirmation => ({
+const awaiting = (id: string, name: string, displayImageCount = 1): CreditAwaitingConfirmation => ({
   id,
   slug: id,
   name,
   bioState: 'none',
   bioGeneratedAt: null,
-  displayImageCount: 0,
+  displayImageCount,
 });
 
 describe('credit-confirmation', () => {
@@ -106,6 +106,28 @@ describe('credit-confirmation', () => {
         ok: false,
         error: 'An artist cannot be both published and kept hidden: Bea',
       });
+    });
+
+    // ADR-0019: an artist with no chosen display image can only be kept hidden.
+    it('refuses to publish an artist with no display image, naming it', () => {
+      const result = checkCreditDecisions([awaiting('a', 'Ada', 0), awaiting('b', 'Bo')], {
+        publishArtistIds: ['a', 'b'],
+        keepHiddenArtistIds: [],
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'These artists have no display image and can only be kept hidden: Ada',
+      });
+    });
+
+    it('lets an artist with no display image be kept hidden', () => {
+      const result = checkCreditDecisions([awaiting('a', 'Ada', 0)], {
+        publishArtistIds: [],
+        keepHiddenArtistIds: ['a'],
+      });
+
+      expect(result).toEqual({ ok: true });
     });
 
     it('ignores a keep-hidden artist that no longer awaits confirmation', () => {
@@ -182,18 +204,28 @@ describe('credit-confirmation', () => {
       expect(credit).toMatchObject({ bioState: 'none', bioGeneratedAt: null });
     });
 
-    it('counts the display images the public page would show', () => {
+    // ADR-0019 counts chosen images only: a suggestion the fallback would
+    // show is not a human's choice and does not make the artist publishable.
+    it('counts the chosen display images only', () => {
       const credit = toCreditAwaitingConfirmation(
         awaitingRow({
           bioImages: [
             { isPrimary: true, displayOrder: null, alt: 'On stage' },
-            { isPrimary: true, displayOrder: null, alt: null },
-            { isPrimary: false, displayOrder: null, alt: 'Portrait' },
+            { isPrimary: false, displayOrder: 1, alt: null },
+            { isPrimary: false, displayOrder: 0, alt: 'Portrait' },
           ],
         })
       );
 
-      expect(credit.displayImageCount).toBe(1);
+      expect(credit.displayImageCount).toBe(2);
+    });
+
+    it('counts zero when only suggestions exist', () => {
+      const credit = toCreditAwaitingConfirmation(
+        awaitingRow({ bioImages: [{ isPrimary: true, displayOrder: null, alt: 'On stage' }] })
+      );
+
+      expect(credit.displayImageCount).toBe(0);
     });
   });
 

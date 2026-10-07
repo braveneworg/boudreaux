@@ -5,7 +5,11 @@
   Wherever this record says "current or alumni" or "inactive with no
   departure date", that condition no longer applies: a public artist is
   published and not deleted, and a credit stays hidden only when its artist
-  is soft-deleted.
+  is soft-deleted. Amended 2026-10-06 by
+  [ADR-0019](0019-publishing-an-artist-needs-a-chosen-display-image.md): a
+  credit decision can publish an artist only if the artist has a chosen
+  display image; an imageless credit can only be kept hidden, and "an artist
+  created published" is no longer a path (an artist is created unpublished).
 - **Date**: 2026-09-26
 
 ## Context
@@ -42,8 +46,10 @@ confirmed that artist by id. `publishedOn` always records a human decision.**
 - **The server enforces it.** The service checks the two lists against the
   actual credits awaiting confirmation and fails with `VALIDATION`, naming
   the artists, when one has no decision, when an id to publish does not
-  await confirmation, or when an id is in both lists. The dialogs are how
-  the lists are built; they are not the gate.
+  await confirmation, when an id is in both lists, or (since 2026-10-06,
+  [ADR-0019](0019-publishing-an-artist-needs-a-chosen-display-image.md))
+  when an id to publish names an artist with no chosen display image. The
+  dialogs are how the lists are built; they are not the gate.
 - **A release is always created unpublished.** Publishing checks the stored
   credits, so `ReleaseService.createRelease` drops any publication date and
   publishing goes through `publishRelease`, which checks the stored credits.

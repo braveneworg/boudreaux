@@ -119,6 +119,9 @@ describe('updateArtistAction', () => {
           'diedOn',
           'formedOn',
           'publishedOn',
+          'websiteLinks',
+          'socialLinks',
+          'contactLinkGroups',
         ],
         expect.anything()
       );
@@ -864,6 +867,91 @@ describe('updateArtistAction', () => {
 
       expect(result.errors).toBeDefined();
       expect(result.errors?.firstName).toEqual(['First name is required']);
+    });
+  });
+
+  // ADR-0020: the form sends three arrays; the action composes `links`.
+  describe('links', () => {
+    const parsedBase = { firstName: 'John', surname: 'Doe', slug: 'john-doe' };
+
+    const stubParsed = (data: Record<string, unknown>): void => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: { success: true, data },
+      } as never);
+      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+        success: true,
+        data: { id: mockArtistId },
+      } as never);
+    };
+
+    it('composes the links composite from the three arrays, normalised', async () => {
+      stubParsed({
+        ...parsedBase,
+        websiteLinks: [{ label: '', url: ' https://example.com ' }],
+        socialLinks: [],
+        contactLinkGroups: [
+          { heading: 'Booking', links: [{ label: 'Agent', url: 'agent@example.com' }] },
+          { heading: 'Merch', links: [] },
+        ],
+      });
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({
+          links: {
+            websites: [{ label: null, url: 'https://example.com' }],
+            social: [],
+            contact: [
+              { heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:agent@example.com' }] },
+            ],
+          },
+        }),
+        'user-123'
+      );
+    });
+
+    it('sends a null composite when every array is empty', async () => {
+      stubParsed({ ...parsedBase, websiteLinks: [], socialLinks: [], contactLinkGroups: [] });
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({ links: null }),
+        'user-123'
+      );
+    });
+
+    // A form whose other arrays are still empty omits them from the request
+    // (an empty array is skipped by the form-data encoder's caller only when
+    // undefined, but a missing one must not void the arrays that did arrive).
+    it('composes the links when only some of the arrays arrive, the rest as empty', async () => {
+      stubParsed({ ...parsedBase, websiteLinks: [{ label: '', url: 'https://example.com' }] });
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(ArtistService.updateArtist).toHaveBeenCalledWith(
+        mockArtistId,
+        expect.objectContaining({
+          links: {
+            websites: [{ label: null, url: 'https://example.com' }],
+            social: [],
+            contact: [],
+          },
+        }),
+        'user-123'
+      );
+    });
+
+    it('leaves the links alone when the form did not send the arrays', async () => {
+      stubParsed(parsedBase);
+
+      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1]).not.toHaveProperty('links');
     });
   });
 });

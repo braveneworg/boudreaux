@@ -58,6 +58,27 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+describe('bioImageWhere.chosen (Docker Mongo contract)', () => {
+  it('matches exactly the rows a human has chosen, whatever the stored order', async () => {
+    const rows = await prisma.artistBioImage.findMany({
+      where: { artistId, AND: [bioImageWhere.chosen] },
+      select: { url: true },
+    });
+
+    expect(rows.map(({ url }) => url).sort()).toEqual(
+      expectUrls((order) => order === 'zero' || order === 'two')
+    );
+  });
+
+  it('counts the same rows, the publish gate’s read', async () => {
+    const count = await prisma.artistBioImage.count({
+      where: { artistId, AND: [bioImageWhere.chosen] },
+    });
+
+    expect(count).toBe(expectUrls((order) => order === 'zero' || order === 'two').length);
+  });
+});
+
 describe('bioImageWhere.displayCandidate (Docker Mongo contract)', () => {
   it('matches a chosen row or a suggested row, whatever the stored order', async () => {
     const rows = await prisma.artistBioImage.findMany({

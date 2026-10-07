@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 
 import { ArtistService } from '@/lib/services/artist-service';
-import { ARTIST_BIO_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
+import { ARTIST_OWN_PAGE_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 import {
   artistBioValues,
   artistPrivateValues,
@@ -220,7 +220,7 @@ describe('Artist by Slug API Route', () => {
       }
     );
 
-    it.each(ARTIST_BIO_FIELDS)(
+    it.each(ARTIST_OWN_PAGE_FIELDS)(
       'never serialises %s on a nested artist (member or release credit)',
       async (field) => {
         const bioArtist = { ...mockArtist, ...artistBioValues };

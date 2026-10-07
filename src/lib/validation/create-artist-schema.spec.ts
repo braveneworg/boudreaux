@@ -9,6 +9,39 @@ const validBase = {
   slug: 'john-doe',
 };
 
+// ADR-0020: the form carries its links as three arrays the action composes.
+describe('createArtistSchema link arrays', () => {
+  it('accepts the three link arrays', () => {
+    const parsed = createArtistSchema.parse({
+      ...validBase,
+      websiteLinks: [{ label: 'Site', url: 'https://example.com' }],
+      socialLinks: [{ url: 'https://www.instagram.com/x' }],
+      contactLinkGroups: [{ heading: 'Booking', links: [{ url: 'agent@example.com' }] }],
+    });
+
+    expect(parsed.websiteLinks).toEqual([{ label: 'Site', url: 'https://example.com' }]);
+    expect(parsed.socialLinks).toEqual([{ url: 'https://www.instagram.com/x' }]);
+    expect(parsed.contactLinkGroups).toEqual([
+      { heading: 'Booking', links: [{ url: 'agent@example.com' }] },
+    ]);
+  });
+
+  it('leaves the arrays absent when the form does not send them', () => {
+    const parsed = createArtistSchema.parse(validBase);
+
+    expect(parsed).not.toHaveProperty('websiteLinks');
+  });
+
+  it('rejects a website link that is not http(s)', () => {
+    const result = createArtistSchema.safeParse({
+      ...validBase,
+      websiteLinks: [{ url: 'mailto:a@example.com' }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('createArtistSchema', () => {
   describe('identity refinement (superRefine)', () => {
     it('accepts an artist identified by firstName + surname', () => {

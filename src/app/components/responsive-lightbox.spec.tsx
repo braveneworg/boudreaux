@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -122,6 +122,69 @@ describe('ResponsiveLightbox', () => {
     await userEvent.click(trigger());
 
     expect(screen.getByText('Lightbox body').parentElement).toHaveClass('min-w-0');
+  });
+
+  // Controlled mode: a gallery opens the lightbox at the tile that was
+  // clicked, so the open state and the trigger both belong to the caller.
+  describe('controlled', () => {
+    it('opens under the caller’s control without a trigger of its own', () => {
+      render(
+        <ResponsiveLightbox
+          open
+          onOpenChange={vi.fn()}
+          title="Test Artist"
+          description="A portrait"
+        >
+          <p>Lightbox body</p>
+        </ResponsiveLightbox>
+      );
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /expand image/i })).not.toBeInTheDocument();
+    });
+
+    it('stays closed while the caller says so', () => {
+      render(
+        <ResponsiveLightbox open={false} onOpenChange={vi.fn()} title="T" description="D">
+          <p>Lightbox body</p>
+        </ResponsiveLightbox>
+      );
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('reports a close to the caller instead of closing itself', async () => {
+      const onOpenChange = vi.fn();
+      render(
+        <ResponsiveLightbox open onOpenChange={onOpenChange} title="T" description="D">
+          <p>Lightbox body</p>
+        </ResponsiveLightbox>
+      );
+
+      await userEvent.keyboard('{Escape}');
+
+      expect(onOpenChange.mock.calls).toEqual([[false]]);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  it('hands the close focus hook to the surface', async () => {
+    const onCloseAutoFocus = vi.fn();
+    render(
+      <ResponsiveLightbox
+        trigger={<LightboxTrigger label="Expand image: Portrait">thumb</LightboxTrigger>}
+        title="T"
+        description="D"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <p>Lightbox body</p>
+      </ResponsiveLightbox>
+    );
+    await userEvent.click(trigger());
+
+    await userEvent.keyboard('{Escape}');
+
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalled());
   });
 });
 

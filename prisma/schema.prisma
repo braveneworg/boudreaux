@@ -256,6 +256,28 @@ model Label {
   artistLabels ArtistLabel[]
 }
 
+/// One curated link on an artist's page: an optional label beside a URL.
+/// Websites and social links are http(s); a contact link may also be
+/// `mailto:` or `tel:` (ADR-0020).
+type ArtistLink {
+  label String?
+  url   String
+}
+
+/// An admin-defined heading over its links in the Contact & Misc section.
+type ArtistLinkGroup {
+  heading String
+  links   ArtistLink[]
+}
+
+/// An artist's curated links in their three sections, written whole and in
+/// the admin's order; absent when the artist has none (ADR-0020).
+type ArtistLinks {
+  websites ArtistLink[]
+  social   ArtistLink[]
+  contact  ArtistLinkGroup[]
+}
+
 model Artist {
   id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
   firstName             String
@@ -322,6 +344,7 @@ model Artist {
   featuredArtist        FeaturedArtist?        @relation(fields: [featuredArtistId], references: [id])
   featuredArtistId      String?                @db.ObjectId
   tourHeadliners        TourDateHeadliner[] // Tours where this artist is a headliner
+  links                 ArtistLinks? // Curated websites / social / contact links shown on the artist's own page (ADR-0020)
 
   @@index([firstName, surname])
   @@index([displayName])

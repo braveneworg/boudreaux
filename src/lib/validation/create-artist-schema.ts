@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { artistLinksFormSchema } from './artist-links-schema';
 import { objectId, slug } from './primitives';
 
 // Bio fields are authored in the rich-text editor and stored as HTML, so their
@@ -92,6 +93,11 @@ export const artistBaseSchema = z.object({
   formedOn: z.string().optional().or(z.literal('')),
   publishedOn: z.string().optional().or(z.literal('')),
   createdBy: objectId.optional(),
+  // The curated links as three arrays (ADR-0020); the update action composes
+  // `Artist.links` from them. Optional: the create form has no link editors.
+  websiteLinks: artistLinksFormSchema.shape.websiteLinks.optional(),
+  socialLinks: artistLinksFormSchema.shape.socialLinks.optional(),
+  contactLinkGroups: artistLinksFormSchema.shape.contactLinkGroups.optional(),
 });
 
 export const createArtistSchema = artistBaseSchema.superRefine((data, ctx) => {
