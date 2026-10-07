@@ -129,6 +129,24 @@ describe('ArtistDetailPage', () => {
     );
   });
 
+  it('keeps the breadcrumb trail above the layout grid, not inside it', async () => {
+    await renderPage();
+
+    // The panel renders its trail before its children; the grid is the one
+    // child, so the trail can never be auto-placed into a spare grid cell.
+    const grid = screen.getByTestId('zine-panel').firstElementChild;
+    expect(grid).toHaveClass('grid');
+    expect(grid).toContainElement(screen.getByRole('heading', { level: 1 }));
+    expect(grid).toContainElement(screen.getByTestId('collage'));
+    expect(grid).toContainElement(screen.getByRole('article', { name: 'Biography' }));
+  });
+
+  it('drops the collage to the cap line of the name on desktop', async () => {
+    await renderPage();
+
+    expect(screen.getByTestId('collage').parentElement).toHaveClass('lg:pt-4');
+  });
+
   it('hands the collage the display images in their chosen order', async () => {
     await renderPage();
 

@@ -27,10 +27,6 @@ const ITEM_CLASS = 'relative shrink-0 snap-start w-[42%] lg:w-auto';
 const LEAD_TILE_CLASS = 'size-full border-0 aspect-[4/5]';
 const TILE_CLASS = 'size-full border-0 aspect-square';
 const MORE_TILE_CLASS = '[&_img]:brightness-[0.35]';
-const FRAME_NUMBER_CLASS =
-  'absolute top-1 left-1.5 font-mono text-[10px] tracking-widest text-amber-200/90';
-const CHINA_MARKER_RING_CLASS =
-  'pointer-events-none absolute inset-2 rounded-[50%] border-[3px] border-orange-400/90 [transform:rotate(-7deg)]';
 const MORE_OVERLAY_CLASS =
   'font-fake-four-cutout absolute inset-0 flex items-center justify-center text-4xl text-white';
 
@@ -43,9 +39,8 @@ interface DisplayImageCollageProps {
 
 /**
  * The artist page's proof sheet: up to seven tiles on black — the lead
- * frame at 4:5 across two columns, the rest square, each numbered, a
- * china-marker ring on the first, and "+N more" over the last when there
- * are more. Every tile opens one gallery lightbox at that image, which then
+ * frame at 4:5 across two columns, the rest square, and "+N more" over the
+ * last when there are more. Every tile opens one gallery lightbox at that image, which then
  * steps through all of them; closing it returns focus to the tile that
  * opened it. Under lg the sheet is a horizontal snap filmstrip. With no
  * image there is an inert black frame where the sheet would be.
@@ -119,10 +114,6 @@ export const DisplayImageCollage = ({
                   priority={isLead}
                   className={cn('size-full object-cover', LIGHTBOX_ZOOM_CLASS)}
                 />
-                <span aria-hidden className={FRAME_NUMBER_CLASS}>
-                  {String(tileIndex + 1).padStart(2, '0')}
-                </span>
-                {isLead && <span aria-hidden className={CHINA_MARKER_RING_CLASS} />}
                 {isMore && (
                   <span className={MORE_OVERLAY_CLASS}>
                     +{more}
