@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
 import { deleteVideoCascade } from '../helpers/e2e-db';
+import { pickVideoFile } from '../helpers/video-dropzone';
 
 import type { Page } from '@playwright/test';
 
@@ -229,14 +230,11 @@ test.describe('Admin video editorial rules', () => {
     await expect(adminPage.getByLabel('Title')).toHaveValue(`E2E Old Song ${STAMP}`, {
       timeout: 15_000,
     });
-    await adminPage
-      .getByTestId('video-dropzone')
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: `ZZ E2E New Artist ${STAMP} - E2E New Song ${STAMP}.mp4`,
-        mimeType: 'video/mp4',
-        buffer: Buffer.from('e2e-not-a-real-video'),
-      });
+    await pickVideoFile(adminPage, {
+      name: `ZZ E2E New Artist ${STAMP} - E2E New Song ${STAMP}.mp4`,
+      mimeType: 'video/mp4',
+      buffer: Buffer.from('e2e-not-a-real-video'),
+    });
 
     await expect(adminPage.getByLabel('Title')).toHaveValue(`E2E New Song ${STAMP}`, {
       timeout: 15_000,
@@ -275,14 +273,11 @@ test.describe('Admin video editorial rules', () => {
     await adminPage.goto(`/admin/videos/${id}`);
     const frames = adminPage.getByRole('radiogroup', { name: 'Captured poster frames' });
     await expect(frames.getByRole('radio')).toHaveCount(3, { timeout: 15_000 });
-    await adminPage
-      .getByTestId('video-dropzone')
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: `ZZ E2E Editorial Artist ${STAMP} - E2E Posterless ${STAMP}.mp4`,
-        mimeType: 'video/mp4',
-        buffer: Buffer.from('e2e-not-a-real-video'),
-      });
+    await pickVideoFile(adminPage, {
+      name: `ZZ E2E Editorial Artist ${STAMP} - E2E Posterless ${STAMP}.mp4`,
+      mimeType: 'video/mp4',
+      buffer: Buffer.from('e2e-not-a-real-video'),
+    });
 
     // The new title proves the replacement landed; the form shows the row's
     // stored frames until the save, which drops them with the old file.

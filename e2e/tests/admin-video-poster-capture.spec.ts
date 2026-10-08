@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
 import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helpers/e2e-db';
+import { pickVideoFile } from '../helpers/video-dropzone';
 
 import type { Page } from '@playwright/test';
 
@@ -33,14 +34,11 @@ const made: string[] = [];
 
 const uploadSource = async (page: Page, label: string): Promise<string> => {
   await page.goto('/admin/videos/new');
-  await page
-    .getByTestId('video-dropzone')
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: `${ARTIST} - E2E Capture ${label} ${STAMP}.webm`,
-      mimeType: 'video/webm',
-      buffer: POSTER_SOURCE,
-    });
+  await pickVideoFile(page, {
+    name: `${ARTIST} - E2E Capture ${label} ${STAMP}.webm`,
+    mimeType: 'video/webm',
+    buffer: POSTER_SOURCE,
+  });
   await page.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/, { timeout: 30_000 });
   const id = page.url().split('/').pop() ?? '';
   made.push(id);
@@ -49,14 +47,11 @@ const uploadSource = async (page: Page, label: string): Promise<string> => {
 
 /** Pick a new source file on a video's edit page; resolves once its title lands. */
 const replaceSource = async (page: Page, label: string): Promise<void> => {
-  await page
-    .getByTestId('video-dropzone')
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: `${ARTIST} - E2E Capture ${label} ${STAMP}.webm`,
-      mimeType: 'video/webm',
-      buffer: POSTER_SOURCE,
-    });
+  await pickVideoFile(page, {
+    name: `${ARTIST} - E2E Capture ${label} ${STAMP}.webm`,
+    mimeType: 'video/webm',
+    buffer: POSTER_SOURCE,
+  });
   await expect(page.getByLabel('Title')).toHaveValue(`E2E Capture ${label} ${STAMP}`, {
     timeout: 15_000,
   });
@@ -210,14 +205,11 @@ test.describe('Admin video poster capture', () => {
       timeout: 15_000,
     });
 
-    await adminPage
-      .getByTestId('video-dropzone')
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: `${ARTIST} - E2E Capture First ${STAMP}.webm`,
-        mimeType: 'video/webm',
-        buffer: POSTER_SOURCE,
-      });
+    await pickVideoFile(adminPage, {
+      name: `${ARTIST} - E2E Capture First ${STAMP}.webm`,
+      mimeType: 'video/webm',
+      buffer: POSTER_SOURCE,
+    });
     await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/, { timeout: 30_000 });
     const id = adminPage.url().split('/').pop() ?? '';
     made.push(id);
