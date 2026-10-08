@@ -90,6 +90,7 @@ describe('ArtistBioSection', () => {
 
     const note = screen.getByText(/"Biography" heading as Heading 3/);
     expect(note).toHaveTextContent('Heading 4');
+    expect(note).not.toHaveTextContent(/cutout/);
     // The editor is a next/dynamic import: await it (see the upload tests).
     const [firstEditor] = await screen.findAllByTestId('rich-text-editor-stub');
     const FOLLOWING = 4;

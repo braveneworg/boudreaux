@@ -139,11 +139,9 @@ export const ArtistBioSection = ({
           )}
         </div>
         <div data-testid="bio-editors-column" className="space-y-4 xl:order-1">
-          {/* The public page sets the bio's h3 in the cutout face (BIO_PROSE_CLASS);
-              the editing surface shows it plain, so the note says what the page does. */}
+          {/* The levels the page's prose treatment (BIO_PROSE_CLASS) expects. */}
           <p className="text-muted-foreground text-sm">
-            Set the &quot;Biography&quot; heading as Heading 3 — it appears in the cutout font on
-            the artist page, though not in the editor. Set every other heading as Heading 4.
+            Set the &quot;Biography&quot; heading as Heading 3 and every other heading as Heading 4.
           </p>
           <BioEditorField
             control={control}
