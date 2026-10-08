@@ -334,4 +334,9 @@ describe('BIO_PROSE_CLASS', () => {
     expect(BIO_PROSE_CLASS).toContain('[&_h2]:mt-10');
     expect(BIO_PROSE_CLASS).toContain('[&_p]:my-4');
   });
+
+  it('sets the bio h3 in the cutout face, the h4 in Jost', () => {
+    expect(BIO_PROSE_CLASS).toContain('[&_h3]:font-fake-four-cutout');
+    expect(BIO_PROSE_CLASS).not.toContain('[&_h4]:font-fake-four-cutout');
+  });
 });

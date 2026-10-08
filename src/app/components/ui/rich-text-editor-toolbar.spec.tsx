@@ -22,8 +22,8 @@ const BASE_STATE: ToolbarState = {
   isItalic: false,
   isLink: false,
   isImage: false,
-  isHeading2: false,
   isHeading3: false,
+  isHeading4: false,
   isBulletList: false,
   isOrderedList: false,
 };
@@ -43,6 +43,21 @@ const renderToolbar = (state: ToolbarState): void => {
 };
 
 describe('RichTextEditorToolbar', () => {
+  it('offers Heading 3 and Heading 4, never Heading 2', () => {
+    renderToolbar(BASE_STATE);
+    expect(screen.getByRole('button', { name: 'Heading 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Heading 4' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Heading 2' })).not.toBeInTheDocument();
+  });
+
+  it('marks the Heading 4 button pressed inside an h4', () => {
+    renderToolbar({ ...BASE_STATE, isHeading4: true });
+    expect(screen.getByRole('button', { name: 'Heading 4' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('marks the image button pressed when an image is selected', () => {
     renderToolbar({ ...BASE_STATE, isImage: true });
     expect(screen.getByRole('button', { name: 'Insert image' })).toHaveAttribute(

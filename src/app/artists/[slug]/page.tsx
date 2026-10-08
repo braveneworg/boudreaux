@@ -78,45 +78,50 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
               className: 'max-w-[200px] truncate sm:max-w-none sm:overflow-visible',
             },
           ]}
-          contentClassName="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr]"
         >
-          <header className="space-y-3 lg:col-start-2 lg:row-start-1">
-            <ZineHeading level={1} className="mb-2">
-              {displayName}
-            </ZineHeading>
-            {latest ? (
-              <LatestReleaseLink
-                release={latest}
-                artistName={displayName}
-                slug={slug}
-                className="text-lg"
-              />
-            ) : (
-              <p className="text-zinc-700">No releases yet.</p>
-            )}
-          </header>
+          {/* The grid is the panel's one child: the breadcrumb trail stays
+              above it instead of auto-placing into the grid's spare cell. */}
+          <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr]">
+            <header className="space-y-3 lg:col-start-2 lg:row-start-1">
+              <ZineHeading level={1} className="mb-2">
+                {displayName}
+              </ZineHeading>
+              {latest ? (
+                <LatestReleaseLink
+                  release={latest}
+                  artistName={displayName}
+                  slug={slug}
+                  className="text-lg"
+                />
+              ) : (
+                <p className="text-zinc-700">No releases yet.</p>
+              )}
+            </header>
 
-          <aside className="space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-            <DisplayImageCollage images={images} displayName={displayName} />
-            {genres.length > 0 && (
-              <ul aria-label="Genres" className="flex flex-wrap gap-1.5">
-                {genres.map((genre) => (
-                  <li key={genre}>
-                    <Badge variant="secondary">{formatVocabularyTerm(genre)}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {links ? (
-              <>
-                <LinkSection heading="Websites" section="websites" links={links.websites} />
-                <LinkSection heading="Social Media" section="social" links={links.social} />
-                <ContactLinkSection groups={links.contact} />
-              </>
-            ) : null}
-          </aside>
+            {/* `lg:pt-4` sets the sheet's top edge on the cap line of the name
+              (the heading's top padding, margin and line-box lead). */}
+            <aside className="space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:pt-4">
+              <DisplayImageCollage images={images} displayName={displayName} />
+              {genres.length > 0 && (
+                <ul aria-label="Genres" className="flex flex-wrap gap-1.5">
+                  {genres.map((genre) => (
+                    <li key={genre}>
+                      <Badge variant="secondary">{formatVocabularyTerm(genre)}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {links ? (
+                <>
+                  <LinkSection heading="Websites" section="websites" links={links.websites} />
+                  <LinkSection heading="Social Media" section="social" links={links.social} />
+                  <ContactLinkSection groups={links.contact} />
+                </>
+              ) : null}
+            </aside>
 
-          <ArtistBio html={artist.bio} className="lg:col-start-2 lg:row-start-2" />
+            <ArtistBio html={artist.bio} className="lg:col-start-2 lg:row-start-2" />
+          </div>
         </ZinePanel>
       </ContentContainer>
     </PageContainer>

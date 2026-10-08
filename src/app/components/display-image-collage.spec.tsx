@@ -55,10 +55,12 @@ describe('DisplayImageCollage', () => {
     );
   });
 
-  it('numbers the frames', () => {
+  it('draws nothing over the frames: no numbers, no ring', () => {
     renderCollage(3);
 
-    expect(collage()).toHaveTextContent('010203');
+    expect(collage()).toHaveTextContent('');
+    const lead = screen.getByRole('button', { name: 'Expand image: Photo 1' });
+    expect(lead.querySelectorAll('span[aria-hidden]')).toHaveLength(0);
   });
 
   it('says how many more images the last tile hides', () => {

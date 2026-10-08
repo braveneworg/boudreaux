@@ -20,7 +20,7 @@ test.describe('Artist Page', () => {
       const latest = page.getByRole('link', { name: 'E2E Album Three' });
       await expect(latest).toHaveAttribute('href', /^\/releases\/[a-f0-9]{24}$/);
 
-      await page.getByRole('link', { name: 'All releases' }).click();
+      await page.getByRole('link', { name: 'View all releases' }).click();
 
       await expect(page).toHaveURL(/\/artists\/e2e-artist\/releases$/, { timeout: 15_000 });
       await expect(page.getByRole('heading', { level: 1, name: 'E2E Artist' })).toBeVisible();

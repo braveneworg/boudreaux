@@ -51,12 +51,13 @@ describe('RichTextEditor', () => {
     expect(screen.getByRole('button', { name: 'New paragraph' })).toBeInTheDocument();
   });
 
-  it('renders the H2 and H3 heading buttons in the toolbar', async () => {
+  it('renders the H3 and H4 heading buttons in the toolbar', async () => {
     render(<Harness />);
     await waitForEditor();
 
-    expect(screen.getByRole('button', { name: 'Heading 2' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Heading 3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Heading 4' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Heading 2' })).not.toBeInTheDocument();
   });
 
   it('renders the bulleted and numbered list buttons in the toolbar', async () => {
@@ -90,7 +91,7 @@ describe('RichTextEditor', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<ul>')));
   });
 
-  it('wraps the current block in an h2 when the Heading 2 button is clicked', async () => {
+  it('wraps the current block in an h4 when the Heading 4 button is clicked', async () => {
     const onChange = vi.fn();
     const Controlled = () => {
       const [value, setValue] = useState('<p>Career</p>');
@@ -108,10 +109,10 @@ describe('RichTextEditor', () => {
     render(<Controlled />);
     await waitForEditor();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Heading 2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Heading 4' }));
 
     await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<h2>Career</h2>'))
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining('<h4>Career</h4>'))
     );
   });
 
@@ -687,7 +688,7 @@ describe('RichTextEditor link dialog handlers', () => {
 });
 
 describe('RichTextEditor active toolbar state and props', () => {
-  it('marks the Heading 2 button pressed after converting a block to h2', async () => {
+  it('marks the Heading 4 button pressed after converting a block to h4', async () => {
     const Controlled = () => {
       const [value, setValue] = useState('<p>Title</p>');
       return <RichTextEditor value={value} onChange={setValue} ariaLabel="Bio" />;
@@ -696,11 +697,11 @@ describe('RichTextEditor active toolbar state and props', () => {
     await waitForEditor();
 
     // Toggling the heading runs a transaction and leaves the cursor inside the
-    // new h2, so useEditorState recomputes the active state to true.
-    await userEvent.click(screen.getByRole('button', { name: 'Heading 2' }));
+    // new h4, so useEditorState recomputes the active state to true.
+    await userEvent.click(screen.getByRole('button', { name: 'Heading 4' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Heading 2' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Heading 4' })).toHaveAttribute(
         'aria-pressed',
         'true'
       )

@@ -9,6 +9,8 @@ import type { JSX, MouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { Eye } from 'lucide-react';
+
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
@@ -104,8 +106,12 @@ export const LatestReleaseLink = ({
         {release.byName ? <> by {release.byName}</> : null} ({release.releasedOn.getUTCFullYear()})
       </p>
       <p className="text-sm">
-        <Link href={allReleasesHref} className="underline underline-offset-2 hover:no-underline">
-          All releases
+        <Link
+          href={allReleasesHref}
+          className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:no-underline"
+        >
+          <Eye className="size-4" aria-hidden="true" />
+          <span>View all releases</span>
         </Link>
       </p>
       {playable ? (
