@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
 import { deleteUnlinkedArtistByDisplayName, deleteVideoCascade } from '../helpers/e2e-db';
+import { pickVideoFile } from '../helpers/video-dropzone';
 
 /**
  * Keystone E2E for the upload → draft → pre-save enrichment flow.
@@ -66,14 +67,11 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
       // Pick a file on the VIDEO dropzone (scoped so the poster input can't win).
       // Garbage bytes carry no container tags, so prefill falls back to the
       // filename parser: `Artist - Title (feat. Guest) [Official Video]`.
-      await adminPage
-        .getByTestId('video-dropzone')
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: 'E2E Draft Artist - E2E Draft Song (feat. E2E Draft Guest) [Official Video].mp4',
-          mimeType: 'video/mp4',
-          buffer: Buffer.from('e2e-not-a-real-video'),
-        });
+      await pickVideoFile(adminPage, {
+        name: 'E2E Draft Artist - E2E Draft Song (feat. E2E Draft Guest) [Official Video].mp4',
+        mimeType: 'video/mp4',
+        buffer: Buffer.from('e2e-not-a-real-video'),
+      });
 
       // Filename-parser prefill: title stripped of decoration + feat clause.
       // The prefill fans out an async metadata extract before writing the field —
@@ -176,14 +174,11 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
 
       // No `Artist - ` prefix → the filename parser yields artist: null, so
       // the draft row persists a BLANK artist and no enrichment auto-kicks.
-      await adminPage
-        .getByTestId('video-dropzone')
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: 'E2E Gate Song.mp4',
-          mimeType: 'video/mp4',
-          buffer: Buffer.from('e2e-not-a-real-video'),
-        });
+      await pickVideoFile(adminPage, {
+        name: 'E2E Gate Song.mp4',
+        mimeType: 'video/mp4',
+        buffer: Buffer.from('e2e-not-a-real-video'),
+      });
 
       await expect(adminPage.getByLabel('Title')).toHaveValue('E2E Gate Song', {
         timeout: 15_000,
@@ -241,14 +236,11 @@ test.describe('Admin video draft-upload — pre-save enrichment', () => {
           /^\/admin\/videos\/[0-9a-f]{24}$/.test(new URL(response.url()).pathname),
         { timeout: 60_000 }
       );
-      await adminPage
-        .getByTestId('video-dropzone')
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: `${artist} - E2E Survive Song.mp4`,
-          mimeType: 'video/mp4',
-          buffer: Buffer.from('e2e-not-a-real-video'),
-        });
+      await pickVideoFile(adminPage, {
+        name: `${artist} - E2E Survive Song.mp4`,
+        mimeType: 'video/mp4',
+        buffer: Buffer.from('e2e-not-a-real-video'),
+      });
       await adminPage.waitForURL(/\/admin\/videos\/[0-9a-f]{24}$/, { timeout: 30_000 });
       videoId = adminPage.url().split('/').pop();
 

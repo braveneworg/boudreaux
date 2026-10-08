@@ -8,6 +8,7 @@ import { useId } from 'react';
 import { Film, UploadCloud } from 'lucide-react';
 
 import { useUploaderDrag } from '@/app/components/ui/use-uploader-drag';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { VIDEO_ALLOWED_MIME_TYPES } from '@/lib/constants/video-uploads';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,9 @@ export const VideoDropzone = ({
   compact = false,
 }: VideoDropzoneProps): React.ReactElement => {
   const inputId = useId();
+  // "false" in the server markup, "true" once the change handler is attached:
+  // the E2E specs wait for it before picking a file (a file set earlier is lost).
+  const hydrated = useHydrated();
 
   const forwardFirst = (files: FileList | null): void => {
     const file = files?.[0];
@@ -45,6 +49,7 @@ export const VideoDropzone = ({
   return (
     <div
       data-testid="video-dropzone"
+      data-hydrated={hydrated}
       data-drag-over={isDragOver}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
