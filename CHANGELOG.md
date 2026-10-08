@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.417.0] - 2026-10-08
+
+### Fixed
+
+- fix(artists): bio h3 and h4 in Jost (#847)
+
 ## [4.416.0] - 2026-10-08
 
 ### Fixed
