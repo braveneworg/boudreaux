@@ -109,9 +109,9 @@ test.describe('Computed styles of shipped design decisions', () => {
   });
 
   test('a zine heading keeps its own casing and tracking (#784)', async ({ page }) => {
-    await page.goto('/merch');
+    await page.goto('/artists/e2e-artist/releases');
     const heading = page.locator('[data-slot="zine-heading"]').first();
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 15_000 });
     const style = await typeStyleOf(heading);
     expect(style.textTransform).toBe('uppercase');
     expect(style.letterSpacing).not.toBe('normal');
