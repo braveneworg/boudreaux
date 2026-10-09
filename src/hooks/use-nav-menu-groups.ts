@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 
-import { useNavMenuItems, type NavMenuItem } from '@/hooks/use-nav-menu-items';
+import { MERCH_STORE_URL, useNavMenuItems, type NavMenuItem } from '@/hooks/use-nav-menu-items';
 
 export interface NavMenuGroup {
   /** Trigger label rendered in the nav row. */
@@ -19,7 +19,7 @@ export type NavMenuEntry =
 
 // Drawer membership by href (spec order). Hrefs are stabler than display names.
 const MUSIC_HREFS = ['/releases', '/artists', '/playlists', '/videos'] as const;
-const LABEL_HREFS = ['/tours', '/merch', '/about'] as const;
+const LABEL_HREFS = ['/tours', MERCH_STORE_URL, '/about'] as const;
 
 const pickGroup = (
   label: string,

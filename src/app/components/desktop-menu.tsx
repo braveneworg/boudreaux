@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation';
 
 import { useNavMenuGroups } from '@/hooks/use-nav-menu-groups';
 import { cn } from '@/lib/utils';
-import { isActiveHref } from '@/lib/utils/is-active-href';
+import { getNavLinkProps } from '@/lib/utils/nav-link-props';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -60,11 +60,11 @@ export const DesktopMenu = (): React.ReactElement => {
                       them over the shadcn defaults (Slot would only concatenate). */}
                   <Link
                     href={entry.item.href}
-                    aria-current={isActiveHref(entry.item.href, pathname) ? 'page' : undefined}
                     // Static nav targets fully prefetch on viewport by default;
-                    // the hover boost upgrades force-dynamic ones (home) to a
-                    // full data prefetch the moment pointer intent shows.
-                    unstable_dynamicOnHover
+                    // internal links get the hover boost, which upgrades
+                    // force-dynamic ones (home) to a full data prefetch the
+                    // moment pointer intent shows.
+                    {...getNavLinkProps(entry.item, pathname)}
                   >
                     {entry.item.name}
                   </Link>

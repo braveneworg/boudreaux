@@ -15,6 +15,7 @@ import type { NavMenuEntry } from '@/hooks/use-nav-menu-groups';
 import type { NavMenuItem } from '@/hooks/use-nav-menu-items';
 import { cn } from '@/lib/utils';
 import { isActiveHref } from '@/lib/utils/is-active-href';
+import { getNavLinkProps } from '@/lib/utils/nav-link-props';
 
 import { MobileMenuGroup } from './mobile-menu-group';
 import { SocialMediaIconLinks } from './social-media-icon-links';
@@ -61,16 +62,15 @@ const MobileMenuLink = ({
   >
     <Link
       href={item.href}
-      aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
+      // Internal links get the prefetch boost: default prefetch grabs static
+      // targets when the sheet opens; the boost upgrades force-dynamic ones
+      // (home) to a full data prefetch on touchstart, a beat before the click.
+      {...getNavLinkProps(item, pathname)}
       className={cn(
         'mt-4 block text-xl tracking-wider text-zinc-50 no-underline underline-offset-8 text-shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
         item.color
       )}
       onClick={onNavigate}
-      // Default prefetch grabs static targets when the sheet opens;
-      // the boost upgrades force-dynamic ones (home) to a full data
-      // prefetch on touchstart, a beat before the click lands.
-      unstable_dynamicOnHover
     >
       {item.name}
     </Link>

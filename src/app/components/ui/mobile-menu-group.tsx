@@ -13,6 +13,7 @@ import { ChevronDown } from 'lucide-react';
 import type { NavMenuGroup } from '@/hooks/use-nav-menu-groups';
 import { cn } from '@/lib/utils';
 import { isActiveHref } from '@/lib/utils/is-active-href';
+import { getNavLinkProps } from '@/lib/utils/nav-link-props';
 
 /**
  * Mobile mirror of the desktop drawer's trigger colors (Music cyan, Label hot
@@ -107,13 +108,12 @@ export const MobileMenuGroup = ({
               <li key={item.name}>
                 <Link
                   href={item.href}
-                  aria-current={isActiveHref(item.href, pathname) ? 'page' : undefined}
+                  {...getNavLinkProps(item, pathname)}
                   className={cn(
                     'mt-3 block text-lg tracking-wider text-zinc-50 no-underline underline-offset-8 text-shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white aria-[current=page]:underline',
                     item.color
                   )}
                   onClick={onNavigate}
-                  unstable_dynamicOnHover
                 >
                   {item.name}
                 </Link>

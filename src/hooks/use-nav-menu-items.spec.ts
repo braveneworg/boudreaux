@@ -49,6 +49,20 @@ describe('useNavMenuItems', () => {
       ]);
     });
 
+    it('points Merch at the external shirt store', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const merch = result.current.find((item) => item.name === 'Merch');
+      expect(merch).toMatchObject({ href: 'https://fakefourshirts.com/', isExternal: true });
+    });
+
+    it('marks no other item external', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      const external = result.current.filter((item) => item.isExternal);
+      expect(external.map((item) => item.name)).toEqual(['Merch']);
+    });
+
     it('does not include My Collection', () => {
       const { result } = renderHook(() => useNavMenuItems());
 

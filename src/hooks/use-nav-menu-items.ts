@@ -17,7 +17,12 @@ export interface NavMenuItem {
    * until interacted with. Shared by the desktop and mobile menus.
    */
   color: string;
+  /** Points off-site; the menus open it in a new tab and never mark it current. */
+  isExternal?: boolean;
 }
+
+/** The label's merch store, linked from the nav in place of an on-site page. */
+export const MERCH_STORE_URL = 'https://fakefourshirts.com/';
 
 // The static signed-out list, in render order:
 // Home, Artists, Releases, Videos, Tours, Merch, Playlists, About, Contact Us.
@@ -55,7 +60,8 @@ const BASE_NAV_ITEMS: NavMenuItem[] = [
   },
   {
     name: 'Merch',
-    href: '/merch',
+    href: MERCH_STORE_URL,
+    isExternal: true,
     color:
       'aria-[current=page]:text-menu-item-yellow-300 aria-[current=page]:decoration-menu-item-yellow-300 hover:text-menu-item-yellow-300 hover:decoration-menu-item-yellow-300',
   },
