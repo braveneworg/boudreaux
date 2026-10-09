@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.418.0] - 2026-10-09
+
+### Changed
+
+- chore(config): 🔧 drop wildcard CORS on static (#850)
+
+### Fixed
+
+- fix(images): 🐛 skip width srcset on bio thumbs (#849)
+
 ## [4.417.0] - 2026-10-08
 
 ### Fixed
