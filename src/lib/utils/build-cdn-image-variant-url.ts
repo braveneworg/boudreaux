@@ -73,6 +73,28 @@ const appendWidthSuffix = (pathname: string, width: number): string => {
   return `${baseWithoutWidth}_w${width}${outputExt}`;
 };
 
+/** True when `appendWidthSuffix` leaves the pathname as-is at any width. */
+const hasNoWidthVariants = (pathname: string): boolean =>
+  appendWidthSuffix(pathname, 1) === pathname;
+
+const isOpaqueSrc = (src: string): boolean => src.startsWith('blob:') || src.startsWith('data:');
+
+const isAbsoluteSrc = (src: string): boolean =>
+  src.startsWith('http://') || src.startsWith('https://');
+
+const isCdnOrigin = (url: URL): boolean => url.origin === new URL(CDN_DOMAIN).origin;
+
+/**
+ * Leading-slashed, per-segment `encodeURIComponent` path for a relative src,
+ * so filenames with spaces or other reserved characters produce valid
+ * srcset/preload URLs (raw spaces break srcset parsing and invalidate
+ * `<link rel=preload href>`).
+ */
+const encodeRelativePath = (src: string): string => {
+  const rawPath = src.startsWith('/') ? src : `/${src}`;
+  return rawPath.split('/').map(encodeURIComponent).join('/');
+};
+
 /**
  * Build a CDN URL for a width-variant of an image.
  *
@@ -82,15 +104,14 @@ const appendWidthSuffix = (pathname: string, width: number): string => {
  *   swapping the extension to `.webp` for transcodable raster formats.
  */
 export const buildCdnImageVariantUrl = (src: string, width: number): string => {
-  if (src.startsWith('blob:') || src.startsWith('data:')) {
+  if (isOpaqueSrc(src)) {
     return src;
   }
 
-  if (src.startsWith('http://') || src.startsWith('https://')) {
+  if (isAbsoluteSrc(src)) {
     const sourceUrl = new URL(src);
-    const cdnUrl = new URL(CDN_DOMAIN);
 
-    if (sourceUrl.origin !== cdnUrl.origin) {
+    if (!isCdnOrigin(sourceUrl)) {
       return src;
     }
 
@@ -103,7 +124,43 @@ export const buildCdnImageVariantUrl = (src: string, width: number): string => {
   // Per-segment `encodeURIComponent` so filenames with spaces or other reserved
   // characters produce valid srcset/preload URLs (raw spaces break srcset
   // parsing and invalidate `<link rel=preload href>`).
-  const rawPath = src.startsWith('/') ? src : `/${src}`;
-  const encodedPath = rawPath.split('/').map(encodeURIComponent).join('/');
-  return `${CDN_DOMAIN}${appendWidthSuffix(encodedPath, width)}`;
+  return `${CDN_DOMAIN}${appendWidthSuffix(encodeRelativePath(src), width)}`;
+};
+
+/** `<Image>` props that point at the right CDN object without the loader warning. */
+export interface CdnImageSource {
+  src: string;
+  unoptimized: boolean;
+}
+
+/**
+ * Resolves the `src`/`unoptimized` pair for a `<Image>` whose src may have no
+ * width variants: a single-variant path, an extension the variant generator
+ * skips, an off-CDN URL, or a blob/data URI.
+ *
+ * The loader serves such a src unchanged at every width, and Next.js warns in
+ * development when a custom loader ignores `width`
+ * (`next-image-missing-loader-width`). Those srcs come back `unoptimized` with
+ * the URL the loader would have produced (a relative path gains the CDN
+ * origin, which a bare `unoptimized` would drop), so the browser loads the same
+ * object minus a srcset whose entries would all be identical. Every other src
+ * is returned untouched for the loader to fan out into `_w{width}` variants.
+ *
+ * @param src - Absolute URL, relative `/media/*` path, or blob/data URI.
+ */
+export const resolveCdnImageSource = (src: string): CdnImageSource => {
+  if (isOpaqueSrc(src)) {
+    return { src, unoptimized: true };
+  }
+
+  if (isAbsoluteSrc(src)) {
+    const sourceUrl = new URL(src);
+    const unoptimized = !isCdnOrigin(sourceUrl) || hasNoWidthVariants(sourceUrl.pathname);
+    return { src, unoptimized };
+  }
+
+  const encodedPath = encodeRelativePath(src);
+  return hasNoWidthVariants(encodedPath)
+    ? { src: `${CDN_DOMAIN}${encodedPath}`, unoptimized: true }
+    : { src, unoptimized: false };
 };

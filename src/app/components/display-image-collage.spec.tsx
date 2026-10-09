@@ -9,12 +9,23 @@ import { DisplayImageCollage } from './display-image-collage';
 import type { GalleryImage } from './display-image-gallery';
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt, priority }: { src: string; alt: string; priority?: boolean }) => (
+  default: ({
+    src,
+    alt,
+    priority,
+    unoptimized,
+  }: {
+    src: string;
+    alt: string;
+    priority?: boolean;
+    unoptimized?: boolean;
+  }) => (
     <span
       data-testid="next-image"
       data-src={src}
       data-alt={alt}
       data-priority={String(!!priority)}
+      data-unoptimized={String(!!unoptimized)}
     />
   ),
 }));
@@ -128,5 +139,33 @@ describe('DisplayImageCollage', () => {
 
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(screen.getByTestId('display-image-placeholder')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('serves a single-variant bio thumbnail unoptimized, so the loader never ignores a width', () => {
+    const thumb = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/1-3c44e452.webp';
+    render(
+      <DisplayImageCollage
+        images={[{ ...image(1), thumbnailUrl: thumb }]}
+        displayName="Test Artist"
+      />
+    );
+
+    const tile = screen.getByTestId('next-image');
+    expect(tile).toHaveAttribute('data-src', thumb);
+    expect(tile).toHaveAttribute('data-unoptimized', 'true');
+  });
+
+  it('leaves a variant-backed CDN image to the loader', () => {
+    const full = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/photo.jpg';
+    render(
+      <DisplayImageCollage
+        images={[{ ...image(1), url: full, thumbnailUrl: null }]}
+        displayName="Test Artist"
+      />
+    );
+
+    const tile = screen.getByTestId('next-image');
+    expect(tile).toHaveAttribute('data-src', full);
+    expect(tile).toHaveAttribute('data-unoptimized', 'false');
   });
 });

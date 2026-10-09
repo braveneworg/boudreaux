@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
+import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
 
 import {
   LIGHTBOX_ZOOM_CLASS,
@@ -50,7 +51,7 @@ export const ArtistCardPhoto = ({
       trigger={
         <LightboxTrigger label={`Expand image: ${alt}`} className={className}>
           <Image
-            src={image.thumbnailUrl ?? image.url}
+            {...resolveCdnImageSource(image.thumbnailUrl ?? image.url)}
             alt={alt}
             width={THUMBNAIL_SOURCE_PX}
             height={THUMBNAIL_SOURCE_PX}

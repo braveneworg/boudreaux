@@ -9,6 +9,7 @@ import type { JSX } from 'react';
 import Image from 'next/image';
 
 import { cn } from '@/lib/utils';
+import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
 
 import { DisplayImageGallery, galleryImageAlt, type GalleryImage } from './display-image-gallery';
 import { LIGHTBOX_ZOOM_CLASS, LightboxTrigger, ResponsiveLightbox } from './responsive-lightbox';
@@ -106,7 +107,7 @@ export const DisplayImageCollage = ({
                 className={cn(isLead ? LEAD_TILE_CLASS : TILE_CLASS, isMore && MORE_TILE_CLASS)}
               >
                 <Image
-                  src={image.thumbnailUrl ?? image.url}
+                  {...resolveCdnImageSource(image.thumbnailUrl ?? image.url)}
                   alt={alt}
                   width={image.width ?? 800}
                   height={image.height ?? 800}
