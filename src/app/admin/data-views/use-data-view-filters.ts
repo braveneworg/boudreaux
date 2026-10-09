@@ -64,6 +64,9 @@ const DEFAULT_SLICES: DataViewFilterSlices = {
   videos: DEFAULT_VIDEO_FILTERS,
 };
 
+/** sessionStorage key the admin data-view filters persist under. */
+export const DATA_VIEW_FILTERS_STORAGE_KEY = 'boudreaux-admin-filters';
+
 /**
  * Admin data-view filters, persisted to sessionStorage so search/toggles/sort
  * survive edit-and-back navigation and tab reloads but reset when the tab
@@ -101,7 +104,7 @@ export const useDataViewFilters = create<DataViewFiltersState>()(
       },
     }),
     {
-      name: 'boudreaux-admin-filters',
+      name: DATA_VIEW_FILTERS_STORAGE_KEY,
       version: 1,
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({

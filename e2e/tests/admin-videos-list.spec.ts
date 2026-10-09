@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { DATA_VIEW_FILTERS_STORAGE_KEY } from '@/app/admin/data-views/use-data-view-filters';
+
 import { expect, test } from '../fixtures/auth.fixture';
 import { scrollToLoad } from '../helpers/infinite-scroll';
 
@@ -101,13 +103,24 @@ test.describe('Admin videos — filters', () => {
     test.slow();
 
     await adminPage.goto('/admin/videos');
+    const showPublished = adminPage.getByRole('switch', { name: 'Show published' });
 
     // Turning off "Show published" leaves the unpublished (draft) rows only.
     // toPass: converges past transient DRAFT rows created by mutating specs
     // (draft-upload creates an unpublished video that would show here transiently).
     await expect(async () => {
+      // The filters persist to sessionStorage and rehydrate on reload, so a
+      // bare reload + click flips the switch back on every second pass. The
+      // stale draft-only list can then satisfy the count while the unfiltered
+      // refetch is in flight. Clear the stored filters so each pass starts
+      // from the defaults, and confirm the switch is off before counting.
+      await adminPage.evaluate(
+        (key) => sessionStorage.removeItem(key),
+        DATA_VIEW_FILTERS_STORAGE_KEY
+      );
       await adminPage.reload();
-      await adminPage.getByRole('switch', { name: 'Show published' }).click();
+      await showPublished.click();
+      await expect(showPublished).toHaveAttribute('aria-checked', 'false', { timeout: 2_000 });
       await expect(
         adminPage.getByRole('heading', { level: 3, name: 'E2E Video Draft' })
       ).toBeVisible({ timeout: 2_000 });
