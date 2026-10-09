@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { buildCdnImageVariantUrl } from './build-cdn-image-variant-url';
+import { buildCdnImageVariantUrl, resolveCdnImageSource } from './build-cdn-image-variant-url';
 
 describe('buildCdnImageVariantUrl', () => {
   it('returns a relative path with no extension unchanged (no width suffix appended)', () => {
@@ -84,6 +84,50 @@ describe('buildCdnImageVariantUrl', () => {
   it('still appends a width suffix for normal media URLs', () => {
     expect(buildCdnImageVariantUrl('https://cdn.fakefourrecords.com/media/cover.jpg', 800)).toBe(
       'https://cdn.fakefourrecords.com/media/cover_w800.webp'
+    );
+  });
+});
+
+describe('resolveCdnImageSource', () => {
+  const PASSTHROUGH_SRCS = [
+    'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/50-3c44e452.webp',
+    '/media/artists/a1/bio/thumbs/50-3c44e452.webp',
+    'https://cdn.fakefourrecords.com/media/videos/v1/poster-123.jpg',
+    '/media/icon.svg',
+    '/media/releases/coverart/no-extension',
+    'https://upload.wikimedia.org/wikipedia/commons/a/ab/Photo.jpg',
+    'blob:https://example.com/abc',
+    'data:image/png;base64,AAA',
+  ];
+
+  const VARIANT_SRCS = [
+    'https://cdn.fakefourrecords.com/media/artists/a1/bio/photo.jpg',
+    '/media/releases/coverart/cover.png',
+    'https://cdn.fakefourrecords.com/media/cover_w1200.webp',
+  ];
+
+  it.each(PASSTHROUGH_SRCS)('serves %s unoptimized at the URL the loader would emit', (src) => {
+    expect(resolveCdnImageSource(src)).toEqual({
+      src: buildCdnImageVariantUrl(src, 640),
+      unoptimized: true,
+    });
+  });
+
+  it.each(VARIANT_SRCS)('leaves %s to the loader', (src) => {
+    expect(resolveCdnImageSource(src)).toEqual({ src, unoptimized: false });
+  });
+
+  it.each([...PASSTHROUGH_SRCS, ...VARIANT_SRCS])(
+    'marks %s unoptimized exactly when the loader ignores width',
+    (src) => {
+      const ignoresWidth = buildCdnImageVariantUrl(src, 640) === buildCdnImageVariantUrl(src, 1080);
+      expect(resolveCdnImageSource(src).unoptimized).toBe(ignoresWidth);
+    }
+  );
+
+  it('prefixes a relative single-variant path with the CDN origin', () => {
+    expect(resolveCdnImageSource('/media/artists/a1/bio/thumbs/my thumb.webp').src).toBe(
+      'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/my%20thumb.webp'
     );
   });
 });

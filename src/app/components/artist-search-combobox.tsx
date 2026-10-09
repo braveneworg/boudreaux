@@ -21,6 +21,7 @@ import {
 } from '@/app/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
+import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 
 const SEARCH_PLACEHOLDER = 'Search by name, genre, or release';
@@ -111,7 +112,7 @@ export const ArtistSearchCombobox = ({
                       thumbnail={
                         imageSrc ? (
                           <Image
-                            src={imageSrc}
+                            {...resolveCdnImageSource(imageSrc)}
                             alt=""
                             width={40}
                             height={40}

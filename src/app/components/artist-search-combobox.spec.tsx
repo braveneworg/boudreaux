@@ -14,7 +14,8 @@ import { ArtistSearchCombobox } from './artist-search-combobox';
 // the thumbnail src can be asserted directly.
 vi.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt }: { src: string; alt: string }) => createElement('img', { src, alt }),
+  default: ({ src, alt, unoptimized }: { src: string; alt: string; unoptimized?: boolean }) =>
+    createElement('img', { src, alt, 'data-unoptimized': String(!!unoptimized) }),
 }));
 
 const makeArtist = (overrides: Partial<ArtistListingRow>): ArtistListingRow => ({
@@ -178,6 +179,42 @@ describe('ArtistSearchCombobox', () => {
       'src',
       'https://cdn.example.com/alpha.jpg'
     );
+  });
+
+  it('serves a single-variant bio thumbnail unoptimized, so the loader never ignores a width', async () => {
+    const user = userEvent.setup();
+    const thumb = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/50-3c44e452.webp';
+    const thumbed = makeArtist({
+      id: 'a-thumb',
+      displayName: 'Thumb Act',
+      bioImages: [{ ...alpha.bioImages[0], thumbnailUrl: thumb }],
+    });
+    render(<ArtistSearchCombobox {...baseProps} results={[thumbed]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Search artists' }));
+    await screen.findByText('Thumb Act');
+
+    const img = document.querySelector('[data-slot="command-item"] img');
+    expect(img).toHaveAttribute('src', thumb);
+    expect(img).toHaveAttribute('data-unoptimized', 'true');
+  });
+
+  it('leaves a variant-backed CDN image to the loader', async () => {
+    const user = userEvent.setup();
+    const full = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/photo.jpg';
+    const unthumbed = makeArtist({
+      id: 'a-full-cdn',
+      displayName: 'Variant Act',
+      bioImages: [{ ...alpha.bioImages[0], url: full, thumbnailUrl: null }],
+    });
+    render(<ArtistSearchCombobox {...baseProps} results={[unthumbed]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Search artists' }));
+    await screen.findByText('Variant Act');
+
+    const img = document.querySelector('[data-slot="command-item"] img');
+    expect(img).toHaveAttribute('src', full);
+    expect(img).toHaveAttribute('data-unoptimized', 'false');
   });
 
   it('forwards typed input to onSearchChange', async () => {

@@ -557,6 +557,25 @@ describe('ArtistListCard', () => {
     expect(enlarged.getAttribute('src')).toContain('full');
   });
 
+  it('renders a single-variant bio thumbnail as-is, with no srcset for the loader to fan out', () => {
+    const thumb = 'https://cdn.fakefourrecords.com/media/artists/a1/bio/thumbs/50-3c44e452.webp';
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          bioImages: [bioImage('bi1', { alt: 'Portrait', thumbnailUrl: thumb })],
+        }}
+      />
+    );
+
+    const photo = within(screen.getByRole('button', { name: 'Expand image: Portrait' })).getByRole(
+      'img',
+      { name: 'Portrait' }
+    );
+    expect(photo).toHaveAttribute('src', thumb);
+    expect(photo).not.toHaveAttribute('srcset');
+  });
+
   it('credits the photo in the enlarged view', async () => {
     render(
       <ArtistListCard
