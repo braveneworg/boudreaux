@@ -15,3 +15,14 @@ Fix lives in the loader: `/media/videos/` is a single-variant path marker
 poster `<Image>` gets the stored URL unchanged. When a new asset class is
 added, decide up front whether the variant generator covers it; if not, add
 its path marker there rather than sprinkling `unoptimized`.
+
+## The loader pass-through still needs `unoptimized` at the `<Image>`
+
+The marker keeps the URL correct, but a loader that returns the same URL at
+every width trips Next.js's dev warning `next-image-missing-loader-width`
+(the bio-thumb collage, artist cards, and artist search all did, 2026-10-09).
+Keep the marker as the correctness net, and render any `<Image>` whose src can
+be a pass-through with `{...resolveCdnImageSource(src)}` from the same module.
+It returns `unoptimized: true` only for srcs the loader would not vary, plus
+the CDN-prefixed URL. A bare `unoptimized` is wrong for a relative
+`/media/...` src because it skips the loader and loads from the app origin.
