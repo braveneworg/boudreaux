@@ -71,20 +71,19 @@ const buildContentSecurityPolicy = (): string => {
 
 // Build the full list of response-header rules. Split out from `headers()` so
 // the config method stays within the function-length limit; behavior is identical.
+//
+// `/_next/static` deliberately has no rule here:
+//   - Cache: Next.js already emits `public, max-age=31536000, immutable` for
+//     hashed build assets. Overriding it triggers a dev-mode warning and
+//     breaks HMR.
+//   - CORS: in production `assetPrefix` points at the CDN, and
+//     `scripts/sync-cdn.ts` uploads `.next/static` to S3, so browsers fetch
+//     these files from CloudFront and the rules below never reach them. The
+//     S3 bucket's CORS rule answers cross-origin font/chunk requests,
+//     echoing only the apex and `www` origins (with `Vary: Origin`). Change
+//     that rule, not this file, if the site gains another host. Without the
+//     CDN prefix (dev, E2E) assets are same-origin and need no CORS header.
 const buildResponseHeaders = () => [
-  // Next.js already emits `public, max-age=31536000, immutable` for hashed
-  // build assets — overriding it here triggers a dev-mode warning and
-  // breaks HMR. We only emit the CORS header so cross-origin font/chunk
-  // requests work when assetPrefix points at the CDN.
-  {
-    source: '/_next/static/:path*',
-    headers: [
-      {
-        key: 'Access-Control-Allow-Origin',
-        value: '*',
-      },
-    ],
-  },
   // Favicon — rarely changes; 1-day cache + 7-day SWR
   {
     source: '/favicon.ico',
