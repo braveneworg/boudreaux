@@ -19,6 +19,8 @@ test.describe('Artist Page', () => {
       // "E2E Album Three" (Sep 2024) is the newest of the artist's own albums.
       const latest = page.getByRole('link', { name: 'E2E Album Three' });
       await expect(latest).toHaveAttribute('href', /^\/releases\/[a-f0-9]{24}$/);
+      // The line says what the release is, with the label outside the link.
+      await expect(page.getByText('Latest Release: E2E Album Three (2024)')).toBeVisible();
 
       await page.getByRole('link', { name: 'View all releases' }).click();
 

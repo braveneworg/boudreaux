@@ -147,11 +147,11 @@ export const LinkSection = ({ heading, section, links }: LinkSectionProps): JSX.
   const headingId = useId();
   if (links.length === 0) return null;
   return (
-    <section aria-labelledby={headingId} className="space-y-2.5">
+    <section aria-labelledby={headingId} className="space-y-3">
       <h2 id={headingId} className={HEADING_CLASS}>
         {heading}
       </h2>
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {keyedBy(links, (link) => link.url).map(({ key, item }) => (
           <LinkItem key={key} link={item} section={section} />
         ))}
@@ -168,7 +168,7 @@ interface LinkGroupProps {
 export const LinkGroup = ({ group }: LinkGroupProps): JSX.Element => (
   <div className="space-y-2">
     <h3 className="text-sm font-semibold text-zinc-800">{group.heading}</h3>
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {keyedBy(group.links, (link) => link.url).map(({ key, item }) => (
         <LinkItem key={key} link={item} section="contact" />
       ))}
@@ -190,9 +190,12 @@ export const ContactLinkSection = ({ groups }: ContactLinkSectionProps): JSX.Ele
       <h2 id={headingId} className={HEADING_CLASS}>
         Contact &amp; Misc
       </h2>
-      {keyedBy(filled, (group) => group.heading).map(({ key, item }) => (
-        <LinkGroup key={key} group={item} />
-      ))}
+      {/* The groups stand further from each other than the first does from the heading. */}
+      <div className="space-y-6">
+        {keyedBy(filled, (group) => group.heading).map(({ key, item }) => (
+          <LinkGroup key={key} group={item} />
+        ))}
+      </div>
     </section>
   );
 };

@@ -81,7 +81,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
         >
           {/* The grid is the panel's one child: the breadcrumb trail stays
               above it instead of auto-placing into the grid's spare cell. */}
-          <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr]">
+          <div className="grid gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr]">
             <header className="space-y-3 lg:col-start-2 lg:row-start-1">
               <ZineHeading level={1} className="mb-2">
                 {displayName}
@@ -100,10 +100,10 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
             {/* `lg:pt-4` sets the sheet's top edge on the cap line of the name
               (the heading's top padding, margin and line-box lead). */}
-            <aside className="space-y-5 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:pt-4">
+            <aside className="space-y-8 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:pt-4">
               <DisplayImageCollage images={images} displayName={displayName} />
               {genres.length > 0 && (
-                <ul aria-label="Genres" className="flex flex-wrap gap-1.5">
+                <ul aria-label="Genres" className="flex flex-wrap gap-2">
                   {genres.map((genre) => (
                     <li key={genre}>
                       <Badge variant="secondary">{formatVocabularyTerm(genre)}</Badge>
