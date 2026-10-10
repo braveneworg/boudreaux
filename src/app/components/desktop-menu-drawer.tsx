@@ -10,6 +10,7 @@ import Link from 'next/link';
 import type { NavMenuGroup } from '@/hooks/use-nav-menu-groups';
 import { cn } from '@/lib/utils';
 import { isActiveHref } from '@/lib/utils/is-active-href';
+import { getNavLinkProps } from '@/lib/utils/nav-link-props';
 import {
   NavigationMenuContent,
   NavigationMenuItem,
@@ -110,32 +111,25 @@ export const DesktopMenuDrawer = ({
           className="bg-menu-item-yellow-200/85 absolute -top-3 left-1/2 z-20 h-6 w-24 -translate-x-1/2 -rotate-2 border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
         />
         <ul className="flex flex-col">
-          {group.items.map((item) => {
-            const isActive = isActiveHref(item.href, pathname);
-            return (
-              <li
-                key={item.name}
-                className="border-b-2 border-dashed border-black/15 last:border-b-0"
+          {group.items.map((item) => (
+            <li
+              key={item.name}
+              className="border-b-2 border-dashed border-black/15 last:border-b-0"
+            >
+              <NavigationMenuLink
+                asChild
+                className="font-fake-four-cutout hover:text-menu-item-tan-100 focus:text-menu-item-tan-100 block px-4 py-2 text-[22px] text-zinc-950 underline-offset-4 hover:bg-zinc-950 focus:bg-zinc-950 aria-[current=page]:underline"
               >
-                <NavigationMenuLink
-                  asChild
-                  className="font-fake-four-cutout hover:text-menu-item-tan-100 focus:text-menu-item-tan-100 block px-4 py-2 text-[22px] text-zinc-950 underline-offset-4 hover:bg-zinc-950 focus:bg-zinc-950 aria-[current=page]:underline"
-                >
-                  {/* Classes live on NavigationMenuLink so its cn() tailwind-merges
-                      them over the shadcn defaults (Slot would only concatenate).
-                      Drawer links are ink-on-paper by design (no per-item palette
-                      colors inside the drawer); active child is underlined in ink. */}
-                  <Link
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    unstable_dynamicOnHover
-                  >
-                    {item.name}
-                  </Link>
-                </NavigationMenuLink>
-              </li>
-            );
-          })}
+                {/* Classes live on NavigationMenuLink so its cn() tailwind-merges
+                    them over the shadcn defaults (Slot would only concatenate).
+                    Drawer links are ink-on-paper by design (no per-item palette
+                    colors inside the drawer); active child is underlined in ink. */}
+                <Link href={item.href} {...getNavLinkProps(item, pathname)}>
+                  {item.name}
+                </Link>
+              </NavigationMenuLink>
+            </li>
+          ))}
         </ul>
       </NavigationMenuContent>
     </NavigationMenuItem>

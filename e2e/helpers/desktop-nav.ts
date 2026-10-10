@@ -12,7 +12,6 @@ const DRAWER_BY_LINK = new Map<string, string>([
   ['Playlists', 'Music'],
   ['Videos', 'Music'],
   ['Tours', 'Label'],
-  ['Merch', 'Label'],
   ['About', 'Label'],
 ]);
 

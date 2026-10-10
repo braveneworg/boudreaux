@@ -4,6 +4,8 @@
 // @vitest-environment happy-dom
 import { renderHook } from '@testing-library/react';
 
+import { MERCH_STORE_URL } from '@/lib/constants/external-links';
+
 import { useNavMenuGroups } from './use-nav-menu-groups';
 
 const mockUseNavMenuItems = vi.fn();
@@ -24,7 +26,7 @@ const FLAT_SIGNED_OUT = [
   item('Releases', '/releases', 'releases-cyan'),
   item('Videos', '/videos'),
   item('Tours', '/tours', 'tours-tan'),
-  item('Merch', '/merch'),
+  item('Merch', MERCH_STORE_URL),
   item('Playlists', '/playlists'),
   item('About', '/about'),
   item('Contact Us', '/contact'),
@@ -97,7 +99,7 @@ describe('useNavMenuGroups', () => {
   });
 
   it('omits a group entirely when every member is absent from the flat list', () => {
-    const labelHrefs = ['/tours', '/merch', '/about'];
+    const labelHrefs = ['/tours', MERCH_STORE_URL, '/about'];
     mockUseNavMenuItems.mockReturnValue(
       FLAT_SIGNED_OUT.filter((i) => !labelHrefs.includes(i.href))
     );

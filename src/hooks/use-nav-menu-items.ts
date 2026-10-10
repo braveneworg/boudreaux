@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useSession } from '@/hooks/use-session';
+import { MERCH_STORE_URL } from '@/lib/constants/external-links';
 
 export interface NavMenuItem {
   name: string;
@@ -17,6 +18,8 @@ export interface NavMenuItem {
    * until interacted with. Shared by the desktop and mobile menus.
    */
   color: string;
+  /** Points off-site; the menus open it in a new tab and never mark it current. */
+  isExternal?: boolean;
 }
 
 // The static signed-out list, in render order:
@@ -55,7 +58,8 @@ const BASE_NAV_ITEMS: NavMenuItem[] = [
   },
   {
     name: 'Merch',
-    href: '/merch',
+    href: MERCH_STORE_URL,
+    isExternal: true,
     color:
       'aria-[current=page]:text-menu-item-yellow-300 aria-[current=page]:decoration-menu-item-yellow-300 hover:text-menu-item-yellow-300 hover:decoration-menu-item-yellow-300',
   },

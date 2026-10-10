@@ -61,6 +61,12 @@ const labelGroup: NavMenuGroup = {
       href: '/tours',
       color: 'aria-[current=page]:text-menu-item-tan-200 hover:text-menu-item-tan-200',
     },
+    {
+      name: 'Merch',
+      href: 'https://fakefourshirts.com/',
+      isExternal: true,
+      color: 'aria-[current=page]:text-menu-item-yellow-300 hover:text-menu-item-yellow-300',
+    },
   ],
 };
 
@@ -189,6 +195,21 @@ describe('MobileMenuGroup', () => {
 
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Artists' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('opens an external child link in a new tab', () => {
+    renderGroup({ group: labelGroup, defaultValue: 'Label' });
+
+    const merch = screen.getByRole('link', { name: 'Merch' });
+    expect(merch).toHaveAttribute('href', 'https://fakefourshirts.com/');
+    expect(merch).toHaveAttribute('target', '_blank');
+    expect(merch).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('keeps internal child links in the same tab', () => {
+    renderGroup({ group: labelGroup, defaultValue: 'Label' });
+
+    expect(screen.getByRole('link', { name: 'Tours' })).not.toHaveAttribute('target');
   });
 
   it('upgrades child links to a full prefetch on touch intent', () => {

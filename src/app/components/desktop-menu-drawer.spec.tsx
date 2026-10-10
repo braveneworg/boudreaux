@@ -42,11 +42,19 @@ const MUSIC_GROUP: NavMenuGroup = {
   ],
 };
 
-const renderDrawer = (pathname = '/') =>
+const LABEL_GROUP: NavMenuGroup = {
+  label: 'Label',
+  items: [
+    { name: 'Tours', href: '/tours', color: 'c1' },
+    { name: 'Merch', href: 'https://fakefourshirts.com/', isExternal: true, color: 'c2' },
+  ],
+};
+
+const renderDrawer = (pathname = '/', group: NavMenuGroup = MUSIC_GROUP) =>
   render(
     <NavigationMenu viewport={false}>
       <NavigationMenuList>
-        <DesktopMenuDrawer group={MUSIC_GROUP} pathname={pathname} />
+        <DesktopMenuDrawer group={group} pathname={pathname} />
       </NavigationMenuList>
     </NavigationMenu>
   );
@@ -70,6 +78,27 @@ describe('DesktopMenuDrawer', () => {
     expect(releases).toHaveAttribute('data-dynamic-on-hover', 'true');
     expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute('href', '/artists');
     expect(screen.getByRole('button', { name: /music/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens an external drawer link in a new tab', async () => {
+    const user = userEvent.setup();
+    renderDrawer('/', LABEL_GROUP);
+
+    await user.click(screen.getByRole('button', { name: /label/i }));
+
+    const merch = await screen.findByRole('link', { name: 'Merch' });
+    expect(merch).toHaveAttribute('href', 'https://fakefourshirts.com/');
+    expect(merch).toHaveAttribute('target', '_blank');
+    expect(merch).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('keeps internal drawer links in the same tab', async () => {
+    const user = userEvent.setup();
+    renderDrawer('/', LABEL_GROUP);
+
+    await user.click(screen.getByRole('button', { name: /label/i }));
+
+    expect(await screen.findByRole('link', { name: 'Tours' })).not.toHaveAttribute('target');
   });
 
   it('positions the drawer below the trigger, never over it', async () => {

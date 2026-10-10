@@ -38,3 +38,24 @@ describe('next.config headers', () => {
     );
   });
 });
+
+interface RedirectRule {
+  source: string;
+  destination: string;
+  permanent: boolean;
+}
+
+const redirectRules = async (): Promise<RedirectRule[]> =>
+  (await config.redirects()) as RedirectRule[];
+
+describe('next.config redirects', () => {
+  it('sends the retired /merch page to the external shirt store for good', async () => {
+    const merch = (await redirectRules()).find(({ source }) => source === '/merch');
+
+    expect(merch).toEqual({
+      source: '/merch',
+      destination: 'https://fakefourshirts.com/',
+      permanent: true,
+    });
+  });
+});

@@ -93,7 +93,10 @@ describe('DesktopMenu', () => {
       await user.click(screen.getByRole('button', { name: /label/i }));
 
       expect(await screen.findByRole('link', { name: 'Tours' })).toHaveAttribute('href', '/tours');
-      expect(screen.getByRole('link', { name: 'Merch' })).toHaveAttribute('href', '/merch');
+      expect(screen.getByRole('link', { name: 'Merch' })).toHaveAttribute(
+        'href',
+        'https://fakefourshirts.com/'
+      );
       expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
     });
 

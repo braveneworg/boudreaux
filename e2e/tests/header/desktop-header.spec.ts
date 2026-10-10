@@ -29,6 +29,20 @@ test.describe('Desktop header — primary navigation', () => {
     await expect(page.getByRole('banner').getByRole('link', { name: 'Playlists' })).toBeVisible();
   });
 
+  test('links Merch in the Label drawer to the shirt store in a new tab', async ({ page }) => {
+    await page.goto('/');
+
+    const labelTrigger = page.getByRole('banner').getByRole('button', { name: 'Label' });
+    await expect(labelTrigger).toBeVisible({ timeout: 10_000 });
+    await labelTrigger.click();
+
+    // Attributes only — the spec never leaves the site for the store.
+    const merch = page.getByRole('banner').getByRole('link', { name: 'Merch' });
+    await expect(merch).toHaveAttribute('href', 'https://fakefourshirts.com/');
+    await expect(merch).toHaveAttribute('target', '_blank');
+    await expect(merch).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   test('hides the My Collection link when signed out', async ({ page }) => {
     await page.goto('/');
 
