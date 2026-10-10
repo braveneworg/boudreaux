@@ -23,17 +23,18 @@ interface BioHtmlProps {
 /**
  * The prose treatment of a biography, shared by the artist page and the
  * editor's preview so what the admin previews is what the page shows: a
- * readable measure, a 17px body on a 28px rhythm, spaced paragraphs and
- * lists, section headings with a rule above, underlined links.
+ * readable measure, a 17px body on a 28px rhythm, paragraphs and lists 20px
+ * apart, list items 8px apart, section headings with room above them (and a
+ * rule above an h2), underlined links.
  */
 export const BIO_PROSE_CLASS = cn(
   'max-w-[68ch] text-[17px] leading-7 text-zinc-900',
-  '[&_p]:my-4 [&_li]:my-1',
-  '[&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6',
+  '[&_p]:my-5 [&_li]:my-2',
+  '[&_ul]:my-5 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-5 [&_ol]:list-decimal [&_ol]:pl-6',
   '[&_h2]:mt-10 [&_h2]:border-t [&_h2]:pt-6 [&_h2]:text-2xl [&_h2]:font-semibold',
   // The h3 is the bio's own "Biography" heading, the h4 the section headings
   // beneath it — both in Jost, inherited from the root.
-  '[&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:mt-5 [&_h4]:font-semibold',
+  '[&_h3]:mt-8 [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:mt-8 [&_h4]:font-semibold',
   '[&_a]:underline [&_a]:underline-offset-4 [&_figure]:my-4'
 );
 

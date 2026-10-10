@@ -90,7 +90,7 @@ export const LatestReleaseLink = ({
   };
 
   return (
-    <div className={cn('space-y-1', className)}>
+    <div className={cn('space-y-2', className)}>
       <p>
         <span className="font-semibold">Latest Release:</span>{' '}
         <Link

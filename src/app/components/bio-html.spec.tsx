@@ -332,7 +332,15 @@ describe('BIO_PROSE_CLASS', () => {
   it('sets the measure, the body size and the heading rhythm the page and the preview share', () => {
     expect(BIO_PROSE_CLASS).toContain('max-w-[68ch]');
     expect(BIO_PROSE_CLASS).toContain('[&_h2]:mt-10');
-    expect(BIO_PROSE_CLASS).toContain('[&_p]:my-4');
+    expect(BIO_PROSE_CLASS).toContain('[&_p]:my-5');
+  });
+
+  it('opens room between list items, lists and the sections of a bio', () => {
+    expect(BIO_PROSE_CLASS).toContain('[&_li]:my-2');
+    expect(BIO_PROSE_CLASS).toContain('[&_ul]:my-5');
+    expect(BIO_PROSE_CLASS).toContain('[&_ol]:my-5');
+    expect(BIO_PROSE_CLASS).toContain('[&_h3]:mt-8');
+    expect(BIO_PROSE_CLASS).toContain('[&_h4]:mt-8');
   });
 
   it('leaves the bio h3 and h4 in Jost, never the cutout face', () => {

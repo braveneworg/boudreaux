@@ -11,7 +11,8 @@ import type { Locator, Page } from '@playwright/test';
 
 /**
  * The link sections of the public artist page (ADR-0020), as a visitor sees
- * them: what a link reads as, and where its parts sit. The layout is
+ * them: what a link reads as, where its parts sit, and how much room the
+ * page leaves between one unit of information and the next. The layout is
  * measured, because a class on the element proves nothing about the box it
  * draws.
  *
@@ -27,7 +28,17 @@ const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 const PAST = new Date('2000-01-01T00:00:00.000Z');
 /** The space between two rows of a link list, in CSS pixels. */
-const ROW_GAP = 8;
+const ROW_GAP = 12;
+/** The space between two sections of the left column, in CSS pixels. */
+const SECTION_GAP = 32;
+/** The space between two groups of Contact & Misc, in CSS pixels. */
+const GROUP_GAP = 24;
+/** The space between the Contact & Misc heading and its first group, in CSS pixels. */
+const GROUP_LEAD = 16;
+/** The space between two paragraphs, or a paragraph and a list, of the biography. */
+const PARAGRAPH_GAP = 20;
+/** The space between two list items of the biography, in CSS pixels. */
+const BIO_ITEM_GAP = 8;
 /** The space between the stacked parts of a contact row, in CSS pixels. */
 const STACK_GAP = 2;
 /** Sub-pixel slack for two boxes that share an edge. */
@@ -47,8 +58,10 @@ interface SeededLinks {
 }
 
 /**
- * A published artist with links in all three sections; returns what the page
- * shows. The first contact link carries the description, the second none.
+ * A published artist with links in all three sections and a biography of two
+ * paragraphs and a list; returns what the page shows. The first contact link
+ * carries the description, the second none. The second contact group has the
+ * one link.
  */
 const seedArtist = async (description: string = DESCRIPTION): Promise<SeededLinks> => {
   const stamp = randomUUID().slice(0, 8);
@@ -61,6 +74,9 @@ const seedArtist = async (description: string = DESCRIPTION): Promise<SeededLink
       displayName: `ZZ E2E Link Sections ${stamp}`,
       slug,
       publishedOn: PAST,
+      bio:
+        '<p>Spacing paragraph one.</p><p>Spacing paragraph two.</p>' +
+        '<ul><li>Spacing item one</li><li>Spacing item two</li></ul>',
       links: {
         websites: [
           { label: 'Official site', url: `https://www.example.com/${stamp}` },
@@ -73,6 +89,12 @@ const seedArtist = async (description: string = DESCRIPTION): Promise<SeededLink
             links: [
               { label: 'Agent', description, url: `mailto:${address}` },
               { label: 'Office', description: null, url: 'tel:+18605550134' },
+            ],
+          },
+          {
+            heading: 'Press',
+            links: [
+              { label: 'Publicist', description: null, url: `mailto:press-${stamp}@example.com` },
             ],
           },
         ],
@@ -226,17 +248,75 @@ test.describe('Artist page link sections (ADR-0020)', () => {
     expect(link.x).toBeGreaterThan(label.x + label.width);
   });
 
-  test('the rows of a link list sit 8px apart', async ({ page }) => {
+  test('the rows of a link list sit 12px apart', async ({ page }) => {
     const { slug } = await seedArtist();
     await openArtist(page, slug);
 
     for (const name of ['Websites', 'Contact & Misc']) {
-      const rows = page.getByRole('region', { name }).getByRole('listitem');
+      const rows = page
+        .getByRole('region', { name })
+        .getByRole('list')
+        .first()
+        .getByRole('listitem');
       await expect(rows).toHaveCount(2);
       const first = await boxOf(rows.nth(0));
       const second = await boxOf(rows.nth(1));
 
       expect(second.y - bottomOf(first), name).toBeCloseTo(ROW_GAP, 0);
     }
+  });
+
+  test('a section of the left column ends 32px above the next', async ({ page }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    const websites = await boxOf(page.getByRole('region', { name: 'Websites' }));
+    const social = await boxOf(page.getByRole('region', { name: 'Social Media' }));
+    const contact = await boxOf(page.getByRole('region', { name: 'Contact & Misc' }));
+
+    expect(social.y - bottomOf(websites)).toBeCloseTo(SECTION_GAP, 0);
+    expect(contact.y - bottomOf(social)).toBeCloseTo(SECTION_GAP, 0);
+  });
+
+  test('a contact group ends 24px above the heading of the next', async ({ page }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    const contact = page.getByRole('region', { name: 'Contact & Misc' });
+    const booking = await boxOf(contact.getByRole('list').first());
+    const press = await boxOf(contact.getByRole('heading', { level: 3, name: 'Press' }));
+
+    expect(press.y - bottomOf(booking)).toBeCloseTo(GROUP_GAP, 0);
+  });
+
+  // The first group stays nearer its section heading than the groups are to
+  // each other, so the heading reads as theirs.
+  test('the first contact group starts 16px under the section heading', async ({ page }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    const contact = page.getByRole('region', { name: 'Contact & Misc' });
+    const heading = await boxOf(contact.getByRole('heading', { level: 2 }));
+    const booking = await boxOf(contact.getByRole('heading', { level: 3, name: 'Booking' }));
+
+    expect(booking.y - bottomOf(heading)).toBeCloseTo(GROUP_LEAD, 0);
+  });
+
+  test('the biography leaves 20px between paragraphs and 8px between list items', async ({
+    page,
+  }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    const bio = page.getByRole('article', { name: 'Biography' });
+    const firstParagraph = await boxOf(bio.getByText('Spacing paragraph one.', { exact: true }));
+    const secondParagraph = await boxOf(bio.getByText('Spacing paragraph two.', { exact: true }));
+    const list = await boxOf(bio.getByRole('list'));
+    const firstItem = await boxOf(bio.getByRole('listitem').nth(0));
+    const secondItem = await boxOf(bio.getByRole('listitem').nth(1));
+
+    expect(secondParagraph.y - bottomOf(firstParagraph)).toBeCloseTo(PARAGRAPH_GAP, 0);
+    expect(list.y - bottomOf(secondParagraph)).toBeCloseTo(PARAGRAPH_GAP, 0);
+    expect(secondItem.y - bottomOf(firstItem)).toBeCloseTo(BIO_ITEM_GAP, 0);
   });
 });
