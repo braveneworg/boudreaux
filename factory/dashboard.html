@@ -264,12 +264,16 @@
 </div>
 
 <script>
-const POLL_MS = 2000
+const POLL_MS = 10000
+const BACKOFF_MS = 60000 // when GitHub's rate limit runs low
+const RATE_LIMIT_FLOOR = 100
+const STAGE_LABEL_PREFIX = 'factory:'
 const STAGES = [
   { key: 'spec', label: 'Spec', who: 'spec-writer · opus' },
   { key: 'build', label: 'Build', who: 'builder · opus' },
   { key: 'review', label: 'Review', who: 'sec · ux · ui · code' },
   { key: 'approve', label: 'Approve', who: 'approver · opus' },
+  { key: 'pr', label: 'PR open', who: 'human merges' },
   { key: 'merged', label: 'Merged', who: 'main', cls: 'merged-col' },
   { key: 'needs-human', label: 'Needs human', who: 'approve · rework', cls: 'human' },
 ]
@@ -282,15 +286,127 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
 
 let jobs = []
 let lastRender = ''
-const roundCache = new Map() // "<job>/<n>" -> verdicts of a finished round
 let openJobId = null
 let openPath = null
 let openText = null
 
-async function fetchText(url) {
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`)
-  return res.text()
+// ---- GitHub (through serve.py) -------------------------------------------
+
+let repoName = ''
+let issues = []
+let issuesEtag = null
+let rateRemaining = null
+let backoffUntil = 0
+const issueCache = new Map() // issue number -> { updatedAt, count, state, artifacts, maxRound }
+
+// GET /api/<path> is `gh api repos/<owner>/<name>/<path>`. A matching ETag
+// answers 304, which costs no rate limit.
+async function fetchJson(path, etag) {
+  const headers = etag ? { 'If-None-Match': etag } : {}
+  const res = await fetch(path, { cache: 'no-store', headers })
+  const remaining = res.headers.get('X-RateLimit-Remaining')
+  if (remaining !== null) rateRemaining = Number(remaining)
+  if (res.status === 304) return { notModified: true, etag }
+  if (!res.ok) {
+    let detail = ''
+    try { detail = (await res.json()).error || '' } catch { /* not JSON */ }
+    throw new Error(`${path}: HTTP ${res.status}${detail ? ` ${detail}` : ''}`)
+  }
+  return { data: await res.json(), etag: res.headers.get('ETag') }
+}
+
+// Same rule as the factory skill: lowercase, non-alphanumerics to hyphens,
+// first four words.
+function slug(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-')
+}
+
+// The orchestrator's `## state` comment carries a fenced JSON block.
+function parseState(body) {
+  const m = body.match(/```(?:json)?\s*\n([\s\S]*?)\n```/)
+  if (!m) return null
+  try { return JSON.parse(m[1]) } catch { return null }
+}
+
+// Every factory comment starts with a heading. Each one maps to the file
+// name the drawer used to read, so the rendering code below is unchanged.
+function artifactPath(heading) {
+  if (heading === '## spec') return 'spec.md'
+  if (/^## decision round-\d+$/.test(heading)) return 'decision.md'
+  if (/^## build round-\d+$/.test(heading)) return 'build.md'
+  const review = heading.match(/^## (round-\d+) review-(\w+)$/)
+  if (review) return `${review[1]}/review-${review[2]}.md`
+  const rework = heading.match(/^## (rework-\d+)$/)
+  if (rework) return `${rework[1]}.md`
+  return null
+}
+
+// Latest comment with a given heading wins.
+function parseArtifacts(comments) {
+  const artifacts = new Map()
+  let state = null
+  let maxRound = 0
+  for (const c of comments) {
+    const lines = (c.body || '').replace(/\r/g, '').split('\n')
+    const heading = lines[0].trim()
+    const body = lines.slice(1).join('\n').replace(/^\n+/, '')
+    if (heading === '## state') { state = parseState(body) || state; continue }
+    const path = artifactPath(heading)
+    if (!path) continue
+    artifacts.set(path, body)
+    const round = heading.match(/round-(\d+)/)
+    if (round) maxRound = Math.max(maxRound, Number(round[1]))
+  }
+  return { state, artifacts, maxRound }
+}
+
+// Reads an issue's comments only when the issue changed since last time.
+async function issueEntry(issue) {
+  const cached = issueCache.get(issue.number)
+  if (cached && cached.updatedAt === issue.updated_at && cached.count === issue.comments) return cached
+  const comments = issue.comments
+    ? (await fetchJson(`/api/issues/${issue.number}/comments?per_page=100`)).data
+    : []
+  const entry = { updatedAt: issue.updated_at, count: issue.comments, ...parseArtifacts(comments) }
+  issueCache.set(issue.number, entry)
+  return entry
+}
+
+// Maps an issue to the job shape the board renders:
+// { id, feature, branch, stage, round, reviews, queued, artifacts }.
+function toJob(issue, entry) {
+  const stageLabel = issue.labels.map((l) => l.name).find((n) => n.startsWith(STAGE_LABEL_PREFIX))
+  const queued = issue.state === 'open' && !stageLabel
+  const stage = issue.state === 'closed' ? 'merged' : stageLabel ? stageLabel.slice(STAGE_LABEL_PREFIX.length) : 'spec'
+  const state = entry.state || {}
+  const id = state.id || `${issue.number}-${slug(issue.title)}`
+  const stateRound = Number(state.round) || 0
+  // A build comment for round N+1 can land before the state comment says N+1.
+  const round = Math.max(stateRound, entry.maxRound)
+  const reviews = {}
+  for (const [k] of REVIEWERS) {
+    const body = entry.artifacts.get(`round-${round}/review-${k}.md`)
+    const fromState = round === stateRound && state.reviews ? state.reviews[k] : undefined
+    reviews[k] = body !== undefined ? verdictOf(body) : fromState || 'pending'
+  }
+  return { id, number: issue.number, feature: issue.title, branch: state.branch || `factory/${id}`,
+    stage, round, reviews, queued, artifacts: entry.artifacts }
+}
+
+async function loadJobs() {
+  if (Date.now() < backoffUntil) return jobs
+  const list = await fetchJson('/api/issues?state=all&labels=factory&per_page=100&sort=updated&direction=desc', issuesEtag)
+  if (!list.notModified) {
+    // Pull requests share the endpoint; an issue closed as "not planned" is
+    // an abandoned job, not a merged one.
+    issues = list.data.filter((i) => !i.pull_request && i.state_reason !== 'not_planned')
+    issuesEtag = list.etag
+  }
+  const out = []
+  for (const issue of issues) out.push(toJob(issue, await issueEntry(issue)))
+  if (rateRemaining !== null && rateRemaining < RATE_LIMIT_FLOOR) backoffUntil = Date.now() + BACKOFF_MS
+  // Oldest issue first, so the newest ends up on top of its column.
+  return out.sort((a, b) => a.number - b.number)
 }
 
 // ---- Board ---------------------------------------------------------------
@@ -300,28 +416,16 @@ function verdictOf(text) {
   return m ? m[1] : 'invalid'
 }
 
-// Earlier rounds aren't on the board; their verdicts come from the review files.
-async function pastRounds(job) {
+// Earlier rounds aren't on the board; their verdicts come from the review comments.
+function pastRounds(job) {
   const rounds = []
   for (let n = 1; n < job.round; n++) {
-    const key = `${job.id}/${n}`
-    if (!roundCache.has(key)) {
-      const verdicts = {}
-      await Promise.all(REVIEWERS.map(async ([k]) => {
-        try {
-          verdicts[k] = verdictOf(await fetchText(`jobs/${job.id}/round-${n}/review-${k}.md`))
-        } catch {
-          verdicts[k] = 'missing'
-        }
-      }))
-      if (Object.values(verdicts).every((v) => v === 'PASS' || v === 'CHANGES')) {
-        roundCache.set(key, verdicts)
-      } else {
-        rounds.push(verdicts)
-        continue
-      }
+    const verdicts = {}
+    for (const [k] of REVIEWERS) {
+      const body = job.artifacts.get(`round-${n}/review-${k}.md`)
+      verdicts[k] = body !== undefined ? verdictOf(body) : 'missing'
     }
-    rounds.push(roundCache.get(key))
+    rounds.push(verdicts)
   }
   return rounds
 }
@@ -337,8 +441,8 @@ function chips(n, verdicts, waiting) {
 }
 
 function card(job, past) {
-  const live = LIVE.has(job.stage)
-  const human = job.stage === 'needs-human'
+  const live = LIVE.has(job.stage) && !job.queued
+  const human = job.stage === 'needs-human' || job.stage === 'pr'
   const rows = past.map((v, i) => chips(i + 1, v, false))
   if (job.round > 0) rows.push(chips(job.round, job.reviews, job.stage === 'review'))
   const [num, ...slug] = job.id.split('-')
@@ -347,8 +451,9 @@ function card(job, past) {
             data-job="${esc(job.id)}">
       <div class="card-top">
         ${live ? '<span class="pulse" aria-label="running"></span>' : ''}
-        <span class="num">${esc(num)} · ${esc(slug.join('-'))}</span>
+        <span class="num">#${esc(num)} · ${esc(slug.join('-'))}</span>
         ${human ? '<span class="flag">your call</span>' : ''}
+        ${job.queued ? '<span class="flag">queued</span>' : ''}
       </div>
       <p class="feature">${esc(job.feature)}</p>
       <div class="branch">${esc(job.branch)}</div>
@@ -360,7 +465,7 @@ function card(job, past) {
 async function render() {
   const problems = []
   const byStage = Object.fromEntries(STAGES.map((s) => [s.key, []]))
-  const pasts = await Promise.all(jobs.map(pastRounds))
+  const pasts = jobs.map(pastRounds)
   jobs.forEach((job, i) => {
     if (!byStage[job.stage]) problems.push(`Job ${job.id} has unknown stage "${job.stage}"`)
     else byStage[job.stage].push(card(job, pasts[i]))
@@ -385,41 +490,21 @@ async function render() {
 async function poll() {
   const status = $('status')
   try {
+    if (!repoName) repoName = (await fetchJson('/api/repo')).data.nameWithOwner
     jobs = await loadJobs()
-    await render()
-    if (openJobId) await refreshDrawer()
+    render()
+    if (openJobId) refreshDrawer()
+    const paused = Date.now() < backoffUntil ? ' · paused, rate limit low' : ''
+    const rate = rateRemaining === null ? '' : ` · ${rateRemaining} calls left`
     status.className = 'status'
-    status.innerHTML = `<span class="dot"></span>jobs/ · ${new Date().toLocaleTimeString()}`
+    status.innerHTML = `<span class="dot"></span>${esc(repoName)}${rate}${paused} · ${new Date().toLocaleTimeString()}`
   } catch (err) {
     status.className = 'status error'
     status.innerHTML = `<span class="dot"></span>${esc(err.message)}`
   }
 }
 
-// Each orchestrator session writes only its own jobs/<id>/job.json.
-async function loadJobs() {
-  const doc = new DOMParser().parseFromString(await fetchText('jobs/'), 'text/html')
-  const ids = [...doc.querySelectorAll('a')]
-    .map((a) => decodeURIComponent(a.getAttribute('href')))
-    .filter((h) => h.endsWith('/'))
-    .map((h) => h.slice(0, -1))
-    .sort()
-  return Promise.all(ids.map(async (id) => JSON.parse(await fetchText(`jobs/${id}/job.json`))))
-}
-
 // ---- Drawer --------------------------------------------------------------
-
-// python -m http.server serves an HTML index for directories; read its links.
-async function listFiles(dir) {
-  const doc = new DOMParser().parseFromString(await fetchText(dir), 'text/html')
-  const hrefs = [...doc.querySelectorAll('a')].map((a) => decodeURIComponent(a.getAttribute('href')))
-  const out = []
-  for (const h of hrefs) {
-    if (h.endsWith('/')) out.push(...(await listFiles(dir + h)).map((f) => h + f))
-    else if (h.endsWith('.md')) out.push(h)
-  }
-  return out
-}
 
 function fileRank(path) {
   const order = ['spec.md', 'build.md', 'decision.md']
@@ -443,27 +528,19 @@ function tone(first) {
   return null
 }
 
-const firstLines = new Map()
-
-async function refreshDrawer() {
+// Every artifact is already in memory: it came with the issue's comments.
+function refreshDrawer() {
   const job = jobs.find((j) => j.id === openJobId)
   if (!job) return
-  $('d-num').textContent = `${job.id} · ${job.stage}${job.round ? ` · round ${job.round}` : ''}`
+  $('d-num').textContent = `#${job.number} · ${job.id} · ${job.stage}${job.round ? ` · round ${job.round}` : ''}`
   $('d-title').textContent = job.feature
   $('d-branch').textContent = job.branch
 
-  const base = `jobs/${job.id}/`
-  const files = sortFiles(await listFiles(base))
+  const files = sortFiles([...job.artifacts.keys()])
   if (!openPath || !files.includes(openPath)) openPath = files[0] || null
 
-  let text = null
-  if (openPath) {
-    text = await fetchText(base + openPath)
-    firstLines.set(base + openPath, text.split('\n')[0].trim())
-  }
-  await Promise.all(files.filter((f) => !firstLines.has(base + f)).map(async (f) => {
-    firstLines.set(base + f, (await fetchText(base + f)).split('\n')[0].trim())
-  }))
+  const text = openPath ? job.artifacts.get(openPath) : null
+  const firstLine = (f) => (job.artifacts.get(f) || '').split('\n')[0].trim()
 
   let group = null
   $('d-files').innerHTML = files.map((f) => {
@@ -474,10 +551,10 @@ async function refreshDrawer() {
     const name = round
       ? `<span class="rn">R${round[1]} </span>${esc(f.split('/')[1].replace(/^review-|\.md$/g, ''))}`
       : esc(f)
-    const t = tone(firstLines.get(base + f) || '')
+    const t = tone(firstLine(f))
     return `${head}<button class="file ${f === openPath ? 'on' : ''}" data-file="${esc(f)}">
       <span class="v ${t || ''}"></span>${name}</button>`
-  }).join('') || '<div class="empty">No files yet.</div>'
+  }).join('') || '<div class="empty">No comments yet.</div>'
 
   if (text !== openText) {
     openText = text
@@ -485,13 +562,13 @@ async function refreshDrawer() {
   }
 }
 
-async function openDrawer(id) {
+function openDrawer(id) {
   openJobId = id
   openPath = null
   openText = undefined
   document.body.classList.add('open')
   try {
-    await refreshDrawer()
+    refreshDrawer()
   } catch (err) {
     $('d-doc').innerHTML = `<p class="note">${esc(err.message)}</p>`
   }
@@ -516,7 +593,7 @@ document.addEventListener('click', (e) => {
 })
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer() })
 
-// ---- Markdown (just enough for the factory's files) ---------------------
+// ---- Markdown (just enough for the factory's comments) ------------------
 
 function inline(s) {
   const codes = []
