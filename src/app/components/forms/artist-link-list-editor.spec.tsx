@@ -253,6 +253,13 @@ describe('ArtistLinkListEditor', () => {
       expect(description).toHaveAttribute('placeholder', 'Description (optional)');
     });
 
+    // A row the form holds without the key (an older client, a raw default).
+    it('shows an empty description for a contact row that has none', () => {
+      renderContactEditor([{ label: 'Agent', url: 'mailto:a@example.com' }]);
+
+      expect(screen.getByRole('textbox', { name: 'Group 1 link 1 description' })).toHaveValue('');
+    });
+
     it('tabs from the label to the URL, then the description, then the row buttons', async () => {
       const { user } = renderContactEditor([
         { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
