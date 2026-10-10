@@ -12,8 +12,8 @@ import type { Page } from '@playwright/test';
 /**
  * E2E coverage for ADR-0020: the admin edits an artist's links as three
  * sections, a save stores one composite in the admin's order with contact
- * hrefs normalised and empty groups dropped, and clearing every link stores
- * no composite at all.
+ * hrefs normalised, a contact link's description beside its label and empty
+ * groups dropped, and clearing every link stores no composite at all.
  *
  * Each test seeds its own artist with a fresh stamp and the worker removes
  * the rows it made by id.
@@ -36,7 +36,10 @@ const seedArtist = async (
   links?: {
     websites: { label: string | null; url: string }[];
     social: { label: string | null; url: string }[];
-    contact: { heading: string; links: { label: string | null; url: string }[] }[];
+    contact: {
+      heading: string;
+      links: { label: string | null; description: string | null; url: string }[];
+    }[];
   }
 ): Promise<string> => {
   const { id } = await prisma.artist.create({
@@ -112,9 +115,18 @@ test.describe('Artist links (ADR-0020)', () => {
     await adminPage
       .getByRole('textbox', { name: 'Group 1 link 1 URL' })
       .fill(`agent-${stamp}@example.com`);
+    await adminPage
+      .getByRole('textbox', { name: 'Group 1 link 1 description' })
+      .fill('Books North American tours');
+    // A second contact link, saved without a description.
+    await adminPage.getByRole('button', { name: 'Add link to group 1' }).click();
+    await adminPage.getByRole('textbox', { name: 'Group 1 link 2 label' }).fill('Office');
+    await adminPage.getByRole('textbox', { name: 'Group 1 link 2 URL' }).fill('+1 (860) 555-0134');
 
     await save(adminPage);
 
+    // Only a contact link stores a description: `toEqual` would fail on a
+    // `description` key in a website or social link.
     expect(await readLinks(id)).toEqual({
       websites: [
         { label: 'Official site', url: `https://example.com/${stamp}` },
@@ -124,7 +136,14 @@ test.describe('Artist links (ADR-0020)', () => {
       contact: [
         {
           heading: 'Booking',
-          links: [{ label: 'Agent', url: `mailto:agent-${stamp}@example.com` }],
+          links: [
+            {
+              label: 'Agent',
+              description: 'Books North American tours',
+              url: `mailto:agent-${stamp}@example.com`,
+            },
+            { label: 'Office', description: null, url: 'tel:+18605550134' },
+          ],
         },
       ],
     });
@@ -137,7 +156,15 @@ test.describe('Artist links (ADR-0020)', () => {
     await expect(adminPage.getByRole('textbox', { name: 'Group 1 link 1 URL' })).toHaveValue(
       `mailto:agent-${stamp}@example.com`
     );
+    await expect(
+      adminPage.getByRole('textbox', { name: 'Group 1 link 1 description' })
+    ).toHaveValue('Books North American tours');
+    await expect(
+      adminPage.getByRole('textbox', { name: 'Group 1 link 2 description' })
+    ).toHaveValue('');
     await expect(adminPage.getByRole('textbox', { name: 'Group 2 heading' })).toHaveCount(0);
+    // The loaded descriptions are the form's defaults: nothing is dirty.
+    await expect(adminPage.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   });
 
   test('reordering a link is stored in the new order', async ({ adminPage }) => {
@@ -167,7 +194,12 @@ test.describe('Artist links (ADR-0020)', () => {
     const id = await seedArtist('Clear', stamp, {
       websites: [{ label: null, url: `https://example.com/${stamp}` }],
       social: [],
-      contact: [{ heading: 'Booking', links: [{ label: null, url: 'tel:+18605550134' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [{ label: null, description: 'Call after noon', url: 'tel:+18605550134' }],
+        },
+      ],
     });
     await gotoEdit(adminPage, id);
 

@@ -28,8 +28,14 @@ const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 const PAST = new Date('2000-01-01T00:00:00.000Z');
 /** The space between two rows of a link list, in CSS pixels. */
 const ROW_GAP = 8;
+/** The space between the stacked parts of a contact row, in CSS pixels. */
+const STACK_GAP = 2;
 /** Sub-pixel slack for two boxes that share an edge. */
 const EDGE_SLACK = 1;
+
+const DESCRIPTION = 'Books North American tours';
+/** Long enough to need several lines, with a word no line can hold. */
+const LONG_DESCRIPTION = `Books North American and European tours, festivals and one-off shows; write well ahead for anything in the summer. ${'unbroken'.repeat(20)}`;
 
 const made: string[] = [];
 
@@ -40,8 +46,11 @@ interface SeededLinks {
   address: string;
 }
 
-/** A published artist with links in all three sections; returns what the page shows. */
-const seedArtist = async (): Promise<SeededLinks> => {
+/**
+ * A published artist with links in all three sections; returns what the page
+ * shows. The first contact link carries the description, the second none.
+ */
+const seedArtist = async (description: string = DESCRIPTION): Promise<SeededLinks> => {
   const stamp = randomUUID().slice(0, 8);
   const slug = `e2e-link-sections-${stamp}`;
   const address = `agent-${stamp}@example.com`;
@@ -62,8 +71,8 @@ const seedArtist = async (): Promise<SeededLinks> => {
           {
             heading: 'Booking',
             links: [
-              { label: 'Agent', url: `mailto:${address}` },
-              { label: 'Office', url: 'tel:+18605550134' },
+              { label: 'Agent', description, url: `mailto:${address}` },
+              { label: 'Office', description: null, url: 'tel:+18605550134' },
             ],
           },
         ],
@@ -134,6 +143,74 @@ test.describe('Artist page link sections (ADR-0020)', () => {
 
     expect(link.y).toBeGreaterThanOrEqual(bottomOf(label) - EDGE_SLACK);
     expect(Math.abs(link.x - label.x)).toBeLessThanOrEqual(EDGE_SLACK);
+  });
+
+  test('a contact description sits between its label and its link, in normal weight', async ({
+    page,
+  }) => {
+    const { slug, address } = await seedArtist();
+    await openArtist(page, slug);
+
+    const contact = page.getByRole('region', { name: 'Contact & Misc' });
+    const labelText = contact.getByText('Agent', { exact: true });
+    const descriptionText = contact.getByText(DESCRIPTION, { exact: true });
+    await expect(descriptionText).toBeVisible();
+    const label = await boxOf(labelText);
+    const description = await boxOf(descriptionText);
+    const link = await boxOf(contact.getByRole('link', { name: address, exact: true }));
+
+    expect(description.y).toBeGreaterThanOrEqual(bottomOf(label) - EDGE_SLACK);
+    expect(link.y).toBeGreaterThanOrEqual(bottomOf(description) - EDGE_SLACK);
+    expect(Math.abs(description.x - label.x)).toBeLessThanOrEqual(EDGE_SLACK);
+    expect(Math.abs(link.x - label.x)).toBeLessThanOrEqual(EDGE_SLACK);
+    await expect(labelText).toHaveCSS('font-weight', '600');
+    await expect(descriptionText).toHaveCSS('font-weight', '400');
+  });
+
+  // The label is semibold on every contact row, and a row without a
+  // description takes no room for one.
+  test('a contact link without a description keeps its link right under a semibold label', async ({
+    page,
+  }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    const contact = page.getByRole('region', { name: 'Contact & Misc' });
+    const labelText = contact.getByText('Office', { exact: true });
+    const label = await boxOf(labelText);
+    const link = await boxOf(contact.getByRole('link', { name: '+18605550134', exact: true }));
+
+    expect(link.y - bottomOf(label)).toBeCloseTo(STACK_GAP, 0);
+    await expect(labelText).toHaveCSS('font-weight', '600');
+  });
+
+  test('a long contact description wraps inside its column', async ({ page }) => {
+    const { slug } = await seedArtist(LONG_DESCRIPTION);
+    await openArtist(page, slug);
+
+    const contact = page.getByRole('region', { name: 'Contact & Misc' });
+    const descriptionText = contact.getByText(LONG_DESCRIPTION, { exact: true });
+    const region = await boxOf(contact);
+    const label = await boxOf(contact.getByText('Agent', { exact: true }));
+    const description = await boxOf(descriptionText);
+
+    expect(description.height).toBeGreaterThan(label.height * 2);
+    expect(description.x + description.width).toBeLessThanOrEqual(
+      region.x + region.width + EDGE_SLACK
+    );
+    expect(
+      await descriptionText.evaluate((element) => element.scrollWidth <= element.clientWidth)
+    ).toBe(true);
+  });
+
+  // The label weight is Contact & Misc's alone.
+  test('a website label keeps its normal weight', async ({ page }) => {
+    const { slug } = await seedArtist();
+    await openArtist(page, slug);
+
+    await expect(
+      page.getByRole('region', { name: 'Websites' }).getByText('Official site', { exact: true })
+    ).toHaveCSS('font-weight', '400');
   });
 
   // Only Contact & Misc stacks: a website row stays one ledger line.
