@@ -3,7 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen, within } from '@testing-library/react';
 
+import type { ArtistContactLink } from '@/lib/types/domain/artist';
+
 import { ContactLinkSection, LinkItem, LinkSection } from './link-section';
+
+/** Whether `later` comes after `earlier` in document order. */
+const follows = (earlier: Element, later: Element): boolean =>
+  Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 describe('LinkSection', () => {
   it('renders nothing for an empty section', () => {
@@ -107,7 +113,7 @@ describe('LinkItem', () => {
     render(
       <LinkItem
         section="contact"
-        link={{ label: 'Shop', url: 'https://www.shop.example.com/merch' }}
+        link={{ label: 'Shop', description: null, url: 'https://www.shop.example.com/merch' }}
       />
     );
 
@@ -123,7 +129,12 @@ describe('LinkItem', () => {
   });
 
   it('shows the address of a mailto: contact link, same tab', () => {
-    render(<LinkItem section="contact" link={{ label: 'Agent', url: 'mailto:a@example.com' }} />);
+    render(
+      <LinkItem
+        section="contact"
+        link={{ label: 'Agent', description: null, url: 'mailto:a@example.com' }}
+      />
+    );
 
     const link = screen.getByRole('link', { name: 'a@example.com' });
     expect(link).toHaveAttribute('href', 'mailto:a@example.com');
@@ -131,7 +142,12 @@ describe('LinkItem', () => {
   });
 
   it('shows the number of a tel: contact link', () => {
-    render(<LinkItem section="contact" link={{ label: null, url: 'tel:+18605550134' }} />);
+    render(
+      <LinkItem
+        section="contact"
+        link={{ label: null, description: null, url: 'tel:+18605550134' }}
+      />
+    );
 
     expect(screen.getByRole('link', { name: '+18605550134' })).toHaveAttribute(
       'href',
@@ -173,6 +189,105 @@ describe('LinkItem', () => {
 
     expect(screen.getAllByText('instagram.com/ceschiramos')).toHaveLength(1);
   });
+});
+
+// ADR-0020 amendment: a Contact & Misc link may carry a description, shown
+// between its label and the link; the label is the bolder of the two.
+describe('LinkItem in Contact & Misc', () => {
+  const agent: ArtistContactLink = {
+    label: 'Agent',
+    description: 'Books North American tours',
+    url: 'mailto:a@example.com',
+  };
+
+  it('shows the label in semibold, as plain text', () => {
+    render(<LinkItem section="contact" link={agent} />);
+
+    const label = screen.getByText('Agent');
+    expect(label).toHaveClass('font-semibold', 'text-zinc-700');
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  it('shows the label in semibold on a link without a description', () => {
+    render(<LinkItem section="contact" link={{ ...agent, description: null }} />);
+
+    expect(screen.getByText('Agent')).toHaveClass('font-semibold');
+  });
+
+  it('shows the description in normal weight, in the label’s size and colour', () => {
+    render(<LinkItem section="contact" link={agent} />);
+
+    expect(screen.getByText('Books North American tours')).toHaveClass(
+      'font-normal',
+      'text-sm',
+      'text-zinc-700'
+    );
+  });
+
+  it('puts the description after the label and before the link', () => {
+    render(<LinkItem section="contact" link={agent} />);
+
+    const description = screen.getByText('Books North American tours');
+    expect(follows(screen.getByText('Agent'), description)).toBe(true);
+    expect(follows(description, screen.getByRole('link', { name: 'a@example.com' }))).toBe(true);
+  });
+
+  it('lets a long description wrap instead of truncating it', () => {
+    render(<LinkItem section="contact" link={agent} />);
+
+    const description = screen.getByText('Books North American tours');
+    expect(description).toHaveClass('break-words');
+    expect(description).not.toHaveClass('truncate');
+  });
+
+  it.each([null, ''])('renders no description element for %j', (description) => {
+    const { container } = render(<LinkItem section="contact" link={{ ...agent, description }} />);
+
+    expect(container.querySelector('.font-normal')).toBeNull();
+    expect(screen.getByRole('listitem')).toHaveTextContent(/^Agenta@example\.com$/);
+  });
+
+  it('shows markup in a description as the text it is', () => {
+    const { container } = render(
+      <LinkItem section="contact" link={{ ...agent, description: '<b>x</b>' }} />
+    );
+
+    expect(screen.getByText('<b>x</b>')).toBeInTheDocument();
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('shows the description of a link that has no label, before the link', () => {
+    render(<LinkItem section="contact" link={{ ...agent, label: null }} />);
+
+    const description = screen.getByText('Books North American tours');
+    expect(description).toHaveClass('font-normal');
+    expect(follows(description, screen.getByRole('link', { name: 'a@example.com' }))).toBe(true);
+  });
+
+  it('shows the description when the label is the link text and so is not shown', () => {
+    render(<LinkItem section="contact" link={{ ...agent, label: 'a@example.com' }} />);
+
+    expect(screen.getAllByText('a@example.com')).toHaveLength(1);
+    expect(screen.getByText('Books North American tours')).toBeInTheDocument();
+  });
+
+  // The description belongs to Contact & Misc alone, whatever the object holds.
+  it.each(['websites', 'social'] as const)(
+    'shows no description and no semibold label on a %s row',
+    (section) => {
+      const link: ArtistContactLink = {
+        label: 'Official site',
+        description: 'Stray description',
+        url: 'https://example.com/x',
+      };
+
+      const { container } = render(<LinkItem section={section} link={link} />);
+
+      expect(screen.queryByText('Stray description')).not.toBeInTheDocument();
+      expect(container.querySelector('.font-normal')).toBeNull();
+      expect(screen.getByText('Official site')).not.toHaveClass('font-semibold');
+    }
+  );
 });
 
 describe('ContactLinkSection', () => {
@@ -229,5 +344,29 @@ describe('ContactLinkSection', () => {
         .getAllByRole('heading', { level: 3 })
         .map((heading) => heading.textContent)
     ).toEqual(['Booking', 'Press']);
+  });
+
+  it('shows each link’s description in its group', () => {
+    render(
+      <ContactLinkSection
+        groups={[
+          {
+            heading: 'Booking',
+            links: [
+              { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+              { label: 'Office', description: null, url: 'tel:+18605550134' },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const rows = within(screen.getByRole('region', { name: 'Contact & Misc' })).getAllByRole(
+      'listitem'
+    );
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'AgentBooks US toursa@example.com',
+      'Office+18605550134',
+    ]);
   });
 });

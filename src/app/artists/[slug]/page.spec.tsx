@@ -202,6 +202,25 @@ describe('ArtistDetailPage', () => {
     expect(screen.queryByRole('region', { name: 'Social Media' })).not.toBeInTheDocument();
   });
 
+  it('shows a contact link’s description in Contact & Misc', async () => {
+    await renderPage({
+      links: {
+        websites: [],
+        social: [],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' }],
+          },
+        ],
+      },
+    });
+
+    expect(
+      within(screen.getByRole('region', { name: 'Contact & Misc' })).getByText('Books US tours')
+    ).toBeInTheDocument();
+  });
+
   it('shows no link section for an artist without links', async () => {
     await renderPage({ links: null });
 
