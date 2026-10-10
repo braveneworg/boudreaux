@@ -110,7 +110,8 @@ admin's own filing vocabulary. See
 _Avoid_: keyword, label (a Label is a signed-artist entity).
 
 **artist link** — one curated `{ label?, url }` an admin files on an Artist,
-shown on that Artist's own page with the label beside the link. Websites and
+shown on that Artist's own page with its label: beside the link in Websites
+and Social Media, above it in Contact & Misc. Websites and
 social links are `http(s)`; a contact link may also be an email (`mailto:`) or
 a phone number (`tel:`), stored normalised. The icon derives from the href at
 render; no platform is stored. Human-owned: a bio generation job never writes
