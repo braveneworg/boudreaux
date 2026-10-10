@@ -1,6 +1,7 @@
 # ADR-0020: Artist links are one composite on the artist
 
-- **Status**: Accepted
+- **Status**: Accepted; amended 2026-10-10 (a contact link carries a
+  description)
 - **Date**: 2026-10-06
 
 ## Context
@@ -92,3 +93,36 @@ social: ArtistLink[]; contact: ArtistLinkGroup[] }`, where an
   nothing stored goes stale.
 - The release page and the artists index do not show links; they are the
   page artist's, like the bio.
+
+## Amendment (2026-10-10): a contact link carries a description
+
+A link in Contact & Misc may now say what it is for: "Books North American
+tours" under the label "Agent". Every rule above stands; one shape changes.
+
+- **A fourth composite type.** An `ArtistContactLink` is an `ArtistLink`
+  with an optional `description`:
+  `{ label?: string; description?: string; url: string }`. The `links` of an
+  `ArtistLinkGroup` are now `ArtistContactLink[]`. `ArtistLink` itself is
+  unchanged.
+- **Contact & Misc only.** Websites and Social Media links stay `ArtistLink`
+  and store no `description`, not even a `null`. Their form schema does not
+  name the field, so one sent on such a link is stripped, and their rows on
+  the page are one ledger line with no place for it.
+- **Optional, and no migration.** A contact link stored before this
+  amendment has no `description` in its document and reads as `null`; the
+  contract spec pins that. Nothing is backfilled. A link may have a
+  description without a label.
+- **Plain text, sanitised like the label.** The service runs the
+  `description` through the bio text sanitiser on every write and stores an
+  empty result as `null`. The form refuses more than 280 characters, a
+  request-size guard like the label's 120.
+- **Where it renders.** Only on the artist's own page, in Contact & Misc,
+  between the label and the link: the label in semibold (on every contact
+  row, with or without a description), the description under it in normal
+  weight and wrapping, then the link, all on the label's left edge. The
+  editor has a single-line description input under each contact row's label
+  and URL.
+
+A `description` on the shared `ArtistLink` was rejected: every website and
+social link would carry a `null` that nothing reads, and the form already
+keeps a separate schema for a contact row.
