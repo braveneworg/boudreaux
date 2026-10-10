@@ -59,7 +59,7 @@ describe('LinkSection keys', () => {
 });
 
 describe('LinkItem', () => {
-  it('shows the label beside the link and the host as the link text', () => {
+  it('shows the label beside the link and the address after the www as the link text', () => {
     render(
       <LinkItem
         section="websites"
@@ -68,10 +68,50 @@ describe('LinkItem', () => {
     );
 
     expect(screen.getByText('Official site')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'example.com' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'example.com/x' })).toHaveAttribute(
       'href',
       'https://www.example.com/x'
     );
+  });
+
+  it('shows the profile path of a social link, without its trailing slash', () => {
+    render(
+      <LinkItem
+        section="social"
+        link={{ label: null, url: 'https://www.instagram.com/ceschiramos/' }}
+      />
+    );
+
+    expect(screen.getByRole('link')).toHaveTextContent(/^instagram\.com\/ceschiramos$/);
+  });
+
+  it('keeps the query and the fragment of a website link in its text', () => {
+    render(
+      <LinkItem
+        section="websites"
+        link={{ label: null, url: 'https://www.youtube.com/watch?v=abc123#t=10' }}
+      />
+    );
+
+    expect(screen.getByRole('link')).toHaveTextContent(/^youtube\.com\/watch\?v=abc123#t=10$/);
+  });
+
+  it('shows only the host of a website link that has no path', () => {
+    render(<LinkItem section="websites" link={{ label: null, url: 'https://www.example.com/' }} />);
+
+    expect(screen.getByRole('link')).toHaveTextContent(/^example\.com$/);
+  });
+
+  // The longer text is for Websites and Social Media only.
+  it('shows only the host of an http contact link', () => {
+    render(
+      <LinkItem
+        section="contact"
+        link={{ label: 'Shop', url: 'https://www.shop.example.com/merch' }}
+      />
+    );
+
+    expect(screen.getByRole('link')).toHaveTextContent(/^shop\.example\.com$/);
   });
 
   it('hardens an external link', () => {
@@ -121,6 +161,17 @@ describe('LinkItem', () => {
     );
 
     expect(screen.getAllByText('example.com')).toHaveLength(1);
+  });
+
+  it('does not repeat a label that is the longer link text', () => {
+    render(
+      <LinkItem
+        section="social"
+        link={{ label: 'instagram.com/ceschiramos', url: 'https://instagram.com/ceschiramos' }}
+      />
+    );
+
+    expect(screen.getAllByText('instagram.com/ceschiramos')).toHaveLength(1);
   });
 });
 

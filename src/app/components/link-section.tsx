@@ -6,14 +6,21 @@ import type { JSX } from 'react';
 
 import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
 import type { ArtistLink, ArtistLinkGroup } from '@/lib/types/domain/artist';
+import { cn } from '@/lib/utils';
 import { isRenderableArtistLinkHref, type ArtistLinkSection } from '@/lib/utils/artist-links';
 
 const HEADING_CLASS = 'border-b-2 border-black pb-0.5 text-base font-semibold';
 
-const hostOf = (url: string): string | null => {
+/**
+ * A URL as a reader names it: the host without its `www.`, and, when
+ * `withPath`, everything after the host except a trailing slash on the path.
+ */
+const addressOf = (url: string, withPath: boolean): string | null => {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    return host === '' ? null : host;
+    const { hostname, pathname, search, hash } = new URL(url);
+    const host = hostname.replace(/^www\./, '');
+    if (host === '') return null;
+    return withPath ? `${host}${pathname.replace(/\/$/, '')}${search}${hash}` : host;
   } catch {
     return null;
   }
@@ -21,12 +28,14 @@ const hostOf = (url: string): string | null => {
 
 /**
  * The text a link shows: the address of a `mailto:`, the number of a `tel:`,
- * the host of an http(s) URL, or the raw value when none of those parse.
+ * and for an http(s) URL what follows the `www.` in Websites and Social
+ * Media, or only the host in Contact & Misc. The raw value when none of
+ * those parse.
  */
-export const linkText = (url: string): string => {
+export const linkText = (url: string, section: ArtistLinkSection): string => {
   if (/^mailto:/i.test(url)) return url.slice('mailto:'.length);
   if (/^tel:/i.test(url)) return url.slice('tel:'.length);
-  return hostOf(url) ?? url;
+  return addressOf(url, section !== 'contact') ?? url;
 };
 
 const isHttp = (url: string): boolean => /^https?:/i.test(url);
@@ -52,37 +61,51 @@ interface LinkItemProps {
 }
 
 /**
- * One ledger row: the icon the href resolves to, the label (when it is not
- * the link text itself), a dotted leader, and the link. An http(s) link
- * opens in a new tab with the usual hardening; `mailto:`/`tel:` open in
- * place. A stored href that fails the rule at render (ADR-0020) is shown as
- * text and never as a link.
+ * One row: the icon the href resolves to, the label (when it is not the link
+ * text itself), and the link. Websites and Social Media are a ledger line,
+ * with a dotted leader between the label and the link. Contact & Misc
+ * stacks instead: the link sits under its label, on the label's left edge,
+ * so an email address has the whole column. An http(s) link opens in a new
+ * tab with the usual hardening; `mailto:`/`tel:` open in place. A stored
+ * href that fails the rule at render (ADR-0020) is shown as text and never
+ * as a link.
  */
 export const LinkItem = ({ link, section }: LinkItemProps): JSX.Element => {
-  const text = linkText(link.url);
+  const text = linkText(link.url, section);
   const renderable = isRenderableArtistLinkHref(link.url, section);
+  const stacked = section === 'contact';
+  const valueClass = stacked ? 'col-start-2 justify-self-start' : 'max-w-[60%]';
   return (
-    <li className="flex items-baseline gap-2 text-sm">
+    <li
+      className={cn(
+        'text-sm',
+        stacked
+          ? 'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5'
+          : 'flex items-baseline gap-2'
+      )}
+    >
       <ArtistLinkIcon
         href={link.url}
         section={section}
         size={14}
-        className="self-center text-zinc-600"
+        className={cn('text-zinc-600', !stacked && 'self-center')}
       />
       {link.label && link.label !== text ? (
         <span className="text-zinc-700">{link.label}</span>
       ) : null}
-      <span aria-hidden="true" className="mb-1 flex-1 border-b border-dotted border-zinc-500" />
+      {stacked ? null : (
+        <span aria-hidden="true" className="mb-1 flex-1 border-b border-dotted border-zinc-500" />
+      )}
       {renderable ? (
         <a
           href={link.url}
           {...(isHttp(link.url) ? { target: '_blank', rel: 'nofollow noopener noreferrer' } : {})}
-          className="max-w-[60%] truncate underline underline-offset-4 hover:no-underline"
+          className={cn('truncate underline underline-offset-4 hover:no-underline', valueClass)}
         >
           {text}
         </a>
       ) : (
-        <span className="max-w-[60%] truncate text-zinc-700">{text}</span>
+        <span className={cn('truncate text-zinc-700', valueClass)}>{text}</span>
       )}
     </li>
   );
@@ -99,11 +122,11 @@ export const LinkSection = ({ heading, section, links }: LinkSectionProps): JSX.
   const headingId = useId();
   if (links.length === 0) return null;
   return (
-    <section aria-labelledby={headingId} className="space-y-1.5">
+    <section aria-labelledby={headingId} className="space-y-2.5">
       <h2 id={headingId} className={HEADING_CLASS}>
         {heading}
       </h2>
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {keyedBy(links, (link) => link.url).map(({ key, item }) => (
           <LinkItem key={key} link={item} section={section} />
         ))}
@@ -118,9 +141,9 @@ interface LinkGroupProps {
 
 /** One Contact & Misc group: its heading over its rows. */
 export const LinkGroup = ({ group }: LinkGroupProps): JSX.Element => (
-  <div className="space-y-1">
+  <div className="space-y-2">
     <h3 className="text-sm font-semibold text-zinc-800">{group.heading}</h3>
-    <ul className="space-y-1">
+    <ul className="space-y-2">
       {keyedBy(group.links, (link) => link.url).map(({ key, item }) => (
         <LinkItem key={key} link={item} section="contact" />
       ))}
@@ -138,7 +161,7 @@ export const ContactLinkSection = ({ groups }: ContactLinkSectionProps): JSX.Ele
   const filled = groups.filter((group) => group.links.length > 0);
   if (filled.length === 0) return null;
   return (
-    <section aria-labelledby={headingId} className="space-y-3">
+    <section aria-labelledby={headingId} className="space-y-4">
       <h2 id={headingId} className={HEADING_CLASS}>
         Contact &amp; Misc
       </h2>
