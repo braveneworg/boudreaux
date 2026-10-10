@@ -115,3 +115,6 @@ package-lock.json
 !stripe-webhook/package-lock.json
 music
 .playwright-mcp
+
+# Software factory job folders are runtime state
+/factory/jobs/

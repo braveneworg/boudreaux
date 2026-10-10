@@ -52,3 +52,10 @@ codecov.yml
 # SDD harness scratch files (git-ignored agent briefs/reports; only the
 # repo-root .gitignore is read by Prettier, so ignore them explicitly)
 .superpowers/
+
+# Software factory prompt, agent and skill markdown — hand-laid-out ASCII
+# diagrams, file trees and aligned columns outside code fences, which
+# Prettier reflows into unreadable text. Keep these byte-for-byte.
+BUILD_PROMPT.md
+.claude/**/*.md
+factory/**/*.md
