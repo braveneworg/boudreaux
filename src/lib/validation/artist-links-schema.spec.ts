@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
+  MAX_ARTIST_LINK_DESCRIPTION_LENGTH,
   MAX_ARTIST_LINK_GROUPS,
   MAX_ARTIST_LINKS_PER_SECTION,
   artistLinkGroupInputSchema,
@@ -16,10 +17,53 @@ describe('artistLinksSchema (stored shape)', () => {
     const links = {
       websites: [{ label: null, url: 'https://example.com' }],
       social: [],
-      contact: [{ heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:a@example.com' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [{ label: 'Agent', description: null, url: 'mailto:a@example.com' }],
+        },
+      ],
     };
 
     expect(artistLinksSchema.parse(links)).toEqual(links);
+  });
+
+  // Zod strips a key a schema does not name, so the read schema must name it.
+  it('keeps the description of a contact link, set or null', () => {
+    const links = {
+      websites: [],
+      social: [],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+            { label: null, description: null, url: 'tel:+18605550134' },
+          ],
+        },
+      ],
+    };
+
+    expect(artistLinksSchema.parse(links).contact[0].links).toEqual([
+      { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+      { label: null, description: null, url: 'tel:+18605550134' },
+    ]);
+  });
+
+  // The description belongs to Contact & Misc alone.
+  it('strips a description from a website or social link', () => {
+    const link = { label: null, description: 'Stray', url: 'https://example.com' };
+
+    const { websites, social } = artistLinksSchema.parse({
+      websites: [link],
+      social: [link],
+      contact: [],
+    });
+
+    expect([...websites, ...social]).toEqual([
+      { label: null, url: 'https://example.com' },
+      { label: null, url: 'https://example.com' },
+    ]);
   });
 });
 
@@ -37,6 +81,13 @@ describe('httpLinkInputSchema', () => {
   it('rejects an empty url', () => {
     expect(httpLinkInputSchema.safeParse({ url: '  ' }).success).toBe(false);
   });
+
+  // Only a Contact & Misc row has a description.
+  it('strips a description sent on a website or social link', () => {
+    expect(
+      httpLinkInputSchema.parse({ label: 'Site', description: 'Stray', url: 'https://example.com' })
+    ).toEqual({ label: 'Site', url: 'https://example.com' });
+  });
 });
 
 describe('contactLinkInputSchema', () => {
@@ -53,6 +104,42 @@ describe('contactLinkInputSchema', () => {
 
   it('rejects text that is neither a URL, an email nor a phone number', () => {
     expect(contactLinkInputSchema.safeParse({ url: 'call me' }).success).toBe(false);
+  });
+
+  it('accepts a link without a description', () => {
+    expect(contactLinkInputSchema.parse({ url: 'agent@example.com' })).toEqual({
+      url: 'agent@example.com',
+    });
+  });
+
+  it('accepts a description and trims it', () => {
+    expect(
+      contactLinkInputSchema.parse({ description: '  Books US tours  ', url: 'agent@example.com' })
+    ).toEqual({ description: 'Books US tours', url: 'agent@example.com' });
+  });
+
+  it('accepts a description at the length limit', () => {
+    const description = 'd'.repeat(MAX_ARTIST_LINK_DESCRIPTION_LENGTH);
+
+    expect(contactLinkInputSchema.parse({ description, url: 'agent@example.com' })).toEqual({
+      description,
+      url: 'agent@example.com',
+    });
+  });
+
+  it('rejects a description past the length limit, naming the field', () => {
+    const result = contactLinkInputSchema.safeParse({
+      description: 'd'.repeat(MAX_ARTIST_LINK_DESCRIPTION_LENGTH + 1),
+      url: 'agent@example.com',
+    });
+
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['description'], message: 'Description is too long' }),
+    ]);
+  });
+
+  it('caps a description at 280 characters', () => {
+    expect(MAX_ARTIST_LINK_DESCRIPTION_LENGTH).toBe(280);
   });
 });
 

@@ -16,13 +16,18 @@ describe('createArtistSchema link arrays', () => {
       ...validBase,
       websiteLinks: [{ label: 'Site', url: 'https://example.com' }],
       socialLinks: [{ url: 'https://www.instagram.com/x' }],
-      contactLinkGroups: [{ heading: 'Booking', links: [{ url: 'agent@example.com' }] }],
+      contactLinkGroups: [
+        {
+          heading: 'Booking',
+          links: [{ description: ' Books US tours ', url: 'agent@example.com' }],
+        },
+      ],
     });
 
     expect(parsed.websiteLinks).toEqual([{ label: 'Site', url: 'https://example.com' }]);
     expect(parsed.socialLinks).toEqual([{ url: 'https://www.instagram.com/x' }]);
     expect(parsed.contactLinkGroups).toEqual([
-      { heading: 'Booking', links: [{ url: 'agent@example.com' }] },
+      { heading: 'Booking', links: [{ description: 'Books US tours', url: 'agent@example.com' }] },
     ]);
   });
 

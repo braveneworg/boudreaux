@@ -85,8 +85,50 @@ describe('composeArtistLinks', () => {
     ).toEqual({
       websites: [{ label: null, url: ' https://example.com ' }],
       social: [],
-      contact: [{ heading: 'Booking', links: [{ label: 'Agent', url: 'agent@example.com' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [{ label: 'Agent', description: null, url: 'agent@example.com' }],
+        },
+      ],
     });
+  });
+
+  it('keeps a typed contact description and stores an empty or missing one as null', () => {
+    const { contact } = composeArtistLinks({
+      websiteLinks: [],
+      socialLinks: [],
+      contactLinkGroups: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US tours', url: 'agent@example.com' },
+            { label: 'Office', description: '', url: '+1 860 555 0134' },
+            { label: '', url: 'https://example.com/booking' },
+          ],
+        },
+      ],
+    });
+
+    expect(contact[0].links).toEqual([
+      { label: 'Agent', description: 'Books US tours', url: 'agent@example.com' },
+      { label: 'Office', description: null, url: '+1 860 555 0134' },
+      { label: null, description: null, url: 'https://example.com/booking' },
+    ]);
+  });
+
+  // Only a Contact & Misc link has a description (ADR-0020 amendment).
+  it('gives a website or social link no description key', () => {
+    const { websites, social } = composeArtistLinks({
+      websiteLinks: [{ label: 'Site', url: 'https://example.com' }],
+      socialLinks: [{ label: '', url: 'https://www.instagram.com/x' }],
+      contactLinkGroups: [],
+    });
+
+    expect([...websites, ...social].map((link) => Object.keys(link))).toEqual([
+      ['label', 'url'],
+      ['label', 'url'],
+    ]);
   });
 });
 
@@ -107,15 +149,57 @@ describe('toArtistLinksFormValues', () => {
       toArtistLinksFormValues({
         websites: [{ label: null, url: 'https://example.com' }],
         social: [{ label: 'IG', url: 'https://www.instagram.com/x' }],
-        contact: [{ heading: 'Press', links: [{ label: null, url: 'mailto:press@example.com' }] }],
+        contact: [
+          {
+            heading: 'Press',
+            links: [{ label: null, description: null, url: 'mailto:press@example.com' }],
+          },
+        ],
       })
     ).toEqual({
       websiteLinks: [{ label: '', url: 'https://example.com' }],
       socialLinks: [{ label: 'IG', url: 'https://www.instagram.com/x' }],
       contactLinkGroups: [
-        { heading: 'Press', links: [{ label: '', url: 'mailto:press@example.com' }] },
+        {
+          heading: 'Press',
+          links: [{ label: '', description: '', url: 'mailto:press@example.com' }],
+        },
       ],
     });
+  });
+
+  it('keeps a stored contact description and maps a null one to an empty string', () => {
+    const { contactLinkGroups } = toArtistLinksFormValues({
+      websites: [],
+      social: [],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US tours', url: 'mailto:agent@example.com' },
+            { label: 'Office', description: null, url: 'tel:+18605550134' },
+          ],
+        },
+      ],
+    });
+
+    expect(contactLinkGroups[0].links).toEqual([
+      { label: 'Agent', description: 'Books US tours', url: 'mailto:agent@example.com' },
+      { label: 'Office', description: '', url: 'tel:+18605550134' },
+    ]);
+  });
+
+  it('gives a website or social row no description key', () => {
+    const { websiteLinks, socialLinks } = toArtistLinksFormValues({
+      websites: [{ label: null, url: 'https://example.com' }],
+      social: [{ label: 'IG', url: 'https://www.instagram.com/x' }],
+      contact: [],
+    });
+
+    expect([...websiteLinks, ...socialLinks].map((link) => Object.keys(link))).toEqual([
+      ['label', 'url'],
+      ['label', 'url'],
+    ]);
   });
 
   it('prefills the groups when the stored contact section is empty', () => {

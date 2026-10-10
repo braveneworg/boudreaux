@@ -189,8 +189,14 @@ describe('ContactLinkSection', () => {
     render(
       <ContactLinkSection
         groups={[
-          { heading: 'Booking', links: [{ label: 'US', url: 'mailto:us@example.com' }] },
-          { heading: 'Booking', links: [{ label: 'EU', url: 'mailto:eu@example.com' }] },
+          {
+            heading: 'Booking',
+            links: [{ label: 'US', description: null, url: 'mailto:us@example.com' }],
+          },
+          {
+            heading: 'Booking',
+            links: [{ label: 'EU', description: null, url: 'mailto:eu@example.com' }],
+          },
         ]}
       />
     );
@@ -204,9 +210,15 @@ describe('ContactLinkSection', () => {
     render(
       <ContactLinkSection
         groups={[
-          { heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:a@example.com' }] },
+          {
+            heading: 'Booking',
+            links: [{ label: 'Agent', description: null, url: 'mailto:a@example.com' }],
+          },
           { heading: 'Merch', links: [] },
-          { heading: 'Press', links: [{ label: null, url: 'https://example.com/press' }] },
+          {
+            heading: 'Press',
+            links: [{ label: null, description: null, url: 'https://example.com/press' }],
+          },
         ]}
       />
     );

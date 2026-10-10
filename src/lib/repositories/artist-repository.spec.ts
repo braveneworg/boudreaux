@@ -303,7 +303,12 @@ describe('ArtistRepository', () => {
       const links = {
         websites: [{ label: null, url: 'https://example.com' }],
         social: [],
-        contact: [],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' }],
+          },
+        ],
       };
 
       await ArtistRepository.update('a', { links });

@@ -188,7 +188,12 @@ describe('ArtistDetailPage', () => {
       links: {
         websites: [{ label: null, url: 'https://margueriteash.example.com' }],
         social: [],
-        contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:a@example.com' }] }],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: null, description: null, url: 'mailto:a@example.com' }],
+          },
+        ],
       },
     });
 

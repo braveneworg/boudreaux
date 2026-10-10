@@ -626,7 +626,12 @@ describe('ArtistService', () => {
             websites: [{ label: '<b>Site</b>', url: ' https://example.com ' }],
             social: [],
             contact: [
-              { heading: ' Booking ', links: [{ label: null, url: 'agent@example.com' }] },
+              {
+                heading: ' Booking ',
+                links: [
+                  { label: null, description: ' <b>Books</b> US tours ', url: 'agent@example.com' },
+                ],
+              },
               { heading: 'Merch', links: [] },
             ],
           },
@@ -641,7 +646,12 @@ describe('ArtistService', () => {
             websites: [{ label: 'Site', url: 'https://example.com' }],
             social: [],
             contact: [
-              { heading: 'Booking', links: [{ label: null, url: 'mailto:agent@example.com' }] },
+              {
+                heading: 'Booking',
+                links: [
+                  { label: null, description: 'Books US tours', url: 'mailto:agent@example.com' },
+                ],
+              },
             ],
           },
         },
