@@ -2,36 +2,42 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm } from 'react-hook-form';
 
 import { Form } from '@/app/components/ui/form';
+import { MAX_ARTIST_LINK_DESCRIPTION_LENGTH } from '@/lib/validation/artist-links-schema';
+import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
-import { ArtistLinkListEditor, type ArtistLinkListName } from './artist-link-list-editor';
+import { ArtistLinkListEditor, type ArtistLinkListTarget } from './artist-link-list-editor';
 
 interface HarnessProps {
-  name?: ArtistLinkListName;
-  section?: 'websites' | 'social' | 'contact';
+  target?: ArtistLinkListTarget;
+  heading?: string;
   defaults?: Partial<ArtistFormData>;
   onRead: (values: unknown, isDirty: boolean) => void;
 }
 
 const Harness = ({
-  name = 'websiteLinks',
-  section = 'websites',
+  target = { name: 'websiteLinks', section: 'websites' },
+  heading = 'Website',
   defaults = {},
   onRead,
 }: HarnessProps): React.ReactElement => {
-  const form = useForm<ArtistFormData>({ defaultValues: defaults as ArtistFormData });
+  const form = useForm<ArtistFormData>({
+    resolver: zodResolver(createArtistSchema),
+    defaultValues: defaults as ArtistFormData,
+  });
+  const { name } = target;
   return (
     <Form {...form}>
       <ArtistLinkListEditor
         control={form.control}
-        name={name}
-        heading="Website"
-        section={section}
+        {...target}
+        heading={heading}
         addLabel="Add website link"
       />
       <button type="button" onClick={() => onRead(form.getValues(name), form.formState.isDirty)}>
@@ -42,6 +48,9 @@ const Harness = ({
         onClick={() => form.setError(`${name}.0.url`, { message: 'Must be an http(s) URL' })}
       >
         fail
+      </button>
+      <button type="button" onClick={() => void form.trigger(name)}>
+        validate
       </button>
     </Form>
   );
@@ -65,6 +74,21 @@ const renderEditor = (props: Partial<HarnessProps> = {}) => {
 };
 
 const urlsOf = (values: unknown): string[] => (values as { url: string }[]).map(({ url }) => url);
+
+const CONTACT_TARGET: ArtistLinkListTarget = {
+  name: 'contactLinkGroups.0.links',
+  section: 'contact',
+};
+
+/** A Contact & Misc list, as the groups editor renders one: "Group 1 link 2". */
+const renderContactEditor = (
+  links: NonNullable<ArtistFormData['contactLinkGroups']>[number]['links']
+) =>
+  renderEditor({
+    target: CONTACT_TARGET,
+    heading: 'Group 1',
+    defaults: { contactLinkGroups: [{ heading: 'Booking', links }] },
+  });
 
 describe('ArtistLinkListEditor', () => {
   it('renders a label and a URL input per link, in order', () => {
@@ -102,6 +126,7 @@ describe('ArtistLinkListEditor', () => {
       'https://fakefourinc.com/x',
       '',
     ]);
+    expect((values as unknown[]).at(-1)).toEqual({ label: '', url: '' });
   });
 
   it('removes a row', async () => {
@@ -164,8 +189,7 @@ describe('ArtistLinkListEditor', () => {
   // ADR-0020: the icon follows the href as it is typed; nothing is stored.
   it('shows the platform icon live on a social row', async () => {
     const { user } = renderEditor({
-      name: 'socialLinks',
-      section: 'social',
+      target: { name: 'socialLinks', section: 'social' },
       defaults: { socialLinks: [{ label: '', url: '' }] },
     });
     const row = screen.getByRole('listitem');
@@ -196,5 +220,84 @@ describe('ArtistLinkListEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Remove website link 1' }));
     const [, dirty] = await read();
     expect(dirty).toBe(true);
+  });
+
+  // Only a Contact & Misc row has a description (ADR-0020 amendment).
+  describe('description', () => {
+    it('shows no description field on a website row', () => {
+      renderEditor();
+
+      expect(
+        screen.getAllByRole('textbox', { name: /^Website link \d (label|URL)$/ })
+      ).toHaveLength(6);
+      expect(screen.queryByRole('textbox', { name: /description$/i })).not.toBeInTheDocument();
+    });
+
+    it('shows no description field on a social row', () => {
+      renderEditor({
+        target: { name: 'socialLinks', section: 'social' },
+        defaults: { socialLinks: [{ label: 'IG', url: 'https://www.instagram.com/x' }] },
+      });
+
+      expect(screen.getByRole('textbox', { name: 'Website link 1 URL' })).toBeInTheDocument();
+      expect(screen.queryByRole('textbox', { name: /description$/i })).not.toBeInTheDocument();
+    });
+
+    it('shows a description field on a contact row', () => {
+      renderContactEditor([
+        { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+      ]);
+
+      const description = screen.getByRole('textbox', { name: 'Group 1 link 1 description' });
+      expect(description).toHaveValue('Books US tours');
+      expect(description).toHaveAttribute('placeholder', 'Description (optional)');
+    });
+
+    it('tabs from the label to the URL, then the description, then the row buttons', async () => {
+      const { user } = renderContactEditor([
+        { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+        { label: 'Office', description: '', url: 'tel:+18605550134' },
+      ]);
+      screen.getByRole('textbox', { name: 'Group 1 link 1 label' }).focus();
+
+      await user.tab();
+      expect(screen.getByRole('textbox', { name: 'Group 1 link 1 URL' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('textbox', { name: 'Group 1 link 1 description' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Move group 1 link 1 later' })).toHaveFocus();
+    });
+
+    it('shows the schema’s error under the description input', async () => {
+      const { user } = renderContactEditor([
+        {
+          label: 'Agent',
+          description: 'd'.repeat(MAX_ARTIST_LINK_DESCRIPTION_LENGTH + 1),
+          url: 'mailto:a@example.com',
+        },
+      ]);
+
+      await user.click(screen.getByRole('button', { name: 'validate' }));
+
+      expect(
+        await screen.findByRole('textbox', {
+          name: 'Group 1 link 1 description',
+          description: 'Description is too long',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'Group 1 link 1 URL' })
+      ).not.toHaveAccessibleDescription();
+    });
+
+    it('appends a contact row with an empty description', async () => {
+      const { user, read } = renderContactEditor([]);
+
+      await user.click(screen.getByRole('button', { name: 'Add website link' }));
+
+      expect(screen.getByRole('textbox', { name: 'Group 1 link 1 description' })).toHaveValue('');
+      const [values] = await read();
+      expect(values).toEqual([{ label: '', description: '', url: '' }]);
+    });
   });
 });
