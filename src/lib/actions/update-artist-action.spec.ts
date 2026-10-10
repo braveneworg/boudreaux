@@ -891,7 +891,13 @@ describe('updateArtistAction', () => {
         websiteLinks: [{ label: '', url: ' https://example.com ' }],
         socialLinks: [],
         contactLinkGroups: [
-          { heading: 'Booking', links: [{ label: 'Agent', url: 'agent@example.com' }] },
+          {
+            heading: 'Booking',
+            links: [
+              { label: 'Agent', description: 'Books US tours', url: 'agent@example.com' },
+              { label: '', description: '', url: '+1 (860) 555-0134' },
+            ],
+          },
           { heading: 'Merch', links: [] },
         ],
       });
@@ -905,7 +911,17 @@ describe('updateArtistAction', () => {
             websites: [{ label: null, url: 'https://example.com' }],
             social: [],
             contact: [
-              { heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:agent@example.com' }] },
+              {
+                heading: 'Booking',
+                links: [
+                  {
+                    label: 'Agent',
+                    description: 'Books US tours',
+                    url: 'mailto:agent@example.com',
+                  },
+                  { label: null, description: null, url: 'tel:+18605550134' },
+                ],
+              },
             ],
           },
         }),

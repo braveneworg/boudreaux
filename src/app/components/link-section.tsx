@@ -5,7 +5,7 @@ import { useId } from 'react';
 import type { JSX } from 'react';
 
 import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
-import type { ArtistLink, ArtistLinkGroup } from '@/lib/types/domain/artist';
+import type { ArtistContactLink, ArtistLink, ArtistLinkGroup } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
 import { isRenderableArtistLinkHref, type ArtistLinkSection } from '@/lib/utils/artist-links';
 
@@ -55,25 +55,52 @@ const keyedBy = <T,>(items: T[], valueOf: (item: T) => string): Array<{ key: str
   });
 };
 
-interface LinkItemProps {
-  link: ArtistLink;
-  section: ArtistLinkSection;
+interface LinkValueProps {
+  href: string;
+  text: string;
+  renderable: boolean;
+  className: string;
 }
+
+/**
+ * The link of a row: an http(s) one opens in a new tab with the usual
+ * hardening, `mailto:`/`tel:` open in place. A stored href that fails the
+ * rule at render (ADR-0020) is shown as text and never as a link.
+ */
+const LinkValue = ({ href, text, renderable, className }: LinkValueProps): JSX.Element =>
+  renderable ? (
+    <a
+      href={href}
+      {...(isHttp(href) ? { target: '_blank', rel: 'nofollow noopener noreferrer' } : {})}
+      className={cn('truncate underline underline-offset-4 hover:no-underline', className)}
+    >
+      {text}
+    </a>
+  ) : (
+    <span className={cn('truncate text-zinc-700', className)}>{text}</span>
+  );
+
+/** The flat sections: every {@link ArtistLinkSection} but Contact & Misc. */
+type FlatLinkSection = Exclude<ArtistLinkSection, 'contact'>;
+
+/** A link with its section: only a Contact & Misc link has a description. */
+type LinkItemProps =
+  { link: ArtistLink; section: FlatLinkSection } | { link: ArtistContactLink; section: 'contact' };
 
 /**
  * One row: the icon the href resolves to, the label (when it is not the link
  * text itself), and the link. Websites and Social Media are a ledger line,
  * with a dotted leader between the label and the link. Contact & Misc
- * stacks instead: the link sits under its label, on the label's left edge,
- * so an email address has the whole column. An http(s) link opens in a new
- * tab with the usual hardening; `mailto:`/`tel:` open in place. A stored
- * href that fails the rule at render (ADR-0020) is shown as text and never
- * as a link.
+ * stacks instead: a semibold label, the link's description (when it has
+ * one) in normal weight under it, and the link under both, all on the
+ * label's left edge, so an email address has the whole column. The
+ * description is plain text and wraps. The link itself is a
+ * {@link LinkValue}.
  */
 export const LinkItem = ({ link, section }: LinkItemProps): JSX.Element => {
   const text = linkText(link.url, section);
-  const renderable = isRenderableArtistLinkHref(link.url, section);
   const stacked = section === 'contact';
+  const description = stacked ? link.description : null;
   const valueClass = stacked ? 'col-start-2 justify-self-start' : 'max-w-[60%]';
   return (
     <li
@@ -91,29 +118,27 @@ export const LinkItem = ({ link, section }: LinkItemProps): JSX.Element => {
         className={cn('text-zinc-600', !stacked && 'self-center')}
       />
       {link.label && link.label !== text ? (
-        <span className="text-zinc-700">{link.label}</span>
+        <span className={cn('text-zinc-700', stacked && 'font-semibold')}>{link.label}</span>
+      ) : null}
+      {description ? (
+        <p className="col-start-2 text-sm font-normal break-words text-zinc-700">{description}</p>
       ) : null}
       {stacked ? null : (
         <span aria-hidden="true" className="mb-1 flex-1 border-b border-dotted border-zinc-500" />
       )}
-      {renderable ? (
-        <a
-          href={link.url}
-          {...(isHttp(link.url) ? { target: '_blank', rel: 'nofollow noopener noreferrer' } : {})}
-          className={cn('truncate underline underline-offset-4 hover:no-underline', valueClass)}
-        >
-          {text}
-        </a>
-      ) : (
-        <span className={cn('truncate text-zinc-700', valueClass)}>{text}</span>
-      )}
+      <LinkValue
+        href={link.url}
+        text={text}
+        renderable={isRenderableArtistLinkHref(link.url, section)}
+        className={valueClass}
+      />
     </li>
   );
 };
 
 interface LinkSectionProps {
   heading: string;
-  section: ArtistLinkSection;
+  section: FlatLinkSection;
   links: ArtistLink[];
 }
 

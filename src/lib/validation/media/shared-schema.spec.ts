@@ -56,7 +56,15 @@ describe('artistScalarSchema', () => {
     const links = {
       websites: [{ label: 'Official site', url: 'https://example.com' }],
       social: [{ label: null, url: 'https://www.instagram.com/example' }],
-      contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:a@example.com' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' },
+            { label: null, description: null, url: 'tel:+18605550134' },
+          ],
+        },
+      ],
     };
 
     expect(artistScalarSchema.parse({ ...artistScalar, links }).links).toEqual(links);

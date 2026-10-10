@@ -20,7 +20,10 @@ describe('normalizeArtistLinks', () => {
       websites: [{ label: 'Site', url: 'https://example.com' }],
       social: [{ label: null, url: 'https://www.instagram.com/x' }],
       contact: [
-        { heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:agent@example.com' }] },
+        {
+          heading: 'Booking',
+          links: [{ label: 'Agent', description: null, url: 'mailto:agent@example.com' }],
+        },
       ],
     });
   });
@@ -59,25 +62,98 @@ describe('sanitizeArtistLinks', () => {
         websites: [{ label: '<b>Site</b>', url: ' https://example.com ' }],
         social: [],
         contact: [
-          { heading: ' Booking ', links: [{ label: null, url: 'agent@example.com' }] },
+          {
+            heading: ' Booking ',
+            links: [{ label: null, description: null, url: 'agent@example.com' }],
+          },
           { heading: 'Merch', links: [] },
         ],
       })
     ).toEqual({
       websites: [{ label: 'Site', url: 'https://example.com' }],
       social: [],
-      contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:agent@example.com' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [{ label: null, description: null, url: 'mailto:agent@example.com' }],
+        },
+      ],
     });
   });
+
+  it('stores a contact description as plain text, trimmed', () => {
+    const sanitized = sanitizeArtistLinks({
+      websites: [],
+      social: [],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            {
+              label: 'Agent',
+              description: '  <b>Books</b> US &amp; EU tours  ',
+              url: 'mailto:agent@example.com',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sanitized?.contact[0].links[0].description).toBe('Books US & EU tours');
+  });
+
+  it.each(['   ', '<b></b>', '<script>alert(1)</script>'])(
+    'stores a description with no text left as null: %s',
+    (description) => {
+      const sanitized = sanitizeArtistLinks({
+        websites: [],
+        social: [],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: 'Agent', description, url: 'mailto:agent@example.com' }],
+          },
+        ],
+      });
+
+      expect(sanitized?.contact[0].links[0].description).toBeNull();
+    }
+  );
 
   it('leaves an already sanitised composite unchanged', () => {
     const links = {
       websites: [{ label: 'Site', url: 'https://example.com' }],
       social: [{ label: null, url: 'https://www.instagram.com/x' }],
-      contact: [{ heading: 'Booking', links: [{ label: null, url: 'tel:+18605550134' }] }],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US & EU tours', url: 'mailto:a@example.com' },
+            { label: null, description: null, url: 'tel:+18605550134' },
+          ],
+        },
+      ],
     };
 
     expect(sanitizeArtistLinks(links)).toEqual(links);
+  });
+
+  // Only a Contact & Misc link has a description (ADR-0020 amendment).
+  it('gives a website or social link no description key', () => {
+    const sanitized = sanitizeArtistLinks({
+      websites: [{ label: 'Site', url: 'https://example.com' }],
+      social: [{ label: null, url: 'https://www.instagram.com/x' }],
+      contact: [],
+    });
+
+    expect(
+      [...(sanitized?.websites ?? []), ...(sanitized?.social ?? [])].map((link) =>
+        Object.keys(link)
+      )
+    ).toEqual([
+      ['label', 'url'],
+      ['label', 'url'],
+    ]);
   });
 
   it('is null when nothing is left', () => {

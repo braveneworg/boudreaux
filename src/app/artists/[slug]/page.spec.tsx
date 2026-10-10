@@ -188,13 +188,37 @@ describe('ArtistDetailPage', () => {
       links: {
         websites: [{ label: null, url: 'https://margueriteash.example.com' }],
         social: [],
-        contact: [{ heading: 'Booking', links: [{ label: null, url: 'mailto:a@example.com' }] }],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: null, description: null, url: 'mailto:a@example.com' }],
+          },
+        ],
       },
     });
 
     expect(screen.getByRole('region', { name: 'Websites' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Contact & Misc' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Social Media' })).not.toBeInTheDocument();
+  });
+
+  it('shows a contact link’s description in Contact & Misc', async () => {
+    await renderPage({
+      links: {
+        websites: [],
+        social: [],
+        contact: [
+          {
+            heading: 'Booking',
+            links: [{ label: 'Agent', description: 'Books US tours', url: 'mailto:a@example.com' }],
+          },
+        ],
+      },
+    });
+
+    expect(
+      within(screen.getByRole('region', { name: 'Contact & Misc' })).getByText('Books US tours')
+    ).toBeInTheDocument();
   });
 
   it('shows no link section for an artist without links', async () => {

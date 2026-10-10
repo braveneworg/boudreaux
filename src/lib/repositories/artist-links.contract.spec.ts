@@ -9,9 +9,9 @@ import type { Prisma } from '@prisma/client';
 
 // Contract: what a real MongoDB returns for the `Artist.links` composite
 // (ADR-0020) in each way it can be stored — absent, a full document, and a
-// document an older write left without one of its lists — and that a write
-// replaces the whole composite and keeps the admin's order. Runs only under
-// `pnpm run test:db`.
+// document an older write left without one of its lists or without a contact
+// link's description — and that a write replaces the whole composite and
+// keeps the admin's order. Runs only under `pnpm run test:db`.
 
 const prefix = `__contract:${randomUUID()}:`;
 
@@ -59,7 +59,11 @@ describe('Artist.links composite', () => {
         {
           heading: 'Booking',
           links: [
-            { label: 'Agency', url: 'mailto:booking@example.com' },
+            {
+              label: 'Agency',
+              description: 'Books North American tours',
+              url: 'mailto:booking@example.com',
+            },
             { label: 'Phone', url: 'tel:+18605550134' },
           ],
         },
@@ -77,13 +81,97 @@ describe('Artist.links composite', () => {
         {
           heading: 'Booking',
           links: [
-            { label: 'Agency', url: 'mailto:booking@example.com' },
-            { label: 'Phone', url: 'tel:+18605550134' },
+            {
+              label: 'Agency',
+              description: 'Books North American tours',
+              url: 'mailto:booking@example.com',
+            },
+            { label: 'Phone', description: null, url: 'tel:+18605550134' },
           ],
         },
         { heading: 'Merch', links: [] },
       ],
     });
+  });
+
+  it('reads back the description a contact link was written with', async () => {
+    const id = await createArtist('description', {
+      websites: [],
+      social: [],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [{ description: 'Books North American tours', url: 'mailto:a@example.com' }],
+        },
+      ],
+    });
+
+    expect((await readLinks(id))?.contact[0].links).toEqual([
+      { label: null, description: 'Books North American tours', url: 'mailto:a@example.com' },
+    ]);
+  });
+
+  it('reads a contact link written without a description as description null', async () => {
+    const id = await createArtist('no-description', {
+      websites: [],
+      social: [],
+      contact: [{ heading: 'Booking', links: [{ label: 'Agent', url: 'mailto:a@example.com' }] }],
+    });
+
+    expect((await readLinks(id))?.contact[0].links).toEqual([
+      { label: 'Agent', description: null, url: 'mailto:a@example.com' },
+    ]);
+  });
+
+  // A contact link stored before the description existed has no such key in
+  // its document. Prisma reads it as `null`, so no backfill is needed.
+  it('reads a raw contact link with no description key as description null', async () => {
+    const id = await createArtist('raw-contact');
+    await prisma.$runCommandRaw({
+      update: 'Artist',
+      updates: [
+        {
+          q: { _id: { $oid: id } },
+          u: {
+            $set: {
+              links: {
+                websites: [],
+                social: [],
+                contact: [
+                  {
+                    heading: 'Booking',
+                    links: [{ label: 'Agent', url: 'mailto:a@example.com' }],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect((await readLinks(id))?.contact[0].links).toEqual([
+      { label: 'Agent', description: null, url: 'mailto:a@example.com' },
+    ]);
+  });
+
+  // The description belongs to Contact & Misc alone: `ArtistLink` has no such
+  // field, so a website or social link never reads one back.
+  it('reads website and social links back with only a label and a url', async () => {
+    const id = await createArtist('flat', {
+      websites: [{ label: 'Official site', url: 'https://example.com' }],
+      social: [{ url: 'https://www.instagram.com/example' }],
+      contact: [],
+    });
+
+    const links = await readLinks(id);
+
+    expect(
+      [...(links?.websites ?? []), ...(links?.social ?? [])].map((link) => Object.keys(link))
+    ).toEqual([
+      ['label', 'url'],
+      ['label', 'url'],
+    ]);
   });
 
   // A document written before a section existed has no such list at all.

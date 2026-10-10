@@ -3,7 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistLink, ArtistLinkGroup, ArtistLinks } from '@/lib/types/domain/artist';
+import type {
+  ArtistContactLink,
+  ArtistLink,
+  ArtistLinkGroup,
+  ArtistLinks,
+} from '@/lib/types/domain/artist';
 import { toContactHref } from '@/lib/utils/artist-links';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 
@@ -21,9 +26,14 @@ export const artistLinkSchema = z.object({
   url: z.string(),
 }) satisfies z.ZodType<ArtistLink>;
 
+/** A Contact & Misc link: the one kind that carries a description. */
+export const artistContactLinkSchema = artistLinkSchema.extend({
+  description: z.string().nullable(),
+}) satisfies z.ZodType<ArtistContactLink>;
+
 export const artistLinkGroupSchema = z.object({
   heading: z.string(),
-  links: z.array(artistLinkSchema),
+  links: z.array(artistContactLinkSchema),
 }) satisfies z.ZodType<ArtistLinkGroup>;
 
 export const artistLinksSchema = z.object({
@@ -37,6 +47,7 @@ export const artistLinksSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const MAX_ARTIST_LINK_LABEL_LENGTH = 120;
+export const MAX_ARTIST_LINK_DESCRIPTION_LENGTH = 280;
 export const MAX_ARTIST_LINK_HEADING_LENGTH = 80;
 export const MAX_ARTIST_LINK_URL_LENGTH = 2048;
 
@@ -52,6 +63,13 @@ export const MAX_ARTIST_LINK_GROUPS = 50;
 // different input and output types, which the form's resolver typing rejects.
 const label = z.string().trim().max(MAX_ARTIST_LINK_LABEL_LENGTH, 'Label is too long').optional();
 
+// Optional rather than defaulted, for the same reason as the label.
+const description = z
+  .string()
+  .trim()
+  .max(MAX_ARTIST_LINK_DESCRIPTION_LENGTH, 'Description is too long')
+  .optional();
+
 const url = z
   .string()
   .trim()
@@ -66,10 +84,12 @@ export const httpLinkInputSchema = z.object({
 
 /**
  * A Contact & Misc row: an http(s) URL, an email address or a phone number,
- * kept as typed here and normalised on save (see `normalizeArtistLinks`).
+ * kept as typed here and normalised on save (see `normalizeArtistLinks`),
+ * with an optional label and an optional description.
  */
 export const contactLinkInputSchema = z.object({
   label,
+  description,
   url: url.refine(
     (value) => toContactHref(value) !== null,
     'Must be an http(s) URL, an email address or a phone number'

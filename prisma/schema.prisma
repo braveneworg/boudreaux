@@ -256,18 +256,26 @@ model Label {
   artistLabels ArtistLabel[]
 }
 
-/// One curated link on an artist's page: an optional label beside a URL.
-/// Websites and social links are http(s); a contact link may also be
-/// `mailto:` or `tel:` (ADR-0020).
+/// One curated link in an artist's Websites or Social Media section: an
+/// optional label beside an http(s) URL (ADR-0020).
 type ArtistLink {
   label String?
   url   String
 }
 
+/// One curated link in an artist's Contact & Misc section: an `ArtistLink`
+/// with an optional plain-text description, shown between its label and the
+/// link. The URL may also be `mailto:` or `tel:` (ADR-0020).
+type ArtistContactLink {
+  label       String?
+  description String?
+  url         String
+}
+
 /// An admin-defined heading over its links in the Contact & Misc section.
 type ArtistLinkGroup {
   heading String
-  links   ArtistLink[]
+  links   ArtistContactLink[]
 }
 
 /// An artist's curated links in their three sections, written whole and in

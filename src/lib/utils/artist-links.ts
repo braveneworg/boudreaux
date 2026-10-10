@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ArtistLink, ArtistLinks } from '@/lib/types/domain/artist';
+import type { ArtistContactLink, ArtistLink, ArtistLinks } from '@/lib/types/domain/artist';
 import type { ArtistLinksFormValues } from '@/lib/validation/artist-links-schema';
 
 import { isHttpUrl } from './is-http-url';
@@ -65,18 +65,29 @@ export const toContactHref = (value: string): string | null => {
 export const isRenderableArtistLinkHref = (href: string, section: ArtistLinkSection): boolean =>
   section === 'contact' ? toContactHref(href) === href : isHttpUrl(href);
 
-const toStoredLink = ({
-  label,
-  url,
-}: ArtistLinksFormValues['websiteLinks'][number]): ArtistLink => ({
+type HttpLinkFormValues = ArtistLinksFormValues['websiteLinks'][number];
+type ContactLinkFormValues = ArtistLinksFormValues['contactLinkGroups'][number]['links'][number];
+
+const toStoredLink = ({ label, url }: HttpLinkFormValues): ArtistLink => ({
   label: label || null,
+  url,
+});
+
+const toStoredContactLink = ({
+  label,
+  description,
+  url,
+}: ContactLinkFormValues): ArtistContactLink => ({
+  label: label || null,
+  description: description || null,
   url,
 });
 
 /**
  * The form's three arrays in the stored shape, as typed: an empty label is
- * `null`, nothing else changes. {@link sanitizeArtistLinks} is what makes
- * the result storable.
+ * `null`, and so is the empty or missing description of a contact row (the
+ * one kind of row that has one); nothing else changes.
+ * {@link sanitizeArtistLinks} is what makes the result storable.
  */
 export const composeArtistLinks = ({
   websiteLinks,
@@ -87,20 +98,31 @@ export const composeArtistLinks = ({
   social: socialLinks.map(toStoredLink),
   contact: contactLinkGroups.map(({ heading, links }) => ({
     heading,
-    links: links.map(toStoredLink),
+    links: links.map(toStoredContactLink),
   })),
 });
 
-const toFormLink = ({ label, url }: ArtistLink): ArtistLinksFormValues['websiteLinks'][number] => ({
+const toFormLink = ({ label, url }: ArtistLink): HttpLinkFormValues => ({
   label: label ?? '',
+  url,
+});
+
+const toFormContactLink = ({
+  label,
+  description,
+  url,
+}: ArtistContactLink): ContactLinkFormValues => ({
+  label: label ?? '',
+  description: description ?? '',
   url,
 });
 
 /**
  * The form's three arrays for a stored composite (or none): a `null` label
- * becomes an empty string, and an empty contact section is prefilled with
- * the {@link CONTACT_GROUP_PREFILL} headings — as default values, so they do
- * not dirty the form.
+ * becomes an empty string, as does the `null` description of a contact link,
+ * and an empty contact section is prefilled with the
+ * {@link CONTACT_GROUP_PREFILL} headings — as default values, so they do not
+ * dirty the form.
  */
 export const toArtistLinksFormValues = (links: ArtistLinks | null): ArtistLinksFormValues => ({
   websiteLinks: (links?.websites ?? []).map(toFormLink),
@@ -109,7 +131,7 @@ export const toArtistLinksFormValues = (links: ArtistLinks | null): ArtistLinksF
     links && links.contact.length > 0
       ? links.contact.map(({ heading, links: groupLinks }) => ({
           heading,
-          links: groupLinks.map(toFormLink),
+          links: groupLinks.map(toFormContactLink),
         }))
       : CONTACT_GROUP_PREFILL.map((heading) => ({ heading, links: [] })),
 });

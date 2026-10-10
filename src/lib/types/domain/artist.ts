@@ -87,10 +87,18 @@ export interface ArtistLink {
   url: string;
 }
 
+/**
+ * One curated link in the Contact & Misc section: an {@link ArtistLink} with
+ * an optional plain-text description, shown between its label and the link.
+ */
+export interface ArtistContactLink extends ArtistLink {
+  description: string | null;
+}
+
 /** An admin-defined heading over its links in the Contact & Misc section. */
 export interface ArtistLinkGroup {
   heading: string;
-  links: ArtistLink[];
+  links: ArtistContactLink[];
 }
 
 /**
