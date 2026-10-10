@@ -40,9 +40,10 @@ const isPlainLeftClick = (event: MouseEvent): boolean =>
   event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
 /**
- * The latest-release line: a link to the release page that, when the
- * release is playable, primes track 1 inside the click and opens the
- * listening modal instead (the `/releases` Play flow). Modified clicks, the
+ * The latest-release line: the "Latest Release:" label, then a link to the
+ * release page that, when the release is playable, primes track 1 inside the
+ * click and opens the listening modal instead (the `/releases` Play flow).
+ * The label is outside the link, so the link is still named by the title. Modified clicks, the
  * keyboard's open-in-new-tab and an unplayable release all navigate as a
  * link does; the `aria-haspopup` appears once hydrated, so the server
  * markup is the plain link. The modal's footer and the line beneath both
@@ -91,6 +92,7 @@ export const LatestReleaseLink = ({
   return (
     <div className={cn('space-y-1', className)}>
       <p>
+        <span className="font-semibold">Latest Release:</span>{' '}
         <Link
           ref={linkRef}
           href={`/releases/${release.id}`}

@@ -91,14 +91,22 @@ describe('LatestReleaseLink', () => {
     const link = screen.getByRole('link', { name: 'Night Shift' });
     expect(link).toHaveAttribute('href', '/releases/rel-1');
     expect(link).toHaveAttribute('data-prefetch', 'false');
-    expect(link.parentElement).toHaveTextContent('Night Shift (2024)');
+    expect(link.parentElement).toHaveTextContent('Latest Release: Night Shift (2024)');
+  });
+
+  it('labels the line, keeping the label out of the link', () => {
+    renderLink();
+
+    const label = screen.getByText('Latest Release:');
+    expect(label.closest('a')).toBeNull();
+    expect(label.parentElement).toContainElement(screen.getByRole('link', { name: 'Night Shift' }));
   });
 
   it('names the album artist when this artist is only featured', () => {
     renderLink({ byName: 'Ceschi' });
 
     expect(screen.getByRole('link', { name: 'Night Shift' }).parentElement).toHaveTextContent(
-      'Night Shift by Ceschi (2024)'
+      'Latest Release: Night Shift by Ceschi (2024)'
     );
   });
 
