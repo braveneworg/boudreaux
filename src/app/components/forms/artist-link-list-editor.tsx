@@ -96,7 +96,15 @@ const LinkRow = ({
 
   return (
     <li
-      className={cn('flex flex-wrap items-start gap-2', section !== 'contact' && 'md:flex-nowrap')}
+      className={cn(
+        'flex flex-wrap items-start gap-2',
+        // A contact row is a grid from `md` up, with the label and URL
+        // columns as wide as the flex line gives them, so its description
+        // can span exactly those two.
+        section === 'contact'
+          ? 'md:grid md:grid-cols-[calc(100%/3)_minmax(0,1fr)_auto]'
+          : 'md:flex-nowrap'
+      )}
     >
       {section === 'social' && (
         <ArtistLinkIcon href={String(url)} section={section} className="mt-2.5" />
@@ -141,7 +149,7 @@ const LinkRow = ({
           control={control}
           name={`${name}.${index}.description`}
           render={({ field }) => (
-            <FormItem className="order-last min-w-0 basis-full">
+            <FormItem className="order-last min-w-0 basis-full md:col-span-2">
               <FormControl>
                 <Input
                   {...field}

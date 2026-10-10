@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * E2E coverage for ADR-0020: the admin edits an artist's links as three
@@ -23,6 +23,11 @@ const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
 
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+
+/** Sub-pixel slack for two boxes that share an edge. */
+const EDGE_SLACK = 1;
+/** A phone-sized viewport, below the breakpoint that puts label and URL on one line. */
+const PHONE = { width: 390, height: 844 };
 
 const made: string[] = [];
 
@@ -65,6 +70,21 @@ const gotoEdit = async (page: Page, id: string): Promise<void> => {
     timeout: 15_000,
   });
   await expect(page.getByRole('region', { name: 'Links' })).toBeVisible();
+};
+
+interface Edges {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** The edges of the box a visible element draws. */
+const edgesOf = async (locator: Locator): Promise<Edges> => {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('A visible element has no box');
+  return { left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height };
 };
 
 const save = async (page: Page): Promise<void> => {
@@ -165,6 +185,52 @@ test.describe('Artist links (ADR-0020)', () => {
     await expect(adminPage.getByRole('textbox', { name: 'Group 2 heading' })).toHaveCount(0);
     // The loaded descriptions are the form's defaults: nothing is dirty.
     await expect(adminPage.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  });
+
+  // The layout is measured, because a class proves nothing about the box.
+  test('a contact description has its own line under the label and URL, as wide as they are', async ({
+    adminPage,
+  }) => {
+    const id = await seedArtist('Layout', newStamp(), {
+      websites: [],
+      social: [],
+      contact: [
+        {
+          heading: 'Booking',
+          links: [
+            { label: 'Agent', description: 'Books US tours', url: 'mailto:agent@example.com' },
+          ],
+        },
+      ],
+    });
+    await gotoEdit(adminPage, id);
+    const labelInput = adminPage.getByRole('textbox', { name: 'Group 1 link 1 label' });
+    const urlInput = adminPage.getByRole('textbox', { name: 'Group 1 link 1 URL' });
+    const descriptionInput = adminPage.getByRole('textbox', {
+      name: 'Group 1 link 1 description',
+    });
+    const removeButton = adminPage.getByRole('button', { name: 'Remove group 1 link 1' });
+
+    // Desktop: label and URL share a line, the row's buttons beside them.
+    const label = await edgesOf(labelInput);
+    const url = await edgesOf(urlInput);
+    const description = await edgesOf(descriptionInput);
+    const remove = await edgesOf(removeButton);
+    expect(url.top).toBeLessThan(label.bottom);
+    expect(remove.top).toBeLessThan(url.bottom);
+    expect(description.top).toBeGreaterThanOrEqual(url.bottom);
+    expect(Math.abs(description.left - label.left)).toBeLessThanOrEqual(EDGE_SLACK);
+    expect(Math.abs(description.right - url.right)).toBeLessThanOrEqual(EDGE_SLACK);
+
+    // Phone: the label has a line of its own, and the description is as wide.
+    await adminPage.setViewportSize(PHONE);
+    const phoneLabel = await edgesOf(labelInput);
+    const phoneUrl = await edgesOf(urlInput);
+    const phoneDescription = await edgesOf(descriptionInput);
+    expect(phoneUrl.top).toBeGreaterThanOrEqual(phoneLabel.bottom);
+    expect(phoneDescription.top).toBeGreaterThanOrEqual(phoneUrl.bottom);
+    expect(Math.abs(phoneDescription.left - phoneLabel.left)).toBeLessThanOrEqual(EDGE_SLACK);
+    expect(Math.abs(phoneDescription.right - phoneLabel.right)).toBeLessThanOrEqual(EDGE_SLACK);
   });
 
   test('reordering a link is stored in the new order', async ({ adminPage }) => {
