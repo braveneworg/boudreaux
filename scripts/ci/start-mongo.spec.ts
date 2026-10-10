@@ -28,14 +28,22 @@ interface StubOptions {
   initiateStatus?: number;
   /** What `rs.isMaster().ismaster` prints. */
   primary?: string;
+  /** What `docker inspect` reports for `.State.Running`. */
+  running?: string;
+  /** What `docker logs` prints. */
+  logs?: string;
+  logsStatus?: number;
 }
 
 const DEFAULT_STUB: Required<StubOptions> = {
   initiateStatus: 0,
+  logs: '',
+  logsStatus: 0,
   pingStatus: 0,
   primary: 'true',
   pullFailures: 0,
   runStatus: 0,
+  running: 'true',
 };
 
 /** The stub's environment for one run: the defaults, then what the test overrides. */
@@ -43,10 +51,13 @@ const stubEnv = (options: StubOptions): Record<string, string> => {
   const stub = { ...DEFAULT_STUB, ...options };
   return {
     STUB_INITIATE_STATUS: String(stub.initiateStatus),
+    STUB_LOGS: stub.logs,
+    STUB_LOGS_STATUS: String(stub.logsStatus),
     STUB_PING_STATUS: String(stub.pingStatus),
     STUB_PRIMARY: stub.primary,
     STUB_PULL_FAILURES: String(stub.pullFailures),
     STUB_RUN_STATUS: String(stub.runStatus),
+    STUB_RUNNING: stub.running,
   };
 };
 
@@ -79,6 +90,17 @@ case "$1" in
       *isMaster*) echo "\${STUB_PRIMARY:-true}"; exit 0 ;;
     esac
     exit 0
+    ;;
+  inspect)
+    case "$*" in
+      *State.ExitCode*) echo "status=exited exit=132 oom=false error=" ;;
+      *) echo "\${STUB_RUNNING:-true}" ;;
+    esac
+    exit 0
+    ;;
+  logs)
+    printf '%s\\n' "\${STUB_LOGS:-}"
+    exit "\${STUB_LOGS_STATUS:-0}"
     ;;
   *) exit 0 ;;
 esac
@@ -164,6 +186,71 @@ describe('start-mongo.sh', () => {
     expect(linesOf(result, 'docker pull ')).toHaveLength(5);
     expect(linesOf(result, 'docker run ')).toEqual([]);
     expect(result.status).toBe(1);
+  });
+});
+
+const MONGOD_LOG = 'mongod: Illegal instruction (core dumped)';
+const LOGS_LINE = 'docker logs --tail 200 mongo-e2e';
+
+describe('start-mongo.sh when the start fails', () => {
+  it('captures no container logs on a clean start', () => {
+    expect(linesOf(runScript(), 'docker logs ')).toEqual([]);
+  });
+
+  it('prints the container state and logs when the container exits before it answers', () => {
+    const result = runScript({ logs: MONGOD_LOG, pingStatus: 1, running: 'false' });
+
+    expect(result.invocations).toContain(LOGS_LINE);
+    expect(result.output).toContain(MONGOD_LOG);
+    expect(result.output).toContain('status=exited exit=132');
+    expect(result.status).toBe(1);
+  });
+
+  it('stops waiting as soon as the container has exited', () => {
+    const result = runScript({ pingStatus: 1, running: 'false' });
+
+    expect(linesOf(result, 'docker exec ')).toHaveLength(1);
+  });
+
+  it('prints the container logs when mongod never answers', () => {
+    const result = runScript({ logs: MONGOD_LOG, pingStatus: 1 });
+
+    expect(linesOf(result, 'docker exec ')).toHaveLength(30);
+    expect(result.output).toContain(MONGOD_LOG);
+    expect(result.status).toBe(1);
+  });
+
+  it('prints the container logs when the container cannot be started', () => {
+    const result = runScript({ logs: MONGOD_LOG, runStatus: 125 });
+
+    expect(linesOf(result, 'docker exec ')).toEqual([]);
+    expect(result.output).toContain(MONGOD_LOG);
+    expect(result.status).toBe(1);
+  });
+
+  it('prints the container logs when the replica set cannot be initiated', () => {
+    const result = runScript({ initiateStatus: 1, logs: MONGOD_LOG });
+
+    expect(result.output).toContain(MONGOD_LOG);
+    expect(result.status).toBe(1);
+  });
+
+  it('prints the container logs when no primary is elected', () => {
+    const result = runScript({ logs: MONGOD_LOG, primary: 'false' });
+
+    expect(result.output).toContain(MONGOD_LOG);
+    expect(result.status).toBe(1);
+  });
+
+  it('still fails with its own message when the logs cannot be read', () => {
+    const result = runScript({ logsStatus: 1, pingStatus: 1, running: 'false' });
+
+    expect(result.output).toContain('❌ MongoDB container exited');
+    expect(result.status).toBe(1);
+  });
+
+  it('prints no container logs when the image cannot be pulled', () => {
+    expect(linesOf(runScript({ pullFailures: 5 }), 'docker logs ')).toEqual([]);
   });
 });
 
