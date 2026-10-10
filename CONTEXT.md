@@ -114,9 +114,9 @@ shown on that Artist's own page with its label: beside the link in Websites
 and Social Media, above it in Contact & Misc. Websites and
 social links are `http(s)`; a contact link may also be an email (`mailto:`) or
 a phone number (`tel:`), stored normalised. A contact link, and only a
-contact link, may also carry a plain-text **description**
-(`{ label?, description?, url }`), shown on the artist's page between its
-semibold label and the link. The icon derives from the href at
+contact link, may also carry a description, a line of plain text saying what
+it is for (`{ label?, description?, url }`), shown on the artist's page
+between its semibold label and the link. The icon derives from the href at
 render; no platform is stored. Human-owned: a bio generation job never writes
 one. See [ADR-0020](docs/adr/0020-artist-links-are-one-composite-on-the-artist.md).
 _Avoid_: URL (the `Url` model carries a platform enum and is not this),
