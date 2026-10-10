@@ -40,6 +40,7 @@ const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.s
 export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/nginx-config-test.spec.ts',
   'scripts/ci/schema-push-gate.spec.ts',
+  'scripts/ci/start-mongo.spec.ts',
   'scripts/assert-toolchain.spec.ts',
   'scripts/check-toolchain-pins.spec.ts',
 ];
