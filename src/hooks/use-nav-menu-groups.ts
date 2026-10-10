@@ -5,7 +5,8 @@
 
 import { useMemo } from 'react';
 
-import { MERCH_STORE_URL, useNavMenuItems, type NavMenuItem } from '@/hooks/use-nav-menu-items';
+import { useNavMenuItems, type NavMenuItem } from '@/hooks/use-nav-menu-items';
+import { MERCH_STORE_URL } from '@/lib/constants/external-links';
 
 export interface NavMenuGroup {
   /** Trigger label rendered in the nav row. */

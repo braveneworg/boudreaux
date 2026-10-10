@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useSession } from '@/hooks/use-session';
+import { MERCH_STORE_URL } from '@/lib/constants/external-links';
 
 export interface NavMenuItem {
   name: string;
@@ -20,9 +21,6 @@ export interface NavMenuItem {
   /** Points off-site; the menus open it in a new tab and never mark it current. */
   isExternal?: boolean;
 }
-
-/** The label's merch store, linked from the nav in place of an on-site page. */
-export const MERCH_STORE_URL = 'https://fakefourshirts.com/';
 
 // The static signed-out list, in render order:
 // Home, Artists, Releases, Videos, Tours, Merch, Playlists, About, Contact Us.

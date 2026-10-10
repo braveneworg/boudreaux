@@ -1,3 +1,4 @@
+import { MERCH_STORE_URL } from './src/lib/constants/external-links';
 import { IMAGE_VARIANT_DEVICE_SIZES } from './src/lib/constants/image-variants';
 
 import type { NextConfig } from 'next';
@@ -270,6 +271,9 @@ const config = {
       // The standalone artist search page was folded into the index (its
       // combobox now lives on /artists); the old URL stays reachable.
       { source: '/artists/search', destination: '/artists', permanent: true },
+      // Merch moved off-site; old links and bookmarks to the retired
+      // placeholder page land on the store instead of a 404.
+      { source: '/merch', destination: MERCH_STORE_URL, permanent: true },
     ];
   },
 

@@ -4,14 +4,13 @@
 // @vitest-environment happy-dom
 import { renderHook } from '@testing-library/react';
 
+import { MERCH_STORE_URL } from '@/lib/constants/external-links';
+
 import { useNavMenuGroups } from './use-nav-menu-groups';
 
 const mockUseNavMenuItems = vi.fn();
 
-const MERCH_STORE_URL = 'https://fakefourshirts.com/';
-
 vi.mock('./use-nav-menu-items', () => ({
-  MERCH_STORE_URL: 'https://fakefourshirts.com/',
   useNavMenuItems: () => mockUseNavMenuItems(),
 }));
 
