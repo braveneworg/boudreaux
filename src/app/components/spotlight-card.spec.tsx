@@ -90,6 +90,7 @@ vi.mock('./release-play-dialog', () => ({
     artistName,
     headingOrder,
     centered,
+    sheetOnPhone,
     initialTrackNumber,
     shareWidget,
     footer,
@@ -102,6 +103,7 @@ vi.mock('./release-play-dialog', () => ({
     artistName: string | null;
     headingOrder?: string;
     centered?: boolean;
+    sheetOnPhone?: boolean;
     initialTrackNumber?: number;
     shareWidget?: React.ReactNode;
     footer?: React.ReactNode;
@@ -117,6 +119,7 @@ vi.mock('./release-play-dialog', () => ({
         data-artist-name={artistName ?? ''}
         data-heading-order={headingOrder}
         data-centered={String(centered)}
+        data-sheet-on-phone={String(sheetOnPhone)}
         data-initial-track-number={initialTrackNumber?.toString() ?? ''}
         data-has-footer={String(footer !== undefined)}
       >
@@ -251,6 +254,14 @@ describe('SpotlightCard', () => {
     expect(opened).toHaveAttribute('data-centered', 'true');
     expect(opened).toHaveAttribute('data-initial-track-number', '2');
     expect(opened).toHaveAttribute('data-has-footer', 'false');
+  });
+
+  it('opens the dialog as a sheet sized to the screen on a phone', async () => {
+    const user = renderCard();
+
+    await user.click(playButton());
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-sheet-on-phone', 'true');
   });
 
   it('puts the share widget for the artist page in the dialog', async () => {

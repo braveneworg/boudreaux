@@ -32,10 +32,11 @@ interface SpotlightCardProps {
  * 13rem wide and centered in its grid cell, then a centered caption — the
  * artist, and the title (linked to the artist's releases) with its year. The
  * cover is a button: the click primes the card's track and opens the
- * listening modal, as the `/releases` Play button does, and a square zine
- * play stamp shows on hover and keyboard focus. Touch screens get no stamp;
- * the home page tells them to tap the cover instead. With nothing playable
- * the cover is disabled and the title link still works.
+ * listening modal (a bottom sheet on phones), as the `/releases` Play button
+ * does, and a square zine play stamp shows on hover and keyboard focus.
+ * Touch screens get no stamp; the home page tells them to tap the cover
+ * instead. With nothing playable the cover is disabled and the title link
+ * still works.
  */
 export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
   const { releaseId, title, year, artistName, artistSlug, coverArt, playSrc } = card;
@@ -137,6 +138,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
           onCloseAutoFocus={returnFocusToCover}
           headingOrder="artist-first"
           centered
+          sheetOnPhone
           initialTrackNumber={card.initialTrackNumber ?? undefined}
           shareWidget={
             <ReleaseShareWidget
