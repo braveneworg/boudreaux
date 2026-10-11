@@ -37,4 +37,40 @@ describe('useTrackNavigation', () => {
     expect(result.current.currentIndex).toBe(0);
     expect(result.current.shouldAutoPlay).toBe(false);
   });
+
+  it('selects a track by file id and plays it', () => {
+    const { result } = renderHook(() => useTrackNavigation(FILES, false));
+
+    act(() => result.current.handleFileSelect('f-3'));
+
+    expect(result.current.currentIndex).toBe(2);
+    expect(result.current.shouldAutoPlay).toBe(true);
+  });
+
+  it('ignores a file id that is not in the list', () => {
+    const { result } = renderHook(() => useTrackNavigation(FILES, false, 1));
+
+    act(() => result.current.handleFileSelect('missing'));
+
+    expect(result.current.currentIndex).toBe(1);
+  });
+
+  it('advances when a track ends, and stops at the last', () => {
+    const { result } = renderHook(() => useTrackNavigation(FILES, false, 1));
+
+    act(() => result.current.handleTrackEnded());
+    act(() => result.current.handleTrackEnded());
+
+    expect(result.current.currentIndex).toBe(2);
+  });
+
+  it('goes no further than the first and the last track', () => {
+    const first = renderHook(() => useTrackNavigation(FILES, false));
+    act(() => first.result.current.handlePreviousTrack(true));
+
+    const last = renderHook(() => useTrackNavigation(FILES, false, 2));
+    act(() => last.result.current.handleNextTrack(true));
+
+    expect([first.result.current.currentIndex, last.result.current.currentIndex]).toEqual([0, 2]);
+  });
 });

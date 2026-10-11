@@ -75,6 +75,17 @@ describe('ReleaseShareWidget', () => {
     );
   });
 
+  it('falls back to the production host when no host name is configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', undefined);
+
+    render(<ReleaseShareWidget {...defaultProps} />);
+
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
+      'https://fakefourrecords.com/artists/spot-artist'
+    );
+  });
+
   it('shares the site when there is no artist page', async () => {
     render(<ReleaseShareWidget {...defaultProps} artistSlug={null} />);
 
