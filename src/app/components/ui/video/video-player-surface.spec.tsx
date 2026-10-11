@@ -236,10 +236,10 @@ describe('VideoPlayerSurface', () => {
     describe('under the StrictMode effect replay', () => {
       const SRC = 'https://cdn.example.com/clip.mp4?sig=abc';
 
-      const renderPrimedSurface = (): {
+      const renderPrimedSurface = async (): Promise<{
         primed: HTMLVideoElement | undefined;
         unmount: () => void;
-      } => {
+      }> => {
         const { result } = renderHook(() => usePrimedMediaHandoff());
         result.current.primeMediaEl(SRC);
         const taken: HTMLVideoElement[] = [];
@@ -254,6 +254,9 @@ describe('VideoPlayerSurface', () => {
             <VideoPlayerSurface title="Live" src={SRC} takeMediaEl={takeMediaEl} />
           </StrictMode>
         );
+        // The replayed cleanup queued a disposal; give it its chance to run, so
+        // a player it wrongly disposed shows up in every case below.
+        await flushMicrotasks();
 
         return { primed: taken[0], unmount };
       };
@@ -262,26 +265,26 @@ describe('VideoPlayerSurface', () => {
       const getPlayersHolding = (el: HTMLVideoElement | undefined): FakePlayer[] =>
         getPlayers().filter((_, index) => vi.mocked(videojs).mock.calls.at(index)?.[0] === el);
 
-      it('builds the live player on the primed element', () => {
-        const { primed } = renderPrimedSurface();
+      it('builds the live player on the primed element', async () => {
+        const { primed } = await renderPrimedSurface();
 
         expect(vi.mocked(videojs).mock.calls.at(-1)?.[0]).toBe(primed);
       });
 
-      it('leaves the primed element its source', () => {
-        const { primed } = renderPrimedSurface();
+      it('leaves the primed element its source', async () => {
+        const { primed } = await renderPrimedSurface();
 
         expect(primed?.getAttribute('src')).toBe(SRC);
       });
 
-      it('leaves the primed element connected to the document', () => {
-        const { primed } = renderPrimedSurface();
+      it('leaves the primed element connected to the document', async () => {
+        const { primed } = await renderPrimedSurface();
 
         expect(primed?.isConnected).toBe(true);
       });
 
-      it('never disposes a player holding the primed element', () => {
-        const { primed } = renderPrimedSurface();
+      it('never disposes a player holding the primed element', async () => {
+        const { primed } = await renderPrimedSurface();
 
         const disposals = getPlayersHolding(primed).map(
           (player) => player.dispose.mock.calls.length
@@ -289,8 +292,8 @@ describe('VideoPlayerSurface', () => {
         expect(disposals).toEqual([0]);
       });
 
-      it('keeps the playback claim of the playing primed element', () => {
-        const { primed } = renderPrimedSurface();
+      it('keeps the playback claim of the playing primed element', async () => {
+        const { primed } = await renderPrimedSurface();
         render(<VideoPlayerSurface title="Second" src="https://cdn.example.com/b.mp4" />);
 
         const [holder] = getPlayersHolding(primed);
@@ -301,7 +304,7 @@ describe('VideoPlayerSurface', () => {
       });
 
       it('leaves no player undisposed once unmounted', async () => {
-        const { unmount } = renderPrimedSurface();
+        const { unmount } = await renderPrimedSurface();
 
         unmount();
         await flushMicrotasks();
