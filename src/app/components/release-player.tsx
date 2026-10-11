@@ -41,6 +41,12 @@ interface ReleasePlayerProps {
    * autoplay blessing survives (release play modal).
    */
   takeMediaEl?: () => HTMLAudioElement | null;
+  /**
+   * Track number to start on (a spotlight's featured track). Falls back to the
+   * first track when no file has it, so the player starts on the same track
+   * the opening gesture primed.
+   */
+  initialTrackNumber?: number;
 }
 
 type ReleasePrimaryArtist = NonNullable<PublishedReleaseDetail['artistReleases'][number]['artist']>;
@@ -210,9 +216,10 @@ interface ReleasePlayerBodyProps {
 }
 
 /**
- * Interactive body of the release player: the track-list drawer, interactive
- * cover art, and the controls/ticker (or an empty-state). Split out of
- * {@link ReleasePlayer} so the parent stays focused on state derivation.
+ * Interactive body of the release player: the interactive cover art and the
+ * controls/ticker (or an empty-state), then the track-list row beneath them.
+ * Split out of {@link ReleasePlayer} so the parent stays focused on state
+ * derivation.
  */
 const ReleasePlayerBody = ({
   release,
@@ -240,18 +247,6 @@ const ReleasePlayerBody = ({
 }: ReleasePlayerBodyProps) => (
   <MediaPlayer className="mb-2">
     <div className="mt-2 space-y-2">
-      {hasFiles && currentFile && (
-        <ReleaseFileListDrawer
-          release={release}
-          files={files}
-          currentFile={currentFile}
-          artistName={artistName}
-          releaseId={releaseId}
-          releaseTitle={releaseTitle}
-          onFileSelect={onFileSelect}
-        />
-      )}
-
       <div className="flex flex-col items-center">
         {/* Mobile-first: max-w-xl matches landing page, scales up on larger screens.
             The black border + zine shadow frame cover art, controls, and ticker as one unit. */}
@@ -297,6 +292,18 @@ const ReleasePlayerBody = ({
           )}
         </div>
       </div>
+
+      {hasFiles && currentFile && (
+        <ReleaseFileListDrawer
+          release={release}
+          files={files}
+          currentFile={currentFile}
+          artistName={artistName}
+          releaseId={releaseId}
+          releaseTitle={releaseTitle}
+          onFileSelect={onFileSelect}
+        />
+      )}
     </div>
   </MediaPlayer>
 );
@@ -312,6 +319,7 @@ export const ReleasePlayer = ({
   releaseId,
   releaseTitle,
   takeMediaEl,
+  initialTrackNumber,
 }: ReleasePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
@@ -332,6 +340,7 @@ export const ReleasePlayer = ({
     () => release.digitalFormats.find((fmt) => fmt.formatType === 'MP3_320KBPS')?.files ?? [],
     [release.digitalFormats]
   );
+  const initialFileIndex = files.findIndex((file) => file.trackNumber === initialTrackNumber);
 
   const {
     currentIndex: currentFileIndex,
@@ -340,7 +349,7 @@ export const ReleasePlayer = ({
     handleTrackEnded,
     handlePreviousTrack,
     handleNextTrack,
-  } = useTrackNavigation(files, autoPlay);
+  } = useTrackNavigation(files, autoPlay, Math.max(initialFileIndex, 0));
 
   const currentFile = files.at(currentFileIndex) ?? null;
   const hasFiles = files.length > 0;

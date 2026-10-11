@@ -407,6 +407,36 @@ describe('ReleasePlayer', () => {
     expect(drawer).toHaveAttribute('data-current-file-id', 'file-1');
   });
 
+  it('starts on the file matching initialTrackNumber', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" initialTrackNumber={2} />);
+
+    expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file2CdnUrl);
+    expect(screen.getByTestId('format-file-list-drawer')).toHaveAttribute(
+      'data-current-file-id',
+      'file-2'
+    );
+  });
+
+  it('starts on the first file when initialTrackNumber matches no file', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" initialTrackNumber={9} />);
+
+    expect(screen.getByTestId('media-controls')).toHaveAttribute('data-audio-src', file1CdnUrl);
+  });
+
+  it('renders the track-list row below the cover and controls', () => {
+    render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
+
+    const drawer = screen.getByTestId('format-file-list-drawer');
+    const controls = screen.getByTestId('media-controls');
+    const cover = screen.getByTestId('interactive-cover-art');
+
+    // DOCUMENT_POSITION_FOLLOWING: the drawer comes after both in DOM order.
+    expect(cover.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      controls.compareDocumentPosition(drawer) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('should not advance past the last file', () => {
     render(<ReleasePlayer release={mockRelease} releaseId="release-1" />);
 
