@@ -22,15 +22,18 @@ vi.mock('./release-player', () => ({
     releaseId,
     releaseTitle,
     takeMediaEl,
+    initialTrackNumber,
   }: {
     release: { id: string };
     autoPlay?: boolean;
     releaseId: string;
     releaseTitle?: string;
     takeMediaEl?: () => HTMLAudioElement | null;
+    initialTrackNumber?: number;
   }) => (
     <div
       data-testid="release-player"
+      data-initial-track-number={initialTrackNumber?.toString()}
       data-release={release.id}
       data-autoplay={autoPlay?.toString()}
       data-release-id={releaseId}
@@ -185,5 +188,86 @@ describe('ReleasePlayDialog', () => {
 
     const content = screen.getByRole('dialog');
     expect(content).toHaveClass('sm:max-w-md', 'lg:max-w-lg', 'max-h-[90dvh]', 'overflow-y-auto');
+  });
+
+  it('names the dialog by the release and describes it by the artist by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('Midnight Serenade');
+    expect(dialog).toHaveAccessibleDescription('John Doe');
+  });
+
+  it('leads with the artist when the heading order is artist-first', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('John Doe');
+    expect(dialog).toHaveAccessibleDescription('Midnight Serenade');
+  });
+
+  it('leads with the release when artist-first has no artist to name', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} artistName={null} headingOrder="artist-first" />);
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Midnight Serenade');
+  });
+
+  it('centers both heading lines when asked', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" centered />);
+
+    expect(screen.getByText('John Doe')).toHaveClass('text-center');
+    expect(screen.getByText('Midnight Serenade')).toHaveClass('text-center');
+  });
+
+  it('leaves the heading lines uncentered by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    expect(screen.getByText('Midnight Serenade')).not.toHaveClass('text-center');
+    expect(screen.getByText('John Doe')).not.toHaveClass('text-center');
+  });
+
+  it('passes the initial track number to the player', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} initialTrackNumber={3} />);
+
+    expect(screen.getByTestId('release-player')).toHaveAttribute('data-initial-track-number', '3');
+  });
+
+  it('renders a share widget slot after the player, shrinkable inside the dialog grid', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} shareWidget={<div data-testid="share" />} />);
+
+    const slot = screen.getByTestId('share').parentElement;
+    expect(slot).toHaveClass('min-w-0');
+    expect(
+      screen.getByTestId('release-player').compareDocumentPosition(slot as HTMLElement) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('renders no share widget slot when none is given', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    expect(document.querySelector('[data-slot="release-play-dialog-share"]')).toBeNull();
   });
 });
