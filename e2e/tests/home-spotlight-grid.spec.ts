@@ -33,6 +33,13 @@ const openSpotlight = async (page: Page): Promise<Locator> => {
   return dialog;
 };
 
+/** Let the modal's open animation finish, so its boxes are where they rest. */
+const settle = async (dialog: Locator): Promise<void> => {
+  await dialog.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished))
+  );
+};
+
 test.describe('home spotlight grid', () => {
   test('serves the spotlight cards in the initial HTML payload', async ({ page }) => {
     // The raw response body, not the DOM: the covers must be discoverable by
@@ -135,6 +142,18 @@ test.describe('home spotlight grid', () => {
     await expect(page.getByText('any release art to play or download the music')).toBeHidden();
   });
 
+  test('keeps the modal centered on a wide screen', async ({ page }) => {
+    const dialog = await openSpotlight(page);
+    await settle(dialog);
+
+    const box = await dialog.boundingBox();
+    const viewport = page.viewportSize();
+    if (!box || !viewport) throw new Error('missing a layout box');
+
+    expect(box.x + box.width / 2).toBeCloseTo(viewport.width / 2, 0);
+    expect(box.y + box.height / 2).toBeCloseTo(viewport.height / 2, 0);
+  });
+
   test('returns focus to the cover when the modal closes', async ({ page }) => {
     const dialog = await openSpotlight(page);
 
@@ -157,5 +176,49 @@ test.describe('home spotlight grid on a touch screen', () => {
     await expect(hint).toBeVisible();
     await expect(hint).toHaveText('Tap any release art to play or download the music');
     await expect(cover.locator('[data-slot="spotlight-play-stamp"]')).toHaveCSS('opacity', '0');
+  });
+});
+
+test.describe('home spotlight grid on a 375×667 phone', () => {
+  // iPhone SE class: the shortest phone screen the listening sheet must fit.
+  test.use({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
+
+  test('slides the modal up as a sheet that fits without scrolling', async ({ page }) => {
+    await page.goto('/');
+    await (await hydratedCover(page)).tap();
+    const dialog = page.getByRole('dialog', { name: 'E2E Featured Artist' });
+    await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+    await settle(dialog);
+
+    // Pinned to the bottom edge, full width, with the page still showing above.
+    const sheet = await dialog.boundingBox();
+    if (!sheet) throw new Error('missing the sheet box');
+    expect(sheet.x).toBe(0);
+    expect(sheet.width).toBe(375);
+    expect(sheet.y + sheet.height).toBeCloseTo(667, 0);
+    expect(sheet.y).toBeGreaterThan(0);
+
+    // Nothing in it scrolls.
+    const overflow = await dialog.evaluate(
+      (element) => element.scrollHeight - element.clientHeight
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    // Heading, cover, controls, tracks row and share row all on screen.
+    const parts = [
+      dialog.getByRole('heading', { name: 'E2E Featured Artist' }),
+      dialog.getByText('E2E Album One', { exact: true }),
+      dialog.getByRole('img', { name: 'E2E Album One cover art' }),
+      dialog.locator('.video-js'),
+      dialog.getByRole('button', { name: 'View', exact: true }),
+      dialog.getByRole('button', { name: 'Download', exact: true }),
+      dialog.locator('[data-slot="release-play-dialog-share"]'),
+    ];
+    for (const part of parts) {
+      const box = await part.boundingBox();
+      if (!box) throw new Error('missing a part box');
+      expect(box.y).toBeGreaterThanOrEqual(sheet.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(667);
+    }
   });
 });
