@@ -6,7 +6,9 @@ import Image from 'next/image';
 import { ContentContainer } from '@/components/ui/content-container';
 import { ZinePanel } from '@/components/ui/zine-panel';
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { cn } from '@/lib/utils';
 import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
+import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/lib/utils/spotlight-card';
 import { PageContainer } from '@/ui/page-container';
 
 /** Cover skeletons in the grid fallback: one row of the four-up desktop grid. */
@@ -90,9 +92,14 @@ export default function HomeLoading() {
             <div data-testid="featured-heading-skeleton" className="mb-4">
               <div className="bg-muted aspect-[4/1] w-full animate-pulse sm:aspect-auto sm:h-14 sm:w-56" />
             </div>
-            {/* Search skeleton — holds the ArtistNavSearchCombobox trigger's row. */}
+            {/* Search skeleton — holds the ArtistNavSearchCombobox trigger's row,
+                as wide as the covers below it, then the touch-only tap hint. */}
             <div data-testid="search-skeleton" className="mb-8">
-              <div className="bg-muted h-9 w-full animate-pulse" />
+              <div className={cn('bg-muted h-9 animate-pulse', SPOTLIGHT_COVER_SPAN_CLASS)} />
+              <div
+                data-testid="tap-hint-skeleton"
+                className="bg-muted mx-auto mt-4 hidden h-5 w-72 max-w-full animate-pulse [@media(hover:none)]:block"
+              />
             </div>
             {/* Spotlight grid skeleton — the SpotlightGrid columns, each card a
                 13rem square cover, centered in its cell, over a centered

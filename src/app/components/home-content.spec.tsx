@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createElement } from 'react';
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+
+import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/utils/spotlight-card';
 
 import { HomeContent } from './home-content';
 
@@ -224,6 +226,59 @@ describe('HomeContent', () => {
       ).toBeTruthy();
       expect(search.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(heading.closest('section')).toContainElement(grid);
+    });
+
+    it('lines the search up with the outer edges of the covers in every column count', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+      render(<HomeContent />);
+
+      expect(screen.getByTestId('artist-search').parentElement).toHaveClass(
+        ...SPOTLIGHT_COVER_SPAN_CLASS.split(' ')
+      );
+    });
+
+    it('tells touch screens to tap a cover, between the search and the grid', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [SPOTLIGHT], count: 1 },
+      });
+
+      render(<HomeContent />);
+
+      const hint = screen.getByText(/any release art to play or download the music/);
+      expect(hint).toHaveTextContent('Tap any release art to play or download the music');
+      expect(within(hint).getByText('Tap').tagName).toBe('STRONG');
+      expect(
+        screen.getByTestId('artist-search').compareDocumentPosition(hint) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        hint.compareDocumentPosition(screen.getByTestId('spotlight-grid')) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it('shows the tap hint on touch screens only, in AA zinc with a bold black "Tap"', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [SPOTLIGHT], count: 1 },
+      });
+
+      render(<HomeContent />);
+
+      const hint = screen.getByText(/any release art to play or download the music/);
+      expect(hint).toHaveClass('hidden', '[@media(hover:none)]:block', 'text-zinc-600');
+      expect(within(hint).getByText('Tap')).toHaveClass('font-bold', 'text-zinc-950');
+    });
+
+    it('gives no tap hint while there is no cover to tap', () => {
+      newestQuery.rows = undefined;
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [], count: 0 },
+      });
+
+      render(<HomeContent />);
+
+      expect(screen.queryByText(/any release art/)).not.toBeInTheDocument();
     });
 
     it('gives the heading its own line, left-aligned', () => {

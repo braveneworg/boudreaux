@@ -59,7 +59,7 @@ export const ArtistNavSearchCombobox = (): ReactElement => {
           aria-expanded={open}
           aria-label="Search artists and releases"
           label={hasQuery ? query : SEARCH_PLACEHOLDER}
-          className="mx-4 mt-2.5 h-10 w-[calc(100%-2rem)]"
+          className="mt-2.5 h-10"
         />
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">

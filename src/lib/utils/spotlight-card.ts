@@ -24,6 +24,18 @@ import {
  */
 export const SPOTLIGHT_COVER_SIZES = '208px';
 
+/**
+ * Width, centered, from the left edge of the grid's first cover to the right
+ * edge of its last column's cover, so a row above the grid (the home search)
+ * lines up with the covers. Each 13rem cover is centered in a cell, and cells
+ * sit 1.5rem apart (`gap-x-6`), so the outer edges lie `100% - (cell - 13rem)`
+ * apart: 13rem in one column, `50% + 13.75rem` in two (`sm`), `75% + 14.125rem`
+ * in four (`lg`). `min(100%, …)` covers cells narrower than 13rem, where the
+ * covers fill them. Change it with the grid's gap, columns or cover cap.
+ */
+export const SPOTLIGHT_COVER_SPAN_CLASS =
+  'mx-auto w-[min(100%,13rem)] sm:w-[min(100%,calc(50%_+_13.75rem))] lg:w-[min(100%,calc(75%_+_14.125rem))]';
+
 /** One cover in the home page's spotlight grid, from a spotlight or a newest release. */
 export interface SpotlightCard {
   releaseId: string;

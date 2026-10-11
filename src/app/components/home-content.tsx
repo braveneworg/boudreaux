@@ -9,7 +9,11 @@ import {
 } from '@/hooks/queries/use-active-featured-artists-query';
 import { useBannersQuery } from '@/hooks/queries/use-banners-query';
 import { useNewestPublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
-import { publishedReleasesToSpotlightCards, toSpotlightCards } from '@/lib/utils/spotlight-card';
+import {
+  publishedReleasesToSpotlightCards,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  toSpotlightCards,
+} from '@/lib/utils/spotlight-card';
 
 import { ArtistNavSearchCombobox } from './artist-nav-search-combobox';
 import { BannerCarousel } from './banner-carousel';
@@ -74,7 +78,18 @@ export const HomeContent = () => {
             className="mt-0 mb-4 block text-left"
           />
           <div className="mb-8">
-            <ArtistNavSearchCombobox />
+            <div className={SPOTLIGHT_COVER_SPAN_CLASS}>
+              <ArtistNavSearchCombobox />
+            </div>
+            {/* Touch screens get no hover stamp on the covers, so they get
+                this line instead; `hover:none` is the same test that keeps
+                the stamp to hover and keyboard focus. */}
+            {cards.length > 0 ? (
+              <p className="mt-4 hidden text-center text-sm text-zinc-600 [@media(hover:none)]:block">
+                <strong className="font-bold text-zinc-950">Tap</strong> any release art to play or
+                download the music
+              </p>
+            ) : null}
           </div>
           <SpotlightGrid cards={cards} />
         </ZinePanel>

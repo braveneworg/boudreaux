@@ -4,6 +4,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/lib/utils/spotlight-card';
 
 import HomeLoading from './loading';
 
@@ -82,6 +83,26 @@ describe('HomeLoading', () => {
     const grid = screen.getByTestId('spotlight-grid-skeleton');
     expect(heading.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(search.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps the search skeleton to the outer edges of the covers', () => {
+    render(<HomeLoading />);
+
+    expect(screen.getByTestId('search-skeleton').firstElementChild).toHaveClass(
+      ...SPOTLIGHT_COVER_SPAN_CLASS.split(' ')
+    );
+  });
+
+  it('reserves the tap hint line on touch screens only, under the search', () => {
+    render(<HomeLoading />);
+
+    const hint = screen.getByTestId('tap-hint-skeleton');
+    expect(hint).toHaveClass('hidden', '[@media(hover:none)]:block');
+    expect(
+      hint.compareDocumentPosition(screen.getByTestId('spotlight-grid-skeleton')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByTestId('search-skeleton')).toContainElement(hint);
   });
 
   it('lays the cover skeletons out one, two, then four to a row', () => {

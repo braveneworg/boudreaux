@@ -7,7 +7,11 @@ import type {
   PublishedReleaseListing,
 } from '@/lib/types/media-models';
 
-import { publishedReleasesToSpotlightCards, toSpotlightCards } from './spotlight-card';
+import {
+  publishedReleasesToSpotlightCards,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  toSpotlightCards,
+} from './spotlight-card';
 
 vi.mock('@/lib/utils/cdn-url', () => ({
   resolveStreamUrl: ({ s3Key }: { s3Key?: string | null }) => (s3Key ? `cdn:${s3Key}` : null),
@@ -197,5 +201,18 @@ describe('publishedReleasesToSpotlightCards', () => {
     const [card] = publishedReleasesToSpotlightCards([makeListing({ digitalFormats: [] })]);
 
     expect(card?.playSrc).toBeNull();
+  });
+});
+
+describe('SPOTLIGHT_COVER_SPAN_CLASS', () => {
+  it('spans the outer cover edges of the one, two and four column grids', () => {
+    // 13rem covers centered in cells with a 1.5rem gap: the outer edges sit
+    // 100% - (cell - 13rem) apart, never more than the full width.
+    expect(SPOTLIGHT_COVER_SPAN_CLASS.split(' ')).toEqual([
+      'mx-auto',
+      'w-[min(100%,13rem)]',
+      'sm:w-[min(100%,calc(50%_+_13.75rem))]',
+      'lg:w-[min(100%,calc(75%_+_14.125rem))]',
+    ]);
   });
 });
