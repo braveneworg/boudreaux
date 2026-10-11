@@ -1,16 +1,21 @@
-Build a simple, visual "software factory" in this repo using a Claude Code skill,
-subagents, and markdown files. Keep it small: a viewer should understand the whole
-thing in a few minutes. Inspect the repo first so the agents know its language,
-test command, and conventions.
+A simple, visual "software factory": one skill, seven subagents and GitHub
+issues. Keep it small: a viewer should understand the whole thing in a few
+minutes. The agents carry nothing repo-specific; they read the repo's
+`AGENTS.md` (or `CLAUDE.md`) for its language, test command and conventions.
+
+SKILL.md holds the procedure, this file the shape: the loop, the files, the
+rules and the commands. Change the shape here first, then make the procedure
+in `.claude/skills/factory/SKILL.md` and the agent files match it.
 
 ## The orchestrator
 
-The factory is one skill, /factory. Whichever Claude Code session runs it becomes
-the orchestrator: it runs the loop below, spawns every agent, and is the only
-writer of factory/board.json.
+The factory is one skill, /factory. Whichever session runs it becomes the
+orchestrator: it runs the loop below, spawns every agent, and is the only
+writer of the job's stage label and state comment.
 
-## The loop (edit this to change the factory)
+## The loop
 
+```
                    ┌──────────────────┐
                    │     feature      │
                    └─────────┬────────┘
@@ -27,15 +32,16 @@ writer of factory/board.json.
         ┌─────────────┬──────┴──────┬─────────────┐         │
         ▼             ▼             ▼             ▼         │
   ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐   │
-  │  security │ │     ux    │ │ ui design │ │    code   │   │
+  │  security │ │    ux*    │ │ ui design*│ │    code   │   │
   │    opus   │ │   sonnet  │ │   sonnet  │ │   sonnet  │   │
   └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └─────┬─────┘   │
         └─────────────┴──────┬──────┴─────────────┘         │
                              ▼                              │
                    ┌──────────────────┐   any CHANGES:      │
                    │   WAIT FOR ALL   ├─────────────────────┘
-                   │   4 reviews in   │   resume builder
-                   └─────────┬────────┘   (max 2 rounds)
+                   │ every review not │   resume builder
+                   │     skipped      │   (max 2 rounds)
+                   └─────────┬────────┘
                              ▼ all PASS
                    ┌──────────────────┐
                    │     approver     │
@@ -44,63 +50,73 @@ writer of factory/board.json.
              APPROVE │               │ ESCALATE
                      ▼               ▼
               ┌─────────────┐ ┌─────────────┐
-              │merge to main│ │ needs-human │ ◄── /factory approve
-              └─────────────┘ └─────────────┘
+              │ open PR to  │ │ needs-human │
+              │    main     │ │             │
+              └──────▲──────┘ └──────┬──────┘
+                     └───────────────┘
+                      /factory approve
+
+  * skipped when the spec says Surface: none
+```
 
 ## Target file system
 
+```
 .claude/
-  skills/factory/SKILL.md          # the orchestrator's instructions
+  skills/factory/SKILL.md          # the orchestrator's procedure
   agents/                          # one file per agent in the loop
+  hooks/factory-guard.sh           # the Guard: blocks merges and pushes to main
+  settings.json                    # runs the Guard, allows the factory's gh issue comment and gh issue edit
 factory/
-  board.json                       # durable state, drives the dashboard
-  dashboard.html                   # visual board, polls board.json
-  backlog.md                       # queue of features for /factory next
-  jobs/003-rate-limiting/          # one folder per job
-    spec.md
-    build.md
-    round-1/                       # one folder per review round,
-      review-security.md           # one file per reviewer
-      review-ux.md
-      review-ui.md
-      review-code.md
-    decision.md
+  dashboard.html                   # visual board of the factory's issues
+  serve.py                         # serves the board, reads GitHub through gh
+  clean.sh                         # removes the worktree and branch of merged jobs
+```
 
-## Example files
-
-.claude/agents/<name>.md  (Claude Code subagent syntax)
----
-name: example-agent
-description: One line on when the orchestrator should use this agent.
-tools: Read, Grep, Glob, Bash, Write
-model: sonnet
----
-What this agent reads, what it does, and which file it writes.
-
-factory/board.json
-{ "jobs": [ { "id": "003-rate-limiting", "branch": "factory/003-rate-limiting",
-  "stage": "review", "round": 2,
-  "reviews": { "security": "CHANGES", "ux": "PASS", "ui": "pending", "code": "PASS" } } ] }
+Everything else about a job lives on GitHub and in git: one issue per job, and
+one worktree under `.claude/worktrees/` on a `factory/<job-id>` branch.
 
 ## Rules
-- Agents get context from files, not the conversation, and write only their own file.
-- Each review starts with VERDICT: PASS or CHANGES; decision.md starts with
+
+- Every job is one GitHub issue labeled `factory`. Exactly one stage label says
+  where it is: `factory:spec`, `factory:build`, `factory:review`,
+  `factory:approve`, `factory:pr` or `factory:needs-human`. An open issue with
+  no stage label is queued.
+- Issue comments are the artifacts. Agents get context from the issue and the
+  repo, not the conversation, and each posts only its own comment, headed
+  `## spec`, `## build round-<N>`, `## round-<N> review-<kind>` or
+  `## decision round-<N>`. The orchestrator keeps one `## state` comment.
+- Each review's second line is VERDICT: PASS or CHANGES; the decision's is
   APPROVE or ESCALATE.
-- The builder works and commits on a feature branch (factory/<job-id>) and tests
-  against the spec's acceptance criteria.
-- WAIT FOR ALL: a review round is done only when every reviewer's file exists in
-  the round folder. Never resume the builder mid-round.
+- The spec's second line is its Surface: `Surface: page` when the change shows
+  on a page, `Surface: none` otherwise. With `none`, the ux and ui reviews are
+  skipped reviews: the state comment marks them `skipped` and nobody runs them.
+- After a post that succeeded, each agent re-reads the issue's comments and
+  confirms its comment landed, with its heading on line 1 and its status line
+  on line 2. If it did not, the agent posts it again once, never a third time.
+  A post that was denied or failed is never retried and never posted another
+  way. The agent's final report gives the URL of the comment it confirmed, or
+  the full text of the comment that did not land and the reason.
+- The builder works and commits on `factory/<job-id>` in the job's worktree and
+  tests against the spec's acceptance criteria.
+- WAIT FOR ALL: a review round is done only when every review that is not
+  skipped has its comment. Never resume the builder mid-round.
 - Spawn the builder with a name (builder-<job-id>) and resume that same builder
-  with SendMessage for each new round, pointing it at the round folder.
+  with SendMessage for each new round.
+- The factory never merges. APPROVE, or a human's /factory approve, opens a
+  pull request whose body says `Closes #<n>`; a human merges it on GitHub.
+- An approver that posts no decision sends the job to `factory:needs-human`,
+  where a human's /factory approve or /factory rework takes over.
+- The Guard enforces that: it blocks `git merge`, `gh pr merge`, pushes to
+  main, force pushes, `git branch -D` and commits on main. Branch protection on
+  main backs it up on GitHub.
 
 ## Commands
-/factory <feature>               run a new job through the loop
-/factory next                    run the first unchecked item in backlog.md
-/factory approve <job-id>        merge a needs-human job into main
-/factory rework <job-id> <note>  send a job back to the builder with feedback
 
-## Dashboard
-One self-contained HTML file, served with `python3 -m http.server` from factory/.
-Jobs are cards moving across the loop's stages. Each review round shows as a row
-of reviewer chips that fill in as verdicts land. needs-human jobs stand out. Click
-a card to read its markdown files. Clean and minimal.
+```
+/factory <feature>               open an issue for the feature and run it through the loop
+/factory next                    claim the oldest queued factory issue and run it
+/factory approve <job-id>        open a pull request for a needs-human job
+/factory rework <job-id> <note>  send a needs-human job back to the builder with feedback
+/factory clean                   remove the worktree and branch of every merged job
+```
