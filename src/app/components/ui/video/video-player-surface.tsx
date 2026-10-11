@@ -84,7 +84,7 @@ export const VideoPlayerSurface = ({
     const disposeReleased = (session: PlayerSession): void => {
       if (!session.isReleased) return;
       session.isReleased = false;
-      if (sessionRef.current === session) sessionRef.current = null;
+      sessionRef.current = null;
       releasePlayback(instanceId);
       session.player.dispose();
     };
