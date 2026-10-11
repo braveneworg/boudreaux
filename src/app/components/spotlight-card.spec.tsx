@@ -309,25 +309,26 @@ describe('SpotlightCard', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows the play stamp on hover, focus and touch screens', () => {
+  it('shows the play stamp on hover and keyboard focus only', () => {
     renderCard();
 
     const overlay = playButton().querySelector('[data-slot="spotlight-play-stamp"]');
     expect(overlay).toHaveClass(
       'opacity-0',
       'group-hover:opacity-100',
-      'group-focus-visible:opacity-100',
-      '[@media(hover:none)]:opacity-100'
+      'group-focus-visible:opacity-100'
     );
+    expect(overlay).not.toHaveClass('[@media(hover:none)]:opacity-100');
     expect(overlay).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('cuts the play stamp square, in black ink on the page accent', () => {
+  it('cuts the play stamp square and upright, a black glyph on white in a zine box', () => {
     renderCard();
 
     const stamp = playButton().querySelector('[data-slot="spotlight-play-stamp"] > span');
-    expect(stamp).toHaveClass('border-2', 'border-black', 'bg-(--card-accent)', 'shadow-zine-ink');
-    expect(stamp?.className).not.toMatch(/rounded/);
+    expect(stamp).toHaveClass('border-2', 'border-black', 'bg-white', 'shadow-zine-ink');
+    expect(stamp?.className).not.toMatch(/rounded|rotate|card-accent/);
+    expect(stamp?.querySelector('svg')).toHaveClass('fill-current', 'text-black');
   });
 
   it('scales the cover slightly on hover', () => {

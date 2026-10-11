@@ -33,7 +33,8 @@ interface SpotlightCardProps {
  * artist, and the title (linked to the artist's releases) with its year. The
  * cover is a button: the click primes the card's track and opens the
  * listening modal, as the `/releases` Play button does, and a square zine
- * play stamp shows on hover, focus and touch screens. With nothing playable
+ * play stamp shows on hover and keyboard focus. Touch screens get no stamp;
+ * the home page tells them to tap the cover instead. With nothing playable
  * the cover is disabled and the title link still works.
  */
 export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
@@ -96,12 +97,12 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
           <span
             data-slot="spotlight-play-stamp"
             aria-hidden="true"
-            className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+            className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
           >
-            {/* A square paste-up stamp, set slightly askew; a press pushes it
-                onto its ink shadow. */}
-            <span className="shadow-zine-ink flex size-11 -rotate-3 items-center justify-center border-2 border-black bg-(--card-accent) transition-[translate,box-shadow] duration-100 group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none motion-reduce:transition-none">
-              <Play className="ml-0.5 size-5 fill-current text-zinc-950" />
+            {/* A square zine stamp, a black glyph on white in the site's
+                hard-border box; a press pushes it onto its ink shadow. */}
+            <span className="shadow-zine-ink flex size-11 items-center justify-center border-2 border-black bg-white transition-[translate,box-shadow] duration-100 group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none motion-reduce:transition-none">
+              <Play className="ml-0.5 size-5 fill-current text-black" />
             </span>
           </span>
         ) : null}
