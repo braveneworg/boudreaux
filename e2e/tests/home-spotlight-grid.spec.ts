@@ -103,6 +103,38 @@ test.describe('home spotlight grid', () => {
     });
   });
 
+  // One, two and four columns. The seed has one card, so the last column's
+  // cover edge is found by symmetry: every cell is as wide, and every cover is
+  // centered in its cell, so it sits as far in from the grid's right edge as
+  // the first cover sits in from its left.
+  for (const width of [375, 768, 1280]) {
+    test(`lines the search up with the outer cover edges at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/');
+
+      const cover = await hydratedCover(page);
+      const grid = page.getByRole('list').filter({ has: cover });
+      const search = page.getByRole('button', { name: 'Search artists and releases' });
+      const [coverBox, gridBox, searchBox] = await Promise.all([
+        cover.boundingBox(),
+        grid.boundingBox(),
+        search.boundingBox(),
+      ]);
+      if (!coverBox || !gridBox || !searchBox) throw new Error('missing a layout box');
+
+      const inset = coverBox.x - gridBox.x;
+      expect(searchBox.x).toBeCloseTo(coverBox.x, 0);
+      expect(searchBox.x + searchBox.width).toBeCloseTo(gridBox.x + gridBox.width - inset, 0);
+    });
+  }
+
+  test('keeps the tap hint off a pointer screen', async ({ page }) => {
+    await page.goto('/');
+    await hydratedCover(page);
+
+    await expect(page.getByText('any release art to play or download the music')).toBeHidden();
+  });
+
   test('returns focus to the cover when the modal closes', async ({ page }) => {
     const dialog = await openSpotlight(page);
 
@@ -110,5 +142,20 @@ test.describe('home spotlight grid', () => {
 
     await expect(dialog).toBeHidden();
     await expect(page.getByRole('button', { name: COVER_NAME })).toBeFocused();
+  });
+});
+
+test.describe('home spotlight grid on a touch screen', () => {
+  // A phone: no hover, so `(hover: none)` matches.
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test('tells the visitor to tap a cover, and shows no play stamp', async ({ page }) => {
+    await page.goto('/');
+    const cover = await hydratedCover(page);
+
+    const hint = page.getByText('any release art to play or download the music');
+    await expect(hint).toBeVisible();
+    await expect(hint).toHaveText('Tap any release art to play or download the music');
+    await expect(cover.locator('[data-slot="spotlight-play-stamp"]')).toHaveCSS('opacity', '0');
   });
 });
