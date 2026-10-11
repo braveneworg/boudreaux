@@ -152,7 +152,15 @@ Playable (an MP3 track) → its line opens the listening modal in place; else
 it links to the release page. See the 2026-10-06 amendment of
 [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: newest release (the summary field is named `newestRelease`, but the
-page concept is this), featured release.
+page concept is this), featured release (the home page row is a
+**spotlight**).
+
+**spotlight** — an admin-chosen artist plus one of their Releases shown on the
+home page during a date window, ordered by position (then newest first), up
+to twelve at a time. Each opens the listening modal on its featured track.
+Backed by the `FeaturedArtist` model; with no spotlight to show, the home grid
+shows the newest published Releases instead.
+_Avoid_: featured artist, featured release, spotlight artist.
 
 **listed artist** — an Artist shown on the public artists index and found by
 its search: published, not deleted, and directly credited (primary or
