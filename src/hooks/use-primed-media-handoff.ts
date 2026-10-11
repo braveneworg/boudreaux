@@ -26,8 +26,10 @@ export interface PrimedMediaHandoff {
   primeMediaEl: (src?: string) => void;
   /**
    * One-shot supplier of the primed element for the player surface; returns
-   * null once taken (or before any priming), and the surface then falls back
-   * to a self-created element (e.g. StrictMode remount).
+   * null once taken (or before any priming), and a surface that gets null
+   * creates its own element. The surface keeps the player it built on the
+   * taken element across React StrictMode's effect replay, so one take is
+   * enough on the dev server too.
    */
   takeMediaEl: () => HTMLVideoElement | null;
   /**

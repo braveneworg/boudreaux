@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { getVideoMimeType } from './get-video-mime-type';
 import { claimPlayback, releasePlayback } from '../playback-session';
 
+import type Player from 'video.js/dist/types/player';
+
 export interface VideoPlayerSurfaceProps {
   title: string;
   src: string;
@@ -25,10 +27,23 @@ export interface VideoPlayerSurfaceProps {
   /**
    * One-shot supplier of a media element primed (load()/play()) during the
    * user's play gesture. Safari/iOS and Firefox bless autoplay per element, so
-   * playing THAT element is what lets the deferred autoplay succeed; returns
-   * null once taken, and the surface then falls back to a fresh element.
+   * playing THAT element is what lets the deferred autoplay succeed. The
+   * surface calls it each time it builds a player, and keeps that player
+   * across React StrictMode's effect replay, so the replay does not ask for
+   * the element a second time. When it returns null (nothing primed, or
+   * already taken) the surface creates its own element.
    */
   takeMediaEl?: () => HTMLVideoElement | null;
+}
+
+/** A player and the inputs it was built from. */
+interface PlayerSession {
+  player: Player;
+  src: string;
+  posterUrl: string | null | undefined;
+  title: string;
+  /** True from the effect's cleanup until the player is disposed or kept. */
+  isReleased: boolean;
 }
 
 /**
@@ -37,9 +52,9 @@ export interface VideoPlayerSurfaceProps {
  * when provided, since browsers with per-element autoplay blessing would
  * reject a deferred play() on any other element. Registers with the playback
  * coordinator on 'play' so only one surface plays at a time, and disposes
- * cleanly on unmount (list virtualization / refetch). A player 'error' swaps
- * in an inline fallback. An optional `onEnded` callback fires when playback
- * finishes (queue advance).
+ * cleanly on unmount (list virtualization / refetch), in a microtask of the
+ * unmounting task. A player 'error' swaps in an inline fallback. An optional
+ * `onEnded` callback fires when playback finishes (queue advance).
  */
 export const VideoPlayerSurface = ({
   title,
@@ -54,6 +69,8 @@ export const VideoPlayerSurface = ({
   // Ref-carried so callback identity changes never tear down the player.
   const onEndedRef = useRef(onEnded);
   const takeMediaElRef = useRef(takeMediaEl);
+  // The player the effect built, so a replay of that effect can keep it.
+  const sessionRef = useRef<PlayerSession | null>(null);
 
   useEffect(() => {
     onEndedRef.current = onEnded;
@@ -64,12 +81,44 @@ export const VideoPlayerSurface = ({
     const host = containerRef.current;
     if (!host) return;
 
+    const disposeReleased = (session: PlayerSession): void => {
+      if (!session.isReleased) return;
+      session.isReleased = false;
+      if (sessionRef.current === session) sessionRef.current = null;
+      releasePlayback(instanceId);
+      session.player.dispose();
+    };
+
+    // The cleanup only marks the player released; a microtask disposes it.
+    // React StrictMode (on in development) replays a new component's effects
+    // — effect, cleanup, effect — in one synchronous pass, so the replay
+    // reaches the check below first and keeps the player. Disposing in the
+    // cleanup would empty the primed element (video.js strips its src and
+    // calls load()), and the one-shot takeMediaEl has no second one to give.
+    // A real unmount has no replay, and its microtask runs in the same task:
+    // no timer or animation frame, which a hidden tab would never fire while
+    // a source-primed element plays on.
+    const releaseOnCleanup = (session: PlayerSession) => (): void => {
+      session.isReleased = true;
+      queueMicrotask(() => disposeReleased(session));
+    };
+
+    const released = sessionRef.current;
+    if (released) {
+      if (released.src === src && released.posterUrl === posterUrl && released.title === title) {
+        released.isReleased = false;
+        return releaseOnCleanup(released);
+      }
+      // Changed inputs (e.g. a playlist advancing): the old player goes now,
+      // before the new one claims the playback session under the same id.
+      disposeReleased(released);
+    }
+
     // video.js adopts the data-vjs-player parent as the player root
     // (playerElIngest) and dispose() removes that parent from the DOM — so
-    // the parent must be created here, fresh per effect run, never rendered
-    // by React: otherwise the run after a dispose (StrictMode remount in
-    // dev, a src change in prod) appends into a detached node and the
-    // player is invisible.
+    // the parent must be created here, fresh per player, never rendered by
+    // React: otherwise the run after a dispose (a src change, e.g. a playlist
+    // advancing) appends into a detached node and the player is invisible.
     const container = document.createElement('div');
     container.setAttribute('data-vjs-player', '');
 
@@ -128,10 +177,9 @@ export const VideoPlayerSurface = ({
       setHasError(true);
     });
 
-    return () => {
-      releasePlayback(instanceId);
-      player.dispose();
-    };
+    const session: PlayerSession = { player, src, posterUrl, title, isReleased: false };
+    sessionRef.current = session;
+    return releaseOnCleanup(session);
   }, [src, posterUrl, title, instanceId]);
 
   return (
