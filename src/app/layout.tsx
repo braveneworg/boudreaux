@@ -9,7 +9,6 @@ import { ChatLauncher } from './components/chat/chat-launcher';
 import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
-import { IosInstallPrompt } from './components/pwa/ios-install-prompt';
 import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
 import { MAIN_CONTENT_ID, SkipNavLink } from './components/skip-nav-link';
 
@@ -152,7 +151,6 @@ export default function RootLayout({
         </Providers>
         <Toaster position="bottom-center" />
         <ServiceWorkerRegister />
-        <IosInstallPrompt />
       </body>
     </html>
   );
