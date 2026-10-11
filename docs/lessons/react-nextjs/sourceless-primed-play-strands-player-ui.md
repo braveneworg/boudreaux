@@ -13,10 +13,13 @@ the element hands off paused, the surface's deferred `play()` fires a real
 empirically in Chromium with `--autoplay-policy=user-gesture-required`,
 Firefox with `media.autoplay.blocking_policy=2`, and WebKit).
 
-Two things masked it pre-merge: dev StrictMode's double-mount burns the
-one-shot primed element (the fallback element is fresh and paused, so dev
-behaves correctly — prod's single mount is the broken path), and both the E2E
-spec and the prod-standalone probe asserted media state (`paused`,
-`currentTime`) instead of player UI state (`vjs-has-started`). When a
-playback bug is UI-vs-media divergence, assert the UI class, not the media
-element.
+Two things masked it pre-merge. At the time, dev StrictMode's double-mount
+burned the one-shot primed element: the fallback element was fresh and
+paused, so dev behaved correctly and prod's single mount was the broken path.
+The surface has since been changed to keep its player across that replay
+(#841, see
+[`one-shot-handoff-in-an-effect-is-not-strictmode-safe.md`](one-shot-handoff-in-an-effect-is-not-strictmode-safe.md)),
+so dev now takes the same path as prod. And both the E2E spec and the
+prod-standalone probe asserted media state (`paused`, `currentTime`) instead
+of player UI state (`vjs-has-started`). When a playback bug is UI-vs-media
+divergence, assert the UI class, not the media element.
