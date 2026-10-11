@@ -11,6 +11,7 @@ import Link from 'next/link';
 
 import { Play } from 'lucide-react';
 
+import { useHydrated } from '@/hooks/use-hydrated';
 import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
 import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
@@ -46,6 +47,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
     takeMediaEl,
   } = useReleasePlayDialog(playSrc);
   const coverButtonRef = useRef<HTMLButtonElement>(null);
+  const hydrated = useHydrated();
   const playable = playSrc !== null;
 
   /** Closing the modal puts focus back on the cover that opened it. */
@@ -60,6 +62,9 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
         ref={coverButtonRef}
         type="button"
         aria-haspopup="dialog"
+        // "false" in the server markup, "true" once the click handler is
+        // attached: an E2E click must wait for it or the click is lost.
+        data-hydrated={hydrated}
         aria-label={artistName ? `Play ${title} by ${artistName}` : `Play ${title}`}
         disabled={!playable}
         onClick={openPlayer}
@@ -118,8 +123,8 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
             </Link>
           ) : (
             title
-          )}{' '}
-          ({year})
+          )}
+          {` (${year})`}
         </p>
       </div>
 

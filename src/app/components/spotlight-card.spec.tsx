@@ -184,6 +184,12 @@ describe('SpotlightCard', () => {
     expect(playButton()).toHaveAttribute('aria-haspopup', 'dialog');
   });
 
+  it('marks the cover hydrated once it runs in the browser', () => {
+    renderCard();
+
+    expect(playButton()).toHaveAttribute('data-hydrated', 'true');
+  });
+
   it('labels the cover button with the release alone when there is no artist', () => {
     renderCard({ artistName: null });
 
