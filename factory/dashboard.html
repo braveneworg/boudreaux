@@ -121,6 +121,10 @@
     background: color-mix(in srgb, var(--changes) 16%, transparent);
   }
   .chip.bad { border: 1px solid var(--human); color: var(--human); }
+  .chip.skipped {
+    border: 1px solid transparent; color: var(--faint);
+    background: color-mix(in srgb, var(--faint) 12%, transparent);
+  }
   .hint {
     margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line);
     font-family: var(--mono); font-size: 10.5px; color: var(--muted); line-height: 1.6;
@@ -245,6 +249,7 @@
   <span>/factory next</span>
   <span>/factory approve &lt;job-id&gt;</span>
   <span>/factory rework &lt;job-id&gt; &lt;note&gt;</span>
+  <span>/factory clean</span>
 </footer>
 
 <div id="overlay">
@@ -417,13 +422,16 @@ function verdictOf(text) {
 }
 
 // Earlier rounds aren't on the board; their verdicts come from the review comments.
+// A spec with `Surface: none` skips the ux and ui reviews in every round.
 function pastRounds(job) {
   const rounds = []
+  const surfaceNone = (job.artifacts.get('spec.md') || '').split('\n')[0].trim() === 'Surface: none'
   for (let n = 1; n < job.round; n++) {
     const verdicts = {}
     for (const [k] of REVIEWERS) {
       const body = job.artifacts.get(`round-${n}/review-${k}.md`)
-      verdicts[k] = body !== undefined ? verdictOf(body) : 'missing'
+      const skipped = surfaceNone && (k === 'ux' || k === 'ui')
+      verdicts[k] = body !== undefined ? verdictOf(body) : skipped ? 'skipped' : 'missing'
     }
     rounds.push(verdicts)
   }
@@ -433,7 +441,7 @@ function pastRounds(job) {
 function chips(n, verdicts, waiting) {
   const cells = REVIEWERS.map(([k, short]) => {
     const v = verdicts[k]
-    const cls = v === 'PASS' || v === 'CHANGES' ? v : v === 'pending' ? (waiting ? 'wait' : '') : 'bad'
+    const cls = v === 'PASS' || v === 'CHANGES' || v === 'skipped' ? v : v === 'pending' ? (waiting ? 'wait' : '') : 'bad'
     const label = v === 'missing' || v === 'invalid' ? `${short}?` : short
     return `<span class="chip ${cls}" title="${k}: ${esc(v)}">${label}</span>`
   }).join('')

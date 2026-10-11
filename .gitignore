@@ -79,6 +79,9 @@ e2e/.auth/
 /public/media
 .claude/*
 !.claude/settings.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/factory-guard.sh
 
 
 # AI agent configs
