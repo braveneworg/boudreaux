@@ -309,17 +309,25 @@ describe('SpotlightCard', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows the play roundel on hover, focus and touch screens', () => {
+  it('shows the play stamp on hover, focus and touch screens', () => {
     renderCard();
 
-    const roundel = playButton().querySelector('[data-slot="spotlight-play-roundel"]');
-    expect(roundel).toHaveClass(
+    const overlay = playButton().querySelector('[data-slot="spotlight-play-stamp"]');
+    expect(overlay).toHaveClass(
       'opacity-0',
       'group-hover:opacity-100',
       'group-focus-visible:opacity-100',
       '[@media(hover:none)]:opacity-100'
     );
-    expect(roundel).toHaveAttribute('aria-hidden', 'true');
+    expect(overlay).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('cuts the play stamp square, in black ink on the page accent', () => {
+    renderCard();
+
+    const stamp = playButton().querySelector('[data-slot="spotlight-play-stamp"] > span');
+    expect(stamp).toHaveClass('border-2', 'border-black', 'bg-(--card-accent)', 'shadow-zine-ink');
+    expect(stamp?.className).not.toMatch(/rounded/);
   });
 
   it('scales the cover slightly on hover', () => {
@@ -328,12 +336,16 @@ describe('SpotlightCard', () => {
     expect(playButton()).toHaveClass('group', 'hover:scale-[1.03]');
   });
 
-  it('tapes a corner of the cover', () => {
+  it('puts no tape on the cover', () => {
     renderCard();
 
-    expect(playButton().querySelector('[data-slot="spotlight-tape"]')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    expect(playButton().querySelector('[data-slot="spotlight-tape"]')).toBeNull();
+  });
+
+  it('keeps the card to the cover width its sizes name', () => {
+    renderCard();
+
+    expect(playButton().parentElement).toHaveClass('mx-auto', 'w-full', 'max-w-52');
+    expect(SPOTLIGHT_COVER_SIZES).toBe('208px');
   });
 });

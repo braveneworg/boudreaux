@@ -28,13 +28,13 @@ interface SpotlightCardProps {
 }
 
 /**
- * One cover in the home page's spotlight grid (variant A): the cover with a
- * taped corner, then a centered caption — the artist, and the title (linked
- * to the artist's releases) with its year. The cover is a button: the click
- * primes the card's track and opens the listening modal, as the `/releases`
- * Play button does, and a zine play roundel shows on hover, focus and touch
- * screens. With nothing playable the cover is disabled and the title link
- * still works.
+ * One cover in the home page's spotlight grid (variant A): the cover, at most
+ * 13rem wide and centered in its grid cell, then a centered caption — the
+ * artist, and the title (linked to the artist's releases) with its year. The
+ * cover is a button: the click primes the card's track and opens the
+ * listening modal, as the `/releases` Play button does, and a square zine
+ * play stamp shows on hover, focus and touch screens. With nothing playable
+ * the cover is disabled and the title link still works.
  */
 export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
   const { releaseId, title, year, artistName, artistSlug, coverArt, playSrc } = card;
@@ -57,7 +57,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="mx-auto flex w-full max-w-52 flex-col gap-3">
       <button
         ref={coverButtonRef}
         type="button"
@@ -92,19 +92,15 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
             </span>
           )}
         </span>
-        {/* A strip of tape over the top-left corner, the ZinePanel gesture. */}
-        <span
-          data-slot="spotlight-tape"
-          aria-hidden="true"
-          className="bg-menu-item-yellow-200/85 absolute -top-2 -left-4 z-10 h-5 w-14 -rotate-[35deg] border border-black/25 shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]"
-        />
         {playable ? (
           <span
-            data-slot="spotlight-play-roundel"
+            data-slot="spotlight-play-stamp"
             aria-hidden="true"
             className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
           >
-            <span className="shadow-zine-ink flex size-12 items-center justify-center rounded-full border-2 border-black bg-(--card-accent)">
+            {/* A square paste-up stamp, set slightly askew; a press pushes it
+                onto its ink shadow. */}
+            <span className="shadow-zine-ink flex size-11 -rotate-3 items-center justify-center border-2 border-black bg-(--card-accent) transition-[translate,box-shadow] duration-100 group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none motion-reduce:transition-none">
               <Play className="ml-0.5 size-5 fill-current text-zinc-950" />
             </span>
           </span>

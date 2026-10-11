@@ -95,13 +95,18 @@ export default function HomeLoading() {
               <div className="bg-muted h-9 w-full animate-pulse" />
             </div>
             {/* Spotlight grid skeleton — the SpotlightGrid columns, each card a
-                square cover over a centered two-line caption. */}
+                13rem square cover, centered in its cell, over a centered
+                two-line caption. */}
             <div
               data-testid="spotlight-grid-skeleton"
               className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4"
             >
               {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
-                <div key={i} data-testid="spotlight-card-skeleton" className="flex flex-col gap-3">
+                <div
+                  key={i}
+                  data-testid="spotlight-card-skeleton"
+                  className="mx-auto flex w-full max-w-52 flex-col gap-3"
+                >
                   <div className="bg-muted aspect-square w-full animate-pulse border-2 border-black" />
                   <div className="flex flex-col items-center gap-1.5">
                     <div className="bg-muted h-4 w-2/5 animate-pulse" />

@@ -16,11 +16,13 @@ import {
 } from '@/lib/utils/release-helpers';
 
 /**
- * The `sizes` of a spotlight card's cover: one column below `sm`, two to
- * `lg`, four from `lg` up. The home page's cover preload uses the same string
- * as its `imagesizes`, so the preload and the card pick the same variant.
+ * The `sizes` of a spotlight card's cover. The card is capped at `max-w-52`
+ * (13rem), and every grid cell is at least that wide, so the cover renders at
+ * 208px at every breakpoint. The home page's cover preload uses the same
+ * string as its `imagesizes`, so the preload and the card pick the same
+ * variant.
  */
-export const SPOTLIGHT_COVER_SIZES = '(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw';
+export const SPOTLIGHT_COVER_SIZES = '208px';
 
 /** One cover in the home page's spotlight grid, from a spotlight or a newest release. */
 export interface SpotlightCard {
