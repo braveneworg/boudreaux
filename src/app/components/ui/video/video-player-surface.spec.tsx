@@ -1,10 +1,13 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { act, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+
+import { act, render, renderHook, screen } from '@testing-library/react';
 import videojs from 'video.js';
 
 import { usePlayerPrefs } from '@/hooks/use-player-prefs';
+import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
 
 import { claimPlayback } from '../playback-session';
 import { VideoPlayerSurface } from './video-player-surface';
@@ -30,6 +33,8 @@ interface FakePlayer {
 // dispose() is DOM-faithful: real video.js adopts the data-vjs-player parent as
 // the player root (playerElIngest) and dispose() removes THAT parent from the
 // DOM — the fake must too, or remount-after-dispose bugs stay invisible here.
+// It also empties the media element, as Html5.disposeMediaElement does (it
+// strips `src` and calls load()), so a disposed primed element shows as spent.
 vi.mock('video.js', () => {
   const makePlayer = (el?: HTMLElement): FakePlayer => {
     const handlers = new Map<string, Array<() => void>>();
@@ -44,7 +49,13 @@ vi.mock('video.js', () => {
       }),
       play: vi.fn(() => Promise.reject(new Error('autoplay-blocked'))),
       pause: vi.fn(),
-      dispose: vi.fn(() => el?.parentElement?.remove()),
+      dispose: vi.fn(() => {
+        el?.parentElement?.remove();
+        if (el instanceof HTMLMediaElement) {
+          el.removeAttribute('src');
+          el.load();
+        }
+      }),
       hasStarted: vi.fn(),
       addClass: vi.fn(),
       removeClass: vi.fn(),
@@ -70,6 +81,11 @@ vi.mock('video.js', () => {
 
 const getPlayers = (): FakePlayer[] =>
   vi.mocked(videojs).mock.results.map((result) => result.value as unknown as FakePlayer);
+
+/** Let the microtasks queued so far run. */
+const flushMicrotasks = async (): Promise<void> => {
+  await Promise.resolve();
+};
 
 describe('VideoPlayerSurface', () => {
   it('initializes video.js once with the resolved source options', () => {
@@ -211,6 +227,93 @@ describe('VideoPlayerSurface', () => {
       });
     });
 
+    // React StrictMode (the App Router default, active on the dev server)
+    // replays a new component's effects: effect, cleanup, effect. The handoff
+    // is one-shot, so the player that is live after the replay must still be
+    // the one built on the primed element. A supplier that returns the element
+    // on every call cannot show a lost handoff (#841), so these cases take it
+    // through the real hook.
+    describe('under the StrictMode effect replay', () => {
+      const SRC = 'https://cdn.example.com/clip.mp4?sig=abc';
+
+      const renderPrimedSurface = async (): Promise<{
+        primed: HTMLVideoElement | undefined;
+        unmount: () => void;
+      }> => {
+        const { result } = renderHook(() => usePrimedMediaHandoff());
+        result.current.primeMediaEl(SRC);
+        const taken: HTMLVideoElement[] = [];
+        const takeMediaEl = (): HTMLVideoElement | null => {
+          const el = result.current.takeMediaEl();
+          if (el) taken.push(el);
+          return el;
+        };
+
+        const { unmount } = render(
+          <StrictMode>
+            <VideoPlayerSurface title="Live" src={SRC} takeMediaEl={takeMediaEl} />
+          </StrictMode>
+        );
+        // The replayed cleanup queued a disposal; give it its chance to run, so
+        // a player it wrongly disposed shows up in every case below.
+        await flushMicrotasks();
+
+        return { primed: taken[0], unmount };
+      };
+
+      /** The players video.js built on `el`, in creation order. */
+      const getPlayersHolding = (el: HTMLVideoElement | undefined): FakePlayer[] =>
+        getPlayers().filter((_, index) => vi.mocked(videojs).mock.calls.at(index)?.[0] === el);
+
+      it('builds the live player on the primed element', async () => {
+        const { primed } = await renderPrimedSurface();
+
+        expect(vi.mocked(videojs).mock.calls.at(-1)?.[0]).toBe(primed);
+      });
+
+      it('leaves the primed element its source', async () => {
+        const { primed } = await renderPrimedSurface();
+
+        expect(primed?.getAttribute('src')).toBe(SRC);
+      });
+
+      it('leaves the primed element connected to the document', async () => {
+        const { primed } = await renderPrimedSurface();
+
+        expect(primed?.isConnected).toBe(true);
+      });
+
+      it('never disposes a player holding the primed element', async () => {
+        const { primed } = await renderPrimedSurface();
+
+        const disposals = getPlayersHolding(primed).map(
+          (player) => player.dispose.mock.calls.length
+        );
+        expect(disposals).toEqual([0]);
+      });
+
+      it('keeps the playback claim of the playing primed element', async () => {
+        const { primed } = await renderPrimedSurface();
+        render(<VideoPlayerSurface title="Second" src="https://cdn.example.com/b.mp4" />);
+
+        const [holder] = getPlayersHolding(primed);
+        const second = getPlayers().at(-1);
+        act(() => second?.trigger('play'));
+
+        expect(holder?.pause).toHaveBeenCalledTimes(1);
+      });
+
+      it('leaves no player undisposed once unmounted', async () => {
+        const { unmount } = await renderPrimedSurface();
+
+        unmount();
+        await flushMicrotasks();
+
+        const undisposed = getPlayers().filter((player) => player.dispose.mock.calls.length === 0);
+        expect(undisposed).toHaveLength(0);
+      });
+    });
+
     it('creates its own element when the primed one was already taken', () => {
       render(
         <VideoPlayerSurface
@@ -240,10 +343,9 @@ describe('VideoPlayerSurface', () => {
   });
 
   // Real video.js dispose() removes the data-vjs-player parent from the DOM,
-  // so that parent must be created per effect run — if React rendered it, the
-  // run after a dispose (StrictMode remount in dev, a src change in prod, e.g.
-  // a playlist advancing between videos) would append into a detached node and
-  // the player would be invisible.
+  // so that parent must be created per player — if React rendered it, the run
+  // after a dispose (a src change, e.g. a playlist advancing between videos)
+  // would append into a detached node and the player would be invisible.
   it('mounts a live, document-attached player after a source change re-init', () => {
     const { rerender } = render(
       <VideoPlayerSurface title="Live" src="https://cdn.example.com/a.mp4" />
@@ -255,18 +357,32 @@ describe('VideoPlayerSurface', () => {
     expect(el.isConnected).toBe(true);
   });
 
-  it('disposes the player on unmount', () => {
+  it('disposes the previous player on a source change', () => {
+    const { rerender } = render(
+      <VideoPlayerSurface title="Live" src="https://cdn.example.com/a.mp4" />
+    );
+    const [previous] = getPlayers();
+
+    rerender(<VideoPlayerSurface title="Live" src="https://cdn.example.com/b.mp4" />);
+
+    expect(previous.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  // The unmount cleanup hands the disposal to a microtask (so a StrictMode
+  // effect replay can keep the player), hence the flush after each unmount.
+  it('disposes the player on unmount', async () => {
     const { unmount } = render(
       <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />
     );
     const [player] = getPlayers();
 
     unmount();
+    await flushMicrotasks();
 
     expect(player.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it('releases playback on unmount so later claims no longer pause it', () => {
+  it('releases playback on unmount so later claims no longer pause it', async () => {
     const { unmount } = render(
       <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />
     );
@@ -274,6 +390,7 @@ describe('VideoPlayerSurface', () => {
     act(() => player.trigger('play'));
 
     unmount();
+    await flushMicrotasks();
     claimPlayback('someone-else', vi.fn());
 
     expect(player.pause).not.toHaveBeenCalled();
@@ -288,7 +405,7 @@ describe('VideoPlayerSurface', () => {
     expect(screen.getByText(/can.?t be played right now/i)).toBeInTheDocument();
   });
 
-  it('still disposes safely on unmount after an error', () => {
+  it('still disposes safely on unmount after an error', async () => {
     const { unmount } = render(
       <VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />
     );
@@ -296,6 +413,7 @@ describe('VideoPlayerSurface', () => {
     act(() => player.trigger('error'));
 
     unmount();
+    await flushMicrotasks();
 
     expect(player.dispose).toHaveBeenCalledTimes(1);
   });

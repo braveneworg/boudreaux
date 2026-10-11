@@ -228,15 +228,40 @@ test.describe('Videos page — signed-in listing', () => {
 
   // #711, #713, #715: one click opens the modal and starts playback, even
   // where play() needs a user gesture; the modal never shows a poster or the
-  // big play button over the playing video. On the production build the
-  // click's primed element plays; the dev server's StrictMode effect replay
-  // disposes it, and the deferred play lands inside the click's activation.
+  // big play button over the playing video. The click's primed element is
+  // the one that plays, on the production build and on the dev server: the
+  // surface keeps its player across StrictMode's effect replay (#841).
   test('one click plays a video under a strict autoplay policy', async ({ userPage }) => {
     await blockAutoplayWithoutGesture(userPage);
     await userPage.goto('/videos');
     await userPage.getByRole('button', { name: 'Play E2E Video Alpha' }).click();
 
     const dialog = userPage.getByRole('dialog', { name: 'E2E Video Alpha' });
+    const player = dialog.locator('.video-js');
+    await expect(player).toHaveClass(/vjs-has-started/, { timeout: 10_000 });
+    await expect
+      .poll(
+        () => dialog.locator('video').evaluate((video) => (video as HTMLVideoElement).currentTime),
+        {
+          timeout: 5_000,
+        }
+      )
+      .toBeGreaterThan(0);
+    await expect(dialog.locator('.vjs-big-play-button')).toBeHidden();
+    await expect(dialog.locator('video')).not.toHaveAttribute('poster', /.+/);
+  });
+
+  // #841: the search pick is the same one-gesture play as the poster click,
+  // through a dialog that mounts already open.
+  test('picking a search suggestion plays the video under a strict autoplay policy', async ({
+    userPage,
+  }) => {
+    await blockAutoplayWithoutGesture(userPage);
+    await userPage.goto('/videos');
+    await (await openSearch(userPage)).fill('Golf');
+    await userPage.getByRole('option').filter({ hasText: 'E2E Video Golf' }).click();
+
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Video Golf' });
     const player = dialog.locator('.video-js');
     await expect(player).toHaveClass(/vjs-has-started/, { timeout: 10_000 });
     await expect
