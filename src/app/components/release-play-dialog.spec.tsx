@@ -261,6 +261,94 @@ describe('ReleasePlayDialog', () => {
     ).toBeTruthy();
   });
 
+  it('slides up from the bottom as a full-width sheet on a phone when asked', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+
+    expect(screen.getByRole('dialog')).toHaveClass(
+      'max-sm:inset-x-0',
+      'max-sm:top-auto',
+      'max-sm:bottom-0',
+      'max-sm:max-w-none',
+      'max-sm:translate-x-0',
+      'max-sm:translate-y-0',
+      'max-sm:border-x-0',
+      'max-sm:border-b-0',
+      'max-sm:data-[state=open]:slide-in-from-bottom',
+      'max-sm:data-[state=closed]:slide-out-to-bottom'
+    );
+  });
+
+  it('fades the sheet in without the slide under reduced motion', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+
+    expect(screen.getByRole('dialog')).toHaveClass(
+      'max-sm:motion-reduce:data-[state=open]:slide-in-from-bottom-0',
+      'max-sm:motion-reduce:data-[state=closed]:slide-out-to-bottom-0'
+    );
+  });
+
+  it('stays a centered dialog on a phone by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    expect(screen.getByRole('dialog')).not.toHaveClass('max-sm:bottom-0');
+  });
+
+  it('sizes the player to the phone screen in the sheet', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+
+    const slot = screen.getByTestId('release-player').parentElement;
+    expect(slot).toHaveAttribute('data-slot', 'release-play-dialog-player');
+    expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
+  });
+
+  it('sizes the loading skeleton like the player in the sheet', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+
+    const slot = screen.getByRole('status').closest('[data-slot="release-play-dialog-player"]');
+    expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
+  });
+
+  it('gives the player the full dialog width by default', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    const slot = screen.getByTestId('release-player').parentElement;
+    expect(slot?.className).not.toMatch(/max-sm:w-/);
+  });
+
+  it('sets the heading lines smaller on a phone in the sheet', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" sheetOnPhone />);
+
+    expect(screen.getByText('John Doe')).toHaveClass('max-sm:text-lg', 'max-sm:leading-tight');
+    expect(screen.getByText('Midnight Serenade')).toHaveClass('max-sm:text-xs');
+  });
+
+  it('keeps the heading sizes by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+
+    expect(screen.getByText('John Doe')).not.toHaveClass('max-sm:text-lg');
+    expect(screen.getByText('Midnight Serenade')).not.toHaveClass('max-sm:text-xs');
+  });
+
   it('renders no share widget slot when none is given', () => {
     mockUseReleaseQuery.mockReturnValue(
       queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
