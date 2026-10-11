@@ -2,15 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 import nextDynamic from 'next/dynamic';
 
 import { Share2Icon } from 'lucide-react';
 import { toast } from 'sonner';
-
-import type { FeaturedArtist } from '@/lib/types/media-models';
-import { getDisplayName } from '@/lib/utils/get-display-name';
 
 import { Separator } from './ui/separator';
 
@@ -32,32 +29,30 @@ const hasErrorName = (error: unknown): error is { name: string } => {
 };
 
 interface ReleaseShareWidgetProps {
-  selectedArtist?: FeaturedArtist | null;
-  featuredArtists?: FeaturedArtist[];
-  setSelectedArtist?: (artist: FeaturedArtist | null) => void;
+  /** Slug of the artist page to share; `null` shares the site instead. */
+  artistSlug: string | null;
+  /** The artist the share text names; `null` names the release. */
+  artistName: string | null;
+  releaseTitle: string;
 }
 
+/**
+ * Share row for a release: the native share sheet (or a copied link) behind
+ * the share icon, then the social links. Every share points at the artist's
+ * page.
+ */
 export const ReleaseShareWidget = ({
-  selectedArtist = null,
-  featuredArtists = [],
-  setSelectedArtist,
+  artistSlug,
+  artistName,
+  releaseTitle,
 }: ReleaseShareWidgetProps) => {
   const baseUrl = process.env.NEXT_PUBLIC_HOST_NAME ?? 'https://fakefourrecords.com';
-
-  const artistUrl = useMemo(() => {
-    const artistSlug = selectedArtist?.artists?.[0]?.slug;
-    return artistSlug ? `${baseUrl}/artists/${artistSlug}` : baseUrl;
-  }, [baseUrl, selectedArtist]);
+  const artistUrl = artistSlug ? `${baseUrl}/artists/${artistSlug}` : baseUrl;
 
   const handleShare2IconClick = useCallback(() => {
-    if (!selectedArtist) {
-      if (featuredArtists.length > 0) setSelectedArtist?.(featuredArtists.slice(1, 2)[0]);
-      return;
-    }
-
     const shareData = {
-      title: selectedArtist.release?.title || getDisplayName(selectedArtist),
-      text: `Check out ${getDisplayName(selectedArtist)} on Fake Four Inc.!`,
+      title: releaseTitle,
+      text: `Check out ${artistName ?? releaseTitle} on Fake Four Inc.!`,
       url: artistUrl,
     };
 
@@ -79,7 +74,7 @@ export const ReleaseShareWidget = ({
         })
         .catch(() => toast.error('Failed to copy link to clipboard'));
     }
-  }, [artistUrl, featuredArtists, selectedArtist, setSelectedArtist]);
+  }, [artistName, artistUrl, releaseTitle]);
   return (
     <>
       <div className="mx-auto mt-3 -mb-3 flex max-w-90 items-center justify-center overflow-hidden">

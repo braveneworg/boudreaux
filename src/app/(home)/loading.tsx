@@ -3,19 +3,22 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import Image from 'next/image';
 
-import { FeaturedArtistsPlayerSkeleton } from '@/components/featured-artists-player-skeleton';
 import { ContentContainer } from '@/components/ui/content-container';
 import { ZinePanel } from '@/components/ui/zine-panel';
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
 import { PageContainer } from '@/ui/page-container';
 
+/** Cover skeletons in the grid fallback: one row of the four-up desktop grid. */
+const SKELETON_CARD_COUNT = 4;
+
 /**
  * Suspense fallback for `/`. It mirrors the hydrated landing layout at every
  * breakpoint — carousel below `md`, stitched BannerStrip frame at `md`+, and
- * the ZinePanel with the `lg` player/headlines grid split — so client-side
- * navigations swap skeleton → page in place instead of flashing a different
- * layout for the duration of the dynamic render (~300ms warm).
+ * the ZinePanel with the wordmark, the search and the 1/2/4-column spotlight
+ * grid — so client-side navigations swap skeleton → page in place instead of
+ * flashing a different layout for the duration of the dynamic render (~300ms
+ * warm).
  */
 export default function HomeLoading() {
   return (
@@ -82,47 +85,30 @@ export default function HomeLoading() {
         </div>
         <ContentContainer>
           <ZinePanel accent="yellow">
+            {/* FEATURED wordmark skeleton — full-width 4:1 image below `sm`,
+                fixed h-14 (224px wide) from `sm` up, on its own line. */}
+            <div data-testid="featured-heading-skeleton" className="mb-4">
+              <div className="bg-muted aspect-[4/1] w-full animate-pulse sm:aspect-auto sm:h-14 sm:w-56" />
+            </div>
             {/* Search skeleton — holds the ArtistNavSearchCombobox trigger's row. */}
-            <div className="lg:mb-8">
+            <div data-testid="search-skeleton" className="mb-8">
               <div className="bg-muted h-9 w-full animate-pulse" />
             </div>
+            {/* Spotlight grid skeleton — the SpotlightGrid columns, each card a
+                square cover over a centered two-line caption. */}
             <div
-              data-testid="home-skeleton-grid"
-              className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-10"
+              data-testid="spotlight-grid-skeleton"
+              className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4"
             >
-              {/* FEATURED wordmark skeleton — full-width 4:1 image below `sm`,
-                  fixed h-14 (224px wide) from `sm` up, right column on `lg`. */}
-              <div
-                data-testid="featured-heading-skeleton"
-                className="mt-8 mb-6 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:mb-8"
-              >
-                <div className="bg-muted aspect-[4/1] w-full animate-pulse sm:aspect-auto sm:h-14 sm:w-56" />
-              </div>
-              {/* Player skeleton — left column spanning both rows on `lg`.
-                  The skeleton matches FeaturedArtistsPlayer's stacked
-                  internals, so the fallback → server-rendered player swap
-                  is pixel-stable. */}
-              <div
-                data-testid="player-skeleton"
-                className="lg:col-start-1 lg:row-span-2 lg:row-start-1"
-              >
-                <FeaturedArtistsPlayerSkeleton />
-              </div>
-              {/* Release headlines skeleton — desktop-only column, like the
-                  hydrated feed (`hidden lg:block`). */}
-              <div
-                data-testid="headlines-skeleton"
-                className="hidden space-y-7 lg:col-start-2 lg:row-start-2 lg:block"
-              >
-                {Array.from({ length: 3 }, (_, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="bg-muted h-7 w-4/5 animate-pulse" />
+              {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
+                <div key={i} data-testid="spotlight-card-skeleton" className="flex flex-col gap-3">
+                  <div className="bg-muted aspect-square w-full animate-pulse border-2 border-black" />
+                  <div className="flex flex-col items-center gap-1.5">
                     <div className="bg-muted h-4 w-2/5 animate-pulse" />
-                    <div className="bg-muted h-3 w-full animate-pulse" />
-                    <div className="bg-muted h-3 w-11/12 animate-pulse" />
+                    <div className="bg-muted h-4 w-3/5 animate-pulse" />
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </ZinePanel>
         </ContentContainer>

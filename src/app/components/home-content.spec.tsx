@@ -15,6 +15,7 @@ vi.mock('@/hooks/queries/use-banners-query', () => ({
 }));
 
 vi.mock('@/hooks/queries/use-active-featured-artists-query', () => ({
+  SPOTLIGHT_LIMIT: 12,
   useActiveFeaturedArtistsQuery: () => useActiveFeaturedArtistsQueryMock(),
 }));
 
@@ -22,17 +23,26 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
-// Mock the player module (statically imported — next/dynamic would SSR only
-// its loading fallback, hiding the LCP cover art from the server HTML) so the
-// spec stays lightweight instead of pulling the media-player tree.
-vi.mock('./featured-artists-player', () => ({
-  FeaturedArtistsPlayer: ({ featuredArtists }: { featuredArtists: unknown[] }) => (
-    <div data-testid="featured-artists-player" data-count={featuredArtists.length} />
-  ),
+const newestQuery = vi.hoisted(() => ({
+  calls: [] as Array<{ take: number; enabled: boolean | undefined }>,
+  rows: undefined as unknown[] | undefined,
 }));
 
-vi.mock('./release-headlines', () => ({
-  ReleaseHeadlines: () => <aside data-testid="release-headlines" />,
+vi.mock('@/hooks/queries/use-infinite-published-releases-query', () => ({
+  useNewestPublishedReleasesQuery: (take: number, options: { enabled?: boolean } = {}) => {
+    newestQuery.calls.push({ take, enabled: options.enabled });
+    return { data: options.enabled ? newestQuery.rows : undefined };
+  },
+}));
+
+vi.mock('./spotlight-grid', () => ({
+  SpotlightGrid: ({ cards }: { cards: Array<{ releaseId: string; title: string }> }) => (
+    <ul data-testid="spotlight-grid">
+      {cards.map((card) => (
+        <li key={card.releaseId}>{card.title}</li>
+      ))}
+    </ul>
+  ),
 }));
 
 vi.mock('./banner-carousel', () => ({
@@ -139,38 +149,6 @@ describe('HomeContent', () => {
     expect(carousel).toHaveAttribute('data-with-notification', 'true');
   });
 
-  it('renders the player directly so its markup server-renders (LCP discovery)', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
-
-    render(<HomeContent />);
-
-    // Static import: next/dynamic server-renders only its loading fallback in
-    // the App Router, which kept the LCP cover art out of the server HTML.
-    // video.js stays code-split behind MediaPlayer.Controls (LazyControls).
-    expect(screen.getByTestId('featured-artists-player')).toBeInTheDocument();
-  });
-
-  it('forwards the featured artists to the player', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({
-      data: { featuredArtists: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] },
-    });
-
-    render(<HomeContent />);
-
-    expect(screen.getByTestId('featured-artists-player')).toHaveAttribute('data-count', '3');
-  });
-
-  it('falls back to an empty featured-artist list when none are returned', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
-
-    render(<HomeContent />);
-
-    expect(screen.getByTestId('featured-artists-player')).toHaveAttribute('data-count', '0');
-  });
-
   it('wraps the content after the banner in a yellow zine panel', () => {
     useBannersQueryMock.mockReturnValue({ data: undefined });
     useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
@@ -181,47 +159,6 @@ describe('HomeContent', () => {
     expect(panel).toHaveAttribute('data-slot', 'zine-panel');
     expect(panel).toHaveClass('zine-accent-yellow');
     expect(panel).toContainElement(screen.getByTestId('artist-search'));
-  });
-
-  it('gives the landing heading extra breathing room', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
-
-    render(<HomeContent />);
-
-    // Landing-only: the wordmark separates the search field from the player,
-    // so it gets more air than the default tight heading margins — slightly
-    // more above than below, tying it to the player it titles.
-    const heading = screen.getByRole('heading', { name: /featured artists/i });
-    expect(heading).toHaveClass('mt-8', 'mb-6');
-  });
-
-  it('reflows the desktop layout: heading atop the headlines column', () => {
-    useBannersQueryMock.mockReturnValue({ data: undefined });
-    useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
-
-    render(<HomeContent />);
-
-    // lg+: the search box keeps clear air above the split, then a
-    // two-column grid places the wordmark in the right column's first row
-    // (top-aligned with the carousel), the player spanning both rows on
-    // the left, and the headlines feed beneath the wordmark. The feed pane
-    // scrolls internally, so the wordmark stays put.
-    expect(screen.getByTestId('artist-search').parentElement).toHaveClass('lg:mb-8');
-    const heading = screen.getByRole('heading', { name: /featured artists/i });
-    expect(heading).toHaveClass('lg:col-start-2', 'lg:row-start-1', 'lg:mt-0', 'lg:mb-8');
-    const grid = heading.parentElement;
-    expect(grid).toHaveClass(
-      'lg:grid',
-      'lg:grid-cols-2',
-      'lg:grid-rows-[auto_1fr]',
-      'lg:items-start',
-      'lg:gap-x-10'
-    );
-    const playerCell = screen.getByTestId('featured-artists-player').parentElement;
-    expect(playerCell).toHaveClass('lg:col-start-1', 'lg:row-start-1', 'lg:row-span-2');
-    const headlinesCell = screen.getByTestId('release-headlines').parentElement;
-    expect(headlinesCell).toHaveClass('lg:col-start-2', 'lg:row-start-2');
   });
 
   it('renders both banner treatments so the visible one is correct from first paint', () => {
@@ -240,5 +177,126 @@ describe('HomeContent', () => {
     // visible one with no JS swap.
     expect(screen.getByTestId('banner-carousel')).toBeInTheDocument();
     expect(screen.getByTestId('banner-strip')).toBeInTheDocument();
+  });
+
+  describe('the spotlight grid', () => {
+    const SPOTLIGHT = {
+      id: 'fa-1',
+      displayName: 'Spot Artist',
+      coverArt: null,
+      featuredTrackNumber: null,
+      artists: [],
+      digitalFormat: null,
+      release: {
+        id: 'rel-1',
+        title: 'Spot Album',
+        coverArt: '',
+        releasedOn: new Date('2024-01-01T00:00:00Z'),
+        images: [],
+      },
+    };
+    const NEWEST = {
+      id: 'rel-9',
+      title: 'Newest Album',
+      coverArt: '',
+      releasedOn: new Date('2025-01-01T00:00:00Z'),
+      images: [],
+      digitalFormats: [],
+      albumArtist: null,
+    };
+
+    beforeEach(() => {
+      newestQuery.calls = [];
+      newestQuery.rows = [NEWEST];
+      useBannersQueryMock.mockReturnValue({ data: undefined });
+    });
+
+    it('stacks the heading, then the search, then the grid inside the panel', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+      render(<HomeContent />);
+
+      const heading = screen.getByRole('heading', { level: 1, name: /featured artists/i });
+      const search = screen.getByTestId('artist-search');
+      const grid = screen.getByTestId('spotlight-grid');
+      expect(
+        heading.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(search.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(heading.closest('section')).toContainElement(grid);
+    });
+
+    it('gives the heading its own line, left-aligned', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+      render(<HomeContent />);
+
+      expect(screen.getByRole('heading', { name: /featured artists/i })).toHaveClass(
+        'block',
+        'text-left'
+      );
+    });
+
+    it('fills the grid with the spotlights', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [SPOTLIGHT], count: 1 },
+      });
+
+      render(<HomeContent />);
+
+      expect(screen.getByTestId('spotlight-grid')).toHaveTextContent('Spot Album');
+    });
+
+    it('never fetches the newest releases while there are spotlights', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [SPOTLIGHT], count: 1 },
+      });
+
+      render(<HomeContent />);
+
+      expect(newestQuery.calls.every(({ enabled }) => enabled === false)).toBe(true);
+      expect(screen.getByTestId('spotlight-grid')).not.toHaveTextContent('Newest Album');
+    });
+
+    it('waits for the spotlights before deciding to fall back', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+      render(<HomeContent />);
+
+      expect(newestQuery.calls.every(({ enabled }) => enabled === false)).toBe(true);
+      expect(screen.getByTestId('spotlight-grid')).toBeEmptyDOMElement();
+    });
+
+    it('falls back to the twelve newest releases when there is no spotlight', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [], count: 0 },
+      });
+
+      render(<HomeContent />);
+
+      expect(newestQuery.calls.at(-1)).toEqual({ take: 12, enabled: true });
+      expect(screen.getByTestId('spotlight-grid')).toHaveTextContent('Newest Album');
+    });
+
+    it('falls back when no spotlight row can render', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [{ ...SPOTLIGHT, release: null }], count: 1 },
+      });
+
+      render(<HomeContent />);
+
+      expect(screen.getByTestId('spotlight-grid')).toHaveTextContent('Newest Album');
+    });
+
+    it('shows an empty grid while the fallback loads', () => {
+      newestQuery.rows = undefined;
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({
+        data: { featuredArtists: [], count: 0 },
+      });
+
+      render(<HomeContent />);
+
+      expect(screen.getByTestId('spotlight-grid')).toBeEmptyDOMElement();
+    });
   });
 });

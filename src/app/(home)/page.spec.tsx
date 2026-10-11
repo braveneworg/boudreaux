@@ -5,6 +5,8 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
+import { SPOTLIGHT_COVER_SIZES } from '@/lib/utils/spotlight-card';
+
 import Home, { dynamic as homeDynamic } from './page';
 
 vi.mock('server-only', () => ({}));
@@ -172,41 +174,6 @@ describe('Home Page', () => {
     });
   });
 
-  it('prefetches the first published-releases page for the landing headlines', async () => {
-    mockGetPublishedReleases.mockResolvedValue({
-      success: true,
-      data: [{ id: 'release-1', title: 'Landing Release' }],
-    });
-
-    render(await Home());
-
-    // Same query key + page param as useInfinitePublishedReleasesQuery('') in
-    // ReleaseHeadlines, so the desktop headlines column hydrates server-filled
-    // instead of popping in after a client API roundtrip.
-    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        queryKey: ['releases', 'publishedInfinite', ''],
-        initialPageParam: 0,
-      })
-    );
-    expect(mockGetPublishedReleases).toHaveBeenCalledWith({ skip: 0, take: 24 });
-
-    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
-    await expect(opts.queryFn()).resolves.toEqual({
-      rows: [{ id: 'release-1', title: 'Landing Release' }],
-      nextSkip: null,
-    });
-  });
-
-  it('falls back to an empty first page when the releases service fails', async () => {
-    mockGetPublishedReleases.mockResolvedValue({ success: false, error: 'Database unavailable' });
-
-    render(await Home());
-
-    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
-    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
-  });
-
   it('surfaces service failures as queryFn rejections so the client refetches', async () => {
     mockGetFeaturedArtists.mockResolvedValue({ success: false, error: 'Database unavailable' });
     mockGetActiveBanners.mockResolvedValue({ success: false, error: 'Database unavailable' });
@@ -273,76 +240,197 @@ describe('Home Page', () => {
     });
   });
 
-  describe('desktop cover-art preload', () => {
-    const coverPreloadSelector = 'link[rel="preload"][as="image"][media="(min-width: 1024px)"]';
+  describe('newest-releases fallback', () => {
+    const SPOTLIGHT = {
+      id: 'featured-1',
+      displayName: 'Jane Doe',
+      coverArt: '/media/releases/abc/cover.jpg',
+      featuredTrackNumber: null,
+      artists: [],
+      digitalFormat: null,
+      release: {
+        id: 'rel-1',
+        title: 'Spot Album',
+        coverArt: '',
+        releasedOn: new Date('2024-01-01T00:00:00Z'),
+        images: [],
+      },
+    };
 
-    const seedFeaturedArtists = (artists: unknown[]) =>
+    const seedSpotlights = (featuredArtists: unknown[] | undefined) =>
       mockGetQueryData.mockImplementation((key: string[]) =>
-        key[0] === 'featuredArtists'
-          ? { featuredArtists: artists, count: artists.length }
+        key[0] === 'featuredArtists' && featuredArtists
+          ? { featuredArtists, count: featuredArtists.length }
           : undefined
       );
 
-    it('emits a desktop-scoped, high-priority preload for the first cover art', async () => {
-      seedFeaturedArtists([
-        {
-          id: 'featured-1',
-          displayName: 'Jane Doe',
-          coverArt: '/media/releases/abc/cover.jpg',
-          artists: [],
-        },
-      ]);
+    const fallbackCall = () =>
+      (
+        mockPrefetchQuery.mock.calls as Array<
+          [{ queryKey: unknown[]; queryFn: () => Promise<unknown> }]
+        >
+      ).find(([opts]) => opts.queryKey[1] === 'newestPublished');
+
+    it('never prefetches the infinite headlines feed', async () => {
+      render(await Home());
+
+      expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
+    });
+
+    it('does not prefetch the newest releases while there are spotlights', async () => {
+      seedSpotlights([SPOTLIGHT]);
 
       render(await Home());
 
-      // The player SSRs, so the selected artist's cover art — the desktop LCP
-      // element — is fetchable as soon as the HTML arrives. `lg` is where the
-      // grid split puts it above the fold; below that it stays lazy.
-      const preload = document.querySelector(coverPreloadSelector);
-      expect(preload).not.toBeNull();
-      expect(preload?.getAttribute('imagesrcset')).toContain(
-        '/media/releases/abc/cover_w640.webp 640w'
-      );
-      expect(preload?.getAttribute('imagesizes')).toBe('576px');
-      expect(preload?.getAttribute('fetchpriority')).toBe('high');
+      expect(fallbackCall()).toBeUndefined();
+      expect(mockGetPublishedReleases).not.toHaveBeenCalled();
     });
 
-    it('targets the first artist with a displayable name (matching player selection)', async () => {
-      seedFeaturedArtists([
-        // No displayName and no connected artists → the player filters it out,
-        // so the preload must skip it too.
-        { id: 'featured-0', coverArt: '/media/releases/skipped/cover.jpg', artists: [] },
-        {
-          id: 'featured-1',
-          displayName: 'Jane Doe',
-          coverArt: '/media/releases/selected/cover.jpg',
-          artists: [],
-        },
+    it('does not prefetch the newest releases when the spotlights failed to load', async () => {
+      seedSpotlights(undefined);
+
+      render(await Home());
+
+      expect(fallbackCall()).toBeUndefined();
+    });
+
+    it('prefetches the twelve newest releases when there is no spotlight', async () => {
+      seedSpotlights([]);
+      mockGetPublishedReleases.mockResolvedValue({
+        success: true,
+        data: [{ id: 'release-1', title: 'Newest Album' }],
+      });
+
+      render(await Home());
+
+      // Same key and page shape as useNewestPublishedReleasesQuery(12), so the
+      // grid hydrates server-filled.
+      expect(fallbackCall()?.[0].queryKey).toEqual(['releases', 'newestPublished', 12]);
+      expect(mockGetPublishedReleases.mock.calls).toEqual([[{ skip: 0, take: 12 }]]);
+      await expect(fallbackCall()?.[0].queryFn()).resolves.toEqual({
+        rows: [{ id: 'release-1', title: 'Newest Album' }],
+        nextSkip: null,
+      });
+    });
+
+    it('prefetches the newest releases when no spotlight row can render', async () => {
+      seedSpotlights([{ ...SPOTLIGHT, release: null }]);
+
+      render(await Home());
+
+      expect(fallbackCall()).toBeDefined();
+    });
+
+    it('surfaces a failed fallback read so the client refetches', async () => {
+      seedSpotlights([]);
+      mockGetPublishedReleases.mockResolvedValue({ success: false, error: 'Database unavailable' });
+
+      render(await Home());
+
+      await expect(fallbackCall()?.[0].queryFn()).rejects.toThrow('Database unavailable');
+    });
+  });
+
+  describe('first-cover preload', () => {
+    const coverPreloadSelector = 'link[rel="preload"][as="image"]:not([media])';
+
+    const SPOTLIGHT = {
+      id: 'featured-1',
+      displayName: 'Jane Doe',
+      coverArt: '/media/releases/abc/cover.jpg',
+      featuredTrackNumber: null,
+      artists: [],
+      digitalFormat: null,
+      release: {
+        id: 'rel-1',
+        title: 'Spot Album',
+        coverArt: '',
+        releasedOn: new Date('2024-01-01T00:00:00Z'),
+        images: [],
+      },
+    };
+
+    const seed = (featuredArtists: unknown[], newestRows?: unknown[]) =>
+      mockGetQueryData.mockImplementation((key: string[]) => {
+        if (key[0] === 'featuredArtists') {
+          return { featuredArtists, count: featuredArtists.length };
+        }
+        if (key[1] === 'newestPublished' && newestRows) {
+          return { rows: newestRows, nextSkip: null };
+        }
+        return undefined;
+      });
+
+    it('preloads the first card cover at every width, at high priority', async () => {
+      seed([SPOTLIGHT]);
+
+      render(await Home());
+
+      // The grid sits above the fold at every width, so the preload carries
+      // no media query; its sizes are the card image's own.
+      const preloads = document.querySelectorAll(coverPreloadSelector);
+      expect(preloads).toHaveLength(1);
+      expect(preloads[0]?.getAttribute('imagesrcset')).toContain(
+        '/media/releases/abc/cover_w640.webp 640w'
+      );
+      expect(preloads[0]?.getAttribute('imagesizes')).toBe(SPOTLIGHT_COVER_SIZES);
+      expect(preloads[0]?.getAttribute('fetchpriority')).toBe('high');
+    });
+
+    it('preloads the first card that renders, skipping rows the grid skips', async () => {
+      seed([
+        // No display name: the grid skips it, so the preload must too.
+        { ...SPOTLIGHT, id: 'featured-0', displayName: null, coverArt: '/media/skipped/c.jpg' },
+        { ...SPOTLIGHT, coverArt: '/media/releases/selected/cover.jpg' },
       ]);
 
       render(await Home());
 
       const preload = document.querySelector(coverPreloadSelector);
       expect(preload?.getAttribute('imagesrcset')).toContain('/media/releases/selected/');
-      expect(preload?.getAttribute('imagesrcset')).not.toContain('/media/releases/skipped/');
+      expect(preload?.getAttribute('imagesrcset')).not.toContain('/media/skipped/');
+    });
+
+    it('preloads the first newest release when the grid falls back', async () => {
+      seed(
+        [],
+        [
+          {
+            id: 'rel-9',
+            title: 'Newest Album',
+            coverArt: '/media/releases/newest/cover.jpg',
+            releasedOn: new Date('2025-01-01T00:00:00Z'),
+            images: [],
+            digitalFormats: [],
+            albumArtist: null,
+          },
+        ]
+      );
+
+      render(await Home());
+
+      expect(document.querySelector(coverPreloadSelector)?.getAttribute('imagesrcset')).toContain(
+        '/media/releases/newest/'
+      );
     });
 
     it('emits no cover preload when the cover art is a data: URI', async () => {
-      seedFeaturedArtists([
-        {
-          id: 'featured-1',
-          displayName: 'Jane Doe',
-          coverArt: 'data:image/webp;base64,AAAA',
-          artists: [],
-        },
-      ]);
+      seed([{ ...SPOTLIGHT, coverArt: 'data:image/webp;base64,AAAA' }]);
 
       render(await Home());
 
       expect(document.querySelector(coverPreloadSelector)).toBeNull();
     });
 
-    it('emits no cover preload when no featured artists are cached', async () => {
+    it('emits no cover preload when the first card has no cover', async () => {
+      seed([{ ...SPOTLIGHT, coverArt: null }]);
+
+      render(await Home());
+
+      expect(document.querySelector(coverPreloadSelector)).toBeNull();
+    });
+
+    it('emits no cover preload when nothing is cached', async () => {
       mockGetQueryData.mockReturnValue(undefined);
 
       render(await Home());

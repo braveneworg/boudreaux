@@ -3,9 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import type { FeaturedArtist } from '@/lib/types/media-models';
-import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
-
 import { ReleaseShareWidget } from './release-share-widget';
 
 const { mockToast } = vi.hoisted(() => ({
@@ -26,269 +23,161 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('./social-share-widget', () => ({
-  SocialShareWidget: () => <div data-testid="social-share-widget" />,
+  SocialShareWidget: ({ artistUrl }: { artistUrl: string }) => (
+    <div data-testid="social-share-widget" data-url={artistUrl} />
+  ),
 }));
 
-vi.mock('@/lib/utils/get-display-name', () => ({
-  getDisplayName: (item: Record<string, unknown>) =>
-    (item.displayName as string) || 'Mock Display Name',
-}));
+const BASE_URL = 'https://fakefour.test';
+
+const defaultProps = {
+  artistSlug: 'spot-artist',
+  artistName: 'Spot Artist',
+  releaseTitle: 'Spot Album',
+};
+
+const stubShare = (share: ((data: ShareData) => Promise<void>) | undefined): void => {
+  Object.defineProperty(navigator, 'share', { value: share, writable: true, configurable: true });
+};
+
+const stubClipboard = (writeText: (text: string) => Promise<void>): void => {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    writable: true,
+    configurable: true,
+  });
+};
 
 describe('ReleaseShareWidget', () => {
-  it('should render a separator', () => {
-    const { container } = render(<ReleaseShareWidget />, { wrapper: createQueryWrapper() });
-
-    const separator = container.querySelector('[data-slot="separator"]');
-    expect(separator).toBeInTheDocument();
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', BASE_URL);
   });
 
-  describe('share functionality', () => {
-    const mockFeaturedArtists = [
-      { displayName: 'Artist One' },
-      { displayName: 'Artist Two', artists: [{ slug: 'artist-two' }] },
-    ] as unknown as FeaturedArtist[];
+  it('renders a separator', () => {
+    const { container } = render(<ReleaseShareWidget {...defaultProps} />);
 
-    const mockSelectedArtist = {
-      displayName: 'Selected Artist',
-      artists: [{ slug: 'selected-artist' }],
-      release: { title: 'Selected Release' },
-    } as unknown as FeaturedArtist;
-    it('should render the Share2Icon', () => {
-      render(<ReleaseShareWidget />, {
-        wrapper: createQueryWrapper(),
-      });
+    expect(container.querySelector('[data-slot="separator"]')).toBeInTheDocument();
+  });
 
-      expect(screen.getByTestId('share2-icon')).toBeInTheDocument();
+  it('renders the Share2Icon', () => {
+    render(<ReleaseShareWidget {...defaultProps} />);
+
+    expect(screen.getByTestId('share2-icon')).toBeInTheDocument();
+  });
+
+  it("shares the artist's page through the social links", async () => {
+    render(<ReleaseShareWidget {...defaultProps} />);
+
+    // SocialShareWidget is a next/dynamic import that resolves asynchronously.
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
+      `${BASE_URL}/artists/spot-artist`
+    );
+  });
+
+  it('shares the site when there is no artist page', async () => {
+    render(<ReleaseShareWidget {...defaultProps} artistSlug={null} />);
+
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute('data-url', BASE_URL);
+  });
+
+  it('shares the release title and artist through navigator.share', () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    stubShare(share);
+
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
+
+    expect(share.mock.calls).toEqual([
+      [
+        {
+          title: 'Spot Album',
+          text: 'Check out Spot Artist on Fake Four Inc.!',
+          url: `${BASE_URL}/artists/spot-artist`,
+        },
+      ],
+    ]);
+  });
+
+  it('names the release when there is no artist name', () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    stubShare(share);
+
+    render(<ReleaseShareWidget {...defaultProps} artistName={null} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
+
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Check out Spot Album on Fake Four Inc.!' })
+    );
+  });
+
+  it('copies the artist link when navigator.share is not available', () => {
+    stubShare(undefined);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
+
+    expect(writeText.mock.calls).toEqual([[`${BASE_URL}/artists/spot-artist`]]);
+  });
+
+  it('confirms a copied link', async () => {
+    stubShare(undefined);
+    stubClipboard(vi.fn().mockResolvedValue(undefined));
+
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
+
+    await vi.waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith('Artist link copied to clipboard!');
     });
+  });
 
-    it('should render the SocialShareWidget', async () => {
-      render(<ReleaseShareWidget />, {
-        wrapper: createQueryWrapper(),
-      });
+  it('shows a success toast when the share succeeds', async () => {
+    stubShare(vi.fn().mockResolvedValue(undefined));
 
-      // SocialShareWidget is a next/dynamic import that resolves asynchronously.
-      // Use findByTestId so the assertion waits for it instead of relying on the
-      // dynamic-import module cache being warmed by an earlier test (which made
-      // this order-dependent under shuffled test order).
-      expect(await screen.findByTestId('social-share-widget')).toBeInTheDocument();
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
+
+    await vi.waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith('Content shared successfully!');
     });
+  });
 
-    it('should call setSelectedArtist with the second featured artist when no selectedArtist', () => {
-      const setSelectedArtist = vi.fn();
+  it('shows an error toast when the share fails', async () => {
+    stubShare(vi.fn().mockRejectedValue(new Error('Share failed')));
 
-      render(
-        <ReleaseShareWidget
-          featuredArtists={mockFeaturedArtists}
-          setSelectedArtist={setSelectedArtist}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
 
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      expect(setSelectedArtist).toHaveBeenCalledWith(mockFeaturedArtists[1]);
+    await vi.waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Error sharing content');
     });
+  });
 
-    it('should not call setSelectedArtist when no selectedArtist and no featured artists', () => {
-      const setSelectedArtist = vi.fn();
+  it('shows an error toast when the clipboard write fails', async () => {
+    stubShare(undefined);
+    stubClipboard(vi.fn().mockRejectedValue(new Error('Clipboard write failed')));
 
-      render(<ReleaseShareWidget featuredArtists={[]} setSelectedArtist={setSelectedArtist} />, {
-        wrapper: createQueryWrapper(),
-      });
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
 
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      expect(setSelectedArtist).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Failed to copy link to clipboard');
     });
+  });
 
-    it('should use navigator.share when available and selectedArtist has a slug', async () => {
-      const mockShare = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'share', {
-        value: mockShare,
-        writable: true,
-        configurable: true,
-      });
+  it('shows no error when the user cancels the share sheet', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('Share canceled', 'AbortError'));
+    stubShare(share);
 
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
+    render(<ReleaseShareWidget {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('share2-icon'));
 
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      expect(mockShare).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Selected Release',
-          text: 'Check out Selected Artist on Fake Four Inc.!',
-          url: expect.stringContaining('/artists/selected-artist'),
-        })
-      );
+    await vi.waitFor(() => {
+      expect(share).toHaveBeenCalled();
     });
-
-    it('should fall back to clipboard.writeText when navigator.share is not available', async () => {
-      Object.defineProperty(navigator, 'share', {
-        value: undefined,
-        writable: true,
-        configurable: true,
-      });
-
-      const mockWriteText = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText: mockWriteText },
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      expect(mockWriteText).toHaveBeenCalledWith(
-        expect.stringContaining('/artists/selected-artist')
-      );
-    });
-
-    it('should show success toast when share succeeds', async () => {
-      const mockShare = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'share', {
-        value: mockShare,
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      await vi.waitFor(() => {
-        expect(mockToast.success).toHaveBeenCalledWith('Content shared successfully!');
-      });
-    });
-
-    it('should use getDisplayName as share title when release title is falsy', async () => {
-      const artistWithNoTitle = {
-        displayName: 'No Title Artist',
-        artists: [{ slug: 'no-title-artist' }],
-        release: { title: '' },
-      } as unknown as FeaturedArtist;
-
-      const mockShare = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'share', {
-        value: mockShare,
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={artistWithNoTitle}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      expect(mockShare).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'No Title Artist',
-        })
-      );
-    });
-
-    it('should show error toast when share fails', async () => {
-      const shareError = new Error('Share failed');
-      const mockShare = vi.fn().mockRejectedValue(shareError);
-      Object.defineProperty(navigator, 'share', {
-        value: mockShare,
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      await vi.waitFor(() => {
-        expect(mockToast.error).toHaveBeenCalledWith('Error sharing content');
-      });
-    });
-
-    it('should show error toast when clipboard.writeText fails', async () => {
-      Object.defineProperty(navigator, 'share', {
-        value: undefined,
-        writable: true,
-        configurable: true,
-      });
-
-      const mockWriteText = vi.fn().mockRejectedValue(new Error('Clipboard write failed'));
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText: mockWriteText },
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      await vi.waitFor(() => {
-        expect(mockToast.error).toHaveBeenCalledWith('Failed to copy link to clipboard');
-      });
-    });
-
-    it('should not show error toast when user cancels the share dialog', async () => {
-      const abortError = new DOMException('Share canceled', 'AbortError');
-      const mockShare = vi.fn().mockRejectedValue(abortError);
-      Object.defineProperty(navigator, 'share', {
-        value: mockShare,
-        writable: true,
-        configurable: true,
-      });
-
-      render(
-        <ReleaseShareWidget
-          selectedArtist={mockSelectedArtist}
-          featuredArtists={mockFeaturedArtists}
-        />,
-        { wrapper: createQueryWrapper() }
-      );
-
-      fireEvent.click(screen.getByTestId('share2-icon'));
-
-      // Give the promise time to settle
-      await vi.waitFor(() => {
-        expect(mockShare).toHaveBeenCalled();
-      });
-
-      expect(mockToast.error).not.toHaveBeenCalled();
-    });
+    expect(mockToast.error).not.toHaveBeenCalled();
   });
 });
