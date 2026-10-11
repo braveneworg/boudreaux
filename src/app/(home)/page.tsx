@@ -4,7 +4,10 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { HomeContent } from '@/components/home-content';
-import type { ActiveFeaturedArtistsResponse } from '@/hooks/queries/use-active-featured-artists-query';
+import {
+  type ActiveFeaturedArtistsResponse,
+  SPOTLIGHT_LIMIT,
+} from '@/hooks/queries/use-active-featured-artists-query';
 import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/queries/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import {
@@ -93,7 +96,7 @@ export default async function Home() {
     queryClient.prefetchQuery({
       queryKey: queryKeys.featuredArtists.active(),
       queryFn: async () => {
-        const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), 7);
+        const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), SPOTLIGHT_LIMIT);
         if (!result.success) {
           throw new Error(result.error);
         }

@@ -51,6 +51,7 @@ export const featuredArtistSchema = z.object({
       id: z.string(),
       title: z.string(),
       coverArt: z.string(),
+      releasedOn: date,
       images: z.array(z.object({ src: nullableString })),
     })
     .nullable(),

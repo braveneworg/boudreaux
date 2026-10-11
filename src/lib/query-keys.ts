@@ -15,6 +15,9 @@ export const queryKeys = {
     all: ['releases'] as const,
     publishedInfinite: (search: string) =>
       [...queryKeys.releases.all, 'publishedInfinite', search.trim().toLowerCase()] as const,
+    /** The first `take` published releases, newest first (the home grid's fallback). */
+    newestPublished: (take: number) =>
+      [...queryKeys.releases.all, 'newestPublished', take] as const,
     adminInfinite: (params: {
       search: string;
       published: boolean | null;

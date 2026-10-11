@@ -70,9 +70,13 @@ describe('FeaturedArtistRepository', () => {
           ...featuredArtistInclude,
           artists: { ...featuredArtistInclude.artists, where: PUBLIC_ARTIST },
         },
-        orderBy: { featuredOn: 'desc' },
+        orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
         take: 5,
       });
+    });
+
+    it('selects the release date, which a spotlight card shows as the year', () => {
+      expect(featuredArtistInclude.release.select).toHaveProperty('releasedOn', true);
     });
 
     it('leaves the admin include unfiltered, so an admin still sees hidden artists', () => {

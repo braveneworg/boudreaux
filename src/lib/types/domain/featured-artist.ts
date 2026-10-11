@@ -56,11 +56,12 @@ export type FeaturedArtistArtist = {
   }>;
 };
 
-/** Narrow release projection on a featured artist (cover-art/title display). */
+/** Narrow release projection on a featured artist (cover art, title, year). */
 export type FeaturedArtistRelease = {
   id: string;
   title: string;
   coverArt: string;
+  releasedOn: Date;
   images: Array<{ src: string | null }>;
 };
 

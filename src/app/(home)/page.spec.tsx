@@ -152,7 +152,7 @@ describe('Home Page', () => {
     const HomeComponent = await Home();
     render(HomeComponent);
 
-    expect(mockGetFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 7);
+    expect(mockGetFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 12);
     expect(mockGetActiveBanners).toHaveBeenCalledTimes(1);
 
     const calls = mockPrefetchQuery.mock.calls as Array<

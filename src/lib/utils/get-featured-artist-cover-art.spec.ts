@@ -39,6 +39,7 @@ const makeRelease = (
   id: 'r-1',
   title: 'Test Album',
   coverArt: 'https://cdn.example.com/album.jpg',
+  releasedOn: new Date('2024-03-01T00:00:00Z'),
   images: [],
   ...overrides,
 });
