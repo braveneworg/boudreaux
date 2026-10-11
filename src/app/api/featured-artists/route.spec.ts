@@ -323,11 +323,14 @@ describe('Featured Artists API Routes', () => {
         });
 
         const request = new NextRequest(
-          'http://localhost:3000/api/featured-artists?active=true&limit=7'
+          'http://localhost:3000/api/featured-artists?active=true&limit=12'
         );
         await GET(request, dummyContext);
 
-        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(expect.any(Date), 7);
+        expect(FeaturedArtistsService.getFeaturedArtists).toHaveBeenCalledWith(
+          expect.any(Date),
+          12
+        );
       });
 
       it('should cap limit to 100', async () => {
