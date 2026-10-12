@@ -79,12 +79,26 @@ interface Edges {
   bottom: number;
 }
 
-/** The edges of the box a visible element draws. */
-const edgesOf = async (locator: Locator): Promise<Edges> => {
-  await expect(locator).toBeVisible();
-  const box = await locator.boundingBox();
-  if (!box) throw new Error('A visible element has no box');
-  return { left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height };
+/**
+ * The edges of the boxes the visible elements draw, read from one layout
+ * frame. Reading each box with its own `boundingBox()` call lets the page
+ * move between reads: on CI the bio section's lazy-loaded editor mounted
+ * above the links mid-sequence, so the row's buttons measured 105px below
+ * the URL they share a line with (run 38188524412).
+ */
+const edgesOfAll = async (locators: readonly Locator[]): Promise<Edges[]> => {
+  for (const locator of locators) await expect(locator).toBeVisible();
+  const handles = await Promise.all(locators.map((locator) => locator.elementHandle()));
+  const page = locators[0].page();
+  return page.evaluate(
+    (elements) =>
+      elements.map((element) => {
+        if (!element) throw new Error('A visible element has no box');
+        const { left, right, top, bottom } = element.getBoundingClientRect();
+        return { left, right, top, bottom };
+      }),
+    handles
+  );
 };
 
 const save = async (page: Page): Promise<void> => {
@@ -212,10 +226,12 @@ test.describe('Artist links (ADR-0020)', () => {
     const removeButton = adminPage.getByRole('button', { name: 'Remove group 1 link 1' });
 
     // Desktop: label and URL share a line, the row's buttons beside them.
-    const label = await edgesOf(labelInput);
-    const url = await edgesOf(urlInput);
-    const description = await edgesOf(descriptionInput);
-    const remove = await edgesOf(removeButton);
+    const [label, url, description, remove] = await edgesOfAll([
+      labelInput,
+      urlInput,
+      descriptionInput,
+      removeButton,
+    ]);
     expect(url.top).toBeLessThan(label.bottom);
     expect(remove.top).toBeLessThan(url.bottom);
     expect(description.top).toBeGreaterThanOrEqual(url.bottom);
@@ -224,9 +240,11 @@ test.describe('Artist links (ADR-0020)', () => {
 
     // Phone: the label has a line of its own, and the description is as wide.
     await adminPage.setViewportSize(PHONE);
-    const phoneLabel = await edgesOf(labelInput);
-    const phoneUrl = await edgesOf(urlInput);
-    const phoneDescription = await edgesOf(descriptionInput);
+    const [phoneLabel, phoneUrl, phoneDescription] = await edgesOfAll([
+      labelInput,
+      urlInput,
+      descriptionInput,
+    ]);
     expect(phoneUrl.top).toBeGreaterThanOrEqual(phoneLabel.bottom);
     expect(phoneDescription.top).toBeGreaterThanOrEqual(phoneUrl.bottom);
     expect(Math.abs(phoneDescription.left - phoneLabel.left)).toBeLessThanOrEqual(EDGE_SLACK);
