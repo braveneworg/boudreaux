@@ -22,6 +22,10 @@ describe('queryKeys', () => {
       expect(queryKeys.releases.all).toEqual(['releases']);
     });
 
+    it('keys the newest published releases by take', () => {
+      expect(queryKeys.releases.newestPublished(12)).toEqual(['releases', 'newestPublished', 12]);
+    });
+
     it('should return detail key with id', () => {
       const key = queryKeys.releases.detail('r-123');
       expect(key).toEqual(['releases', 'detail', 'r-123']);

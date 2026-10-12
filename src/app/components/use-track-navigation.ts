@@ -37,12 +37,14 @@ interface UseTrackNavigationResult {
  *
  * @param files - Ordered playable files for the current release.
  * @param initialAutoPlay - Initial value for `shouldAutoPlay`.
+ * @param initialIndex - The track to start on (defaults to the first).
  */
 export const useTrackNavigation = (
   files: readonly TrackNavItem[],
-  initialAutoPlay: boolean
+  initialAutoPlay: boolean,
+  initialIndex = 0
 ): UseTrackNavigationResult => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(initialAutoPlay);
 
   const handleFileSelect = useCallback(

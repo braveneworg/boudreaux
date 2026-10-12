@@ -5,91 +5,60 @@ import { render, screen } from '@testing-library/react';
 
 import { SocialShareWidget } from './social-share-widget';
 
-vi.mock('react-share', () => ({
-  FacebookIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
-    <span data-testid="facebook-icon" data-size={size} {...props} />
-  ),
-  FacebookMessengerIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
-    <span data-testid="messenger-icon" data-size={size} {...props} />
-  ),
-  FacebookMessengerShareButton: ({
-    children,
-    url,
-    appId,
-    ...props
-  }: {
-    children: React.ReactNode;
-    url: string;
-    appId: string;
-  } & Record<string, unknown>) => (
-    <button data-url={url} data-app-id={appId} aria-label={props['aria-label'] as string}>
+type IconMockProps = {
+  size: number;
+  bgStyle?: { fill?: string };
+  className?: string;
+  'aria-hidden'?: boolean;
+};
+
+type ButtonMockProps = {
+  children: React.ReactNode;
+  url: string;
+  title?: string;
+  appId?: string;
+  className?: string;
+  'aria-label'?: string;
+};
+
+vi.mock('react-share', () => {
+  // Echo the size, the gray fill override and the classes so the layers can
+  // be asserted; the brand layer is a second icon with no bgStyle.
+  const icon =
+    (testId: string) =>
+    ({ size, bgStyle, className, ...props }: IconMockProps) => (
+      <span
+        data-testid={testId}
+        data-size={size}
+        data-bg-fill={bgStyle?.fill}
+        className={className}
+        aria-hidden={props['aria-hidden']}
+      />
+    );
+  const button = ({ children, url, title, appId, className, ...props }: ButtonMockProps) => (
+    <button
+      data-url={url}
+      data-title={title}
+      data-app-id={appId}
+      className={className}
+      aria-label={props['aria-label']}
+    >
       {children}
     </button>
-  ),
-  FacebookShareButton: ({
-    children,
-    url,
-    ...props
-  }: {
-    children: React.ReactNode;
-    url: string;
-  } & Record<string, unknown>) => (
-    <button data-url={url} aria-label={props['aria-label'] as string}>
-      {children}
-    </button>
-  ),
-  TelegramIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
-    <span data-testid="telegram-icon" data-size={size} {...props} />
-  ),
-  TelegramShareButton: ({
-    children,
-    url,
-    title,
-    ...props
-  }: {
-    children: React.ReactNode;
-    url: string;
-    title: string;
-  } & Record<string, unknown>) => (
-    <button data-url={url} data-title={title} aria-label={props['aria-label'] as string}>
-      {children}
-    </button>
-  ),
-  WhatsappIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
-    <span data-testid="whatsapp-icon" data-size={size} {...props} />
-  ),
-  WhatsappShareButton: ({
-    children,
-    url,
-    title,
-    ...props
-  }: {
-    children: React.ReactNode;
-    url: string;
-    title: string;
-  } & Record<string, unknown>) => (
-    <button data-url={url} data-title={title} aria-label={props['aria-label'] as string}>
-      {children}
-    </button>
-  ),
-  XIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
-    <span data-testid="x-icon" data-size={size} {...props} />
-  ),
-  XShareButton: ({
-    children,
-    url,
-    title,
-    ...props
-  }: {
-    children: React.ReactNode;
-    url: string;
-    title: string;
-  } & Record<string, unknown>) => (
-    <button data-url={url} data-title={title} aria-label={props['aria-label'] as string}>
-      {children}
-    </button>
-  ),
-}));
+  );
+  return {
+    FacebookIcon: icon('facebook-icon'),
+    FacebookMessengerIcon: icon('messenger-icon'),
+    FacebookMessengerShareButton: button,
+    FacebookShareButton: button,
+    TelegramIcon: icon('telegram-icon'),
+    TelegramShareButton: button,
+    WhatsappIcon: icon('whatsapp-icon'),
+    WhatsappShareButton: button,
+    XIcon: icon('x-icon'),
+    XShareButton: button,
+  };
+});
 
 vi.mock('lucide-react', () => ({
   MessageSquareIcon: ({ size, ...props }: { size: number } & Record<string, unknown>) => (
@@ -259,6 +228,81 @@ describe('SocialShareWidget', () => {
       const messengerButton = screen.getByLabelText('Share on Messenger');
 
       expect(messengerButton).toHaveAttribute('data-app-id', customAppId);
+    });
+  });
+
+  describe('gray at rest, brand on interaction', () => {
+    const CONTROLS = [
+      'Share on Facebook',
+      'Share on Messenger',
+      'Share on WhatsApp',
+      'Share via SMS',
+      'Share on Telegram',
+      '微信 — Share on WeChat (scan QR code)',
+      'Share on X',
+    ];
+
+    const layer = (control: HTMLElement, name: 'gray' | 'brand'): Element | null =>
+      control.querySelector(`[data-share-layer="${name}"]`);
+
+    it.each(CONTROLS)('makes %s the group its layers react to', (label) => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+
+      expect(screen.getByLabelText(label)).toHaveClass('group');
+    });
+
+    it.each(CONTROLS)('stacks a gray layer and a brand layer in %s', (label) => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+      const control = screen.getByLabelText(label);
+
+      expect(layer(control, 'gray')).not.toBeNull();
+      expect(layer(control, 'brand')).not.toBeNull();
+    });
+
+    it.each(CONTROLS)('hides the brand layer of %s until hover, focus or press', (label) => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+      const brand = layer(screen.getByLabelText(label), 'brand');
+
+      expect(brand).toHaveClass(
+        'absolute',
+        'opacity-0',
+        'group-hover:opacity-100',
+        'group-focus-visible:opacity-100',
+        'group-active:opacity-100',
+        'transition-opacity'
+      );
+      expect(brand).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it.each([
+      ['facebook-icon', '#3f3f46'],
+      ['messenger-icon', '#52525b'],
+      ['whatsapp-icon', '#71717a'],
+      ['telegram-icon', '#52525b'],
+      ['x-icon', '#27272a'],
+    ])('fills the gray %s with its zinc shade', (testId, fill) => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+      const [gray, brand] = screen.getAllByTestId(testId);
+
+      expect(gray).toHaveAttribute('data-bg-fill', fill);
+      // The brand layer keeps react-share's own network color.
+      expect(brand).not.toHaveAttribute('data-bg-fill');
+    });
+
+    it.each(['Share via SMS', '微信 — Share on WeChat (scan QR code)'])(
+      'gives the %s gray layer a zinc-700 background',
+      (label) => {
+        render(<SocialShareWidget artistUrl={TEST_URL} />);
+        const gray = layer(screen.getByLabelText(label), 'gray');
+
+        expect(gray?.firstElementChild).toHaveClass('bg-zinc-700');
+      }
+    );
+
+    it('sets no inline size on the SMS link', () => {
+      render(<SocialShareWidget artistUrl={TEST_URL} />);
+
+      expect(screen.getByLabelText('Share via SMS')).not.toHaveAttribute('style');
     });
   });
 });

@@ -9,7 +9,6 @@ import { ChatLauncher } from './components/chat/chat-launcher';
 import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
 import { Providers } from './components/providers';
-import { IosInstallPrompt } from './components/pwa/ios-install-prompt';
 import { ServiceWorkerRegister } from './components/pwa/service-worker-register';
 import { MAIN_CONTENT_ID, SkipNavLink } from './components/skip-nav-link';
 
@@ -26,7 +25,7 @@ import './globals.css';
 //
 // We disable next/font's auto-preload because the loader would emit a
 // `<link rel=preload>` for both files while first paint is mostly upright
-// text (the italic is used only by the featured player's NowPlayingHeading).
+// text (italic appears only in bio captions and legal notes).
 // Preloading both would compete with the LCP image fetch for early
 // bandwidth; with `inlineCss` the `@font-face` rules arrive with the HTML
 // anyway, so discovery is already immediate.
@@ -152,7 +151,6 @@ export default function RootLayout({
         </Providers>
         <Toaster position="bottom-center" />
         <ServiceWorkerRegister />
-        <IosInstallPrompt />
       </body>
     </html>
   );

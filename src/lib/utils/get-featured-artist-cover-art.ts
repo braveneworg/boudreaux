@@ -6,7 +6,7 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
 
 /**
  * Resolve the cover-art URL for a featured artist, applying the same fallback
- * chain used by `featured-artists-player`:
+ * chain used by the home page's spotlight cards:
  *   1. `featured.coverArt`
  *   2. `featured.release.coverArt`
  *   3. First `featured.release.images[].src`

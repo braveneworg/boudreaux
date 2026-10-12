@@ -114,7 +114,7 @@ const releaseListItemInclude = {
 const publicListingCredits = orderedCredits({
   select: {
     artist: {
-      // slug feeds the landing headlines' artist links.
+      // slug feeds the home grid's fallback title links.
       select: {
         id: true,
         firstName: true,

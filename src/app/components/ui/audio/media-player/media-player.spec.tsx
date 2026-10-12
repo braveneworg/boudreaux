@@ -3,11 +3,11 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import React from 'react';
 
-import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import videojs from 'video.js';
 
-import type { FeaturedArtist, Release, Artist } from '@/lib/types/media-models';
+import type { Release, Artist } from '@/lib/types/media-models';
 
 import { MediaPlayer } from './media-player';
 import { claimPlayback, releasePlayback } from '../../playback-session';
@@ -165,40 +165,10 @@ vi.mock('@/components/ui/drawer', () => ({
 }));
 
 // Mock Carousel components
-const mockScrollTo = vi.fn();
-const mockCarouselOn = vi.fn();
-const mockCarouselOff = vi.fn();
-const mockSelectedScrollSnap = vi.fn().mockReturnValue(0);
-const mockCarouselApi = {
-  scrollTo: mockScrollTo,
-  on: mockCarouselOn,
-  off: mockCarouselOff,
-  selectedScrollSnap: mockSelectedScrollSnap,
-};
-let shouldProvideCarouselApi = true;
-
 vi.mock('@/components/ui/carousel', () => ({
-  Carousel: ({
-    children,
-    setApi,
-    opts,
-  }: {
-    children: React.ReactNode;
-    setApi?: (api: typeof mockCarouselApi) => void;
-    opts?: { loop?: boolean; align?: string };
-  }) => {
-    // Use useEffect to avoid setState-during-render warning
-    React.useEffect(() => {
-      if (shouldProvideCarouselApi) {
-        setApi?.(mockCarouselApi);
-      }
-    }, [setApi]);
-    return (
-      <div data-testid="carousel" data-align={opts?.align} data-loop={opts?.loop?.toString()}>
-        {children}
-      </div>
-    );
-  },
+  Carousel: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="carousel">{children}</div>
+  ),
   CarouselContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="carousel-content" className={className}>
       {children}
@@ -351,54 +321,6 @@ const createMockArtist = (
     releases: [],
     urls: [],
   }) as unknown as Artist;
-
-const createMockFeaturedArtist = (
-  overrides: Partial<{
-    id: string;
-    displayName: string | null;
-    position: number;
-    coverArt: string | null;
-    digitalFormat: {
-      id: string;
-      files: Array<{
-        id: string;
-        trackNumber: number;
-        title: string;
-        fileName: string;
-        s3Key: string;
-      }>;
-    } | null;
-    release: Release | null;
-    artists: Array<{
-      id: string;
-      firstName: string;
-      surname: string;
-      displayName: string | null;
-    }>;
-  }> = {}
-): FeaturedArtist =>
-  ({
-    id: overrides.id ?? 'featured-1',
-    displayName: 'displayName' in overrides ? overrides.displayName : 'Test Artist',
-    featuredOn: new Date('2024-01-15'),
-    position: overrides.position ?? 1,
-    description: null,
-    coverArt: overrides.coverArt ?? null,
-    digitalFormatId: 'format-1',
-    releaseId: 'release-1',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    artists:
-      overrides.artists?.map((a) => ({
-        ...a,
-        images: [],
-        labels: [],
-        releases: [],
-        urls: [],
-      })) ?? [],
-    digitalFormat: overrides.digitalFormat ?? null,
-    release: overrides.release ?? null,
-  }) as unknown as FeaturedArtist;
 
 describe('MediaPlayer', () => {
   beforeEach(() => {
@@ -722,181 +644,60 @@ describe('MediaPlayer', () => {
   });
 
   describe('InfoTickerTape component', () => {
-    it('should render track title and display name with featuredArtist', () => {
-      const mockRelease = createMockRelease([], { title: 'My Album' });
-
-      const featuredArtist = createMockFeaturedArtist({
-        displayName: 'Test Artist',
-        release: mockRelease,
-      });
-
+    const renderTicker = (isPlaying?: boolean) =>
       render(
         <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} trackTitle="My Song" />
+          <MediaPlayer.InfoTickerTape
+            artistRelease={{
+              release: createMockRelease([createMockFormatFile()], { title: 'My Album' }),
+              artist: createMockArtist({ displayName: 'Test Artist' }),
+            }}
+            trackName="My Song"
+            isPlaying={isPlaying}
+          />
         </MediaPlayer>
       );
 
-      expect(screen.getByText(/My Song/)).toBeInTheDocument();
-      expect(screen.getByText(/Test Artist/)).toBeInTheDocument();
-      expect(screen.getByText(/My Album/)).toBeInTheDocument();
+    it('should render the track name, artist display name and release title', () => {
+      renderTicker();
+
+      expect(screen.getByText('My Song • by Test Artist • My Album')).toBeInTheDocument();
     });
 
     it('should use text-xs font class for ticker text', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
+      const { container } = renderTicker();
 
-      const featuredArtist = createMockFeaturedArtist({
-        release: mockRelease,
-      });
-
-      const { container } = render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      const tickerText = container.querySelector('.text-xs');
-      expect(tickerText).toBeInTheDocument();
+      expect(container.querySelector('.text-xs')).toBeInTheDocument();
     });
 
     it('should apply marquee animation when isPlaying is true', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
+      const { container } = renderTicker(true);
 
-      const featuredArtist = createMockFeaturedArtist({
-        release: mockRelease,
-      });
-
-      const { container } = render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} isPlaying />
-        </MediaPlayer>
-      );
-
-      const animatedElement = container.querySelector('.animate-marquee');
-      expect(animatedElement).toBeInTheDocument();
+      expect(container.querySelector('.animate-marquee')).toBeInTheDocument();
     });
 
     it('should center text when isPlaying is false', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
+      const { container } = renderTicker(false);
 
-      const featuredArtist = createMockFeaturedArtist({
-        release: mockRelease,
-      });
-
-      const { container } = render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} isPlaying={false} />
-        </MediaPlayer>
-      );
-
-      const centeredContainer = container.querySelector('.text-center');
-      expect(centeredContainer).toBeInTheDocument();
+      expect(container.querySelector('.text-center')).toBeInTheDocument();
     });
 
     it('should render a square ticker without a rounded bottom edge', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
-
-      const featuredArtist = createMockFeaturedArtist({
-        release: mockRelease,
-      });
-
-      const { container } = render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
+      const { container } = renderTicker();
 
       const ticker = container.querySelector('.bg-zinc-800');
       expect(ticker).toBeInTheDocument();
       expect(ticker).not.toHaveClass('rounded-b-lg');
     });
 
-    it('should fall back to artist firstName surname when no displayName on featuredArtist', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
-
-      const featuredArtist = createMockFeaturedArtist({
-        displayName: null,
-        release: mockRelease,
-        artists: [{ id: 'artist-1', firstName: 'Jane', surname: 'Smith', displayName: null }],
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
-    });
-
-    it('should use artist displayName when available', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
-
-      const featuredArtist = createMockFeaturedArtist({
-        displayName: null,
-        release: mockRelease,
-        artists: [{ id: 'artist-1', firstName: 'Jane', surname: 'Smith', displayName: 'DJ Jane' }],
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByText(/DJ Jane/)).toBeInTheDocument();
-    });
-
-    it('should not display artist name when no displayName and no artists', () => {
-      const mockRelease = createMockRelease([createMockFormatFile()]);
-
-      const featuredArtist = createMockFeaturedArtist({
-        displayName: null,
-        release: mockRelease,
-        artists: [],
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      expect(screen.queryByText(/Unknown Artist/)).not.toBeInTheDocument();
-    });
-
     it('should render overflow wrapper with horizontal margin', () => {
-      const release = createMockRelease([createMockFormatFile()]);
+      const { container } = renderTicker();
 
-      const featuredArtist = createMockFeaturedArtist({
-        release,
-      });
-
-      const { container } = render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
-
-      const overflowDiv = container.querySelector('.overflow-hidden.mx-3');
-      expect(overflowDiv).toBeInTheDocument();
+      expect(container.querySelector('.overflow-hidden.mx-3')).toBeInTheDocument();
     });
 
     it('should not render TrackListDrawer inside InfoTickerTape', () => {
-      const release = createMockRelease([
-        createMockFormatFile({ id: 'file-1', trackNumber: 1, title: 'Track 1' }),
-        createMockFormatFile({ id: 'file-2', trackNumber: 2, title: 'Track 2' }),
-      ]);
-
-      const featuredArtist = createMockFeaturedArtist({
-        release,
-        artists: [{ id: 'artist-1', firstName: 'Test', surname: 'Artist', displayName: null }],
-      });
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.InfoTickerTape featuredArtist={featuredArtist} />
-        </MediaPlayer>
-      );
+      renderTicker();
 
       expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
     });
@@ -1202,343 +1003,6 @@ describe('MediaPlayer', () => {
       const badge = container.querySelector('.backdrop-blur-sm');
       expect(badge).toBeInTheDocument();
       expect(badge).not.toHaveClass('rounded-full');
-    });
-  });
-
-  describe('FeaturedArtistCarousel component', () => {
-    const mockFeaturedArtists: FeaturedArtist[] = [
-      createMockFeaturedArtist({
-        id: 'featured-1',
-        displayName: 'Artist One',
-        position: 1,
-        coverArt: 'https://example.com/cover1.jpg',
-      }),
-      createMockFeaturedArtist({
-        id: 'featured-2',
-        displayName: 'Artist Two',
-        position: 2,
-        coverArt: 'https://example.com/cover2.jpg',
-      }),
-    ];
-
-    beforeEach(() => {
-      shouldProvideCarouselApi = true;
-      mockCarouselOn.mockClear();
-      mockCarouselOff.mockClear();
-      mockScrollTo.mockClear();
-      mockSelectedScrollSnap.mockReset();
-      mockSelectedScrollSnap.mockReturnValue(0);
-    });
-
-    it('should render carousel with featured artists', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByTestId('carousel')).toBeInTheDocument();
-    });
-
-    it('should render navigation buttons', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByTestId('carousel-previous')).toBeInTheDocument();
-      expect(screen.getByTestId('carousel-next')).toBeInTheDocument();
-    });
-
-    it('should outline thumbnails in black, accenting and scaling the playing one', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={mockFeaturedArtists}
-            selectedArtistId="featured-2"
-          />
-        </MediaPlayer>
-      );
-
-      // Flat black outline on every tile (matching the player frame); the
-      // playing tile swaps to the panel accent and stays slightly scaled up,
-      // animating via the transform transition as it slides in.
-      const playing = screen.getByRole('button', { name: 'Select Artist Two' });
-      expect(playing).toHaveClass(
-        'border-2',
-        'border-(--card-accent)',
-        'scale-105',
-        'transition-transform'
-      );
-      const idle = screen.getByRole('button', { name: 'Select Artist One' });
-      expect(idle).toHaveClass('border-2', 'border-black');
-      expect(idle).not.toHaveClass('scale-105');
-    });
-
-    it('should ring thumbnails only for keyboard focus, not clicks', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      // focus-visible fires for keyboard/programmatic focus but not pointer
-      // clicks on buttons — so clicking a thumbnail shows no dark ring.
-      const tile = screen.getByRole('button', { name: 'Select Artist One' });
-      expect(tile).toHaveClass('focus-visible:ring-2', 'focus-visible:ring-primary');
-      expect(tile.className).not.toMatch(/focus:ring/);
-    });
-
-    it('should inset the desktop row from the column edge with airier gutters', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      // The arrows sit in-flow at the row's ends; the negative margins match
-      // the panel padding (p-6/sm:p-8) so the arrow tips sit near-flush with
-      // the panel edge. On desktop the carousel insets 1rem from the left
-      // column edge so the media below reads as a smaller card with air.
-      const row = screen.getByTestId('carousel-previous').parentElement;
-      expect(row).toHaveClass('-mx-6', 'sm:-mx-8', 'lg:mx-auto', 'lg:max-w-[calc(100%_-_2rem)]');
-      // Roomy 24px gutters between the images, and 3-up on desktop where
-      // the carousel spans the landing split's left half.
-      expect(screen.getByTestId('carousel-content')).toHaveClass('-ml-6');
-      screen.getAllByTestId('carousel-item').forEach((item) => {
-        expect(item).toHaveClass('pl-6', 'lg:basis-1/3');
-        expect(item).not.toHaveClass('pl-2');
-      });
-    });
-
-    it('should serve thumbnails via the loader srcset, not a fixed 384 variant', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      // Raw src → the global CDN loader emits the full pinned-variant srcset,
-      // letting DPR-1 desktops drop to _w256 for the ~166px slot while retina
-      // keeps _w384. `unoptimized` + a hardcoded _w384 forced ~2× the bytes.
-      const thumb = screen
-        .getAllByTestId('next-image')
-        .find((img) => img.getAttribute('src')?.includes('cover1'));
-      expect(thumb).toHaveAttribute('src', 'https://example.com/cover1.jpg');
-      expect(thumb).not.toHaveAttribute('data-unoptimized');
-    });
-
-    it('should size thumbnails to their real slot widths per breakpoint', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      // 3-up below sm (33vw), 5-up to lg (20vw), then a fixed ~166px slot in
-      // the landing grid's left column (600px column − arrow gutters, ÷3).
-      const thumb = screen
-        .getAllByTestId('next-image')
-        .find((img) => img.getAttribute('src')?.includes('cover1'));
-      expect(thumb).toHaveAttribute(
-        'sizes',
-        '(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 166px'
-      );
-    });
-
-    it('should call onSelect when a featured artist is clicked', () => {
-      const onSelect = vi.fn();
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={mockFeaturedArtists}
-            onSelect={onSelect}
-          />
-        </MediaPlayer>
-      );
-
-      // Click on the first carousel item button
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const firstItemButton = within(carouselItems[0]).getByRole('button');
-      fireEvent.click(firstItemButton);
-
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0], { autoPlay: true });
-    });
-
-    it('should sort artists by position', () => {
-      const unsortedArtists: FeaturedArtist[] = [
-        createMockFeaturedArtist({
-          id: 'featured-2',
-          displayName: 'Artist Two',
-          position: 2,
-        }),
-        createMockFeaturedArtist({
-          id: 'featured-1',
-          displayName: 'Artist One',
-          position: 1,
-        }),
-      ];
-
-      const onSelect = vi.fn();
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={unsortedArtists}
-            onSelect={onSelect}
-          />
-        </MediaPlayer>
-      );
-
-      // Click first item - should be position 1 (Artist One) after sorting
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const firstItemButton = within(carouselItems[0]).getByRole('button');
-      fireEvent.click(firstItemButton);
-
-      // The artist with position 1 should be first
-      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }), {
-        autoPlay: true,
-      });
-    });
-
-    it('should use center alignment for carousel', () => {
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      expect(screen.getByTestId('carousel')).toHaveAttribute('data-align', 'center');
-    });
-
-    it('should scroll to the selected artist index on click', async () => {
-      const onSelect = vi.fn();
-      mockScrollTo.mockClear();
-      mockCarouselOn.mockClear();
-      // Carousel is currently at index 0, clicking index 1 triggers scrollTo
-      mockSelectedScrollSnap.mockReturnValue(0);
-
-      await act(async () => {
-        render(
-          <MediaPlayer>
-            <MediaPlayer.FeaturedArtistCarousel
-              featuredArtists={mockFeaturedArtists}
-              onSelect={onSelect}
-            />
-          </MediaPlayer>
-        );
-      });
-
-      // Click on the second carousel item
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const secondItemButton = within(carouselItems[1]).getByRole('button');
-      fireEvent.click(secondItemButton);
-
-      expect(mockScrollTo).toHaveBeenCalledWith(1);
-
-      // Simulate the settle event firing after scroll completes
-      const settleHandler = mockCarouselOn.mock.calls.find(
-        (call: unknown[]) => call[0] === 'settle'
-      )?.[1] as (() => void) | undefined;
-      mockSelectedScrollSnap.mockReturnValue(1);
-      act(() => {
-        settleHandler?.();
-      });
-
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: true });
-    });
-
-    it('should call onSelect directly when clicking the already-selected slide', () => {
-      const onSelect = vi.fn();
-      mockScrollTo.mockClear();
-      // Carousel is at index 0, clicking index 0 fires onSelect immediately
-      mockSelectedScrollSnap.mockReturnValue(0);
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={mockFeaturedArtists}
-            onSelect={onSelect}
-          />
-        </MediaPlayer>
-      );
-
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const firstItemButton = within(carouselItems[0]).getByRole('button');
-      fireEvent.click(firstItemButton);
-
-      expect(mockScrollTo).toHaveBeenCalledWith(0);
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[0], { autoPlay: true });
-    });
-
-    it('should call onSelect directly when carousel api is unavailable', () => {
-      shouldProvideCarouselApi = false;
-      const onSelect = vi.fn();
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel
-            featuredArtists={mockFeaturedArtists}
-            onSelect={onSelect}
-          />
-        </MediaPlayer>
-      );
-
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const secondItemButton = within(carouselItems[1]).getByRole('button');
-      fireEvent.click(secondItemButton);
-
-      expect(mockScrollTo).not.toHaveBeenCalled();
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: true });
-    });
-
-    it('should call onSelect on settle event from carousel navigation', async () => {
-      const onSelect = vi.fn();
-      mockCarouselOn.mockClear();
-      mockSelectedScrollSnap.mockReturnValue(0);
-
-      await act(async () => {
-        render(
-          <MediaPlayer>
-            <MediaPlayer.FeaturedArtistCarousel
-              featuredArtists={mockFeaturedArtists}
-              onSelect={onSelect}
-            />
-          </MediaPlayer>
-        );
-      });
-
-      // Simulate carousel navigating via arrows/drag (settle without click)
-      const settleHandler = mockCarouselOn.mock.calls.find(
-        (call: unknown[]) => call[0] === 'settle'
-      )?.[1] as (() => void) | undefined;
-      mockSelectedScrollSnap.mockReturnValue(1);
-      act(() => {
-        settleHandler?.();
-      });
-
-      expect(onSelect).toHaveBeenCalledWith(mockFeaturedArtists[1], { autoPlay: false });
-    });
-
-    it('should work without onSelect callback', () => {
-      mockScrollTo.mockClear();
-      mockCarouselOn.mockClear();
-      mockSelectedScrollSnap.mockReturnValue(0);
-
-      render(
-        <MediaPlayer>
-          <MediaPlayer.FeaturedArtistCarousel featuredArtists={mockFeaturedArtists} />
-        </MediaPlayer>
-      );
-
-      const carouselItems = screen.getAllByTestId('carousel-item');
-      const firstItemButton = within(carouselItems[0]).getByRole('button');
-      fireEvent.click(firstItemButton);
-
-      // Should still scroll even without onSelect
-      expect(mockScrollTo).toHaveBeenCalledWith(0);
     });
   });
 

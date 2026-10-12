@@ -66,6 +66,7 @@ export const featuredArtistInclude = {
       id: true,
       title: true,
       coverArt: true,
+      releasedOn: true,
       images: { select: { src: true } },
     },
   },
@@ -162,10 +163,10 @@ export class FeaturedArtistRepository {
   }
 
   /**
-   * Find featured artists currently visible on `currentDate` (published, within
-   * the featured window), newest first, capped at `take`. A row whose artists
-   * are all hidden is left out, and the rows returned name public artists
-   * only (ADR-0015).
+   * Find the spotlights visible on `currentDate` (published, within the
+   * featured window), ordered by position then newest first, capped at `take`.
+   * A row whose artists are all hidden is left out, and the rows returned name
+   * public artists only (ADR-0015).
    */
   static async findFeatured(currentDate: Date, take: number): Promise<FeaturedArtist[]> {
     return prisma.featuredArtist.findMany({
@@ -175,9 +176,7 @@ export class FeaturedArtistRepository {
         AND: [hasNoHiddenOnlyArtists],
       },
       include: publicFeaturedArtistInclude,
-      orderBy: {
-        featuredOn: 'desc',
-      },
+      orderBy: [{ position: 'asc' }, { featuredOn: 'desc' }],
       take,
     }) as Promise<FeaturedArtist[]>;
   }

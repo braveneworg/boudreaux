@@ -90,6 +90,30 @@ export const useInfinitePublishedReleasesQuery = (
   });
 
 /**
+ * The newest published releases, one page of `take` rows: what the home grid
+ * shows when there is no spotlight to show.
+ *
+ * Hits the published endpoint at skip 0 under its own non-infinite key in the
+ * releases family, so release mutations still invalidate it and the page's
+ * server prefetch (same key, same `{ rows, nextSkip }` page) hydrates it.
+ *
+ * @param take - How many releases to fetch.
+ * @param options - Caller overrides spread into the `useQuery` call (e.g.
+ * `enabled`, to fetch only once the spotlight list turns out empty).
+ * @returns The TanStack `useQuery` result whose `data` is the release rows.
+ */
+export const useNewestPublishedReleasesQuery = (
+  take: number,
+  options: QueryOptionsOverride<PublishedReleasesPaginatedResponse, PublishedReleaseListing[]> = {}
+) =>
+  useQuery({
+    queryKey: queryKeys.releases.newestPublished(take),
+    queryFn: ({ signal }) => fetchPublishedReleases('', 0, take, signal),
+    select: (page) => page.rows,
+    ...options,
+  });
+
+/**
  * Lightweight quick-search hook for the releases combobox.
  *
  * Hits the same published endpoint with the typed term and returns the first

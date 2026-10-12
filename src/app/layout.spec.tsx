@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 
 import RootLayout, { dynamic, metadata, viewport } from './layout';
 
@@ -110,6 +110,10 @@ describe('RootLayout', () => {
   });
 
   describe('rendering', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('renders Header component', async () => {
       render(await RootLayout({ children: <div>Test</div> }));
 
@@ -127,6 +131,18 @@ describe('RootLayout', () => {
 
       const toaster = screen.getByTestId('toaster');
       expect(toaster).toHaveAttribute('data-position', 'bottom-center');
+    });
+
+    it('offers no install-on-home-screen prompt, even to iOS Safari', async () => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+      );
+
+      render(await RootLayout({ children: <div>Test</div> }));
+
+      // The prompt revealed itself in an effect; give it one to run.
+      await act(async () => {});
+      expect(screen.queryByText('Install Fake Four Inc.')).not.toBeInTheDocument();
     });
 
     it('wraps content in Providers', async () => {

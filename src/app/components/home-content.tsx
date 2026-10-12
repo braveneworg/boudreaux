@@ -3,21 +3,25 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useActiveFeaturedArtistsQuery } from '@/hooks/queries/use-active-featured-artists-query';
+import {
+  SPOTLIGHT_LIMIT,
+  useActiveFeaturedArtistsQuery,
+} from '@/hooks/queries/use-active-featured-artists-query';
 import { useBannersQuery } from '@/hooks/queries/use-banners-query';
+import { useNewestPublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
+import {
+  publishedReleasesToSpotlightCards,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  toSpotlightCards,
+} from '@/lib/utils/spotlight-card';
 
 import { ArtistNavSearchCombobox } from './artist-nav-search-combobox';
 import { BannerCarousel } from './banner-carousel';
 import { BannerStrip } from './banner-strip';
-// Static import on purpose: the server HTML must contain the selected
-// artist's cover art — the desktop LCP element — so the browser's preload
-// scanner discovers it immediately. `next/dynamic` cannot deliver that in
-// the App Router: it server-renders only its `loading` fallback (verified on
-// the webpack prod standalone), which cost ~1.4s of measured LCP load delay.
-// video.js stays out of the initial bundle regardless: MediaPlayer.Controls
-// is `LazyControls`, its own `ssr: false` dynamic boundary.
-import { FeaturedArtistsPlayer } from './featured-artists-player';
-import { ReleaseHeadlines } from './release-headlines';
+// Static import on purpose: the server HTML must contain the cards' covers so
+// the browser's preload scanner finds them at once. `next/dynamic` cannot do
+// that in the App Router: it server-renders only its `loading` fallback.
+import { SpotlightGrid } from './spotlight-grid';
 import { ContentContainer } from './ui/content-container';
 import { ImageHeading } from './ui/image-heading';
 import { ZinePanel } from './ui/zine-panel';
@@ -25,8 +29,10 @@ import { ZinePanel } from './ui/zine-panel';
 import type { BannerSlotData } from './banner-carousel';
 
 /**
- * Client content wrapper for the home page.
- * Uses TanStack Query to fetch banners and featured artists (hydrated from SSR prefetch).
+ * Client content wrapper for the home page: the banners, then the FEATURED
+ * heading, the search and the spotlight grid. Uses TanStack Query for the
+ * banners and spotlights (hydrated from the SSR prefetch). With no spotlight
+ * to show, the grid shows the newest published releases instead.
  */
 export const HomeContent = () => {
   const { data: artistsData } = useActiveFeaturedArtistsQuery();
@@ -38,7 +44,17 @@ export const HomeContent = () => {
   // straight through without a field-by-field remap.
   const banners: BannerSlotData[] = bannersData?.banners ?? [];
   const rotationInterval = bannersData?.rotationInterval;
-  const featuredArtists = artistsData?.featuredArtists ?? [];
+
+  const spotlightCards = toSpotlightCards(artistsData?.featuredArtists ?? []);
+  // Fall back only once the spotlights have loaded and none can render, so
+  // the newest releases are never fetched while there are spotlights.
+  const showNewest = artistsData !== undefined && spotlightCards.length === 0;
+  const { data: newestReleases } = useNewestPublishedReleasesQuery(SPOTLIGHT_LIMIT, {
+    enabled: showNewest,
+  });
+  const cards = showNewest
+    ? publishedReleasesToSpotlightCards(newestReleases ?? [])
+    : spotlightCards;
 
   return (
     <>
@@ -49,42 +65,33 @@ export const HomeContent = () => {
       <BannerCarousel banners={banners} rotationInterval={rotationInterval} />
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
-        {/* Desktop (lg+) reflows via explicit grid placement: search on top,
-            then the player spanning the left half beside the wordmark, which
-            caps the infinitely-scrolling release headlines on the right half
-            (top-aligned with the carousel, fixed while the feed pane scrolls
-            internally). Mobile keeps the stacked search → heading → player
-            flow via plain block order. */}
         <ZinePanel chat accent="yellow">
-          {/* Desktop: clear air beneath the search box before the split. */}
-          <div className="lg:mb-8">
-            <ArtistNavSearchCombobox />
-          </div>
-          {/* grid-rows [auto,1fr] keeps the wordmark row content-sized so the
-              tall row-spanning player can't inflate the gap beneath it. */}
-          <div className="lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-10">
-            {/* No `priority`: this heading sits below the banner and search
-                input, so it's not the LCP — a preload would go unused below
-                the fold on mobile. `loading="eager"` still starts the fetch at
-                render (not viewport intersection) so the wordmark doesn't
-                linger as an empty sketch frame after navigation. Extra
-                vertical air (landing only) separates the search field above
-                from the player below; on desktop the wordmark heads the
-                headlines column with ample air before the feed. */}
-            <ImageHeading
-              src="/media/headings/FEATURED.webp"
-              alt="featured artists"
-              imageHeight={480}
-              loading="eager"
-              className="mt-8 mb-6 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:mb-8"
-            />
-            <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
-              <FeaturedArtistsPlayer featuredArtists={featuredArtists} />
+          {/* No `priority`: the spotlight covers, not this wordmark, are the
+              LCP candidates, and the page preloads the first one. `eager`
+              still starts the fetch at render so the wordmark doesn't linger
+              as an empty frame after navigation. */}
+          <ImageHeading
+            src="/media/headings/FEATURED.webp"
+            alt="featured artists"
+            imageHeight={480}
+            loading="eager"
+            className="mt-0 mb-4 block text-left"
+          />
+          <div className="mb-8">
+            <div className={SPOTLIGHT_COVER_SPAN_CLASS}>
+              <ArtistNavSearchCombobox />
             </div>
-            <div className="lg:col-start-2 lg:row-start-2">
-              <ReleaseHeadlines />
-            </div>
+            {/* Touch screens get no hover stamp on the covers, so they get
+                this line instead; `hover:none` is the same test that keeps
+                the stamp to hover and keyboard focus. */}
+            {cards.length > 0 ? (
+              <p className="mt-4 hidden text-center text-sm text-zinc-600 [@media(hover:none)]:block">
+                <strong className="font-bold text-zinc-950">Tap</strong> any release art to play or
+                download the music
+              </p>
+            ) : null}
           </div>
+          <SpotlightGrid cards={cards} />
         </ZinePanel>
       </ContentContainer>
     </>

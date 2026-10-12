@@ -4,6 +4,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
+import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/lib/utils/spotlight-card';
 
 import HomeLoading from './loading';
 
@@ -74,24 +75,70 @@ describe('HomeLoading', () => {
     expect(panel).toHaveClass('zine-accent-yellow');
   });
 
-  it('mirrors the landing grid split: player left, wordmark + headlines right', () => {
+  it('mirrors the landing stack: wordmark, then search, then the spotlight grid', () => {
     render(<HomeLoading />);
 
-    const grid = screen.getByTestId('home-skeleton-grid');
-    expect(grid).toHaveClass('lg:grid', 'lg:grid-cols-2', 'lg:grid-rows-[auto_1fr]');
-
     const heading = screen.getByTestId('featured-heading-skeleton');
-    expect(heading).toHaveClass('lg:col-start-2', 'lg:row-start-1');
+    const search = screen.getByTestId('search-skeleton');
+    const grid = screen.getByTestId('spotlight-grid-skeleton');
+    expect(heading.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(search.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 
-    const player = screen.getByTestId('player-skeleton');
-    expect(player).toHaveClass('lg:col-start-1', 'lg:row-span-2', 'lg:row-start-1');
-    // The cell renders the same shared skeleton the player's dynamic-import
-    // fallback uses, so route-fallback → chunk-fallback → player is
-    // pixel-stable.
-    expect(player).toContainElement(screen.getByTestId('featured-artists-player-skeleton'));
+  it('keeps the search skeleton to the outer edges of the covers', () => {
+    render(<HomeLoading />);
 
-    // Headlines are desktop-only in the hydrated layout (`hidden lg:block`).
-    const headlines = screen.getByTestId('headlines-skeleton');
-    expect(headlines).toHaveClass('hidden', 'lg:block', 'lg:col-start-2', 'lg:row-start-2');
+    expect(screen.getByTestId('search-skeleton').firstElementChild).toHaveClass(
+      ...SPOTLIGHT_COVER_SPAN_CLASS.split(' ')
+    );
+  });
+
+  it('reserves the tap hint line on touch screens only, under the search', () => {
+    render(<HomeLoading />);
+
+    const hint = screen.getByTestId('tap-hint-skeleton');
+    expect(hint).toHaveClass('hidden', '[@media(hover:none)]:block');
+    expect(
+      hint.compareDocumentPosition(screen.getByTestId('spotlight-grid-skeleton')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByTestId('search-skeleton')).toContainElement(hint);
+  });
+
+  it('lays the cover skeletons out one, two, then four to a row', () => {
+    render(<HomeLoading />);
+
+    expect(screen.getByTestId('spotlight-grid-skeleton')).toHaveClass(
+      'grid',
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-4'
+    );
+  });
+
+  it('gives each card skeleton a square cover and caption bars', () => {
+    render(<HomeLoading />);
+
+    const cards = screen.getAllByTestId('spotlight-card-skeleton');
+    expect(cards.length).toBeGreaterThan(0);
+    cards.forEach((card) => {
+      expect(card.firstElementChild).toHaveClass('aspect-square');
+      expect(card.lastElementChild?.children).toHaveLength(2);
+    });
+  });
+
+  it('keeps each card skeleton to the card cover width', () => {
+    render(<HomeLoading />);
+
+    screen
+      .getAllByTestId('spotlight-card-skeleton')
+      .forEach((card) => expect(card).toHaveClass('mx-auto', 'w-full', 'max-w-52'));
+  });
+
+  it('no longer reserves room for the player or the headlines', () => {
+    render(<HomeLoading />);
+
+    expect(screen.queryByTestId('player-skeleton')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('headlines-skeleton')).not.toBeInTheDocument();
   });
 });

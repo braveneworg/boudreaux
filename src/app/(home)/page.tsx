@@ -4,8 +4,11 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 
 import { HomeContent } from '@/components/home-content';
-import type { ActiveFeaturedArtistsResponse } from '@/hooks/queries/use-active-featured-artists-query';
-import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/queries/use-infinite-published-releases-query';
+import {
+  type ActiveFeaturedArtistsResponse,
+  SPOTLIGHT_LIMIT,
+} from '@/hooks/queries/use-active-featured-artists-query';
+import type { PublishedReleasesPaginatedResponse } from '@/hooks/queries/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import {
   type BannersApiResponse,
@@ -19,81 +22,41 @@ import {
   buildImagePreloadSrcSet,
   isPreloadableImageSrc,
 } from '@/lib/utils/cloudfront-loader';
-import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
-import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
+import {
+  publishedReleasesToSpotlightCards,
+  SPOTLIGHT_COVER_SIZES,
+  type SpotlightCard,
+  toSpotlightCards,
+} from '@/lib/utils/spotlight-card';
 import { PageContainer } from '@/ui/page-container';
 
 /**
  * Force dynamic rendering on every request.
  *
- * The featured artists are chosen by today's date, and the banners and
- * releases change as admins publish. A statically generated page would ship
- * the set chosen at build time until the next deploy; the services' own
- * `withCache` keeps the per-request cost low.
+ * The spotlights are chosen by today's date, and the banners and releases
+ * change as admins publish. A statically generated page would ship the set
+ * chosen at build time until the next deploy; the services' own `withCache`
+ * keeps the per-request cost low.
  */
 export const dynamic = 'force-dynamic';
 
-/**
- * Resolve the desktop LCP preload target from the prefetched featured-artist
- * cache: the cover art of the first artist with a displayable name — the same
- * selection the SSR'd `FeaturedArtistsPlayer` makes. Returns null when there
- * is nothing preloadable (no artists, no art, or a local `data:`/`blob:`
- * source such as the seeded placeholder, which has nothing to fetch).
- */
-const resolveCoverArtPreloadSrc = (
-  artistsData: ActiveFeaturedArtistsResponse | undefined
-): string | null => {
-  const firstDisplayableArtist = artistsData?.featuredArtists?.find(
-    (featured) => getFeaturedArtistDisplayName(featured) !== null
-  );
-  const coverArt = firstDisplayableArtist
-    ? getFeaturedArtistCoverArt(firstDisplayableArtist)
-    : null;
-  return coverArt && isPreloadableImageSrc(coverArt) ? coverArt : null;
-};
+type HomeQueryClient = ReturnType<typeof getQueryClient>;
 
 /**
- * Home page — Server Component that prefetches banners and featured artists,
- * then hydrates client components for interactivity.
- *
- * The hero banner LCP preload is emitted here as a media-scoped
- * `<link rel=preload as=image media="(max-width: 767.98px)">` for the first
- * banner slot. It is REQUIRED for mobile LCP — HomeContent hydrates from a
- * client query cache, so without a server-rendered preload the banner isn't
- * discovered until hydration (pushing LCP to ~9s). Scoping it to the mobile
- * breakpoint matters because the `BannerCarousel` is `md:hidden` on desktop
- * (the `BannerStrip` shows instead); an unconditional preload — e.g. the one
- * `next/image` `priority` emits — would be fetched on desktop and never used,
- * triggering Chrome's "preloaded but not used" warning. The `imagesrcset`
- * mirrors what the carousel's `<Image>` requests (via `buildBannerPreloadSrcSet`,
- * same custom loader), so the preload cache hits the rendered `<img>`.
- *
- * The featured-artist cover art gets the mirror treatment for desktop: the
- * player server-renders (see home-content.tsx), so its `<Image>` — the desktop
- * LCP element — is already in the initial HTML, but as a non-priority lazy
- * image it wouldn't start fetching until after layout. The
- * `(min-width: 1024px)` preload below starts that fetch at HTML parse.
- * The media query matches the `lg` grid split that places the cover above the
- * fold; below `lg` it sits below the fold, where a preload would be flagged
- * "preloaded but not used". `imageSizes="576px"` mirrors the img's effective
- * `sizes` at those viewports so the preload picker and the img choose the
- * same `_w` variant and the preload cache hits.
+ * Prefetch the spotlights and the banners. Both call the services directly
+ * rather than fetching our own API routes over HTTP — same data, same shapes
+ * as the routes the client hooks hit, minus a self-HTTP round-trip per query
+ * on this force-dynamic page. Server-side caching is preserved: the services
+ * cache via `withCache` (see the `force-dynamic` comment above).
  */
-export default async function Home() {
-  const queryClient = getQueryClient();
-
-  // Both prefetches call the services directly rather than fetching our own
-  // API routes over HTTP — same data, same shapes as the routes the client
-  // hooks hit, minus a self-HTTP round-trip per query on this force-dynamic
-  // page. Server-side caching is preserved: both services cache via
-  // `withCache` (see the `force-dynamic` comment above).
-  await Promise.all([
+const prefetchSpotlightsAndBanners = (queryClient: HomeQueryClient): Promise<[void, void]> =>
+  Promise.all([
     queryClient.prefetchQuery({
       queryKey: queryKeys.featuredArtists.active(),
       queryFn: async () => {
-        const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), 7);
+        const result = await FeaturedArtistsService.getFeaturedArtists(new Date(), SPOTLIGHT_LIMIT);
         if (!result.success) {
           throw new Error(result.error);
         }
@@ -115,37 +78,85 @@ export default async function Home() {
         return result.data;
       },
     }),
-    // First page of the desktop headlines feed. The query key and
-    // initialPageParam must exactly match useInfinitePublishedReleasesQuery('')
-    // in ReleaseHeadlines or hydration misses and the column renders empty
-    // until a client refetch — the last piece of the landing that used to pop
-    // in after navigation. Same service-direct pattern as /releases/page.tsx.
-    queryClient.prefetchInfiniteQuery({
-      queryKey: queryKeys.releases.publishedInfinite(''),
-      initialPageParam: 0,
-      queryFn: async () => {
-        const result = await ReleaseService.getPublishedReleases({
-          skip: 0,
-          take: PUBLISHED_RELEASES_PAGE_SIZE,
-        });
-        const rows = result.success ? result.data : [];
-        return serializeForResponse({
-          rows,
-          nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_RELEASES_PAGE_SIZE),
-        });
-      },
-    }),
   ]);
+
+/**
+ * The grid's cards, by the rule HomeContent applies: the spotlights, or — once
+ * they have loaded and none can render — the newest published releases, which
+ * are prefetched then under the same key and page as
+ * `useNewestPublishedReleasesQuery(SPOTLIGHT_LIMIT)`, serialized as the API
+ * route does, so the grid hydrates server-filled.
+ */
+const prefetchGridCards = async (queryClient: HomeQueryClient): Promise<SpotlightCard[]> => {
+  const artistsData = queryClient.getQueryData<ActiveFeaturedArtistsResponse>(
+    queryKeys.featuredArtists.active()
+  );
+  const spotlightCards = toSpotlightCards(artistsData?.featuredArtists ?? []);
+  if (artistsData === undefined || spotlightCards.length > 0) {
+    return spotlightCards;
+  }
+
+  const newestKey = queryKeys.releases.newestPublished(SPOTLIGHT_LIMIT);
+  await queryClient.prefetchQuery({
+    queryKey: newestKey,
+    queryFn: async () => {
+      const result = await ReleaseService.getPublishedReleases({ skip: 0, take: SPOTLIGHT_LIMIT });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return serializeForResponse({
+        rows: result.data,
+        nextSkip: computeNextSkip(result.data.length, 0, SPOTLIGHT_LIMIT),
+      });
+    },
+  });
+  return publishedReleasesToSpotlightCards(
+    queryClient.getQueryData<PublishedReleasesPaginatedResponse>(newestKey)?.rows ?? []
+  );
+};
+
+/**
+ * The cover the page preloads: the first card's, when it has one the browser
+ * can fetch (a local `data:`/`blob:` source such as the seeded placeholder
+ * has nothing to fetch).
+ */
+const resolveCoverArtPreloadSrc = (cards: SpotlightCard[]): string | null => {
+  const coverArt = cards[0]?.coverArt;
+  return coverArt && isPreloadableImageSrc(coverArt) ? coverArt : null;
+};
+
+/**
+ * Home page — Server Component that prefetches the banners and the spotlights
+ * (or, with none to show, the newest releases), then hydrates client
+ * components for interactivity.
+ *
+ * The hero banner LCP preload is emitted here as a media-scoped
+ * `<link rel=preload as=image media="(max-width: 767.98px)">` for the first
+ * banner slot. It is REQUIRED for mobile LCP — HomeContent hydrates from a
+ * client query cache, so without a server-rendered preload the banner isn't
+ * discovered until hydration (pushing LCP to ~9s). Scoping it to the mobile
+ * breakpoint matters because the `BannerCarousel` is `md:hidden` on desktop
+ * (the `BannerStrip` shows instead); an unconditional preload — e.g. the one
+ * `next/image` `priority` emits — would be fetched on desktop and never used,
+ * triggering Chrome's "preloaded but not used" warning. The `imagesrcset`
+ * mirrors what the carousel's `<Image>` requests (via `buildBannerPreloadSrcSet`,
+ * same custom loader), so the preload cache hits the rendered `<img>`.
+ *
+ * The first spotlight card's cover gets a preload too. The grid server-renders
+ * (see home-content.tsx) above the fold at every width, so this preload has no
+ * media query; it starts the fetch at HTML parse instead of after layout.
+ * `imageSizes` is the card image's own `sizes`, so the preload picker and the
+ * img choose the same `_w` variant and the preload cache hits.
+ */
+export default async function Home() {
+  const queryClient = getQueryClient();
+  await prefetchSpotlightsAndBanners(queryClient);
 
   // Read the prefetched banners back out of the query cache (no extra service
   // call) to build the first-slot preload. `banners[0]` is carousel slide 0.
   const bannersData = queryClient.getQueryData<BannersApiResponse>(queryKeys.banners.active());
   const firstBannerFilename = bannersData?.banners?.[0]?.imageFilename;
-
-  // Same read-back for the featured artists (see resolveCoverArtPreloadSrc).
-  const coverArtPreloadSrc = resolveCoverArtPreloadSrc(
-    queryClient.getQueryData<ActiveFeaturedArtistsResponse>(queryKeys.featuredArtists.active())
-  );
+  const coverArtPreloadSrc = resolveCoverArtPreloadSrc(await prefetchGridCards(queryClient));
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -163,9 +174,8 @@ export default async function Home() {
         <link
           rel="preload"
           as="image"
-          media="(min-width: 1024px)"
           imageSrcSet={buildImagePreloadSrcSet(coverArtPreloadSrc)}
-          imageSizes="576px"
+          imageSizes={SPOTLIGHT_COVER_SIZES}
           fetchPriority="high"
         />
       )}

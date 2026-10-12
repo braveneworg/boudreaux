@@ -91,6 +91,14 @@ describe('ArtistNavSearchCombobox', () => {
     );
   });
 
+  it('fills its container, leaving the width to the page', () => {
+    stubSearchReturning([]);
+    renderCombobox();
+
+    expect(findTrigger()).toHaveClass('w-full');
+    expect(findTrigger().className).not.toMatch(/\bmx-|\bw-\[/);
+  });
+
   it('does not render the search field until opened', () => {
     stubSearchReturning([]);
     renderCombobox();

@@ -7,6 +7,7 @@ import { renderHook } from '@testing-library/react';
 
 import {
   PUBLISHED_RELEASES_PAGE_SIZE,
+  useNewestPublishedReleasesQuery,
   usePublishedReleaseSearchQuery,
   useInfinitePublishedReleasesQuery,
 } from './use-infinite-published-releases-query';
@@ -25,6 +26,13 @@ interface InfiniteOptions {
   initialPageParam: number;
   queryFn: (ctx: { pageParam: number; signal?: AbortSignal }) => Promise<unknown>;
   getNextPageParam: (lastPage: { nextSkip: number | null }) => number | null;
+}
+
+interface NewestOptions {
+  queryKey: unknown[];
+  enabled?: boolean;
+  queryFn: (ctx: { signal?: AbortSignal }) => Promise<unknown>;
+  select: (page: { rows: unknown[] }) => unknown;
 }
 
 interface SearchOptions {
@@ -120,5 +128,40 @@ describe('usePublishedReleaseSearchQuery', () => {
       '/api/releases?listing=published&skip=0&take=20&search=rock',
       { signal: undefined }
     );
+  });
+});
+
+describe('useNewestPublishedReleasesQuery', () => {
+  const getOptions = (take: number, options = {}): NewestOptions => {
+    useQueryMock.mockReturnValue({ data: [] });
+    renderHook(() => useNewestPublishedReleasesQuery(take, options));
+    return useQueryMock.mock.calls.at(-1)?.[0] as NewestOptions;
+  };
+
+  it('keys the query by take in the releases family', () => {
+    expect(getOptions(12).queryKey).toEqual(['releases', 'newestPublished', 12]);
+  });
+
+  it('selects the rows from the page response', () => {
+    const rows = [{ id: 'r-1' }];
+    expect(getOptions(12).select({ rows })).toBe(rows);
+  });
+
+  it('requests the first page of the given size and forwards the signal', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const { signal } = new AbortController();
+
+    await getOptions(12).queryFn({ signal });
+
+    expect(fetchMock.mock.calls).toEqual([
+      ['/api/releases?listing=published&skip=0&take=12', { signal }],
+    ]);
+  });
+
+  it('lets the caller gate the fetch with enabled', () => {
+    expect(getOptions(12, { enabled: false }).enabled).toBe(false);
   });
 });

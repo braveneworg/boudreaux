@@ -5,7 +5,7 @@
 
 import type React from 'react';
 import type { ReactNode } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import Image from 'next/image';
 
@@ -13,7 +13,6 @@ import { ChevronDown, ChevronUp, EllipsisVertical, Eye, Pause, Play, Star } from
 
 import { Button } from '@/components/ui/button';
 import {
-  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -30,13 +29,11 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { Artist, FeaturedArtist, Release } from '@/lib/types/media-models';
+import type { Artist, Release } from '@/lib/types/media-models';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { formatDuration } from '@/lib/utils/format-duration';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import type { ArtistNameFields } from '@/lib/utils/get-artist-display-name';
-import { getFeaturedArtistCoverArt } from '@/lib/utils/get-featured-artist-cover-art';
-import { getFeaturedArtistDisplayName } from '@/lib/utils/get-featured-artist-display-name';
 import { getTrackDisplayTitle } from '@/lib/utils/get-track-display-title';
 import { cn } from '@/lib/utils/tailwind-utils';
 
@@ -116,191 +113,6 @@ const CoverArtCarousel = ({ artists, numberUp = 4 }: { artists: Artist[]; number
     </Carousel>
   );
 };
-
-/**
- * A carousel component that displays featured artists with their cover art.
- *
- * @param props - The component props
- * @param props.featuredArtists - Array of FeaturedArtist objects to display in the carousel
- * @param props.onSelect - Optional callback function when a featured artist is selected
- *
- * @returns A horizontal carousel component with featured artist cover art images
- *
- * @remarks
- * - Displays the cover art for each featured artist (uses coverArt, release coverArt, or placeholder)
- * - Includes previous/next navigation controls
- * - Shows display name on hover
- * - Sorted by position field
- *
- * @example
- * ```tsx
- * <MediaPlayer>
- *   <MediaPlayer.FeaturedArtistCarousel
- *     featuredArtists={featuredArtists}
- *     onSelect={(artist) => console.log(artist)}
- *   />
- * </MediaPlayer>
- * ```
- */
-const FeaturedArtistCarousel = memo(
-  ({
-    featuredArtists,
-    selectedArtistId,
-    onSelect,
-  }: {
-    featuredArtists: FeaturedArtist[];
-    selectedArtistId?: string;
-    onSelect?: (featuredArtist: FeaturedArtist, options?: { autoPlay?: boolean }) => void;
-  }) => {
-    // Sort by position (lower numbers first)
-    const sortedArtists = useMemo(
-      () => [...featuredArtists].sort((a, b) => a.position - b.position),
-      [featuredArtists]
-    );
-    const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
-    const [carouselApi, setCarouselApi] = useState<CarouselApi>();
-    const clickInitiatedRef = useRef(false);
-
-    // Index of the externally-selected artist. The carousel must always center
-    // this slide so the visible center matches the playing cover art.
-    const selectedIndex = useMemo(() => {
-      if (!selectedArtistId) return 0;
-      const idx = sortedArtists.findIndex((a) => a.id === selectedArtistId);
-      return idx < 0 ? 0 : idx;
-    }, [sortedArtists, selectedArtistId]);
-
-    const handleSelect = (featured: FeaturedArtist, index: number) => {
-      if (!carouselApi) {
-        onSelect?.(featured, { autoPlay: true });
-        return;
-      }
-
-      clickInitiatedRef.current = true;
-      carouselApi.scrollTo(index);
-      // If already on this slide, settle won't fire — call onSelect directly
-      if (carouselApi.selectedScrollSnap() === index) {
-        onSelect?.(featured, { autoPlay: true });
-        clickInitiatedRef.current = false;
-      }
-    };
-
-    /** Sync player state when the carousel settles on a new slide */
-    const handleSettle = useCallback(() => {
-      if (!carouselApi) return;
-      const index = carouselApi.selectedScrollSnap();
-      const artist = sortedArtists.at(index);
-      if (!artist) return;
-      const autoPlay = clickInitiatedRef.current;
-      clickInitiatedRef.current = false;
-      onSelect?.(artist, { autoPlay });
-    }, [carouselApi, sortedArtists, onSelect]);
-
-    useEffect(() => {
-      if (!carouselApi) return;
-      carouselApi.on('settle', handleSettle);
-      return () => {
-        carouselApi.off('settle', handleSettle);
-      };
-    }, [carouselApi, handleSettle]);
-
-    // Keep the carousel centered on the externally-selected artist. Runs on
-    // mount once the API is ready, and on any change to the selected id.
-    useEffect(() => {
-      if (!carouselApi) return;
-      if (carouselApi.selectedScrollSnap() === selectedIndex) return;
-      carouselApi.scrollTo(selectedIndex);
-    }, [carouselApi, selectedIndex]);
-
-    return (
-      <Carousel
-        aria-label="Featured Artists"
-        orientation="horizontal"
-        className="mb-0 w-full"
-        opts={{ loop: true, align: 'center' }}
-        setApi={setCarouselApi}
-      >
-        {/* Negative margins match the panel padding (p-6/sm:p-8) so the
-            in-flow arrow tips sit near-flush with the panel edge — the
-            images stay on the content column. On desktop the carousel sits in
-            from the column edge (1rem each side) so the media below it reads
-            as a smaller card with breathing room; the player wrap in
-            featured-artists-player.tsx tracks this (its inset = this + 2rem
-            arrow gutters). */}
-        <div className="-mx-6 flex items-center sm:-mx-8 lg:mx-auto lg:max-w-[calc(100%_-_2rem)]">
-          <CarouselPrevious className="relative top-auto left-0 shrink-0 translate-y-0" />
-          <CarouselContent className="-ml-6">
-            {sortedArtists.map((featured, index) => {
-              const coverArt = getFeaturedArtistCoverArt(featured);
-              const displayName = getFeaturedArtistDisplayName(featured);
-              const imageError = failedImages.has(featured.id);
-              const isSelectedArtist = selectedArtistId === featured.id;
-
-              return (
-                <CarouselItem
-                  key={featured.id}
-                  // 3-up on desktop, where the carousel spans the left half
-                  // of the landing split instead of the full content width.
-                  className="shrink-0 basis-1/3 pt-1 pb-1 pl-6 sm:basis-1/5 lg:basis-1/3"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(featured, index)}
-                    className={cn(
-                      // focus-visible (not focus) so pointer clicks show no
-                      // dark ring — keyboard focus keeps it.
-                      'group focus-visible:ring-primary relative aspect-square w-full border-2 transition-transform duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-                      // Flat black outline like the player frame; the playing
-                      // tile swaps to the panel accent and holds a slight
-                      // scale-up, animating as it slides toward center.
-                      isSelectedArtist ? 'scale-105 border-(--card-accent)' : 'border-black'
-                    )}
-                    aria-label={`Select ${displayName}`}
-                  >
-                    <div className="absolute inset-0 overflow-hidden">
-                      {coverArt && !imageError ? (
-                        <Image
-                          // Raw src → the global CDN loader emits the full
-                          // pinned-variant srcset, so DPR-1 desktops drop to
-                          // _w256 for the ~166px slot while retina keeps
-                          // _w384 sharp. (`unoptimized` + a hardcoded _w384
-                          // shipped ~2× the bytes at 1× DPR.) Slot widths:
-                          // 3-up below sm, 5-up to lg, then a fixed ~166px
-                          // in the landing grid's left column.
-                          src={coverArt}
-                          alt={displayName ?? ''}
-                          fill
-                          className="object-cover transition-transform group-hover:scale-105"
-                          sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 166px"
-                          loading={isSelectedArtist ? 'eager' : undefined}
-                          fetchPriority={isSelectedArtist ? 'high' : 'low'}
-                          onError={() => {
-                            setFailedImages((prev) => new Set(prev).add(featured.id));
-                          }}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-zinc-200">
-                          <span className="px-1 text-center text-xs text-zinc-950">
-                            {displayName}
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 flex items-end justify-center bg-black/0 transition-colors group-hover:bg-black/40">
-                        <span className="max-w-full truncate px-1 pb-2 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                          {displayName}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                </CarouselItem>
-              );
-            })}
-          </CarouselContent>
-          <CarouselNext className="relative top-auto right-auto shrink-0 translate-y-0" />
-        </div>
-      </Carousel>
-    );
-  }
-);
 
 /**
  * A view that displays the cover art for a given release and artist.
@@ -535,40 +347,25 @@ const InteractiveCoverArt = ({
 interface InfoTickerTapeArtistReleaseProps {
   artistRelease: ArtistReleasePair;
   trackName: string;
-  featuredArtist?: never;
   isPlaying?: boolean;
-  onTrackSelect?: (trackId: string) => void;
-}
-
-/**
- * Props for InfoTickerTape when using featuredArtist format
- */
-interface InfoTickerTapeFeaturedArtistProps {
-  featuredArtist: FeaturedArtist;
-  artistRelease?: never;
-  trackName?: never;
-  isPlaying?: boolean;
-  trackTitle?: string;
   onTrackSelect?: (trackId: string) => void;
 }
 
 /**
  * Props for InfoTickerTape when using the minimal format (title + optional
- * artist name) — no release/featured-artist objects required. Used by the
+ * artist name) — no release object required. Used by the
  * playlist player, whose items only carry snapshot display strings.
  */
 interface InfoTickerTapeMinimalProps {
   trackTitle: string;
   artistName?: string | null;
   artistRelease?: never;
-  featuredArtist?: never;
   trackName?: never;
   isPlaying?: boolean;
   onTrackSelect?: (trackId: string) => void;
 }
 
-type InfoTickerTapeProps =
-  InfoTickerTapeArtistReleaseProps | InfoTickerTapeFeaturedArtistProps | InfoTickerTapeMinimalProps;
+type InfoTickerTapeProps = InfoTickerTapeArtistReleaseProps | InfoTickerTapeMinimalProps;
 
 /** Resolved display values shown by {@link InfoTickerTape}, derived from any prop variant. */
 interface InfoTickerTapeDisplay {
@@ -579,19 +376,10 @@ interface InfoTickerTapeDisplay {
 
 /**
  * Derive the artist/release/track display strings for {@link InfoTickerTape}
- * from whichever prop variant was supplied (featuredArtist, artistRelease,
- * or the minimal title + artist-name pair).
+ * from whichever prop variant was supplied (artistRelease, or the minimal
+ * title + artist-name pair).
  */
 const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTapeDisplay => {
-  if ('featuredArtist' in props && props.featuredArtist) {
-    const { featuredArtist } = props;
-    return {
-      displayName: getFeaturedArtistDisplayName(featuredArtist),
-      releaseTitle: featuredArtist.release?.title ?? null,
-      trackTitle: props.trackTitle ?? '',
-    };
-  }
-
   if ('artistRelease' in props && props.artistRelease) {
     const { artistRelease, trackName } = props as InfoTickerTapeArtistReleaseProps;
     return {
@@ -611,8 +399,7 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  * @param props - The component props
  * @param props.artistRelease - An object containing a release and its associated artist (option 1)
  * @param props.trackName - The name of the currently playing track (required with artistRelease)
- * @param props.featuredArtist - A FeaturedArtist object (option 2)
- * @param props.trackTitle - The track title for the minimal format (option 3)
+ * @param props.trackTitle - The track title for the minimal format (option 2)
  * @param props.artistName - Optional artist name shown with the minimal format
  *
  * @returns A ticker tape component with scrolling track information
@@ -621,8 +408,8 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  * - Displays artist/group name, release title, and track name
  * - Has a transparent background
  * - Uses CSS animation for the scrolling effect
- * - Supports three usage patterns: artistRelease + trackName OR featuredArtist
- *   OR the minimal trackTitle + artistName pair (used by the playlist player)
+ * - Supports two usage patterns: artistRelease + trackName OR the minimal
+ *   trackTitle + artistName pair (used by the playlist player)
  *
  * @example
  * ```tsx
@@ -631,9 +418,6 @@ const resolveInfoTickerTapeDisplay = (props: InfoTickerTapeProps): InfoTickerTap
  *   artistRelease={{ release, artist }}
  *   trackName="Song Title"
  * />
- *
- * // Using featuredArtist format
- * <MediaPlayer.InfoTickerTape featuredArtist={selectedArtist} />
  *
  * // Using the minimal format (playlist player)
  * <MediaPlayer.InfoTickerTape trackTitle="Song Title" artistName="Artist" />
@@ -980,7 +764,7 @@ const FormatFileRow = ({
 
 /**
  * FormatFileListDrawer component displays a collapsible drawer with digital format files.
- * Used by the FeaturedArtistsPlayer to show track-by-track navigation from ReleaseDigitalFormatFiles.
+ * Used by the release player to show track-by-track navigation from ReleaseDigitalFormatFiles.
  */
 const FormatFileListDrawer = ({
   files,
@@ -1134,7 +918,6 @@ MediaPlayer.InteractiveCoverArt = InteractiveCoverArt;
 MediaPlayer.InfoTickerTape = InfoTickerTape;
 MediaPlayer.Controls = LazyControls;
 MediaPlayer.CoverArtCarousel = CoverArtCarousel;
-MediaPlayer.FeaturedArtistCarousel = FeaturedArtistCarousel;
 MediaPlayer.Description = Description;
 MediaPlayer.DotNavMenu = DotNavMenu;
 MediaPlayer.TrackListDrawer = TrackListDrawer;

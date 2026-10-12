@@ -10,6 +10,13 @@ import type { FeaturedArtist } from '@/lib/types/media-models';
 import { featuredArtistSchema } from '@/lib/validation/media/featured-artist-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
+/**
+ * How many spotlights the home grid shows. The page's server prefetch and this
+ * hook must request the same number, or the prefetched cache never hydrates
+ * the client query.
+ */
+export const SPOTLIGHT_LIMIT = 12;
+
 export interface ActiveFeaturedArtistsResponse {
   featuredArtists: FeaturedArtist[];
   count: number;
@@ -33,10 +40,14 @@ const activeFeaturedArtistsResponseSchema = z.object({
 const fetchActiveFeaturedArtists = async ({
   signal,
 }: QueryFunctionContext): Promise<ActiveFeaturedArtistsResponse> =>
-  fetchAndParse('/api/featured-artists?active=true&limit=7', activeFeaturedArtistsResponseSchema, {
-    signal,
-    errorMessage: 'Failed to fetch featured artists',
-  });
+  fetchAndParse(
+    `/api/featured-artists?active=true&limit=${SPOTLIGHT_LIMIT}`,
+    activeFeaturedArtistsResponseSchema,
+    {
+      signal,
+      errorMessage: 'Failed to fetch featured artists',
+    }
+  );
 
 /**
  * React Query hook for fetching the active featured artists.

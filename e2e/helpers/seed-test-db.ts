@@ -1275,11 +1275,11 @@ const seedTestDatabase = async () => {
     });
 
     // A featured artist for the admin featured-artists list/edit views AND the
-    // public homepage player (linked to E2E Artist + E2E Album One).
-    // publishedOn is required by FeaturedArtistRepository.findFeatured — without
-    // it the homepage player renders its empty state in every E2E run and the
-    // SSR'd LCP markup (cover art, now-playing heading) goes unexercised.
-    await prisma.featuredArtist.create({
+    // home page's spotlight grid (linked to E2E Artist + E2E Album One; its MP3
+    // format is linked once that exists, below). publishedOn is required by
+    // FeaturedArtistRepository.findFeatured — without it the grid falls back to
+    // the newest releases in every E2E run and the spotlight goes unexercised.
+    const e2eSpotlight = await prisma.featuredArtist.create({
       data: {
         displayName: 'E2E Featured Artist',
         description: 'Seeded featured artist for admin edit e2e coverage.',
@@ -1455,6 +1455,8 @@ const seedTestDatabase = async () => {
     // Captured per track title so the public-playlist fixture can reference
     // the live MP3 rows by id.
     const mp3FilesByTitle = new Map<string, SeededTrackFile>();
+    // Captured per release so the spotlight can link E2E Album One's MP3.
+    const mp3FormatIdByReleaseId = new Map<string, string>();
 
     for (const { release, trackTitle } of e2eReleases) {
       const format = await prisma.releaseDigitalFormat.create({
@@ -1480,7 +1482,18 @@ const seedTestDatabase = async () => {
         },
       });
       mp3FilesByTitle.set(trackTitle, { id: file.id, releaseId: release.id });
+      mp3FormatIdByReleaseId.set(release.id, format.id);
     }
+
+    // The spotlight plays E2E Album One, so its card opens a playable modal.
+    const albumOneMp3FormatId = mp3FormatIdByReleaseId.get(e2eRelease1.id);
+    if (!albumOneMp3FormatId) {
+      throw new Error('E2E Album One has no MP3 format to link to the spotlight');
+    }
+    await prisma.featuredArtist.update({
+      where: { id: e2eSpotlight.id },
+      data: { digitalFormat: { connect: { id: albumOneMp3FormatId } } },
+    });
 
     // Add FLAC and WAV formats to E2E Album One for download/purchase flow testing
     const flacFormat = await prisma.releaseDigitalFormat.create({
