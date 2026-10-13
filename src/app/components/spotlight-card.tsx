@@ -28,9 +28,10 @@ interface SpotlightCardProps {
 }
 
 /**
- * One cover in the home page's spotlight grid (variant A): the cover, at most
- * 13rem wide and centered in its grid cell, then a centered caption — the
- * artist (linked to the artist's page), and the title with its year. The
+ * One cover in the home page's spotlight grid (variant A): the cover, as wide
+ * as the panel on phones and at most 13rem from `sm`, centered in its grid
+ * cell, then a centered caption — the artist (linked to the artist's page),
+ * and the title with its year. The
  * cover is a button: the click primes the card's track and opens the
  * listening modal (a bottom sheet on phones), as the `/releases` Play button
  * does, and a square zine play stamp shows on hover and keyboard focus.
@@ -59,7 +60,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-52 flex-col gap-3">
+    <div className="mx-auto flex w-full flex-col gap-3 sm:max-w-52">
       <button
         ref={coverButtonRef}
         type="button"

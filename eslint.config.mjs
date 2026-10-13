@@ -87,6 +87,12 @@ const eslintConfig = [
       '**/.turbo/**',
       '**/coverage/**',
       '**/.vitest/**',
+      // Playwright's HTML report and failure traces (playwright.config.ts
+      // outputDir/reporter): a failed local E2E run leaves minified trace
+      // viewer assets here that the pre-push repo-wide lint would parse.
+      '**/e2e/playwright-report/**',
+      '**/e2e/test-results/**',
+      '**/blob-report/**',
       '**/backups/**',
       'next-env.d.ts',
       'tsconfig.json',
