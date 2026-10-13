@@ -41,6 +41,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
     warning: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -53,6 +54,20 @@ const mockFetchSuccess = (s3Key = 'uploads/key'): typeof fetch =>
     status: 200,
     json: vi.fn().mockResolvedValue({ success: true, s3Key, contentType: 'audio/mpeg' }),
   }) as unknown as typeof fetch;
+
+/**
+ * Build a fetch mock whose request never settles until its `AbortSignal`
+ * fires, then rejects with an `AbortError` the way the real fetch does.
+ */
+const mockFetchUntilAborted = (): typeof fetch =>
+  vi.fn().mockImplementation(
+    (_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () =>
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        );
+      })
+  ) as unknown as typeof fetch;
 
 /** Render the hook with sensible defaults; overrides merge into the options. */
 const renderUploads = (overrides: Partial<Parameters<typeof useDigitalFormatUploads>[0]> = {}) =>
@@ -1489,6 +1504,78 @@ describe('useDigitalFormatUploads', () => {
       });
 
       expect(toast.success).toHaveBeenCalledWith('FLAC uploaded successfully');
+    });
+  });
+
+  describe('handleCancelUpload', () => {
+    const changeEvent = (files: File[]): React.ChangeEvent<HTMLInputElement> =>
+      ({ target: { files } }) as unknown as React.ChangeEvent<HTMLInputElement>;
+
+    it('aborts a single-file upload, resets the format to idle, and skips confirm', async () => {
+      global.fetch = mockFetchUntilAborted();
+      const { result } = renderUploads();
+      const file = new File(['a'], 'song.flac', { type: 'audio/flac' });
+      let uploadRun: Promise<void> = Promise.resolve();
+
+      await act(async () => {
+        uploadRun = result.current.handleFileInputChange('FLAC', changeEvent([file]));
+      });
+      expect(result.current.isUploading('FLAC')).toBe(true);
+
+      await act(async () => {
+        result.current.handleCancelUpload('FLAC');
+        await uploadRun;
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
+      expect(result.current.selectedFiles.FLAC).toBeUndefined();
+      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(toast.info).toHaveBeenCalledWith('FLAC upload cancelled');
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('stops a batch after the in-flight file and never confirms the partial batch', async () => {
+      const abortable = mockFetchUntilAborted();
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, s3Key: 'k1' }),
+        })
+        .mockImplementation(abortable) as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const files = [
+        new File(['a'], '01.flac', { type: 'audio/flac' }),
+        new File(['b'], '02.flac', { type: 'audio/flac' }),
+        new File(['c'], '03.flac', { type: 'audio/flac' }),
+      ];
+      let uploadRun: Promise<void> = Promise.resolve();
+
+      await act(async () => {
+        uploadRun = result.current.handleFileInputChange('FLAC', changeEvent(files));
+      });
+      await act(async () => {
+        result.current.handleCancelUpload('FLAC');
+        await uploadRun;
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
+      expect(confirmMultiTrackUploadAction).not.toHaveBeenCalled();
+      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(toast.info).toHaveBeenCalledWith('FLAC upload cancelled');
+    });
+
+    it('is a no-op for a format with no upload in flight', () => {
+      const { result } = renderUploads();
+
+      act(() => {
+        result.current.handleCancelUpload('FLAC');
+      });
+
+      expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
+      expect(toast.info).not.toHaveBeenCalled();
     });
   });
 });

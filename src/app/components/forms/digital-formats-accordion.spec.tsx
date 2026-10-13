@@ -38,6 +38,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
     warning: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -2121,6 +2122,43 @@ describe('DigitalFormatsAccordion', () => {
       await waitFor(() => {
         expect(screen.getByText('Finalizing upload...')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Cancel upload', () => {
+    it('cancels an in-flight upload and returns the format to idle', async () => {
+      // Fetch hangs until its AbortSignal fires, then rejects like the real fetch
+      global.fetch = vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation was aborted.', 'AbortError'))
+            );
+          })
+      );
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
+
+      await user.click(screen.getByText('MP3 320kbps'));
+      const fileInput = await screen.findByLabelText(/upload mp3/i);
+      await user.upload(
+        fileInput,
+        new File(['audio content'], 'album.mp3', { type: 'audio/mpeg' })
+      );
+
+      const cancel = await screen.findByRole('button', { name: /cancel mp3 320kbps upload/i });
+      await user.click(cancel);
+
+      await waitFor(() => {
+        expect(fileInput).toBeEnabled();
+      });
+      expect(
+        screen.queryByRole('button', { name: /cancel mp3 320kbps upload/i })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/uploading to cloud storage/i)).not.toBeInTheDocument();
+      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(toast.info).toHaveBeenCalledWith('MP3 320kbps upload cancelled');
     });
   });
 });
