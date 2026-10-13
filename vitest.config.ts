@@ -43,6 +43,7 @@ export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/start-mongo.spec.ts',
   'scripts/assert-toolchain.spec.ts',
   'scripts/check-toolchain-pins.spec.ts',
+  'scripts/factory-guard.spec.ts',
 ];
 
 // Database contract specs: prove a repository `where` fragment against a real
