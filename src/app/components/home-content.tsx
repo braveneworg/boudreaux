@@ -81,7 +81,7 @@ export const HomeContent = () => {
                 alt="featured artists"
                 imageHeight={480}
                 loading="eager"
-                className="mt-6 mb-0 block text-left"
+                className="mt-7 mb-0 -ml-1.5 block text-left"
               />
             </div>
             {/* Touch screens get no hover stamp on the covers, so they get
