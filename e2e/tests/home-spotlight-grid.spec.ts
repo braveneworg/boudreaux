@@ -15,6 +15,9 @@ import type { Locator, Page } from '@playwright/test';
 
 const COVER_NAME = 'Play E2E Album One by E2E Featured Artist';
 
+/** `-ml-1.5` on the FEATURED wordmark: 0.375rem at the 16px root size. */
+const WORDMARK_INK_OFFSET_PX = 6;
+
 /** The seeded spotlight's cover button, once its click handler is attached. */
 const hydratedCover = async (page: Page): Promise<Locator> => {
   const cover = page.getByRole('button', { name: COVER_NAME });
@@ -136,8 +139,10 @@ test.describe('home spotlight grid', () => {
       const inset = coverBox.left - gridBox.left;
       expect(searchBox.left).toBeCloseTo(coverBox.left, 0);
       expect(searchBox.right).toBeCloseTo(gridBox.right - inset, 0);
-      // The wordmark sits below the search, flush with its left edge.
-      expect(headingBox.left).toBeCloseTo(searchBox.left, 0);
+      // The wordmark sits below the search with its ink flush to the search's
+      // left edge. The artwork carries its own left padding, so the image box
+      // is pulled 6px (`-ml-1.5`) left of the search box to put the ink there.
+      expect(headingBox.left).toBeCloseTo(searchBox.left - WORDMARK_INK_OFFSET_PX, 0);
       expect(headingBox.top).toBeGreaterThanOrEqual(searchBox.bottom);
       expect(headingBox.bottom).toBeLessThanOrEqual(gridBox.top);
     });
