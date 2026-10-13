@@ -213,7 +213,7 @@ describe('HomeContent', () => {
       useBannersQueryMock.mockReturnValue({ data: undefined });
     });
 
-    it('stacks the heading, then the search, then the grid inside the panel', () => {
+    it('stacks the search, then the heading, then the grid inside the panel', () => {
       useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
 
       render(<HomeContent />);
@@ -222,10 +222,23 @@ describe('HomeContent', () => {
       const search = screen.getByTestId('artist-search');
       const grid = screen.getByTestId('spotlight-grid');
       expect(
-        heading.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+        search.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
-      expect(search.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(heading.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(heading.closest('section')).toContainElement(grid);
+    });
+
+    it('puts the heading in the search column so their left edges meet', () => {
+      useActiveFeaturedArtistsQueryMock.mockReturnValue({ data: undefined });
+
+      render(<HomeContent />);
+
+      const heading = screen.getByRole('heading', { level: 1, name: /featured artists/i });
+      const search = screen.getByTestId('artist-search');
+      // Same `mx-auto` wrapper with the same width expression at every
+      // breakpoint, so the two left edges cannot drift apart.
+      expect(heading.parentElement).toBe(search.parentElement);
+      expect(heading.parentElement).toHaveClass(...SPOTLIGHT_COVER_SPAN_CLASS.split(' '));
     });
 
     it('lines the search up with the outer edges of the covers in every column count', () => {
@@ -251,6 +264,11 @@ describe('HomeContent', () => {
       expect(
         screen.getByTestId('artist-search').compareDocumentPosition(hint) &
           Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        screen
+          .getByRole('heading', { level: 1, name: /featured artists/i })
+          .compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
       expect(
         hint.compareDocumentPosition(screen.getByTestId('spotlight-grid')) &

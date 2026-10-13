@@ -29,8 +29,8 @@ import { ZinePanel } from './ui/zine-panel';
 import type { BannerSlotData } from './banner-carousel';
 
 /**
- * Client content wrapper for the home page: the banners, then the FEATURED
- * heading, the search and the spotlight grid. Uses TanStack Query for the
+ * Client content wrapper for the home page: the banners, then the search, the
+ * FEATURED heading and the spotlight grid. Uses TanStack Query for the
  * banners and spotlights (hydrated from the SSR prefetch). With no spotlight
  * to show, the grid shows the newest published releases instead.
  */
@@ -66,20 +66,23 @@ export const HomeContent = () => {
       <BannerStrip banners={banners} rotationInterval={rotationInterval} />
       <ContentContainer>
         <ZinePanel chat accent="yellow">
-          {/* No `priority`: the spotlight covers, not this wordmark, are the
-              LCP candidates, and the page preloads the first one. `eager`
-              still starts the fetch at render so the wordmark doesn't linger
-              as an empty frame after navigation. */}
-          <ImageHeading
-            src="/media/headings/FEATURED.webp"
-            alt="featured artists"
-            imageHeight={480}
-            loading="eager"
-            className="mt-0 mb-4 block text-left"
-          />
           <div className="mb-8">
+            {/* The search and the wordmark share this column so the wordmark's
+                left edge sits on the search box's left edge at every column
+                count, not on the panel padding. */}
             <div className={SPOTLIGHT_COVER_SPAN_CLASS}>
               <ArtistNavSearchCombobox />
+              {/* No `priority`: the spotlight covers, not this wordmark, are
+                  the LCP candidates, and the page preloads the first one.
+                  `eager` still starts the fetch at render so the wordmark
+                  doesn't linger as an empty frame after navigation. */}
+              <ImageHeading
+                src="/media/headings/FEATURED.webp"
+                alt="featured artists"
+                imageHeight={480}
+                loading="eager"
+                className="mt-6 mb-0 block text-left"
+              />
             </div>
             {/* Touch screens get no hover stamp on the covers, so they get
                 this line instead; `hover:none` is the same test that keeps

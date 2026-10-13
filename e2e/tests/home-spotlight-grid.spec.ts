@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { expect, test } from '../fixtures/base.fixture';
+import { edgesOfAll } from '../helpers/layout-edges';
 
 import type { Locator, Page } from '@playwright/test';
 
@@ -115,23 +116,30 @@ test.describe('home spotlight grid', () => {
   // centered in its cell, so it sits as far in from the grid's right edge as
   // the first cover sits in from its left.
   for (const width of [375, 768, 1280]) {
-    test(`lines the search up with the outer cover edges at ${width}px`, async ({ page }) => {
+    test(`lines the search and heading up with the outer cover edges at ${width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/');
 
       const cover = await hydratedCover(page);
       const grid = page.getByRole('list').filter({ has: cover });
       const search = page.getByRole('button', { name: 'Search artists and releases' });
-      const [coverBox, gridBox, searchBox] = await Promise.all([
-        cover.boundingBox(),
-        grid.boundingBox(),
-        search.boundingBox(),
+      const heading = page.getByRole('img', { name: 'featured artists' });
+      const [coverBox, gridBox, searchBox, headingBox] = await edgesOfAll([
+        cover,
+        grid,
+        search,
+        heading,
       ]);
-      if (!coverBox || !gridBox || !searchBox) throw new Error('missing a layout box');
 
-      const inset = coverBox.x - gridBox.x;
-      expect(searchBox.x).toBeCloseTo(coverBox.x, 0);
-      expect(searchBox.x + searchBox.width).toBeCloseTo(gridBox.x + gridBox.width - inset, 0);
+      const inset = coverBox.left - gridBox.left;
+      expect(searchBox.left).toBeCloseTo(coverBox.left, 0);
+      expect(searchBox.right).toBeCloseTo(gridBox.right - inset, 0);
+      // The wordmark sits below the search, flush with its left edge.
+      expect(headingBox.left).toBeCloseTo(searchBox.left, 0);
+      expect(headingBox.top).toBeGreaterThanOrEqual(searchBox.bottom);
+      expect(headingBox.bottom).toBeLessThanOrEqual(gridBox.top);
     });
   }
 
