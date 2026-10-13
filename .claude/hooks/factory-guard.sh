@@ -12,6 +12,18 @@
 #     `cd <dir>`s and the commit's own `git -C <dir>`s lead to from the
 #     session's cwd
 #
+# The one opt-in: when the user has asked for a merge in so many words, the
+# agent prefixes that single command with FACTORY_GUARD_USER_MERGE=1 —
+#
+#   FACTORY_GUARD_USER_MERGE=1 gh pr merge 866 --squash
+#   FACTORY_GUARD_USER_MERGE=1 git merge origin/main
+#
+# and `gh pr merge` and `git merge` pass for that simple command only. The
+# prefix is read off the command text, never the environment, so an exported
+# variable or a prefix on an earlier command in the chain changes nothing,
+# and the permission prompt and the transcript both show the attestation on
+# the merge it covers. Pushes to main and force pushes stay blocked.
+#
 # A command matches only at a command boundary: the start of the string, or
 # after &&, ||, ;, |, ( or a newline outside quotes. NAME=value assignments,
 # the shell keywords then, do, else, elif, ! and {, the wrappers env (with its
@@ -183,13 +195,16 @@ for segment in "${segments[@]}"; do
   split_words "$segment"
 
   # NAME=value assignments, shell keywords and wrappers come first, and env's
-  # own options after env.
+  # own options after env. The merge opt-in is one of those assignments and
+  # holds for this simple command only.
   w=0
   after_env=false
+  user_merge=false
   while [ "$w" -lt "${#words[@]}" ]; do
     case "${words[w]}" in
       env) after_env=true ;;
       -*) [ "$after_env" = true ] || break ;;
+      FACTORY_GUARD_USER_MERGE=1) user_merge=true ;;
       command | then | do | else | elif | '!' | '{' | time | nohup | exec | nice | sudo | xargs \
         | [A-Za-z_]*=*) ;;
       *) break ;;
@@ -223,10 +238,10 @@ for segment in "${segments[@]}"; do
       [ "$subcommand" = "-" ] || cd_args[${#cd_args[@]}]="$(expand_dir "$subcommand")"
       ;;
     "git merge")
-      block "git merge"
+      [ "$user_merge" = true ] || block "git merge"
       ;;
     "gh pr")
-      [ "${args[0]:-}" = merge ] && block "gh pr merge"
+      [ "${args[0]:-}" = merge ] && [ "$user_merge" != true ] && block "gh pr merge"
       ;;
     "git push")
       for word in ${args[@]+"${args[@]}"}; do
