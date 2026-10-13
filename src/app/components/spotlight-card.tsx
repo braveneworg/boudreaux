@@ -9,8 +9,6 @@ import type { ReactElement } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Play } from 'lucide-react';
-
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
@@ -20,6 +18,7 @@ import {
   type SpotlightCard as SpotlightCardData,
 } from '@/lib/utils/spotlight-card';
 
+import { PlaySharpIcon } from './icons/play-sharp-icon';
 import { ReleasePlayDialog } from './release-play-dialog';
 import { ReleaseShareWidget } from './release-share-widget';
 
@@ -104,7 +103,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
             {/* A square zine stamp, a black glyph on white in the site's
                 hard-border box; a press pushes it onto its ink shadow. */}
             <span className="shadow-zine-ink flex size-11 items-center justify-center border-2 border-black bg-white transition-[translate,box-shadow] duration-100 group-active:translate-x-0.5 group-active:translate-y-0.5 group-active:shadow-none motion-reduce:transition-none">
-              <Play className="ml-0.5 size-5 fill-current text-black" />
+              <PlaySharpIcon className="ml-0.5 size-5 fill-current text-black" />
             </span>
           </span>
         ) : null}

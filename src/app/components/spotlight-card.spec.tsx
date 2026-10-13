@@ -343,6 +343,15 @@ describe('SpotlightCard', () => {
     expect(stamp?.querySelector('svg')).toHaveClass('fill-current', 'text-black');
   });
 
+  it('draws the play glyph as a pointed triangle, not the rounded lucide mark', () => {
+    renderCard();
+
+    const glyph = playButton().querySelector('[data-slot="spotlight-play-stamp"] svg');
+    expect(glyph?.querySelector('polygon')).toHaveAttribute('points', '6 3 20 12 6 21');
+    expect(glyph?.querySelector('path')).toBeNull();
+    expect(glyph).toHaveAttribute('stroke', 'none');
+  });
+
   it('scales the cover slightly on hover', () => {
     renderCard();
 
