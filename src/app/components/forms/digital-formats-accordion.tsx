@@ -128,6 +128,7 @@ export const DigitalFormatsAccordion = ({
     handleDragOver,
     handleDragLeave,
     handleRemoveFile,
+    handleCancelUpload,
     handleUploadButtonClick,
     handleConfirmReupload,
     setConfirmReuploadFormat,
@@ -217,6 +218,7 @@ export const DigitalFormatsAccordion = ({
                 onDragLeave={handleDragLeave}
                 onFileInputChange={handleFileInputChange}
                 onUploadButtonClick={handleUploadButtonClick}
+                onCancelUpload={handleCancelUpload}
                 onRemoveFile={handleRemoveFile}
               />
             );

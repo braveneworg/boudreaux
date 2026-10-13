@@ -50,6 +50,7 @@ const renderItem = (overrides: Overrides = {}) => {
     onDragLeave: vi.fn(),
     onFileInputChange: vi.fn(),
     onUploadButtonClick: vi.fn(),
+    onCancelUpload: vi.fn(),
     onRemoveFile: vi.fn(),
     ...overrides,
   };
@@ -145,6 +146,40 @@ describe('FormatAccordionItem', () => {
       });
 
       expect(screen.getByText(/My Song/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Cancel button', () => {
+    const uploadingState: UploadState = {
+      status: 'uploading',
+      progress: 0,
+      currentFile: 1,
+      totalFiles: 1,
+    };
+
+    it('renders a Cancel button beside Upload while uploading and reports the format', () => {
+      const onCancelUpload = vi.fn();
+      renderItem({ uploading: true, state: uploadingState, onCancelUpload });
+
+      const cancel = screen.getByRole('button', { name: 'Cancel FLAC upload' });
+      fireEvent.click(cancel);
+
+      expect(onCancelUpload.mock.calls).toEqual([['FLAC']]);
+    });
+
+    it('keeps the Cancel button interactive while the drop zone is inert', () => {
+      renderItem({ uploading: true, state: uploadingState });
+
+      const cancel = screen.getByRole('button', { name: 'Cancel FLAC upload' });
+
+      expect(cancel).toBeEnabled();
+      expect(cancel.closest('.pointer-events-auto')).not.toBeNull();
+    });
+
+    it('does not render a Cancel button when the format is idle', () => {
+      renderItem();
+
+      expect(screen.queryByRole('button', { name: 'Cancel FLAC upload' })).not.toBeInTheDocument();
     });
   });
 });

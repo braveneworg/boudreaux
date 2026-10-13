@@ -71,6 +71,8 @@ interface UploadStateBundle {
   setIsDeletingFiles: Dispatch<SetStateAction<boolean>>;
   fileInputRefs: React.RefObject<Record<string, HTMLInputElement | null>>;
   uploadButtonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>;
+  /** In-flight upload controller per format; absent when nothing is uploading. */
+  abortControllers: React.RefObject<Map<DigitalFormatType, AbortController>>;
 }
 
 /** Shared dependency bundle for the heavy upload helpers. */
@@ -106,6 +108,35 @@ const setFormatError = (
     [formatType]: { status: 'error', message },
   }));
   state.setErrorMessages((prev) => ({ ...prev, [formatType]: message }));
+};
+
+/**
+ * Register a fresh `AbortController` for `formatType` and return its signal.
+ * Upload flows thread the signal into every request and bail out — without
+ * touching state — once {@link cancelUpload} has fired it.
+ */
+const beginUpload = (state: UploadStateBundle, formatType: DigitalFormatType): AbortSignal => {
+  const controller = new AbortController();
+  state.abortControllers.current.set(formatType, controller);
+  return controller.signal;
+};
+
+/** Drop the controller once a flow settles so a later cancel cannot reset a finished format. */
+const endUpload = (state: UploadStateBundle, formatType: DigitalFormatType): void => {
+  state.abortControllers.current.delete(formatType);
+};
+
+/** Run an upload flow for `formatType`, dropping its controller however it settles. */
+const runThenEndUpload = async (
+  ctx: UploadContext,
+  formatType: DigitalFormatType,
+  run: () => Promise<void>
+): Promise<void> => {
+  try {
+    await run();
+  } finally {
+    endUpload(ctx.state, formatType);
+  }
 };
 
 /** Resolve a format's display label, falling back to the raw type when absent. */
@@ -187,7 +218,8 @@ const failedUpload = (file: File, error: string): SingleUploadResult => ({
 const uploadSingleFileToS3 = async (
   releaseId: string | undefined,
   formatType: DigitalFormatType,
-  file: File
+  file: File,
+  signal: AbortSignal
 ): Promise<SingleUploadResult> => {
   const uploadStartTime = performance.now();
   console.info(
@@ -218,6 +250,7 @@ const uploadSingleFileToS3 = async (
         'x-file-name': encodeURIComponent(file.name),
         'x-file-size': String(file.size),
       },
+      signal,
     });
 
     const uploadResult = (await uploadResponse.json()) as {
@@ -293,12 +326,15 @@ interface SequentialUploadResult {
 
 /**
  * Upload `files` one at a time, updating per-file progress state and collecting
- * the successful results, their s3 keys, and the failure count.
+ * the successful results, their s3 keys, and the failure count. Stops at the
+ * first file after `signal` aborts and leaves state alone — the cancel path has
+ * already reset it.
  */
 const uploadFilesSequentially = async (
   ctx: UploadContext,
   formatType: DigitalFormatType,
-  files: File[]
+  files: File[],
+  signal: AbortSignal
 ): Promise<SequentialUploadResult> => {
   const successFiles: UploadedFileInfo[] = [];
   const s3Keys: string[] = [];
@@ -307,6 +343,7 @@ const uploadFilesSequentially = async (
   for (let i = 0; i < files.length; i++) {
     const file = files.at(i);
     if (!file) continue;
+    if (signal.aborted) break;
     console.info(`[batch-upload] Uploading ${i + 1}/${files.length}: ${formatType} → ${file.name}`);
     ctx.state.setUploadStates((prev) => ({
       ...prev,
@@ -318,7 +355,8 @@ const uploadFilesSequentially = async (
       },
     }));
 
-    const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file);
+    const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file, signal);
+    if (signal.aborted) break;
 
     if (result.success && result.s3Key) {
       const trackMeta = await extractTrackMetadata(file);
@@ -506,6 +544,7 @@ const runBatchUpload = async (
   files: File[]
 ): Promise<void> => {
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const signal = beginUpload(ctx.state, formatType);
 
   ctx.state.setSelectedFiles((prev) => ({
     ...prev,
@@ -523,7 +562,9 @@ const runBatchUpload = async (
   }));
 
   const extractedMetadata = await extractBatchMetadata(ctx, formatType, files[0]);
-  const upload = await uploadFilesSequentially(ctx, formatType, files);
+  if (signal.aborted) return;
+  const upload = await uploadFilesSequentially(ctx, formatType, files, signal);
+  if (signal.aborted) return;
   const op: BatchOperation = { formatType, files, upload, extractedMetadata };
 
   if (upload.successFiles.length > 0) {
@@ -693,6 +734,7 @@ const runFileUpload = async (
   formatType: DigitalFormatType,
   file: File
 ): Promise<void> => {
+  const signal = beginUpload(ctx.state, formatType);
   ctx.state.setSelectedFiles((prev) => ({
     ...prev,
     [formatType]: { file, fileName: file.name, fileSize: file.size },
@@ -706,8 +748,10 @@ const runFileUpload = async (
   }));
 
   const extractedMetadata = await extractSingleFileMetadata(ctx, formatType, file);
+  if (signal.aborted) return;
 
-  const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file);
+  const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file, signal);
+  if (signal.aborted) return;
 
   if (!result.success || !result.s3Key) {
     failFormat(ctx, formatType, result.error ?? 'Upload failed');
@@ -895,6 +939,22 @@ const removeFile = (state: UploadStateBundle, formatType: DigitalFormatType): vo
 };
 
 /**
+ * Cancel a format's in-flight upload: abort its request, drop the controller,
+ * reset the format to idle, and announce it. No-op when nothing is uploading.
+ * Files already uploaded in the batch were never confirmed, so nothing is
+ * recorded against the release.
+ */
+const cancelUpload = (state: UploadStateBundle, formatType: DigitalFormatType): void => {
+  const controller = state.abortControllers.current.get(formatType);
+  if (!controller) return;
+
+  controller.abort();
+  endUpload(state, formatType);
+  removeFile(state, formatType);
+  toast.info(`${formatLabel(formatType)} upload cancelled`);
+};
+
+/**
  * Confirmed re-upload flow: delete a format's existing files, reset its state, and
  * re-open the file picker. Mirrors the original `handleConfirmReupload` body,
  * including its defensive guard and `finally` cleanup.
@@ -944,7 +1004,7 @@ const confirmReupload = async (
 };
 
 /**
- * Owns every piece of upload state (11 `useState` + 2 `useRef`), including the
+ * Owns every piece of upload state (11 `useState` + 3 `useRef`), including the
  * initial-state derivation from `existingFormats`, and returns them bundled for
  * the hook and its module-scope helpers.
  */
@@ -1018,6 +1078,9 @@ const useUploadState = (existingFormats: ExistingFormat[]): UploadStateBundle =>
   // Upload button refs per format for scroll-into-view on expand
   const uploadButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
+  // Abort controller per format for cancelling an in-flight upload
+  const abortControllers = useRef(new Map<DigitalFormatType, AbortController>());
+
   return {
     selectedFiles,
     setSelectedFiles,
@@ -1039,6 +1102,7 @@ const useUploadState = (existingFormats: ExistingFormat[]): UploadStateBundle =>
     setIsDeletingFiles,
     fileInputRefs,
     uploadButtonRefs,
+    abortControllers,
   };
 };
 
@@ -1117,14 +1181,16 @@ const useUploadActionHandlers = (
 
   const handleFileUpload = useCallback(
     async (formatType: DigitalFormatType, file: File): Promise<void> => {
-      await runFileUpload(buildContext(), formatType, file);
+      const ctx = buildContext();
+      await runThenEndUpload(ctx, formatType, () => runFileUpload(ctx, formatType, file));
     },
     [buildContext]
   );
 
   const handleBatchUpload = useCallback(
     async (formatType: DigitalFormatType, files: File[]): Promise<void> => {
-      await runBatchUpload(buildContext(), formatType, files);
+      const ctx = buildContext();
+      await runThenEndUpload(ctx, formatType, () => runBatchUpload(ctx, formatType, files));
     },
     [buildContext]
   );
@@ -1177,9 +1243,10 @@ const useUploadActionHandlers = (
   };
 };
 
-/** File-list management handlers (remove, re-upload button, confirm re-upload). */
+/** File-list management handlers (remove, cancel, re-upload button, confirm re-upload). */
 interface FileManagementHandlers {
   handleRemoveFile: (formatType: DigitalFormatType) => void;
+  handleCancelUpload: (formatType: DigitalFormatType) => void;
   handleUploadButtonClick: (formatType: DigitalFormatType) => void;
   handleConfirmReupload: () => Promise<void>;
 }
@@ -1203,6 +1270,13 @@ const useFileManagementHandlers = (
     [state]
   );
 
+  const handleCancelUpload = useCallback(
+    (formatType: DigitalFormatType) => {
+      cancelUpload(state, formatType);
+    },
+    [state]
+  );
+
   /** Show confirmation dialog if format already has files; otherwise open file picker. */
   const handleUploadButtonClick = useCallback(
     (formatType: DigitalFormatType) => {
@@ -1220,7 +1294,7 @@ const useFileManagementHandlers = (
     await confirmReupload(state, releaseId, confirmReuploadFormat);
   }, [state, releaseId, confirmReuploadFormat]);
 
-  return { handleRemoveFile, handleUploadButtonClick, handleConfirmReupload };
+  return { handleRemoveFile, handleCancelUpload, handleUploadButtonClick, handleConfirmReupload };
 };
 
 export const useDigitalFormatUploads = ({
@@ -1259,6 +1333,7 @@ export const useDigitalFormatUploads = ({
     handleDragOver: actions.handleDragOver,
     handleDragLeave: actions.handleDragLeave,
     handleRemoveFile: management.handleRemoveFile,
+    handleCancelUpload: management.handleCancelUpload,
     handleUploadButtonClick: management.handleUploadButtonClick,
     handleConfirmReupload: management.handleConfirmReupload,
     setConfirmReuploadFormat: state.setConfirmReuploadFormat,

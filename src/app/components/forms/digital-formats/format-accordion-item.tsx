@@ -6,7 +6,7 @@
 
 import type { MutableRefObject } from 'react';
 
-import { AlertCircle, FileAudio, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, FileAudio, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -44,6 +44,7 @@ interface FormatAccordionItemProps {
     event: React.ChangeEvent<HTMLInputElement>
   ) => void;
   onUploadButtonClick: (formatType: DigitalFormatType) => void;
+  onCancelUpload: (formatType: DigitalFormatType) => void;
   onRemoveFile: (formatType: DigitalFormatType) => void;
 }
 
@@ -65,11 +66,13 @@ interface FormatDropZoneProps {
     event: React.ChangeEvent<HTMLInputElement>
   ) => void;
   onUploadButtonClick: (formatType: DigitalFormatType) => void;
+  onCancelUpload: (formatType: DigitalFormatType) => void;
 }
 
 interface FormatUploadControlProps {
   config: FormatConfig;
   uploaded: boolean;
+  uploading: boolean;
   disableInput: boolean;
   disableButton: boolean;
   fileInputRef: MutableRefObject<Record<string, HTMLInputElement | null>>;
@@ -79,19 +82,27 @@ interface FormatUploadControlProps {
     event: React.ChangeEvent<HTMLInputElement>
   ) => void;
   onUploadButtonClick: (formatType: DigitalFormatType) => void;
+  onCancelUpload: (formatType: DigitalFormatType) => void;
 }
 
+/**
+ * Hidden folder input plus its Upload button, and a Cancel button while this
+ * format is uploading. The drop zone goes `pointer-events-none` during an
+ * upload, so the control row re-enables pointer events to keep Cancel clickable.
+ */
 const FormatUploadControl = ({
   config,
   uploaded,
+  uploading,
   disableInput,
   disableButton,
   fileInputRef,
   uploadButtonRef,
   onFileInputChange,
   onUploadButtonClick,
+  onCancelUpload,
 }: FormatUploadControlProps) => (
-  <div className="space-y-2">
+  <div className={cn('space-y-2', uploading && 'pointer-events-auto')}>
     <Label htmlFor={`upload-${config.type}`} className="sr-only">
       Upload {config.label} folder
     </Label>
@@ -109,28 +120,42 @@ const FormatUploadControl = ({
       aria-label={`Upload ${config.label} folder`}
       className="hidden"
     />
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={disableButton}
-      onClick={() => onUploadButtonClick(config.type)}
-      ref={(el) => {
-        uploadButtonRef.current[config.type] = el;
-      }}
-    >
-      {uploaded ? (
-        <>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Re-upload files
-        </>
-      ) : (
-        <>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload files
-        </>
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disableButton}
+        onClick={() => onUploadButtonClick(config.type)}
+        ref={(el) => {
+          uploadButtonRef.current[config.type] = el;
+        }}
+      >
+        {uploaded ? (
+          <>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Re-upload files
+          </>
+        ) : (
+          <>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload files
+          </>
+        )}
+      </Button>
+      {uploading && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onCancelUpload(config.type)}
+          aria-label={`Cancel ${config.label} upload`}
+        >
+          <X className="mr-2 h-4 w-4" />
+          Cancel
+        </Button>
       )}
-    </Button>
+    </div>
   </div>
 );
 
@@ -149,6 +174,7 @@ const FormatDropZone = ({
   onDragLeave,
   onFileInputChange,
   onUploadButtonClick,
+  onCancelUpload,
 }: FormatDropZoneProps) => {
   const disableInput = uploading || isLocked || isBlockedByOtherUpload;
   const disableButton = disableInput || isDeletingFiles;
@@ -161,27 +187,32 @@ const FormatDropZone = ({
         'flex flex-col items-center justify-center border-2 border-dashed p-6',
         'hover:border-primary/50 transition-colors',
         dragOverFormat === config.type && 'border-primary bg-primary/5',
-        disableInput && 'pointer-events-none opacity-50'
+        disableInput && 'pointer-events-none'
       )}
     >
-      <Upload className="mb-3 h-8 w-8 text-zinc-950" />
-      {isLocked ? (
-        <p className="mb-1 text-sm text-zinc-950">Upload MP3 320kbps first</p>
-      ) : (
-        <p className="mb-1 text-sm text-zinc-950">
-          Drag and drop a {config.label} file or folder here, or choose a folder below
-        </p>
-      )}
-      <p className="mb-3 text-xs text-zinc-950">Accepts: {config.acceptTypes}</p>
+      {/* Only the drop-target copy dims while inert; the Cancel button below stays legible */}
+      <div className={cn('flex flex-col items-center', disableInput && 'opacity-50')}>
+        <Upload className="mb-3 h-8 w-8 text-zinc-950" />
+        {isLocked ? (
+          <p className="mb-1 text-sm text-zinc-950">Upload MP3 320kbps first</p>
+        ) : (
+          <p className="mb-1 text-sm text-zinc-950">
+            Drag and drop a {config.label} file or folder here, or choose a folder below
+          </p>
+        )}
+        <p className="mb-3 text-xs text-zinc-950">Accepts: {config.acceptTypes}</p>
+      </div>
       <FormatUploadControl
         config={config}
         uploaded={uploaded}
+        uploading={uploading}
         disableInput={disableInput}
         disableButton={disableButton}
         fileInputRef={fileInputRef}
         uploadButtonRef={uploadButtonRef}
         onFileInputChange={onFileInputChange}
         onUploadButtonClick={onUploadButtonClick}
+        onCancelUpload={onCancelUpload}
       />
     </div>
   );
@@ -317,6 +348,7 @@ export const FormatAccordionItem = ({
   onDragLeave,
   onFileInputChange,
   onUploadButtonClick,
+  onCancelUpload,
   onRemoveFile,
 }: FormatAccordionItemProps) => (
   <AccordionItem key={config.type} value={config.type}>
@@ -360,6 +392,7 @@ export const FormatAccordionItem = ({
           onDragLeave={onDragLeave}
           onFileInputChange={onFileInputChange}
           onUploadButtonClick={onUploadButtonClick}
+          onCancelUpload={onCancelUpload}
         />
 
         {/* Status row with file info and actions */}
