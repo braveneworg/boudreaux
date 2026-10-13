@@ -16,25 +16,28 @@ import {
 } from '@/lib/utils/release-helpers';
 
 /**
- * The `sizes` of a spotlight card's cover. The card is capped at `max-w-52`
- * (13rem), and every grid cell is at least that wide, so the cover renders at
- * 208px at every breakpoint. The home page's cover preload uses the same
- * string as its `imagesizes`, so the preload and the card pick the same
- * variant.
+ * The `sizes` of a spotlight card's cover. On a phone the one-column card
+ * fills the panel, so the cover is as wide as the viewport less the panel's
+ * padding; `100vw` is the safe ceiling. From `sm` the card is capped at
+ * `sm:max-w-52` (13rem), and every grid cell is at least that wide, so the
+ * cover renders at 208px. The home page's cover preload uses the same string
+ * as its `imagesizes`, so the preload and the card pick the same variant.
  */
-export const SPOTLIGHT_COVER_SIZES = '208px';
+export const SPOTLIGHT_COVER_SIZES = '(min-width: 640px) 208px, 100vw';
 
 /**
  * Width, centered, from the left edge of the grid's first cover to the right
  * edge of its last column's cover, so a row above the grid (the home search)
- * lines up with the covers. Each 13rem cover is centered in a cell, and cells
- * sit 1.5rem apart (`gap-x-6`), so the outer edges lie `100% - (cell - 13rem)`
- * apart: 13rem in one column, `50% + 13.75rem` in two (`sm`), `75% + 14.125rem`
- * in four (`lg`). `min(100%, …)` covers cells narrower than 13rem, where the
- * covers fill them. Change it with the grid's gap, columns or cover cap.
+ * lines up with the covers. On a phone the single cover fills the panel, so
+ * the span is the full width. From `sm` each 13rem cover is centered in a
+ * cell, and cells sit 1.5rem apart (`gap-x-6`), so the outer edges lie
+ * `100% - (cell - 13rem)` apart: `50% + 13.75rem` in two columns (`sm`),
+ * `75% + 14.125rem` in four (`lg`). `min(100%, …)` covers cells narrower than
+ * 13rem, where the covers fill them. Change it with the grid's gap, columns or
+ * cover cap.
  */
 export const SPOTLIGHT_COVER_SPAN_CLASS =
-  'mx-auto w-[min(100%,13rem)] sm:w-[min(100%,calc(50%_+_13.75rem))] lg:w-[min(100%,calc(75%_+_14.125rem))]';
+  'mx-auto w-full sm:w-[min(100%,calc(50%_+_13.75rem))] lg:w-[min(100%,calc(75%_+_14.125rem))]';
 
 /** One cover in the home page's spotlight grid, from a spotlight or a newest release. */
 export interface SpotlightCard {

@@ -354,10 +354,12 @@ describe('SpotlightCard', () => {
     expect(playButton().querySelector('[data-slot="spotlight-tape"]')).toBeNull();
   });
 
-  it('keeps the card to the cover width its sizes name', () => {
+  it('fills the phone width and caps the card at the cover width its sizes name from sm', () => {
     renderCard();
 
-    expect(playButton().parentElement).toHaveClass('mx-auto', 'w-full', 'max-w-52');
-    expect(SPOTLIGHT_COVER_SIZES).toBe('208px');
+    const card = playButton().parentElement;
+    expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-52');
+    expect(card).not.toHaveClass('max-w-52');
+    expect(SPOTLIGHT_COVER_SIZES).toBe('(min-width: 640px) 208px, 100vw');
   });
 });

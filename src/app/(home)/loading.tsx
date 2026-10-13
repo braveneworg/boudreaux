@@ -102,8 +102,8 @@ export default function HomeLoading() {
               />
             </div>
             {/* Spotlight grid skeleton — the SpotlightGrid columns, each card a
-                13rem square cover, centered in its cell, over a centered
-                two-line caption. */}
+                square cover (panel-wide on phones, 13rem from `sm`), centered
+                in its cell, over a centered two-line caption. */}
             <div
               data-testid="spotlight-grid-skeleton"
               className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4"
@@ -112,7 +112,7 @@ export default function HomeLoading() {
                 <div
                   key={i}
                   data-testid="spotlight-card-skeleton"
-                  className="mx-auto flex w-full max-w-52 flex-col gap-3"
+                  className="mx-auto flex w-full flex-col gap-3 sm:max-w-52"
                 >
                   <div className="bg-muted aspect-square w-full animate-pulse border-2 border-black" />
                   <div className="flex flex-col items-center gap-1.5">

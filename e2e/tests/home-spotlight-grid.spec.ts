@@ -177,6 +177,27 @@ test.describe('home spotlight grid on a touch screen', () => {
     await expect(hint).toHaveText('Tap any release art to play or download the music');
     await expect(cover.locator('[data-slot="spotlight-play-stamp"]')).toHaveCSS('opacity', '0');
   });
+
+  test('runs the search and the cover edge to edge with the tap hint', async ({ page }) => {
+    await page.goto('/');
+    const cover = await hydratedCover(page);
+    const search = page.getByRole('button', { name: 'Search artists and releases' });
+    const hint = page.getByText('any release art to play or download the music');
+
+    const [coverBox, searchBox, hintBox] = await Promise.all([
+      cover.boundingBox(),
+      search.boundingBox(),
+      hint.boundingBox(),
+    ]);
+    if (!coverBox || !searchBox || !hintBox) throw new Error('missing a layout box');
+
+    // On a phone the search and the cover fill the panel, so both share the
+    // hint's margins on either side.
+    expect(searchBox.x).toBeCloseTo(hintBox.x, 0);
+    expect(searchBox.x + searchBox.width).toBeCloseTo(hintBox.x + hintBox.width, 0);
+    expect(coverBox.x).toBeCloseTo(hintBox.x, 0);
+    expect(coverBox.x + coverBox.width).toBeCloseTo(hintBox.x + hintBox.width, 0);
+  });
 });
 
 test.describe('home spotlight grid on a 375×667 phone', () => {

@@ -127,12 +127,13 @@ describe('HomeLoading', () => {
     });
   });
 
-  it('keeps each card skeleton to the card cover width', () => {
+  it('keeps each card skeleton to the card width: full on phones, the cover cap from sm', () => {
     render(<HomeLoading />);
 
-    screen
-      .getAllByTestId('spotlight-card-skeleton')
-      .forEach((card) => expect(card).toHaveClass('mx-auto', 'w-full', 'max-w-52'));
+    screen.getAllByTestId('spotlight-card-skeleton').forEach((card) => {
+      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-52');
+      expect(card).not.toHaveClass('max-w-52');
+    });
   });
 
   it('no longer reserves room for the player or the headlines', () => {
