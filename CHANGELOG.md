@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.430.0] - 2026-10-13
+
+### Added
+
+- feat(home): ✨ link spotlight artist, not title (#867)
+
+## [4.429.0] - 2026-10-13
+
+### Changed
+
+- Home: FEATURED heading below the search, edge-aligned (#866)
+- Factory Guard: merge opt-in on explicit user instruction (#869)
+
 ## [4.428.0] - 2026-10-13
 
 ### Changed

@@ -47,7 +47,7 @@ export interface SpotlightCard {
   year: number;
   /** The artist the card names; `null` for a release with no public credit. */
   artistName: string | null;
-  /** Slug of the artist page the title links to; `null` leaves the title as text. */
+  /** Slug of the artist page the artist name links to; `null` leaves the name as text. */
   artistSlug: string | null;
   coverArt: string | null;
   /** Stream URL of the track the modal starts on; `null` when nothing is playable. */

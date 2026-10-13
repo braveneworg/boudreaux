@@ -6,8 +6,9 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/auth.fixture';
+import { edgesOfAll } from '../helpers/layout-edges';
 
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * E2E coverage for ADR-0020: the admin edits an artist's links as three
@@ -70,35 +71,6 @@ const gotoEdit = async (page: Page, id: string): Promise<void> => {
     timeout: 15_000,
   });
   await expect(page.getByRole('region', { name: 'Links' })).toBeVisible();
-};
-
-interface Edges {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
-
-/**
- * The edges of the boxes the visible elements draw, read from one layout
- * frame. Reading each box with its own `boundingBox()` call lets the page
- * move between reads: on CI the bio section's lazy-loaded editor mounted
- * above the links mid-sequence, so the row's buttons measured 105px below
- * the URL they share a line with (run 38188524412).
- */
-const edgesOfAll = async (locators: readonly Locator[]): Promise<Edges[]> => {
-  for (const locator of locators) await expect(locator).toBeVisible();
-  const handles = await Promise.all(locators.map((locator) => locator.elementHandle()));
-  const page = locators[0].page();
-  return page.evaluate(
-    (elements) =>
-      elements.map((element) => {
-        if (!element) throw new Error('A visible element has no box');
-        const { left, right, top, bottom } = element.getBoundingClientRect();
-        return { left, right, top, bottom };
-      }),
-    handles
-  );
 };
 
 const save = async (page: Page): Promise<void> => {

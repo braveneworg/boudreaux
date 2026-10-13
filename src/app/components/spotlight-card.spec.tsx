@@ -221,21 +221,22 @@ describe('SpotlightCard', () => {
     expect(playButton()).toHaveTextContent('Spot Album');
   });
 
-  it('captions the cover with the artist in semibold, then the linked title and year', () => {
+  it('captions the cover with the linked artist in semibold, then the title and year as text', () => {
     renderCard();
 
-    const artist = screen.getByText('Spot Artist');
-    expect(artist).toHaveClass('font-semibold');
-    const link = screen.getByRole('link', { name: 'Spot Album' });
-    expect(link).toHaveAttribute('href', '/artists/spot-artist/releases');
-    expect(link.parentElement).toHaveTextContent('Spot Album (2024)');
-    expect(artist.parentElement).toHaveClass('text-center');
+    const artist = screen.getByRole('link', { name: 'Spot Artist' });
+    expect(artist).toHaveAttribute('href', '/artists/spot-artist');
+    expect(artist.parentElement).toHaveClass('font-semibold');
+    expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Spot Album' })).not.toBeInTheDocument();
+    expect(artist.parentElement?.parentElement).toHaveClass('text-center');
   });
 
-  it('leaves the title as text when there is no artist page', () => {
+  it('leaves the artist as text when there is no artist page', () => {
     renderCard({ artistSlug: null });
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('Spot Artist')).toBeInTheDocument();
     expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
   });
 
@@ -306,9 +307,9 @@ describe('SpotlightCard', () => {
 
     expect(playButton()).toBeDisabled();
     expect(dialog.playSrcs.at(-1)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Spot Album' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Spot Artist' })).toHaveAttribute(
       'href',
-      '/artists/spot-artist/releases'
+      '/artists/spot-artist'
     );
   });
 

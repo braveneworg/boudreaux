@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { expect, test } from '../fixtures/base.fixture';
+import { edgesOfAll } from '../helpers/layout-edges';
 
 import type { Locator, Page } from '@playwright/test';
 
@@ -13,6 +14,9 @@ import type { Locator, Page } from '@playwright/test';
  */
 
 const COVER_NAME = 'Play E2E Album One by E2E Featured Artist';
+
+/** `-ml-1.5` on the FEATURED wordmark: 0.375rem at the 16px root size. */
+const WORDMARK_INK_OFFSET_PX = 6;
 
 /** The seeded spotlight's cover button, once its click handler is attached. */
 const hydratedCover = async (page: Page): Promise<Locator> => {
@@ -50,24 +54,21 @@ test.describe('home spotlight grid', () => {
     const html = await response.text();
     expect(html).toContain('alt="E2E Album One cover art"');
     expect(html).toContain(`aria-label="${COVER_NAME}"`);
-    expect(html).toContain('>E2E Featured Artist</p>');
-    expect(html).toContain('>E2E Album One</a> (2024)');
+    expect(html).toContain('>E2E Featured Artist</a>');
+    expect(html).toContain('>E2E Album One (2024)</p>');
   });
 
-  test('captions the card with the artist, then the linked title and year', async ({ page }) => {
+  test('captions the card with the linked artist, then the title and year', async ({ page }) => {
     await page.goto('/');
 
     const card = page
       .getByRole('listitem')
       .filter({ has: page.getByRole('button', { name: COVER_NAME }) });
-    await expect(card.getByText('E2E Featured Artist', { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      card.getByRole('link', { name: 'E2E Featured Artist', exact: true })
+    ).toHaveAttribute('href', '/artists/e2e-artist', { timeout: 15_000 });
     await expect(card.getByText('E2E Album One (2024)', { exact: true })).toBeVisible();
-    await expect(card.getByRole('link', { name: 'E2E Album One', exact: true })).toHaveAttribute(
-      'href',
-      '/artists/e2e-artist/releases'
-    );
+    await expect(card.getByRole('link', { name: 'E2E Album One', exact: true })).toHaveCount(0);
   });
 
   test('opens the modal artist first, with the tracks row under the player', async ({ page }) => {
@@ -115,23 +116,32 @@ test.describe('home spotlight grid', () => {
   // centered in its cell, so it sits as far in from the grid's right edge as
   // the first cover sits in from its left.
   for (const width of [375, 768, 1280]) {
-    test(`lines the search up with the outer cover edges at ${width}px`, async ({ page }) => {
+    test(`lines the search and heading up with the outer cover edges at ${width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/');
 
       const cover = await hydratedCover(page);
       const grid = page.getByRole('list').filter({ has: cover });
       const search = page.getByRole('button', { name: 'Search artists and releases' });
-      const [coverBox, gridBox, searchBox] = await Promise.all([
-        cover.boundingBox(),
-        grid.boundingBox(),
-        search.boundingBox(),
+      const heading = page.getByRole('img', { name: 'featured artists' });
+      const [coverBox, gridBox, searchBox, headingBox] = await edgesOfAll([
+        cover,
+        grid,
+        search,
+        heading,
       ]);
-      if (!coverBox || !gridBox || !searchBox) throw new Error('missing a layout box');
 
-      const inset = coverBox.x - gridBox.x;
-      expect(searchBox.x).toBeCloseTo(coverBox.x, 0);
-      expect(searchBox.x + searchBox.width).toBeCloseTo(gridBox.x + gridBox.width - inset, 0);
+      const inset = coverBox.left - gridBox.left;
+      expect(searchBox.left).toBeCloseTo(coverBox.left, 0);
+      expect(searchBox.right).toBeCloseTo(gridBox.right - inset, 0);
+      // The wordmark sits below the search with its ink flush to the search's
+      // left edge. The artwork carries its own left padding, so the image box
+      // is pulled 6px (`-ml-1.5`) left of the search box to put the ink there.
+      expect(headingBox.left).toBeCloseTo(searchBox.left - WORDMARK_INK_OFFSET_PX, 0);
+      expect(headingBox.top).toBeGreaterThanOrEqual(searchBox.bottom);
+      expect(headingBox.bottom).toBeLessThanOrEqual(gridBox.top);
     });
   }
 

@@ -30,13 +30,13 @@ interface SpotlightCardProps {
 /**
  * One cover in the home page's spotlight grid (variant A): the cover, as wide
  * as the panel on phones and at most 13rem from `sm`, centered in its grid
- * cell, then a centered caption — the
- * artist, and the title (linked to the artist's releases) with its year. The
+ * cell, then a centered caption — the artist (linked to the artist's page),
+ * and the title with its year. The
  * cover is a button: the click primes the card's track and opens the
  * listening modal (a bottom sheet on phones), as the `/releases` Play button
  * does, and a square zine play stamp shows on hover and keyboard focus.
  * Touch screens get no stamp; the home page tells them to tap the cover
- * instead. With nothing playable the cover is disabled and the title link
+ * instead. With nothing playable the cover is disabled and the artist link
  * still works.
  */
 export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
@@ -111,20 +111,21 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
       </button>
 
       <div className="text-center text-sm leading-snug text-zinc-950">
-        {artistName ? <p className="font-semibold">{artistName}</p> : null}
-        <p>
-          {artistSlug ? (
-            <Link
-              href={`/artists/${artistSlug}/releases`}
-              className="underline underline-offset-4 hover:no-underline"
-            >
-              {title}
-            </Link>
-          ) : (
-            title
-          )}
-          {` (${year})`}
-        </p>
+        {artistName ? (
+          <p className="font-semibold">
+            {artistSlug ? (
+              <Link
+                href={`/artists/${artistSlug}`}
+                className="underline underline-offset-4 hover:no-underline"
+              >
+                {artistName}
+              </Link>
+            ) : (
+              artistName
+            )}
+          </p>
+        ) : null}
+        <p>{`${title} (${year})`}</p>
       </div>
 
       {playable ? (
