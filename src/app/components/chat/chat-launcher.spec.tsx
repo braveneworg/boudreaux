@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ChatLauncher } from './chat-launcher';
@@ -93,19 +93,20 @@ describe('ChatLauncher', () => {
     await user.click(screen.getByRole('button', { name: /open chat/i }));
 
     // ChatBody is mocked at the top of this file so the launcher test
-    // does not pull in the realtime + query dependency graph.
-    expect(screen.getByTestId('chat-body-mock')).toBeInTheDocument();
+    // does not pull in the realtime + query dependency graph. It arrives as
+    // a lazy chunk, hence the find.
+    expect(await screen.findByTestId('chat-body-mock')).toBeInTheDocument();
     expect(screen.queryByText('Sign in to chat')).not.toBeInTheDocument();
   });
 
-  it('auto-opens the drawer for an authenticated viewer arriving via a mention link', () => {
+  it('auto-opens the drawer for an authenticated viewer arriving via a mention link', async () => {
     useSessionMock.mockReturnValue(authenticatedSession);
     searchParamsMock.mockReturnValue(new URLSearchParams('chat=mention'));
 
     const { rerender } = render(<ChatLauncher />);
 
     // The auto-open effect mounts ChatBody without any click.
-    expect(screen.getByTestId('chat-body-mock')).toBeInTheDocument();
+    expect(await screen.findByTestId('chat-body-mock')).toBeInTheDocument();
 
     // Flip auth off then on so the auto-open effect re-runs with
     // `autoOpenedRef.current` already true, exercising the early-return
@@ -115,8 +116,9 @@ describe('ChatLauncher', () => {
     useSessionMock.mockReturnValue(authenticatedSession);
     rerender(<ChatLauncher />);
 
-    // The sign-out transition tore down the socket exactly once.
-    expect(disconnectPusherClientMock).toHaveBeenCalledTimes(1);
+    // The sign-out transition tore down the socket exactly once (the
+    // teardown reaches the Pusher client through a lazy import).
+    await waitFor(() => expect(disconnectPusherClientMock).toHaveBeenCalledTimes(1));
   });
 
   it('does not auto-open for an anonymous viewer arriving via a mention link', () => {
@@ -134,14 +136,27 @@ describe('ChatLauncher', () => {
 
     const { rerender } = render(<ChatLauncher />);
     await user.click(screen.getByRole('button', { name: /open chat/i }));
-    expect(screen.getByTestId('chat-body-mock')).toBeInTheDocument();
+    expect(await screen.findByTestId('chat-body-mock')).toBeInTheDocument();
 
     // Transition from authenticated → unauthenticated triggers the teardown.
     useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
     rerender(<ChatLauncher />);
 
-    expect(disconnectPusherClientMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(disconnectPusherClientMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('chat-body-mock')).not.toBeInTheDocument();
+  });
+
+  it('does not touch the Pusher client on sign-out when the chat never opened', () => {
+    useSessionMock.mockReturnValue(authenticatedSession);
+
+    const { rerender } = render(<ChatLauncher />);
+
+    // No drawer session ran, so no socket exists: the teardown must not pull
+    // the pusher-js chunk into the page just to disconnect nothing.
+    useSessionMock.mockReturnValue({ status: 'unauthenticated', data: null });
+    rerender(<ChatLauncher />);
+
+    expect(disconnectPusherClientMock).not.toHaveBeenCalled();
   });
 
   // Close-button behaviour is covered by chat-drawer.spec.tsx. We do

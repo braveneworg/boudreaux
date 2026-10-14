@@ -5,16 +5,28 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 
 import { useSession } from '@/hooks/use-session';
-import { disconnectPusherClient } from '@/lib/utils/pusher-client';
 
 import { ChatAuthGate } from './chat-auth-gate';
-import { ChatBody } from './chat-body';
+import { ChatBodyLoading } from './chat-body-loading';
 import { ChatDrawer } from './chat-drawer';
 import { ChatTriggerButton } from './chat-trigger-button';
 import { useChatOpen } from './use-chat-open';
+
+// The chat body (message list, composer, Pusher socket, fingerprinting,
+// emoji, mention parsing) is the heaviest client subtree the root layout
+// mounts, and nothing on a page needs it until the drawer opens. Loading it
+// on first open keeps pusher-js and friends out of every page's initial
+// bundle. `ssr: false` because the drawer content only mounts client-side on
+// open anyway, and it gives the lazy chunk its own Suspense boundary so the
+// in-flight state is the drawer's spinner, never the route's loading skeleton.
+const ChatBody = dynamic(() => import('./chat-body').then((mod) => mod.ChatBody), {
+  ssr: false,
+  loading: () => <ChatBodyLoading label="Loading chat" />,
+});
 
 /**
  * Top-level chat entry point — mounted globally in the root layout.
@@ -43,6 +55,15 @@ export const ChatLauncher = () => {
     }
   }, [shouldAutoOpenForMention, isAuthenticated, setOpen]);
 
+  // Only a mounted chat body ever opens the Pusher socket, so remember whether
+  // one ran: a sign-out that never saw the drawer has nothing to disconnect,
+  // and importing the client just to find that out would pull the pusher-js
+  // chunk into the page.
+  const chatSessionRanRef = useRef(false);
+  if (open && isAuthenticated) {
+    chatSessionRanRef.current = true;
+  }
+
   // Tear down the Pusher socket on sign-out so the now-stale userId no
   // longer holds a presence membership in the chat channel. Without
   // this, signing out without a hard refresh leaks a slot from the
@@ -51,7 +72,11 @@ export const ChatLauncher = () => {
   const wasAuthenticatedRef = useRef(isAuthenticated);
   useEffect(() => {
     if (wasAuthenticatedRef.current && !isAuthenticated) {
-      disconnectPusherClient();
+      if (chatSessionRanRef.current) {
+        void import('@/lib/utils/pusher-client').then(({ disconnectPusherClient }) =>
+          disconnectPusherClient()
+        );
+      }
       setOpen(false);
     }
     wasAuthenticatedRef.current = isAuthenticated;
