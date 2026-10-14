@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/app/components/ui/dialog';
 import { Skeleton } from '@/app/components/ui/skeleton';
+import { getZineAccentClass, type ZineAccent } from '@/app/components/ui/zine-panel';
 import { useReleaseQuery } from '@/hooks/queries/use-release-query';
 import type { PublishedReleaseDetail } from '@/hooks/queries/use-release-query';
 import { cn } from '@/lib/utils';
@@ -63,6 +64,12 @@ export interface ReleasePlayDialogProps {
    * sheet fits the screen without scrolling.
    */
   sheetOnPhone?: boolean;
+  /**
+   * The opening page's accent. The dialog portals to `<body>`, out of the
+   * page's `ZinePanel`, so without it the player frame and buttons take the
+   * root pink `--card-accent`.
+   */
+  accent?: ZineAccent;
 }
 
 /**
@@ -226,13 +233,15 @@ const ReleasePlayDialogPlayer = ({
 };
 
 /**
- * Listening-station modal for the `/releases` listing. Opened by a card's Play
- * button — the click gesture source-primes the first MP3 track (audio starts
+ * Listening-station modal for a release. Opened by a cover in the home and
+ * `/releases` grids, a release card's Play button or the artist page's latest
+ * release — the click gesture source-primes the card's track (audio starts
  * immediately) while this dialog fetches the `withTracks` release detail and
  * mounts the full {@link ReleasePlayer}, which adopts the playing element.
  * Kept to a tasteful width, with the square cover shrunk to fit the screen's
  * height so the whole modal shows without scrolling (down to the controls'
- * 16rem minimum); `sheetOnPhone` makes it a bottom sheet on phones instead.
+ * 16rem minimum); `sheetOnPhone` makes it a bottom sheet on phones instead,
+ * and `accent` gives it the opening page's accent.
  * Closing unmounts the player, which disposes video.js and stops playback.
  */
 export const ReleasePlayDialog = ({
@@ -250,6 +259,7 @@ export const ReleasePlayDialog = ({
   initialTrackNumber,
   shareWidget,
   sheetOnPhone = false,
+  accent,
 }: ReleasePlayDialogProps): ReactElement => {
   const {
     isPending,
@@ -262,7 +272,8 @@ export const ReleasePlayDialog = ({
       <DialogContent
         className={cn(
           'max-h-[90dvh] gap-3 overflow-y-auto p-4 sm:max-w-md lg:max-w-lg',
-          sheetOnPhone && PHONE_SHEET_CLASS
+          sheetOnPhone && PHONE_SHEET_CLASS,
+          accent && getZineAccentClass(accent)
         )}
         onCloseAutoFocus={onCloseAutoFocus}
       >

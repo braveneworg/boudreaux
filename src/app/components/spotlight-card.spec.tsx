@@ -13,6 +13,8 @@ import {
 
 import { SpotlightCard } from './spotlight-card';
 
+import type { ZineAccent } from './ui/zine-panel';
+
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -96,6 +98,7 @@ vi.mock('./release-play-dialog', () => ({
     footer,
     onOpenChange,
     onCloseAutoFocus,
+    accent,
   }: {
     open: boolean;
     releaseId: string;
@@ -109,6 +112,7 @@ vi.mock('./release-play-dialog', () => ({
     footer?: React.ReactNode;
     onOpenChange: (open: boolean) => void;
     onCloseAutoFocus?: (event: Event) => void;
+    accent?: string;
   }) =>
     open ? (
       <div
@@ -122,6 +126,7 @@ vi.mock('./release-play-dialog', () => ({
         data-sheet-on-phone={String(sheetOnPhone)}
         data-initial-track-number={initialTrackNumber?.toString() ?? ''}
         data-has-footer={String(footer !== undefined)}
+        data-accent={accent ?? ''}
       >
         {shareWidget}
         <button
@@ -167,8 +172,13 @@ const CARD: SpotlightCardData = {
   initialTrackNumber: 2,
 };
 
-const renderCard = (overrides: Partial<SpotlightCardData> = {}) => {
-  render(<SpotlightCard card={{ ...CARD, ...overrides }} />);
+interface CardOptions {
+  caption?: 'artist-and-title' | 'title';
+  accent?: ZineAccent;
+}
+
+const renderCard = (overrides: Partial<SpotlightCardData> = {}, options: CardOptions = {}) => {
+  render(<SpotlightCard card={{ ...CARD, ...overrides }} {...options} />);
   return userEvent.setup({ delay: null });
 };
 
@@ -230,6 +240,39 @@ describe('SpotlightCard', () => {
     expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Spot Album' })).not.toBeInTheDocument();
     expect(artist.parentElement?.parentElement).toHaveClass('text-center');
+  });
+
+  it('captions the cover with the title alone when asked, with no artist, year or link', () => {
+    renderCard({}, { caption: 'title' });
+
+    const caption = screen.getByText('Spot Album', { exact: true });
+    expect(caption.parentElement).toHaveClass('text-center');
+    expect(caption).not.toHaveClass('font-semibold');
+    expect(screen.queryByText('Spot Album (2024)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Spot Artist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('keeps the cover button named by the release and artist under a title caption', () => {
+    renderCard({}, { caption: 'title' });
+
+    expect(playButton()).toBeInTheDocument();
+  });
+
+  it('opens the dialog in the given accent', async () => {
+    const user = renderCard({}, { accent: 'cyan' });
+
+    await user.click(playButton());
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'cyan');
+  });
+
+  it('leaves the dialog accent to the dialog by default', async () => {
+    const user = renderCard();
+
+    await user.click(playButton());
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', '');
   });
 
   it('leaves the artist as text when there is no artist page', () => {

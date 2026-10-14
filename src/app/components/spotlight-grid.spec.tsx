@@ -3,7 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import type { SpotlightCard as SpotlightCardData } from '@/utils/spotlight-card';
+import {
+  SPOTLIGHT_GRID_CLASS,
+  type SpotlightCard as SpotlightCardData,
+} from '@/utils/spotlight-card';
 
 import { SpotlightGrid } from './spotlight-grid';
 
@@ -42,6 +45,12 @@ describe('SpotlightGrid', () => {
       'sm:grid-cols-2',
       'lg:grid-cols-4'
     );
+  });
+
+  it('uses the grid class it shares with the /releases grid', () => {
+    render(<SpotlightGrid cards={makeCards(1)} />);
+
+    expect(screen.getByRole('list')).toHaveAttribute('class', SPOTLIGHT_GRID_CLASS);
   });
 
   it('shows at most twelve cards', () => {

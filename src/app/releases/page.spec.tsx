@@ -92,34 +92,23 @@ describe('ReleasesPage', () => {
     expect(items).toEqual([{ anchorText: 'Releases', url: '/releases', isActive: true }]);
   });
 
-  it('should render the releases heading as an image', async () => {
+  it('should leave the heading to the releases content, under its search', async () => {
     const Page = await ReleasesPage();
     render(Page);
 
-    const headingImage = screen.getByRole('img', { name: /releases/i });
-    expect(headingImage).toHaveAttribute('alt', 'releases');
+    // ReleasesContent renders the RELEASES wordmark below its search, as the
+    // home page does; the page adds no heading of its own.
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /releases/i })).not.toBeInTheDocument();
   });
 
-  it('should size the heading to the shared zine strip scale', async () => {
-    const Page = await ReleasesPage();
-    render(Page);
-
-    // Consistent header size site-wide: full-width masthead on mobile, the
-    // ZineHeading strip height from sm up instead of spanning the panel.
-    const headingImage = screen.getByRole('img', { name: /releases/i });
-    expect(headingImage).toHaveClass('h-auto', 'w-full', 'sm:h-14', 'sm:w-auto');
-  });
-
-  it('should wrap the heading and releases content in a cyan zine panel', async () => {
+  it('should wrap the releases content in a cyan zine panel', async () => {
     const Page = await ReleasesPage();
     const { container } = render(Page);
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveClass('zine-accent-cyan');
-
-    const headingImage = screen.getByRole('img', { name: /releases/i });
-    expect(panel).toContainElement(headingImage);
     expect(panel).toContainElement(screen.getByTestId('releases-content'));
   });
 

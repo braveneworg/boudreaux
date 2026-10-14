@@ -27,7 +27,7 @@ export const SPOTLIGHT_COVER_SIZES = '(min-width: 640px) 208px, 100vw';
 
 /**
  * Width, centered, from the left edge of the grid's first cover to the right
- * edge of its last column's cover, so a row above the grid (the home search)
+ * edge of its last column's cover, so a row above the grid (a page's search)
  * lines up with the covers. On a phone the single cover fills the panel, so
  * the span is the full width. From `sm` each 13rem cover is centered in a
  * cell, and cells sit 1.5rem apart (`gap-x-6`), so the outer edges lie
@@ -39,7 +39,15 @@ export const SPOTLIGHT_COVER_SIZES = '(min-width: 640px) 208px, 100vw';
 export const SPOTLIGHT_COVER_SPAN_CLASS =
   'mx-auto w-full sm:w-[min(100%,calc(50%_+_13.75rem))] lg:w-[min(100%,calc(75%_+_14.125rem))]';
 
-/** One cover in the home page's spotlight grid, from a spotlight or a newest release. */
+/**
+ * The cover grid of the home page and `/releases`: one column on phones, two
+ * from `sm`, four from `lg`. {@link SPOTLIGHT_COVER_SPAN_CLASS} assumes these
+ * columns and the `gap-x-6`, so change them together.
+ */
+export const SPOTLIGHT_GRID_CLASS =
+  'grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4';
+
+/** One cover in the home or `/releases` grid, from a spotlight or a published release. */
 export interface SpotlightCard {
   releaseId: string;
   title: string;
@@ -109,8 +117,9 @@ export const toSpotlightCards = (featured: FeaturedArtist[]): SpotlightCard[] =>
   featured.flatMap((row) => toSpotlightCard(row) ?? []);
 
 /**
- * Map newest published releases to grid cards: the grid's fallback when there
- * is no spotlight to show. A card starts on the release's first track.
+ * Map published releases to grid cards: the `/releases` grid, and the home
+ * grid's fallback when there is no spotlight to show. A card starts on the
+ * release's first track.
  */
 export const publishedReleasesToSpotlightCards = (
   rows: PublishedReleaseListing[]

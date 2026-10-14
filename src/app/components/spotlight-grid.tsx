@@ -6,7 +6,10 @@
 import type { ReactElement } from 'react';
 
 import { SPOTLIGHT_LIMIT } from '@/hooks/queries/use-active-featured-artists-query';
-import type { SpotlightCard as SpotlightCardData } from '@/lib/utils/spotlight-card';
+import {
+  SPOTLIGHT_GRID_CLASS,
+  type SpotlightCard as SpotlightCardData,
+} from '@/lib/utils/spotlight-card';
 
 import { SpotlightCard } from './spotlight-card';
 
@@ -16,15 +19,15 @@ interface SpotlightGridProps {
 }
 
 /**
- * The home page's grid of spotlight covers: one column on phones, two from
- * `sm`, four from `lg`, at most {@link SPOTLIGHT_LIMIT} cards. Renders nothing
- * without cards.
+ * The home page's grid of spotlight covers, laid out by
+ * {@link SPOTLIGHT_GRID_CLASS} (the `/releases` grid uses it too), at most
+ * {@link SPOTLIGHT_LIMIT} cards. Renders nothing without cards.
  */
 export const SpotlightGrid = ({ cards }: SpotlightGridProps): ReactElement | null => {
   if (cards.length === 0) return null;
 
   return (
-    <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className={SPOTLIGHT_GRID_CLASS}>
       {cards.slice(0, SPOTLIGHT_LIMIT).map((card) => (
         <li key={card.releaseId}>
           <SpotlightCard card={card} />

@@ -14,7 +14,6 @@ import { ReleasesContent } from '@/app/components/releases-content';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { ImageHeading } from '@/components/ui/image-heading';
 import { PUBLISHED_RELEASES_PAGE_SIZE } from '@/hooks/queries/use-infinite-published-releases-query';
 import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';
@@ -32,8 +31,9 @@ export const metadata: Metadata = {
 const breadcrumbItems = [{ anchorText: 'Releases', url: '/releases', isActive: true }];
 
 /**
- * Releases listing page — prefetches published releases, then renders
- * a searchable card grid via the client content component.
+ * Releases listing page — prefetches published releases, then renders the
+ * search, the RELEASES wordmark and the cover grid via the client content
+ * component, inside the page's cyan zine panel.
  */
 export default async function ReleasesPage() {
   const queryClient = getQueryClient();
@@ -64,12 +64,6 @@ export default async function ReleasesPage() {
       <PageContainer>
         <ContentContainer>
           <ZinePanel chat accent="cyan" breadcrumbs={breadcrumbItems}>
-            <ImageHeading
-              src="/media/headings/RELEASES.webp"
-              alt="releases"
-              imageHeight={480}
-              priority
-            />
             <ReleasesContent />
           </ZinePanel>
         </ContentContainer>
