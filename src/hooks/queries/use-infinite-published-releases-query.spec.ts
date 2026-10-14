@@ -50,17 +50,43 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('useInfinitePublishedReleasesQuery', () => {
-  const getOptions = (search?: string): InfiniteOptions => {
+  const getOptions = (search?: string, artist?: string): InfiniteOptions => {
     useInfiniteQueryMock.mockReturnValue({ isPending: true });
-    renderHook(() => useInfinitePublishedReleasesQuery(search));
+    renderHook(() => useInfinitePublishedReleasesQuery(search, artist));
     return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as InfiniteOptions;
   };
 
   it('keys the query by search and starts at skip 0', () => {
     const opts = getOptions('Doe');
 
-    expect(opts.queryKey).toEqual(['releases', 'publishedInfinite', 'doe']);
+    expect(opts.queryKey).toEqual(['releases', 'publishedInfinite', 'doe', '']);
     expect(opts.initialPageParam).toBe(0);
+  });
+
+  it('keys the query by the artist filter', () => {
+    expect(getOptions('', 'e2e-artist').queryKey).toEqual([
+      'releases',
+      'publishedInfinite',
+      '',
+      'e2e-artist',
+    ]);
+  });
+
+  it('sends the artist filter with each page', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextSkip: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions('', 'e2e-artist');
+
+    await opts.queryFn({ pageParam: 24 });
+
+    expect(fetchMock.mock.calls).toEqual([
+      [
+        `/api/releases?listing=published&skip=24&take=${PUBLISHED_RELEASES_PAGE_SIZE}&artist=e2e-artist`,
+        { signal: undefined },
+      ],
+    ]);
   });
 
   it('derives the next page param from nextSkip', () => {
@@ -107,7 +133,12 @@ describe('usePublishedReleaseSearchQuery', () => {
   });
 
   it('keys the query under a combobox namespace', () => {
-    expect(getOptions('rock').queryKey).toEqual(['releases', 'publishedInfinite', 'combobox:rock']);
+    expect(getOptions('rock').queryKey).toEqual([
+      'releases',
+      'publishedInfinite',
+      'combobox:rock',
+      '',
+    ]);
   });
 
   it('selects the rows from the page response', () => {

@@ -323,11 +323,16 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
 };
 
 /**
- * Build the public-listing `where` from an optional search term. The deletedOn
- * OR and the search OR are combined under `AND` so they don't collide on the
- * same `OR` key.
+ * Build the public-listing `where` from an optional search term and an
+ * optional artist slug. The deletedOn OR and the search OR are combined under
+ * `AND` so they don't collide on the same `OR` key; the artist filter is one
+ * more `AND` member, matching a credit by the public artist with that slug, so
+ * a hidden artist's slug matches nothing.
  */
-const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
+const buildPublishedWhere = ({
+  search,
+  artist,
+}: Pick<PublishedReleaseFilters, 'search' | 'artist'>): Prisma.ReleaseWhereInput => {
   const contains = containsInsensitive(search ?? '');
   return {
     ...isPresent('publishedAt'),
@@ -365,6 +370,9 @@ const buildPublishedWhere = (search?: string): Prisma.ReleaseWhereInput => {
               ],
             },
           ]
+        : []),
+      ...(artist
+        ? [{ artistReleases: { some: { artist: { is: { slug: artist, ...publicArtistWhere } } } } }]
         : []),
     ],
   };
@@ -606,15 +614,16 @@ export class ReleaseRepository {
 
   /**
    * Fetch a page of published, non-deleted releases for the public listing,
-   * building the `where` from an optional search term and using the listing
+   * building the `where` from an optional search term and an optional artist
+   * slug (releases crediting that public artist), and using the listing
    * projection. Ordered by `releasedOn` desc.
    */
   static async findPublished(
     filters: PublishedReleaseFilters
   ): Promise<PublishedReleaseListingRow[]> {
-    const { skip = 0, take = 24, search } = filters;
+    const { skip = 0, take = 24, search, artist } = filters;
     return prisma.release.findMany({
-      where: buildPublishedWhere(search),
+      where: buildPublishedWhere({ search, artist }),
       orderBy: { releasedOn: 'desc' },
       skip,
       take,

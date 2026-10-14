@@ -13,12 +13,16 @@ import type { Locator, Page } from '@playwright/test';
  * E2E coverage for the public releases listing + detail:
  *  - Releases listing: laid out like the home page — the search, then the
  *    RELEASES wordmark, then a 1/2/4-column grid of covers captioned with the
- *    title alone. A cover opens the home page's listening modal on the
- *    release's first track, in the page's cyan accent.
+ *    artist above the title. A cover opens the home page's listening modal on
+ *    the release's first track, in the page's cyan accent.
+ *  - Artist filter: a caption's artist link lists only that artist's
+ *    releases (`/releases?artist=<slug>`), with a "View releases by all
+ *    artists" link back under the wordmark.
  *  - Release detail: the "Release Notes" section renders (cutout heading +
  *    floated summary card + notes copy).
  *
- * Read-only against the seed: E2E Album One by E2E Artist (seed-test-db.ts).
+ * Read-only against the seed: E2E Album One, Two and Three by E2E Artist, and
+ * E2E Band Single by E2E Band (seed-test-db.ts).
  */
 
 const E2E_DATABASE_URL =
@@ -28,7 +32,12 @@ const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 const RELEASE_TITLE = 'E2E Album One';
 const ARTIST_NAME = 'E2E Artist';
+const ARTIST_SLUG = 'e2e-artist';
 const COVER_NAME = `Play ${RELEASE_TITLE} by ${ARTIST_NAME}`;
+const ARTIST_RELEASE_TITLES = ['E2E Album One', 'E2E Album Two', 'E2E Album Three'];
+/** A release by another artist (E2E Band), on the first page of the full grid. */
+const OTHER_ARTIST_COVER_NAME = 'Play E2E Band Single by E2E Band';
+const ALL_ARTISTS_LINK = 'View releases by all artists';
 const TAP_HINT = 'Tap any release art to play or download the music';
 
 let releaseId: string;
@@ -90,14 +99,88 @@ test.describe('Releases — cover grid + listening modal', () => {
     expect(html).toContain(`alt="${RELEASE_TITLE} cover art"`);
   });
 
-  test('captions the cover with the release title alone', async ({ page }) => {
+  test('captions the cover with the artist, linked to their releases, above the title', async ({
+    page,
+  }) => {
     await page.goto('/releases');
     const cover = await hydratedCover(page);
 
     const card = page.getByRole('listitem').filter({ has: cover });
-    await expect(card.getByText(RELEASE_TITLE, { exact: true })).toBeVisible();
-    await expect(card).toHaveText(RELEASE_TITLE);
-    await expect(card.getByRole('link')).toHaveCount(0);
+    const artist = card.getByRole('link', { name: ARTIST_NAME, exact: true });
+    const title = card.getByText(RELEASE_TITLE, { exact: true });
+    await expect(artist).toHaveAttribute('href', `/releases?artist=${ARTIST_SLUG}`);
+    await expect(card).toHaveText(`${ARTIST_NAME}${RELEASE_TITLE}`);
+    await expect(card.getByRole('link')).toHaveCount(1);
+
+    const [artistBox, titleBox] = await edgesOfAll([artist, title]);
+    expect(artistBox.bottom).toBeLessThanOrEqual(titleBox.top);
+  });
+
+  test('an artist link lists only that artist’s releases, and the all-artists link lists every release again', async ({
+    page,
+  }) => {
+    await page.goto('/releases');
+    const cover = await hydratedCover(page);
+    // Set on this document: a full page load would drop it.
+    await page.evaluate(() => {
+      (window as Window & { releasesNoReload?: boolean }).releasesNoReload = true;
+    });
+    const stillSameDocument = (): Promise<boolean | undefined> =>
+      page.evaluate(() => (window as Window & { releasesNoReload?: boolean }).releasesNoReload);
+
+    await page
+      .getByRole('listitem')
+      .filter({ has: cover })
+      .getByRole('link', { name: ARTIST_NAME, exact: true })
+      .click();
+
+    await expect(page).toHaveURL(`/releases?artist=${ARTIST_SLUG}`);
+    const allArtists = page.getByRole('link', { name: ALL_ARTISTS_LINK });
+    await expect(allArtists).toHaveAttribute('href', '/releases');
+    const grid = page
+      .getByRole('list')
+      .filter({ has: page.getByRole('button', { name: COVER_NAME }) });
+    for (const title of ARTIST_RELEASE_TITLES) {
+      await expect(
+        grid.getByRole('button', { name: `Play ${title} by ${ARTIST_NAME}` })
+      ).toBeVisible();
+    }
+    // Every card is credited to the artist; the other artist's release is gone.
+    await expect(
+      grid
+        .getByRole('listitem')
+        .filter({ hasNot: page.getByRole('link', { name: ARTIST_NAME, exact: true }) })
+    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: OTHER_ARTIST_COVER_NAME })).toHaveCount(0);
+
+    // The link sits under the wordmark, its eye icon left of the words.
+    const [headingBox, linkBox, iconBox, wordsBox] = await edgesOfAll([
+      page.getByRole('img', { name: 'releases', exact: true }),
+      allArtists,
+      allArtists.locator('svg'),
+      allArtists.getByText(ALL_ARTISTS_LINK, { exact: true }),
+    ]);
+    expect(linkBox.top).toBeGreaterThanOrEqual(headingBox.bottom);
+    expect(linkBox.top - headingBox.bottom).toBeLessThan(24);
+    expect(iconBox.right).toBeLessThanOrEqual(wordsBox.left);
+    expect(await stillSameDocument()).toBe(true);
+
+    await allArtists.click();
+
+    await expect(page).toHaveURL('/releases');
+    await expect(page.getByRole('button', { name: OTHER_ARTIST_COVER_NAME })).toBeVisible();
+    await expect(page.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveCount(0);
+    expect(await stillSameDocument()).toBe(true);
+  });
+
+  test('an unknown artist lists nothing but keeps the all-artists link', async ({ page }) => {
+    await page.goto('/releases?artist=no-such-artist');
+
+    await expect(page.getByText('No releases available.')).toBeVisible();
+    await expect(page.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveAttribute(
+      'href',
+      '/releases'
+    );
   });
 
   test('shows none of the old listing row details', async ({ page }) => {

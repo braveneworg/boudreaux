@@ -25,10 +25,12 @@ import { ReleaseShareWidget } from './release-share-widget';
 import type { ZineAccent } from './ui/zine-panel';
 
 /**
- * What the caption under a cover names: the artist (linked) and then the title
- * with its year, or the title alone.
+ * What the caption under a cover names. `'artist-and-title'` (home): the
+ * artist, linked to the artist's page, then the title with its year.
+ * `'releases'` (`/releases`): the artist, linked to `/releases?artist=<slug>`
+ * (that artist's releases on the same page), then the title alone.
  */
-type SpotlightCaption = 'artist-and-title' | 'title';
+type SpotlightCaption = 'artist-and-title' | 'releases';
 
 interface SpotlightCardProps {
   card: SpotlightCardData;
@@ -43,17 +45,16 @@ interface SpotlightCardCaptionProps {
   caption: SpotlightCaption;
 }
 
-/** The centered caption under a cover (see {@link SpotlightCard}). */
+/**
+ * The centered caption under a cover (see {@link SpotlightCard}): a semibold
+ * artist line, a link when the artist has a slug and plain text when not, and
+ * none when there is no artist name; then the title line.
+ */
 const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): ReactElement => {
   const { title, year, artistName, artistSlug } = card;
-
-  if (caption === 'title') {
-    return (
-      <div className="text-center text-sm leading-snug text-zinc-950">
-        <p>{title}</p>
-      </div>
-    );
-  }
+  const onReleases = caption === 'releases';
+  const artistHref = (slug: string): string =>
+    onReleases ? `/releases?artist=${encodeURIComponent(slug)}` : `/artists/${slug}`;
 
   return (
     <div className="text-center text-sm leading-snug text-zinc-950">
@@ -61,7 +62,7 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
         <p className="font-semibold">
           {artistSlug ? (
             <Link
-              href={`/artists/${artistSlug}`}
+              href={artistHref(artistSlug)}
               className="underline underline-offset-4 hover:no-underline"
             >
               {artistName}
@@ -71,7 +72,7 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
           )}
         </p>
       ) : null}
-      <p>{`${title} (${year})`}</p>
+      <p>{onReleases ? title : `${title} (${year})`}</p>
     </div>
   );
 };
@@ -81,7 +82,8 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
  * the cover, as wide as the panel on phones and at most 13rem from `sm`,
  * centered in its grid cell, then a centered caption — by default the artist
  * (linked to the artist's page) and the title with its year, or with
- * `caption="title"` the title alone. The cover is a button: the click primes
+ * `caption="releases"` the artist (linked to their releases on `/releases`)
+ * and the title alone. The cover is a button: the click primes
  * the card's track and opens the listening modal (a bottom sheet on phones),
  * and a square zine play stamp shows on hover and keyboard focus. Touch
  * screens get no stamp; the page tells them to tap the cover instead. With

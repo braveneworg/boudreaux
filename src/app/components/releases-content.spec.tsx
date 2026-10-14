@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createElement } from 'react';
+import type { ComponentProps } from 'react';
 
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,13 +10,11 @@ import userEvent from '@testing-library/user-event';
 import { useInfinitePublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
-import {
-  SPOTLIGHT_COVER_SPAN_CLASS,
-  SPOTLIGHT_GRID_CLASS,
-  type SpotlightCard as SpotlightCardData,
-} from '@/utils/spotlight-card';
+import { SPOTLIGHT_COVER_SPAN_CLASS, SPOTLIGHT_GRID_CLASS } from '@/utils/spotlight-card';
 
 import { ReleasesContent, ReleasesSkeleton } from './releases-content';
+
+import type * as SpotlightCardModule from './spotlight-card';
 
 vi.mock('@/hooks/queries/use-infinite-published-releases-query', () => ({
   useInfinitePublishedReleasesQuery: vi.fn(),
@@ -29,27 +28,58 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
+vi.mock('next/link', () => ({
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: React.ReactNode;
+  } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+/** `real: true` renders the real card, for the cover regression checks. */
+const cards = vi.hoisted(() => ({ real: false }));
+
 // Stub the card — covered by spotlight-card.spec. The content island's job is
 // paging, states, the layout around the grid, and what each card is given.
-vi.mock('./spotlight-card', () => ({
-  SpotlightCard: ({
-    card,
-    caption,
-    accent,
-  }: {
-    card: SpotlightCardData;
-    caption?: string;
-    accent?: string;
-  }) => (
-    <div
-      data-testid="spotlight-card"
-      data-release-id={card.releaseId}
-      data-caption={caption ?? ''}
-      data-accent={accent ?? ''}
-    >
-      {card.title}
-    </div>
-  ),
+vi.mock('./spotlight-card', async (importOriginal) => {
+  const actual = await importOriginal<typeof SpotlightCardModule>();
+  return {
+    SpotlightCard: (props: ComponentProps<typeof actual.SpotlightCard>) => {
+      if (cards.real) return <actual.SpotlightCard {...props} />;
+      const { card, caption, accent } = props;
+      return (
+        <div
+          data-testid="spotlight-card"
+          data-release-id={card.releaseId}
+          data-caption={caption ?? ''}
+          data-accent={accent ?? ''}
+        >
+          {card.title}
+        </div>
+      );
+    },
+  };
+});
+
+// The real card's listening modal and its priming hook, kept closed and inert.
+vi.mock('./release-play-dialog', () => ({ ReleasePlayDialog: () => null }));
+
+vi.mock('@/hooks/use-release-play-dialog', () => ({
+  useReleasePlayDialog: () => ({
+    playerOpen: false,
+    prefetchPlayer: false,
+    openPlayer: vi.fn(),
+    handlePlayerOpenChange: vi.fn(),
+    warmPlayer: vi.fn(),
+    takeMediaEl: () => null,
+  }),
 }));
 
 vi.mock('./release-search-combobox', () => ({
@@ -104,6 +134,8 @@ const releasesHeading = (): HTMLElement =>
   screen.getByRole('heading', { level: 1, name: 'releases' });
 
 const TAP_HINT = /any release art to play or download the music/;
+
+const ALL_ARTISTS_LINK = 'View releases by all artists';
 
 beforeEach(() => {
   vi.mocked(useInfinitePublishedReleasesQuery).mockReturnValue(toInfiniteResult() as never);
@@ -199,14 +231,92 @@ describe('ReleasesContent', () => {
     ).toEqual(['release-1', 'release-2']);
   });
 
-  it('captions each card with the title alone', () => {
+  it('captions each card with the artist, linked to their releases, above the title', () => {
     mockPages([{ rows: twoRows, nextSkip: null }]);
 
     render(<ReleasesContent />);
 
     screen.getAllByTestId('spotlight-card').forEach((card) => {
-      expect(card).toHaveAttribute('data-caption', 'title');
+      expect(card).toHaveAttribute('data-caption', 'releases');
     });
+  });
+
+  it('lists every artist’s releases without an artist filter', () => {
+    render(<ReleasesContent />);
+
+    expect(vi.mocked(useInfinitePublishedReleasesQuery)).toHaveBeenLastCalledWith('', '');
+  });
+
+  it('lists only the filtered artist’s releases with an artist filter', () => {
+    render(<ReleasesContent artist="e2e-artist" />);
+
+    expect(vi.mocked(useInfinitePublishedReleasesQuery)).toHaveBeenLastCalledWith('', 'e2e-artist');
+  });
+
+  it('shows no link to every artist’s releases without an artist filter', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent />);
+
+    expect(screen.queryByRole('link', { name: ALL_ARTISTS_LINK })).not.toBeInTheDocument();
+  });
+
+  it('links back to every artist’s releases, with an eye icon, under the heading when filtered', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent artist="e2e-artist" />);
+
+    const link = screen.getByRole('link', { name: ALL_ARTISTS_LINK });
+    expect(link).toHaveAttribute('href', '/releases');
+    expect(link).toHaveTextContent(/^View releases by all artists$/);
+    expect(link).toHaveClass(
+      'inline-flex',
+      'items-center',
+      'gap-1.5',
+      'underline',
+      'underline-offset-2',
+      'hover:no-underline'
+    );
+    const icon = link.querySelector('svg');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon).toHaveClass('size-4');
+    expect(link.firstElementChild).toBe(icon);
+    expect(
+      releasesHeading().compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      link.compareDocumentPosition(screen.getByRole('list')) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('puts the all-artists link in the heading’s column, left-aligned with it', () => {
+    render(<ReleasesContent artist="e2e-artist" />);
+
+    const column = releasesHeading().parentElement;
+    expect(column).toHaveClass(...SPOTLIGHT_COVER_SPAN_CLASS.split(' '));
+    expect(column).toContainElement(screen.getByRole('link', { name: ALL_ARTISTS_LINK }));
+  });
+
+  it('keeps the all-artists link in the empty state of a filtered listing', () => {
+    render(<ReleasesContent artist="no-such-artist" />);
+
+    expect(screen.getByText('No releases available.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveAttribute(
+      'href',
+      '/releases'
+    );
+  });
+
+  it('keeps the all-artists link above the error state of a filtered listing', () => {
+    vi.mocked(useInfinitePublishedReleasesQuery).mockReturnValue(
+      toInfiniteResult({ error: Error('boom'), data: undefined }) as never
+    );
+
+    render(<ReleasesContent artist="e2e-artist" />);
+
+    const error = screen.getByText('Unable to load releases. Please try again later.');
+    const link = screen.getByRole('link', { name: ALL_ARTISTS_LINK });
+    expect(link.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('opens each card in the page’s cyan accent', () => {
@@ -317,6 +427,31 @@ describe('ReleasesContent', () => {
       expect.objectContaining({ current: expect.any(HTMLElement) }),
       expect.objectContaining({ hasNextPage: true, fetchNextPage })
     );
+  });
+});
+
+describe('ReleasesContent covers', () => {
+  beforeEach(() => {
+    cards.real = true;
+  });
+
+  afterEach(() => {
+    cards.real = false;
+  });
+
+  it('gives every cover the home page’s hover scale and play stamp', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent />);
+
+    const covers = within(screen.getByRole('list'))
+      .getAllByRole('listitem')
+      .map((item) => within(item).getByRole('button', { name: /^Play / }));
+    expect(covers).toHaveLength(2);
+    covers.forEach((cover) => {
+      expect(cover.className).toContain('hover:scale-[1.03]');
+      expect(cover.querySelector('[data-slot="spotlight-play-stamp"]')).not.toBeNull();
+    });
   });
 });
 

@@ -36,8 +36,10 @@ const requireAdmin = (session: ServerSession | null): NextResponse | null =>
 const handlePublishedListing = async (searchParams: URLSearchParams): Promise<NextResponse> => {
   const { skip, take } = parsePagination(searchParams);
   const search = searchParams.get('search') ?? undefined;
+  // An empty or blank `artist` means no filter.
+  const artist = searchParams.get('artist')?.trim() || undefined;
 
-  const result = await ReleaseService.getPublishedReleases({ skip, take, search });
+  const result = await ReleaseService.getPublishedReleases({ skip, take, search, artist });
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
@@ -106,7 +108,8 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  * Get all releases or search for releases.
  *
  * Query params:
- *   listing    – When "published", returns public published releases via `getPublishedReleases()`.
+ *   listing    – When "published", returns public published releases via `getPublishedReleases()`,
+ *                optionally limited to one public artist's releases by an `artist` slug.
  *   skip, take, search, artistIds, published, deleted – Pagination/filter params for admin listing mode.
  *   withoutByline – "true" lists only the published releases whose byline names nobody.
  */
