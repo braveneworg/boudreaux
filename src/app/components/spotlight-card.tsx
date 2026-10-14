@@ -24,20 +24,23 @@ import { ReleaseShareWidget } from './release-share-widget';
 
 import type { ZineAccent } from './ui/zine-panel';
 
+/**
+ * What the caption under a cover names: the artist (linked) and then the title
+ * with its year, or the title alone.
+ */
+type SpotlightCaption = 'artist-and-title' | 'title';
+
 interface SpotlightCardProps {
   card: SpotlightCardData;
-  /**
-   * What the caption under the cover names: the artist (linked) and then the
-   * title with its year (the default, as on home), or the title alone.
-   */
-  caption?: 'artist-and-title' | 'title';
+  /** The caption under the cover; `'artist-and-title'` (as on home) by default. */
+  caption?: SpotlightCaption;
   /** The page's accent, for the listening modal (see `ReleasePlayDialog`). */
   accent?: ZineAccent;
 }
 
 interface SpotlightCardCaptionProps {
   card: SpotlightCardData;
-  caption: 'artist-and-title' | 'title';
+  caption: SpotlightCaption;
 }
 
 /** The centered caption under a cover (see {@link SpotlightCard}). */
