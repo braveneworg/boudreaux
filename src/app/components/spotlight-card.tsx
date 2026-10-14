@@ -22,24 +22,74 @@ import { PlaySharpIcon } from './icons/play-sharp-icon';
 import { ReleasePlayDialog } from './release-play-dialog';
 import { ReleaseShareWidget } from './release-share-widget';
 
+import type { ZineAccent } from './ui/zine-panel';
+
 interface SpotlightCardProps {
   card: SpotlightCardData;
+  /**
+   * What the caption under the cover names: the artist (linked) and then the
+   * title with its year (the default, as on home), or the title alone.
+   */
+  caption?: 'artist-and-title' | 'title';
+  /** The page's accent, for the listening modal (see `ReleasePlayDialog`). */
+  accent?: ZineAccent;
 }
 
+interface SpotlightCardCaptionProps {
+  card: SpotlightCardData;
+  caption: 'artist-and-title' | 'title';
+}
+
+/** The centered caption under a cover (see {@link SpotlightCard}). */
+const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): ReactElement => {
+  const { title, year, artistName, artistSlug } = card;
+
+  if (caption === 'title') {
+    return (
+      <div className="text-center text-sm leading-snug text-zinc-950">
+        <p>{title}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center text-sm leading-snug text-zinc-950">
+      {artistName ? (
+        <p className="font-semibold">
+          {artistSlug ? (
+            <Link
+              href={`/artists/${artistSlug}`}
+              className="underline underline-offset-4 hover:no-underline"
+            >
+              {artistName}
+            </Link>
+          ) : (
+            artistName
+          )}
+        </p>
+      ) : null}
+      <p>{`${title} (${year})`}</p>
+    </div>
+  );
+};
+
 /**
- * One cover in the home page's spotlight grid (variant A): the cover, as wide
- * as the panel on phones and at most 13rem from `sm`, centered in its grid
- * cell, then a centered caption — the artist (linked to the artist's page),
- * and the title with its year. The
- * cover is a button: the click primes the card's track and opens the
- * listening modal (a bottom sheet on phones), as the `/releases` Play button
- * does, and a square zine play stamp shows on hover and keyboard focus.
- * Touch screens get no stamp; the home page tells them to tap the cover
- * instead. With nothing playable the cover is disabled and the artist link
- * still works.
+ * One cover in a grid of release covers, on the home page and on `/releases`:
+ * the cover, as wide as the panel on phones and at most 13rem from `sm`,
+ * centered in its grid cell, then a centered caption — by default the artist
+ * (linked to the artist's page) and the title with its year, or with
+ * `caption="title"` the title alone. The cover is a button: the click primes
+ * the card's track and opens the listening modal (a bottom sheet on phones),
+ * and a square zine play stamp shows on hover and keyboard focus. Touch
+ * screens get no stamp; the page tells them to tap the cover instead. With
+ * nothing playable the cover is disabled and the artist link still works.
  */
-export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
-  const { releaseId, title, year, artistName, artistSlug, coverArt, playSrc } = card;
+export const SpotlightCard = ({
+  card,
+  caption = 'artist-and-title',
+  accent,
+}: SpotlightCardProps): ReactElement => {
+  const { releaseId, title, artistName, artistSlug, coverArt, playSrc } = card;
   const {
     playerOpen,
     prefetchPlayer,
@@ -109,23 +159,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
         ) : null}
       </button>
 
-      <div className="text-center text-sm leading-snug text-zinc-950">
-        {artistName ? (
-          <p className="font-semibold">
-            {artistSlug ? (
-              <Link
-                href={`/artists/${artistSlug}`}
-                className="underline underline-offset-4 hover:no-underline"
-              >
-                {artistName}
-              </Link>
-            ) : (
-              artistName
-            )}
-          </p>
-        ) : null}
-        <p>{`${title} (${year})`}</p>
-      </div>
+      <SpotlightCardCaption card={card} caption={caption} />
 
       {playable ? (
         <ReleasePlayDialog
@@ -140,6 +174,7 @@ export const SpotlightCard = ({ card }: SpotlightCardProps): ReactElement => {
           headingOrder="artist-first"
           centered
           sheetOnPhone
+          accent={accent}
           initialTrackNumber={card.initialTrackNumber ?? undefined}
           shareWidget={
             <ReleaseShareWidget
