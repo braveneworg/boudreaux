@@ -173,7 +173,7 @@ const CARD: SpotlightCardData = {
 };
 
 interface CardOptions {
-  caption?: 'artist-and-title' | 'title';
+  caption?: 'artist-and-title' | 'releases';
   accent?: ZineAccent;
 }
 
@@ -242,19 +242,50 @@ describe('SpotlightCard', () => {
     expect(artist.parentElement?.parentElement).toHaveClass('text-center');
   });
 
-  it('captions the cover with the title alone when asked, with no artist, year or link', () => {
-    renderCard({}, { caption: 'title' });
+  it('captions a /releases cover with the artist, linked to their releases, above the title alone', () => {
+    renderCard({}, { caption: 'releases' });
 
-    const caption = screen.getByText('Spot Album', { exact: true });
-    expect(caption.parentElement).toHaveClass('text-center');
-    expect(caption).not.toHaveClass('font-semibold');
+    const artist = screen.getByRole('link', { name: 'Spot Artist' });
+    expect(artist).toHaveAttribute('href', '/releases?artist=spot-artist');
+    expect(artist).toHaveClass('underline', 'underline-offset-4', 'hover:no-underline');
+    expect(artist.parentElement).toHaveClass('font-semibold');
+    const title = screen.getByText('Spot Album', { exact: true });
+    expect(title).not.toHaveClass('font-semibold');
+    expect(artist.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('Spot Album (2024)')).not.toBeInTheDocument();
-    expect(screen.queryByText('Spot Artist')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(title.parentElement).toHaveClass('text-center');
   });
 
-  it('keeps the cover button named by the release and artist under a title caption', () => {
-    renderCard({}, { caption: 'title' });
+  it('URI-encodes the artist slug in the /releases caption link', () => {
+    renderCard({ artistSlug: 'spot artist&co' }, { caption: 'releases' });
+
+    expect(screen.getByRole('link', { name: 'Spot Artist' })).toHaveAttribute(
+      'href',
+      '/releases?artist=spot%20artist%26co'
+    );
+  });
+
+  it('leaves the /releases caption artist as text when there is no slug', () => {
+    renderCard({ artistSlug: null }, { caption: 'releases' });
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('Spot Artist')).toHaveClass('font-semibold');
+    expect(screen.getByText('Spot Album', { exact: true })).toBeInTheDocument();
+  });
+
+  it('gives the /releases caption no artist line when there is no artist name', () => {
+    const { container } = render(
+      <SpotlightCard card={{ ...CARD, artistName: null }} caption="releases" />
+    );
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('Spot Artist')).not.toBeInTheDocument();
+    expect(container.querySelector('.font-semibold')).toBeNull();
+    expect(screen.getByText('Spot Album', { exact: true })).toBeInTheDocument();
+  });
+
+  it('keeps the cover button named by the release and artist under a /releases caption', () => {
+    renderCard({}, { caption: 'releases' });
 
     expect(playButton()).toBeInTheDocument();
   });
