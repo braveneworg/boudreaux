@@ -261,6 +261,24 @@ describe('ReleasePlayDialog', () => {
     ).toBeTruthy();
   });
 
+  it('takes the page accent on the dialog when given one', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} accent="cyan" />);
+
+    // The dialog portals out of the page's ZinePanel, so it sets the accent
+    // itself for the player frame's and buttons' shadow-zine.
+    expect(screen.getByRole('dialog')).toHaveClass('zine-accent-cyan');
+  });
+
+  it('sets no accent of its own by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} />);
+
+    expect(screen.getByRole('dialog').className).not.toMatch(/zine-accent-/);
+  });
+
   it('slides up from the bottom as a full-width sheet on a phone when asked', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 

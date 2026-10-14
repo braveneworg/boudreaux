@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import { ZinePanel, type ZineAccent } from './zine-panel';
+import { getZineAccentClass, ZinePanel, type ZineAccent } from './zine-panel';
 
 vi.mock('../chat/chat-panel-trigger', () => ({
   ChatPanelTrigger: () => <div data-testid="chat-panel-trigger" />,
@@ -217,5 +217,11 @@ describe('ZinePanel', () => {
       </ZinePanel>
     );
     expect(screen.getByTestId('panel').className).toContain('shadow-zine');
+  });
+});
+
+describe('getZineAccentClass', () => {
+  it.each(ACCENT_CASES)('maps the %s accent to class %s', (accent, accentClass) => {
+    expect(getZineAccentClass(accent)).toBe(accentClass);
   });
 });
