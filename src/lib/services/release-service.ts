@@ -342,19 +342,21 @@ export class ReleaseService {
    * Includes artist info for display name and search, images for cover art
    * fallback, and URLs for Bandcamp links.
    *
-   * Supports skip/offset pagination and an optional server-side `search` term
-   * (title, catalog number, description, or artist name). Only the default,
-   * unsearched first page is cached (10 min in production) — searched/offset
-   * pages vary too much to share a cache entry.
+   * Supports skip/offset pagination, an optional server-side `search` term
+   * (title, catalog number, description, or artist name) and an optional
+   * `artist` slug (only releases crediting that public artist). Only the
+   * default, unsearched and unfiltered first page is cached (10 min in
+   * production) — searched, artist-filtered and offset pages vary too much to
+   * share a cache entry.
    */
   static async getPublishedReleases(
     params?: PublishedReleaseFilters
   ): Promise<ServiceResponse<PublishedReleaseListing[]>> {
-    const { skip = 0, take = PUBLISHED_RELEASES_PAGE_SIZE, search } = params ?? {};
+    const { skip = 0, take = PUBLISHED_RELEASES_PAGE_SIZE, search, artist } = params ?? {};
 
     const fetchReleases = async (): Promise<ServiceResponse<PublishedReleaseListing[]>> => {
       try {
-        const releases = await ReleaseRepository.findPublished({ skip, take, search });
+        const releases = await ReleaseRepository.findPublished({ skip, take, search, artist });
 
         return {
           success: true,
@@ -365,13 +367,14 @@ export class ReleaseService {
       }
     };
 
-    // Only the default first page (no search, skip 0) is cacheable. Disabled
+    // Only the default first page (no search, no artist, skip 0) is cacheable. Disabled
     // in E2E: the Playwright webServer readiness probe renders `/` pre-seed,
     // which would poison this cache with an empty listing for the whole run.
     if (
       process.env.NODE_ENV === 'development' ||
       process.env.E2E_MODE === 'true' ||
       search ||
+      artist ||
       skip > 0
     ) {
       return fetchReleases();

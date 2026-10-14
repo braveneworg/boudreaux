@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Public releases listing page at `/releases`.
+ * Public releases listing page at `/releases`, or `/releases?artist=<slug>`
+ * for one artist's releases.
  * Server Component that prefetches published releases for SSR,
  * then hydrates the client content component.
  */
@@ -30,26 +31,38 @@ export const metadata: Metadata = {
 
 const breadcrumbItems = [{ anchorText: 'Releases', url: '/releases', isActive: true }];
 
+interface ReleasesPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+/** The `?artist=` slug: the first value when repeated, `''` when missing or blank. */
+const readArtistSlug = (value: string | string[] | undefined): string =>
+  (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
+
 /**
- * Releases listing page — prefetches published releases, then renders the
+ * Releases listing page — prefetches published releases (only the releases
+ * crediting the `?artist=` slug's artist, when given), then renders the
  * search, the RELEASES wordmark and the cover grid via the client content
  * component, inside the page's cyan zine panel.
  */
-export default async function ReleasesPage() {
+export default async function ReleasesPage({ searchParams }: ReleasesPageProps) {
+  const artist = readArtistSlug((await searchParams).artist);
   const queryClient = getQueryClient();
 
-  // Prefetch the first (unsearched) page as an infinite query. The query key and
-  // initialPageParam must exactly match the client `useInfinitePublishedReleasesQuery('')`
-  // hook or hydration misses and the client refetches. Read the service directly
-  // instead of self-fetching /api/releases — the internal HTTP roundtrip fails
-  // silently under load on the standalone server.
+  // Prefetch the first (unsearched) page, filtered by the artist when given, as
+  // an infinite query. The query key and initialPageParam must exactly match the
+  // client `useInfinitePublishedReleasesQuery('', artist)` hook or hydration
+  // misses and the client refetches. Read the service directly instead of
+  // self-fetching /api/releases — the internal HTTP roundtrip fails silently
+  // under load on the standalone server.
   await queryClient.prefetchInfiniteQuery({
-    queryKey: queryKeys.releases.publishedInfinite(''),
+    queryKey: queryKeys.releases.publishedInfinite('', artist),
     initialPageParam: 0,
     queryFn: async () => {
       const result = await ReleaseService.getPublishedReleases({
         skip: 0,
         take: PUBLISHED_RELEASES_PAGE_SIZE,
+        ...(artist && { artist }),
       });
       const rows = result.success ? result.data : [];
       return serializeForResponse({
@@ -64,7 +77,7 @@ export default async function ReleasesPage() {
       <PageContainer>
         <ContentContainer>
           <ZinePanel chat accent="cyan" breadcrumbs={breadcrumbItems}>
-            <ReleasesContent />
+            <ReleasesContent artist={artist} />
           </ZinePanel>
         </ContentContainer>
       </PageContainer>

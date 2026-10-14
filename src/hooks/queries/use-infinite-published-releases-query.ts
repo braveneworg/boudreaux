@@ -25,6 +25,17 @@ const publishedReleasesPaginatedResponseSchema = paginatedResponseSchema(
 /** Max combobox quick-search results. */
 const SEARCH_RESULT_LIMIT = 20;
 
+/** The server-side filters of one published-releases request. */
+interface PublishedReleasesFilters {
+  /** Search term (empty string fetches all releases). */
+  search: string;
+  /** Artist slug to list only that artist's releases (empty string fetches every artist's). */
+  artist: string;
+}
+
+/** No search and no artist: every published release. */
+const ALL_RELEASES: PublishedReleasesFilters = { search: '', artist: '' };
+
 /**
  * Fetches one page of published releases from the
  * `/api/releases?listing=published` route handler.
@@ -32,7 +43,7 @@ const SEARCH_RESULT_LIMIT = 20;
  * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
  *
- * @param search - Server-side search term (empty string fetches all releases).
+ * @param filters - Server-side search term and artist slug.
  * @param skip - Offset of the page to fetch.
  * @param take - Page size to request.
  * @param signal - The query's abort signal.
@@ -40,7 +51,7 @@ const SEARCH_RESULT_LIMIT = 20;
  * @throws If the response status is not OK.
  */
 const fetchPublishedReleases = async (
-  search: string,
+  { search, artist }: PublishedReleasesFilters,
   skip: number,
   take: number,
   signal?: AbortSignal
@@ -51,6 +62,7 @@ const fetchPublishedReleases = async (
     take: String(take),
   });
   if (search) params.set('search', search);
+  if (artist) params.set('artist', artist);
 
   return fetchAndParse(
     `/api/releases?${params.toString()}`,
@@ -66,23 +78,27 @@ const fetchPublishedReleases = async (
  * React Query infinite hook for the public releases listing.
  *
  * Pages through the published-releases endpoint via skip/offset, accumulating
- * results for infinite scroll. `search` is applied server-side and is part of
- * the query key, so changing it resets pagination; `keepPreviousData` keeps the
- * current results visible during a search transition.
+ * results for infinite scroll. `search` and `artist` are applied server-side
+ * and are part of the query key, so changing either resets pagination;
+ * `keepPreviousData` keeps the current results visible during a search
+ * transition.
  *
  * @param search - Debounced, server-side search term (defaults to all releases).
+ * @param artist - Artist slug (`/releases?artist=`) that limits the listing to
+ * releases crediting that public artist (defaults to every artist).
  * @param options - Caller overrides spread into the `useInfiniteQuery` call
  * (e.g. `enabled`, `staleTime`); they take precedence over the defaults below.
  * @returns The TanStack `useInfiniteQuery` result (`data.pages`, `fetchNextPage`, etc.).
  */
 export const useInfinitePublishedReleasesQuery = (
   search = '',
+  artist = '',
   options: InfiniteQueryOptionsOverride<PublishedReleasesPaginatedResponse> = {}
 ) =>
   useInfiniteQuery({
-    queryKey: queryKeys.releases.publishedInfinite(search),
+    queryKey: queryKeys.releases.publishedInfinite(search, artist),
     queryFn: ({ pageParam, signal }) =>
-      fetchPublishedReleases(search, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
+      fetchPublishedReleases({ search, artist }, pageParam, PUBLISHED_RELEASES_PAGE_SIZE, signal),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextSkip,
     placeholderData: keepPreviousData,
@@ -108,7 +124,7 @@ export const useNewestPublishedReleasesQuery = (
 ) =>
   useQuery({
     queryKey: queryKeys.releases.newestPublished(take),
-    queryFn: ({ signal }) => fetchPublishedReleases('', 0, take, signal),
+    queryFn: ({ signal }) => fetchPublishedReleases(ALL_RELEASES, 0, take, signal),
     select: (page) => page.rows,
     ...options,
   });
@@ -131,7 +147,8 @@ export const usePublishedReleaseSearchQuery = (
 ) =>
   useQuery({
     queryKey: queryKeys.releases.publishedInfinite(`combobox:${search}`),
-    queryFn: ({ signal }) => fetchPublishedReleases(search, 0, SEARCH_RESULT_LIMIT, signal),
+    queryFn: ({ signal }) =>
+      fetchPublishedReleases({ search, artist: '' }, 0, SEARCH_RESULT_LIMIT, signal),
     select: (page) => page.rows,
     placeholderData: keepPreviousData,
     ...options,

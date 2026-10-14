@@ -6,7 +6,9 @@
 import { useRef } from 'react';
 import type { ReactElement } from 'react';
 
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+
+import { Eye, Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { ImageHeading } from '@/app/components/ui/image-heading';
@@ -75,13 +77,17 @@ const ReleasesError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
 interface ReleasesHeaderProps {
   /** Show the touch-only tap hint: only when there are covers to tap. */
   showTapHint: boolean;
+  /** Show the link back to every artist's releases: only when filtered by artist. */
+  showAllArtistsLink: boolean;
 }
 
 /**
  * The search, then the RELEASES wordmark, in one column as wide as the
- * covers' outer edges (as on the home page), then the touch-only tap hint.
+ * covers' outer edges (as on the home page), with the "View releases by all
+ * artists" link under the wordmark when the listing is filtered by artist,
+ * then the touch-only tap hint.
  */
-const ReleasesHeader = ({ showTapHint }: ReleasesHeaderProps): ReactElement => (
+const ReleasesHeader = ({ showTapHint, showAllArtistsLink }: ReleasesHeaderProps): ReactElement => (
   <div className="mb-8">
     {/* The search and the wordmark share this column so the wordmark's left
         edge sits on the search box's left edge at every column count. */}
@@ -94,6 +100,17 @@ const ReleasesHeader = ({ showTapHint }: ReleasesHeaderProps): ReactElement => (
         priority
         className="mt-7 mb-0 -ml-1.5 block text-left"
       />
+      {showAllArtistsLink ? (
+        <p className="mt-3 text-sm">
+          <Link
+            href="/releases"
+            className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:no-underline"
+          >
+            <Eye className="size-4" aria-hidden="true" />
+            <span>View releases by all artists</span>
+          </Link>
+        </p>
+      ) : null}
     </div>
     {/* Touch screens get no hover stamp on the covers, so they get this line
         instead; `hover:none` is the same test that keeps the stamp to hover
@@ -107,20 +124,31 @@ const ReleasesHeader = ({ showTapHint }: ReleasesHeaderProps): ReactElement => (
   </div>
 );
 
+interface ReleasesContentProps {
+  /** Artist slug from `/releases?artist=`: list only that artist's releases. */
+  artist?: string;
+}
+
 /**
  * Client content island for the public `/releases` listing, laid out like the
  * home page: the search and the RELEASES wordmark, then a grid of release
- * covers captioned with the title alone. A cover opens the listening modal on
- * the release's first track, in the page's cyan accent.
+ * covers, each captioned with the artist (linked to `/releases?artist=<slug>`)
+ * above the title. A cover opens the listening modal on the release's first
+ * track, in the page's cyan accent.
+ *
+ * With an `artist` slug the grid lists only the releases crediting that
+ * artist, and a "View releases by all artists" link sits under the wordmark.
  *
  * Pages through published releases with infinite scroll (the first page is
  * hydrated from the SSR prefetch, so the covers are server-rendered), with no
  * cap on the card count. The search combobox is self-contained and queries
- * the server directly, so it is not coupled to the loaded pages.
+ * the server directly (across every artist), so it is not coupled to the
+ * loaded pages.
  */
-export const ReleasesContent = (): ReactElement => {
+export const ReleasesContent = ({ artist = '' }: ReleasesContentProps): ReactElement => {
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfinitePublishedReleasesQuery();
+    useInfinitePublishedReleasesQuery('', artist);
+  const showAllArtistsLink = artist !== '';
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
@@ -132,7 +160,7 @@ export const ReleasesContent = (): ReactElement => {
   if (error && !data) {
     return (
       <>
-        <ReleasesHeader showTapHint={false} />
+        <ReleasesHeader showTapHint={false} showAllArtistsLink={showAllArtistsLink} />
         <ReleasesError onRetry={refetch} />
       </>
     );
@@ -142,7 +170,7 @@ export const ReleasesContent = (): ReactElement => {
 
   return (
     <>
-      <ReleasesHeader showTapHint={cards.length > 0} />
+      <ReleasesHeader showTapHint={cards.length > 0} showAllArtistsLink={showAllArtistsLink} />
 
       {cards.length === 0 ? (
         <p className="py-12 text-center text-lg text-zinc-500">No releases available.</p>
@@ -150,7 +178,7 @@ export const ReleasesContent = (): ReactElement => {
         <ul className={SPOTLIGHT_GRID_CLASS}>
           {cards.map((card) => (
             <li key={card.releaseId}>
-              <SpotlightCard card={card} caption="title" accent="cyan" />
+              <SpotlightCard card={card} caption="releases" accent="cyan" />
             </li>
           ))}
         </ul>

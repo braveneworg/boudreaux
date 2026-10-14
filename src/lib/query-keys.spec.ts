@@ -374,11 +374,21 @@ describe('queryKeys', () => {
   });
 
   describe('infinite-scroll keys', () => {
-    it('normalizes the published-releases infinite key search term', () => {
+    it('normalizes the published-releases infinite key search term, with no artist', () => {
       expect(queryKeys.releases.publishedInfinite('  Rock  ')).toEqual([
         'releases',
         'publishedInfinite',
         'rock',
+        '',
+      ]);
+    });
+
+    it('keys the published-releases infinite listing by the trimmed artist slug', () => {
+      expect(queryKeys.releases.publishedInfinite('', '  e2e-artist ')).toEqual([
+        'releases',
+        'publishedInfinite',
+        '',
+        'e2e-artist',
       ]);
     });
 

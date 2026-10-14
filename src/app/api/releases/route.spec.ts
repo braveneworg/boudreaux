@@ -361,6 +361,40 @@ describe('Release API Routes', () => {
         });
       });
 
+      it('should forward a trimmed artist filter for published listing', async () => {
+        vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+          success: true,
+          data: [] as never,
+        });
+
+        const request = new NextRequest(
+          'http://localhost:3000/api/releases?listing=published&artist=%20e2e-artist%20'
+        );
+        await GET(request);
+
+        expect(vi.mocked(ReleaseService.getPublishedReleases).mock.calls).toEqual([
+          [{ skip: 0, take: 24, search: undefined, artist: 'e2e-artist' }],
+        ]);
+      });
+
+      it.each(['', '%20%20'])(
+        'should ignore an empty artist filter (%j) for published listing',
+        async (value) => {
+          vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
+            success: true,
+            data: [] as never,
+          });
+
+          const request = new NextRequest(
+            `http://localhost:3000/api/releases?listing=published&artist=${value}`
+          );
+          await GET(request);
+
+          const [[filters]] = vi.mocked(ReleaseService.getPublishedReleases).mock.calls;
+          expect(filters?.artist).toBeUndefined();
+        }
+      );
+
       it('should return nextSkip null when the published page is short', async () => {
         vi.mocked(ReleaseService.getPublishedReleases).mockResolvedValue({
           success: true,

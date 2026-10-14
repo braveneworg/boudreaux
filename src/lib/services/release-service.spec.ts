@@ -1010,6 +1010,44 @@ describe('ReleaseService', () => {
       );
     });
 
+    it('forwards the artist filter to the repository', async () => {
+      vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
+
+      await ReleaseService.getPublishedReleases({ artist: 'e2e-artist' });
+
+      expect(vi.mocked(ReleaseRepository.findPublished).mock.calls).toEqual([
+        [{ skip: 0, take: 24, search: undefined, artist: 'e2e-artist' }],
+      ]);
+    });
+
+    describe('caching outside development and E2E', () => {
+      beforeEach(() => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('E2E_MODE', 'false');
+        vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
+      });
+
+      it('caches the unfiltered first page', async () => {
+        const { withCache } = await import('../utils/simple-cache');
+
+        await ReleaseService.getPublishedReleases();
+
+        expect(withCache).toHaveBeenCalledTimes(1);
+      });
+
+      it('never serves or stores the cached page for an artist-filtered request', async () => {
+        const { withCache } = await import('../utils/simple-cache');
+
+        const result = await ReleaseService.getPublishedReleases({ artist: 'e2e-artist' });
+
+        expect(result.success).toBe(true);
+        expect(withCache).not.toHaveBeenCalled();
+        expect(ReleaseRepository.findPublished).toHaveBeenCalledWith(
+          expect.objectContaining({ artist: 'e2e-artist' })
+        );
+      });
+    });
+
     it('should return empty array when no published releases exist', async () => {
       vi.mocked(ReleaseRepository.findPublished).mockResolvedValue([] as never);
 

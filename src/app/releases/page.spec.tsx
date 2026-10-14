@@ -5,6 +5,8 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
+import { queryKeys } from '@/lib/query-keys';
+
 import ReleasesPage from './page';
 
 vi.mock('server-only', () => ({}));
@@ -70,21 +72,29 @@ vi.mock('@/app/components/ui/heading', () => ({
 }));
 
 vi.mock('@/app/components/releases-content', () => ({
-  ReleasesContent: () => <div data-testid="releases-content">Releases Content</div>,
+  ReleasesContent: ({ artist }: { artist?: string }) => (
+    <div data-testid="releases-content" data-artist={artist ?? ''}>
+      Releases Content
+    </div>
+  ),
 }));
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+/** Render the page for the given query string params. */
+const renderPage = async (searchParams: SearchParams = {}) =>
+  render(await ReleasesPage({ searchParams: Promise.resolve(searchParams) }));
 
 describe('ReleasesPage', () => {
   it('should render page structure with PageContainer and ContentContainer', async () => {
-    const Page = await ReleasesPage();
-    render(Page);
+    await renderPage();
 
     expect(screen.getByTestId('page-container')).toBeInTheDocument();
     expect(screen.getByTestId('content-container')).toBeInTheDocument();
   });
 
   it('should render BreadcrumbMenu with Releases', async () => {
-    const Page = await ReleasesPage();
-    render(Page);
+    await renderPage();
 
     const breadcrumbs = screen.getByTestId('breadcrumb-menu');
     expect(breadcrumbs).toBeInTheDocument();
@@ -93,8 +103,7 @@ describe('ReleasesPage', () => {
   });
 
   it('should leave the heading to the releases content, under its search', async () => {
-    const Page = await ReleasesPage();
-    render(Page);
+    await renderPage();
 
     // ReleasesContent renders the RELEASES wordmark below its search, as the
     // home page does; the page adds no heading of its own.
@@ -103,8 +112,7 @@ describe('ReleasesPage', () => {
   });
 
   it('should wrap the releases content in a cyan zine panel', async () => {
-    const Page = await ReleasesPage();
-    const { container } = render(Page);
+    const { container } = await renderPage();
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
     expect(panel).toBeInTheDocument();
@@ -118,12 +126,11 @@ describe('ReleasesPage', () => {
       data: [{ id: 'release-1', title: 'E2E Release' }],
     });
 
-    const Page = await ReleasesPage();
-    render(Page);
+    await renderPage();
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['releases', 'publishedInfinite', ''],
+        queryKey: ['releases', 'publishedInfinite', '', ''],
         initialPageParam: 0,
       })
     );
@@ -137,9 +144,47 @@ describe('ReleasesPage', () => {
     });
   });
 
+  it('should prefetch the artist-filtered first page under the key the client hook uses', async () => {
+    mockGetPublishedReleases.mockResolvedValue({ success: true, data: [] });
+
+    await renderPage({ artist: 'e2e-artist' });
+
+    const [[opts]] = mockPrefetchInfiniteQuery.mock.calls as [[{ queryKey: unknown[] }]];
+    expect(opts.queryKey).toEqual(['releases', 'publishedInfinite', '', 'e2e-artist']);
+    expect(opts.queryKey).toEqual(queryKeys.releases.publishedInfinite('', 'e2e-artist'));
+    expect(mockGetPublishedReleases.mock.calls).toEqual([
+      [{ skip: 0, take: 24, artist: 'e2e-artist' }],
+    ]);
+  });
+
+  it('should pass the artist filter to the releases content', async () => {
+    await renderPage({ artist: ' e2e-artist ' });
+
+    expect(screen.getByTestId('releases-content')).toHaveAttribute('data-artist', 'e2e-artist');
+  });
+
+  it('should take the first artist when the param repeats', async () => {
+    await renderPage({ artist: ['e2e-artist', 'e2e-band'] });
+
+    expect(screen.getByTestId('releases-content')).toHaveAttribute('data-artist', 'e2e-artist');
+    const [[opts]] = mockPrefetchInfiniteQuery.mock.calls as [[{ queryKey: unknown[] }]];
+    expect(opts.queryKey).toEqual(['releases', 'publishedInfinite', '', 'e2e-artist']);
+  });
+
+  it.each([{ artist: '' }, { artist: '   ' }, {}])(
+    'should ignore an empty or missing artist param (%j)',
+    async (searchParams) => {
+      await renderPage(searchParams);
+
+      expect(screen.getByTestId('releases-content')).toHaveAttribute('data-artist', '');
+      const [[opts]] = mockPrefetchInfiniteQuery.mock.calls as [[{ queryKey: unknown[] }]];
+      expect(opts.queryKey).toEqual(['releases', 'publishedInfinite', '', '']);
+      expect(mockGetPublishedReleases.mock.calls).toEqual([[{ skip: 0, take: 24 }]]);
+    }
+  );
+
   it('should render ReleasesContent within HydrationBoundary', async () => {
-    const Page = await ReleasesPage();
-    render(Page);
+    await renderPage();
 
     expect(screen.getByTestId('releases-content')).toBeInTheDocument();
   });
