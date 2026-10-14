@@ -29,6 +29,50 @@ test.describe('Desktop header — primary navigation', () => {
     await expect(page.getByRole('banner').getByRole('link', { name: 'Playlists' })).toBeVisible();
   });
 
+  test('keeps the Music drawer open while the pointer crosses the gap to Artists', async ({
+    page,
+  }) => {
+    // On /releases the drawer's Artists row overlaps the page's search button.
+    // Radix closes a hover-opened drawer 150ms after the pointer leaves both the
+    // trigger and the drawer, so a pointer that pauses in the strip between
+    // them used to lose the drawer and press the search button instead.
+    await page.goto('/releases');
+
+    const banner = page.getByRole('banner');
+    const musicTrigger = banner.getByRole('button', { name: 'Music' });
+    await expect(musicTrigger).toBeVisible({ timeout: 10_000 });
+    const releasesSearch = page.getByRole('button', { name: 'Search releases' });
+    await expect(releasesSearch).toBeVisible({ timeout: 10_000 });
+
+    // Hover opens the drawer (Radix's delayed open fires on pointer move).
+    await musicTrigger.hover();
+    const artists = banner.getByRole('link', { name: 'Artists' });
+    await expect(artists).toBeVisible();
+
+    // Both boxes from one frame, then park the pointer midway in the strip
+    // between the trigger's bottom edge and the drawer's top edge.
+    const strip = await page.evaluate(() => {
+      const trigger = document.querySelector('[data-slot="navigation-menu-trigger"]');
+      const drawer = document.querySelector('[data-slot="navigation-menu-content"]');
+      if (!trigger || !drawer) throw new Error('nav drawer not rendered');
+      const t = trigger.getBoundingClientRect();
+      const d = drawer.getBoundingClientRect();
+      return { x: t.left + t.width / 2, y: (t.bottom + d.top) / 2, gap: d.top - t.bottom };
+    });
+    expect(strip.gap).toBeGreaterThan(0);
+    await page.mouse.move(strip.x, strip.y, { steps: 6 });
+
+    // Well past Radix's 150ms close timer: the drawer must still be open.
+    await page.waitForTimeout(400);
+    await expect(musicTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(artists).toBeVisible();
+
+    await artists.click();
+
+    await expect(page).toHaveURL(/\/artists$/);
+    await expect(page.locator('[data-slot="popover-content"]')).toHaveCount(0);
+  });
+
   test('links Merch in the Label drawer to the shirt store in a new tab', async ({ page }) => {
     await page.goto('/');
 

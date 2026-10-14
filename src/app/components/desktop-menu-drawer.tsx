@@ -102,6 +102,15 @@ export const DesktopMenuDrawer = ({
           // shadcn's own positioning is gated behind the `group/navigation-menu`
           // marker the Root omits, leaving base `top-0` to cover the trigger.
           'bg-menu-item-tan-100 shadow-zine-sm top-full mt-3 w-56 overflow-visible border-2 border-black p-0 pt-3 md:w-56',
+          // Invisible bridge over the `mt-3` strip between trigger and scrap.
+          // Radix closes a hover-opened drawer 150ms (hardcoded) after the
+          // pointer leaves both the trigger and this content, so a pointer that
+          // crosses the strip slowly used to lose the drawer and press whatever
+          // sat beneath it (the /releases search button under "Artists"). The
+          // pseudo-element is part of the content for hit-testing, so crossing
+          // it keeps Radix's close timer cleared. One notch taller than the
+          // margin because the 1.5deg tilt drops one top corner a few pixels.
+          "before:absolute before:inset-x-0 before:-top-4 before:h-4 before:content-['']",
           DRAWER_ACCENT_CLASS.get(group.label)
         )}
       >
