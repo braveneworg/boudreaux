@@ -29,8 +29,12 @@ export interface VideoPlayerSurfaceProps {
    * (the control bar toggle, the browser menu, Safari's button).
    */
   onEnterPictureInPicture?: () => void;
-  /** Fired when the player leaves picture-in-picture (e.g. "back to tab"). */
-  onLeavePictureInPicture?: () => void;
+  /**
+   * Fired when the player leaves picture-in-picture, with whether it is
+   * paused: closing the floating window pauses the video, "back to tab" does
+   * not.
+   */
+  onLeavePictureInPicture?: (isPaused: boolean) => void;
   /**
    * One-shot supplier of a media element primed (load()/play()) during the
    * user's play gesture. Safari/iOS and Firefox bless autoplay per element, so
@@ -64,7 +68,7 @@ interface PlayerSession {
  * `onEnded` callback fires when playback finishes (queue advance), and the
  * optional `onEnterPictureInPicture` / `onLeavePictureInPicture` callbacks
  * fire on the native picture-in-picture events, which bubble from the
- * `<video>` to the player. The player and its element live on while in
+ * `<video>` to the player (the leave callback learns whether it is paused). The player and its element live on while in
  * picture-in-picture: only an unmount or a changed source disposes them.
  */
 export const VideoPlayerSurface = ({
@@ -195,7 +199,7 @@ export const VideoPlayerSurface = ({
     });
 
     player.on('leavepictureinpicture', () => {
-      onLeavePictureInPictureRef.current?.();
+      onLeavePictureInPictureRef.current?.(player.paused());
     });
 
     player.on('error', () => {
