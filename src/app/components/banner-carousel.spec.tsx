@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToString } from 'react-dom/server';
 
 import { isDarkColor } from '@/lib/utils/color';
 
@@ -171,11 +172,44 @@ describe('BannerCarousel', () => {
       expect(img).toHaveAttribute('loading', 'eager');
       expect(img).toHaveAttribute('fetchpriority', 'high');
     });
+
+    it('serves a blank candidate from md up, so desktops never fetch the hidden carousel', () => {
+      // The carousel is `md:hidden`, but a display:none <img> still loads: the
+      // current slide was fetched eagerly, at high priority and full width,
+      // under the desktop strip. A <picture> source matching the strip
+      // breakpoint resolves to a blank data URI instead.
+      render(<BannerCarousel banners={[makeBanner(1)]} />);
+
+      const source = screen.getByAltText('Banner 1').previousElementSibling;
+      expect(source?.tagName).toBe('SOURCE');
+      expect(source).toHaveAttribute('media', '(min-width: 768px)');
+      expect(source?.getAttribute('srcset')).toMatch(/^data:image\/gif;base64,/);
+    });
   });
 
   /* ---- multiple banners ---- */
 
   describe('multiple banners', () => {
+    it('server-renders only the current slide image; the neighbours mount after hydration', () => {
+      // The previous and next slides sit inside the viewport-sized track
+      // (translated off to the sides), so the browser's lazy-load margin
+      // fetched both full-width variants right behind the LCP banner, ahead
+      // of the stylesheet and scripts. Mounting them client-side keeps those
+      // ~115 KiB out of the first paint's request queue; the first rotation
+      // (≥3 s away) and any swipe happen long after hydration.
+      const html = renderToString(<BannerCarousel banners={THREE_BANNERS} />);
+
+      expect(html.match(/alt="Banner \d"/g)).toHaveLength(1);
+      expect(html).toContain('alt="Banner 1"');
+    });
+
+    it('mounts the neighbouring slide images once hydrated', async () => {
+      render(<BannerCarousel banners={THREE_BANNERS} />);
+
+      expect(await screen.findByAltText('Banner 2')).toBeInTheDocument();
+      expect(screen.getByAltText('Banner 3')).toBeInTheDocument();
+    });
+
     it('renders dot indicators for each banner', () => {
       render(<BannerCarousel banners={THREE_BANNERS} />);
 

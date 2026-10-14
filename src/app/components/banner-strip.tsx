@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import Image from 'next/image';
+import { BreakpointImage } from '@/app/components/ui/breakpoint-image';
+import { BANNER_CAROUSEL_MEDIA } from '@/lib/constants/banner-slots';
 
 import { buildBannerSrc, type BannerSlotData } from './banner-carousel';
 import { BannerNotificationTicker } from './banner-notification-ticker';
@@ -55,7 +56,12 @@ export const BannerStrip = ({ banners, rotationInterval }: BannerStripProps) => 
       <div className="flex w-full">
         {banners.map((banner, index) => (
           <div key={banner.slotNumber} className={`relative flex-1 ${BANNER_CELL_ASPECT}`}>
-            <Image
+            <BreakpointImage
+              // The strip is `hidden md:block`, but a display:none <img> is
+              // still fetched, so every phone paid for all five eager cells
+              // (the first at high priority) under the carousel it never
+              // shows. Below md the picture resolves to a blank data URI.
+              hiddenMedia={BANNER_CAROUSEL_MEDIA}
               src={buildBannerSrc(banner.imageFilename)}
               alt={`Banner ${banner.slotNumber}`}
               fill
