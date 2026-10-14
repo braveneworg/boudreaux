@@ -46,11 +46,12 @@ export interface VideoPlayDialogProps {
  * playing, and the modal shows again around the same player, still playing.
  * Closing the floating window pauses the video, so a paused leave requests a
  * close through `onOpenChange(false)` instead: the modal stays hidden and the
- * player is disposed. Otherwise the hidden state is internal: `onOpenChange`
- * never fires for it, and it ends when `src` changes. The surface renders
- * through a portal into a node of its own, which moves between the dialog and
- * a hidden spot beside it, so the dialog can unmount without unmounting the
- * surface.
+ * player is disposed. The page cannot tell "back to tab" from a close once the
+ * video is already paused, so "back to tab" on a paused video closes too.
+ * Otherwise the hidden state is internal: `onOpenChange` never fires for it,
+ * and it ends when `src` changes. The surface renders through a portal into a
+ * node of its own, which moves between the dialog and a hidden spot beside it,
+ * so the dialog can unmount without unmounting the surface.
  *
  * Closing the shown dialog (Close button, Esc, an overlay click) unmounts the
  * surface once the dialog has animated out, which disposes the player and
