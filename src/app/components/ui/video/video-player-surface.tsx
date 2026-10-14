@@ -68,8 +68,9 @@ interface PlayerSession {
  * `onEnded` callback fires when playback finishes (queue advance), and the
  * optional `onEnterPictureInPicture` / `onLeavePictureInPicture` callbacks
  * fire on the native picture-in-picture events, which bubble from the
- * `<video>` to the player (the leave callback learns whether it is paused). The player and its element live on while in
- * picture-in-picture: only an unmount or a changed source disposes them.
+ * `<video>` to the player (the leave callback learns whether it is paused).
+ * The player and its element live on while in picture-in-picture: only an
+ * unmount or a changed source disposes them.
  */
 export const VideoPlayerSurface = ({
   title,
