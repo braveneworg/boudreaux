@@ -98,6 +98,7 @@ subdirectories:
 | `prisma-mongo/`   | schema, seed, or query changes                              |
 | `nginx/`          | `nginx/nginx.conf`: rate-limit zones, locations, headers    |
 | `ops/`            | production incidents, third-party free tiers, runbook work  |
+| `performance/`    | Lighthouse / Core Web Vitals, document size, asset loading  |
 | `testing/`        | writing or debugging unit tests, vitest mocks               |
 | `tooling/`        | shell-heavy work, lint config, stress-repro runs            |
 | `validation/`     | Zod schemas, validating external input                      |

@@ -6,7 +6,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useFingerprint } from '@/hooks/use-fingerprint';
@@ -28,6 +27,7 @@ import { useChatReopenRefresh } from './_hooks/use-chat-reopen-refresh';
 import { useChatTyping } from './_hooks/use-chat-typing';
 import { useInfiniteChatMessagesQuery } from './_hooks/use-infinite-chat-messages-query';
 import { useOptimisticChat, type OptimisticChatMessage } from './_hooks/use-optimistic-chat';
+import { ChatBodyLoading } from './chat-body-loading';
 import { ChatDeleteMessageDialog } from './chat-delete-message-dialog';
 import { ChatDisabledState } from './chat-disabled-state';
 import { ChatInput } from './chat-input';
@@ -298,14 +298,7 @@ export const ChatBody = ({ session, enabled, scrollToMention = false }: ChatBody
   }
 
   if (isPending) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <Loader2
-          aria-label="Loading messages"
-          className="text-muted-foreground size-6 animate-spin"
-        />
-      </div>
-    );
+    return <ChatBodyLoading label="Loading messages" />;
   }
 
   if (isError) {

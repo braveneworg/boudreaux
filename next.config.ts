@@ -240,13 +240,15 @@ const config = {
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   serverExternalPackages: ['node-id3', 'winston'],
   experimental: {
-    // Inline initial route CSS in production to remove the stylesheet
-    // request waterfall on first visit. This targets the render-blocking
-    // Tailwind/global sheet and the small next/font Jost stylesheet that
-    // Chrome flags on the homepage audit. Trade-off: returning visitors lose
-    // separate CSS caching, but first-load FCP/LCP improves when CSS is
-    // discovered with the HTML instead of via extra CDN requests.
-    inlineCss: process.env.NODE_ENV === 'production',
+    // CSS stays an external `<link>` on purpose. `inlineCss` was tried to
+    // remove the stylesheet round-trip, but Next writes the sheet into every
+    // document three times — the head `<style>` plus two copies in the RSC
+    // payload (its docs call the duplication a known limitation) — and this
+    // app's single Tailwind + video.js sheet is ~230 KiB, so each page carried
+    // ~130 KiB gzipped of CSS on top of its HTML. Lighthouse's mobile model
+    // cannot paint or start the preloaded LCP image until the whole document
+    // has arrived, so the inlined copies cost more than the one cacheable,
+    // preconnected CDN request they replaced.
     optimizePackageImports: ['lucide-react', 'date-fns', 'react-share', 'recharts'],
     serverActions: {
       // 50mb is required: raw digital files (FLAC/WAV) go through the

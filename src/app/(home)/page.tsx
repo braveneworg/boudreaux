@@ -9,6 +9,7 @@ import {
   SPOTLIGHT_LIMIT,
 } from '@/hooks/queries/use-active-featured-artists-query';
 import type { PublishedReleasesPaginatedResponse } from '@/hooks/queries/use-infinite-published-releases-query';
+import { BANNER_CAROUSEL_MEDIA } from '@/lib/constants/banner-slots';
 import { queryKeys } from '@/lib/query-keys';
 import {
   type BannersApiResponse,
@@ -164,7 +165,7 @@ export default async function Home() {
         <link
           rel="preload"
           as="image"
-          media="(max-width: 767.98px)"
+          media={BANNER_CAROUSEL_MEDIA}
           imageSrcSet={buildBannerPreloadSrcSet(firstBannerFilename)}
           imageSizes="100vw"
           fetchPriority="high"

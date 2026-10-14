@@ -110,6 +110,18 @@ describe('BannerStrip', () => {
     expect(container.querySelectorAll('.flex-1')).toHaveLength(3);
   });
 
+  it('serves every cell a blank candidate below md, so phones never fetch the hidden strip', () => {
+    // The strip is `hidden md:block`, but a display:none <img> still loads.
+    // A <picture> source that matches the carousel breakpoint resolves to a
+    // blank data URI there, so the five eager strip fetches (one at high
+    // priority) stop competing with the mobile LCP banner.
+    const { container } = render(<BannerStrip banners={THREE_BANNERS} />);
+
+    const sources = container.querySelectorAll('picture > source[media="(max-width: 767.98px)"]');
+    expect(sources).toHaveLength(THREE_BANNERS.length);
+    expect(sources[0]?.getAttribute('srcset')).toMatch(/^data:image\/gif;base64,/);
+  });
+
   it('renders nothing when there are no banners', () => {
     const { container } = render(<BannerStrip banners={[]} />);
 

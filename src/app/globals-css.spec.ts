@@ -179,6 +179,17 @@ describe('globals.css', () => {
     });
   });
 
+  describe('header-bg-pulse utility', () => {
+    it('pulses the mobile particle image together with the ::before tile layer', () => {
+      // The masthead texture below xl is an <img> (so it can load at low
+      // priority); the pulse that used to animate only the ::before background
+      // must reach it too, or the mobile masthead stops breathing.
+      expect(readGlobalsCss()).toMatch(
+        /@utility header-bg-pulse \{\s*&::before,\s*& > img \{\s*animation: header-bg-pulse/
+      );
+    });
+  });
+
   describe('base anchor rule', () => {
     it('keeps the permanent underline as the link cue', () => {
       expect(readGlobalsCss()).toMatch(/\ba \{[^}]*text-decoration-line: underline;/);

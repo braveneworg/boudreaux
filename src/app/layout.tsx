@@ -27,8 +27,9 @@ import './globals.css';
 // `<link rel=preload>` for both files while first paint is mostly upright
 // text (italic appears only in bio captions and legal notes).
 // Preloading both would compete with the LCP image fetch for early
-// bandwidth; with `inlineCss` the `@font-face` rules arrive with the HTML
-// anyway, so discovery is already immediate.
+// bandwidth; the `@font-face` rules arrive with the (render-blocking)
+// stylesheet, so the upright face is discovered at first style resolution
+// anyway and `display: 'swap'` paints the fallback until it lands.
 // `display: 'swap'` lets the page render with the fallback first and swap
 // to Jost when the font is fetched, and `next/font`'s automatic
 // `adjustFontFallback` (size-adjust descriptors on an Arial fallback)

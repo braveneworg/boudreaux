@@ -27,3 +27,13 @@ export const MIN_ROTATION_INTERVAL = 3;
 export const MAX_ROTATION_INTERVAL = 15;
 
 export const ROTATION_INTERVAL_SETTINGS_KEY = 'carousel-rotation-interval';
+
+/**
+ * The viewports that show the sliding carousel: below Tailwind's `md`
+ * (48rem = 768px). The stitched desktop strip takes over from `md` up. Both
+ * treatments are rendered on every page and CSS picks one (`md:hidden` /
+ * `hidden md:block`), so these queries also gate which one fetches its images
+ * and the home page's media-scoped LCP preload.
+ */
+export const BANNER_CAROUSEL_MEDIA = '(max-width: 767.98px)';
+export const BANNER_STRIP_MEDIA = '(min-width: 768px)';

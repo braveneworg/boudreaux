@@ -39,6 +39,22 @@ describe('next.config headers', () => {
   });
 });
 
+describe('next.config CSS delivery', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'production');
+  });
+
+  it('ships the stylesheet as an external, cacheable file rather than inlining it', async () => {
+    // `experimental.inlineCss` writes the whole Tailwind sheet into every
+    // document three times (the head <style> plus two copies in the RSC
+    // payload), which was ~130 KiB gzipped per page on top of the HTML.
+    const { default: productionConfig } = await import('./next.config');
+
+    expect(productionConfig.experimental).not.toHaveProperty('inlineCss', true);
+  });
+});
+
 interface RedirectRule {
   source: string;
   destination: string;
