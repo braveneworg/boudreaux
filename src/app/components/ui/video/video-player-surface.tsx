@@ -25,6 +25,17 @@ export interface VideoPlayerSurfaceProps {
   /** Fired when playback reaches the end of the source (e.g. queue advance). */
   onEnded?: () => void;
   /**
+   * Fired when the player enters picture-in-picture, however it was started
+   * (the control bar toggle, the browser menu, Safari's button).
+   */
+  onEnterPictureInPicture?: () => void;
+  /**
+   * Fired when the player leaves picture-in-picture, with whether it is
+   * paused: closing the floating window pauses the video, "back to tab" does
+   * not.
+   */
+  onLeavePictureInPicture?: (isPaused: boolean) => void;
+  /**
    * One-shot supplier of a media element primed (load()/play()) during the
    * user's play gesture. Safari/iOS and Firefox bless autoplay per element, so
    * playing THAT element is what lets the deferred autoplay succeed. The
@@ -54,13 +65,20 @@ interface PlayerSession {
  * coordinator on 'play' so only one surface plays at a time, and disposes
  * cleanly on unmount (list virtualization / refetch), in a microtask of the
  * unmounting task. A player 'error' swaps in an inline fallback. An optional
- * `onEnded` callback fires when playback finishes (queue advance).
+ * `onEnded` callback fires when playback finishes (queue advance), and the
+ * optional `onEnterPictureInPicture` / `onLeavePictureInPicture` callbacks
+ * fire on the native picture-in-picture events, which bubble from the
+ * `<video>` to the player (the leave callback learns whether it is paused).
+ * The player and its element live on while in picture-in-picture: only an
+ * unmount or a changed source disposes them.
  */
 export const VideoPlayerSurface = ({
   title,
   src,
   posterUrl,
   onEnded,
+  onEnterPictureInPicture,
+  onLeavePictureInPicture,
   takeMediaEl,
 }: VideoPlayerSurfaceProps): ReactElement => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,14 +86,18 @@ export const VideoPlayerSurface = ({
   const [hasError, setHasError] = useState(false);
   // Ref-carried so callback identity changes never tear down the player.
   const onEndedRef = useRef(onEnded);
+  const onEnterPictureInPictureRef = useRef(onEnterPictureInPicture);
+  const onLeavePictureInPictureRef = useRef(onLeavePictureInPicture);
   const takeMediaElRef = useRef(takeMediaEl);
   // The player the effect built, so a replay of that effect can keep it.
   const sessionRef = useRef<PlayerSession | null>(null);
 
   useEffect(() => {
     onEndedRef.current = onEnded;
+    onEnterPictureInPictureRef.current = onEnterPictureInPicture;
+    onLeavePictureInPictureRef.current = onLeavePictureInPicture;
     takeMediaElRef.current = takeMediaEl;
-  }, [onEnded, takeMediaEl]);
+  }, [onEnded, onEnterPictureInPicture, onLeavePictureInPicture, takeMediaEl]);
 
   useEffect(() => {
     const host = containerRef.current;
@@ -171,6 +193,14 @@ export const VideoPlayerSurface = ({
 
     player.on('ended', () => {
       onEndedRef.current?.();
+    });
+
+    player.on('enterpictureinpicture', () => {
+      onEnterPictureInPictureRef.current?.();
+    });
+
+    player.on('leavepictureinpicture', () => {
+      onLeavePictureInPictureRef.current?.(player.paused());
     });
 
     player.on('error', () => {

@@ -17,6 +17,7 @@ interface FakePlayer {
   on: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
+  paused: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
   hasStarted: ReturnType<typeof vi.fn>;
   addClass: ReturnType<typeof vi.fn>;
@@ -49,6 +50,7 @@ vi.mock('video.js', () => {
       }),
       play: vi.fn(() => Promise.reject(new Error('autoplay-blocked'))),
       pause: vi.fn(),
+      paused: vi.fn(() => false),
       dispose: vi.fn(() => {
         el?.parentElement?.remove();
         if (el instanceof HTMLMediaElement) {
@@ -453,6 +455,107 @@ describe('VideoPlayerSurface', () => {
     expect(players).toHaveLength(1);
     expect(second).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
+  });
+
+  // The /videos modal hides while its player is in picture-in-picture and
+  // shows again when it leaves, whatever started it (the control bar toggle,
+  // the browser menu, Safari's button): the native events bubble to video.js.
+  describe('picture-in-picture callbacks', () => {
+    it('fires onEnterPictureInPicture when the player enters picture-in-picture', () => {
+      const onEnterPictureInPicture = vi.fn();
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          onEnterPictureInPicture={onEnterPictureInPicture}
+        />
+      );
+      const [player] = getPlayers();
+
+      act(() => player.trigger('enterpictureinpicture'));
+
+      expect(onEnterPictureInPicture.mock.calls).toEqual([[]]);
+    });
+
+    it('fires onLeavePictureInPicture when the player leaves picture-in-picture', () => {
+      const onLeavePictureInPicture = vi.fn();
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          onLeavePictureInPicture={onLeavePictureInPicture}
+        />
+      );
+      const [player] = getPlayers();
+
+      act(() => player.trigger('leavepictureinpicture'));
+
+      expect(onLeavePictureInPicture.mock.calls).toEqual([[false]]);
+    });
+
+    // Closing the floating window pauses the video, "back to tab" does not:
+    // the paused state is what tells the two apart.
+    it('tells onLeavePictureInPicture the player is paused when it left paused', () => {
+      const onLeavePictureInPicture = vi.fn();
+      render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          onLeavePictureInPicture={onLeavePictureInPicture}
+        />
+      );
+      const [player] = getPlayers();
+      player.paused.mockReturnValue(true);
+
+      act(() => player.trigger('leavepictureinpicture'));
+
+      expect(onLeavePictureInPicture.mock.calls).toEqual([[true]]);
+    });
+
+    it('ignores picture-in-picture events when no callbacks are provided', () => {
+      render(<VideoPlayerSurface title="Live" src="https://cdn.example.com/clip.mp4" />);
+      const [player] = getPlayers();
+
+      expect(() =>
+        act(() => {
+          player.trigger('enterpictureinpicture');
+          player.trigger('leavepictureinpicture');
+        })
+      ).not.toThrow();
+    });
+
+    it('uses the latest callbacks without re-initializing the player', () => {
+      const firstEnter = vi.fn();
+      const firstLeave = vi.fn();
+      const secondEnter = vi.fn();
+      const secondLeave = vi.fn();
+      const { rerender } = render(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          onEnterPictureInPicture={firstEnter}
+          onLeavePictureInPicture={firstLeave}
+        />
+      );
+
+      rerender(
+        <VideoPlayerSurface
+          title="Live"
+          src="https://cdn.example.com/clip.mp4"
+          onEnterPictureInPicture={secondEnter}
+          onLeavePictureInPicture={secondLeave}
+        />
+      );
+      const players = getPlayers();
+      act(() => {
+        players[0].trigger('enterpictureinpicture');
+        players[0].trigger('leavepictureinpicture');
+      });
+
+      expect(vi.mocked(videojs)).toHaveBeenCalledTimes(1);
+      expect([secondEnter.mock.calls, secondLeave.mock.calls]).toEqual([[[]], [[false]]]);
+      expect([firstEnter.mock.calls, firstLeave.mock.calls]).toEqual([[], []]);
+    });
   });
 
   it('applies stored volume prefs when the player mounts', () => {
