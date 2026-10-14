@@ -299,6 +299,74 @@ describe('VideosContent search', () => {
   });
 });
 
+// The modal hides itself while its video plays picture-in-picture, which
+// leaves the search usable with the player still open.
+describe('VideosContent suggestion while its modal is hidden in picture-in-picture', () => {
+  const exitPictureInPicture = vi.fn(() => Promise.resolve());
+
+  beforeEach(() => {
+    Object.defineProperty(document, 'exitPictureInPicture', {
+      configurable: true,
+      value: exitPictureInPicture,
+    });
+    vi.mocked(useInfinitePublishedVideosQuery).mockReturnValue(
+      toInfiniteResult({
+        pages: [
+          {
+            rows: [
+              { id: 'a', title: 'Alpha Session', artist: 'Artist One' },
+              { id: 'b', title: 'Bravo Live', artist: 'Artist Two' },
+            ],
+            nextSkip: null,
+          },
+        ],
+      }) as never
+    );
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'exitPictureInPicture');
+  });
+
+  const pick = async (artist: string): Promise<void> => {
+    await openSearch();
+    await userEvent.click(screen.getByText(artist));
+  };
+
+  it('exits picture-in-picture when the same video is picked again', async () => {
+    render(<VideosContent />);
+
+    await pick('Artist One');
+    await pick('Artist One');
+
+    expect(exitPictureInPicture.mock.calls).toEqual([[]]);
+  });
+
+  it('primes no second element when the same video is picked again', async () => {
+    const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
+    render(<VideosContent />);
+
+    await pick('Artist One');
+    const [primedEl] = playSpy.mock.instances;
+    await pick('Artist One');
+
+    expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(dialogProps.takeMediaEl?.()).toBe(primedEl);
+  });
+
+  it('plays a different picked video as before', async () => {
+    const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
+    render(<VideosContent />);
+
+    await pick('Artist One');
+    await pick('Artist Two');
+
+    expect(exitPictureInPicture).not.toHaveBeenCalled();
+    expect(playSpy).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('play-dialog')).toHaveTextContent('dialog:Bravo Live');
+  });
+});
+
 describe('VideosContent list', () => {
   it('flattens the loaded pages in order', () => {
     vi.mocked(useInfinitePublishedVideosQuery).mockReturnValue(

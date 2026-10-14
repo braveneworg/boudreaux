@@ -143,6 +143,13 @@ export const VideosContent = (): ReactElement => {
   };
 
   const handleSuggestionSelect = (video: VideoRow): void => {
+    if (playerOpen && video.id === selected?.id) {
+      // Still open, so its modal is hidden while the video plays
+      // picture-in-picture. Leaving picture-in-picture shows the modal again;
+      // priming here would start a second, orphaned element.
+      document.exitPictureInPicture().catch(() => {});
+      return;
+    }
     // Start playback of the real source inside the selection gesture — allowed
     // by every autoplay policy (see usePrimedMediaHandoff).
     primeMediaEl(resolveStreamUrl(video) ?? undefined);

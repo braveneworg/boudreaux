@@ -300,6 +300,57 @@ describe('VideoCard', () => {
       expect(dialogProps.takeMediaEl?.()).toBeInstanceOf(HTMLVideoElement);
     });
 
+    // The modal hides itself while its video plays picture-in-picture, which
+    // leaves the poster clickable with the player still open.
+    describe('while the modal is hidden in picture-in-picture', () => {
+      const exitPictureInPicture = vi.fn(() => Promise.resolve());
+
+      beforeEach(() => {
+        Object.defineProperty(document, 'exitPictureInPicture', {
+          configurable: true,
+          value: exitPictureInPicture,
+        });
+      });
+
+      afterEach(() => {
+        Reflect.deleteProperty(document, 'exitPictureInPicture');
+      });
+
+      it('exits picture-in-picture when the poster is clicked again', async () => {
+        const user = userEvent.setup();
+        render(<VideoCard video={baseVideo} />);
+        const poster = screen.getByRole('button', { name: 'Play Live at the Basement' });
+
+        await user.click(poster);
+        await user.click(poster);
+
+        expect(exitPictureInPicture.mock.calls).toEqual([[]]);
+      });
+
+      it('primes no second element when the poster is clicked again', async () => {
+        const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play');
+        const user = userEvent.setup();
+        render(<VideoCard video={baseVideo} />);
+        const poster = screen.getByRole('button', { name: 'Play Live at the Basement' });
+
+        await user.click(poster);
+        const [primedEl] = playSpy.mock.instances;
+        await user.click(poster);
+
+        expect(playSpy).toHaveBeenCalledTimes(1);
+        expect(dialogProps.takeMediaEl?.()).toBe(primedEl);
+      });
+
+      it('does not exit picture-in-picture on the opening click', async () => {
+        const user = userEvent.setup();
+        render(<VideoCard video={baseVideo} />);
+
+        await user.click(screen.getByRole('button', { name: 'Play Live at the Basement' }));
+
+        expect(exitPictureInPicture).not.toHaveBeenCalled();
+      });
+    });
+
     it('closes the modal when it requests close', async () => {
       const user = userEvent.setup();
       render(<VideoCard video={baseVideo} />);

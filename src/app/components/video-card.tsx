@@ -29,8 +29,10 @@ interface VideoCardProps {
  * title, artist, description, and release metadata typeset beside it. Only the
  * poster carries the zine border/shadow. Clicking it primes a media element
  * inside the gesture (so Safari/iOS and Firefox honor the deferred autoplay)
- * and opens the enlarged modal player, which starts playback immediately. The
- * read-only counterpart to the admin `VideoAdminCard` — no lifecycle actions.
+ * and opens the enlarged modal player, which starts playback immediately.
+ * Clicking it again while that modal is hidden in picture-in-picture brings
+ * the modal back instead of starting a second playback. The read-only
+ * counterpart to the admin `VideoAdminCard` — no lifecycle actions.
  */
 export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   const [playerOpen, setPlayerOpen] = useState(false);
@@ -45,6 +47,13 @@ export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   });
 
   const openPlayer = (): void => {
+    if (playerOpen) {
+      // Still open, so its modal is hidden while the video plays
+      // picture-in-picture. Leaving picture-in-picture shows the modal again;
+      // priming here would start a second, orphaned element.
+      document.exitPictureInPicture().catch(() => {});
+      return;
+    }
     // Start playback of the real source inside the click gesture — allowed by
     // every autoplay policy, unlike a deferred play(), which strict profiles
     // and extensions can reject (see usePrimedMediaHandoff).
