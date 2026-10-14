@@ -10,6 +10,7 @@ import type {
 import {
   publishedReleasesToSpotlightCards,
   SPOTLIGHT_COVER_SPAN_CLASS,
+  SPOTLIGHT_GRID_CLASS,
   toSpotlightCards,
 } from './spotlight-card';
 
@@ -215,6 +216,19 @@ describe('SPOTLIGHT_COVER_SPAN_CLASS', () => {
       'w-full',
       'sm:w-[min(100%,calc(50%_+_13.75rem))]',
       'lg:w-[min(100%,calc(75%_+_14.125rem))]',
+    ]);
+  });
+});
+
+describe('SPOTLIGHT_GRID_CLASS', () => {
+  it('lays the covers out one, two, then four to a row, with the gaps the span assumes', () => {
+    expect(SPOTLIGHT_GRID_CLASS.split(' ')).toEqual([
+      'grid',
+      'grid-cols-1',
+      'gap-x-6',
+      'gap-y-8',
+      'sm:grid-cols-2',
+      'lg:grid-cols-4',
     ]);
   });
 });
