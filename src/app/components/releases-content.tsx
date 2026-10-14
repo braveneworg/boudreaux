@@ -9,38 +9,56 @@ import type { ReactElement } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
+import { ImageHeading } from '@/app/components/ui/image-heading';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { useInfinitePublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import {
+  publishedReleasesToSpotlightCards,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  SPOTLIGHT_GRID_CLASS,
+} from '@/lib/utils/spotlight-card';
 
-import { ReleaseListRow } from './release-list-row';
 import { ReleaseSearchCombobox } from './release-search-combobox';
+import { SpotlightCard } from './spotlight-card';
+
+/** Cover skeletons in the loading grid: two rows of the four-up desktop grid. */
+const SKELETON_CARD_COUNT = 8;
 
 /**
- * Initial-load skeleton mirroring the real layout — the search combobox and a
- * few sleeve-left/info-right placeholder rows — so nothing jumps when the
- * first page lands.
+ * Loading skeleton mirroring the real layout — the search bar and the
+ * RELEASES wordmark in the cover-span column, then the 1/2/4-column grid of
+ * square covers over a one-line caption — so nothing jumps when the first
+ * page lands. Also the `/releases` route's `loading.tsx` fallback.
  */
-const ReleasesSkeleton = (): ReactElement => (
-  <div className="flex flex-col gap-8 py-4" aria-busy="true">
+export const ReleasesSkeleton = (): ReactElement => (
+  <div aria-busy="true">
     <p role="status" className="sr-only">
       Loading releases…
     </p>
-    <Skeleton className="h-10 w-full" />
-    {[0, 1, 2].map((key) => (
-      <div
-        key={key}
-        className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6"
-      >
-        <Skeleton className="aspect-square w-full" />
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
+    <div className="mb-8">
+      <div className={SPOTLIGHT_COVER_SPAN_CLASS}>
+        <Skeleton data-testid="releases-search-skeleton" className="my-0 h-10 w-full" />
+        {/* The wordmark's box: a full-width 4:1 image below `sm`, fixed
+            h-14 (224px wide) from `sm` up. */}
+        <Skeleton
+          data-testid="releases-heading-skeleton"
+          className="mt-7 mb-0 aspect-[4/1] w-full sm:aspect-auto sm:h-14 sm:w-56"
+        />
       </div>
-    ))}
+    </div>
+    <div data-testid="releases-grid-skeleton" className={SPOTLIGHT_GRID_CLASS}>
+      {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
+        <div
+          key={index}
+          data-testid="releases-card-skeleton"
+          className="mx-auto flex w-full flex-col gap-3 sm:max-w-52"
+        >
+          <Skeleton className="my-0 aspect-square w-full" />
+          <Skeleton className="mx-auto my-0 h-4 w-3/5" />
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -54,14 +72,51 @@ const ReleasesError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
   </div>
 );
 
+interface ReleasesHeaderProps {
+  /** Show the touch-only tap hint: only when there are covers to tap. */
+  showTapHint: boolean;
+}
+
 /**
- * Client content island for the public `/releases` listing.
+ * The search, then the RELEASES wordmark, in one column as wide as the
+ * covers' outer edges (as on the home page), then the touch-only tap hint.
+ */
+const ReleasesHeader = ({ showTapHint }: ReleasesHeaderProps): ReactElement => (
+  <div className="mb-8">
+    {/* The search and the wordmark share this column so the wordmark's left
+        edge sits on the search box's left edge at every column count. */}
+    <div className={SPOTLIGHT_COVER_SPAN_CLASS}>
+      <ReleaseSearchCombobox />
+      <ImageHeading
+        src="/media/headings/RELEASES.webp"
+        alt="releases"
+        imageHeight={480}
+        priority
+        className="mt-7 mb-0 -ml-1.5 block text-left"
+      />
+    </div>
+    {/* Touch screens get no hover stamp on the covers, so they get this line
+        instead; `hover:none` is the same test that keeps the stamp to hover
+        and keyboard focus. */}
+    {showTapHint ? (
+      <p className="mt-4 hidden text-center text-sm text-zinc-600 [@media(hover:none)]:block">
+        <strong className="font-bold text-zinc-950">Tap</strong> any release art to play or download
+        the music
+      </p>
+    ) : null}
+  </div>
+);
+
+/**
+ * Client content island for the public `/releases` listing, laid out like the
+ * home page: the search and the RELEASES wordmark, then a grid of release
+ * covers captioned with the title alone. A cover opens the listening modal on
+ * the release's first track, in the page's cyan accent.
  *
  * Pages through published releases with infinite scroll (the first page is
- * hydrated from the SSR prefetch), rendering each as a sleeve-left/info-right
- * {@link ReleaseListRow} between dashed dividers — the same paste-up rhythm as
- * the `/videos` listing. The search combobox is self-contained and queries the
- * server directly, so it is not coupled to the loaded pages.
+ * hydrated from the SSR prefetch, so the covers are server-rendered), with no
+ * cap on the card count. The search combobox is self-contained and queries
+ * the server directly, so it is not coupled to the loaded pages.
  */
 export const ReleasesContent = (): ReactElement => {
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -75,22 +130,27 @@ export const ReleasesContent = (): ReactElement => {
   }
 
   if (error && !data) {
-    return <ReleasesError onRetry={refetch} />;
+    return (
+      <>
+        <ReleasesHeader showTapHint={false} />
+        <ReleasesError onRetry={refetch} />
+      </>
+    );
   }
 
-  const releases = data?.pages.flatMap((page) => page.rows) ?? [];
+  const cards = publishedReleasesToSpotlightCards(data?.pages.flatMap((page) => page.rows) ?? []);
 
   return (
-    <div className="flex flex-col gap-6 py-4">
-      <ReleaseSearchCombobox />
+    <>
+      <ReleasesHeader showTapHint={cards.length > 0} />
 
-      {releases.length === 0 ? (
+      {cards.length === 0 ? (
         <p className="py-12 text-center text-lg text-zinc-500">No releases available.</p>
       ) : (
-        <ul className="flex flex-col divide-y-2 divide-dashed divide-zinc-300">
-          {releases.map((release) => (
-            <li key={release.id} className="py-6 first:pt-2 last:pb-2">
-              <ReleaseListRow release={release} />
+        <ul className={SPOTLIGHT_GRID_CLASS}>
+          {cards.map((card) => (
+            <li key={card.releaseId}>
+              <SpotlightCard card={card} caption="title" accent="cyan" />
             </li>
           ))}
         </ul>
@@ -110,6 +170,6 @@ export const ReleasesContent = (): ReactElement => {
           </>
         ) : null}
       </div>
-    </div>
+    </>
   );
 };

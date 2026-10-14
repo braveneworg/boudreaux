@@ -92,10 +92,10 @@ test.describe('Computed styles of shipped design decisions', () => {
     await page.keyboard.press('Escape');
 
     await page.goto('/releases');
-    await page
-      .getByRole('button', { name: /^Play E2E Album/ })
-      .first()
-      .click();
+    const releaseCover = page.getByRole('button', { name: /^Play E2E Album/ }).first();
+    // A cover click before hydration is lost; the cover marks when it is ready.
+    await expect(releaseCover).toHaveAttribute('data-hydrated', 'true', { timeout: 15_000 });
+    await releaseCover.click();
     await expectCutout(
       page.getByRole('dialog').getByRole('heading').first(),
       'release dialog title'

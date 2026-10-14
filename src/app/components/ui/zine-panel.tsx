@@ -45,6 +45,13 @@ const ACCENT_CLASS = new Map<ZineAccent, string>([
   ['orchid', 'zine-accent-orchid'],
 ]);
 
+/**
+ * The `zine-accent-*` utility for an accent, from the literal map above, so a
+ * surface outside the panel (a portaled dialog) can take the same accent.
+ */
+export const getZineAccentClass = (accent: ZineAccent): string | undefined =>
+  ACCENT_CLASS.get(accent);
+
 export interface ZinePanelProps extends React.ComponentProps<'section'> {
   accent: ZineAccent;
   tape?: boolean;
@@ -82,7 +89,7 @@ export const ZinePanel = ({
     data-slot="zine-panel"
     className={cn(
       'bg-menu-item-tan-100 shadow-zine relative mt-3 mb-4 w-full overflow-visible rounded-none border-2 border-black',
-      ACCENT_CLASS.get(accent),
+      getZineAccentClass(accent),
       className
     )}
     {...props}
