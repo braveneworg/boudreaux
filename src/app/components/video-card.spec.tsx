@@ -349,6 +349,28 @@ describe('VideoCard', () => {
 
         expect(exitPictureInPicture).not.toHaveBeenCalled();
       });
+
+      it('does not throw where picture-in-picture is unsupported', async () => {
+        Object.defineProperty(document, 'exitPictureInPicture', {
+          configurable: true,
+          value: undefined,
+        });
+        const errors: unknown[] = [];
+        const onError = (event: ErrorEvent): void => {
+          errors.push(event.error);
+          event.preventDefault();
+        };
+        window.addEventListener('error', onError);
+        const user = userEvent.setup();
+        render(<VideoCard video={baseVideo} />);
+        const poster = screen.getByRole('button', { name: 'Play Live at the Basement' });
+
+        await user.click(poster);
+        await user.click(poster);
+        window.removeEventListener('error', onError);
+
+        expect(errors).toEqual([]);
+      });
     });
 
     it('closes the modal when it requests close', async () => {

@@ -147,7 +147,7 @@ export const VideosContent = (): ReactElement => {
       // Still open, so its modal is hidden while the video plays
       // picture-in-picture. Leaving picture-in-picture shows the modal again;
       // priming here would start a second, orphaned element.
-      document.exitPictureInPicture().catch(() => {});
+      document.exitPictureInPicture?.().catch(() => {});
       return;
     }
     // Start playback of the real source inside the selection gesture — allowed

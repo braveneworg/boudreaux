@@ -365,6 +365,26 @@ describe('VideosContent suggestion while its modal is hidden in picture-in-pictu
     expect(playSpy).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('play-dialog')).toHaveTextContent('dialog:Bravo Live');
   });
+
+  it('does not throw where picture-in-picture is unsupported', async () => {
+    Object.defineProperty(document, 'exitPictureInPicture', {
+      configurable: true,
+      value: undefined,
+    });
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent): void => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', onError);
+    render(<VideosContent />);
+
+    await pick('Artist One');
+    await pick('Artist One');
+    window.removeEventListener('error', onError);
+
+    expect(errors).toEqual([]);
+  });
 });
 
 describe('VideosContent list', () => {
