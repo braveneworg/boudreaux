@@ -18,6 +18,16 @@ const COVER_NAME = 'Play E2E Album One by E2E Featured Artist';
 /** `-ml-1.5` on the FEATURED wordmark: 0.375rem at the 16px root size. */
 const WORDMARK_INK_OFFSET_PX = 6;
 
+/**
+ * The release and track titles in issue #872's screenshot. Together they make
+ * a ticker line far wider than the modal; it must not widen anything.
+ */
+const LONG_RELEASE_TITLE = 'Bring Us The Head Of Francisco False (Part 2)';
+const LONG_TRACK_TITLE = 'Thank Plath (prod. by Smoke M2D6)';
+
+/** `shadow-zine` on the player frame: 6px right and down. */
+const ZINE_SHADOW_PX = 6;
+
 /** The seeded spotlight's cover button, once its click handler is attached. */
 const hydratedCover = async (page: Page): Promise<Locator> => {
   const cover = page.getByRole('button', { name: COVER_NAME });
@@ -43,6 +53,66 @@ const settle = async (dialog: Locator): Promise<void> => {
     Promise.all(element.getAnimations().map((animation) => animation.finished))
   );
 };
+
+interface ReleaseDetailBody {
+  title: string;
+  digitalFormats: Array<{ formatType: string; files: Array<{ title: string | null }> }>;
+}
+
+/** Serve the seeded spotlight release under issue #872's long titles. */
+const serveLongTitles = async (page: Page): Promise<void> => {
+  await page.route(
+    (url) =>
+      url.pathname.startsWith('/api/releases/') && url.searchParams.get('withTracks') === 'true',
+    async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as ReleaseDetailBody;
+      body.title = LONG_RELEASE_TITLE;
+      body.digitalFormats
+        .filter(({ formatType }) => formatType === 'MP3_320KBPS')
+        .flatMap(({ files }) => files)
+        .forEach((file) => {
+          file.title = LONG_TRACK_TITLE;
+        });
+      await route.fulfill({ response, json: body });
+    }
+  );
+};
+
+interface LongTitledModal {
+  dialog: Locator;
+  /** The black frame around the cover, the controls and the ticker. */
+  frame: Locator;
+  ticker: Locator;
+}
+
+/**
+ * Open the spotlight modal with the long titles at the current viewport, and
+ * wait until every part that adds height has loaded and the modal has settled.
+ */
+const openLongTitledSpotlight = async (page: Page): Promise<LongTitledModal> => {
+  await serveLongTitles(page);
+  await page.goto('/');
+  await (await hydratedCover(page)).click();
+
+  const dialog = page.getByRole('dialog', { name: 'E2E Featured Artist' });
+  const frame = dialog.locator('div.shadow-zine');
+  const ticker = frame.locator('div.bg-zinc-800', { hasText: LONG_TRACK_TITLE });
+  await expect(ticker).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole('button', { name: 'Share on Facebook' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await settle(dialog);
+  return { dialog, frame, ticker };
+};
+
+/** How far the dialog's content runs past its box, across and down. */
+const overflowOf = (dialog: Locator): Promise<{ across: number; down: number }> =>
+  dialog.evaluate((element) => ({
+    across: element.scrollWidth - element.clientWidth,
+    down: element.scrollHeight - element.clientHeight,
+  }));
 
 test.describe('home spotlight grid', () => {
   test('serves the spotlight cards in the initial HTML payload', async ({ page }) => {
@@ -251,5 +321,63 @@ test.describe('home spotlight grid on a 375×667 phone', () => {
       expect(box.y).toBeGreaterThanOrEqual(sheet.y);
       expect(box.y + box.height).toBeLessThanOrEqual(667);
     }
+  });
+});
+
+test.describe('home spotlight modal with long titles', () => {
+  // Desktop, tablet and phone screens, down to the shortest phone the sheet
+  // must fit. The modal's width and height both have to hold the player.
+  for (const [width, height] of [
+    [1280, 720],
+    [1194, 834],
+    [1440, 900],
+    [768, 1024],
+    [390, 844],
+    [375, 667],
+  ]) {
+    test(`fits the whole player in the modal at ${width}×${height}`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const { dialog, frame, ticker } = await openLongTitledSpotlight(page);
+
+      // Nothing in it scrolls, across or down.
+      const overflow = await overflowOf(dialog);
+      expect(overflow.across).toBeLessThanOrEqual(0);
+      expect(overflow.down).toBeLessThanOrEqual(0);
+
+      const [dialogBox, ...partBoxes] = await edgesOfAll([
+        dialog,
+        frame,
+        dialog.locator('.video-js'),
+        dialog.getByRole('img', { name: `${LONG_RELEASE_TITLE} cover art` }),
+        ticker,
+        dialog.getByRole('button', { name: 'View', exact: true }),
+        dialog.getByRole('button', { name: 'Download', exact: true }),
+        dialog.locator('[data-slot="release-play-dialog-share"]'),
+      ]);
+      for (const box of partBoxes) {
+        expect(box.left).toBeGreaterThanOrEqual(Math.max(dialogBox.left, 0));
+        expect(box.right).toBeLessThanOrEqual(Math.min(dialogBox.right, width));
+        expect(box.top).toBeGreaterThanOrEqual(Math.max(dialogBox.top, 0));
+        expect(box.bottom).toBeLessThanOrEqual(Math.min(dialogBox.bottom, height));
+      }
+
+      // The frame's zine shadow shows inside the modal too.
+      const [frameBox] = partBoxes;
+      expect(frameBox.right + ZINE_SHADOW_PX).toBeLessThanOrEqual(dialogBox.right);
+      expect(frameBox.bottom + ZINE_SHADOW_PX).toBeLessThanOrEqual(dialogBox.bottom);
+    });
+  }
+
+  test('keeps the controls inside the frame on a 320×568 phone', async ({ page }) => {
+    // The controls' 16rem floor is taller than this screen leaves, so the
+    // modal may scroll down here, but never across.
+    await page.setViewportSize({ width: 320, height: 568 });
+    const { dialog, frame } = await openLongTitledSpotlight(page);
+
+    expect((await overflowOf(dialog)).across).toBeLessThanOrEqual(0);
+
+    const [frameBox, controlsBox] = await edgesOfAll([frame, dialog.locator('.video-js')]);
+    expect(controlsBox.left).toBeGreaterThanOrEqual(frameBox.left);
+    expect(controlsBox.right).toBeLessThanOrEqual(frameBox.right);
   });
 });

@@ -79,13 +79,32 @@ const PHONE_SHEET_CLASS = cn(
 );
 
 /**
- * The square cover is the one part of the sheet that can give, so on a phone
- * the player is as wide as the sheet's 90dvh cap leaves room for once the
- * heading, controls, ticker, tracks row and share row (about 20rem) are in.
- * It never drops below the audio controls' 16rem minimum plus the frame's
- * border; a screen shorter than that scrolls the sheet instead.
+ * The square cover is the one part of the modal that can give, so the player
+ * is only as wide as the dialog's 90dvh cap leaves room for once the rest is
+ * in. Each class names that rest, the reserve, as measured in Chromium with
+ * the player loaded: the dialog's border and padding, the heading, the gaps,
+ * the controls, the ticker, the tracks row, and the share or footer row. The
+ * player never drops below the audio controls' 16rem minimum plus the frame's
+ * border (docs/lessons/react-nextjs/audio-controls-need-16rem.md); a screen
+ * shorter than that scrolls the dialog instead.
+ *
+ * In the phone sheet the compact heading and the share row leave a 19.7rem
+ * reserve, so 20rem.
  */
 const PHONE_SHEET_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]';
+
+/**
+ * In the centered phone dialog the full-size heading and the footer row leave
+ * 18.9rem, and 20.7rem once a long release title wraps to a second line, so
+ * 21rem.
+ */
+const PHONE_DIALOG_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-21rem)))]';
+
+/**
+ * From `sm` the larger heading and the share row leave 21.5rem, and the footer
+ * row under a two-line release title 21.2rem, so 22rem.
+ */
+const WIDE_PLAYER_CLASS = 'sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]';
 
 /** Loading placeholder shaped like the player: square cover + controls bar. */
 const ReleasePlayerSkeleton = (): ReactElement => (
@@ -168,7 +187,13 @@ const ReleasePlayDialogPlayer = ({
   initialTrackNumber,
   fitPhoneSheet,
 }: ReleasePlayDialogPlayerProps): ReactElement => {
-  const slotClass = cn('mx-auto w-full', fitPhoneSheet && PHONE_SHEET_PLAYER_CLASS);
+  // min-w-0: the ticker's no-wrap line would otherwise widen the dialog
+  // (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
+  const slotClass = cn(
+    'mx-auto min-w-0',
+    fitPhoneSheet ? PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
+    WIDE_PLAYER_CLASS
+  );
 
   if (isPending) {
     return (
@@ -205,10 +230,10 @@ const ReleasePlayDialogPlayer = ({
  * button — the click gesture source-primes the first MP3 track (audio starts
  * immediately) while this dialog fetches the `withTracks` release detail and
  * mounts the full {@link ReleasePlayer}, which adopts the playing element.
- * Kept to a tasteful width (square cover ≤ 32rem on desktop, full-width on
- * mobile) and scrollable on short viewports; `sheetOnPhone` makes it a bottom
- * sheet on phones instead. Closing unmounts the player, which disposes
- * video.js and stops playback.
+ * Kept to a tasteful width, with the square cover shrunk to fit the screen's
+ * height so the whole modal shows without scrolling (down to the controls'
+ * 16rem minimum); `sheetOnPhone` makes it a bottom sheet on phones instead.
+ * Closing unmounts the player, which disposes video.js and stops playback.
  */
 export const ReleasePlayDialog = ({
   releaseId,

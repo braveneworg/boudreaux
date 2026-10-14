@@ -67,6 +67,15 @@ const defaultProps = {
   takeMediaEl: (): HTMLAudioElement | null => null,
 };
 
+/**
+ * The player box's width: the dialog's width, or the room `90dvh` leaves under
+ * a measured reserve, but never under the 16.25rem the audio controls need.
+ */
+const SCREEN_HEIGHT_CAP = {
+  phone: /^max-sm:w-\[min\(100%,max\(16\.25rem,calc\(90dvh-[\d.]+rem\)\)\)\]$/,
+  wide: /^sm:w-\[min\(100%,max\(16\.25rem,calc\(90dvh-[\d.]+rem\)\)\)\]$/,
+};
+
 describe('ReleasePlayDialog', () => {
   it('lets the opener decide where focus returns when the dialog closes', async () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
@@ -320,7 +329,43 @@ describe('ReleasePlayDialog', () => {
     expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
   });
 
-  it('gives the player the full dialog width by default', () => {
+  describe.each([
+    { variant: 'in the sheet', sheetOnPhone: true },
+    { variant: 'by default', sheetOnPhone: false },
+  ])('the player slot $variant', ({ sheetOnPhone }) => {
+    const playerSlot = (): HTMLElement | null => {
+      mockUseReleaseQuery.mockReturnValue(
+        queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+      );
+      render(<ReleasePlayDialog {...defaultProps} sheetOnPhone={sheetOnPhone} />);
+      return screen.getByTestId('release-player').parentElement;
+    };
+
+    const skeletonSlot = (): HTMLElement | null => {
+      mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+      render(<ReleasePlayDialog {...defaultProps} sheetOnPhone={sheetOnPhone} />);
+      return screen.getByRole('status').closest('[data-slot="release-play-dialog-player"]');
+    };
+
+    it.each([
+      { box: 'player', slot: playerSlot },
+      { box: 'loading skeleton', slot: skeletonSlot },
+    ])('lets the $box shrink inside the dialog grid', ({ slot }) => {
+      expect(slot()).toHaveClass('mx-auto', 'min-w-0');
+    });
+
+    it.each([
+      { box: 'player', slot: playerSlot },
+      { box: 'loading skeleton', slot: skeletonSlot },
+    ])('caps the $box by the screen height at every width', ({ slot }) => {
+      const classes = slot()?.className.split(' ') ?? [];
+
+      expect(classes).toContainEqual(expect.stringMatching(SCREEN_HEIGHT_CAP.phone));
+      expect(classes).toContainEqual(expect.stringMatching(SCREEN_HEIGHT_CAP.wide));
+    });
+  });
+
+  it('caps the player by its own phone reserve outside the sheet', () => {
     mockUseReleaseQuery.mockReturnValue(
       queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
     );
@@ -328,7 +373,8 @@ describe('ReleasePlayDialog', () => {
     render(<ReleasePlayDialog {...defaultProps} />);
 
     const slot = screen.getByTestId('release-player').parentElement;
-    expect(slot?.className).not.toMatch(/max-sm:w-/);
+    expect(slot).toHaveAttribute('data-slot', 'release-play-dialog-player');
+    expect(slot).not.toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
   });
 
   it('sets the heading lines smaller on a phone in the sheet', () => {
