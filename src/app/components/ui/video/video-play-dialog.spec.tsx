@@ -11,7 +11,7 @@ interface SurfaceProps {
   src: string;
   posterUrl?: string | null;
   onEnterPictureInPicture?: () => void;
-  onLeavePictureInPicture?: () => void;
+  onLeavePictureInPicture?: (isPaused: boolean) => void;
   takeMediaEl?: () => HTMLVideoElement | null;
 }
 
@@ -71,7 +71,9 @@ const renderDialog = (open: boolean, onOpenChange = vi.fn()) => {
 
 const enterPictureInPicture = (): void => act(() => surfaceProps.onEnterPictureInPicture?.());
 
-const leavePictureInPicture = (): void => act(() => surfaceProps.onLeavePictureInPicture?.());
+// "Back to tab" leaves the video playing; closing the floating window pauses it.
+const leavePictureInPicture = (isPaused = false): void =>
+  act(() => surfaceProps.onLeavePictureInPicture?.(isPaused));
 
 describe('VideoPlayDialog', () => {
   it('renders nothing while closed', () => {
@@ -186,7 +188,7 @@ describe('VideoPlayDialog', () => {
       expect(screen.getByRole('button', { name: 'Page behind' })).toBeVisible();
     });
 
-    it('never requests a close on entering or leaving picture-in-picture', () => {
+    it('never requests a close on entering picture-in-picture or going back to the tab', () => {
       const onOpenChange = renderDialog(true);
 
       enterPictureInPicture();
@@ -233,6 +235,36 @@ describe('VideoPlayDialog', () => {
       rerender(dialogElement(true));
 
       expect(screen.getByRole('dialog', { name: 'Live at the Basement' })).toBeInTheDocument();
+    });
+
+    it('requests a close when picture-in-picture is left paused', () => {
+      const onOpenChange = renderDialog(true);
+
+      enterPictureInPicture();
+      leavePictureInPicture(true);
+
+      expect(onOpenChange.mock.calls).toEqual([[false]]);
+    });
+
+    it('stays hidden when picture-in-picture is left paused', () => {
+      renderDialog(true);
+
+      enterPictureInPicture();
+      leavePictureInPicture(true);
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('unmounts the surface once the close requested on a paused leave lands', () => {
+      const { rerender } = render(dialogElement(true));
+
+      enterPictureInPicture();
+      leavePictureInPicture(true);
+      rerender(dialogElement(false));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('video-surface')).not.toBeInTheDocument();
+      expect(surfaceProps.unmounts).toBe(1);
     });
 
     it('still unmounts the surface when the shown dialog is closed', () => {

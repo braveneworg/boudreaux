@@ -42,16 +42,19 @@ export interface VideoPlayDialogProps {
  * While the player is in picture-in-picture the modal hides: the Radix dialog
  * closes, so the page behind is usable again (no overlay, scroll lock or
  * `aria-hidden`), but the surface stays mounted and its `<video>` keeps
- * playing in the floating window. Leaving picture-in-picture (e.g. "back to
- * tab") shows the modal again around the same player. The hidden state is
- * internal: `onOpenChange` never fires for it, and it ends when `src`
- * changes. The surface renders through a portal into a node of its own, which
- * moves between the dialog and a hidden spot beside it, so the dialog can
- * unmount without unmounting the surface.
+ * playing in the floating window. Going "back to tab" leaves the video
+ * playing, and the modal shows again around the same player, still playing.
+ * Closing the floating window pauses the video, so a paused leave requests a
+ * close through `onOpenChange(false)` instead: the modal stays hidden and the
+ * player is disposed. Otherwise the hidden state is internal: `onOpenChange`
+ * never fires for it, and it ends when `src` changes. The surface renders
+ * through a portal into a node of its own, which moves between the dialog and
+ * a hidden spot beside it, so the dialog can unmount without unmounting the
+ * surface.
  *
  * Closing the shown dialog (Close button, Esc, an overlay click) unmounts the
  * surface once the dialog has animated out, which disposes the player and
- * stops playback.
+ * stops playback. Closing it while hidden unmounts the surface at once.
  */
 export const VideoPlayDialog = ({
   title,
@@ -115,7 +118,13 @@ export const VideoPlayDialog = ({
               src={src}
               takeMediaEl={takeMediaEl}
               onEnterPictureInPicture={() => setPictureInPictureSrc(src)}
-              onLeavePictureInPicture={() => setPictureInPictureSrc(null)}
+              onLeavePictureInPicture={(isPaused) => {
+                if (isPaused) {
+                  onOpenChange(false);
+                } else {
+                  setPictureInPictureSrc(null);
+                }
+              }}
             />,
             surfaceHost
           )
