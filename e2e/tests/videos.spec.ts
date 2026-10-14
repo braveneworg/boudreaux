@@ -276,6 +276,56 @@ test.describe('Videos page — signed-in listing', () => {
     await expect(dialog.locator('video')).not.toHaveAttribute('poster', /.+/);
   });
 
+  // #873: picture-in-picture hides the modal and leaves the page usable while
+  // the same <video> plays on; leaving it ("back to tab") shows the modal
+  // again around that element, still playing. Real picture-in-picture is
+  // unreliable headless, so the test dispatches the element's own bubbling
+  // events, which reach video.js whatever starts picture-in-picture.
+  test('picture-in-picture hides the modal and leaving it shows the same video again', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/videos');
+    await userPage.getByRole('button', { name: 'Play E2E Video Alpha' }).click();
+
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Video Alpha' });
+    await expect(dialog.locator('.video-js')).toHaveClass(/vjs-has-started/, { timeout: 10_000 });
+    const video = await dialog.locator('video').elementHandle();
+    if (!video) throw new Error('The modal has no <video>');
+    // The E2E clip lasts 2s; slowed down, it is still playing at the end.
+    const timeBefore = await video.evaluate((el) => {
+      const media = el as HTMLVideoElement;
+      media.playbackRate = 0.25;
+      media.dispatchEvent(new Event('enterpictureinpicture', { bubbles: true }));
+      return media.currentTime;
+    });
+
+    await expect(userPage.getByRole('dialog')).toHaveCount(0);
+    await expect(userPage.locator('[data-slot="dialog-overlay"]')).toHaveCount(0);
+    // Role queries skip aria-hidden subtrees: the page behind is exposed again.
+    await expect(userPage.getByRole('button', { name: 'Play E2E Video Bravo' })).toBeVisible();
+    const scrollBefore = await userPage.evaluate(() => window.scrollY);
+    await userPage.mouse.move(640, 360);
+    await userPage.mouse.wheel(0, 400);
+    await expect.poll(() => userPage.evaluate(() => window.scrollY)).not.toBe(scrollBefore);
+    expect(
+      await video.evaluate((el) => ({
+        isConnected: el.isConnected,
+        paused: (el as HTMLVideoElement).paused,
+      }))
+    ).toEqual({ isConnected: true, paused: false });
+
+    await video.evaluate((el) =>
+      el.dispatchEvent(new Event('leavepictureinpicture', { bubbles: true }))
+    );
+
+    await expect(dialog).toBeVisible();
+    expect(await dialog.locator('video').evaluate((el, held) => el === held, video)).toBe(true);
+    await expect
+      .poll(() => video.evaluate((el) => (el as HTMLVideoElement).currentTime))
+      .toBeGreaterThan(timeBefore);
+    expect(await video.evaluate((el) => (el as HTMLVideoElement).paused)).toBe(false);
+  });
+
   // #709: toggling the sort after scrolling restarts paging, so no card of
   // the newest-first pages survives. With the page scrolled down, the
   // sentinel may load the next oldest-first page straight away, so the list
