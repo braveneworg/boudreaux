@@ -326,6 +326,41 @@ test.describe('Videos page — signed-in listing', () => {
     expect(await video.evaluate((el) => (el as HTMLVideoElement).paused)).toBe(false);
   });
 
+  // #873: closing the floating window pauses the video (unlike "back to
+  // tab"), and a paused leave closes everything: the modal stays hidden and
+  // the player is disposed, so nothing plays or shows any more.
+  test('leaving picture-in-picture paused closes the modal and stops the video', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/videos');
+    await userPage.getByRole('button', { name: 'Play E2E Video Alpha' }).click();
+
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Video Alpha' });
+    await expect(dialog.locator('.video-js')).toHaveClass(/vjs-has-started/, { timeout: 10_000 });
+    const video = await dialog.locator('video').elementHandle();
+    if (!video) throw new Error('The modal has no <video>');
+    await video.evaluate((el) => {
+      const media = el as HTMLVideoElement;
+      media.playbackRate = 0.25;
+      media.dispatchEvent(new Event('enterpictureinpicture', { bubbles: true }));
+    });
+    await expect(userPage.getByRole('dialog')).toHaveCount(0);
+
+    await video.evaluate((el) => {
+      (el as HTMLVideoElement).pause();
+      el.dispatchEvent(new Event('leavepictureinpicture', { bubbles: true }));
+    });
+
+    await expect(userPage.locator('.video-js')).toHaveCount(0);
+    await expect(userPage.getByRole('dialog')).toHaveCount(0);
+    expect(
+      await video.evaluate((el) => ({
+        isConnected: el.isConnected,
+        paused: (el as HTMLVideoElement).paused,
+      }))
+    ).toEqual({ isConnected: false, paused: true });
+  });
+
   // #709: toggling the sort after scrolling restarts paging, so no card of
   // the newest-first pages survives. With the page scrolled down, the
   // sentinel may load the next oldest-first page straight away, so the list
