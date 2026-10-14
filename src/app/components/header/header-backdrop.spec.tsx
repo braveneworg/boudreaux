@@ -4,6 +4,7 @@
 import React from 'react';
 
 import { render } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 
 import { HeaderBackdrop } from './header-backdrop';
 
@@ -44,12 +45,57 @@ describe('HeaderBackdrop', () => {
       expect(bgDiv).not.toHaveClass('xl:bg-transparent');
       expect(bgDiv?.className).toContain('xl:before:bg-[url(/media/ffinc-starfield-tile.png)]');
     });
+
+    it('paints the mobile particle texture as a low-priority image so it yields bandwidth to the LCP banner', () => {
+      // A CSS background in the viewport is fetched at high priority, and the
+      // particle SVG is the largest asset on a phone's first paint (~77 KiB
+      // over the wire). As an <img> it can carry fetchpriority=low, so the
+      // hero banner and the stylesheet get the bandwidth first; eager loading
+      // still starts it at render so the masthead texture is not deferred.
+      const { container } = render(<HeaderBackdrop />);
+      const particles = container.querySelector('.header-bg-pulse img');
+
+      expect(particles?.getAttribute('src')).toContain('particles-6.svg');
+      expect(particles).toHaveAttribute('fetchpriority', 'low');
+      expect(particles).toHaveAttribute('loading', 'eager');
+      expect(particles).toHaveAttribute('alt', '');
+      expect(particles).toHaveClass('absolute', 'inset-0', 'object-cover', 'xl:hidden');
+    });
+
+    it('loads the particles from the same URL as the footer and nav-sheet backgrounds, so the file is fetched once', () => {
+      // The footer (`bg-[url('/media/particles-6.svg')]`) and the mobile nav
+      // backdrop utility paint the same texture from the app-origin path; a
+      // CDN-prefixed src here would make the browser download the 77 KiB SVG
+      // a second time.
+      const { container } = render(<HeaderBackdrop />);
+      const particles = container.querySelector('.header-bg-pulse img');
+
+      expect(particles).toHaveAttribute('src', '/media/particles-6.svg');
+    });
+
+    it('leaves the particles out of the server markup so the texture never queues ahead of the first paint', () => {
+      // Lighthouse's simulated LCP counts every request that starts before
+      // the observed paint; mounting the texture after hydration keeps its
+      // 77 KiB out of that set. The black base paints meanwhile, as before.
+      const html = renderToString(<HeaderBackdrop />);
+
+      expect(html).not.toContain('particles-6.svg');
+    });
+
+    it('no longer paints the particles as a ::before background below xl', () => {
+      const { container } = render(<HeaderBackdrop />);
+      const bgDiv = container.querySelector('.header-bg-pulse');
+
+      expect(bgDiv?.className).not.toContain('particles-6.svg');
+    });
   });
 
   describe('sparkle effects', () => {
     it('renders sparkle container', () => {
       const { container } = render(<HeaderBackdrop />);
-      const sparkleContainer = container.querySelector('.pointer-events-none');
+      // The particle image is also pointer-events-none; the overlay is the
+      // z-10 layer above it.
+      const sparkleContainer = container.querySelector('.pointer-events-none.z-10');
       expect(sparkleContainer).toBeInTheDocument();
       expect(sparkleContainer).toHaveClass('absolute', 'inset-0', 'z-10');
     });

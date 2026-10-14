@@ -445,8 +445,12 @@ textarea:focus-visible,
    Sparkle/extinguish durations and delays are set per-element via inline
    style in header.tsx, so the animation shorthand here omits duration. */
 
+/* The masthead texture breathes once after load. Below xl it is the particle
+   <img> child (an image so it can load at low priority); at xl it is the
+   starfield tile on ::before. Both layers get the same pulse. */
 @utility header-bg-pulse {
-  &::before {
+  &::before,
+  & > img {
     animation: header-bg-pulse 4.4s ease-in-out forwards;
   }
 }

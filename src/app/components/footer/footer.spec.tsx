@@ -68,6 +68,28 @@ describe('Footer', () => {
       expect(footer).toHaveClass('bg-zinc-950', 'w-full', 'relative');
     });
 
+    it('paints the mobile particle texture as a lazy, low-priority image', () => {
+      // A CSS background is fetched at high priority as soon as the footer
+      // is styled, even 3000px below the fold, so every page paid for the
+      // 77 KiB SVG beside its LCP image. A lazy <img> waits until the footer
+      // nears the viewport and by then the masthead has it cached.
+      render(<Footer />);
+      const particles = document.querySelector('footer > img');
+
+      expect(particles).toHaveAttribute('src', '/media/particles-6.svg');
+      expect(particles).toHaveAttribute('loading', 'lazy');
+      expect(particles).toHaveAttribute('fetchpriority', 'low');
+      expect(particles).toHaveAttribute('alt', '');
+      expect(particles).toHaveClass('absolute', 'inset-0', 'object-cover', 'xl:hidden');
+    });
+
+    it('no longer requests the particles as a CSS background', () => {
+      render(<Footer />);
+      const footer = document.querySelector('footer');
+
+      expect(footer?.className).not.toContain('particles-6.svg');
+    });
+
     it('renders content container with xl max width', () => {
       render(<Footer />);
 
@@ -84,7 +106,8 @@ describe('Footer', () => {
       expect(footer.className).toContain('xl:bg-repeat');
       expect(footer.className).toContain('xl:border-t-2');
       expect(footer.className).toContain('xl:border-t-zinc-50');
-      const content = footer.firstElementChild;
+      // The lazy particle image comes first; the content block is the div.
+      const content = footer.querySelector(':scope > div');
       expect(content?.className).toContain('xl:max-w-7xl');
       expect(content?.className).not.toContain('max-w-480');
     });
