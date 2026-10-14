@@ -123,7 +123,7 @@ describe('ReleasesPage', () => {
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['releases', 'publishedInfinite', ''],
+        queryKey: ['releases', 'publishedInfinite', '', ''],
         initialPageParam: 0,
       })
     );

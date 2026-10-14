@@ -13,8 +13,14 @@ export const queryKeys = {
   },
   releases: {
     all: ['releases'] as const,
-    publishedInfinite: (search: string) =>
-      [...queryKeys.releases.all, 'publishedInfinite', search.trim().toLowerCase()] as const,
+    /** The public listing, by normalised search and the `?artist=` slug filter. */
+    publishedInfinite: (search: string, artist = '') =>
+      [
+        ...queryKeys.releases.all,
+        'publishedInfinite',
+        search.trim().toLowerCase(),
+        artist.trim(),
+      ] as const,
     /** The first `take` published releases, newest first (the home grid's fallback). */
     newestPublished: (take: number) =>
       [...queryKeys.releases.all, 'newestPublished', take] as const,

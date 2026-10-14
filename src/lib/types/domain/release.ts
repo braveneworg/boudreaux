@@ -342,11 +342,13 @@ export interface ReleaseListQuery extends Omit<ReleaseListFilters, 'ids'> {
   withoutByline?: boolean;
 }
 
-/** Pagination + optional search for the public published-releases listing. */
+/** Pagination, optional search and artist filter for the public published-releases listing. */
 export interface PublishedReleaseFilters {
   skip?: number;
   take?: number;
   search?: string;
+  /** Slug of a public artist: lists only the releases crediting that artist. */
+  artist?: string;
 }
 
 /** Count filters for the admin dashboard (Prisma-free at the boundary). */
