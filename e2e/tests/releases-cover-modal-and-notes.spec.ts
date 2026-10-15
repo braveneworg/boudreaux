@@ -152,19 +152,25 @@ test.describe('Releases — cover grid + listening modal', () => {
     // The band the artist belongs to is in; a release they hold no credit on is out.
     await expect(grid.getByRole('button', { name: BAND_COVER_NAME })).toBeVisible();
     await expect(page.getByRole('button', { name: UNRELATED_COVER_NAME })).toHaveCount(0);
-    await expect(
-      page.getByRole('heading', { level: 2, name: `Releases by ${ARTIST_NAME}` })
-    ).toBeVisible();
+    const artistHeading = page.getByRole('heading', {
+      level: 2,
+      name: `Releases by ${ARTIST_NAME}`,
+    });
+    await expect(artistHeading).toBeVisible();
 
-    // The link sits under the wordmark, its eye icon left of the words.
-    const [headingBox, linkBox, iconBox, wordsBox] = await edgesOfAll([
+    // The artist's name sits under the wordmark and the link under the name,
+    // its eye icon left of the words.
+    const [headingBox, artistBox, linkBox, iconBox, wordsBox] = await edgesOfAll([
       page.getByRole('img', { name: 'releases', exact: true }),
+      artistHeading,
       allArtists,
       allArtists.locator('svg'),
       allArtists.getByText(ALL_ARTISTS_LINK, { exact: true }),
     ]);
-    expect(linkBox.top).toBeGreaterThanOrEqual(headingBox.bottom);
-    expect(linkBox.top - headingBox.bottom).toBeLessThan(24);
+    expect(artistBox.top).toBeGreaterThanOrEqual(headingBox.bottom);
+    expect(artistBox.top - headingBox.bottom).toBeLessThan(24);
+    expect(linkBox.top).toBeGreaterThanOrEqual(artistBox.bottom);
+    expect(linkBox.top - artistBox.bottom).toBeLessThan(24);
     expect(iconBox.right).toBeLessThanOrEqual(wordsBox.left);
     expect(await stillSameDocument()).toBe(true);
 
