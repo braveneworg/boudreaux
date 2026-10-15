@@ -662,6 +662,28 @@ describe('ReleaseRepository', () => {
   });
 
   describe('findPublished', () => {
+    // A direct credit by the public artist, or a credit by a public band the
+    // artist is a member of (ADR-0006).
+    const creditedToE2eArtist = {
+      artistReleases: {
+        some: {
+          artist: {
+            is: {
+              OR: [
+                { slug: 'e2e-artist', ...publicArtistWhere },
+                {
+                  ...publicArtistWhere,
+                  members: {
+                    some: { member: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
     it('uses the listing select, releasedOn desc, pagination, and a published+non-deleted where', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
 
@@ -717,7 +739,7 @@ describe('ReleaseRepository', () => {
         ],
       });
     });
-    it('limits the listing to releases crediting the public artist with the slug', async () => {
+    it('limits the listing to releases the public artist holds a credit on, band releases included', async () => {
       vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
 
       await ReleaseRepository.findPublished({ artist: 'e2e-artist' });
@@ -725,14 +747,7 @@ describe('ReleaseRepository', () => {
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
       expect(arg?.where).toEqual({
         publishedAt: { not: null },
-        AND: [
-          releaseWhere.notDeleted,
-          {
-            artistReleases: {
-              some: { artist: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
-            },
-          },
-        ],
+        AND: [releaseWhere.notDeleted, creditedToE2eArtist],
       });
       expect(arg?.orderBy).toEqual({ releasedOn: 'desc' });
     });
@@ -746,11 +761,7 @@ describe('ReleaseRepository', () => {
       const clauses = (arg?.where as { AND: unknown[] }).AND;
       expect(clauses).toHaveLength(3);
       expect(clauses[1]).toHaveProperty('OR');
-      expect(clauses[2]).toEqual({
-        artistReleases: {
-          some: { artist: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
-        },
-      });
+      expect(clauses[2]).toEqual(creditedToE2eArtist);
     });
   });
 
