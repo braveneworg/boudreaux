@@ -174,7 +174,7 @@ describe('ArtistDetailPage', () => {
   });
 
   it('leads a member with only band releases to them', async () => {
-    const [ownRow] = artistWithPublishedReleases.releases;
+    const [ownRow] = graph().releases;
     await renderPage({ newestRelease: null, releases: [{ ...ownRow, credit: 'member' }] });
 
     expect(screen.getByText('No releases of their own yet.')).toBeInTheDocument();
