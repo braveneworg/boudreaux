@@ -15,14 +15,16 @@ import type { Locator, Page } from '@playwright/test';
  *    RELEASES wordmark, then a 1/2/4-column grid of covers captioned with the
  *    artist above the title. A cover opens the home page's listening modal on
  *    the release's first track, in the page's cyan accent.
- *  - Artist filter: a caption's artist link lists only that artist's
- *    releases (`/releases?artist=<slug>`), with a "View releases by all
- *    artists" link back under the wordmark.
+ *  - Artist filter: a caption's artist link lists every release that artist
+ *    holds a credit on, their band's included (`/releases?artist=<slug>`),
+ *    named under the wordmark with a "View releases by all artists" link
+ *    back. A slug naming no public artist is a 404.
  *  - Release detail: the "Release Notes" section renders (cutout heading +
  *    floated summary card + notes copy).
  *
- * Read-only against the seed: E2E Album One, Two and Three by E2E Artist, and
- * E2E Band Single by E2E Band (seed-test-db.ts).
+ * Read-only against the seed: E2E Album One, Two and Three by E2E Artist,
+ * E2E Band Single by E2E Band (E2E Artist is its member), and E2E Roster
+ * Compilation by the roster artists (seed-test-db.ts).
  */
 
 const E2E_DATABASE_URL =
@@ -35,8 +37,10 @@ const ARTIST_NAME = 'E2E Artist';
 const ARTIST_SLUG = 'e2e-artist';
 const COVER_NAME = `Play ${RELEASE_TITLE} by ${ARTIST_NAME}`;
 const ARTIST_RELEASE_TITLES = ['E2E Album One', 'E2E Album Two', 'E2E Album Three'];
-/** A release by another artist (E2E Band), on the first page of the full grid. */
-const OTHER_ARTIST_COVER_NAME = 'Play E2E Band Single by E2E Band';
+/** A release by a band E2E Artist is a member of: in the artist's grid. */
+const BAND_COVER_NAME = 'Play E2E Band Single by E2E Band';
+/** A release E2E Artist holds no credit on, on the first page of the full grid. */
+const UNRELATED_COVER_NAME = /^Play E2E Roster Compilation\b/;
 const ALL_ARTISTS_LINK = 'View releases by all artists';
 const TAP_HINT = 'Tap any release art to play or download the music';
 
@@ -116,7 +120,7 @@ test.describe('Releases — cover grid + listening modal', () => {
     expect(artistBox.bottom).toBeLessThanOrEqual(titleBox.top);
   });
 
-  test('an artist link lists only that artist’s releases, and the all-artists link lists every release again', async ({
+  test('an artist link lists that artist’s releases, their band’s included, and the all-artists link lists every release again', async ({
     page,
   }) => {
     await page.goto('/releases');
@@ -145,13 +149,12 @@ test.describe('Releases — cover grid + listening modal', () => {
         grid.getByRole('button', { name: `Play ${title} by ${ARTIST_NAME}` })
       ).toBeVisible();
     }
-    // Every card is credited to the artist; the other artist's release is gone.
+    // The band the artist belongs to is in; a release they hold no credit on is out.
+    await expect(grid.getByRole('button', { name: BAND_COVER_NAME })).toBeVisible();
+    await expect(page.getByRole('button', { name: UNRELATED_COVER_NAME })).toHaveCount(0);
     await expect(
-      grid
-        .getByRole('listitem')
-        .filter({ hasNot: page.getByRole('link', { name: ARTIST_NAME, exact: true }) })
-    ).toHaveCount(0);
-    await expect(page.getByRole('button', { name: OTHER_ARTIST_COVER_NAME })).toHaveCount(0);
+      page.getByRole('heading', { level: 2, name: `Releases by ${ARTIST_NAME}` })
+    ).toBeVisible();
 
     // The link sits under the wordmark, its eye icon left of the words.
     const [headingBox, linkBox, iconBox, wordsBox] = await edgesOfAll([
@@ -168,19 +171,17 @@ test.describe('Releases — cover grid + listening modal', () => {
     await allArtists.click();
 
     await expect(page).toHaveURL('/releases');
-    await expect(page.getByRole('button', { name: OTHER_ARTIST_COVER_NAME })).toBeVisible();
+    await expect(page.getByRole('button', { name: UNRELATED_COVER_NAME })).toBeVisible();
     await expect(page.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveCount(0);
     expect(await stillSameDocument()).toBe(true);
   });
 
-  test('an unknown artist lists nothing but keeps the all-artists link', async ({ page }) => {
+  test('shows the not-found page for an unknown artist', async ({ page }) => {
     await page.goto('/releases?artist=no-such-artist');
 
-    await expect(page.getByText('No releases available.')).toBeVisible();
-    await expect(page.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveAttribute(
-      'href',
-      '/releases'
-    );
+    // The dev server streams the shell before `notFound()` settles the status,
+    // so the page's own copy is the reliable signal, not the response code.
+    await expect(page.getByText(/torn off the wall/i)).toBeVisible({ timeout: 15_000 });
   });
 
   test('shows none of the old listing row details', async ({ page }) => {
