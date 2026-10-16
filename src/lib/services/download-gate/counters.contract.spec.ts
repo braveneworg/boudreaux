@@ -48,9 +48,10 @@ beforeAll(async () => {
       data: { title: `${prefix}${title}`, releasedOn: NOW, coverArt: 'https://cdn/x.webp' },
       select: { id: true },
     });
-  [releaseId, otherReleaseId] = (await Promise.all([release('r1'), release('r2')])).map(
-    ({ id }) => id
-  );
+  // Serial creates: concurrent first writes to a fresh collection race
+  // Prisma's post-insert read-back (docs/lessons/prisma-mongo).
+  releaseId = (await release('r1')).id;
+  otherReleaseId = (await release('r2')).id;
 
   const mkUser = (name: string) =>
     prisma.user.create({ data: { email: `${prefix}${name}@example.com` }, select: { id: true } });
