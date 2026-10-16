@@ -114,7 +114,7 @@ describe('LatestReleaseLink', () => {
     renderLink();
 
     const link = screen.getByRole('link', { name: 'View all releases' });
-    expect(link).toHaveAttribute('href', '/artists/marguerite-ash/releases');
+    expect(link).toHaveAttribute('href', '/releases?artist=marguerite-ash');
     const icon = link.querySelector('svg');
     expect(icon).toHaveAttribute('aria-hidden', 'true');
     expect(icon?.nextSibling).toHaveTextContent('View all releases');
@@ -182,7 +182,7 @@ describe('LatestReleaseLink', () => {
     );
 
     expect(dialog.handlePlayerOpenChange).toHaveBeenCalledWith(false);
-    expect(push).toHaveBeenCalledWith('/artists/marguerite-ash/releases');
+    expect(push).toHaveBeenCalledWith('/releases?artist=marguerite-ash');
   });
 
   it('leaves a modified click on "View all releases" to the browser, keeping the player open', async () => {

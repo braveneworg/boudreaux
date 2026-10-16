@@ -139,8 +139,9 @@ the byline empty, and no later credit takes its place.
 **primary** (the Artist is its album artist), **featured** (credited, but not
 first), or **member** (a release by a band the Artist belongs to). Derived
 from the stored credit order and band membership when the page is built;
-an Artist's page leads with its **latest release** and lists every release
-they hold a credit on, primary first, at `/artists/[slug]/releases`.
+an Artist's page leads with its **latest release**, and every release they
+hold a credit on, band releases included, is the releases listing filtered
+by that Artist, newest first.
 See [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: role (that is the Video term), guest.
 

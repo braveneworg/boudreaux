@@ -32,16 +32,6 @@ interface ReleaseCoverArtSource {
   }>;
 }
 
-/** Minimal release shape for Bandcamp URL extraction */
-interface ReleaseBandcampSource {
-  releaseUrls: Array<{
-    url: {
-      platform: string;
-      url: string;
-    };
-  }>;
-}
-
 /** Minimal release shape for first-track stream resolution */
 interface ReleaseFirstTrackSource {
   digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
@@ -136,17 +126,6 @@ export const getFirstTrackStreamSource = (release: ReleaseFirstTrackSource): str
   const firstFile = release.digitalFormats[0]?.files[0];
   if (!firstFile) return null;
   return resolveStreamUrl(firstFile);
-};
-
-/**
- * Extract the Bandcamp URL from a release's associated URLs.
- *
- * @param release - Release with releaseUrls including url records
- * @returns The Bandcamp URL string, or `null` if not found
- */
-export const getBandcampUrl = (release: ReleaseBandcampSource): string | null => {
-  const bandcampReleaseUrl = release.releaseUrls.find((ru) => ru.url.platform === 'BANDCAMP');
-  return bandcampReleaseUrl?.url.url ?? null;
 };
 
 /**

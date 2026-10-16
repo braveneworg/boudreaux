@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { notFound } from 'next/navigation';
 
+import { AllReleasesLink } from '@/app/components/all-releases-link';
 import { ArtistBio } from '@/app/components/artist-bio';
 import { DisplayImageCollage } from '@/app/components/display-image-collage';
 import { LatestReleaseLink } from '@/app/components/latest-release-link';
@@ -93,6 +94,15 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                   slug={slug}
                   className="text-lg"
                 />
+              ) : artist.releases.length > 0 ? (
+                // Only band releases: no latest release to lead with, but
+                // the full list still holds them (ADR-0006).
+                <div className="space-y-2">
+                  <p className="text-lg text-zinc-700">No releases of their own yet.</p>
+                  <p className="text-sm">
+                    <AllReleasesLink slug={slug} />
+                  </p>
+                </div>
               ) : (
                 <p className="text-zinc-700">No releases yet.</p>
               )}

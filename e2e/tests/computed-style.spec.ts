@@ -109,7 +109,7 @@ test.describe('Computed styles of shipped design decisions', () => {
   });
 
   test('a zine heading keeps its own casing and tracking (#784)', async ({ page }) => {
-    await page.goto('/artists/e2e-artist/releases');
+    await page.goto('/artists/e2e-artist');
     const heading = page.locator('[data-slot="zine-heading"]').first();
     await expect(heading).toBeVisible({ timeout: 15_000 });
     const style = await typeStyleOf(heading);
