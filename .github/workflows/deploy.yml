@@ -167,6 +167,7 @@ jobs:
               --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --cache-to type=registry,ref=${{ env.WEBSITE_IMAGE }}:buildcache,mode=max \
               -t ${{ env.WEBSITE_IMAGE }}:latest \
+              -t ${{ env.WEBSITE_IMAGE }}:sha-${{ github.event.workflow_run.head_sha }} \
               -f Dockerfile \
               --push .; then
               echo "Website image buildx push succeeded"
@@ -256,6 +257,7 @@ jobs:
               --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --cache-to type=registry,ref=${{ env.NGINX_IMAGE }}:buildcache,mode=max \
               -t ${{ env.NGINX_IMAGE }}:latest \
+              -t ${{ env.NGINX_IMAGE }}:sha-${{ github.event.workflow_run.head_sha }} \
               -f nginx/Dockerfile \
               --push .; then
               echo "Nginx image buildx push succeeded"
@@ -405,218 +407,34 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm exec prisma db push --skip-generate
 
+  # The host roll is shared with rollback.yml (ADR-0021): one workflow writes
+  # the remote env file, uploads the compose files and the deploy script,
+  # rolls the containers, and verifies health, so the forward deploy and the
+  # rollback cannot drift apart. The host gets the files of the commit being
+  # deployed, not main's tip, which may already be newer (ADR-0012).
   deploy:
-    name: Deploy to EC2 via SSH with temporary IP allow
-    runs-on: ubuntu-latest
+    name: Roll the host
     needs: [build-images, build-nginx, sync-to-s3, schema-push]
     permissions:
       contents: read
-      id-token: write
-      packages: read
-    env:
-      WEBSITE_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/website
-      NGINX_IMAGE: ghcr.io/${{ github.repository_owner }}/boudreaux/nginx
-      # Align secret names: ensure AWS_SECURITY_GROUP_ID exists in repo secrets
-      AWS_SECURITY_GROUP_ID: ${{ secrets.AWS_SECURITY_GROUP_ID }}
-      # Toggle: set to 'true' to fail deploy if self-signed cert remains after issuance attempts
-      REQUIRE_TRUSTED_CERT: ${{ vars.REQUIRE_TRUSTED_CERT || 'false' }}
-      WEBSITE_DIGEST: ${{ needs.build-images.outputs.digest }}
-      NGINX_DIGEST: ${{ needs.build-nginx.outputs.digest }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Validate image digests
-        run: |
-          echo "Will deploy with digests:"
-          echo "  Website: $WEBSITE_DIGEST"
-          echo "  Nginx: $NGINX_DIGEST"
-
-          if [ -z "$WEBSITE_DIGEST" ] || [ "$WEBSITE_DIGEST" = "null" ]; then
-            echo "ERROR: Missing website image digest"
-            exit 1
-          fi
-          if [ -z "$NGINX_DIGEST" ] || [ "$NGINX_DIGEST" = "null" ]; then
-            echo "ERROR: Missing nginx image digest"
-            exit 1
-          fi
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Ensure Security Groups allow HTTP/HTTPS on all attached SGs
-        env:
-          AWS_SECURITY_GROUP_ID: ${{ env.AWS_SECURITY_GROUP_ID }}
-        run: bash scripts/ci/ensure-security-groups.sh
-
-      - name: Get runner public IP
-        id: ip
-        run: echo "ipv4=$(curl -sf https://api.ipify.org)" >> "$GITHUB_OUTPUT"
-
-      - name: Temporarily whitelist runner IP for SSH on all Security Groups
-        env:
-          AWS_SECURITY_GROUP_ID: ${{ env.AWS_SECURITY_GROUP_ID }}
-        run: bash scripts/ci/whitelist-runner-ip.sh "${{ steps.ip.outputs.ipv4 }}"
-
-      - name: Create .env for remote
-        env:
-          # Handled separately below so their value is normalized to a single
-          # line — see the newline-stripping block after the heredoc.
-          CLOUDFRONT_PRIVATE_KEY_BASE64: ${{ secrets.CLOUDFRONT_PRIVATE_KEY_BASE64 }}
-          APPLE_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}
-        run: |
-          cat > .env.deploy << 'EOF'
-          NEXT_APP_WEBSITE_IMAGE=${{ env.WEBSITE_IMAGE }}
-          NEXT_APP_NGINX_IMAGE=${{ env.NGINX_IMAGE }}
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-          AUTH_URL=${{ secrets.AUTH_URL }}
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-          FACEBOOK_CLIENT_ID=${{ secrets.FACEBOOK_CLIENT_ID }}
-          FACEBOOK_CLIENT_SECRET=${{ secrets.FACEBOOK_CLIENT_SECRET }}
-          TWITTER_CLIENT_ID=${{ secrets.TWITTER_CLIENT_ID }}
-          TWITTER_CLIENT_SECRET=${{ secrets.TWITTER_CLIENT_SECRET }}
-          APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
-          APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
-          APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}
-          APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}
-          APPLE_APP_BUNDLE_IDENTIFIER=${{ secrets.APPLE_APP_BUNDLE_IDENTIFIER }}
-          EMAIL_SERVER_HOST=${{ secrets.EMAIL_SERVER_HOST }}
-          EMAIL_SERVER_PORT=${{ secrets.EMAIL_SERVER_PORT }}
-          EMAIL_SERVER_USER=${{ secrets.EMAIL_SERVER_USER }}
-          EMAIL_SERVER_PASSWORD=${{ secrets.EMAIL_SERVER_PASSWORD }}
-          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
-          NEXT_PUBLIC_CLOUDFLARE_SITE_KEY=${{ secrets.NEXT_PUBLIC_CLOUDFLARE_SITE_KEY }}
-          CLOUDFLARE_SECRET=${{ secrets.CLOUDFLARE_SECRET }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_BUCKET_NAME=${{ secrets.AWS_S3_BUCKET_NAME }}
-          S3_BUCKET=${{ secrets.S3_BUCKET }}
-          CDN_DOMAIN=${{ secrets.CDN_DOMAIN }}
-          NEXT_PUBLIC_CDN_DOMAIN=${{ secrets.NEXT_PUBLIC_CDN_DOMAIN }}
-          CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID }}
-          NEXT_PUBLIC_HOST_NAME=${{ secrets.NEXT_PUBLIC_HOST_NAME }}
-          NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
-          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          NEXT_PUBLIC_STRIPE_PRICE_MINIMUM=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_MINIMUM }}
-          NEXT_PUBLIC_STRIPE_PRICE_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA }}
-          NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA=${{ secrets.NEXT_PUBLIC_STRIPE_PRICE_EXTRA_EXTRA }}
-          PUSHER_APP_ID=${{ secrets.PUSHER_APP_ID }}
-          PUSHER_KEY=${{ secrets.PUSHER_KEY }}
-          PUSHER_SECRET=${{ secrets.PUSHER_SECRET }}
-          PUSHER_CLUSTER=${{ secrets.PUSHER_CLUSTER }}
-          NEXT_PUBLIC_PUSHER_KEY=${{ secrets.NEXT_PUBLIC_PUSHER_KEY }}
-          NEXT_PUBLIC_PUSHER_CLUSTER=${{ secrets.NEXT_PUBLIC_PUSHER_CLUSTER }}
-          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-          BIO_GENERATOR_LAMBDA_NAME=${{ vars.BIO_GENERATOR_LAMBDA_NAME || 'fakefour-bio-generator' }}
-          JOB_CALLBACK_SECRET=${{ secrets.JOB_CALLBACK_SECRET }}
-          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-          GRAFANA_ALERT_EMAIL=${{ secrets.GRAFANA_ALERT_EMAIL }}
-          LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
-          SMS_PROVIDER=${{ vars.SMS_PROVIDER || 'noop' }}
-          SNS_SMS_ORIGINATION_NUMBER=${{ vars.SNS_SMS_ORIGINATION_NUMBER }}
-          EOF
-
-          # Base64-encoded private keys can be stored line-wrapped (multi-line):
-          # `base64` wraps at 76 columns, `openssl base64` at 64. Compose's
-          # env-file parser reads only the FIRST line of an unquoted value, so a
-          # wrapped key reaches the container truncated (the CloudFront signing
-          # incident: a header-only PEM that fails to parse). Collapse each to a
-          # single line so the whole value survives regardless of how it was
-          # encoded. `tr -d '\r\n'` on an already-single-line value is a no-op.
-          {
-            printf 'CLOUDFRONT_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$CLOUDFRONT_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
-            printf 'APPLE_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$APPLE_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
-          } >> .env.deploy
-
-      - name: Upload compose + env
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          # Align secret names: EC2_HOST, EC2_USERNAME, SSH_PRIVATE_KEY
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yml,docker-compose.logging.yml,.env.deploy
-          target: ~/boudreaux
-
-      - name: Upload observability configs (Loki, Alloy, Grafana provisioning)
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: observability
-          target: ~/boudreaux
-
-      - name: Upload deploy script
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: scripts/ci/deploy-remote.sh
-          target: ~/boudreaux
-          strip_components: 2
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.5
-        env:
-          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
-          # Use the workflow's short-lived GITHUB_TOKEN (granted packages: read above)
-          # so we don't depend on a long-lived GHCR_TOKEN PAT for EC2 pulls.
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USERNAME: ${{ github.actor }}
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 60s
-          command_timeout: 30m
-          envs: WEBSITE_IMAGE,NGINX_IMAGE,WEBSITE_DIGEST,NGINX_DIGEST,REQUIRE_TRUSTED_CERT,LETSENCRYPT_EMAIL,GHCR_TOKEN,GHCR_USERNAME
-          script: |
-            chmod +x ~/boudreaux/deploy-remote.sh
-            ~/boudreaux/deploy-remote.sh
-
-      - name: Revoke runner IP from all Security Groups
-        if: always()
-        env:
-          AWS_SECURITY_GROUP_ID: ${{ env.AWS_SECURITY_GROUP_ID }}
-        run: bash scripts/ci/revoke-runner-ip.sh "${{ steps.ip.outputs.ipv4 }}"
-
-  verify-deployment:
-    name: Verify deployment health
-    runs-on: ubuntu-latest
-    needs: [deploy]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Wait for application startup
-        run: |
-          echo "Waiting 30 seconds for application to fully initialize..."
-          sleep 30
-
-      - name: Verify application health
-        env:
-          HEALTH_URL: https://fakefourrecords.com/api/health
-        run: bash scripts/ci/verify-health.sh
+      packages: write
+    uses: ./.github/workflows/roll-host.yml
+    with:
+      website_digest: ${{ needs.build-images.outputs.digest }}
+      nginx_digest: ${{ needs.build-nginx.outputs.digest }}
+      files_ref: ${{ github.event.workflow_run.head_sha }}
+    secrets: inherit
 
   version-bump:
     name: Bump version & release
     runs-on: ubuntu-latest
-    needs: [verify-deployment]
+    # build-images and build-nginx are already upstream of deploy; naming them
+    # here exposes their digest outputs for the version retag below.
+    needs: [deploy, build-images, build-nginx]
     permissions:
       contents: write
       pull-requests: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -896,3 +714,29 @@ jobs:
             --title "${{ steps.version.outputs.tag }}" \
             --notes-file release-notes.txt \
             --target main
+
+      # A version is a rollback target only once its images carry its tag
+      # (ADR-0021). The digests are the ones this run deployed and
+      # health-checked; the tags are added to the existing manifests, nothing
+      # is rebuilt or re-pushed.
+      - name: Log in to container registry
+        if: steps.bump-type.outputs.skip != 'true' &&
+          steps.version.outputs.skip_remainder != 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag the deployed images with the version
+        if: steps.bump-type.outputs.skip != 'true' &&
+          steps.version.outputs.skip_remainder != 'true'
+        env:
+          NEW_TAG: ${{ steps.version.outputs.tag }}
+          WEBSITE_DIGEST: ${{ needs.build-images.outputs.digest }}
+          NGINX_DIGEST: ${{ needs.build-nginx.outputs.digest }}
+        run: |
+          set -e
+          docker buildx imagetools create -t "${WEBSITE_IMAGE}:${NEW_TAG}" "${WEBSITE_IMAGE}@${WEBSITE_DIGEST}"
+          docker buildx imagetools create -t "${NGINX_IMAGE}:${NEW_TAG}" "${NGINX_IMAGE}@${NGINX_DIGEST}"
+          echo "Tagged website ${WEBSITE_DIGEST} and nginx ${NGINX_DIGEST} as ${NEW_TAG}"
