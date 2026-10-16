@@ -512,6 +512,9 @@ export type ArtistDetail = ArtistScalars;
 export interface ArtistSearchReleaseRecord {
   id: string;
   title: string;
+  /** The stored cover art URL (may be empty) and the first image by sort order behind it. */
+  coverArt: string;
+  images: Array<{ src: string | null; altText: string | null }>;
   publishedAt: Date | null;
   deletedOn: Date | null;
 }

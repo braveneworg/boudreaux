@@ -19,15 +19,15 @@ const ceschi = {
   artistName: 'Ceschi',
   thumbnailSrc: 'https://cdn.example.com/ceschi.jpg',
   releases: [
-    { id: 'r-1', title: 'Broken Bone Ballads' },
-    { id: 'r-2', title: 'Sad, Fat Luck' },
+    { id: 'r-1', title: 'Broken Bone Ballads', coverArtSrc: 'https://cdn.example.com/bbb.jpg' },
+    { id: 'r-2', title: 'Sad, Fat Luck', coverArtSrc: null },
   ],
 };
 const ramos = {
   artistSlug: 'david-ramos',
   artistName: 'David Ramos',
   thumbnailSrc: null,
-  releases: [{ id: 'r-3', title: 'That Down There' }],
+  releases: [{ id: 'r-3', title: 'That Down There', coverArtSrc: null }],
 };
 const noReleases = {
   artistSlug: 'sixo',
@@ -147,6 +147,21 @@ describe('ArtistNavSearchPanel', () => {
 
     expect(screen.getByRole('option', { name: 'Broken Bone Ballads' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'That Down There' })).toBeInTheDocument();
+  });
+
+  it('shows the release cover art beside a release', () => {
+    renderPanel();
+
+    const row = screen.getByRole('option', { name: 'Broken Bone Ballads' });
+    expect(row.querySelector('img')).toHaveAttribute('src', 'https://cdn.example.com/bbb.jpg');
+  });
+
+  it('shows a placeholder tile when a release has no cover art', () => {
+    renderPanel();
+
+    const row = screen.getByRole('option', { name: 'Sad, Fat Luck' });
+    expect(row.querySelector('img')).toBeNull();
+    expect(row.querySelector('svg')).not.toBeNull();
   });
 
   it('hands the artist slug back when an artist row is picked', async () => {

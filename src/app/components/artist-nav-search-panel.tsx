@@ -61,7 +61,8 @@ const statusMessage = ({
  * Body of the home page search popover: the search field over either a status
  * line (the three-character hint, searching, failed, nothing found) or the
  * matches — one row per artist in the shared search-row anatomy, each followed
- * by slimmer, indented rows for that artist's matching releases. Lazy-loaded
+ * by slimmer, indented rows for that artist's matching releases, each led by
+ * its cover art (a disc tile when the release has none). Lazy-loaded
  * into a popover that is already open, so Radix's mount-time autofocus has
  * already run against the loading fallback — the field takes focus itself.
  * Server search provides the matches; cmdk's own filtering is disabled.
@@ -132,7 +133,19 @@ export const ArtistNavSearchPanel = ({
                   onSelect={() => onReleaseSelect(artist.artistSlug, release.id)}
                   className="flex items-center gap-3 py-1.5 pr-2 pl-6"
                 >
-                  <Disc3 aria-hidden className="size-4 shrink-0 text-zinc-950" />
+                  {release.coverArtSrc ? (
+                    <Image
+                      src={release.coverArtSrc}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="size-8 shrink-0 object-cover"
+                    />
+                  ) : (
+                    <span className="flex size-8 shrink-0 items-center justify-center bg-zinc-200 text-zinc-500">
+                      <Disc3 aria-hidden className="size-4" />
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1 truncate text-sm">{release.title}</span>
                 </CommandItem>
               ))}

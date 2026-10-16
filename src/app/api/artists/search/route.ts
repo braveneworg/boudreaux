@@ -14,6 +14,7 @@ import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
+import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,8 @@ interface ArtistSearchResult {
   artistSlug: string;
   artistName: string;
   thumbnailSrc: string | null;
-  /** Published release titles for this artist (used for display and matching) */
-  releases: Array<{ id: string; title: string }>;
+  /** Published releases for this artist: the title shown and the cover art beside it. */
+  releases: Array<{ id: string; title: string; coverArtSrc: string | null }>;
 }
 
 const CACHE_HEADER = 'public, s-maxage=60, stale-while-revalidate=300';
@@ -42,7 +43,11 @@ const mapArtistToComboboxResult = (artist: ArtistSearchMatch): ArtistSearchResul
     artistSlug: artist.slug,
     artistName: getArtistDisplayName(artist),
     thumbnailSrc: firstDisplayImageSrc(artist.bioImages),
-    releases: releases.map((r) => ({ id: r.id, title: r.title })),
+    releases: releases.map((r) => ({
+      id: r.id,
+      title: r.title,
+      coverArtSrc: getReleaseCoverArt(r)?.src ?? null,
+    })),
   };
 };
 

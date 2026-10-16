@@ -8,7 +8,8 @@ import { expect, test } from '../fixtures/base.fixture';
 /**
  * The homepage's click-to-open artist and release search (#758): a hint
  * until three characters, then one group per artist with its releases
- * indented under it, and a release pick that opens it on the artist's page.
+ * indented under it, each led by its cover art, and a release pick that
+ * opens the release page.
  * Read-only against the seed.
  */
 
@@ -36,6 +37,8 @@ test('the home search groups releases under their artist and opens a pick', asyn
   const releaseRow = page.getByRole('option', { name: 'E2E Album One', exact: true });
   await expect(artistRow).toBeVisible({ timeout: 15_000 });
   await expect(releaseRow).toBeVisible();
+  // A release row leads with its cover art (the seed gives every release one).
+  await expect(releaseRow.locator('img')).toHaveCount(1);
 
   const [artistIndent, releaseIndent] = await Promise.all(
     [artistRow, releaseRow].map((row) =>

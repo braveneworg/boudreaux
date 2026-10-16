@@ -67,6 +67,33 @@ describe('useArtistNavSearchQuery', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=artist', { signal });
   });
 
+  it('keeps each release cover art source in the parsed results', async () => {
+    const results = [
+      {
+        artistSlug: 'a',
+        artistName: 'A',
+        thumbnailSrc: null,
+        releases: [
+          { id: 'r-1', title: 'One', coverArtSrc: 'https://cdn.example.com/one.jpg' },
+          { id: 'r-2', title: 'Two', coverArtSrc: null },
+        ],
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results }) })
+    );
+
+    renderHook(() => useArtistNavSearchQuery('artist'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as {
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
+    };
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).resolves.toEqual({ results });
+  });
+
   it('throws when the search request fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
