@@ -13,7 +13,6 @@ vi.mock('@/lib/repositories/user-repository', () => ({
     findByEmail: vi.fn(),
     findIdByEmail: vi.fn(),
     findEmailById: vi.fn(),
-    create: vi.fn(),
     createGuest: vi.fn(),
     updateUsername: vi.fn(),
   },
@@ -26,46 +25,6 @@ vi.mock('unique-username-generator', () => ({
 const dataError = (code: DataErrorCode): DataError => new DataError(code, 'forced');
 
 describe('UserService', () => {
-  describe('ensureAdminUser', () => {
-    const adminData = {
-      firstName: 'Admin',
-      lastName: 'User',
-      phone: '555-0100',
-      email: 'admin@example.com',
-      role: 'admin',
-    };
-
-    it('should create admin user when user does not exist', async () => {
-      vi.mocked(UserRepository.findByEmail).mockResolvedValue(null);
-      vi.mocked(UserRepository.create).mockResolvedValue({} as never);
-
-      await UserService.ensureAdminUser(adminData);
-
-      expect(UserRepository.findByEmail).toHaveBeenCalledWith('admin@example.com');
-      expect(UserRepository.create).toHaveBeenCalledWith({
-        firstName: 'Admin',
-        lastName: 'User',
-        phone: '555-0100',
-        email: 'admin@example.com',
-        name: 'Admin',
-        role: 'admin',
-        emailVerified: true,
-      });
-    });
-
-    it('should skip creation when user already exists', async () => {
-      vi.mocked(UserRepository.findByEmail).mockResolvedValue({
-        id: 'existing-user',
-        email: 'admin@example.com',
-      } as never);
-
-      await UserService.ensureAdminUser(adminData);
-
-      expect(UserRepository.findByEmail).toHaveBeenCalledWith('admin@example.com');
-      expect(UserRepository.create).not.toHaveBeenCalled();
-    });
-  });
-
   describe('findByEmail', () => {
     it('delegates to UserRepository.findByEmail', async () => {
       const user = { id: 'u1', email: 'a@b.co' };
