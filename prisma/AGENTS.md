@@ -8,6 +8,12 @@
   worktrees carry real `.env*` copies, and `prisma.config.ts` loads `.env` for
   anything the shell leaves unset. Read the isolation rules in
   [`e2e/AGENTS.md`](../e2e/AGENTS.md) first; they are a hard constraint.
+- `prisma/seed.ts` runs under plain `tsx`, so it must not import any module
+  that imports `server-only` (services, repositories, `@/lib/prisma`, the
+  logger) — it writes through its own `PrismaClient`.
+  `prisma/seed.spec.ts` walks its import graph and enforces this. The fix is
+  never to remove `server-only` or to run the seed under the React Server
+  export condition.
 - Production gets schema changes from the deploy: `deploy.yml`'s
   `schema-push` job runs `prisma db push` before the roll when
   `schema.prisma` changed (ADR-0012). No manual post-merge push, except for

@@ -7,7 +7,7 @@ import { render, screen } from '@testing-library/react';
 
 import { queryKeys } from '@/lib/query-keys';
 
-import ReleasesPage from './page';
+import ReleasesPage, { generateMetadata } from './page';
 
 vi.mock('server-only', () => ({}));
 
@@ -72,12 +72,34 @@ vi.mock('@/app/components/ui/heading', () => ({
 }));
 
 vi.mock('@/app/components/releases-content', () => ({
-  ReleasesContent: ({ artist }: { artist?: string }) => (
-    <div data-testid="releases-content" data-artist={artist ?? ''}>
+  ReleasesContent: ({ artist, artistName }: { artist?: string; artistName?: string }) => (
+    <div
+      data-testid="releases-content"
+      data-artist={artist ?? ''}
+      data-artist-name={artistName ?? ''}
+    >
       Releases Content
     </div>
   ),
 }));
+
+// Like Next's own, the mock throws: nothing after a `notFound()` runs.
+const notFound = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({
+  notFound: () => {
+    notFound();
+    throw new Error('NEXT_NOT_FOUND');
+  },
+}));
+
+const getPublicArtist = vi.hoisted(() => vi.fn());
+vi.mock('@/app/artists/[slug]/get-public-artist', () => ({
+  getPublicArtist: (slug: string) => getPublicArtist(slug),
+}));
+
+beforeEach(() => {
+  getPublicArtist.mockResolvedValue({ displayName: 'E2E Artist' });
+});
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -182,6 +204,61 @@ describe('ReleasesPage', () => {
       expect(mockGetPublishedReleases.mock.calls).toEqual([[{ skip: 0, take: 24 }]]);
     }
   );
+
+  it('should name the filtered artist in the releases content', async () => {
+    await renderPage({ artist: 'e2e-artist' });
+
+    expect(getPublicArtist.mock.calls).toEqual([['e2e-artist']]);
+    expect(screen.getByTestId('releases-content')).toHaveAttribute(
+      'data-artist-name',
+      'E2E Artist'
+    );
+  });
+
+  it('should look up no artist without an artist filter', async () => {
+    await renderPage();
+
+    expect(getPublicArtist).not.toHaveBeenCalled();
+    expect(screen.getByTestId('releases-content')).toHaveAttribute('data-artist-name', '');
+  });
+
+  it('should show 404 when the filter names no public artist, before prefetching', async () => {
+    getPublicArtist.mockResolvedValueOnce(null);
+
+    await expect(
+      ReleasesPage({ searchParams: Promise.resolve({ artist: 'hidden-artist' }) })
+    ).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFound).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
+  });
+
+  describe('generateMetadata', () => {
+    const metadataFor = (searchParams: SearchParams) =>
+      generateMetadata({ searchParams: Promise.resolve(searchParams) });
+
+    it('titles the unfiltered listing as releases', async () => {
+      await expect(metadataFor({})).resolves.toEqual({
+        title: 'Releases',
+        description: 'Browse all published releases. Search by artist or title.',
+      });
+    });
+
+    it('titles a filtered listing with the artist', async () => {
+      await expect(metadataFor({ artist: 'e2e-artist' })).resolves.toEqual({
+        title: 'Releases by E2E Artist',
+        description: 'Every release by E2E Artist.',
+      });
+    });
+
+    it('titles a filter naming no public artist as not found', async () => {
+      getPublicArtist.mockResolvedValueOnce(null);
+
+      await expect(metadataFor({ artist: 'hidden-artist' })).resolves.toEqual({
+        title: 'Artist Not Found',
+      });
+    });
+  });
 
   it('should render ReleasesContent within HydrationBoundary', async () => {
     await renderPage();

@@ -5,7 +5,6 @@
 import {
   buildReleaseSearchValue,
   getArtistDisplayNameForRelease,
-  getBandcampUrl,
   getFirstTrackStreamSource,
   getReleaseCoverArt,
 } from './release-helpers';
@@ -168,81 +167,6 @@ describe('release-helpers', () => {
       };
 
       expect(getReleaseCoverArt(release)).toBeNull();
-    });
-  });
-
-  describe('getBandcampUrl', () => {
-    it('should return the Bandcamp URL when present', () => {
-      const release = {
-        releaseUrls: [
-          {
-            id: 'ru-1',
-            releaseId: 'r-1',
-            urlId: 'u-1',
-            url: {
-              id: 'u-1',
-              platform: 'BANDCAMP' as const,
-              url: 'https://label.bandcamp.com/album/test',
-            },
-          },
-        ],
-      };
-
-      expect(getBandcampUrl(release)).toBe('https://label.bandcamp.com/album/test');
-    });
-
-    it('should return null when no Bandcamp URL exists', () => {
-      const release = {
-        releaseUrls: [
-          {
-            id: 'ru-1',
-            releaseId: 'r-1',
-            urlId: 'u-1',
-            url: {
-              id: 'u-1',
-              platform: 'SPOTIFY' as const,
-              url: 'https://open.spotify.com/album/test',
-            },
-          },
-        ],
-      };
-
-      expect(getBandcampUrl(release)).toBeNull();
-    });
-
-    it('should return null when releaseUrls is empty', () => {
-      const release = { releaseUrls: [] };
-
-      expect(getBandcampUrl(release)).toBeNull();
-    });
-
-    it('should return first Bandcamp URL when multiple exist', () => {
-      const release = {
-        releaseUrls: [
-          {
-            id: 'ru-1',
-            releaseId: 'r-1',
-            urlId: 'u-1',
-            url: {
-              id: 'u-1',
-              platform: 'BANDCAMP' as const,
-              url: 'https://first.bandcamp.com/album/test',
-            },
-          },
-          {
-            id: 'ru-2',
-            releaseId: 'r-1',
-            urlId: 'u-2',
-            url: {
-              id: 'u-2',
-              platform: 'BANDCAMP' as const,
-              url: 'https://second.bandcamp.com/album/test',
-            },
-          },
-        ],
-      };
-
-      expect(getBandcampUrl(release)).toBe('https://first.bandcamp.com/album/test');
     });
   });
 

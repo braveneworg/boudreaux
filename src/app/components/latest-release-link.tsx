@@ -9,12 +9,12 @@ import type { JSX, MouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { Eye } from 'lucide-react';
-
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
+import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 
+import { AllReleasesLink } from './all-releases-link';
 import { ReleasePlayDialog } from './release-play-dialog';
 
 /** The newest release the page leads with, as the page derives it from the artist graph. */
@@ -67,7 +67,7 @@ export const LatestReleaseLink = ({
     takeMediaEl,
   } = useReleasePlayDialog(release.playSrc);
   const playable = release.playSrc !== null;
-  const allReleasesHref = `/artists/${slug}/releases`;
+  const allReleasesHref = artistReleasesHref(slug);
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (!playable || !isPlainLeftClick(event)) return;
@@ -108,13 +108,7 @@ export const LatestReleaseLink = ({
         {release.byName ? <> by {release.byName}</> : null} ({release.releasedOn.getUTCFullYear()})
       </p>
       <p className="text-sm">
-        <Link
-          href={allReleasesHref}
-          className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:no-underline"
-        >
-          <Eye className="size-4" aria-hidden="true" />
-          <span>View all releases</span>
-        </Link>
+        <AllReleasesLink slug={slug} />
       </p>
       {playable ? (
         <ReleasePlayDialog

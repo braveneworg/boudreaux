@@ -289,6 +289,39 @@ describe('ReleasesContent', () => {
     ).toBeTruthy();
   });
 
+  it('names the filtered artist under the wordmark, above the all-artists link', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    const artistHeading = screen.getByRole('heading', { level: 2, name: 'Releases by E2E Artist' });
+    expect(releasesHeading().parentElement).toContainElement(artistHeading);
+    expect(
+      releasesHeading().compareDocumentPosition(artistHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      artistHeading.compareDocumentPosition(screen.getByRole('link', { name: ALL_ARTISTS_LINK })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('names no artist without an artist filter', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent />);
+
+    expect(screen.queryByRole('heading', { name: /^Releases by / })).not.toBeInTheDocument();
+  });
+
+  it('keeps the artist’s name in the empty state of a filtered listing', () => {
+    render(<ReleasesContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    expect(screen.getByText('No releases available.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Releases by E2E Artist' })
+    ).toBeInTheDocument();
+  });
+
   it('puts the all-artists link in the heading’s column, left-aligned with it', () => {
     render(<ReleasesContent artist="e2e-artist" />);
 

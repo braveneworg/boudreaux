@@ -488,6 +488,8 @@ const eslintConfig = [
       // Reads the repositories' own sources for the specs that scan for a load
       // written outside its seam (`orderedCredits`, `playableFormats`).
       'src/test-utils/repository-sources.ts',
+      // Walks the seed's own import graph to check no module in it is server-only.
+      'prisma/seed.spec.ts',
     ],
     rules: {
       'security/detect-non-literal-fs-filename': 'off',

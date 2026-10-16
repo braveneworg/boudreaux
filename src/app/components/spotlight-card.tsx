@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
 import { cn } from '@/lib/utils';
+import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
 import {
   SPOTLIGHT_COVER_SIZES,
@@ -54,7 +55,7 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
   const { title, year, artistName, artistSlug } = card;
   const onReleases = caption === 'releases';
   const artistHref = (slug: string): string =>
-    onReleases ? `/releases?artist=${encodeURIComponent(slug)}` : `/artists/${slug}`;
+    onReleases ? artistReleasesHref(slug) : `/artists/${slug}`;
 
   return (
     <div className="text-center text-sm leading-snug text-zinc-950">
