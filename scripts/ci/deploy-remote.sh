@@ -6,7 +6,8 @@
 # Executed on the remote EC2 instance via SSH during deployment.
 # Handles: Docker setup, TLS certificate management (Let's Encrypt / self-signed
 # fallback), image pull with digest pinning, container restart, health check,
-# rollback, and digest audit persistence.
+# automatic rollback on a failed health check (forward deploys only), and
+# digest audit persistence.
 #
 # Usage: ./deploy-remote.sh
 # Env (required):
@@ -19,6 +20,11 @@
 #   NGINX_DIGEST        - sha256 digest to pin the nginx image
 #   REQUIRE_TRUSTED_CERT - 'true' to fail deploy if self-signed cert remains
 #   LETSENCRYPT_EMAIL   - Email for Let's Encrypt registration
+#   ROLLBACK_RUN        - 'true' when rollback.yml is rolling an older version:
+#                         a failed health check then exits non-zero with the
+#                         containers left as they are, instead of re-pulling
+#                         the digests found on the host (the version being
+#                         rolled back from). See ADR-0021.
 
 set -euo pipefail
 
@@ -357,6 +363,17 @@ fi
 
 # shellcheck disable=SC2086
 if ! curl $CURL_OPTS https://fakefourrecords.com/api/health; then
+  if [ "${ROLLBACK_RUN:-false}" = "true" ]; then
+    # The digests captured above are the version the operator is escaping
+    # from. Putting them back would report a green run while production runs
+    # the version the rollback was meant to remove. Fail loudly instead.
+    echo '❌ Health check failed during a rollback - leaving the containers as they are.'
+    echo "   Running: website $NEW_WEBSITE_DIGEST, nginx $NEW_NGINX_DIGEST"
+    echo '   Pick another version or fix forward; nothing was rolled back automatically.'
+    $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml logs --tail=50 website || true
+    exit 1
+  fi
+
   echo 'Health check failed - attempting rollback'
 
   if [ -n "$PREV_WEBSITE_DIGEST" ]; then

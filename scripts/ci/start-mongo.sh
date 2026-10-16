@@ -29,6 +29,12 @@ max_pull_attempts=5
 max_ready_attempts=30
 max_primary_attempts=15
 log_tail=200
+# mongo:7 sets HOME=/data/db, and its entrypoint chowns everything under
+# /data/db while mongod starts. A mongosh probe writes its state (and a lock
+# file it then deletes) under $HOME/.mongodb; when the chown reaches that
+# lock just after it is gone, the entrypoint fails and the container exits.
+# Point every probe's HOME outside /data/db so the two never meet.
+probe_home=/tmp
 
 # Best effort: a diagnostic that cannot be read must not hide the failure it
 # was meant to explain, so no command here may end the script.
@@ -77,7 +83,7 @@ docker run -d --name "$container" \
 # Wait for mongod to accept connections
 ready=0
 for attempt in $(seq 1 "$max_ready_attempts"); do
-  if docker exec "$container" mongosh --port "$port" --eval "db.runCommand({ping:1})" 2>/dev/null; then
+  if docker exec -e HOME="$probe_home" "$container" mongosh --port "$port" --eval "db.runCommand({ping:1})" 2>/dev/null; then
     echo "MongoDB is ready"
     ready=1
     break
@@ -95,7 +101,7 @@ done
 [ "$ready" -eq 1 ] || fail "MongoDB did not accept a connection after $max_ready_attempts attempts."
 
 # Initiate replica set (ignore "already initialized" errors)
-docker exec "$container" mongosh --port "$port" --eval "
+docker exec -e HOME="$probe_home" "$container" mongosh --port "$port" --eval "
   try { rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:$port'}]}) }
   catch(e) { if (e.codeName !== 'AlreadyInitialized') throw e; }
 " || fail "Replica set rs0 could not be initiated."
@@ -103,7 +109,7 @@ docker exec "$container" mongosh --port "$port" --eval "
 # Wait for primary election
 elected=0
 for attempt in $(seq 1 "$max_primary_attempts"); do
-  primary=$(docker exec "$container" mongosh --port "$port" --quiet --eval "rs.isMaster().ismaster" 2>/dev/null || echo "false")
+  primary=$(docker exec -e HOME="$probe_home" "$container" mongosh --port "$port" --quiet --eval "rs.isMaster().ismaster" 2>/dev/null || echo "false")
   if [ "$primary" = "true" ]; then
     echo "Replica set primary elected"
     elected=1

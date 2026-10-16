@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.442.0] - 2026-10-16
+
+### Added
+
+- feat(ci): ✨ manual rollback to a version tag (#885)
+
+### Fixed
+
+- fix(ci): 🐛 mongosh probes write outside /data/db (#888)
+
+## [4.441.0] - 2026-10-16
+
+### Added
+
+- feat(artists): ✨ view all releases opens the artist filter (#884)
+
 ## [4.440.0] - 2026-10-16
 
 ### Changed

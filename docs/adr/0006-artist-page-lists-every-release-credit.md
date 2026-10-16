@@ -100,3 +100,28 @@ Component over the same cached read, rendering `ReleaseCard`s with the same
 Play flow. The release picker and the artist player are gone, and so is the
 `?release=` query the nav search used to deep-link into the picker: a
 release picked in the search opens the release page.
+
+## Amendment (2026-10-15): the full list is the filtered releases listing
+
+`/artists/[slug]/releases` is gone, and its URL is a 404 with no redirect.
+"View all releases", beneath the latest release and in the listening
+modal's footer, opens `/releases?artist=<slug>`.
+
+- The `?artist=` filter matches every credit above: a direct credit
+  (`primary` or `featured`) by the public artist with that slug, or a
+  credit by a public band they are a member of. A hidden band's releases
+  are not listed, as on the old page. The `where` was proved on Docker
+  Mongo (`release-artist-filter.contract.spec.ts`).
+- The order rule above no longer holds for the full list. It is the
+  listing's one paged grid, newest first, with no credit groups. Each card
+  is captioned with its album artist, so a featured or band release names
+  who leads it. The latest release still counts direct credits only.
+- The listing names the artist ("Releases by …") under its wordmark. A slug
+  naming no public artist is a 404, as the artist page is.
+- An artist whose only releases are their bands' has no latest release.
+  Their page reads "No releases of their own yet" and still links to the
+  filtered listing.
+
+Trade-off accepted: band membership changes do not invalidate the listing's
+cache. Only the unfiltered first page is cached, so the filtered listing
+is read fresh, and no stale band release can show there.

@@ -173,6 +173,19 @@ describe('start-mongo.sh', () => {
     );
   });
 
+  // mongo:7 sets HOME=/data/db, and its entrypoint chowns /data/db while
+  // mongod starts. A probe that writes mongosh state there races the chown;
+  // a lock file that vanishes mid-chown kills the container (CI run
+  // 38918513740).
+  it('runs every mongosh probe with a HOME outside /data/db', () => {
+    const execs = linesOf(runScript(), 'docker exec ');
+
+    expect(execs).toHaveLength(3);
+    for (const exec of execs) {
+      expect(exec).toMatch(/^docker exec -e HOME=\/tmp mongo-e2e mongosh /);
+    }
+  });
+
   it('retries the image pull against transient registry failures', () => {
     const result = runScript({ pullFailures: 2 });
 

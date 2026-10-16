@@ -165,11 +165,23 @@ describe('ArtistDetailPage', () => {
     expect(latest).toHaveAttribute('data-slug', 'marguerite-ash');
   });
 
-  it('says when there is no release yet', async () => {
-    await renderPage({ newestRelease: null });
+  it('says when there is no release yet, with nothing to view', async () => {
+    await renderPage({ newestRelease: null, releases: [] });
 
     expect(screen.getByText('No releases yet.')).toBeInTheDocument();
     expect(screen.queryByTestId('latest-release')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View all releases' })).not.toBeInTheDocument();
+  });
+
+  it('leads a member with only band releases to them', async () => {
+    const [ownRow] = graph().releases;
+    await renderPage({ newestRelease: null, releases: [{ ...ownRow, credit: 'member' }] });
+
+    expect(screen.getByText('No releases of their own yet.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
+      'href',
+      '/releases?artist=marguerite-ash'
+    );
   });
 
   it('lists the genres, formatted', async () => {

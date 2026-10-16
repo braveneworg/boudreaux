@@ -79,15 +79,21 @@ interface ReleasesHeaderProps {
   showTapHint: boolean;
   /** Show the link back to every artist's releases: only when filtered by artist. */
   showAllArtistsLink: boolean;
+  /** The filtered artist's display name, named under the wordmark; `''` when unfiltered. */
+  artistName: string;
 }
 
 /**
  * The search, then the RELEASES wordmark, in one column as wide as the
- * covers' outer edges (as on the home page), with the "View releases by all
- * artists" link under the wordmark when the listing is filtered by artist,
- * then the touch-only tap hint.
+ * covers' outer edges (as on the home page), with the filtered artist's name
+ * and the "View releases by all artists" link under the wordmark when the
+ * listing is filtered by artist, then the touch-only tap hint.
  */
-const ReleasesHeader = ({ showTapHint, showAllArtistsLink }: ReleasesHeaderProps): ReactElement => (
+const ReleasesHeader = ({
+  showTapHint,
+  showAllArtistsLink,
+  artistName,
+}: ReleasesHeaderProps): ReactElement => (
   <div className="mb-8">
     {/* The search and the wordmark share this column so the wordmark's left
         edge sits on the search box's left edge at every column count. */}
@@ -100,6 +106,9 @@ const ReleasesHeader = ({ showTapHint, showAllArtistsLink }: ReleasesHeaderProps
         priority
         className="mt-7 mb-0 -ml-1.5 block text-left"
       />
+      {artistName ? (
+        <h2 className="mt-3 text-xl font-semibold text-zinc-950">Releases by {artistName}</h2>
+      ) : null}
       {showAllArtistsLink ? (
         <p className="mt-3 text-sm">
           <Link
@@ -127,6 +136,8 @@ const ReleasesHeader = ({ showTapHint, showAllArtistsLink }: ReleasesHeaderProps
 interface ReleasesContentProps {
   /** Artist slug from `/releases?artist=`: list only that artist's releases. */
   artist?: string;
+  /** The display name of the `artist` slug's artist, named under the wordmark. */
+  artistName?: string;
 }
 
 /**
@@ -136,8 +147,9 @@ interface ReleasesContentProps {
  * above the title. A cover opens the listening modal on the release's first
  * track, in the page's cyan accent.
  *
- * With an `artist` slug the grid lists only the releases crediting that
- * artist, and a "View releases by all artists" link sits under the wordmark.
+ * With an `artist` slug the grid lists only the releases that artist holds a
+ * release credit on (their bands' included), and the artist's name and a
+ * "View releases by all artists" link sit under the wordmark.
  *
  * Pages through published releases with infinite scroll (the first page is
  * hydrated from the SSR prefetch, so the covers are server-rendered), with no
@@ -145,7 +157,10 @@ interface ReleasesContentProps {
  * the server directly (across every artist), so it is not coupled to the
  * loaded pages.
  */
-export const ReleasesContent = ({ artist = '' }: ReleasesContentProps): ReactElement => {
+export const ReleasesContent = ({
+  artist = '',
+  artistName = '',
+}: ReleasesContentProps): ReactElement => {
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfinitePublishedReleasesQuery('', artist);
   const showAllArtistsLink = artist !== '';
@@ -160,7 +175,11 @@ export const ReleasesContent = ({ artist = '' }: ReleasesContentProps): ReactEle
   if (error && !data) {
     return (
       <>
-        <ReleasesHeader showTapHint={false} showAllArtistsLink={showAllArtistsLink} />
+        <ReleasesHeader
+          showTapHint={false}
+          showAllArtistsLink={showAllArtistsLink}
+          artistName={artistName}
+        />
         <ReleasesError onRetry={refetch} />
       </>
     );
@@ -170,7 +189,11 @@ export const ReleasesContent = ({ artist = '' }: ReleasesContentProps): ReactEle
 
   return (
     <>
-      <ReleasesHeader showTapHint={cards.length > 0} showAllArtistsLink={showAllArtistsLink} />
+      <ReleasesHeader
+        showTapHint={cards.length > 0}
+        showAllArtistsLink={showAllArtistsLink}
+        artistName={artistName}
+      />
 
       {cards.length === 0 ? (
         <p className="py-12 text-center text-lg text-zinc-500">No releases available.</p>

@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
 
 test.describe('Artist Page', () => {
   // The page leads with the newest release the artist holds a direct credit
-  // on (ADR-0006 amendment); every release lives on /artists/[slug]/releases.
+  // on (ADR-0006 amendment); every release lives on /releases?artist=<slug>.
   test.describe('Latest release', () => {
     test('leads with the newest release and links to every release', async ({ page }) => {
       await page.goto('/artists/e2e-artist');
@@ -24,8 +24,10 @@ test.describe('Artist Page', () => {
 
       await page.getByRole('link', { name: 'View all releases' }).click();
 
-      await expect(page).toHaveURL(/\/artists\/e2e-artist\/releases$/, { timeout: 15_000 });
-      await expect(page.getByRole('heading', { level: 1, name: 'E2E Artist' })).toBeVisible();
+      await expect(page).toHaveURL(/\/releases\?artist=e2e-artist$/, { timeout: 15_000 });
+      await expect(
+        page.getByRole('heading', { level: 2, name: 'Releases by E2E Artist' })
+      ).toBeVisible();
     });
 
     test('plays the latest release in place on a click, and returns focus on close', async ({
@@ -64,7 +66,10 @@ test.describe('Artist Page', () => {
 
       await dialog.getByRole('link', { name: 'View all releases' }).click();
 
-      await expect(page).toHaveURL(/\/artists\/e2e-artist\/releases$/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/releases\?artist=e2e-artist$/, { timeout: 15_000 });
+      await expect(
+        page.getByRole('heading', { level: 2, name: 'Releases by E2E Artist' })
+      ).toBeVisible();
     });
   });
 

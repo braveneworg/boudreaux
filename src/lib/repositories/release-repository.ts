@@ -323,11 +323,34 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
 };
 
 /**
+ * Match the releases the public artist with this slug holds a release credit
+ * on (ADR-0006): a direct credit (primary or featured), or a credit by a
+ * public band they are a member of. A hidden artist's slug matches nothing,
+ * and neither does a hidden band's release.
+ */
+const creditedToArtistWhere = (slug: string): Prisma.ReleaseWhereInput => {
+  const theArtist = { is: { slug, ...publicArtistWhere } };
+  return {
+    artistReleases: {
+      some: {
+        artist: {
+          is: {
+            OR: [
+              { slug, ...publicArtistWhere },
+              { ...publicArtistWhere, members: { some: { member: theArtist } } },
+            ],
+          },
+        },
+      },
+    },
+  };
+};
+
+/**
  * Build the public-listing `where` from an optional search term and an
  * optional artist slug. The deletedOn OR and the search OR are combined under
  * `AND` so they don't collide on the same `OR` key; the artist filter is one
- * more `AND` member, matching a credit by the public artist with that slug, so
- * a hidden artist's slug matches nothing.
+ * more `AND` member ({@link creditedToArtistWhere}).
  */
 const buildPublishedWhere = ({
   search,
@@ -371,9 +394,7 @@ const buildPublishedWhere = ({
             },
           ]
         : []),
-      ...(artist
-        ? [{ artistReleases: { some: { artist: { is: { slug: artist, ...publicArtistWhere } } } } }]
-        : []),
+      ...(artist ? [creditedToArtistWhere(artist)] : []),
     ],
   };
 };
