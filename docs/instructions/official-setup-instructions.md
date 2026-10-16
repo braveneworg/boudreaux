@@ -228,7 +228,7 @@ These run automatically via Husky:
 
 ## 8. CI overview
 
-Three workflows are relevant:
+Five workflows are relevant:
 
 **`.github/workflows/ci.yml`** — unit + E2E on every PR.
 
@@ -279,6 +279,52 @@ DATABASE_URL='<prod-mongodb-uri>' pnpm exec prisma db push
 
 The runner connects from a GitHub-hosted IP, so the production database's network access list
 must admit GitHub Actions runners.
+
+**`.github/workflows/roll-host.yml`** — the host roll, shared by `deploy.yml` and `rollback.yml`.
+
+- A `workflow_call` that writes the remote env file from the repository secrets, uploads the
+  compose files, observability configs and `scripts/ci/deploy-remote.sh` from the commit it is
+  given (`files_ref`), rolls the containers to two image digests, and verifies health. Both
+  callers pass `secrets: inherit`, so the env list cannot drift between a deploy and a rollback.
+- Every built image is tagged `sha-<commit>` at build time, and `deploy.yml`'s version-bump
+  retags the deployed digests `vX.Y.Z` once the release exists. `latest` is the live image.
+
+**`.github/workflows/rollback.yml`** — manual rollback to an earlier version (ADR-0021).
+
+Actions → Rollback → Run workflow. Two inputs, both optional:
+
+- `version` — the tag to deploy (`v4.438.0`). Empty means the version just below the live one.
+  Only versions deployed after the image tagging began are targets; a deploy whose version bump
+  was skipped (`version:skip`) has no tag and is not one.
+- `force` — roll even though the schema tripwire blocked (see below).
+
+What it does, in about two minutes: resolves the target and its digests from GHCR, finds the
+target's deployed commit (the `Deployed-Sha` trailer on its release commit), diffs the Prisma
+schema between the live and target commits, then rolls the host through `roll-host.yml` with the
+target's files and digests, verifies health, and moves `latest` in GHCR to the rolled digests so
+a second rollback steps back one more version. It runs no build, test, lint or type check, never
+pushes the schema, and writes no release commit or tag. The run summary records the operator,
+the live version before, the target, and its deployed commit.
+
+What it refuses:
+
+- **Schema tripwire.** If the live version removed or retyped a field, or dropped an index, that
+  the target still declares, the run fails with the diff in its summary. The rollback never
+  pushes the schema, so the older code would run without something it may need. Read the diff;
+  if the older code does not depend on it, re-run with `force: true`. If it does, fix forward or
+  apply the index by hand (see the `prisma db push` section above) before rolling.
+- **A failed health check after the roll.** The remote script leaves the containers as they are
+  and the run goes red (`ROLLBACK_RUN=true` turns off its re-pull of the digests it found on the
+  host, which would be the version you just tried to remove). Pick another version or fix
+  forward.
+
+What no rollback fixes: a version that already wrote documents the older code cannot read. That
+is a data migration, not a deploy. The rule in `prisma/AGENTS.md` (every version readable by its
+predecessor; removals ship one version after the code stops writing the old shape) is what keeps
+a one-step rollback safe.
+
+Starting a rollback cancels a forward deploy in flight (same concurrency group); its images are
+already in GHCR and the next merge rebuilds anyway.
 
 **`.github/workflows/deploy-bio-generator.yml`** — deploys the Lambda (new).
 

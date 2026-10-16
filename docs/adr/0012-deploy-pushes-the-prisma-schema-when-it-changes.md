@@ -1,6 +1,7 @@
 # ADR-0012: Deploy pushes the Prisma schema when it changes
 
-- **Status**: Accepted
+- **Status**: Accepted; amended 2026-10-15 (a rollback never pushes; the
+  marker is the schema last applied, see ADR-0021)
 - **Date**: 2026-09-26
 
 ## Context
@@ -69,7 +70,16 @@ differs from the last deployed commit.**
 - A deploy whose version bump is skipped (`version:skip`, or no PR) writes
   no marker. The next deploy diffs against an older marker, which can only
   add a push, never lose one.
-- Re-running an old deploy (a rollback) pushes the older schema when it
-  differs, so indexes follow the code that is running.
+- ~~Re-running an old deploy (a rollback) pushes the older schema when it
+  differs, so indexes follow the code that is running.~~ Amended
+  2026-10-15: a rollback (`rollback.yml`, ADR-0021) never pushes the
+  schema and writes no release commit. The `Deployed-Sha` marker therefore
+  means "the commit whose schema was last applied to production", not "the
+  code that is live". Pushing the older schema would drop the newer
+  version's indexes while the marker still named the newer version, and the
+  next forward deploy's gate would skip the push that restores them. Older
+  code runs fine with the newer version's extra fields and indexes; the one
+  case it cannot, a dropped index or a retyped field, is what the rollback's
+  schema tripwire stops on.
 - Until the first marked release, deploys skip the push. Any schema change
   merged before then needs the manual push once.

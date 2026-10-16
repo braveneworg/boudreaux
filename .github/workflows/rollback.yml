@@ -1,0 +1,173 @@
+name: Rollback
+
+# Manual, code-only rollback to an earlier version (ADR-0021). Nothing is
+# built, tested, linted, or type-checked, and the Prisma schema is never
+# pushed: the images a version was deployed from already exist in GHCR under
+# its `vX.Y.Z` tag, and the host roll is the same shared workflow the forward
+# deploy uses. Only versions deployed after that tagging began are targets.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to deploy, as its tag (vX.Y.Z). Leave empty for the version
+          just below the live one.
+        required: false
+        type: string
+      force:
+        description: >-
+          Roll back even though the live version removed or retyped a field,
+          or dropped an index, that the target's schema has. The rollback
+          never pushes the schema, so older code may then run without
+          something it needs. Read the diff in the failed run first.
+        required: false
+        type: boolean
+        default: false
+
+# The same group as deploy.yml on main, so a rollback and a forward deploy
+# never touch the host at once. Starting a rollback cancels a forward deploy
+# in flight: the operator has decided the older version wins.
+concurrency:
+  group: cicd-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  resolve:
+    name: Resolve the target version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      live: ${{ steps.target.outputs.live }}
+      target: ${{ steps.target.outputs.target }}
+      target_sha: ${{ steps.commits.outputs.target_sha }}
+      website_digest: ${{ steps.target.outputs.website_digest }}
+      nginx_digest: ${{ steps.target.outputs.nginx_digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Full history: the deployed commit of a version is the Deployed-Sha
+          # trailer on its release commit, found by subject on origin/main.
+          fetch-depth: 0
+
+      - name: List the image versions in GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -eo pipefail
+          gh api --paginate "/orgs/${OWNER}/packages/container/boudreaux%2Fwebsite/versions?per_page=100" \
+            | jq -s 'add' > website-versions.json
+          gh api --paginate "/orgs/${OWNER}/packages/container/boudreaux%2Fnginx/versions?per_page=100" \
+            | jq -s 'add' > nginx-versions.json
+          echo "website image versions: $(jq 'length' website-versions.json)"
+          echo "nginx image versions:   $(jq 'length' nginx-versions.json)"
+
+      - name: Resolve the target version
+        id: target
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          set -eo pipefail
+          bash scripts/ci/rollback-resolve.sh "$REQUESTED" website-versions.json nginx-versions.json | tee -a "$GITHUB_OUTPUT"
+
+      - name: Find the deployed commits
+        id: commits
+        env:
+          TARGET: ${{ steps.target.outputs.target }}
+          LIVE: ${{ steps.target.outputs.live }}
+        run: |
+          set -eo pipefail
+          target_sha=$(bash scripts/ci/release-deployed-sha.sh "$TARGET" origin/main)
+          echo "target ${TARGET} was deployed from ${target_sha}"
+          echo "target_sha=${target_sha}" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$LIVE" ]; then
+            live_sha=$(bash scripts/ci/release-deployed-sha.sh "$LIVE" origin/main)
+            echo "live ${LIVE} was deployed from ${live_sha}"
+            echo "live_sha=${live_sha}" >> "$GITHUB_OUTPUT"
+          else
+            echo "live version unknown (latest carries no version tag); skipping the schema check"
+            echo "live_sha=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The rollback never pushes the schema. The one thing it cannot undo is
+      # a live version that removed or retyped a field, or dropped an index,
+      # the target still declares: older code may need it. Stop there unless
+      # the operator forces it, and show the diff either way.
+      - name: Check the schema between live and target
+        env:
+          LIVE_SHA: ${{ steps.commits.outputs.live_sha }}
+          TARGET_SHA: ${{ steps.commits.outputs.target_sha }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -eo pipefail
+          if [ -z "$LIVE_SHA" ]; then
+            echo "No live version to compare against; continuing."
+            exit 0
+          fi
+
+          decision=$(bash scripts/ci/schema-rollback-tripwire.sh "$LIVE_SHA" "$TARGET_SHA" 2> schema.diff)
+          echo "Schema check: ${decision}"
+
+          if [ "$decision" = "blocked" ]; then
+            {
+              echo "## Schema check: blocked"
+              echo
+              echo "The live version removed or changed schema the target has. A rollback never pushes the schema, so the older code may run without it."
+              echo
+              echo '```diff'
+              cat schema.diff
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$FORCE" = "true" ]; then
+              echo "::warning::Schema check blocked; continuing because force=true"
+              echo "**Forced past by ${{ github.actor }}.**" >> "$GITHUB_STEP_SUMMARY"
+            else
+              cat schema.diff
+              echo "::error::The live version made a destructive schema change relative to the target. Re-run with force=true to roll back anyway, or fix forward."
+              exit 1
+            fi
+          fi
+
+      - name: Summarize the plan
+        env:
+          LIVE: ${{ steps.target.outputs.live }}
+          TARGET: ${{ steps.target.outputs.target }}
+          TARGET_SHA: ${{ steps.commits.outputs.target_sha }}
+          WEBSITE_DIGEST: ${{ steps.target.outputs.website_digest }}
+          NGINX_DIGEST: ${{ steps.target.outputs.nginx_digest }}
+          REASON: ${{ steps.target.outputs.reason }}
+        run: |
+          {
+            echo "## Rollback"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Operator | ${{ github.actor }} |"
+            echo "| Live before | ${LIVE:-unknown (latest carried no version tag)} |"
+            echo "| Target | ${TARGET} |"
+            echo "| Deployed commit | ${TARGET_SHA} |"
+            echo "| Website image | \`${WEBSITE_DIGEST}\` |"
+            echo "| nginx image | \`${NGINX_DIGEST}\` |"
+            echo
+            echo "${REASON}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  roll:
+    name: Roll the host to the target
+    needs: [resolve]
+    uses: ./.github/workflows/roll-host.yml
+    with:
+      website_digest: ${{ needs.resolve.outputs.website_digest }}
+      nginx_digest: ${{ needs.resolve.outputs.nginx_digest }}
+      files_ref: ${{ needs.resolve.outputs.target_sha }}
+      rollback_run: true
+    secrets: inherit

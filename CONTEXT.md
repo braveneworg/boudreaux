@@ -358,3 +358,32 @@ away; claiming pauses whoever held it. The session knows only `{ id, pause }`,
 which is what lets it span audio and video without either side knowing the other
 exists. Distinct from **player preferences** (volume and mute), which are shared
 by every player but are settings, not playback state.
+
+## Shipping vocabulary
+
+**version** — one shipped build of the software, named by its `vX.Y.Z` tag.
+Its tag sits on the release commit, which can be newer than the commit it was
+built from. Not a **Release**, which is a body of work by an Artist.
+_Avoid_: release (for software), build, deploy (as a noun for the thing shipped).
+
+**deployed commit** — the commit a **version** was built from and health-checked
+on. Recorded on the version's release commit. The tag can sit on a newer
+commit, so the two are not the same thing.
+See [ADR-0012](docs/adr/0012-deploy-pushes-the-prisma-schema-when-it-changes.md).
+
+**live version** — the **version** serving production right now. After a
+**rollback** it is older than the newest version. Not the Video **live** state
+above.
+_Avoid_: current version, deployed version.
+
+**rollback** — a deploy of a **version** older than the **live version**, code
+only: it changes no data and no schema, and writes no release commit.
+"Previous" means the version just below the live one, so repeated rollbacks
+step back one version each time.
+See [ADR-0021](docs/adr/0021-a-rollback-is-code-only-and-targets-a-version-tag.md).
+_Avoid_: revert (that is a git operation on main), redeploy.
+
+**schema tripwire** — the check a **rollback** makes before rolling: whether the
+**live version** removed or retyped a field, or dropped an index, that the
+target still declares. Older code may need those, and a rollback never puts
+them back, so the run stops unless the operator forces it. Additions pass.

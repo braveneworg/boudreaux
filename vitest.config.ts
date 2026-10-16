@@ -39,7 +39,10 @@ const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.s
 // via `pnpm run test:shell`) and stay out of the default local run.
 export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/nginx-config-test.spec.ts',
+  'scripts/ci/release-deployed-sha.spec.ts',
+  'scripts/ci/rollback-resolve.spec.ts',
   'scripts/ci/schema-push-gate.spec.ts',
+  'scripts/ci/schema-rollback-tripwire.spec.ts',
   'scripts/ci/start-mongo.spec.ts',
   'scripts/assert-toolchain.spec.ts',
   'scripts/check-toolchain-pins.spec.ts',

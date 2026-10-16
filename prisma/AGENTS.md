@@ -12,4 +12,12 @@
   `schema-push` job runs `prisma db push` before the roll when
   `schema.prisma` changed (ADR-0012). No manual post-merge push, except for
   a destructive change, which fails the deploy and is applied by hand.
+- Every version must be readable by the version before it (expand, then
+  contract). A PR may add fields and indexes and start writing new shapes;
+  it never removes a field, changes a field's type, or drops an index in the
+  same version that stops writing the old shape. The removal ships one
+  version later, once the version before it already tolerates the absence.
+  This is what makes a one-step rollback safe: the rollback never pushes
+  the schema and never rewrites documents (ADR-0021), and its schema
+  tripwire stops on exactly the changes this rule forbids.
 - Load `docs/lessons/prisma-mongo/` before query or seed changes.
