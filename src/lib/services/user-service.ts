@@ -7,7 +7,6 @@ import { generateUsername } from 'unique-username-generator';
 
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { DataError } from '@/lib/types/domain/errors';
-import { loggers } from '@/lib/utils/logger';
 
 /** Result of {@link UserService.updateUsername}. */
 export interface UpdateUsernameResult {
@@ -26,38 +25,6 @@ export interface CreateGuestPurchaserResult {
 }
 
 export const UserService = {
-  ensureAdminUser: async ({
-    firstName,
-    lastName,
-    phone,
-    email,
-    role = 'admin',
-  }: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    email: string;
-    role?: string;
-  }) => {
-    const adminUser = await UserRepository.findByEmail(email);
-
-    if (!adminUser) {
-      loggers.auth.info('🌱 Creating admin user...');
-      await UserRepository.create({
-        firstName,
-        lastName,
-        phone,
-        email,
-        name: 'Admin',
-        role,
-        emailVerified: true,
-      });
-      loggers.auth.info(`✅ Admin user, ${email}, created.`);
-    } else {
-      loggers.auth.info(`ℹ️ Admin user, ${email}, already exists.`);
-    }
-  },
-
   /**
    * Look up a user by email. Returns null when no match is found.
    */

@@ -66,25 +66,25 @@ const findKeys = async (where: Prisma.ArtistWhereInput): Promise<string[]> => {
 };
 
 beforeAll(async () => {
-  const [listed, draft] = await Promise.all([
-    prisma.release.create({
-      data: {
-        title: `${prefix}listed`,
-        releasedOn: SET_AT,
-        coverArt: 'https://cdn.example.com/contract.webp',
-        publishedAt: SET_AT,
-      },
-      select: { id: true },
-    }),
-    prisma.release.create({
-      data: {
-        title: `${prefix}draft`,
-        releasedOn: SET_AT,
-        coverArt: 'https://cdn.example.com/contract.webp',
-      },
-      select: { id: true },
-    }),
-  ]);
+  // Serial creates: concurrent first writes to a fresh collection race
+  // Prisma's post-insert read-back (docs/lessons/prisma-mongo).
+  const listed = await prisma.release.create({
+    data: {
+      title: `${prefix}listed`,
+      releasedOn: SET_AT,
+      coverArt: 'https://cdn.example.com/contract.webp',
+      publishedAt: SET_AT,
+    },
+    select: { id: true },
+  });
+  const draft = await prisma.release.create({
+    data: {
+      title: `${prefix}draft`,
+      releasedOn: SET_AT,
+      coverArt: 'https://cdn.example.com/contract.webp',
+    },
+    select: { id: true },
+  });
   listedReleaseId = listed.id;
   draftReleaseId = draft.id;
 

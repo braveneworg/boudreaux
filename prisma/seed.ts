@@ -1,14 +1,15 @@
 import { Platform, PrismaClient } from '@prisma/client';
 
-import { UserService } from '@/lib/services/user-service';
-
 import type { Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Validate one admin's env-derived fields and create the admin user. Exits the
-// process (code 1) with a descriptive message if any required field is missing —
-// extracted from `createAdminUsers` to keep its cyclomatic complexity in bounds.
+// Validate one admin's env-derived fields and create the admin user unless one
+// with that email exists. Exits the process (code 1) with a descriptive message
+// if any required field is missing — extracted from `createAdminUsers` to keep
+// its cyclomatic complexity in bounds. Writes through this file's own client:
+// services, repositories and `@/lib/prisma` are guarded to the Next.js server
+// and throw under plain `tsx` (see prisma/seed.spec.ts).
 const ensureAdminFromEnv = async ({
   firstName,
   lastName,
@@ -27,13 +28,26 @@ const ensureAdminFromEnv = async ({
     process.exit(1);
   }
 
-  await UserService.ensureAdminUser({
-    firstName,
-    lastName,
-    email,
-    phone,
-    role: 'admin',
+  const adminUser = await prisma.user.findUnique({ where: { email } });
+
+  if (adminUser) {
+    console.info(`ℹ️ Admin user, ${email}, already exists.`);
+    return;
+  }
+
+  console.info('🌱 Creating admin user...');
+  await prisma.user.create({
+    data: {
+      firstName,
+      lastName,
+      phone,
+      email,
+      name: 'Admin',
+      role: 'admin',
+      emailVerified: true,
+    },
   });
+  console.info(`✅ Admin user, ${email}, created.`);
 };
 
 const createAdminUsers = async () => {
