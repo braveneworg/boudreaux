@@ -28,7 +28,7 @@ const ceschi = {
   artistSlug: 'ceschi',
   artistName: 'Ceschi',
   thumbnailSrc: null,
-  releases: [{ id: 'r-1', title: 'Broken Bone Ballads' }],
+  releases: [{ id: 'r-1', title: 'Broken Bone Ballads', coverArtSrc: null }],
 };
 
 const stubSearchReturning = (results: (typeof ceschi)[]) =>

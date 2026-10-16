@@ -548,6 +548,34 @@ describe('ArtistRepository', () => {
       });
     });
 
+    // The dropdown shows each release's cover art, resolved the way every
+    // public listing resolves it: `coverArt`, else the first image by sort order.
+    it('selects each release with its cover art and first image', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.searchPublished({});
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.releases).toEqual({
+        select: {
+          release: {
+            select: {
+              id: true,
+              title: true,
+              coverArt: true,
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
+                select: { src: true, altText: true },
+              },
+              publishedAt: true,
+              deletedOn: true,
+            },
+          },
+        },
+      });
+    });
+
     // ADR-0007: a public read selects what it shows. The search dropdown
     // shows a name, a slug, a thumbnail and release titles; an include would
     // load every scalar — phone, email, the job tokens — into memory for the

@@ -95,6 +95,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-1',
               title: 'Album One',
+              coverArt: 'https://example.com/album-one.jpg',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: null,
             },
@@ -117,8 +119,80 @@ describe('GET /api/artists/search', () => {
       artistSlug: 'john-doe',
       artistName: 'John Doe',
       thumbnailSrc: 'https://example.com/thumb.jpg',
-      releases: [{ id: 'release-1', title: 'Album One' }],
+      releases: [
+        { id: 'release-1', title: 'Album One', coverArtSrc: 'https://example.com/album-one.jpg' },
+      ],
     });
+  });
+
+  it('should fall back to the first release image when the cover art is empty', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        bioImages: [],
+        releases: [
+          {
+            release: {
+              id: 'release-1',
+              title: 'Album One',
+              coverArt: '',
+              images: [{ src: 'https://example.com/album-one-image.jpg', altText: null }],
+              publishedAt: new Date('2024-01-01'),
+              deletedOn: null,
+            },
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValueOnce({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const response = await GET(createRequest('john'), dummyContext);
+    const body = await response.json();
+
+    expect(body.results[0].releases[0].coverArtSrc).toBe('https://example.com/album-one-image.jpg');
+  });
+
+  it('should use null for the cover art when a release has neither cover art nor images', async () => {
+    const mockArtists = [
+      {
+        id: 'artist-1',
+        firstName: 'John',
+        surname: 'Doe',
+        displayName: 'John Doe',
+        slug: 'john-doe',
+        bioImages: [],
+        releases: [
+          {
+            release: {
+              id: 'release-1',
+              title: 'Album One',
+              coverArt: '',
+              images: [],
+              publishedAt: new Date('2024-01-01'),
+              deletedOn: null,
+            },
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(ArtistService.searchPublishedArtists).mockResolvedValueOnce({
+      success: true,
+      data: mockArtists as never,
+    });
+
+    const response = await GET(createRequest('john'), dummyContext);
+    const body = await response.json();
+
+    expect(body.results[0].releases[0].coverArtSrc).toBeNull();
   });
 
   it('should filter out unpublished releases', async () => {
@@ -135,6 +209,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-1',
               title: 'Published Album',
+              coverArt: '',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: null,
             },
@@ -143,6 +219,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-2',
               title: 'Unpublished Album',
+              coverArt: '',
+              images: [],
               publishedAt: null,
               deletedOn: null,
             },
@@ -178,6 +256,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-1',
               title: 'Active Album',
+              coverArt: '',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: null,
             },
@@ -186,6 +266,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-2',
               title: 'Deleted Album',
+              coverArt: '',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: new Date('2024-06-01'),
             },
@@ -450,6 +532,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-1',
               title: 'Missing publishedAt',
+              coverArt: '',
+              images: [],
               publishedAt: undefined,
               deletedOn: null,
             },
@@ -458,6 +542,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-2',
               title: 'Published Album',
+              coverArt: '',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: null,
             },
@@ -493,6 +579,8 @@ describe('GET /api/artists/search', () => {
             release: {
               id: 'release-1',
               title: 'Active Album',
+              coverArt: '',
+              images: [],
               publishedAt: new Date('2024-01-01'),
               deletedOn: undefined,
             },

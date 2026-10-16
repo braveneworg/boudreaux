@@ -226,8 +226,10 @@ const artistListingSelect = {
 /**
  * Public-search select (ADR-0007): the name fields and slug the dropdown
  * shows, the display-image candidates behind its thumbnail, and release joins
- * carrying the narrow release projection the search consumes — and nothing
- * the public may not see.
+ * carrying the narrow release projection the search consumes — each release's
+ * title and the cover art behind its row (`coverArt`, else the first image by
+ * sort order, as every public listing resolves it) — and nothing the public
+ * may not see.
  */
 const artistSearchSelect = {
   ...artistListingNameSelect,
@@ -239,7 +241,16 @@ const artistSearchSelect = {
   },
   releases: {
     select: {
-      release: { select: { id: true, title: true, publishedAt: true, deletedOn: true } },
+      release: {
+        select: {
+          id: true,
+          title: true,
+          coverArt: true,
+          images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { src: true, altText: true } },
+          publishedAt: true,
+          deletedOn: true,
+        },
+      },
     },
   },
 } as const satisfies Prisma.ArtistSelect;

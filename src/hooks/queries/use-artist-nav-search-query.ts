@@ -12,7 +12,7 @@ export interface ArtistNavSearchResult {
   artistSlug: string;
   artistName: string;
   thumbnailSrc: string | null;
-  releases: Array<{ id: string; title: string }>;
+  releases: Array<{ id: string; title: string; coverArtSrc: string | null }>;
 }
 
 interface ArtistNavSearchResponse {
@@ -29,6 +29,7 @@ const artistNavSearchResponseSchema = z.object({
         z.object({
           id: z.string(),
           title: z.string(),
+          coverArtSrc: z.string().nullable(),
         })
       ),
     })
