@@ -28,7 +28,16 @@ const ceschi = {
   artistSlug: 'ceschi',
   artistName: 'Ceschi',
   thumbnailSrc: null,
-  releases: [{ id: 'r-1', title: 'Broken Bone Ballads', coverArtSrc: null }],
+  releases: [
+    {
+      id: 'r-1',
+      title: 'Broken Bone Ballads',
+      coverArtSrc: null,
+      playSrc: 'https://cdn.example.com/r-1/01.mp3',
+      year: 2024,
+    },
+  ],
+  videos: [],
 };
 
 const stubSearchReturning = (results: (typeof ceschi)[]) =>

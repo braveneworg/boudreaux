@@ -12,7 +12,9 @@ import {
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { playableFormatWhere } from './_internal/playable-formats';
 import { releaseWhere } from './_internal/release-where';
+import { publicVideoWhere } from './_internal/video-where';
 import { isUnsetOr } from './_internal/where-kit';
 import { ArtistRepository } from './artist-repository';
 
@@ -662,6 +664,205 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where?.AND).toBeDefined();
+    });
+  });
+
+  describe('searchForHomeNav', () => {
+    const NOW = new Date('2026-10-16T12:00:00.000Z');
+    const playableListedRelease = {
+      ...releaseWhere.listed,
+      digitalFormats: { some: { ...playableFormatWhere, files: { some: {} } } },
+    };
+    const hasCredit = {
+      OR: [
+        { releases: { some: { release: playableListedRelease } } },
+        { videoArtists: { some: { video: { is: publicVideoWhere(NOW) } } } },
+      ],
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const findManyArg = () => vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+
+    it('finds public artists credited on a playable listed release or a live video', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({});
+
+      expect(findManyArg()?.where).toEqual({ ...publicArtistWhere, AND: [hasCredit] });
+    });
+
+    // The credit joins `releases` deepest, so it is the last member to read it
+    // (docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md).
+    it('lets each search token match a name, a release title or a live video title', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({ search: 'ash' });
+
+      const contains = { contains: 'ash', mode: 'insensitive' };
+      expect(findManyArg()?.where).toEqual({
+        ...publicArtistWhere,
+        AND: [
+          {
+            OR: [
+              { firstName: contains },
+              { middleName: contains },
+              { surname: contains },
+              { displayName: contains },
+              { title: contains },
+              { suffix: contains },
+              { slug: contains },
+              { akaNames: contains },
+              { genres: contains },
+              { releases: { some: { release: { title: contains, ...releaseWhere.listed } } } },
+              {
+                videoArtists: {
+                  some: { video: { is: { title: contains, ...publicVideoWhere(NOW) } } },
+                },
+              },
+            ],
+          },
+          hasCredit,
+        ],
+      });
+    });
+
+    it('needs every token to match, each in a block of its own', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({ search: 'marguerite ash' });
+
+      expect(findManyArg()?.where?.AND).toHaveLength(3);
+    });
+
+    it('loads only playable listed releases, with the first file of the playable format', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({});
+
+      expect(findManyArg()?.select?.releases).toEqual({
+        where: { release: playableListedRelease },
+        select: {
+          release: {
+            select: {
+              id: true,
+              title: true,
+              coverArt: true,
+              releasedOn: true,
+              images: {
+                orderBy: { sortOrder: 'asc' },
+                take: 1,
+                select: { src: true, altText: true },
+              },
+              digitalFormats: {
+                where: playableFormatWhere,
+                select: {
+                  files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('loads only the video credits on live videos, read at the same moment', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({});
+
+      expect(findManyArg()?.select?.videoArtists).toEqual({
+        where: { video: { is: publicVideoWhere(NOW) } },
+        select: {
+          video: {
+            select: {
+              id: true,
+              title: true,
+              posterUrl: true,
+              releasedOn: true,
+              durationSeconds: true,
+              s3Key: true,
+            },
+          },
+        },
+      });
+    });
+
+    // ADR-0007: a public read selects what it shows.
+    it('selects the public name fields and no private scalar', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([] as never);
+
+      await ArtistRepository.searchForHomeNav({});
+
+      const arg = findManyArg();
+      expect(arg).not.toHaveProperty('include');
+      expect(Object.keys(arg?.select ?? {}).sort()).toEqual([
+        'bioImages',
+        'displayName',
+        'firstName',
+        'id',
+        'middleName',
+        'releases',
+        'slug',
+        'suffix',
+        'surname',
+        'title',
+        'videoArtists',
+      ]);
+      expect(arg?.select?.bioImages).toEqual({
+        where: bioImageWhere.displayCandidate,
+        orderBy: { sortOrder: 'asc' },
+        select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
+      });
+    });
+
+    it('orders matches by displayed name and slices the requested page', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([
+        { id: 'c', displayName: 'Cara', videoArtists: [] },
+        { id: 'a', displayName: 'alice', videoArtists: [] },
+        { id: 'b', displayName: 'Bob', videoArtists: [] },
+      ] as never);
+
+      const result = await ArtistRepository.searchForHomeNav({ skip: 1, take: 1 });
+
+      expect(result.map(({ id }) => id)).toEqual(['b']);
+      const arg = findManyArg();
+      expect(arg).not.toHaveProperty('skip');
+      expect(arg).not.toHaveProperty('take');
+    });
+
+    it("orders each artist's videos newest first, then by title, undated last", async () => {
+      const video = (id: string, title: string, releasedOn: Date | null) => ({
+        video: { id, title, releasedOn },
+      });
+      vi.mocked(prisma.artist.findMany).mockResolvedValueOnce([
+        {
+          id: 'a',
+          displayName: 'Alice',
+          videoArtists: [
+            video('undated', 'Aardvark', null),
+            video('old', 'Old', new Date('2024-01-01')),
+            video('new-b', 'Bravo', new Date('2026-01-01')),
+            video('new-a', 'Alpha', new Date('2026-01-01')),
+          ],
+        },
+      ] as never);
+
+      const [artist] = await ArtistRepository.searchForHomeNav({});
+
+      expect(artist.videoArtists.map(({ video: { id } }) => id)).toEqual([
+        'new-a',
+        'new-b',
+        'old',
+        'undated',
+      ]);
     });
   });
 

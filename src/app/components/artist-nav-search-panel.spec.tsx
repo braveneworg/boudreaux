@@ -14,26 +14,37 @@ vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => createElement('img', { src, alt }),
 }));
 
+const release = (id: string, title: string, coverArtSrc: string | null) => ({
+  id,
+  title,
+  coverArtSrc,
+  playSrc: `https://cdn.example.com/${id}/01.mp3`,
+  year: 2024,
+});
+
 const ceschi = {
   artistSlug: 'ceschi',
   artistName: 'Ceschi',
   thumbnailSrc: 'https://cdn.example.com/ceschi.jpg',
   releases: [
-    { id: 'r-1', title: 'Broken Bone Ballads', coverArtSrc: 'https://cdn.example.com/bbb.jpg' },
-    { id: 'r-2', title: 'Sad, Fat Luck', coverArtSrc: null },
+    release('r-1', 'Broken Bone Ballads', 'https://cdn.example.com/bbb.jpg'),
+    release('r-2', 'Sad, Fat Luck', null),
   ],
+  videos: [],
 };
 const ramos = {
   artistSlug: 'david-ramos',
   artistName: 'David Ramos',
   thumbnailSrc: null,
-  releases: [{ id: 'r-3', title: 'That Down There', coverArtSrc: null }],
+  releases: [release('r-3', 'That Down There', null)],
+  videos: [],
 };
 const noReleases = {
   artistSlug: 'sixo',
   artistName: 'Sixo',
   thumbnailSrc: null,
   releases: [],
+  videos: [],
 };
 
 const renderPanel = (overrides: Partial<ArtistNavSearchPanelProps> = {}) => {

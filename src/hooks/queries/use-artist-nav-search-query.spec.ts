@@ -46,7 +46,9 @@ describe('useArtistNavSearchQuery', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [] }],
+          results: [
+            { artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [], videos: [] },
+          ],
         }),
       })
     );
@@ -62,7 +64,7 @@ describe('useArtistNavSearchQuery', () => {
 
     expect(options.enabled).toBe(true);
     await expect(options.queryFn({ signal })).resolves.toEqual({
-      results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [] }],
+      results: [{ artistSlug: 'a', artistName: 'A', thumbnailSrc: null, releases: [], videos: [] }],
     });
     expect(global.fetch).toHaveBeenCalledWith('/api/artists/search?q=artist', { signal });
   });
@@ -74,8 +76,57 @@ describe('useArtistNavSearchQuery', () => {
         artistName: 'A',
         thumbnailSrc: null,
         releases: [
-          { id: 'r-1', title: 'One', coverArtSrc: 'https://cdn.example.com/one.jpg' },
-          { id: 'r-2', title: 'Two', coverArtSrc: null },
+          {
+            id: 'r-1',
+            title: 'One',
+            coverArtSrc: 'https://cdn.example.com/one.jpg',
+            playSrc: 'https://cdn.example.com/one/01.mp3',
+            year: 2024,
+          },
+          { id: 'r-2', title: 'Two', coverArtSrc: null, playSrc: null, year: 2023 },
+        ],
+        videos: [],
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ results }) })
+    );
+
+    renderHook(() => useArtistNavSearchQuery('artist'));
+
+    const options = mockUseQuery.mock.calls[0]?.[0] as {
+      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
+    };
+    const { signal } = new AbortController();
+
+    await expect(options.queryFn({ signal })).resolves.toEqual({ results });
+  });
+
+  it('keeps each video row in the parsed results', async () => {
+    const results = [
+      {
+        artistSlug: 'a',
+        artistName: 'A',
+        thumbnailSrc: null,
+        releases: [],
+        videos: [
+          {
+            id: 'v-1',
+            title: 'Video',
+            posterSrc: 'https://cdn.example.com/poster.jpg',
+            streamUrl: 'https://cdn.example.com/video.mp4?signed',
+            year: 2025,
+            durationSeconds: 125,
+          },
+          {
+            id: 'v-2',
+            title: 'Unsigned',
+            posterSrc: null,
+            streamUrl: null,
+            year: 2024,
+            durationSeconds: null,
+          },
         ],
       },
     ];
