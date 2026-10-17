@@ -230,6 +230,51 @@ describe('VideoCard', () => {
 
       expect(screen.getByRole('button', { name: 'Play Live at the Basement' })).toBeDisabled();
     });
+
+    describe('play stamp', () => {
+      const stampOverlay = (): Element | null =>
+        screen
+          .getByRole('button', { name: 'Play Live at the Basement' })
+          .querySelector('[data-slot="video-play-stamp"]');
+
+      it('rests translucent and turns solid on hover and keyboard focus', () => {
+        render(<VideoCard video={baseVideo} />);
+
+        const overlay = stampOverlay();
+        expect(overlay).toHaveClass(
+          'opacity-60',
+          'group-hover:opacity-100',
+          'group-focus-visible:opacity-100'
+        );
+        expect(overlay).not.toHaveClass('opacity-0');
+        expect(overlay).toHaveAttribute('aria-hidden', 'true');
+      });
+
+      it('cuts the stamp square and upright, a black glyph on white in a zine box', () => {
+        render(<VideoCard video={baseVideo} />);
+
+        const stamp = stampOverlay()?.querySelector(':scope > span');
+        expect(stamp).toHaveClass('border-2', 'border-black', 'bg-white', 'shadow-zine-ink');
+        expect(stamp).toHaveClass('group-active:translate-x-0.5', 'group-active:translate-y-0.5');
+        expect(stamp?.className).not.toMatch(/rounded|rotate|bg-black/);
+        expect(stamp?.querySelector('svg')).toHaveClass('fill-current', 'text-black');
+      });
+
+      it('draws the play glyph as a pointed triangle, not the rounded lucide mark', () => {
+        render(<VideoCard video={baseVideo} />);
+
+        const glyph = stampOverlay()?.querySelector('svg');
+        expect(glyph?.querySelector('polygon')).toHaveAttribute('points', '6 3 20 12 6 21');
+        expect(glyph?.querySelector('path')).toBeNull();
+        expect(glyph).toHaveAttribute('stroke', 'none');
+      });
+
+      it('keeps the stamp over the placeholder when the poster url is absent', () => {
+        render(<VideoCard video={{ ...baseVideo, posterUrl: null }} />);
+
+        expect(stampOverlay()).not.toBeNull();
+      });
+    });
   });
 
   describe('modal playback', () => {
