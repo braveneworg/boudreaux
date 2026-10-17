@@ -287,6 +287,45 @@ describe('VideoRepository', () => {
     });
   });
 
+  // The `/videos` "(N videos)" label: the same where as `findPublished`.
+  describe('countPublished', () => {
+    it('counts the visible, non-archived videos with no filters', async () => {
+      vi.mocked(prisma.video.count).mockResolvedValueOnce(12 as never);
+
+      const result = await VideoRepository.countPublished({});
+
+      expect(result).toBe(12);
+      expect(vi.mocked(prisma.video.count).mock.calls).toEqual([
+        [{ where: { AND: [notArchived, videoLiveAt(expect.any(Date) as Date)] } }],
+      ]);
+    });
+
+    it('counts with the search OR and the artist credit filter of the listing', async () => {
+      vi.mocked(prisma.video.count).mockResolvedValueOnce(2 as never);
+
+      await VideoRepository.countPublished({ artist: 'marguerite-ash', search: 'basement' });
+
+      expect(vi.mocked(prisma.video.count).mock.calls).toEqual([
+        [
+          {
+            where: {
+              AND: [
+                notArchived,
+                videoLiveAt(expect.any(Date) as Date),
+                {
+                  videoArtists: {
+                    some: { artist: { is: { slug: 'marguerite-ash', ...publicArtistWhere } } },
+                  },
+                },
+              ],
+              OR: [{ title: contains('basement') }, { artist: contains('basement') }],
+            },
+          },
+        ],
+      ]);
+    });
+  });
+
   // The lean projection pinned for the playlist lookup/search reads.
   const summarySelect = {
     id: true,

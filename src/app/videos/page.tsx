@@ -90,13 +90,20 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
     queryKey: queryKeys.videos.publishedInfinite('desc', '', artist),
     initialPageParam: 0,
     queryFn: async () => {
-      const result = await VideoService.getPublishedVideos({
-        sort: 'desc',
-        skip: 0,
-        take: PUBLISHED_VIDEOS_PAGE_SIZE,
-        ...(artist && { artist }),
-      });
-      const videos = result.success ? result.data : [];
+      const filters = artist ? { artist } : {};
+      const [result, countResult] = await Promise.all([
+        VideoService.getPublishedVideos({
+          sort: 'desc',
+          skip: 0,
+          take: PUBLISHED_VIDEOS_PAGE_SIZE,
+          ...filters,
+        }),
+        VideoService.countPublishedVideos(filters),
+      ]);
+      // Either read failing degrades to the empty page, so the rows and the
+      // "(N videos)" total never disagree.
+      const ok = result.success && countResult.success;
+      const videos = ok ? result.data : [];
       // Route through the shared `toPublicVideoRow` so the dehydrated SSR cache
       // strips every audit/probe/enrichment internal — including the
       // `enrichmentJobToken` callback secret and raw `probeData` — exactly like
@@ -105,6 +112,7 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
       return serializeForResponse({
         rows,
         nextSkip: computeNextSkip(rows.length, 0, PUBLISHED_VIDEOS_PAGE_SIZE),
+        total: ok ? countResult.data : 0,
       });
     },
   });

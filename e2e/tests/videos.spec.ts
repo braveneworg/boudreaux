@@ -44,6 +44,32 @@ test.describe('Videos page — public access', () => {
     await expect(alpha).toHaveCount(1);
     await expect(alpha.getByRole('button', { name: 'Play E2E Video Alpha' })).toBeVisible();
   });
+
+  // Page 1 holds 5 cards; the count is every published video, so 7 proves it
+  // is the server total and not the loaded rows.
+  test('shows the total beside the search', async ({ page }) => {
+    await page.goto('/videos');
+
+    const search = page.getByRole('button', { name: 'Search videos' });
+    const count = page.getByText('(7 videos)', { exact: true });
+    await expect(count).toBeVisible({ timeout: 15_000 });
+    await expect(search).toBeVisible();
+    await expect(cardTitles(page)).toHaveCount(PAGE_ONE_TITLES.length);
+
+    // Read both boxes in one layout frame, from the row that holds them: the
+    // count sits on the search's line, to its right.
+    const { searchBox, countBox } = await count.evaluate((countEl) => {
+      const searchEl = countEl.previousElementSibling;
+      return {
+        searchBox: searchEl?.getBoundingClientRect().toJSON() as DOMRect,
+        countBox: countEl.getBoundingClientRect().toJSON() as DOMRect,
+      };
+    });
+    expect(countBox.left).toBeGreaterThanOrEqual(searchBox.right);
+    expect(
+      Math.abs(countBox.top + countBox.height / 2 - (searchBox.top + searchBox.height / 2))
+    ).toBeLessThan(2);
+  });
 });
 
 // #890: `/videos?artist=<slug>` holds only the videos that artist holds a
@@ -57,6 +83,7 @@ test.describe('Videos page — filtered by artist', () => {
       { timeout: 15_000 }
     );
     await expect(cardTitles(page)).toHaveText(['Videos by E2E Artist', 'E2E Video Alpha']);
+    await expect(page.getByText('(1 video)', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'View videos by all artists' })).toHaveAttribute(
       'href',
       '/videos'
@@ -178,6 +205,7 @@ test.describe('Videos page — signed-in listing', () => {
     await (await openSearch(userPage)).fill('E2E Artist Two');
 
     await expect(cardTitles(userPage)).toHaveText(['E2E Video Bravo', 'E2E Video Echo']);
+    await expect(userPage.getByText('(2 videos)', { exact: true })).toBeVisible();
   });
 
   test('clearing the search restores the full listing', async ({ userPage }) => {

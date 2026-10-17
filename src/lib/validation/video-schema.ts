@@ -83,5 +83,16 @@ export const videoRowSchema = z.object({
 /** Strict schema for one `/api/videos` page (`{ rows, nextSkip }`). */
 export const videoPageSchema = paginatedResponseSchema(videoRowSchema);
 
+/**
+ * Strict schema for one public `/api/videos?listing=published` page — the
+ * `{ rows, nextSkip }` page plus `total`, the count of every video the
+ * listing's search and artist match.
+ */
+export const publishedVideoPageSchema = z.object({
+  rows: z.array(videoRowSchema),
+  nextSkip: z.number().nullable(),
+  total: z.number().int().nonnegative(),
+});
+
 /** A single validated `Video` row as it arrives over the wire. */
 export type VideoRow = z.infer<typeof videoRowSchema>;

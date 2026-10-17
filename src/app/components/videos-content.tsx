@@ -14,7 +14,10 @@ import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { ZineToggleGroup, ZineToggleGroupItem } from '@/app/components/ui/zine-toggle-group';
 import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
-import { useInfinitePublishedVideosQuery } from '@/hooks/queries/use-infinite-published-videos-query';
+import {
+  type PublishedVideosPaginatedResponse,
+  useInfinitePublishedVideosQuery,
+} from '@/hooks/queries/use-infinite-published-videos-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
@@ -34,6 +37,15 @@ const MAX_SUGGESTIONS = 8;
  */
 const TOOLBAR_GRID_CLASS =
   'sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center sm:gap-6';
+
+/**
+ * The toolbar's "(N videos)" label from the first loaded page's `total` —
+ * singular for exactly one video, zero before any page has loaded.
+ */
+const formatVideoCount = (pages: PublishedVideosPaginatedResponse[]): string => {
+  const total = pages[0]?.total ?? 0;
+  return `(${total} ${total === 1 ? 'video' : 'videos'})`;
+};
 
 /** Release-date sort directions offered by the listing toggle. */
 type VideoSort = 'asc' | 'desc';
@@ -139,7 +151,8 @@ interface VideosContentProps {
  * Pages through published videos with infinite scroll (the first page is
  * hydrated from the SSR prefetch). A toolbar pairs a debounced title/artist
  * search combobox — whose dropdown prepopulates with the matching videos and
- * opens the play modal for a picked suggestion — with the release-date sort
+ * opens the play modal for a picked suggestion, and "(N videos)" to its right
+ * counting every match — with the release-date sort
  * toggle; the query and sort are part of the query key, so changing either
  * resets pagination while `keepPreviousData` keeps the current rows on screen
  * during the transition. With an `artist` slug the listing holds only the
@@ -206,7 +219,8 @@ export const VideosContent = ({ artist = '', artistName }: VideosContentProps): 
     return <VideosError onRetry={refetch} />;
   }
 
-  const videos = data?.pages.flatMap((page) => page.rows) ?? [];
+  const pages = data?.pages ?? [];
+  const videos = pages.flatMap((page) => page.rows);
 
   return (
     <div className="flex flex-col gap-6 py-4">
@@ -214,13 +228,21 @@ export const VideosContent = ({ artist = '', artistName }: VideosContentProps): 
       {/* Same column template as `VideoCard`, so the search spans exactly the
           poster column and the sort toggle sits over the details column. */}
       <div data-slot="videos-toolbar" className={cn('flex flex-col gap-3', TOOLBAR_GRID_CLASS)}>
-        <VideoSearchCombobox
-          search={searchInput}
-          onSearchChange={setSearchInput}
-          results={videos.slice(0, MAX_SUGGESTIONS)}
-          isFetching={isFetching}
-          onSelect={handleSuggestionSelect}
-        />
+        {/* The search and, to its right, every video the listing's search and
+            artist match — the search shrinks so the count never wraps. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <VideoSearchCombobox
+            search={searchInput}
+            onSearchChange={setSearchInput}
+            results={videos.slice(0, MAX_SUGGESTIONS)}
+            isFetching={isFetching}
+            onSelect={handleSuggestionSelect}
+            className="min-w-0 flex-1"
+          />
+          <span aria-live="polite" className="shrink-0 text-sm whitespace-nowrap text-zinc-950">
+            {formatVideoCount(pages)}
+          </span>
+        </div>
 
         <ZineToggleGroup
           type="single"
