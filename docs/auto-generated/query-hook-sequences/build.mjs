@@ -192,47 +192,6 @@ sequenceDiagram
     end`,
   },
   {
-    file: '05-use-release-related-query.mmd',
-    title: '5. useReleaseRelatedQuery — "more by this artist" carousel',
-    src: `%% useReleaseRelatedQuery — more-by-this-artist carousel
-sequenceDiagram
-    autonumber
-    actor U as Visitor
-    participant C as Component<br/>(release-detail-content)
-    participant H as useReleaseRelatedQuery<br/>(useQuery, gated on releaseId)
-    participant F as fetchAndParse
-    participant R as GET /api/releases/{id}/related<br/>(withRateLimit · publicLimiter)
-    participant SV as ReleaseService<br/>.getArtistOtherReleases
-    participant DB as Prisma · MongoDB
-    participant V as z.object releases[]<br/>(releaseCarouselItemSchema)
-    participant RC as QueryCache.onError
-    C->>H: useReleaseRelatedQuery(releaseId, artistId)
-    H->>F: queryFn({signal}) [enabled only if releaseId]
-    F->>R: fetch(/api/releases/{id}/related?artistId, {signal})
-    alt invalid ObjectId
-        R-->>F: 400 Invalid release ID
-        F-->>H: throw Error('Failed to fetch related releases')
-    else no artistId
-        R-->>F: 200 { releases: [] } (s-maxage=60)
-    else has artistId
-        R->>SV: getArtistOtherReleases(artistId, id)
-        SV->>DB: findMany(same artist, exclude id, published, not deleted)
-        DB-->>SV: rows
-        SV-->>R: { success, data }
-        R-->>F: 200 { releases } (s-maxage=60)
-    end
-    F->>V: safeParse(body)
-    alt valid
-        V-->>F: parsed
-        F-->>H: data
-        H-->>C: { releases }
-    else contract drift
-        V-->>F: error
-        F-->>H: throw ResponseValidationError
-        H->>RC: onError reports to /api/client-errors
-    end`,
-  },
-  {
     file: '06-use-release-digital-formats-query.mmd',
     title: '6. useReleaseDigitalFormatsQuery — published downloadable formats',
     src: `%% useReleaseDigitalFormatsQuery — published downloadable formats

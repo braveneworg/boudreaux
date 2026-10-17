@@ -59,7 +59,7 @@ depicts it. See the [coverage section](#validation-coverage) below.
 
 **Releases & catalog**
 
-1. [useInfiniteReleasesQuery](#1-useinfinitereleasesquery) · 2. [useInfinitePublishedReleasesQuery](#2-useinfinitepublishedreleasesquery) · 3. [useReleaseListQuery](#3-usereleaselistquery) · 4. [useReleaseQuery](#4-usereleasequery) · 5. [useReleaseRelatedQuery](#5-usereleaserelatedquery) · 6. [useReleaseDigitalFormatsQuery](#6-usereleasedigitalformatsquery) · 7. [useReleaseUserStatusQuery](#7-usereleaseuserstatusquery)
+1. [useInfiniteReleasesQuery](#1-useinfinitereleasesquery) · 2. [useInfinitePublishedReleasesQuery](#2-useinfinitepublishedreleasesquery) · 3. [useReleaseListQuery](#3-usereleaselistquery) · 4. [useReleaseQuery](#4-usereleasequery) · 6. [useReleaseDigitalFormatsQuery](#6-usereleasedigitalformatsquery) · 7. [useReleaseUserStatusQuery](#7-usereleaseuserstatusquery)
 
 **Artists & featured** 8. [useInfiniteArtistsQuery](#8-useinfiniteartistsquery) · 9. [useArtistListQuery](#9-useartistlistquery) · 10. [useArtistBySlugQuery](#10-useartistbyslugquery) · 11. [useInfinitePublishedArtistsQuery](#11-useinfinitepublishedartistsquery) · 12. [useArtistNavSearchQuery](#12-useartistnavsearchquery) · 13. [useInfiniteFeaturedArtistsQuery](#13-useinfinitefeaturedartistsquery) · 14. [useActiveFeaturedArtistsQuery](#14-useactivefeaturedartistsquery)
 
@@ -92,10 +92,6 @@ Appendix: [Validation coverage](#validation-coverage) · [Regenerating the PDF](
 ### 4. useReleaseQuery
 
 **Validated.** Fetches one published release with its tracks from `/api/releases/{id}?withTracks=true` (rate-limited public route), which calls `ReleaseService.getReleaseWithTracks`, serializes BigInts to numbers, and attaches S3 stream URLs. Returns `null` on 404 and throws `Error('Failed to fetch release')` for any other non-OK status; on 200 it validates the body with `parseResponse` against `publishedReleaseDetailSchema` (drift throws `ResponseValidationError`). Gated by a non-empty `releaseId`. PDF page 4.
-
-### 5. useReleaseRelatedQuery
-
-**Validated.** Powers the "more by this artist" carousel in `release-detail-content`, hitting `/api/releases/{id}/related` (optional `artistId`), gated to run only when `releaseId` is truthy. The rate-limited GET validates the id as an ObjectId (400), short-circuits to `{ releases: [] }` with no `artistId`, else calls `ReleaseService.getArtistOtherReleases`. Validates against inline `z.object({ releases: array(releaseCarouselItemSchema) })`; `Error('Failed to fetch related releases')` on HTTP failure. PDF page 5.
 
 ### 6. useReleaseDigitalFormatsQuery
 
@@ -249,7 +245,7 @@ cast.**
 
 All 34, by domain:
 
-- **Releases & catalog:** useInfiniteReleasesQuery, useInfinitePublishedReleasesQuery, useReleaseListQuery, useReleaseQuery, useReleaseRelatedQuery, useReleaseDigitalFormatsQuery, useReleaseUserStatusQuery
+- **Releases & catalog:** useInfiniteReleasesQuery, useInfinitePublishedReleasesQuery, useReleaseListQuery, useReleaseQuery, useReleaseDigitalFormatsQuery, useReleaseUserStatusQuery
 - **Artists & featured:** useInfiniteArtistsQuery, useArtistListQuery, useArtistBySlugQuery, useInfinitePublishedArtistsQuery, useArtistNavSearchQuery, useInfiniteFeaturedArtistsQuery, useActiveFeaturedArtistsQuery
 - **Downloads & commerce:** useDownloadQuotaQuery, useFreeDownloadStatusQuery, useDownloadAnalyticsQuery, useCollectionQuery
 - **Tours & venues:** useInfiniteToursQuery, useTourQuery, useTourDatesQuery, useVenueSearchQuery, useVenueDetailQuery
