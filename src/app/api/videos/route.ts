@@ -64,12 +64,15 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   const { skip, take } = parsePagination(searchParams);
   const sort = parseSort(searchParams);
   const search = searchParams.get('search') ?? undefined;
+  // An empty or blank `artist` means no filter.
+  const artist = searchParams.get('artist')?.trim() || undefined;
 
   const result = await VideoService.getPublishedVideos({
     sort,
     skip,
     take,
     ...(search && { search }),
+    ...(artist && { artist }),
   });
 
   if (!result.success) {
@@ -119,7 +122,8 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  * Query params:
  *   listing   – When "published", returns published, non-archived videos for
  *               any visitor via `getPublishedVideos()`; honors `skip`,
- *               `take`, `sort`, and a title/artist `search`.
+ *               `take`, `sort`, a title/artist `search`, and an `artist`
+ *               slug (the videos credited to that public artist).
  *   skip, take, search, published, archived, sort – Pagination/filter params
  *               for the admin listing mode (requires the admin role).
  */

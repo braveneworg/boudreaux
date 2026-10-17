@@ -540,6 +540,47 @@ export interface ArtistSearchMatch extends ArtistListingName {
   releases: Array<{ release: ArtistSearchReleaseRecord }>;
 }
 
+/**
+ * Narrow release projection loaded for a home search match: the title, year
+ * and cover art behind its row, and the first file of its playable format,
+ * which the row's play pick primes. Only playable listed releases are loaded.
+ */
+export interface ArtistHomeSearchReleaseRecord {
+  id: string;
+  title: string;
+  coverArt: string;
+  releasedOn: Date;
+  images: Array<{ src: string | null; altText: string | null }>;
+  digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
+}
+
+/**
+ * Narrow video projection loaded for a home search match: what its row shows
+ * and the key its stream URL is signed from. Only live videos are loaded.
+ */
+export interface ArtistHomeSearchVideoRecord {
+  id: string;
+  title: string;
+  posterUrl: string | null;
+  releasedOn: Date | null;
+  durationSeconds: number | null;
+  s3Key: string;
+}
+
+/**
+ * Home search match: a public artist the home page search can find, with a
+ * direct credit on a playable listed release or a video credit on a live
+ * video. Carries the same name fields, slug and display-image candidates as
+ * {@link ArtistSearchMatch}, its playable listed releases, and its video
+ * credits on live videos.
+ */
+export interface ArtistHomeSearchMatch extends ArtistListingName {
+  slug: string;
+  bioImages: ArtistSearchBioImage[];
+  releases: Array<{ release: ArtistHomeSearchReleaseRecord }>;
+  videoArtists: Array<{ video: ArtistHomeSearchVideoRecord }>;
+}
+
 /** Narrow name projection used by the find-or-create-by-name flow. */
 export interface ArtistNameRecord {
   id: string;

@@ -87,8 +87,15 @@ export const queryKeys = {
   },
   videos: {
     all: ['videos'] as const,
-    publishedInfinite: (sort: 'asc' | 'desc', search = '') =>
-      [...queryKeys.videos.all, 'publishedInfinite', sort, search.trim().toLowerCase()] as const,
+    /** The public listing, by sort, normalised search and the `?artist=` slug filter. */
+    publishedInfinite: (sort: 'asc' | 'desc', search = '', artist = '') =>
+      [
+        ...queryKeys.videos.all,
+        'publishedInfinite',
+        sort,
+        search.trim().toLowerCase(),
+        artist.trim(),
+      ] as const,
     adminInfinite: (params: {
       search: string;
       published: boolean | null;

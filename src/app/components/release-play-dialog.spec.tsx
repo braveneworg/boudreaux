@@ -245,6 +245,36 @@ describe('ReleasePlayDialog', () => {
     expect(screen.getByText('John Doe')).not.toHaveClass('text-center');
   });
 
+  it('links the artist line to the artist page and adds the year to the title', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(
+      <ReleasePlayDialog
+        {...defaultProps}
+        headingOrder="artist-first"
+        artistHref="/artists/john-doe"
+        year={2024}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('John Doe');
+    expect(dialog).toHaveAccessibleDescription('Midnight Serenade (2024)');
+    expect(screen.getByRole('link', { name: 'John Doe' })).toHaveAttribute(
+      'href',
+      '/artists/john-doe'
+    );
+  });
+
+  it('links no artist and shows no year by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+
+    expect(screen.queryByRole('link', { name: 'John Doe' })).toBeNull();
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Midnight Serenade');
+  });
+
   it('passes the initial track number to the player', () => {
     mockUseReleaseQuery.mockReturnValue(
       queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
@@ -336,6 +366,29 @@ describe('ReleasePlayDialog', () => {
     const slot = screen.getByTestId('release-player').parentElement;
     expect(slot).toHaveAttribute('data-slot', 'release-play-dialog-player');
     expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
+  });
+
+  // The home spotlight shows the share row and the "View all releases" footer
+  // together: the cover gives up the footer row's height as well.
+  it('reserves room for both the share row and the footer under the player', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(
+      <ReleasePlayDialog
+        {...defaultProps}
+        sheetOnPhone
+        shareWidget={<div>share</div>}
+        footer={<a href="/releases?artist=jd">View all releases</a>}
+      />
+    );
+
+    const slot = screen.getByTestId('release-player').parentElement;
+    expect(slot).toHaveClass(
+      'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]',
+      'sm:w-[min(100%,max(16.25rem,calc(90dvh-24rem)))]'
+    );
   });
 
   it('sizes the loading skeleton like the player in the sheet', () => {

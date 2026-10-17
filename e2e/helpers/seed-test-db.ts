@@ -691,10 +691,24 @@ const seedEnrichmentFixtures = async (prisma: PrismaClient): Promise<void> => {
     ],
   });
 
+  // The one video credit on a live video: Alpha credits the public
+  // `e2e-artist`, so the home search lists it under that artist's "Videos" and
+  // `/videos?artist=e2e-artist` holds it alone. Both rows exist by now.
+  const [creditedVideo, creditedArtist] = await Promise.all([
+    prisma.video.findFirstOrThrow({ where: { title: 'E2E Video Alpha' }, select: { id: true } }),
+    prisma.artist.findUniqueOrThrow({ where: { slug: 'e2e-artist' }, select: { id: true } }),
+  ]);
+
   // First-ever writes to the fresh VideoArtist collection — a single
   // createMany (concurrent create() read-backs race in CI on new collections).
   await prisma.videoArtist.createMany({
     data: [
+      {
+        videoId: creditedVideo.id,
+        artistId: creditedArtist.id,
+        role: 'PRIMARY',
+        sortOrder: 0,
+      },
       {
         videoId: ENRICH_MUSIC_VIDEO_ID,
         artistId: ENRICH_LEAD_ARTIST_ID,

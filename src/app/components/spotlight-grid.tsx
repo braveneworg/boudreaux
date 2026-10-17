@@ -21,7 +21,9 @@ interface SpotlightGridProps {
 /**
  * The home page's grid of spotlight covers, laid out by
  * {@link SPOTLIGHT_GRID_CLASS} (the `/releases` grid uses it too), at most
- * {@link SPOTLIGHT_LIMIT} cards. Renders nothing without cards.
+ * {@link SPOTLIGHT_LIMIT} cards. Each cover opens the home page's play modal:
+ * a new loud accent on each open, the artist linked to their page, the year,
+ * and a "View all releases" link. Renders nothing without cards.
  */
 export const SpotlightGrid = ({ cards }: SpotlightGridProps): ReactElement | null => {
   if (cards.length === 0) return null;
@@ -30,7 +32,7 @@ export const SpotlightGrid = ({ cards }: SpotlightGridProps): ReactElement | nul
     <ul className={SPOTLIGHT_GRID_CLASS}>
       {cards.slice(0, SPOTLIGHT_LIMIT).map((card) => (
         <li key={card.releaseId}>
-          <SpotlightCard card={card} />
+          <SpotlightCard card={card} accent="random" linkedHeading />
         </li>
       ))}
     </ul>

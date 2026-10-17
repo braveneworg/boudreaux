@@ -59,7 +59,7 @@ const backgroundOf = (locator: Locator): Promise<string> =>
 
 /** Each public search: its page and the trigger that opens it. */
 const SEARCHES = [
-  { path: '/', trigger: 'Search artists and releases' },
+  { path: '/', trigger: 'Search artists, releases and videos' },
   { path: '/artists', trigger: 'Search artists' },
   { path: '/videos', trigger: 'Search videos' },
   { path: '/releases', trigger: 'Search releases' },

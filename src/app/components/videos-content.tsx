@@ -6,7 +6,9 @@
 import { useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+
+import { Eye, Loader2 } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
 import { Skeleton } from '@/app/components/ui/skeleton';
@@ -93,6 +95,27 @@ const SuggestionPlayDialog = ({
   );
 };
 
+/**
+ * The filtered artist's name over the listing and the link back to every
+ * artist's videos, as `/releases?artist=` shows them; nothing when the
+ * listing is not filtered.
+ */
+const VideosArtistContext = ({ artistName }: { artistName?: string }): ReactElement | null =>
+  artistName ? (
+    <div>
+      <h2 className="text-xl font-semibold text-zinc-950">Videos by {artistName}</h2>
+      <p className="mt-3 text-sm">
+        <Link
+          href="/videos"
+          className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:no-underline"
+        >
+          <Eye className="size-4" aria-hidden="true" />
+          <span>View videos by all artists</span>
+        </Link>
+      </p>
+    </div>
+  ) : null;
+
 /** Error state with a retry that refetches the listing in place. */
 const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
   <div role="alert" className="flex flex-col items-center gap-4 py-12 text-center">
@@ -103,6 +126,13 @@ const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
   </div>
 );
 
+interface VideosContentProps {
+  /** Artist slug from `/videos?artist=`: list only the videos credited to that artist. */
+  artist?: string;
+  /** The display name of the `artist` slug's artist, named over the listing. */
+  artistName?: string;
+}
+
 /**
  * Client content island for the signed-in `/videos` listing.
  *
@@ -112,9 +142,11 @@ const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
  * opens the play modal for a picked suggestion — with the release-date sort
  * toggle; the query and sort are part of the query key, so changing either
  * resets pagination while `keepPreviousData` keeps the current rows on screen
- * during the transition.
+ * during the transition. With an `artist` slug the listing holds only the
+ * videos credited to that artist, under the artist's name and a link back to
+ * every artist's videos.
  */
-export const VideosContent = (): ReactElement => {
+export const VideosContent = ({ artist = '', artistName }: VideosContentProps): ReactElement => {
   const [sort, setSort] = useState<VideoSort>('desc');
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, 300).trim();
@@ -127,7 +159,7 @@ export const VideosContent = (): ReactElement => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfinitePublishedVideosQuery(sort, search);
+  } = useInfinitePublishedVideosQuery(sort, search, artist);
 
   // Play modal for a suggestion picked from the search dropdown; the cards
   // carry their own dialogs, this one belongs to the combobox selection.
@@ -178,6 +210,7 @@ export const VideosContent = (): ReactElement => {
 
   return (
     <div className="flex flex-col gap-6 py-4">
+      <VideosArtistContext artistName={artistName} />
       {/* Same column template as `VideoCard`, so the search spans exactly the
           poster column and the sort toggle sits over the details column. */}
       <div data-slot="videos-toolbar" className={cn('flex flex-col gap-3', TOOLBAR_GRID_CLASS)}>

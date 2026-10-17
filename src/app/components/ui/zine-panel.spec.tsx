@@ -3,7 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
-import { getZineAccentClass, ZinePanel, type ZineAccent } from './zine-panel';
+import {
+  getZineAccentClass,
+  LOUD_ZINE_ACCENTS,
+  pickLoudZineAccent,
+  ZinePanel,
+  type ZineAccent,
+} from './zine-panel';
 
 vi.mock('../chat/chat-panel-trigger', () => ({
   ChatPanelTrigger: () => <div data-testid="chat-panel-trigger" />,
@@ -223,5 +229,47 @@ describe('ZinePanel', () => {
 describe('getZineAccentClass', () => {
   it.each(ACCENT_CASES)('maps the %s accent to class %s', (accent, accentClass) => {
     expect(getZineAccentClass(accent)).toBe(accentClass);
+  });
+});
+
+describe('pickLoudZineAccent', () => {
+  it('holds the ten loud accents, never the yellow home panel or the paper tones', () => {
+    expect(LOUD_ZINE_ACCENTS).toEqual([
+      'hot-pink',
+      'pink',
+      'cyan',
+      'orange',
+      'green',
+      'teal',
+      'mustard',
+      'denim',
+      'storm',
+      'orchid',
+    ]);
+  });
+
+  it.each([
+    [0, 'hot-pink'],
+    [0.15, 'pink'],
+    [0.5, 'teal'],
+    [0.95, 'orchid'],
+    [0.999_999, 'orchid'],
+  ])('maps random() = %s to %s', (value, accent) => {
+    expect(pickLoudZineAccent(() => value)).toBe(accent);
+  });
+
+  it('only ever picks a loud accent', () => {
+    const picks = Array.from({ length: 100 }, (_, index) => pickLoudZineAccent(() => index / 100));
+
+    expect(new Set(picks)).toEqual(new Set(LOUD_ZINE_ACCENTS));
+    expect(picks).not.toContain('yellow');
+    expect(picks).not.toContain('tan');
+    expect(picks).not.toContain('kraft');
+  });
+
+  it('draws from Math.random by default', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25);
+
+    expect(pickLoudZineAccent()).toBe('cyan');
   });
 });
