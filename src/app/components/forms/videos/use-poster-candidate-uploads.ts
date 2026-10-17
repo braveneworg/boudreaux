@@ -24,21 +24,56 @@ export interface UsePosterCandidateUploadsResult {
   getSettledAligned: () => Promise<(VideoPosterCandidate | null)[]>;
 }
 
+/** The display name of the frame at `ordinal` (1-based across every batch of a video). */
+const candidateFileName = (ordinal: number): string => `poster-candidate-${ordinal}.jpg`;
+
 /** Wrap one captured frame as the JPEG File the presigned PUT expects. */
-const candidateFile = (candidate: PosterCandidate, index: number): File =>
-  new File([candidate.blob], `poster-candidate-${index + 1}.jpg`, { type: 'image/jpeg' });
+const candidateFile = (candidate: PosterCandidate, ordinal: number): File =>
+  new File([candidate.blob], candidateFileName(ordinal), { type: 'image/jpeg' });
 
 /** PUT one candidate; null on any failure (skip-and-continue contract). */
 const uploadOne = async (
   candidate: PosterCandidate,
-  index: number,
+  ordinal: number,
   presigned: { uploadUrl: string; s3Key: string; cdnUrl: string } | undefined
 ): Promise<VideoPosterCandidate | null> => {
   if (!presigned) return null;
-  const result = await uploadFileToS3(candidateFile(candidate, index), presigned);
+  const result = await uploadFileToS3(candidateFile(candidate, ordinal), presigned);
   return result.success
     ? { url: result.cdnUrl, atSeconds: candidate.atSeconds, score: candidate.score }
     : null;
+};
+
+/**
+ * One presign batch plus parallel PUTs for a set of captured frames, resolving
+ * the index-aligned uploaded candidates (`null` where a PUT failed, `[]` when
+ * the presign batch itself failed). `ordinalOffset` numbers the files after
+ * the frames the video already holds, so a "Next 5 frames" batch reads
+ * `poster-candidate-6.jpg` onward; the S3 keys carry their own unique suffix,
+ * so the names are for humans only. Shared by the upload-time fan-out hook
+ * and the next-frames capture.
+ */
+export const uploadPosterCandidates = async (
+  candidates: PosterCandidate[],
+  preGeneratedId: string,
+  ordinalOffset: number
+): Promise<(VideoPosterCandidate | null)[]> => {
+  const presigned = await getPresignedUploadUrlsAction(
+    'videos',
+    preGeneratedId,
+    candidates.map((candidate, index) => ({
+      fileName: candidateFileName(ordinalOffset + index + 1),
+      contentType: 'image/jpeg',
+      fileSize: candidate.blob.size,
+    }))
+  );
+  if (!presigned.success || !presigned.data) return [];
+  const targets = presigned.data;
+  return Promise.all(
+    candidates.map((candidate, index) =>
+      uploadOne(candidate, ordinalOffset + index + 1, targets.at(index))
+    )
+  );
 };
 
 /**
@@ -69,20 +104,7 @@ export const usePosterCandidateUploads = ({
       candidates: PosterCandidate[],
       generation: number
     ): Promise<(VideoPosterCandidate | null)[]> => {
-      const presigned = await getPresignedUploadUrlsAction(
-        'videos',
-        preGeneratedId,
-        candidates.map((candidate, index) => ({
-          fileName: `poster-candidate-${index + 1}.jpg`,
-          contentType: 'image/jpeg',
-          fileSize: candidate.blob.size,
-        }))
-      );
-      if (!presigned.success || !presigned.data) return [];
-      const targets = presigned.data;
-      const aligned = await Promise.all(
-        candidates.map((candidate, index) => uploadOne(candidate, index, targets.at(index)))
-      );
+      const aligned = await uploadPosterCandidates(candidates, preGeneratedId, 0);
       // Only the newest run may publish to alignedNow — an older run that
       // resolves after a newer one started would otherwise overwrite it with
       // stale, index-misaligned data.

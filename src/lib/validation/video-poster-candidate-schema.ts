@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
+import { VIDEO_POSTER_CANDIDATE_CAP } from '@/lib/constants/video-uploads';
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import { isHttpUrl } from '@/lib/utils/is-http-url';
 
@@ -13,5 +14,7 @@ export const videoPosterCandidateSchema = z.object({
   score: z.number().min(0),
 }) satisfies z.ZodType<VideoPosterCandidate>;
 
-/** Candidate list cap — 5 captured today; headroom, never unbounded. */
-export const posterCandidatesSchema = z.array(videoPosterCandidateSchema).max(10);
+/** Candidate list cap — the first 5 frames plus every later window, never unbounded. */
+export const posterCandidatesSchema = z
+  .array(videoPosterCandidateSchema)
+  .max(VIDEO_POSTER_CANDIDATE_CAP);

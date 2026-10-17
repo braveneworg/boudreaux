@@ -56,7 +56,10 @@ export interface UseVideoPosterStripArgs {
 export interface UseVideoPosterStripResult {
   /** Wire to useVideoUpload's onPosterCandidates. */
   handlePosterCandidates: (candidates: PosterCandidate[]) => void;
-  /** Thumbs for the section — fresh blobs this session, else stored candidates. */
+  /**
+   * Thumbs for the section — fresh blobs this session, else stored candidates,
+   * followed by every "Next 5 frames" batch appended this session.
+   */
   stripCandidates: StripCandidate[];
   /** Highlighted index; -1 = none (e.g. a manual poster is live). */
   selectedIndex: number;
@@ -66,20 +69,31 @@ export interface UseVideoPosterStripResult {
   selectedPosterBlob: Blob | null;
   /** Poster fields for the draft payload (the draft hook's `getPosterFields`). */
   getPosterDraftFields: () => Promise<DraftPosterFields>;
+  /**
+   * Add a "Next 5 frames" batch — frames already uploaded AND persisted on the
+   * row — after the current thumbs. The current pick stays where it is.
+   */
+  appendCandidates: (candidates: VideoPosterCandidate[]) => void;
+  /** Timestamp of the latest frame on the strip; null when it is empty. */
+  latestAtSeconds: number | null;
 }
 
 type SelectVideoPosterAsync = ReturnType<
   typeof useSelectVideoPosterMutation
 >['selectVideoPosterAsync'];
 
+/** The CDN URL of a stored thumb; `undefined` for a fresh blob or an absent index. */
+const storedUrlOf = (candidate: StripCandidate | undefined): string | undefined =>
+  candidate && 'url' in candidate ? candidate.url : undefined;
+
 /**
  * Which stored candidate the live poster URL points at — `-1` when none does
  * (a manually uploaded poster, or a row whose poster predates the candidates).
  */
 const resolveStoredSelectedIndex = (
-  stored: VideoPosterCandidate[],
+  candidates: StripCandidate[],
   posterUrl: string | undefined
-): number => stored.findIndex((candidate) => candidate.url === posterUrl);
+): number => candidates.findIndex((candidate) => storedUrlOf(candidate) === posterUrl);
 
 /**
  * Run the persist call and report only whether the poster stuck. A rejected
@@ -146,6 +160,139 @@ const usePersistPosterPick = ({
 };
 
 /**
+ * A capture that replaces a file already in play forces a fresh poster
+ * choice: the outgoing capture's frames, the row's stored frames, and an
+ * image the admin uploaded by hand all go, since cover art of a file that is
+ * no longer there must never ride along (Save would otherwise hand file A's
+ * poster to file B, and nothing in the UI would flag it). `s3Key` still holds
+ * the OUTGOING key at capture time — the upload rewrites it only on success —
+ * so it tells a replacement from a new video's first file, where there is
+ * nothing to drop. `shouldDirty` so `VideoForm`'s `keepDirtyValues` reset
+ * cannot restore the row's value over the clear.
+ */
+const dropOutgoingPoster = (
+  form: UseFormReturn<VideoFormData>,
+  onPosterDropped: (() => void) | undefined
+): void => {
+  if (!form.getValues('s3Key')) return;
+  if (form.getValues('posterUrl')) form.setValue('posterUrl', '', { shouldDirty: true });
+  onPosterDropped?.();
+};
+
+interface PickableUrlArgs {
+  index: number;
+  /** How many thumbs at the front are this session's capture (0 on a stored strip). */
+  freshCount: number;
+  alignedNow: (VideoPosterCandidate | null)[];
+  stripCandidates: StripCandidate[];
+}
+
+/**
+ * The URL a click on thumb `index` may persist, or `undefined` while it has
+ * none. A fresh frame needs its own upload to have landed (`alignedNow`), and
+ * the caller still checks the row carries it. An appended frame (past the
+ * fresh set) or any stored thumb always has its URL: it reached the row
+ * before it reached the strip.
+ */
+const pickableUrlAt = ({
+  index,
+  freshCount,
+  alignedNow,
+  stripCandidates,
+}: PickableUrlArgs): string | undefined =>
+  index < freshCount ? alignedNow.at(index)?.url : storedUrlOf(stripCandidates.at(index));
+
+interface UseSelectCandidateArgs {
+  /** How many thumbs at the front are this session's capture (0 on a stored strip). */
+  freshCount: number;
+  setFreshSelectedIndex: (index: number) => void;
+  alignedNow: (VideoPosterCandidate | null)[];
+  stripCandidates: StripCandidate[];
+  isPersisted: boolean;
+  rowCandidateUrls: Set<string>;
+  persistPick: (candidateUrl: string) => Promise<void>;
+}
+
+/**
+ * A click on thumb `index`: moves the local highlight on a fresh strip, then
+ * persists the pick when a row exists AND carries the thumb's URL. Otherwise
+ * the pick stays local and the draft/save payload carries it.
+ */
+const useSelectCandidate = ({
+  freshCount,
+  setFreshSelectedIndex,
+  alignedNow,
+  stripCandidates,
+  isPersisted,
+  rowCandidateUrls,
+  persistPick,
+}: UseSelectCandidateArgs): ((index: number) => void) =>
+  useCallback(
+    (index: number): void => {
+      if (freshCount > 0) setFreshSelectedIndex(index);
+      const candidateUrl = pickableUrlAt({ index, freshCount, alignedNow, stripCandidates });
+      if (isPersisted && candidateUrl && rowCandidateUrls.has(candidateUrl)) {
+        void persistPick(candidateUrl);
+      }
+    },
+    [
+      freshCount,
+      setFreshSelectedIndex,
+      alignedNow,
+      stripCandidates,
+      isPersisted,
+      rowCandidateUrls,
+      persistPick,
+    ]
+  );
+
+interface UseStripRowsArgs {
+  isFreshMode: boolean;
+  freshCandidates: PosterCandidate[];
+  stored: VideoPosterCandidate[];
+  draftCandidateUrls: string[];
+  appendedCandidates: VideoPosterCandidate[];
+}
+
+interface StripRows {
+  /** Every candidate URL the row is known to carry — the only persistable picks. */
+  rowCandidateUrls: Set<string>;
+  stripCandidates: StripCandidate[];
+  latestAtSeconds: number | null;
+}
+
+/**
+ * The thumbs the strip shows and the URLs a pick may persist: this session's
+ * capture (else the row's stored frames), then every appended batch — each
+ * shown once even after the refetched row carries it too.
+ */
+const useStripRows = ({
+  isFreshMode,
+  freshCandidates,
+  stored,
+  draftCandidateUrls,
+  appendedCandidates,
+}: UseStripRowsArgs): StripRows => {
+  const rowCandidateUrls = useMemo(
+    () =>
+      new Set([
+        ...stored.map(({ url }) => url),
+        ...draftCandidateUrls,
+        ...appendedCandidates.map(({ url }) => url),
+      ]),
+    [stored, draftCandidateUrls, appendedCandidates]
+  );
+  const stripCandidates = useMemo<StripCandidate[]>(() => {
+    const base: StripCandidate[] = isFreshMode ? freshCandidates : stored;
+    const baseUrls = new Set(stored.map(({ url }) => url));
+    return [...base, ...appendedCandidates.filter(({ url }) => !baseUrls.has(url))];
+  }, [isFreshMode, freshCandidates, stored, appendedCandidates]);
+  const latestAtSeconds =
+    stripCandidates.length > 0 ? Math.max(...stripCandidates.map((c) => c.atSeconds)) : null;
+  return { rowCandidateUrls, stripCandidates, latestAtSeconds };
+};
+
+/**
  * Owns the poster candidate strip: what it shows, which thumb is highlighted,
  * and what a click does.
  *
@@ -175,6 +322,10 @@ export const useVideoPosterStrip = ({
 }: UseVideoPosterStripArgs): UseVideoPosterStripResult => {
   const [freshCandidates, setFreshCandidates] = useState<PosterCandidate[]>([]);
   const [freshSelectedIndex, setFreshSelectedIndex] = useState(0);
+  // Later windows' frames, already on the row. Kept locally because a create
+  // session never refetches its draft row, and because the refetch an append
+  // triggers in edit mode lands later than the strip should grow.
+  const [appendedCandidates, setAppendedCandidates] = useState<VideoPosterCandidate[]>([]);
   const { startUploads, alignedNow, getSettledAligned } = usePosterCandidateUploads({
     preGeneratedId,
   });
@@ -183,59 +334,42 @@ export const useVideoPosterStrip = ({
 
   const isFreshMode = freshCandidates.length > 0;
   const stored = useMemo<VideoPosterCandidate[]>(() => video?.posterCandidates ?? [], [video]);
-  /** Every candidate URL the row is known to carry — the only persistable picks. */
-  const rowCandidateUrls = useMemo(
-    () => new Set([...stored.map(({ url }) => url), ...draftCandidateUrls]),
-    [stored, draftCandidateUrls]
-  );
-  const stripCandidates: StripCandidate[] = isFreshMode ? freshCandidates : stored;
+  const { rowCandidateUrls, stripCandidates, latestAtSeconds } = useStripRows({
+    isFreshMode,
+    freshCandidates,
+    stored,
+    draftCandidateUrls,
+    appendedCandidates,
+  });
   const selectedIndex = isFreshMode
     ? freshSelectedIndex
-    : resolveStoredSelectedIndex(stored, watchedPosterUrl);
+    : resolveStoredSelectedIndex(stripCandidates, watchedPosterUrl);
 
-  // Capturing a fresh candidate set pre-selects the sharpest frame and kicks
-  // the upload fan-out, so the selection has a URL to persist by the time the
-  // draft lands (and Save can still commit the blob if every upload failed).
-  // Every capture goes to the fan-out, including an empty one: it owns the
-  // settled/aligned state, so only it can forget the previous file's frames
-  // (it skips the pointless presign for an empty set itself).
   const handlePosterCandidates = useCallback(
     (candidates: PosterCandidate[]): void => {
-      // Replacing the video file forces a fresh poster choice — the outgoing
-      // capture's frames, the row's stored frames, and an image the admin
-      // uploaded by hand all go. Cover art belonging to a file that is no
-      // longer there must never ride along (Save would otherwise hand file
-      // A's poster to file B), and nothing in the UI would flag it if it did.
-      // `s3Key` still holds the OUTGOING key here — the upload rewrites it
-      // only on success — so it tells a replacement from a new video's first
-      // file, where there is nothing to replace. `shouldDirty` so
-      // `VideoForm`'s `keepDirtyValues` reset cannot restore the row's value
-      // over the clear.
-      if (form.getValues('s3Key')) {
-        if (form.getValues('posterUrl')) form.setValue('posterUrl', '', { shouldDirty: true });
-        onPosterDropped?.();
-      }
+      dropOutgoingPoster(form, onPosterDropped);
       setFreshCandidates(candidates);
       setFreshSelectedIndex(bestPosterCandidateIndex(candidates));
+      // Later windows belong to the outgoing file as much as its first frames do.
+      setAppendedCandidates([]);
       startUploads(candidates);
     },
     [startUploads, form, onPosterDropped]
   );
 
-  const handleSelectCandidate = useCallback(
-    (index: number): void => {
-      if (isFreshMode) setFreshSelectedIndex(index);
-      // Only a URL the row already carries is persistable — a fresh frame
-      // needs its own upload to have landed AND the draft create to have put
-      // it there. Until then the pick stays local and the draft/save payload
-      // carries it.
-      const candidateUrl = isFreshMode ? alignedNow.at(index)?.url : stored.at(index)?.url;
-      if (isPersisted && candidateUrl && rowCandidateUrls.has(candidateUrl)) {
-        void persistPick(candidateUrl);
-      }
-    },
-    [isFreshMode, alignedNow, stored, isPersisted, rowCandidateUrls, persistPick]
-  );
+  const appendCandidates = useCallback((candidates: VideoPosterCandidate[]): void => {
+    setAppendedCandidates((previous) => [...previous, ...candidates]);
+  }, []);
+
+  const handleSelectCandidate = useSelectCandidate({
+    freshCount: isFreshMode ? freshCandidates.length : 0,
+    setFreshSelectedIndex,
+    alignedNow,
+    stripCandidates,
+    isPersisted,
+    rowCandidateUrls,
+    persistPick,
+  });
 
   const getPosterDraftFields = useCallback(async (): Promise<DraftPosterFields> => {
     const aligned = await getSettledAligned();
@@ -258,5 +392,7 @@ export const useVideoPosterStrip = ({
     handleSelectCandidate,
     selectedPosterBlob,
     getPosterDraftFields,
+    appendCandidates,
+    latestAtSeconds,
   };
 };

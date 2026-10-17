@@ -7,7 +7,7 @@ import { act, renderHook } from '@testing-library/react';
 
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 
-import { usePosterCandidateUploads } from './use-poster-candidate-uploads';
+import { uploadPosterCandidates, usePosterCandidateUploads } from './use-poster-candidate-uploads';
 
 import type { PosterCandidate } from './video-metadata';
 
@@ -330,5 +330,66 @@ describe('usePosterCandidateUploads', () => {
 
     expect(settled).toEqual([]);
     expect(uploadFileToS3Mock).not.toHaveBeenCalled();
+  });
+});
+
+describe('uploadPosterCandidates', () => {
+  beforeEach(() => {
+    getPresignedUploadUrlsActionMock.mockReset();
+    uploadFileToS3Mock.mockReset();
+  });
+
+  it('presigns one batch under the given file-name offset and resolves aligned candidates', async () => {
+    const candidates = [makeCandidate(0), makeCandidate(1)];
+    getPresignedUploadUrlsActionMock.mockResolvedValue({
+      success: true,
+      data: [presignedTarget(6), presignedTarget(7)],
+    });
+    uploadFileToS3Mock.mockImplementation((_file: File, presigned: { cdnUrl: string }) =>
+      Promise.resolve({ success: true, cdnUrl: presigned.cdnUrl })
+    );
+
+    const aligned = await uploadPosterCandidates(candidates, 'vid1', 5);
+
+    expect(getPresignedUploadUrlsActionMock).toHaveBeenCalledWith('videos', 'vid1', [
+      {
+        fileName: 'poster-candidate-6.jpg',
+        contentType: 'image/jpeg',
+        fileSize: candidates[0].blob.size,
+      },
+      {
+        fileName: 'poster-candidate-7.jpg',
+        contentType: 'image/jpeg',
+        fileSize: candidates[1].blob.size,
+      },
+    ]);
+    expect(aligned).toEqual([
+      { url: 'https://cdn/candidate-6.jpg', atSeconds: 2.7, score: 10 },
+      { url: 'https://cdn/candidate-7.jpg', atSeconds: 3.7, score: 11 },
+    ]);
+  });
+
+  it('resolves empty when the presign batch fails', async () => {
+    getPresignedUploadUrlsActionMock.mockResolvedValue({ success: false, error: 'nope' });
+
+    await expect(uploadPosterCandidates([makeCandidate(0)], 'vid1', 0)).resolves.toEqual([]);
+    expect(uploadFileToS3Mock).not.toHaveBeenCalled();
+  });
+
+  it('aligns a null where one PUT fails', async () => {
+    getPresignedUploadUrlsActionMock.mockResolvedValue({
+      success: true,
+      data: [presignedTarget(1), presignedTarget(2)],
+    });
+    uploadFileToS3Mock
+      .mockResolvedValueOnce({ success: false, error: 'boom' })
+      .mockResolvedValueOnce({ success: true, cdnUrl: 'https://cdn/candidate-2.jpg' });
+
+    const aligned = await uploadPosterCandidates([makeCandidate(0), makeCandidate(1)], 'vid1', 0);
+
+    expect(aligned).toEqual([
+      null,
+      { url: 'https://cdn/candidate-2.jpg', atSeconds: 3.7, score: 11 },
+    ]);
   });
 });
