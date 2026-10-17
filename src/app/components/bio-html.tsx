@@ -11,6 +11,9 @@ import { ExternalLink } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { isInternalBioUrl } from '@/lib/utils/is-internal-url';
+import { parseReleaseDeepLink } from '@/lib/utils/release-deep-link';
+
+import { BioReleaseLink } from './bio-release-link';
 
 import type { DOMNode, HTMLReactParserOptions } from 'html-react-parser';
 
@@ -103,7 +106,17 @@ const renderAnchor = (domNode: Element, options: HTMLReactParserOptions): JSX.El
   // An anchor stripped of its href by the sanitizer renders as plain text.
   if (!href) return <>{domToReact(domNode.children as DOMNode[], options)}</>;
 
-  // Internal links navigate same-tab with no rel hardening and no icon.
+  // A release deep link opens the release's listening modal in place.
+  const deepLink = parseReleaseDeepLink(href);
+  if (deepLink) {
+    return (
+      <BioReleaseLink href={href} {...deepLink}>
+        {domToReact(domNode.children as DOMNode[], options)}
+      </BioReleaseLink>
+    );
+  }
+
+  // Other internal links navigate same-tab with no rel hardening and no icon.
   if (isInternalBioUrl(href)) {
     return <Link href={href}>{domToReact(domNode.children as DOMNode[], options)}</Link>;
   }
@@ -165,7 +178,8 @@ const renderFigcaption = (domNode: Element, options: HTMLReactParserOptions): JS
  * Maps the sanitized bio HTML onto React, replacing raw `<a>`/`<img>` tags with
  * Next.js `<Link>` and `<Image>` and `<figure>`/`<figcaption>` with floated,
  * width-constrained figures. External links are hardened with
- * `rel="nofollow noopener noreferrer"` and `target="_blank"`; internal links
+ * `rel="nofollow noopener noreferrer"` and `target="_blank"`; a release deep
+ * link opens its listening modal (`BioReleaseLink`); other internal links
  * navigate same-tab without the icon. Images flow through the global CDN
  * loader (variants/`srcset`) instead of hotlinking.
  */
@@ -190,8 +204,9 @@ const replace: HTMLReactParserOptions['replace'] = (domNode) => {
  * Renders sanitized bio HTML with Next.js primitives instead of
  * `dangerouslySetInnerHTML`. The input must already be sanitized
  * (`sanitizeBioHtml`); this component only maps trusted tags to components.
- * No hooks, so it renders on the server for the artist page and inside the
- * client editor for its preview.
+ * No hooks of its own, so it renders on the server for the artist page and
+ * inside the client editor for its preview; a release deep link is the one
+ * client island it renders.
  *
  * @param html - Sanitized bio HTML string.
  * @param className - Optional wrapper class (e.g. prose styles).
