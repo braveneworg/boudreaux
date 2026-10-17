@@ -912,10 +912,21 @@ describe('ArtistRepository', () => {
     const searchOr = (arg: { where?: { AND?: Array<{ OR?: unknown[] }> } } | undefined) =>
       arg?.where?.AND?.[0]?.OR ?? [];
 
-    /** A listing record whose only listed release carries the given date. */
-    const listedRecord = (id: string, displayName: string, releasedOn: Date | null) => ({
+    /**
+     * A listing record whose only listed release carries the given date, with
+     * live videos released on the given dates.
+     */
+    const listedRecord = (
+      id: string,
+      displayName: string,
+      releasedOn: Date | null,
+      videoDates: Array<Date | null> = []
+    ) => ({
       id,
       displayName,
+      videoArtists: videoDates.map((videoReleasedOn) => ({
+        video: { releasedOn: videoReleasedOn },
+      })),
       releases:
         releasedOn === null
           ? []
@@ -1212,6 +1223,55 @@ describe('ArtistRepository', () => {
       expect(arg).not.toHaveProperty('skip');
       expect(arg).not.toHaveProperty('take');
       expect(arg).not.toHaveProperty('orderBy');
+    });
+
+    it('selects only the live video credits, with each video release date', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
+      expect(arg?.select?.videoArtists).toEqual({
+        where: { video: { is: publicVideoWhere(NOW) } },
+        select: { video: { select: { releasedOn: true } } },
+      });
+    });
+
+    it('ranks an artist by the newer of its newest listed release and newest live video', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('release', 'Release Act', new Date('2020-01-01')),
+        listedRecord('video', 'Video Act', new Date('2010-01-01'), [new Date('2024-01-01')]),
+        listedRecord('mid', 'Mid Act', new Date('2022-01-01'), [new Date('2015-01-01')]),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['video', 'mid', 'release']);
+    });
+
+    it('ranks an artist with only videos by its newest live video', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('release', 'Release Act', new Date('2020-01-01')),
+        listedRecord('video-only', 'Video Only', null, [
+          new Date('2019-01-01'),
+          new Date('2023-01-01'),
+        ]),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['video-only', 'release']);
+    });
+
+    it('sorts an artist whose only video is undated last', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([
+        listedRecord('undated-video', 'Undated Video', null, [null]),
+        listedRecord('dated', 'Dated', new Date('2001-01-01')),
+      ] as never);
+
+      const result = await ArtistRepository.listListed({ sort: 'newest', skip: 0, take: 24 });
+
+      expect(result.map(({ id }) => id)).toEqual(['dated', 'undated-video']);
     });
 
     it('orders by the newest listed release date, newest first', async () => {

@@ -312,6 +312,24 @@ describe('home search (Docker Mongo contract)', () => {
     ]);
   });
 
+  it('reads only the live videos an artist index row ranks by', async () => {
+    const listed = await ArtistRepository.listListed({
+      search: TOKEN,
+      sort: 'newest',
+      skip: 0,
+      take: 100,
+    });
+    const videoDates = (label: string): Array<Date | null> | undefined =>
+      listed
+        .find(({ slug }) => slug === slugOf(label))
+        ?.videoArtists.map(({ video }) => video.releasedOn);
+
+    // `both` also holds a scheduled video, which a public read never sees.
+    expect(videoDates('both')).toEqual([PAST]);
+    expect(videoDates('video-only')).toHaveLength(2);
+    expect(videoDates('playable')).toEqual([]);
+  });
+
   it('finds an artist on the artists index by the title of a live video', async () => {
     const listed = await ArtistRepository.listListed({
       search: VIDEO_TITLE_TOKEN,

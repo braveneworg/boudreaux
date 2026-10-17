@@ -475,6 +475,8 @@ export interface ArtistListingRecord {
   members: Array<{ member: ArtistListingName }>;
   memberOf: Array<{ artist: ArtistListingName }>;
   releases: Array<{ release: ArtistListingReleaseRecord }>;
+  /** The artist's live video credits, read only to rank the "newest" order. */
+  videoArtists: Array<{ video: { releasedOn: Date | null } }>;
 }
 
 /** The newest listed release credited to an artist, as shown on the listing row. */
@@ -492,7 +494,7 @@ export interface ArtistListingNewestRelease {
  */
 export interface ArtistListingRow extends Omit<
   ArtistListingRecord,
-  'members' | 'memberOf' | 'releases'
+  'members' | 'memberOf' | 'releases' | 'videoArtists'
 > {
   members: ArtistListingName[];
   memberOf: ArtistListingName[];

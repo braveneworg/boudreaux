@@ -172,58 +172,64 @@ const artistListingNameSelect = {
  * leaves the server, so contact fields are never selected), the display-image
  * candidates, the band graph as name projections, and the artist's
  * direct release joins with the narrow release projection the listing rule and
- * the "newest release" summary read.
+ * the "newest release" summary read, and the release date of each video live
+ * at `now` for the "newest" order (ADR-0022).
  */
-const artistListingSelect = {
-  id: true,
-  slug: true,
-  firstName: true,
-  middleName: true,
-  surname: true,
-  title: true,
-  suffix: true,
-  displayName: true,
-  akaNames: true,
-  genres: true,
-  instruments: true,
-  shortBio: true,
-  bornOn: true,
-  diedOn: true,
-  formedOn: true,
-  bioImages: {
-    where: bioImageWhere.displayCandidate,
-    orderBy: { sortOrder: 'asc' },
-    select: {
-      id: true,
-      url: true,
-      thumbnailUrl: true,
-      title: true,
-      attribution: true,
-      license: true,
-      licenseUrl: true,
-      sourceUrl: true,
-      alt: true,
-      isPrimary: true,
-      displayOrder: true,
-    },
-  },
-  // A card names only the members and bands that are public artists (ADR-0015).
-  members: {
-    where: { member: { is: publicArtistWhere } },
-    select: { member: { select: artistListingNameSelect } },
-  },
-  memberOf: {
-    where: { artist: { is: publicArtistWhere } },
-    select: { artist: { select: artistListingNameSelect } },
-  },
-  releases: {
-    select: {
-      release: {
-        select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+const artistListingSelect = (now: Date) =>
+  ({
+    id: true,
+    slug: true,
+    firstName: true,
+    middleName: true,
+    surname: true,
+    title: true,
+    suffix: true,
+    displayName: true,
+    akaNames: true,
+    genres: true,
+    instruments: true,
+    shortBio: true,
+    bornOn: true,
+    diedOn: true,
+    formedOn: true,
+    bioImages: {
+      where: bioImageWhere.displayCandidate,
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        url: true,
+        thumbnailUrl: true,
+        title: true,
+        attribution: true,
+        license: true,
+        licenseUrl: true,
+        sourceUrl: true,
+        alt: true,
+        isPrimary: true,
+        displayOrder: true,
       },
     },
-  },
-} as const satisfies Prisma.ArtistSelect;
+    // A card names only the members and bands that are public artists (ADR-0015).
+    members: {
+      where: { member: { is: publicArtistWhere } },
+      select: { member: { select: artistListingNameSelect } },
+    },
+    memberOf: {
+      where: { artist: { is: publicArtistWhere } },
+      select: { artist: { select: artistListingNameSelect } },
+    },
+    releases: {
+      select: {
+        release: {
+          select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+        },
+      },
+    },
+    videoArtists: {
+      where: { video: { is: publicVideoWhere(now) } },
+      select: { video: { select: { releasedOn: true } } },
+    },
+  }) as const satisfies Prisma.ArtistSelect;
 
 /**
  * Public-search select (ADR-0007): the name fields and slug the dropdown
@@ -379,7 +385,7 @@ type _ArtistDrift = AssertExact<
 type _ArtistDetailDrift = AssertExact<ArtistDetail, Prisma.ArtistGetPayload<object>>;
 type _ArtistListingRecordDrift = AssertExact<
   ArtistListingRecord,
-  Prisma.ArtistGetPayload<{ select: typeof artistListingSelect }>
+  Prisma.ArtistGetPayload<{ select: ReturnType<typeof artistListingSelect> }>
 >;
 type _ArtistWithReleaseGraphDrift = AssertExact<
   ArtistWithReleaseGraph,
@@ -663,16 +669,23 @@ const compareByDisplayName = (
     sensitivity: 'base',
   }) || a.id.localeCompare(b.id);
 
-/** Epoch millis of an artist's newest listed release; no listed release sorts last. */
-const newestListedReleaseTime = (record: ArtistListingRecord): number =>
-  summarizeListedReleases(record.releases).newestRelease?.releasedOn.getTime() ?? -Infinity;
+/**
+ * Epoch millis of an artist's newest work: the later of its newest listed
+ * release and its newest live video. An artist with neither dated sorts last.
+ */
+const newestWorkTime = ({ releases, videoArtists }: ArtistListingRecord): number =>
+  Math.max(
+    summarizeListedReleases(releases).newestRelease?.releasedOn.getTime() ?? -Infinity,
+    ...videoArtists.map(({ video }) => videoReleasedTime(video))
+  );
 
 /**
- * Newest-release order for the artists index: latest listed release first,
- * ties (and artists without a dated listed release) by display name.
+ * Newest order for the artists index (ADR-0022): the artist with the latest
+ * listed release or live video first, ties (and artists with nothing dated)
+ * by display name.
  */
-const compareByNewestRelease = (a: ArtistListingRecord, b: ArtistListingRecord): number =>
-  newestListedReleaseTime(b) - newestListedReleaseTime(a) ||
+const compareByNewest = (a: ArtistListingRecord, b: ArtistListingRecord): number =>
+  newestWorkTime(b) - newestWorkTime(a) ||
   getArtistDisplayName(a).localeCompare(getArtistDisplayName(b));
 
 /** A regenerated bio-link row before it is stamped `origin: 'generated'`. */
@@ -804,9 +817,12 @@ export class ArtistRepository {
     skip,
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
-    const where = buildListedWhere(search, new Date());
-    const records = await prisma.artist.findMany({ where, select: artistListingSelect });
-    const compare = sort === 'alpha' ? compareByDisplayName : compareByNewestRelease;
+    const now = new Date();
+    const records = await prisma.artist.findMany({
+      where: buildListedWhere(search, now),
+      select: artistListingSelect(now),
+    });
+    const compare = sort === 'alpha' ? compareByDisplayName : compareByNewest;
     return [...records].sort(compare).slice(skip, skip + take);
   }
 

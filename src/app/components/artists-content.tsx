@@ -31,7 +31,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** The sort toggle's options, in the order they read left to right. */
 const ARTIST_SORT_OPTIONS: ReadonlyArray<{ value: ArtistListingSort; label: string }> = [
   { value: 'alpha', label: 'A–Z' },
-  { value: 'newest', label: 'Newest release' },
+  { value: 'newest', label: 'Newest' },
 ];
 
 /** Whether a toggle value is one of the listing's sort orders. */
