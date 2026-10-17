@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { expect, test } from '../fixtures/base.fixture';
 import { E2E_AUTH_SECRET } from '../helpers/auth-constants';
 import { createStorageState } from '../helpers/auth-helpers';
+import { openReleaseDeepLink } from '../helpers/release-deep-link';
 
 import type { APIRequestContext, Browser, BrowserContext } from '@playwright/test';
 
@@ -109,7 +110,7 @@ test.describe('Download gate for signed-in users', () => {
     const { context } = await signInNewUser(browser, 'dialog');
     try {
       const page = await context.newPage();
-      await page.goto(`/releases/${albumTwoId}`);
+      await openReleaseDeepLink(page, albumTwoId);
       await page.getByRole('button', { name: 'Download' }).click();
       await expect(page.getByRole('heading', { name: 'Download', exact: true })).toBeVisible({
         timeout: 10_000,

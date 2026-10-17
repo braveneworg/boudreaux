@@ -102,6 +102,29 @@ const seed = async (): Promise<Seeded> => {
   await prisma.artistRelease.create({ data: { artistId: hidden.id, releaseId: shared.id } });
   await prisma.artistRelease.create({ data: { artistId: visible.id, releaseId: shared.id } });
   await prisma.artistRelease.create({ data: { artistId: band.id, releaseId: shared.id } });
+  // Playable, so its release deep link opens the listening modal with the
+  // release's detail dehydrated into the page.
+  const sharedMp3 = await prisma.releaseDigitalFormat.create({
+    data: {
+      releaseId: shared.id,
+      formatType: 'MP3_320KBPS',
+      trackCount: 1,
+      totalFileSize: BigInt(5_000_000),
+      deletedAt: null,
+    },
+  });
+  await prisma.releaseDigitalFormatFile.create({
+    data: {
+      formatId: sharedMp3.id,
+      trackNumber: 1,
+      title: `${RELEASE_TITLE} track`,
+      duration: 210,
+      s3Key: `releases/${shared.id}/audio/mp3_320kbps/01-track.mp3`,
+      fileName: '01-track.mp3',
+      fileSize: BigInt(5_000_000),
+      mimeType: 'audio/mpeg',
+    },
+  });
   const solo = await release(SOLO_RELEASE_TITLE);
   await prisma.artistRelease.create({ data: { artistId: hidden.id, releaseId: solo.id } });
 
@@ -174,7 +197,16 @@ const cleanup = async (): Promise<void> => {
     where: { OR: [{ artistId: { in: artistIds } }, { memberId: { in: artistIds } }] },
   });
   await prisma.artistRelease.deleteMany({ where: { artistId: { in: artistIds } } });
-  await prisma.release.deleteMany({ where: { title: stamped } });
+  const releases = await prisma.release.findMany({
+    where: { title: stamped },
+    select: { id: true },
+  });
+  const releaseIds = releases.map(({ id }) => id);
+  await prisma.releaseDigitalFormatFile.deleteMany({
+    where: { format: { releaseId: { in: releaseIds } } },
+  });
+  await prisma.releaseDigitalFormat.deleteMany({ where: { releaseId: { in: releaseIds } } });
+  await prisma.release.deleteMany({ where: { id: { in: releaseIds } } });
   await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
 };
 
@@ -198,7 +230,10 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
       url: `/api/releases?listing=published&search=${encodeURIComponent(RELEASE_TITLE)}`,
     },
     { name: 'release detail API', url: `/api/releases/${seeded.releaseId}?withTracks=true` },
-    { name: 'release page', url: `/releases/${seeded.releaseId}` },
+    {
+      name: 'release deep link',
+      url: `/releases?artist=${seeded.publicSlug}&release=${seeded.releaseId}`,
+    },
     {
       name: 'artist page API',
       url: `/api/artists/slug/${seeded.publicSlug}?withReleases=true`,
@@ -302,14 +337,6 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
 
     expect(api.status()).toBe(404);
     expect(await listing.text()).not.toContain(HIDDEN_TOUR_TITLE);
-  });
-
-  test('does not list another artist’s releases for a hidden artist’s id', async ({ page }) => {
-    const response = await page.request.get(
-      `/api/releases/${seeded.soloReleaseId}/related?artistId=${seeded.hiddenId}`
-    );
-
-    expect(await response.json()).toEqual({ releases: [] });
   });
 
   test('refuses the admin reads to an anonymous visitor', async ({ page }) => {

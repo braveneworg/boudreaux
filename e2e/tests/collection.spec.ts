@@ -54,6 +54,35 @@ test.describe('My Collection — purchased user', () => {
     await expect(userPage.getByRole('button', { name: /Download \d+ formats?/ })).toBeVisible();
   });
 
+  test('the row opens the listening modal, whose download needs no payment', async ({
+    userPage,
+  }) => {
+    await userPage.goto('/collection');
+
+    const title = userPage.getByRole('link', { name: 'E2E Album One' });
+    await expect(title).toHaveAttribute(
+      'href',
+      /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/,
+      { timeout: 10_000 }
+    );
+    await title.click();
+
+    const dialog = userPage.getByRole('dialog', { name: 'E2E Album One' });
+    await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+    await expect(userPage).toHaveURL(/\/collection$/);
+
+    await dialog.getByRole('button', { name: 'Download' }).click();
+    await expect(userPage.getByRole('heading', { name: 'Download Again' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(userPage.getByText('You already purchased this on')).toBeVisible();
+    await userPage.getByRole('combobox').click();
+    for (const format of [/FLAC/i, /WAV/i, /MP3 320kbps/i, /^AAC$/i]) {
+      await expect(userPage.getByRole('option', { name: format })).toBeVisible();
+    }
+    await expect(userPage.getByLabel('Custom amount')).toHaveCount(0);
+  });
+
   test('does not expose a delete-purchase control to a non-admin user', async ({ userPage }) => {
     await userPage.goto('/collection');
 

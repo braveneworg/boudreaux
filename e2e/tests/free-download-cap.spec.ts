@@ -7,6 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { devices, expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 
+import { openReleaseDeepLink } from '../helpers/release-deep-link';
+
 /**
  * 007-free-digital-downloads — User Story 2 + User Story 3
  *
@@ -117,7 +119,7 @@ test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () =>
     try {
       await context.addCookies([visitorCookie(identity.visitorId, baseURL)]);
 
-      await page.goto(`/releases/${cappedReleaseId}`);
+      await openReleaseDeepLink(page, cappedReleaseId);
 
       // Open the dialog and pick the Free radio.
       const downloadButton = page.getByRole('button', { name: 'Download' });
@@ -146,15 +148,15 @@ test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () =>
       await expect(countdown).toHaveAttribute('datetime', /\d{4}-\d{2}-\d{2}T/);
       await expect(countdown).toHaveAttribute('role', 'timer');
 
-      // Pay-what-you-want upsell CTA points to the release's purchase entry.
-      const pwywLink = page.getByRole('link', { name: /Pay what you want/i });
-      await expect(pwywLink).toBeVisible();
-      await expect
-        .poll(() => pwywLink.getAttribute('href'))
-        .toContain(`/releases/${cappedReleaseId}`);
-
       // The format combobox is replaced by the cap-reached layout.
       await expect(page.getByRole('combobox')).toHaveCount(0);
+
+      // The Pay-what-you-want upsell is a button that switches the dialog to
+      // the paid path: the download step with the premium option chosen.
+      await capContainer.getByRole('button', { name: /Pay what you want/i }).click();
+      await expect(page.getByTestId('free-cap-reached')).toHaveCount(0);
+      await expect(page.getByLabel(/Premium digital formats/i)).toBeChecked();
+      await expect(page.getByLabel('Custom amount')).toBeVisible();
     } finally {
       await clearSeededIdentity(identity);
     }
@@ -175,7 +177,7 @@ test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () =>
       //    asserting the absence of the combobox + presence of the
       //    cap-reached block confirms AAC and MP3 320Kbps are simultaneously
       //    inaccessible (no separate per-format quota).
-      await page.goto(`/releases/${cappedReleaseId}`);
+      await openReleaseDeepLink(page, cappedReleaseId);
       await page.getByRole('button', { name: 'Download' }).click();
       await page.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }).click();
       await page.getByRole('button', { name: /^Download$/ }).click();
@@ -186,7 +188,7 @@ test.describe('Free download per-release cap (007 US2 + US3) — Pixel 7', () =>
       // 2) A different release for the same visitor still has remaining
       //    capacity, so the free flow advances normally and the format
       //    combobox is rendered.
-      await page.goto(`/releases/${openReleaseId}`);
+      await openReleaseDeepLink(page, openReleaseId);
       await page.getByRole('button', { name: 'Download' }).click();
       await page.getByRole('radio', { name: /MP3 \(320Kbps\) and AAC/i }).click();
       await page.getByRole('button', { name: /^Download$/ }).click();

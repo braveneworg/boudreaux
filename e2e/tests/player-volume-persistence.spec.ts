@@ -5,6 +5,7 @@
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/base.fixture';
+import { openReleaseDeepLink } from '../helpers/release-deep-link';
 
 const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
@@ -32,7 +33,7 @@ test.afterAll(async () => {
  */
 test.describe('Player volume persistence', () => {
   test('a volume change persists and re-applies after reload', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     // Video.js wraps the <audio> element in a .video-js container div and adds
     // the vjs-tech class to the underlying media element. Scope to the

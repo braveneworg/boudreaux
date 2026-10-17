@@ -1,8 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { PrismaClient } from '@prisma/client';
-
 import { expect, test } from '../fixtures/base.fixture';
 import { edgesOfAll } from '../helpers/layout-edges';
 import { blockAutoplayWithoutGesture, isAnyMediaPlaying } from '../helpers/strict-autoplay';
@@ -10,7 +8,7 @@ import { blockAutoplayWithoutGesture, isAnyMediaPlaying } from '../helpers/stric
 import type { Locator, Page } from '@playwright/test';
 
 /**
- * E2E coverage for the public releases listing + detail:
+ * E2E coverage for the public releases listing:
  *  - Releases listing: laid out like the home page — the search, then the
  *    RELEASES wordmark, then a 1/2/4-column grid of covers captioned with the
  *    artist above the title. A cover opens the home page's listening modal on
@@ -19,18 +17,12 @@ import type { Locator, Page } from '@playwright/test';
  *    holds a credit on, their band's included (`/releases?artist=<slug>`),
  *    named under the wordmark with a "View releases by all artists" link
  *    back. A slug naming no public artist is a 404.
- *  - Release detail: the "Release Notes" section renders (cutout heading +
- *    floated summary card + notes copy).
+ *  - Search: a picked release opens its listening modal in place.
  *
  * Read-only against the seed: E2E Album One, Two and Three by E2E Artist,
  * E2E Band Single by E2E Band (E2E Artist is its member), and E2E Roster
  * Compilation by the roster artists (seed-test-db.ts).
  */
-
-const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL || 'mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0';
-
-const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 const RELEASE_TITLE = 'E2E Album One';
 const ARTIST_NAME = 'E2E Artist';
@@ -43,20 +35,6 @@ const BAND_COVER_NAME = 'Play E2E Band Single by E2E Band';
 const UNRELATED_COVER_NAME = /^Play E2E Roster Compilation\b/;
 const ALL_ARTISTS_LINK = 'View releases by all artists';
 const TAP_HINT = 'Tap any release art to play or download the music';
-
-let releaseId: string;
-
-test.beforeAll(async () => {
-  const release = await prisma.release.findFirstOrThrow({
-    where: { title: RELEASE_TITLE },
-    select: { id: true },
-  });
-  releaseId = release.id;
-});
-
-test.afterAll(async () => {
-  await prisma.$disconnect();
-});
 
 /** The E2E Album One cover button, once its click handler is attached. */
 const hydratedCover = async (page: Page): Promise<Locator> => {
@@ -295,6 +273,22 @@ test.describe('Releases — cover grid + listening modal', () => {
   });
 });
 
+test.describe('Releases — search', () => {
+  test('a picked release opens its listening modal in place, the URL unchanged', async ({
+    page,
+  }) => {
+    await page.goto('/releases');
+    await page.getByRole('button', { name: 'Search releases' }).click();
+    await page.getByPlaceholder(/search by artist/i).fill(RELEASE_TITLE);
+    await page.getByRole('option', { name: new RegExp(RELEASE_TITLE) }).click();
+
+    const dialog = listeningModal(page);
+    await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toContainText(RELEASE_TITLE);
+    await expect(page).toHaveURL(/\/releases$/);
+  });
+});
+
 test.describe('Releases — cover grid on a 390×844 phone', () => {
   // A phone: no hover, so `(hover: none)` matches.
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -320,27 +314,5 @@ test.describe('Releases — cover grid on a 390×844 phone', () => {
     expect(sheet.x).toBe(0);
     expect(sheet.width).toBe(390);
     expect(sheet.y + sheet.height).toBeCloseTo(844, 0);
-  });
-});
-
-test.describe('Releases — release detail notes', () => {
-  test('the detail page renders the Release Notes section', async ({ page }) => {
-    await page.goto(`/releases/${releaseId}`);
-
-    await expect(page.getByRole('heading', { name: /release notes/i })).toBeVisible();
-
-    // The notes section holds the floated summary card + the authored copy.
-    const notes = page.locator('section[aria-labelledby="release-notes-heading"]');
-    await expect(notes).toContainText(RELEASE_TITLE);
-    await expect(notes).toContainText(/Released/);
-    await expect(notes).toContainText('Hand-numbered edition of 300.');
-    await expect(notes).toContainText('Ships with a risograph insert.');
-  });
-
-  test('the detail page never renders placeholder copy', async ({ page }) => {
-    await page.goto(`/releases/${releaseId}`);
-
-    const notes = page.locator('section[aria-labelledby="release-notes-heading"]');
-    await expect(notes).not.toContainText(/Lorem ipsum/i);
   });
 });

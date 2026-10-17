@@ -5,6 +5,7 @@
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/base.fixture';
+import { openReleaseDeepLink } from '../helpers/release-deep-link';
 
 /**
  * Use the E2E database directly so we can look up release IDs for navigation.
@@ -30,7 +31,7 @@ test.afterAll(async () => {
 
 test.describe('Download Dialog — Purchased User', () => {
   test('opens download dialog and shows returning purchaser state', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     // Click the download trigger button
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
@@ -44,7 +45,7 @@ test.describe('Download Dialog — Purchased User', () => {
   });
 
   test('shows format options via multi-combobox', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -63,7 +64,7 @@ test.describe('Download Dialog — Purchased User', () => {
   });
 
   test('shows download button with format count after selecting formats', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -92,7 +93,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
   });
 
   test('opens download dialog with free and premium options', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease2Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease2Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -109,7 +110,7 @@ test.describe('Download Dialog — Unpurchased User (Free Tier)', () => {
   });
 
   test('shows PWYW amount input when premium option selected', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease2Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease2Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await downloadButton.click();
@@ -140,7 +141,7 @@ test.describe('Download Dialog — Multi-format selection', () => {
   });
 
   test('can select and deselect formats via multi-combobox', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -165,7 +166,7 @@ test.describe('Download Dialog — Multi-format selection', () => {
   });
 
   test('shows selected format pills below combobox', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease1Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });
@@ -200,7 +201,7 @@ test.describe('Download Dialog — Free download flow', () => {
   });
 
   test('can select free download option and proceed', async ({ userPage }) => {
-    await userPage.goto(`/releases/${e2eRelease2Id}`);
+    await openReleaseDeepLink(userPage, e2eRelease2Id);
 
     const downloadButton = userPage.getByRole('button', { name: 'Download' });
     await expect(downloadButton).toBeVisible({ timeout: 10_000 });

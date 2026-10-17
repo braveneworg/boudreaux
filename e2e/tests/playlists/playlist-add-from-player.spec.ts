@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../../fixtures/base.fixture';
+import { openReleaseDeepLink } from '../../helpers/release-deep-link';
 import { PlaylistsPage } from '../../pages/playlists-page';
 
 import type { Locator, Page } from '@playwright/test';
@@ -103,10 +104,10 @@ const expectPanelInsidePopover = async (page: Page): Promise<void> => {
 test.describe('Add to a playlist from a player', () => {
   // #736: the kebab's lazy panel suspended up to the route loading boundary,
   // which hid the page and re-created the playing player. The bug lives in
-  // the shared add-to-playlist menu, so the release page's player (which has
-  // a track) exercises it as the home player would.
+  // the shared add-to-playlist menu, so the listening modal's player (which
+  // has a track) exercises it as the home player would.
   test('opening the kebab keeps the page and the playing audio', async ({ userPage }) => {
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
     const audio = userPage.locator('[data-vjs-player] audio.vjs-tech').first();
     await expect(audio).toBeAttached({ timeout: 15_000 });
     await userPage.getByRole('button', { name: 'Play', exact: true }).first().click();
@@ -165,7 +166,7 @@ test.describe('Add to a playlist from a player', () => {
       await route.fulfill({ response, json: body });
     });
 
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
     await addToPlaylistTrigger(userPage).click();
     await userPage.getByRole('button', { name: 'Create playlist' }).click();
     const createDialog = userPage.getByRole('dialog', { name: 'Create playlist' });
@@ -184,11 +185,11 @@ test.describe('Add to a playlist from a player', () => {
       .toBeGreaterThan(0);
   });
 
-  test('hides the kebab from a signed-out visitor on a release page', async ({ page }) => {
-    await page.goto(`/releases/${releaseId}`);
+  test('hides the kebab from a signed-out visitor in the listening modal', async ({ page }) => {
+    // The player renders for everyone (the helper waits for it), but the
+    // session-gated kebab does not.
+    await openReleaseDeepLink(page, releaseId);
 
-    // The player renders for everyone, but the session-gated kebab does not.
-    await expect(page.getByRole('heading', { name: /release notes/i })).toBeVisible();
     await expect(addToPlaylistTrigger(page)).toHaveCount(0);
   });
 
@@ -204,7 +205,7 @@ test.describe('Add to a playlist from a player', () => {
     await playlists.goto();
     await playlists.createPlaylistWithFirstTrack(SEED_TRACK_TITLE, title);
 
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
 
     // Open the kebab popover.
     await addToPlaylistTrigger(userPage).click();
@@ -241,7 +242,7 @@ test.describe('Add to a playlist from a player', () => {
   }, testInfo) => {
     const title = `Player Create ${testInfo.retry}-${Date.now()}`;
 
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
 
     // Open the kebab → "Create playlist": the popover closes and the create
     // dialog opens with the playing track already staged.
@@ -280,7 +281,7 @@ test.describe('Add to a playlist from a player', () => {
   }, testInfo) => {
     const title = `Player Heading Save ${testInfo.retry}-${Date.now()}`;
 
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
 
     await addToPlaylistTrigger(userPage).click();
     await expect(playlistPicker(userPage)).toBeVisible();
@@ -308,7 +309,7 @@ test.describe('Add to a playlist from a player', () => {
     // duration + two action buttons) exceeds the dialog. The creator must
     // shrink and truncate instead of widening the dialog's grid track.
     await userPage.setViewportSize({ width: 390, height: 844 });
-    await userPage.goto(`/releases/${releaseId}`);
+    await openReleaseDeepLink(userPage, releaseId);
 
     await addToPlaylistTrigger(userPage).click();
     await expect(playlistPicker(userPage)).toBeVisible();
