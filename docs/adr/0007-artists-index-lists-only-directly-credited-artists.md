@@ -29,6 +29,10 @@ request under the same rule.)
 [ADR-0016](0016-an-artist-is-public-whether-or-not-it-is-still-on-the-label.md):
 "active" is no longer part of the rule. A listed artist is published, not
 deleted, and directly credited, and the index is one list.)
+(Amended again by
+[ADR-0022](0022-an-artist-with-a-live-video-is-listed.md): a video credit
+on a live video also lists an artist. The playlist "By artist" search keeps
+this decision's release-only rule.)
 
 - One `where` builder (`buildListedWhere`) defines "holds a listed direct
   release" for both the index and the playlist "By artist" search. Only the
