@@ -7,7 +7,11 @@ import { useImperativeHandle, useState, type ReactElement, type Ref, type RefObj
 
 import Link from 'next/link';
 
-import { pickLoudZineAccent, type ZineAccent } from '@/app/components/ui/zine-panel';
+import {
+  pickLoudZineAccent,
+  zineAccentForRelease,
+  type ZineAccent,
+} from '@/app/components/ui/zine-panel';
 import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
 import type {
   ArtistNavSearchRelease,
@@ -17,10 +21,12 @@ import { usePrimedAudioHandoff } from '@/hooks/use-primed-audio-handoff';
 import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { artistVideosHref } from '@/lib/utils/artist-videos-href';
+import { releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
 
 import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
 import { videoMediaItem } from './playlists/player-media-item';
 import { ReleasePlayDialog } from './release-play-dialog';
+import { ReleaseShareWidget } from './release-share-widget';
 
 /** The artist whose search group a picked row sat in: the modal's byline. */
 export interface HomeSearchPickArtist {
@@ -28,24 +34,34 @@ export interface HomeSearchPickArtist {
   artistSlug: string;
 }
 
-/** What the home search combobox calls, inside the pick's gesture. */
+/**
+ * A picked release's album artist: the modal's byline, its links and the deep
+ * link. Both `null` when the album artist is hidden (ADR-0015), as a
+ * `/releases` search row's can be.
+ */
+export interface HomeSearchReleaseArtist {
+  artistName: string | null;
+  artistSlug: string | null;
+}
+
+/** What the search combobox calls, inside the pick's gesture. */
 export interface HomeSearchPlayDialogHandle {
   /** Prime the release's first track and open it playing. */
-  openRelease: (artist: HomeSearchPickArtist, release: ArtistNavSearchRelease) => void;
+  openRelease: (artist: HomeSearchReleaseArtist, release: ArtistNavSearchRelease) => void;
   /** Prime the video's stream and open it playing. */
   openVideo: (artist: HomeSearchPickArtist, video: ArtistNavSearchVideo) => void;
 }
 
-type HomeSearchSelection = HomeSearchPickArtist & { accent: ZineAccent } & (
-    | { kind: 'release'; item: ArtistNavSearchRelease }
-    | { kind: 'video'; item: ArtistNavSearchVideo }
-  );
+type HomeSearchSelection = { accent: ZineAccent } & (
+  | (HomeSearchReleaseArtist & { kind: 'release'; item: ArtistNavSearchRelease })
+  | (HomeSearchPickArtist & { kind: 'video'; item: ArtistNavSearchVideo })
+);
 
 interface HomeSearchPlayDialogProps {
   ref: Ref<HomeSearchPlayDialogHandle>;
   /** Where focus goes when the modal closes: the search trigger. */
   returnFocusRef: RefObject<HTMLElement | null>;
-  /** Draws each pick's accent; injectable for tests. */
+  /** Draws each video pick's accent; injectable for tests. */
   pickAccent?: () => ZineAccent;
 }
 
@@ -61,13 +77,14 @@ const ViewAllLink = ({ href, children }: { href: string; children: string }): Re
 );
 
 /**
- * The play modal behind the home search: a picked release plays in the
- * release modal (a bottom sheet on phones), a picked video in the video
- * modal, each framed in a loud accent drawn per pick, with the artist of the
- * row's search group as a linked byline, the title with its year, and a
- * "View all releases" or "View all videos" link for that artist under the
- * player. The video modal carries the add-to-playlist kebab, which shows
- * only to a signed-in visitor.
+ * The play modal behind the home and `/releases` searches: a picked release
+ * plays in the release modal (a bottom sheet on phones), framed in the
+ * release's own accent and sharing its deep link; a picked video plays in the
+ * video modal, framed in a loud accent drawn per pick. Each has the artist as
+ * a linked byline, the title with its year, and a "View all releases" or
+ * "View all videos" link for that artist under the player (a release whose
+ * album artist is hidden has no artist to link). The video modal carries the
+ * add-to-playlist kebab, which shows only to a signed-in visitor.
  *
  * It owns the primed handoffs, so `openRelease` / `openVideo` start playback
  * inside the pick's gesture; the combobox imports it statically for that
@@ -88,7 +105,12 @@ export const HomeSearchPlayDialog = ({
   useImperativeHandle(ref, () => ({
     openRelease: (artist, release) => {
       if (release.playSrc) audio.primeMediaEl(release.playSrc);
-      setSelection({ ...artist, kind: 'release', item: release, accent: pickAccent() });
+      setSelection({
+        ...artist,
+        kind: 'release',
+        item: release,
+        accent: zineAccentForRelease(release.id),
+      });
       setOpen(true);
     },
     openVideo: (artist, video) => {
@@ -133,7 +155,7 @@ export const HomeSearchPlayDialog = ({
     headingOrder: 'artist-first',
     centered: true,
     accent,
-    artistHref: `/artists/${artistSlug}`,
+    artistHref: artistSlug ? `/artists/${artistSlug}` : undefined,
     year: selection.item.year,
   } as const;
 
@@ -147,26 +169,39 @@ export const HomeSearchPlayDialog = ({
         artistName={artistName}
         takeMediaEl={audio.takeMediaEl}
         sheetOnPhone
-        footer={<ViewAllLink href={artistReleasesHref(artistSlug)}>View all releases</ViewAllLink>}
+        shareWidget={
+          <ReleaseShareWidget
+            artistSlug={artistSlug}
+            artistName={artistName}
+            releaseTitle={release.title}
+            shareUrl={artistSlug ? releaseDeepLinkUrl(artistSlug, release.id) : undefined}
+          />
+        }
+        footer={
+          artistSlug ? (
+            <ViewAllLink href={artistReleasesHref(artistSlug)}>View all releases</ViewAllLink>
+          ) : undefined
+        }
       />
     );
   }
 
-  const { item: video } = selection;
+  // Narrowed to the video pick, whose artist always has a name and a page.
+  const { item: video, artistName: videoArtist, artistSlug: videoArtistSlug } = selection;
   return (
     <VideoPlayDialog
       {...shared}
       title={video.title}
-      artist={artistName}
+      artist={videoArtist}
       src={video.streamUrl}
       takeMediaEl={media.takeMediaEl}
-      footer={<ViewAllLink href={artistVideosHref(artistSlug)}>View all videos</ViewAllLink>}
+      footer={<ViewAllLink href={artistVideosHref(videoArtistSlug)}>View all videos</ViewAllLink>}
       action={
         <AddToPlaylistMenu
           item={videoMediaItem({
             videoId: video.id,
             title: video.title,
-            artistName,
+            artistName: videoArtist,
             coverArt: video.posterSrc,
             duration: video.durationSeconds,
           })}

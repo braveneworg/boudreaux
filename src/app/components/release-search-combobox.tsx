@@ -9,14 +9,13 @@
  * switches to a server-side search by artist name, release title, or catalog
  * number, covering the full catalog rather than only loaded pages. Uses
  * shadcn/ui Popover + Command (cmdk) for keyboard-navigable results.
- * Selecting a result navigates to the release's media player page.
+ * Selecting a playable result opens its listening modal in place.
  */
 'use client';
 
 import * as React from 'react';
 
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 
 import { SearchComboboxTrigger } from '@/app/components/search-combobox-trigger';
 import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/app/components/search-result-row';
@@ -34,20 +33,45 @@ import {
   usePublishedReleaseSearchQuery,
 } from '@/hooks/queries/use-infinite-published-releases-query';
 import { useDebounce } from '@/hooks/use-debounce';
-import { getArtistDisplayNameForRelease, getReleaseCoverArt } from '@/lib/utils/release-helpers';
+import type { PublishedReleaseListing } from '@/lib/types/media-models';
+import {
+  getArtistDisplayNameForRelease,
+  getFirstTrackStreamSource,
+  getReleaseCoverArt,
+} from '@/lib/utils/release-helpers';
+
+import {
+  HomeSearchPlayDialog,
+  type HomeSearchPlayDialogHandle,
+  type HomeSearchReleaseArtist,
+} from './home-search-play-dialog';
 
 /** How close to the list's bottom edge (px) before the next page loads. */
 const NEAR_BOTTOM_THRESHOLD_PX = 48;
+
+/** One result row, derived once per result set. */
+interface ReleaseSearchResult {
+  release: PublishedReleaseListing;
+  coverArt: ReturnType<typeof getReleaseCoverArt>;
+  /** The album artist's name and slug; both `null` when that artist is hidden. */
+  artist: HomeSearchReleaseArtist;
+  /** The first MP3 track's stream URL; `null` leaves the row unselectable. */
+  playSrc: string | null;
+}
 
 /**
  * A combobox dropdown that opens onto the browsable published catalog
  * (infinitely scrolled) and switches to server search as the user types.
  * Each result shows a cover art thumbnail, artist name, and title.
- * Selecting a result navigates to `/releases/{releaseId}`.
+ * Selecting a playable result primes its first track inside the pick's
+ * gesture and opens its listening modal in place (`HomeSearchPlayDialog`),
+ * leaving the URL as it is; a result with nothing playable is disabled.
+ * Closing the modal returns focus to the search trigger.
  */
 export const ReleaseSearchCombobox = () => {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const playDialogRef = React.useRef<HomeSearchPlayDialogHandle>(null);
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebounce(search, 300);
 
@@ -63,13 +87,17 @@ export const ReleaseSearchCombobox = () => {
     isPending: isBrowsePending,
   } = useInfinitePublishedReleasesQuery('');
 
-  const handleSelect = React.useCallback(
-    (releaseId: string) => {
-      setOpen(false);
-      router.push(`/releases/${releaseId}`);
-    },
-    [router]
-  );
+  // Primes inside this pick's gesture, so playback starts now.
+  const handleSelect = ({ release, coverArt, artist, playSrc }: ReleaseSearchResult): void => {
+    setOpen(false);
+    playDialogRef.current?.openRelease(artist, {
+      id: release.id,
+      title: release.title,
+      coverArtSrc: coverArt?.src ?? null,
+      playSrc,
+      year: release.releasedOn.getUTCFullYear(),
+    });
+  };
 
   const hasQuery = debouncedSearch.trim().length > 0;
 
@@ -83,13 +111,17 @@ export const ReleaseSearchCombobox = () => {
   // keystroke-driven re-render (the search input updates state on each key,
   // while `releases` only changes when the debounced query resolves).
   const enrichedResults = React.useMemo(
-    () =>
+    (): ReleaseSearchResult[] =>
       (releases ?? []).map((release) => ({
         release,
         coverArt: getReleaseCoverArt(release),
-        artistName: release.albumArtist
-          ? getArtistDisplayNameForRelease(release.albumArtist)
-          : null,
+        artist: {
+          artistName: release.albumArtist
+            ? getArtistDisplayNameForRelease(release.albumArtist)
+            : null,
+          artistSlug: release.albumArtist?.slug ?? null,
+        },
+        playSrc: getFirstTrackStreamSource(release),
       })),
     [releases]
   );
@@ -107,67 +139,73 @@ export const ReleaseSearchCombobox = () => {
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <SearchComboboxTrigger
-          aria-expanded={open}
-          aria-label="Search releases"
-          label="Search releases..."
-        />
-      </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-        {/* Server provides the matches; disable cmdk's client-side filtering. */}
-        <Command shouldFilter={false}>
-          <CommandInput
-            value={search}
-            onValueChange={setSearch}
-            placeholder="Search by artist, title, or catalog number..."
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <SearchComboboxTrigger
+            ref={triggerRef}
+            aria-expanded={open}
             aria-label="Search releases"
+            label="Search releases..."
           />
-          <CommandList onScroll={handleListScroll}>
-            <CommandEmpty>
-              {(hasQuery ? isFetching : isBrowsePending)
-                ? 'Loading releases…'
-                : 'No releases found.'}
-            </CommandEmpty>
-            <CommandGroup>
-              {enrichedResults.map(({ release, coverArt, artistName }) => {
-                return (
-                  <CommandItem
-                    key={release.id}
-                    value={release.id}
-                    onSelect={() => handleSelect(release.id)}
-                    className={SEARCH_RESULT_ITEM_CLASS}
-                  >
-                    <SearchResultRow
-                      thumbnail={
-                        coverArt ? (
-                          <Image
-                            src={coverArt.src}
-                            alt={coverArt.alt}
-                            width={40}
-                            height={40}
-                            className="size-10 shrink-0 object-cover"
-                          />
-                        ) : (
-                          <span className="flex size-10 shrink-0 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
-                            ♫
-                          </span>
-                        )
-                      }
-                      primary={release.title}
-                      secondary={artistName}
-                    />
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-            {!hasQuery && isFetchingNextPage && (
-              <div className="py-2 text-center text-xs text-zinc-500">Loading more…</div>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        </PopoverTrigger>
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          {/* Server provides the matches; disable cmdk's client-side filtering. */}
+          <Command shouldFilter={false}>
+            <CommandInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search by artist, title, or catalog number..."
+              aria-label="Search releases"
+            />
+            <CommandList onScroll={handleListScroll}>
+              <CommandEmpty>
+                {(hasQuery ? isFetching : isBrowsePending)
+                  ? 'Loading releases…'
+                  : 'No releases found.'}
+              </CommandEmpty>
+              <CommandGroup>
+                {enrichedResults.map((result) => {
+                  const { release, coverArt, artist, playSrc } = result;
+                  return (
+                    <CommandItem
+                      key={release.id}
+                      value={release.id}
+                      disabled={playSrc === null}
+                      onSelect={() => handleSelect(result)}
+                      className={SEARCH_RESULT_ITEM_CLASS}
+                    >
+                      <SearchResultRow
+                        thumbnail={
+                          coverArt ? (
+                            <Image
+                              src={coverArt.src}
+                              alt={coverArt.alt}
+                              width={40}
+                              height={40}
+                              className="size-10 shrink-0 object-cover"
+                            />
+                          ) : (
+                            <span className="flex size-10 shrink-0 items-center justify-center bg-zinc-200 text-xs text-zinc-500">
+                              ♫
+                            </span>
+                          )
+                        }
+                        primary={release.title}
+                        secondary={artist.artistName}
+                      />
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+              {!hasQuery && isFetchingNextPage && (
+                <div className="py-2 text-center text-xs text-zinc-500">Loading more…</div>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      <HomeSearchPlayDialog ref={playDialogRef} returnFocusRef={triggerRef} />
+    </>
   );
 };

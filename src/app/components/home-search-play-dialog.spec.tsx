@@ -11,6 +11,7 @@ import type {
 } from '@/hooks/queries/use-artist-nav-search-query';
 
 import { HomeSearchPlayDialog, type HomeSearchPlayDialogHandle } from './home-search-play-dialog';
+import { zineAccentForRelease } from './ui/zine-panel';
 
 const audio = vi.hoisted(() => ({
   primeMediaEl: vi.fn(),
@@ -42,6 +43,7 @@ interface DialogProps {
   artistHref?: string;
   year?: number;
   footer?: ReactNode;
+  shareWidget?: ReactNode;
   action?: ReactNode;
   [key: string]: unknown;
 }
@@ -58,12 +60,29 @@ vi.mock('./release-play-dialog', () => ({
         {props.open ? (
           <>
             {props.title}
+            {props.shareWidget}
             {props.footer}
           </>
         ) : null}
       </div>
     );
   },
+}));
+
+vi.mock('./release-share-widget', () => ({
+  ReleaseShareWidget: ({
+    shareUrl,
+    artistSlug,
+  }: {
+    shareUrl?: string;
+    artistSlug: string | null;
+  }) => (
+    <div
+      data-testid="share-widget"
+      data-share-url={shareUrl ?? ''}
+      data-artist-slug={artistSlug ?? ''}
+    />
+  ),
 }));
 
 const videoDialog = vi.hoisted((): { props?: DialogProps } => ({}));
@@ -126,6 +145,7 @@ const renderDialog = (pickAccent = vi.fn(() => 'orchid' as const)) => {
 };
 
 beforeEach(() => {
+  vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
   releaseDialog.props = undefined;
   videoDialog.props = undefined;
 });
@@ -169,6 +189,37 @@ describe('HomeSearchPlayDialog', () => {
         'href',
         '/releases?artist=marguerite-ash'
       );
+    });
+
+    it('shares the release deep link from the release dialog', () => {
+      const { handle } = renderDialog();
+
+      act(() => handle.current?.openRelease(ARTIST, RELEASE));
+
+      expect(screen.getByTestId('share-widget')).toHaveAttribute(
+        'data-share-url',
+        'https://fakefour.test/releases?artist=marguerite-ash&release=r-1'
+      );
+    });
+
+    it("frames the release in its own accent, never the picker's", () => {
+      const { handle, pickAccent } = renderDialog();
+
+      act(() => handle.current?.openRelease(ARTIST, RELEASE));
+
+      expect(releaseDialog.props?.accent).toBe(zineAccentForRelease('r-1'));
+      expect(pickAccent).not.toHaveBeenCalled();
+    });
+
+    it('opens a release with no public album artist without byline links or a deep link', () => {
+      const { handle } = renderDialog();
+
+      act(() => handle.current?.openRelease({ artistName: null, artistSlug: null }, RELEASE));
+
+      expect(releaseDialog.props).toMatchObject({ open: true, artistName: null });
+      expect(releaseDialog.props?.artistHref).toBeUndefined();
+      expect(screen.queryByRole('link', { name: 'View all releases' })).toBeNull();
+      expect(screen.getByTestId('share-widget')).toHaveAttribute('data-share-url', '');
     });
 
     it('primes nothing for a release without a playable track', () => {
@@ -233,14 +284,14 @@ describe('HomeSearchPlayDialog', () => {
     });
   });
 
-  it('frames each pick in a fresh accent from the picker', () => {
+  it('frames each video pick in a fresh accent from the picker', () => {
     const pickAccent = vi.fn().mockReturnValueOnce('cyan').mockReturnValueOnce('storm');
     const { handle } = renderDialog(pickAccent);
 
-    act(() => handle.current?.openRelease(ARTIST, RELEASE));
-    expect(releaseDialog.props?.accent).toBe('cyan');
-
     act(() => handle.current?.openVideo(ARTIST, VIDEO));
+    expect(videoDialog.props?.accent).toBe('cyan');
+
+    act(() => handle.current?.openVideo(ARTIST, { ...VIDEO, id: 'v-2' }));
     expect(videoDialog.props?.accent).toBe('storm');
     expect(pickAccent).toHaveBeenCalledTimes(2);
   });
