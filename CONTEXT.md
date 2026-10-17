@@ -262,6 +262,19 @@ extracted by ffprobe), a **description**, and **enrichment** (externally
 sourced facts such as release date; available to any category once the video
 names an artist or creator).
 
+**poster candidate** — one frame captured from a Video and stored on it as a
+choice for its poster. The first five are captured from the first **sample
+window** when the file is picked; every "Next 5 frames" press appends the
+next window's five. A Video holds at most 25. The poster is always one of
+them, unless an admin uploaded an image by hand.
+_Avoid_: thumbnail (the strip's rendering of one), frame (any decoded picture).
+
+**sample window** — the stretch of a Video that one capture samples five
+evenly spaced poster candidates from. The first window runs from 3 s to 10 s
+(the whole clip when it is that short); each later window is the next stretch
+of the same width, and the last one is clipped at the end of the Video.
+_Avoid_: segment, range, batch (the frames, not the stretch they came from).
+
 **release date** — the day-precision UTC day a Video was released. It is
 **never defaulted**: a **draft** may have none, and today only ever appears
 because a human typed it. Publishing requires one. See
