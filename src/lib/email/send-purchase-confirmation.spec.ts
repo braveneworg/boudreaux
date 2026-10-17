@@ -177,12 +177,12 @@ describe('sendPurchaseConfirmationEmail', () => {
       );
     });
 
-    it('should build the downloadUrl from NEXT_PUBLIC_BASE_URL and releaseId pointing to the release page', async () => {
+    it("should link the email to the buyer's collection on NEXT_PUBLIC_BASE_URL", async () => {
       await sendPurchaseConfirmationEmail(validInput);
 
       expect(vi.mocked(buildPurchaseConfirmationEmailHtml)).toHaveBeenCalledWith(
         expect.objectContaining({
-          downloadUrl: 'https://example.com/releases/release-abc',
+          downloadUrl: 'https://example.com/collection',
         })
       );
     });
@@ -243,7 +243,7 @@ describe('sendPurchaseConfirmationEmail', () => {
 
       expect(vi.mocked(buildPurchaseConfirmationEmailHtml)).toHaveBeenCalledWith(
         expect.objectContaining({
-          downloadUrl: 'https://fakefourrecords.com/releases/release-abc',
+          downloadUrl: 'https://fakefourrecords.com/collection',
         })
       );
     });
