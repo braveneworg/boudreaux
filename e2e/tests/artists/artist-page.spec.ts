@@ -439,13 +439,26 @@ test.describe('Artist Page', () => {
       await expect(bandCard).toContainText('Latest: E2E Band Single (2025)');
     });
 
-    test('sorts A–Z by default and by newest release on demand', async ({ page }) => {
+    // ADR-0022: "Newest" ranks by the later of an artist's newest release and
+    // newest live video. E2E Artist's live video (2026-01-07) beats E2E Band's
+    // 2025 single, which beats E2E Artist's newest release (2024), so E2E
+    // Artist leads only when the video counts. A–Z also leads with E2E Artist,
+    // so the spec waits for the newest page itself before reading the grid.
+    test('sorts A–Z by default and by newest release or video on demand', async ({ page }) => {
       await page.goto('/artists');
       await expect(cards(page).first()).toContainText('E2E Artist', { timeout: 15_000 });
 
-      await page.getByRole('radio', { name: 'Newest release' }).click();
+      const newestPage = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/artists?') &&
+          new URL(response.url()).searchParams.get('sort') === 'newest' &&
+          response.ok()
+      );
+      await page.getByRole('radio', { name: 'Newest' }).click();
+      await newestPage;
 
-      await expect(cards(page).first()).toContainText('E2E Band', { timeout: 10_000 });
+      await expect(cards(page).nth(0)).toContainText('E2E Artist', { timeout: 10_000 });
+      await expect(cards(page).nth(1)).toContainText('E2E Band');
     });
 
     test('loads the second page on scroll', async ({ page }) => {
