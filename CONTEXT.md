@@ -149,12 +149,28 @@ _Avoid_: role (that is the Video term), guest.
 **release credit** on (primary or featured, never member), by release date:
 the one the Artist's page leads with and the artists index card names. A
 featured one is shown "by" its album artist when that Artist is public.
-Playable (an MP3 track) → its line opens the listening modal in place; else
-it links to the release page. See the 2026-10-06 amendment of
+Playable (an MP3 track) → its line opens the **listening modal** in place,
+its href the **release deep link**; else its title is plain text. See the
+2026-10-06 amendment of
 [ADR-0006](docs/adr/0006-artist-page-lists-every-release-credit.md).
 _Avoid_: newest release (the summary field is named `newestRelease`, but the
 page concept is this), featured release (the home page row is a
 **spotlight**).
+
+**listening modal** — the in-place player dialog for a Release
+(`ReleasePlayDialog`): its cover, track list, controls, download and share
+row. Every opener of a playable Release opens it in place — a cover, the
+**latest release** line, a search pick, a collection row, a bio link —
+from the click's gesture, and a **release deep link** opens it on arrival,
+paused. A Release is never a page of its own.
+See [ADR-0023](docs/adr/0023-a-release-is-a-listening-modal-not-a-page.md).
+_Avoid_: release page, player page.
+
+**release deep link** — `/releases?artist=<slug>&release=<id>`: a Release's
+permalink, the releases listing filtered by an Artist credited on it with the
+**listening modal** open on that Release. It is what a share row shares; the
+old `/releases/<id>` URL permanently redirects to it.
+_Defined in_ `src/lib/utils/release-deep-link.ts`.
 
 **spotlight** — an admin-chosen artist plus one of their Releases shown on the
 home page during a date window, ordered by position (then newest first), up
