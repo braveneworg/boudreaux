@@ -1,7 +1,8 @@
+// @vitest-environment node
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import ReleaseRedirectPage from './page';
+import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
 
@@ -31,9 +32,11 @@ vi.mock('@/lib/services/release-service', () => ({
 const RELEASE_ID = '0123456789abcdef01234567';
 
 const visit = (releaseId: string) =>
-  ReleaseRedirectPage({ params: Promise.resolve({ releaseId }) });
+  GET(new Request(`http://localhost/releases/${releaseId}`), {
+    params: Promise.resolve({ releaseId }),
+  });
 
-describe('ReleaseRedirectPage', () => {
+describe('GET /releases/[releaseId]', () => {
   it("permanently redirects to the release deep link on the album artist's releases", async () => {
     getPublishedReleaseRedirectTarget.mockResolvedValueOnce({ artistSlug: 'e2e-artist' });
 
