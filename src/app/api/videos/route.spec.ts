@@ -28,6 +28,8 @@ vi.mock('@/lib/services/video-service', () => ({
   VideoService: {
     getVideos: vi.fn(),
     getPublishedVideos: vi.fn(),
+    // A persistent default: `clearMocks` resets calls, not this implementation.
+    countPublishedVideos: vi.fn().mockResolvedValue({ success: true, data: 0 }),
   },
 }));
 
@@ -164,6 +166,61 @@ describe('GET /api/videos', () => {
     expect(vi.mocked(VideoService.getPublishedVideos).mock.calls).toEqual([
       [{ sort: 'desc', skip: 0, take: 5 }],
     ]);
+  });
+
+  // The `/videos` "(N videos)" label beside the search.
+  it('adds the total of the published listing to its page', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValueOnce({
+      success: true,
+      data: [mockVideo] as never,
+    });
+    vi.mocked(VideoService.countPublishedVideos).mockResolvedValueOnce({ success: true, data: 9 });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(data.total).toBe(9);
+  });
+
+  it('counts with the same search and artist as the published page', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValueOnce({
+      success: true,
+      data: [] as never,
+    });
+
+    await call('?listing=published&search=blues&artist=marguerite-ash&skip=5');
+
+    expect(vi.mocked(VideoService.countPublishedVideos).mock.calls).toEqual([
+      [{ search: 'blues', artist: 'marguerite-ash' }],
+    ]);
+  });
+
+  it('maps a failed published count to its status code', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValueOnce({
+      success: true,
+      data: [] as never,
+    });
+    vi.mocked(VideoService.countPublishedVideos).mockResolvedValueOnce({
+      success: false,
+      error: 'Database unavailable',
+      code: 'UNAVAILABLE',
+    });
+
+    const response = await call('?listing=published');
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data).toEqual({ error: 'Database unavailable' });
+  });
+
+  it('adds no total to the admin listing', async () => {
+    vi.mocked(auth).mockResolvedValueOnce({ user: { id: 'admin-1', role: 'admin' } } as never);
+    vi.mocked(VideoService.getVideos).mockResolvedValueOnce({ success: true, data: [] as never });
+
+    const response = await call();
+    const data = await response.json();
+
+    expect(data).toEqual({ rows: [], nextSkip: null });
   });
 
   it('clamps take=500 to 50 on the admin listing', async () => {

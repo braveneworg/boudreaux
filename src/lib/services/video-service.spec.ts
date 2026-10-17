@@ -30,6 +30,7 @@ vi.mock('@/lib/repositories/video-repository', () => ({
     findById: vi.fn(),
     findMany: vi.fn(),
     findPublished: vi.fn(),
+    countPublished: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
   },
@@ -255,6 +256,40 @@ describe('VideoService', () => {
       const result = await VideoService.getPublishedVideos({});
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve videos' });
+    });
+  });
+
+  describe('countPublishedVideos', () => {
+    it('returns the count of the listing for the same search and artist', async () => {
+      vi.mocked(VideoRepository.countPublished).mockResolvedValueOnce(4);
+
+      const result = await VideoService.countPublishedVideos({
+        search: 'blues',
+        artist: 'marguerite-ash',
+      });
+
+      expect(result).toEqual({ success: true, data: 4 });
+      expect(vi.mocked(VideoRepository.countPublished).mock.calls).toEqual([
+        [{ search: 'blues', artist: 'marguerite-ash' }],
+      ]);
+    });
+
+    it('maps a DataError to a failure response', async () => {
+      vi.mocked(VideoRepository.countPublished).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
+
+      const result = await VideoService.countPublishedVideos({});
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('maps an unknown error to a failure response', async () => {
+      vi.mocked(VideoRepository.countPublished).mockRejectedValueOnce(new Error('Unknown error'));
+
+      const result = await VideoService.countPublishedVideos({});
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to count videos' });
     });
   });
 

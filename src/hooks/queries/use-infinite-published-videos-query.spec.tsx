@@ -109,7 +109,7 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('fetches the published listing with skip/take/sort and forwards the signal', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null, total: 1 }),
     });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('desc');
@@ -126,7 +126,7 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('appends the search param to the listing request when set', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null, total: 1 }),
     });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('desc', 'Rock');
@@ -143,7 +143,7 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('appends the artist param to the listing request when set', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null, total: 1 }),
     });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('desc', '', {}, 'marguerite-ash');
@@ -162,7 +162,7 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('parses the wire row back into coerced Date and bigint fields', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null, total: 1 }),
     });
     vi.stubGlobal('fetch', fetchMock);
     const opts = getOptions('desc');
@@ -170,6 +170,34 @@ describe('useInfinitePublishedVideosQuery', () => {
     const page = await opts.queryFn({ pageParam: 0 });
 
     expect(page.rows[0]?.fileSize).toBe(123456n);
+  });
+
+  it('parses the total of the listing from the page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ rows: [videoRowResponse], nextSkip: null, total: 7 }),
+      })
+    );
+    const opts = getOptions('desc');
+
+    const page = await opts.queryFn({ pageParam: 0 });
+
+    expect(page.total).toBe(7);
+  });
+
+  it('rejects a page without a total', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+      })
+    );
+    const opts = getOptions('desc');
+
+    await expect(opts.queryFn({ pageParam: 0 })).rejects.toThrow();
   });
 
   it('throws when the response is not ok', async () => {

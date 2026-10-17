@@ -52,9 +52,11 @@ vi.mock('@/lib/utils/get-query-client', () => ({
 }));
 
 const mockGetPublishedVideos = vi.fn();
+const mockCountPublishedVideos = vi.fn();
 vi.mock('@/lib/services/video-service', () => ({
   VideoService: {
     getPublishedVideos: (...args: unknown[]) => mockGetPublishedVideos(...args),
+    countPublishedVideos: (...args: unknown[]) => mockCountPublishedVideos(...args),
   },
 }));
 
@@ -153,6 +155,7 @@ const mockVideo: Video = {
 describe('VideosPage', () => {
   beforeEach(() => {
     mockGetPublishedVideos.mockResolvedValue({ success: true, data: [] });
+    mockCountPublishedVideos.mockResolvedValue({ success: true, data: 0 });
     getPublicArtist.mockResolvedValue({ displayName: 'E2E Artist' });
   });
 
@@ -185,6 +188,7 @@ describe('VideosPage', () => {
 
   it('should shape the prefetched first page with signed stream urls', async () => {
     mockGetPublishedVideos.mockResolvedValue({ success: true, data: [mockVideo] });
+    mockCountPublishedVideos.mockResolvedValue({ success: true, data: 3 });
 
     await pageFor();
 
@@ -223,6 +227,7 @@ describe('VideosPage', () => {
     await expect(opts.queryFn()).resolves.toEqual({
       rows: [{ ...publicVideo, streamUrl: 'https://cdn.example.com/signed' }],
       nextSkip: null,
+      total: 3,
     });
   });
 
@@ -262,7 +267,23 @@ describe('VideosPage', () => {
     await pageFor();
 
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
-    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
+    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null, total: 0 });
+  });
+
+  it('should degrade to an empty first page when the count fails', async () => {
+    mockGetPublishedVideos.mockResolvedValue({ success: true, data: [mockVideo] });
+    mockCountPublishedVideos.mockResolvedValue({ success: false, error: 'Database unavailable' });
+
+    await pageFor();
+
+    const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
+    await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null, total: 0 });
+  });
+
+  it('should count the first page with the artist filter', async () => {
+    await pageFor({ artist: 'e2e-artist' });
+
+    expect(mockCountPublishedVideos.mock.calls).toEqual([[{ artist: 'e2e-artist' }]]);
   });
 
   it('should prefetch the artist-filtered first page under the key the client hook uses', async () => {
