@@ -406,6 +406,14 @@ describe('ArtistListCard', () => {
     expect(link).not.toHaveClass('self-end');
   });
 
+  it('leads the full-bio link with a decorative eye icon', () => {
+    render(<ArtistListCard artist={baseArtist} />);
+
+    const icon = screen.getByRole('link', { name: 'View full bio' }).firstElementChild;
+    expect(icon).toHaveClass('lucide-eye');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('points the full-bio link at the artist page, where the bio now lives', () => {
     render(<ArtistListCard artist={baseArtist} />);
 
