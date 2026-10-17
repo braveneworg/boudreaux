@@ -71,8 +71,9 @@ const ViewAllLink = ({ href, children }: { href: string; children: string }): Re
  *
  * It owns the primed handoffs, so `openRelease` / `openVideo` start playback
  * inside the pick's gesture; the combobox imports it statically for that
- * reason. Closing stops an element the player never took, and once the modal
- * has gone the pick is discarded and focus returns to the search trigger.
+ * reason. Closing stops an element the player never took, and once the closed
+ * modal has gone the pick is discarded and focus returns to the search
+ * trigger. Hiding the video modal for picture-in-picture is not a close.
  */
 export const HomeSearchPlayDialog = ({
   ref,
@@ -109,8 +110,16 @@ export const HomeSearchPlayDialog = ({
     setOpen(next);
   };
 
-  /** Once the modal has gone: forget the pick, focus the search trigger. */
+  /**
+   * Once a closed modal has gone: forget the pick, focus the search trigger.
+   * Radix fires this whenever the dialog's content unmounts, and the video
+   * modal unmounts it to hide while its player is in picture-in-picture, still
+   * open. Then the pick stays, or the player would be disposed and the modal
+   * could never come back. (A picture-in-picture window closed paused closes
+   * the modal while it is hidden; the closed pick then waits for the next.)
+   */
   const handleCloseAutoFocus = (event: Event): void => {
+    if (open) return;
     event.preventDefault();
     setSelection(null);
     returnFocusRef.current?.focus();
