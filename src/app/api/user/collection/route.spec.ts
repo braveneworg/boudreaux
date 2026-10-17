@@ -48,12 +48,18 @@ describe('GET /api/user/collection', () => {
     const publicArtist = { id: 'a1', publishedOn: '2024-01-01T00:00:00.000Z', deletedOn: null };
     const hiddenArtist = { id: 'a2', publishedOn: null, deletedOn: null };
     const mockPurchases = [
-      { id: 'purchase-1', release: { artistReleases: [{ artist: publicArtist }] } },
+      {
+        id: 'purchase-1',
+        release: { artistReleases: [{ artist: publicArtist }], digitalFormats: [] },
+      },
       // A hidden album artist leaves the byline empty — the next credit is
       // not promoted (ADR-0015).
       {
         id: 'purchase-2',
-        release: { artistReleases: [{ artist: hiddenArtist }, { artist: publicArtist }] },
+        release: {
+          artistReleases: [{ artist: hiddenArtist }, { artist: publicArtist }],
+          digitalFormats: [],
+        },
       },
     ];
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
@@ -68,17 +74,75 @@ describe('GET /api/user/collection', () => {
       purchases: [
         {
           id: 'purchase-1',
-          release: { artistReleases: [{ artist: publicArtist }], albumArtist: publicArtist },
+          release: {
+            artistReleases: [{ artist: publicArtist }],
+            albumArtist: publicArtist,
+            digitalFormats: [],
+            playSrc: null,
+          },
         },
         {
           id: 'purchase-2',
-          release: { artistReleases: [{ artist: publicArtist }], albumArtist: null },
+          release: {
+            artistReleases: [{ artist: publicArtist }],
+            albumArtist: null,
+            digitalFormats: [],
+            playSrc: null,
+          },
         },
       ],
       count: 2,
       isAdmin: false,
     });
     expect(PurchaseRepository.findAllByUser).toHaveBeenCalledWith('user-1');
+  });
+
+  it("resolves the first MP3 track's stream for the listening modal, keeping every key server-side", async () => {
+    const formats = [
+      {
+        formatType: 'FLAC',
+        fileName: 'album.zip',
+        files: [{ fileName: '01.flac', s3Key: 'k/01.flac' }],
+      },
+      {
+        formatType: 'MP3_320KBPS',
+        fileName: 'album.zip',
+        files: [{ fileName: '01.mp3', s3Key: 'releases/r1/01.mp3' }],
+      },
+    ];
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
+    vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue([
+      { id: 'purchase-1', release: { artistReleases: [], digitalFormats: formats } },
+    ] as never);
+
+    const response = await GET(new NextRequest('http://localhost:3000/api/user/collection'), ctx);
+    const { purchases } = await response.json();
+
+    expect(purchases[0].release.playSrc).toEqual(expect.stringContaining('releases/r1/01.mp3'));
+    expect(purchases[0].release.digitalFormats).toEqual([
+      { formatType: 'FLAC', fileName: 'album.zip', files: [{ fileName: '01.flac' }] },
+      { formatType: 'MP3_320KBPS', fileName: 'album.zip', files: [{ fileName: '01.mp3' }] },
+    ]);
+  });
+
+  it('gives a purchase with no MP3 format no stream', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'user' } });
+    vi.mocked(PurchaseRepository.findAllByUser).mockResolvedValue([
+      {
+        id: 'purchase-1',
+        release: {
+          artistReleases: [],
+          digitalFormats: [
+            { formatType: 'FLAC', fileName: 'a.zip', files: [{ fileName: '01.flac', s3Key: 'k' }] },
+          ],
+        },
+      },
+    ] as never);
+
+    const response = await GET(new NextRequest('http://localhost:3000/api/user/collection'), ctx);
+    const { purchases } = await response.json();
+
+    expect(purchases[0].release.playSrc).toBeNull();
   });
 
   it('should return isAdmin=true for admin users', async () => {

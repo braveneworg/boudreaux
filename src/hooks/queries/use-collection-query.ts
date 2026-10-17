@@ -30,7 +30,11 @@ interface CollectionResponse {
         firstName: string;
         surname: string;
         displayName: string | null;
+        /** Names the release deep link. */
+        slug: string;
       } | null;
+      /** The first MP3 track's stream URL, for the listening modal; `null` when nothing plays. */
+      playSrc: string | null;
       digitalFormats: Array<{
         formatType: string;
         files: Array<{ fileName: string }>;
@@ -70,8 +74,10 @@ const collectionResponseSchema = z.object({
             firstName: z.string(),
             surname: z.string(),
             displayName: z.string().nullable(),
+            slug: z.string(),
           })
           .nullable(),
+        playSrc: z.string().nullable(),
         digitalFormats: z.array(
           z.object({
             formatType: z.string(),
