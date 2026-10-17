@@ -109,6 +109,22 @@ export class VideoService {
     }
   }
 
+  /**
+   * Count every published, non-archived video the public `/videos` listing
+   * pages through for an optional title/artist search and artist slug — the
+   * "(N videos)" beside the listing's search.
+   */
+  static async countPublishedVideos(
+    filters: Pick<VideoListFilters, 'search' | 'artist'>
+  ): Promise<ServiceResponse<number>> {
+    try {
+      const total = await VideoRepository.countPublished(filters);
+      return { success: true, data: total };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to count videos' });
+    }
+  }
+
   /** Update a video by id. */
   static async updateVideo(id: string, data: UpdateVideoData): Promise<ServiceResponse<Video>> {
     try {

@@ -65,6 +65,7 @@ interface InfiniteResultOverrides {
   pages?: Array<{
     rows: Array<{ id: string; title: string; artist?: string; posterUrl?: string | null }>;
     nextSkip: number | null;
+    total?: number;
   }>;
   isPending?: boolean;
   error?: Error | null;
@@ -384,6 +385,80 @@ describe('VideosContent suggestion while its modal is hidden in picture-in-pictu
     window.removeEventListener('error', onError);
 
     expect(errors).toEqual([]);
+  });
+});
+
+// "(N videos)" to the right of the search: every video the listing's search
+// and artist match, from the first page's `total`.
+describe('VideosContent count', () => {
+  const withTotal = (total: number): void => {
+    vi.mocked(useInfinitePublishedVideosQuery).mockReturnValue(
+      toInfiniteResult({
+        pages: [{ rows: [{ id: 'a', title: 'Alpha' }], nextSkip: 5, total }],
+      }) as never
+    );
+  };
+
+  it('shows the total of the listing in parentheses', () => {
+    withTotal(12);
+
+    render(<VideosContent />);
+
+    expect(screen.getByText('(12 videos)')).toBeInTheDocument();
+  });
+
+  it('names a single video in the singular', () => {
+    withTotal(1);
+
+    render(<VideosContent />);
+
+    expect(screen.getByText('(1 video)')).toBeInTheDocument();
+  });
+
+  it('shows zero videos for an empty listing', () => {
+    withTotal(0);
+
+    render(<VideosContent />);
+
+    expect(screen.getByText('(0 videos)')).toBeInTheDocument();
+  });
+
+  it('places the count to the right of the search, beside it in one row', () => {
+    withTotal(12);
+
+    render(<VideosContent />);
+
+    const search = screen.getByRole('button', { name: 'Search videos' });
+    const count = screen.getByText('(12 videos)');
+    expect(count.previousElementSibling).toBe(search);
+    expect(count.parentElement).toHaveClass('flex', 'items-center');
+  });
+
+  it('keeps the search and its count in the poster column, before the sort toggle', () => {
+    withTotal(12);
+
+    render(<VideosContent />);
+
+    const count = screen.getByText('(12 videos)');
+    const toggle = screen.getByRole('radiogroup', { name: /sort videos by release date/i });
+    expect(count.parentElement?.nextElementSibling).toBe(toggle);
+  });
+
+  it('lets the search shrink so the count never wraps', () => {
+    withTotal(12);
+
+    render(<VideosContent />);
+
+    expect(screen.getByRole('button', { name: 'Search videos' })).toHaveClass('min-w-0', 'flex-1');
+    expect(screen.getByText('(12 videos)')).toHaveClass('shrink-0', 'whitespace-nowrap');
+  });
+
+  it('announces a changed count politely', () => {
+    withTotal(12);
+
+    render(<VideosContent />);
+
+    expect(screen.getByText('(12 videos)')).toHaveAttribute('aria-live', 'polite');
   });
 });
 

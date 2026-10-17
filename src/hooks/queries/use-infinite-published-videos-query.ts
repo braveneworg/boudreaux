@@ -6,11 +6,17 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteQueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import type { PaginatedResponse } from '@/lib/types/pagination';
-import { videoPageSchema, type VideoRow } from '@/lib/validation/video-schema';
+import { publishedVideoPageSchema, type VideoRow } from '@/lib/validation/video-schema';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
-/** One skip/offset page of published videos returned by `/api/videos?listing=published`. */
-export type PublishedVideosPaginatedResponse = PaginatedResponse<VideoRow>;
+/**
+ * One skip/offset page of published videos returned by
+ * `/api/videos?listing=published`, with `total`: the count of every video the
+ * page's search and artist match.
+ */
+export interface PublishedVideosPaginatedResponse extends PaginatedResponse<VideoRow> {
+  total: number;
+}
 
 /** Page size requested per fetch — kept in sync with the SSR prefetch and service. */
 export const PUBLISHED_VIDEOS_PAGE_SIZE = 5;
@@ -59,7 +65,7 @@ const fetchPublishedVideos = async ({
   if (search) params.set('search', search);
   if (artist) params.set('artist', artist);
 
-  return fetchAndParse(`/api/videos?${params.toString()}`, videoPageSchema, {
+  return fetchAndParse(`/api/videos?${params.toString()}`, publishedVideoPageSchema, {
     signal,
     errorMessage: 'Failed to fetch videos',
   });

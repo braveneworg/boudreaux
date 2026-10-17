@@ -67,19 +67,29 @@ const handlePublishedListing = async (searchParams: URLSearchParams): Promise<Ne
   // An empty or blank `artist` means no filter.
   const artist = searchParams.get('artist')?.trim() || undefined;
 
-  const result = await VideoService.getPublishedVideos({
-    sort,
-    skip,
-    take,
-    ...(search && { search }),
-    ...(artist && { artist }),
-  });
+  const filters = { ...(search && { search }), ...(artist && { artist }) };
+  const [result, countResult] = await Promise.all([
+    VideoService.getPublishedVideos({ sort, skip, take, ...filters }),
+    VideoService.countPublishedVideos(filters),
+  ]);
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: httpStatusForCode(result.code) });
   }
+  if (!countResult.success) {
+    return NextResponse.json(
+      { error: countResult.error },
+      { status: httpStatusForCode(countResult.code) }
+    );
+  }
 
-  return pageResponse(result.data, skip, take);
+  // `total` is every video the listing pages through for this search and
+  // artist — the "(N videos)" beside the `/videos` search.
+  const rows = buildRows(result.data);
+  return NextResponse.json(
+    { rows, nextSkip: computeNextSkip(rows.length, skip, take), total: countResult.data },
+    { headers: CACHE_HEADERS }
+  );
 };
 
 /** Handle the admin (default) branch — gated on a signed-in admin session. */
@@ -123,7 +133,9 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  *   listing   – When "published", returns published, non-archived videos for
  *               any visitor via `getPublishedVideos()`; honors `skip`,
  *               `take`, `sort`, a title/artist `search`, and an `artist`
- *               slug (the videos credited to that public artist).
+ *               slug (the videos credited to that public artist). Each
+ *               page also carries `total`, the count of every video that
+ *               search and artist match.
  *   skip, take, search, published, archived, sort – Pagination/filter params
  *               for the admin listing mode (requires the admin role).
  */

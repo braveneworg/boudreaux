@@ -110,6 +110,23 @@ const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
   return { AND: and };
 };
 
+/**
+ * The public `/videos` listing's `where`: published and visible now,
+ * non-archived, optionally credited to the `artist` slug's public artist. An
+ * optional `search` narrows by title/artist (case-insensitive substring) — the
+ * OR sits at the top level beside `buildListWhere`'s `AND` so the clauses
+ * never collide (same shape as `searchPublished`).
+ */
+const buildPublishedWhere = ({
+  search,
+  artist,
+}: Pick<VideoListFilters, 'search' | 'artist'>): Prisma.VideoWhereInput => ({
+  ...buildListWhere({ visibleAt: new Date(), artist }),
+  ...(search && {
+    OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
+  }),
+});
+
 // =============================================================================
 // Select projections (lean playlist-feature reads)
 // =============================================================================
@@ -191,18 +208,24 @@ export class VideoRepository {
   static async findPublished(
     filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search' | 'artist'>
   ): Promise<Video[]> {
-    const { sort = 'desc', skip = 0, take = 5, search, artist } = filters;
+    const { sort = 'desc', skip = 0, take = 5 } = filters;
     return prisma.video.findMany({
-      where: {
-        ...buildListWhere({ visibleAt: new Date(), artist }),
-        ...(search && {
-          OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
-        }),
-      },
+      where: buildPublishedWhere(filters),
       orderBy: { releasedOn: sort },
       skip,
       take,
     });
+  }
+
+  /**
+   * Count every video the public `/videos` listing would page through for the
+   * same `search` and `artist` — the `where` is `findPublished`'s, so the
+   * count and the rows never drift apart.
+   */
+  static async countPublished(
+    filters: Pick<VideoListFilters, 'search' | 'artist'>
+  ): Promise<number> {
+    return prisma.video.count({ where: buildPublishedWhere(filters) });
   }
 
   /**
