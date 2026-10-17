@@ -48,7 +48,8 @@ vi.mock('@/lib/services/bio-generation-service', () => ({
   BioGenerationService: {
     verifyAndClaimCallback: (id: string, token: string, proof: unknown) =>
       verifyAndClaimCallbackMock(id, token, proof),
-    completeCallback: (id: string, result: unknown) => completeCallbackMock(id, result),
+    completeCallback: (id: string, result: unknown, slug: string) =>
+      completeCallbackMock(id, result, slug),
   },
 }));
 
@@ -114,13 +115,13 @@ describe('POST /api/artists/[id]/bio-generation/callback', () => {
     expect(response.status).toBe(202);
   });
 
-  it('runs completeCallback in the background after a successful claim', async () => {
+  it("runs completeCallback in the background after a successful claim, with the artist's slug", async () => {
     verifyAndClaimCallbackMock.mockResolvedValue({ slug: 'radiohead' });
 
     await callRoute(JSON.stringify(validBody));
     await afterMock.mock.calls[0][0]();
 
-    expect(completeCallbackMock).toHaveBeenCalledWith(ARTIST_ID, validBody.result);
+    expect(completeCallbackMock).toHaveBeenCalledWith(ARTIST_ID, validBody.result, 'radiohead');
   });
 
   it('revalidates the artist bio paths in the background after a successful claim', async () => {

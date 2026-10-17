@@ -80,7 +80,8 @@ const _bioImageContentCoverage: _BioImageContentCoverage = true;
 
 /**
  * A link URL as persisted: absolute http(s) or a site-relative path
- * (injected release links use `/releases/<id>` paths).
+ * (injected release links are release deep links,
+ * `/releases?artist=<slug>&release=<id>`).
  * Rejects `javascript:`, `data:`, and protocol-relative `//` URLs.
  * Also reused by the palette drag-payload schema (`bio-dnd-schema.ts`).
  */

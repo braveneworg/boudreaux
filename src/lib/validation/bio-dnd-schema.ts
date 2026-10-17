@@ -14,8 +14,9 @@ export const BIO_IMAGE_DRAG_MIME = 'application/x-bio-image';
 
 // Drag data is external input (a hostile page can set these MIME types), so
 // both url fields constrain the scheme: links allow http(s) or site-relative
-// (release links are `/releases/<id>` paths); image sources are always remote,
-// so http(s) only. Rejects `javascript:`/`data:`/protocol-relative payloads.
+// (release links are `/releases?artist=<slug>&release=<id>` deep links); image
+// sources are always remote, so http(s) only. Rejects
+// `javascript:`/`data:`/protocol-relative payloads.
 export const bioLinkDragPayloadSchema = z.object({
   label: z.string().min(1),
   url: bioStatusLinkUrlSchema,

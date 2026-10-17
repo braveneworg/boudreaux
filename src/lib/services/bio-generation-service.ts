@@ -19,6 +19,7 @@ import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url
 import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
 import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
+import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import {
   sanitizeBioHtml,
@@ -339,7 +340,8 @@ const shouldSkipLinkValidation = (): boolean =>
 export { MAX_LAMBDA_RELEASES };
 
 /**
- * Builds the lambda-input releases payload from the label's own catalog.
+ * Builds the lambda-input releases payload from the label's own catalog, each
+ * release linked by its deep link on the artist's own releases listing.
  *
  * Capped: the Lambda rejects an over-cap payload wholesale, and the invoke is
  * fire-and-forget, so exceeding it would strand the job until the stale sweep
@@ -347,28 +349,32 @@ export { MAX_LAMBDA_RELEASES };
  * so the cap keeps the most recent chronology anchors.
  */
 const toLambdaReleases = (
-  releases: ReleaseCoverSource[]
+  releases: ReleaseCoverSource[],
+  artistSlug: string
 ): NonNullable<BioGenerationLambdaInput['releases']> =>
   releases.slice(0, MAX_LAMBDA_RELEASES).map((release) => ({
     title: release.title,
     releasedOn: toIsoDate(release.releasedOn),
-    url: `/releases/${release.id}`,
+    url: releaseDeepLinkHref(artistSlug, release.id),
   }));
 
 /**
  * Appends internal release links (label = release title) after the discovered
- * links using the prefetched `ReleaseCoverSource[]`. Uses an accumulating
- * `seen` set so the same release URL is never written twice, even if the
- * list contains duplicate rows.
+ * links using the prefetched `ReleaseCoverSource[]`, each the release's deep
+ * link on the artist's own releases listing (the artist holds a credit on
+ * every one, so the listing's filter keeps it). Uses an accumulating `seen`
+ * set so the same release URL is never written twice, even if the list
+ * contains duplicate rows.
  */
 const appendReleaseLinks = (
   links: PersistedLink[],
-  releases: ReleaseCoverSource[]
+  releases: ReleaseCoverSource[],
+  artistSlug: string
 ): PersistedLink[] => {
   const seen = new Set(links.map((link) => link.url));
   const result = [...links];
   for (const release of releases) {
-    const url = `/releases/${release.id}`;
+    const url = releaseDeepLinkHref(artistSlug, release.id);
     if (!seen.has(url)) {
       seen.add(url);
       result.push({ label: release.title, url, kind: 'release', sortOrder: result.length });
@@ -475,7 +481,8 @@ const assembleContent = ({
 export const persistGeneratedBio = async (
   artistId: string,
   data: BioGenerationData,
-  releases: ReleaseCoverSource[]
+  releases: ReleaseCoverSource[],
+  artistSlug: string
 ): Promise<GeneratedBioContent> => {
   // Sanitize first (the value is model output), then normalise every term into
   // the one storage form. Without the normalise step a blank-fill generation
@@ -522,8 +529,8 @@ export const persistGeneratedBio = async (
   const reindexedLinks = validatedLinks.map((link, index) => ({ ...link, sortOrder: index }));
 
   // Append internal release links using the prefetched catalog (no extra
-  // query). Appended AFTER validation so `/releases/...` URLs are never probed.
-  const persistedLinks = appendReleaseLinks(reindexedLinks, releases);
+  // query). Appended AFTER validation so the site's own release links are never probed.
+  const persistedLinks = appendReleaseLinks(reindexedLinks, releases, artistSlug);
 
   // Append rights-cleared CDN cover images after the discovered palette.
   const persistedImagesWithCovers = appendInternalCoverImages(persistedImages, releases);
@@ -653,7 +660,7 @@ const prepareGeneration = async (
     bornOn: toIsoDate(artist.bornOn),
     diedOn: toIsoDate(artist.diedOn),
     formedOn: toIsoDate(artist.formedOn),
-    releases: releases.length ? toLambdaReleases(releases) : undefined,
+    releases: releases.length ? toLambdaReleases(releases, artist.slug) : undefined,
     referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
   };
 
@@ -961,8 +968,13 @@ export class BioGenerationService {
    *
    * @param artistId - The artist whose job is completing.
    * @param result - The Lambda's validated generation result.
+   * @param artistSlug - The artist's slug: the release links' deep links name it.
    */
-  static async completeCallback(artistId: string, result: BioGenerationResult): Promise<void> {
+  static async completeCallback(
+    artistId: string,
+    result: BioGenerationResult,
+    artistSlug: string
+  ): Promise<void> {
     if (!result.ok) {
       await ArtistRepository.setBioStatus(artistId, 'failed', { error: result.error });
       return;
@@ -973,7 +985,7 @@ export class BioGenerationService {
     );
 
     try {
-      await persistGeneratedBio(artistId, result.data, releases);
+      await persistGeneratedBio(artistId, result.data, releases, artistSlug);
       await ArtistRepository.setBioStatus(artistId, 'succeeded', { error: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Bio persistence failed.';

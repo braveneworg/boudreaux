@@ -54,7 +54,7 @@ export const POST = withRateLimit<{ id: string }>(
   if (claim) {
     // Heavy re-host/persist runs post-response; the admin form's poll surfaces completion.
     after(async () => {
-      await BioGenerationService.completeCallback(id, parsed.data.result);
+      await BioGenerationService.completeCallback(id, parsed.data.result, claim.slug);
       revalidateArtistBioPaths(claim.slug);
     });
   }
