@@ -245,6 +245,36 @@ describe('ReleasePlayDialog', () => {
     expect(screen.getByText('John Doe')).not.toHaveClass('text-center');
   });
 
+  it('links the artist line to the artist page and adds the year to the title', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(
+      <ReleasePlayDialog
+        {...defaultProps}
+        headingOrder="artist-first"
+        artistHref="/artists/john-doe"
+        year={2024}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('John Doe');
+    expect(dialog).toHaveAccessibleDescription('Midnight Serenade (2024)');
+    expect(screen.getByRole('link', { name: 'John Doe' })).toHaveAttribute(
+      'href',
+      '/artists/john-doe'
+    );
+  });
+
+  it('links no artist and shows no year by default', () => {
+    mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
+
+    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+
+    expect(screen.queryByRole('link', { name: 'John Doe' })).toBeNull();
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Midnight Serenade');
+  });
+
   it('passes the initial track number to the player', () => {
     mockUseReleaseQuery.mockReturnValue(
       queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })

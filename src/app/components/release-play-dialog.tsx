@@ -5,13 +5,8 @@
 
 import type { ReactElement, ReactNode } from 'react';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/app/components/ui/dialog';
+import { Dialog, DialogContent } from '@/app/components/ui/dialog';
+import { PlayDialogHeading } from '@/app/components/ui/play-dialog-heading';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { getZineAccentClass, type ZineAccent } from '@/app/components/ui/zine-panel';
 import { useReleaseQuery } from '@/hooks/queries/use-release-query';
@@ -54,6 +49,10 @@ export interface ReleasePlayDialogProps {
   headingOrder?: 'title-first' | 'artist-first';
   /** Center both heading lines. */
   centered?: boolean;
+  /** The artist's page: the artist line links there when given. */
+  artistHref?: string;
+  /** The release year, shown after the title as `Title (Year)` when given. */
+  year?: number;
   /** Track number the player starts on (see `ReleasePlayer`). */
   initialTrackNumber?: number;
   /** Rendered under the player, e.g. a `ReleaseShareWidget`. */
@@ -123,52 +122,6 @@ const ReleasePlayerSkeleton = (): ReactElement => (
     <Skeleton className="mt-px h-16 w-full" />
   </div>
 );
-
-interface ReleasePlayDialogHeadingProps {
-  title: string;
-  artistName: string | null;
-  headingOrder: 'title-first' | 'artist-first';
-  centered: boolean;
-  /** Set both lines smaller below `sm`, for the phone sheet. */
-  compactOnPhone: boolean;
-}
-
-/**
- * The dialog's two heading lines: the title names the dialog, the description
- * describes it. Artist-first needs an artist; without one the release leads.
- */
-const ReleasePlayDialogHeading = ({
-  title,
-  artistName,
-  headingOrder,
-  centered,
-  compactOnPhone,
-}: ReleasePlayDialogHeadingProps): ReactElement => {
-  const artistFirst = headingOrder === 'artist-first' && artistName !== null;
-
-  return (
-    <DialogHeader className={cn('pr-8', compactOnPhone && 'max-sm:gap-0.5')}>
-      <DialogTitle
-        className={cn(
-          'font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl',
-          centered && 'text-center',
-          compactOnPhone && 'max-sm:text-lg max-sm:leading-tight'
-        )}
-      >
-        {artistFirst ? artistName : title}
-      </DialogTitle>
-      <DialogDescription
-        className={cn(
-          'text-zinc-600',
-          centered && 'text-center',
-          compactOnPhone && 'max-sm:text-xs'
-        )}
-      >
-        {artistFirst ? title : (artistName ?? 'Release audio player')}
-      </DialogDescription>
-    </DialogHeader>
-  );
-};
 
 interface ReleasePlayDialogPlayerProps extends Pick<
   ReleasePlayDialogProps,
@@ -256,6 +209,8 @@ export const ReleasePlayDialog = ({
   footer,
   headingOrder = 'title-first',
   centered = false,
+  artistHref,
+  year,
   initialTrackNumber,
   shareWidget,
   sheetOnPhone = false,
@@ -277,9 +232,11 @@ export const ReleasePlayDialog = ({
         )}
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <ReleasePlayDialogHeading
+        <PlayDialogHeading
           title={title}
           artistName={artistName}
+          artistHref={artistHref}
+          year={year}
           headingOrder={headingOrder}
           centered={centered}
           compactOnPhone={sheetOnPhone}

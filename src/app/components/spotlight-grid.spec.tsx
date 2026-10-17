@@ -11,8 +11,22 @@ import {
 import { SpotlightGrid } from './spotlight-grid';
 
 vi.mock('./spotlight-card', () => ({
-  SpotlightCard: ({ card }: { card: SpotlightCardData }) => (
-    <div data-testid="spotlight-card">{card.title}</div>
+  SpotlightCard: ({
+    card,
+    accent,
+    linkedHeading,
+  }: {
+    card: SpotlightCardData;
+    accent?: string;
+    linkedHeading?: boolean;
+  }) => (
+    <div
+      data-testid="spotlight-card"
+      data-accent={accent ?? ''}
+      data-linked-heading={String(Boolean(linkedHeading))}
+    >
+      {card.title}
+    </div>
   ),
 }));
 
@@ -63,5 +77,17 @@ describe('SpotlightGrid', () => {
     const { container } = render(<SpotlightGrid cards={[]} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  // The home modal: a new loud accent on each open, the artist linked, the
+  // year and a "View all releases" footer. `/releases` renders its own cards.
+  it('opens each card in a random accent with the linked heading', () => {
+    render(<SpotlightGrid cards={makeCards(2)} />);
+
+    const cards = screen.getAllByTestId('spotlight-card');
+    expect(cards.map(({ dataset }) => [dataset.accent, dataset.linkedHeading])).toEqual([
+      ['random', 'true'],
+      ['random', 'true'],
+    ]);
   });
 });
