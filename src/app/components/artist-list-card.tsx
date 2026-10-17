@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 
-import { ArrowRight, User } from 'lucide-react';
+import { ArrowRight, Eye, User } from 'lucide-react';
 
 import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
@@ -234,6 +234,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
               href={`/artists/${artist.slug}`}
               className="text-primary inline-flex w-fit items-center gap-1 text-sm font-medium hover:underline"
             >
+              <Eye className="size-4" aria-hidden />
               View full bio
               <ArrowRight className="size-4" aria-hidden />
             </Link>
