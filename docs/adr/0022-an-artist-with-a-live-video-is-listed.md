@@ -30,14 +30,21 @@ archived).**
 - The playlist "By artist" search keeps ADR-0007's release-only rule
   (`buildReleaseCreditedWhere`): it expands each match into release tracks,
   so a video-only artist would add nothing.
-- "Newest release" ordering is unchanged: an artist with no listed release
-  sorts last. The card's release count is 0 and it shows no newest release.
+- The "Newest" order (labelled "Newest release" before this decision) ranks
+  an artist by their newest work: the later of their newest listed release's
+  `releasedOn` and their newest live video's `releasedOn`. The listing read
+  selects each live video's date for this alone; the service drops it before
+  the row leaves the server. An artist with nothing dated sorts last, ties by
+  display name. A video-only artist's card shows a release count of 0 and no
+  newest release.
 
 ## Alternatives rejected
 
-- **Sort "newest" by the newer of the latest release and latest video** —
-  changes the meaning of a sort labelled "newest release"; revisit if the
-  label asks for it.
+- **Keep "Newest release" ranking releases only** — files every video-only
+  artist last, however recent their video.
+- **Rank a video by its go-live moment (`publishedAt`)** — a live video
+  always has a `releasedOn` (ADR-0004), and the release side ranks by
+  release date too.
 - **Widen the playlist search too** — it plays release tracks only.
 
 ## Consequences
