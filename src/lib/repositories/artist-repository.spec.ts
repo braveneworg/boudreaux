@@ -892,7 +892,23 @@ describe('ArtistRepository', () => {
   });
 
   describe('listListed', () => {
-    const listedReleaseClause = { some: { release: releaseWhere.listed } };
+    const NOW = new Date('2026-10-17T12:00:00.000Z');
+    const hasReleaseOrVideo = {
+      OR: [
+        { releases: { some: { release: releaseWhere.listed } } },
+        { videoArtists: { some: { video: { is: publicVideoWhere(NOW) } } } },
+      ],
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     const searchOr = (arg: { where?: { AND?: Array<{ OR?: unknown[] }> } } | undefined) =>
       arg?.where?.AND?.[0]?.OR ?? [];
 
@@ -916,13 +932,26 @@ describe('ArtistRepository', () => {
             ],
     });
 
-    it('lists only published, non-deleted artists with a listed direct release', async () => {
+    it('lists only public artists with a listed direct release or a live video', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({ ...publicArtistWhere, releases: listedReleaseClause });
+      expect(arg?.where).toEqual({ ...publicArtistWhere, AND: [hasReleaseOrVideo] });
+    });
+
+    // Same-relation filters share one join on MongoDB, so the credit `OR`
+    // goes after the search tokens (docs/lessons/prisma-mongo).
+    it('puts the release-or-video clause after the search words', async () => {
+      vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
+
+      await ArtistRepository.listListed({ search: 'foo', sort: 'alpha', skip: 0, take: 24 });
+
+      const and = (vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where?.AND ??
+        []) as unknown[];
+      expect(and).toHaveLength(2);
+      expect(and.at(-1)).toEqual(hasReleaseOrVideo);
     });
 
     // Whether an artist is still on the label decides nothing (ADR-0016).
@@ -947,7 +976,7 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
-      expect(and.map(({ OR }) => OR[0])).toEqual([
+      expect(and.slice(0, -1).map(({ OR }) => OR[0])).toEqual([
         { firstName: { contains: 'foo', mode: 'insensitive' } },
         { firstName: { contains: 'bar', mode: 'insensitive' } },
       ]);
@@ -1010,7 +1039,7 @@ describe('ArtistRepository', () => {
       });
     });
 
-    it('matches the search term against every name field, aka names, genres, and release titles', async () => {
+    it('matches the search term against every name field, aka names, genres, release and video titles', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
 
       await ArtistRepository.listListed({
@@ -1039,6 +1068,11 @@ describe('ArtistRepository', () => {
             },
           },
         },
+        {
+          videoArtists: {
+            some: { video: { is: { title: contains, ...publicVideoWhere(NOW) } } },
+          },
+        },
       ]);
     });
 
@@ -1054,7 +1088,7 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
-      expect(and.map(({ OR }) => OR[0].firstName)).toEqual(
+      expect(and.slice(0, -1).map(({ OR }) => OR[0].firstName)).toEqual(
         ['Dr', 'Quillon', 'M', 'Tokensmith', 'Jr'].map((token) => ({
           contains: token,
           mode: 'insensitive',
@@ -1073,7 +1107,7 @@ describe('ArtistRepository', () => {
       });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).not.toHaveProperty('AND');
+      expect(arg?.where?.AND).toEqual([hasReleaseOrVideo]);
     });
 
     it('omits the search clause when no term is given', async () => {
@@ -1082,7 +1116,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).not.toHaveProperty('AND');
+      expect(arg?.where?.AND).toEqual([hasReleaseOrVideo]);
     });
 
     it('fetches every listed artist for the A–Z order instead of paging in the database', async () => {

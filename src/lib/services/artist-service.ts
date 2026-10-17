@@ -749,8 +749,9 @@ export class ArtistService {
   }
 
   /**
-   * Search current listed artists: published, non-deleted, and holding a
+   * Search the artists that are published, non-deleted, and holding a
    * direct credit on a published release (the playlist "By artist" search).
+   * Narrower than the listed artists: an artist with only videos is left out.
    * The repository owns the Mongo-safe `where`.
    */
   static async searchPublishedArtists(
@@ -795,7 +796,7 @@ export class ArtistService {
 
   /**
    * List one page of listed artists for the public `/artists` index and its
-   * search combobox (ADR-0007). This is the single projection behind both the
+   * search combobox (ADR-0007, ADR-0022). This is the single projection behind both the
    * `/api/artists?listing=published` route and the page's SSR prefetch, so the
    * hydrated first page and every fetched page share one shape.
    */

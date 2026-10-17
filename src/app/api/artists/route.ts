@@ -120,9 +120,10 @@ const handleAdminListing = async (searchParams: URLSearchParams): Promise<NextRe
  *
  * Query params:
  *   listing   – When "published", returns one page of listed artists for any
- *               visitor via `ArtistService.listPublishedArtists` (ADR-0007);
- *               honors `skip`, `take`, `sort` (`alpha` | `newest`), and a
- *               name/aka/genre/release-title `search`.
+ *               visitor via `ArtistService.listPublishedArtists` (ADR-0007,
+ *               ADR-0022); honors `skip`, `take`, `sort` (`alpha` |
+ *               `newest`), and a name/aka/genre/release-title/video-title
+ *               `search`.
  *   skip, take, search, published, deleted – Pagination/filter params for the
  *               admin listing mode (requires the admin role; `skip` default 0,
  *               `take` default 24 clamped to 100, `published` 'true'/'false',

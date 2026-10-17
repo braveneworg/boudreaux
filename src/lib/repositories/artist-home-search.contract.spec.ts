@@ -11,9 +11,10 @@ import { ArtistRepository } from './artist-repository';
 // Contract: on a real MongoDB, the home search finds the public artists with
 // a direct credit on a playable listed release (a non-withdrawn MP3 320 format
 // holding a file) or a video credit on a live video, and a matched artist
-// lists only its playable releases and its live videos. The artists index and
-// the playlist "By artist" search stay on listed releases only (ADR-0007).
-// Runs only under `pnpm run test:db`.
+// lists only its playable releases and its live videos. The artists index
+// lists an artist with a listed release, playable or not, or a live video
+// (ADR-0022); the playlist "By artist" search stays on listed releases only
+// (ADR-0007). Runs only under `pnpm run test:db`.
 
 const prefix = `__contract:${randomUUID()}:`;
 // One search token every seeded artist carries, and tokens that only one
@@ -279,8 +280,20 @@ describe('home search (Docker Mongo contract)', () => {
     expect(ours(await homeSearch(`playable ${BOTH_VIDEO_TOKEN}`))).toEqual([]);
   });
 
-  it('keeps the video-only artist out of the playlist search and the artists index', async () => {
+  it('keeps the video-only artist out of the playlist search', async () => {
     const searched = await ArtistRepository.searchPublished({ search: TOKEN, take: 100 });
+
+    // Every artist with a listed release, playable or not, and nobody else.
+    expect(ours(searched)).toEqual([
+      'both',
+      'flac-only',
+      'mp3-no-files',
+      'playable',
+      'withdrawn-mp3',
+    ]);
+  });
+
+  it('lists the artists with a listed release or a live video on the artists index', async () => {
     const listed = await ArtistRepository.listListed({
       search: TOKEN,
       sort: 'alpha',
@@ -288,9 +301,25 @@ describe('home search (Docker Mongo contract)', () => {
       take: 100,
     });
 
-    // Both still list every artist with a listed release, playable or not.
-    const withListedRelease = ['both', 'flac-only', 'mp3-no-files', 'playable', 'withdrawn-mp3'];
-    expect(ours(searched)).toEqual(withListedRelease);
-    expect(ours(listed)).toEqual(withListedRelease);
+    // A draft release, a scheduled or archived video, or a hidden artist lists nobody.
+    expect(ours(listed)).toEqual([
+      'both',
+      'flac-only',
+      'mp3-no-files',
+      'playable',
+      'video-only',
+      'withdrawn-mp3',
+    ]);
+  });
+
+  it('finds an artist on the artists index by the title of a live video', async () => {
+    const listed = await ArtistRepository.listListed({
+      search: VIDEO_TITLE_TOKEN,
+      sort: 'alpha',
+      skip: 0,
+      take: 100,
+    });
+
+    expect(ours(listed)).toEqual(['video-only']);
   });
 });

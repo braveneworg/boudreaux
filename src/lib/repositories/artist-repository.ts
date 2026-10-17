@@ -521,27 +521,32 @@ const readVocabularyColumn = (
 };
 
 /**
- * Build the `where` shared by the public artists index and the public artist
- * search: a published, non-deleted artist holding a DIRECT credit on at least
- * one listed release (a member credit alone never qualifies — ADR-0007), with
- * an optional case-insensitive token search — every word must match one of
- * the name fields, aka names, genres, or the titles of their listed releases.
- * Whether the artist is still on the label plays no part (ADR-0016).
- *
- * Both reads require the artist to be published: a search that matched a
- * hidden artist would name it (ADR-0015).
+ * A search word matching the title of one of the artist's listed releases —
+ * the token clause the artists index, the playlist "By artist" search and the
+ * home search share.
  */
-const buildListedWhere = (search: string | undefined): Prisma.ArtistWhereInput => {
+const listedReleaseTitleClause = (token: string): Prisma.ArtistWhereInput => ({
+  releases: { some: { release: { title: containsToken(token), ...releaseWhere.listed } } },
+});
+
+/**
+ * Build the playlist "By artist" search `where`: a public artist holding a
+ * DIRECT credit on at least one listed release (a member credit alone never
+ * qualifies — ADR-0007), with an optional case-insensitive token search —
+ * every word must match one of the name fields, aka names, genres, or the
+ * titles of their listed releases. The search expands each match into its
+ * release tracks, so an artist with only videos has nothing to offer it.
+ *
+ * It requires the artist to be published: a search that matched a hidden
+ * artist would name it (ADR-0015).
+ */
+const buildReleaseCreditedWhere = (search: string | undefined): Prisma.ArtistWhereInput => {
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
         ...nameFieldClauses(token),
         { akaNames: containsToken(token) },
         { genres: containsToken(token) },
-        {
-          releases: {
-            some: { release: { title: containsToken(token), ...releaseWhere.listed } },
-          },
-        },
+        listedReleaseTitleClause(token),
       ])
     : [];
   return {
@@ -552,10 +557,51 @@ const buildListedWhere = (search: string | undefined): Prisma.ArtistWhereInput =
 };
 
 /**
+ * Build the public artists index `where` (a **listed artist**): a public
+ * artist with a direct credit on a listed release or a video credit on a
+ * video live at `now` (ADR-0022), with an optional token search — every word
+ * must match one of the name fields, aka names, genres, the title of a listed
+ * release, or the title of a live video. Whether the artist is still on the
+ * label plays no part (ADR-0016).
+ *
+ * `publicArtistWhere` holds the only top-level `OR`, so the credit `OR` and
+ * each token's `OR` sit in `AND` members. The credit comes last: two filters
+ * on one relation share one join on MongoDB, and the last one wins
+ * (docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md).
+ */
+const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput => {
+  const liveVideo = publicVideoWhere(now);
+  const tokenSearch = search
+    ? buildTokenSearch(search, (token) => [
+        ...nameFieldClauses(token),
+        { akaNames: containsToken(token) },
+        { genres: containsToken(token) },
+        listedReleaseTitleClause(token),
+        {
+          videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
+        },
+      ])
+    : [];
+  return {
+    ...publicArtistWhere,
+    AND: [
+      ...tokenSearch,
+      {
+        OR: [
+          { releases: { some: { release: releaseWhere.listed } } },
+          { videoArtists: { some: { video: { is: liveVideo } } } },
+        ],
+      },
+    ],
+  };
+};
+
+/**
  * Build the home search `where` (a **home search match**): a public artist
  * with a direct credit on a playable listed release or a video credit on a
- * video live at `now` — wider than the listed artists {@link buildListedWhere}
- * finds — with an optional token search: every word must match one of the
+ * video live at `now` — narrower than the listed artists
+ * {@link buildListedWhere} finds, whose releases need not be playable — with
+ * an optional token search: every word must match one of the
  * name fields, aka names, genres, the title of a listed release, or the title
  * of a live video. A title match on a listed release that cannot be played
  * still finds an artist that qualifies some other way.
@@ -574,9 +620,7 @@ const buildHomeSearchWhere = (search: string | undefined, now: Date): Prisma.Art
         ...nameFieldClauses(token),
         { akaNames: containsToken(token) },
         { genres: containsToken(token) },
-        {
-          releases: { some: { release: { title: containsToken(token), ...releaseWhere.listed } } },
-        },
+        listedReleaseTitleClause(token),
         {
           videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
         },
@@ -740,15 +784,17 @@ export class ArtistRepository {
 
   /**
    * List one page of listed artists for the public `/artists` index —
-   * published, non-deleted, and directly credited on a listed release — with
-   * the narrow
-   * {@link artistListingSelect} projection and an optional search.
+   * published, non-deleted, and directly credited on a listed release or
+   * credited on a live video ({@link buildListedWhere}, ADR-0022) — with the
+   * narrow {@link artistListingSelect} projection and an optional search. One
+   * `now` decides what is live for the whole read.
    *
    * Neither order can be sorted in the database: `alpha` ranks by the name an
    * artist is displayed under, which is composed from the name parts when no
    * `displayName` is stored (a DB sort on `displayName` files those nulls
    * first, outside the alphabet), and `newest` by each artist's latest listed
-   * release, a relation aggregate Prisma on MongoDB cannot sort by. The listed
+   * release, a relation aggregate Prisma on MongoDB cannot sort by (an artist
+   * with only videos has no listed release and sorts last). The listed
    * artists are read whole and ordered + sliced here; there are few of them,
    * and ADR-0007 records the revisit trigger.
    */
@@ -758,7 +804,7 @@ export class ArtistRepository {
     skip,
     take,
   }: ArtistListingFilters): Promise<ArtistListingRecord[]> {
-    const where = buildListedWhere(search);
+    const where = buildListedWhere(search, new Date());
     const records = await prisma.artist.findMany({ where, select: artistListingSelect });
     const compare = sort === 'alpha' ? compareByDisplayName : compareByNewestRelease;
     return [...records].sort(compare).slice(skip, skip + take);
@@ -887,9 +933,10 @@ export class ArtistRepository {
   }
 
   /**
-   * Search listed artists — published, non-deleted, and holding a
-   * direct credit on a listed release (the playlist "By artist" search; the
-   * home page searches wider, {@link ArtistRepository.searchForHomeNav}), with
+   * Search the artists holding a direct credit on a listed release
+   * ({@link buildReleaseCreditedWhere}, the playlist "By artist" search —
+   * narrower than the artists index, which also lists artists with only live
+   * videos), with
    * the lightweight images/releases include that
    * search consumes. Matches are ordered by
    * displayed name and sliced here, for the same reason as the index's A–Z
@@ -901,7 +948,7 @@ export class ArtistRepository {
     take = 50,
   }: ArtistListFilters): Promise<ArtistSearchMatch[]> {
     const matches = await prisma.artist.findMany({
-      where: buildListedWhere(search),
+      where: buildReleaseCreditedWhere(search),
       select: artistSearchSelect,
     });
     return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
