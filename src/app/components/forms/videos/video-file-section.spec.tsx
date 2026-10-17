@@ -18,6 +18,7 @@ const baseUpload: UseVideoUploadResult = {
   selectFile: vi.fn(),
   cancel: vi.fn(),
   retry: vi.fn(),
+  selectedFile: null,
 };
 
 const Harness = ({

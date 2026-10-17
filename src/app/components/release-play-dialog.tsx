@@ -5,13 +5,8 @@
 
 import type { ReactElement, ReactNode } from 'react';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/app/components/ui/dialog';
+import { Dialog, DialogContent } from '@/app/components/ui/dialog';
+import { PlayDialogHeading } from '@/app/components/ui/play-dialog-heading';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { getZineAccentClass, type ZineAccent } from '@/app/components/ui/zine-panel';
 import { useReleaseQuery } from '@/hooks/queries/use-release-query';
@@ -54,6 +49,10 @@ export interface ReleasePlayDialogProps {
   headingOrder?: 'title-first' | 'artist-first';
   /** Center both heading lines. */
   centered?: boolean;
+  /** The artist's page: the artist line links there when given. */
+  artistHref?: string;
+  /** The release year, shown after the title as `Title (Year)` when given. */
+  year?: number;
   /** Track number the player starts on (see `ReleasePlayer`). */
   initialTrackNumber?: number;
   /** Rendered under the player, e.g. a `ReleaseShareWidget`. */
@@ -113,6 +112,28 @@ const PHONE_DIALOG_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-21
  */
 const WIDE_PLAYER_CLASS = 'sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]';
 
+/**
+ * With both the share row and a footer row (the home spotlight's "View all
+ * releases"), the footer adds 24px measured in Chromium, so the sheet's and
+ * the wide reserves each grow by 2rem.
+ */
+const STACKED_PHONE_SHEET_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]';
+const STACKED_WIDE_PLAYER_CLASS = 'sm:w-[min(100%,max(16.25rem,calc(90dvh-24rem)))]';
+
+/** The player slot's width caps: the phone one, then the one from `sm`. */
+const playerWidthClasses = (fitPhoneSheet: boolean, stacked: boolean): string => {
+  if (stacked) {
+    return cn(
+      fitPhoneSheet ? STACKED_PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
+      STACKED_WIDE_PLAYER_CLASS
+    );
+  }
+  return cn(
+    fitPhoneSheet ? PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
+    WIDE_PLAYER_CLASS
+  );
+};
+
 /** Loading placeholder shaped like the player: square cover + controls bar. */
 const ReleasePlayerSkeleton = (): ReactElement => (
   <div className="flex flex-col" aria-busy="true">
@@ -124,52 +145,6 @@ const ReleasePlayerSkeleton = (): ReactElement => (
   </div>
 );
 
-interface ReleasePlayDialogHeadingProps {
-  title: string;
-  artistName: string | null;
-  headingOrder: 'title-first' | 'artist-first';
-  centered: boolean;
-  /** Set both lines smaller below `sm`, for the phone sheet. */
-  compactOnPhone: boolean;
-}
-
-/**
- * The dialog's two heading lines: the title names the dialog, the description
- * describes it. Artist-first needs an artist; without one the release leads.
- */
-const ReleasePlayDialogHeading = ({
-  title,
-  artistName,
-  headingOrder,
-  centered,
-  compactOnPhone,
-}: ReleasePlayDialogHeadingProps): ReactElement => {
-  const artistFirst = headingOrder === 'artist-first' && artistName !== null;
-
-  return (
-    <DialogHeader className={cn('pr-8', compactOnPhone && 'max-sm:gap-0.5')}>
-      <DialogTitle
-        className={cn(
-          'font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl',
-          centered && 'text-center',
-          compactOnPhone && 'max-sm:text-lg max-sm:leading-tight'
-        )}
-      >
-        {artistFirst ? artistName : title}
-      </DialogTitle>
-      <DialogDescription
-        className={cn(
-          'text-zinc-600',
-          centered && 'text-center',
-          compactOnPhone && 'max-sm:text-xs'
-        )}
-      >
-        {artistFirst ? title : (artistName ?? 'Release audio player')}
-      </DialogDescription>
-    </DialogHeader>
-  );
-};
-
 interface ReleasePlayDialogPlayerProps extends Pick<
   ReleasePlayDialogProps,
   'releaseId' | 'takeMediaEl' | 'initialTrackNumber'
@@ -179,6 +154,8 @@ interface ReleasePlayDialogPlayerProps extends Pick<
   release: PublishedReleaseDetail | null | undefined;
   /** Size the player to fit the phone sheet below `sm`. */
   fitPhoneSheet: boolean;
+  /** Both the share row and a footer row sit under the player. */
+  stacked: boolean;
 }
 
 /**
@@ -193,14 +170,11 @@ const ReleasePlayDialogPlayer = ({
   takeMediaEl,
   initialTrackNumber,
   fitPhoneSheet,
+  stacked,
 }: ReleasePlayDialogPlayerProps): ReactElement => {
   // min-w-0: the ticker's no-wrap line would otherwise widen the dialog
   // (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
-  const slotClass = cn(
-    'mx-auto min-w-0',
-    fitPhoneSheet ? PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
-    WIDE_PLAYER_CLASS
-  );
+  const slotClass = cn('mx-auto min-w-0', playerWidthClasses(fitPhoneSheet, stacked));
 
   if (isPending) {
     return (
@@ -256,6 +230,8 @@ export const ReleasePlayDialog = ({
   footer,
   headingOrder = 'title-first',
   centered = false,
+  artistHref,
+  year,
   initialTrackNumber,
   shareWidget,
   sheetOnPhone = false,
@@ -277,9 +253,11 @@ export const ReleasePlayDialog = ({
         )}
         onCloseAutoFocus={onCloseAutoFocus}
       >
-        <ReleasePlayDialogHeading
+        <PlayDialogHeading
           title={title}
           artistName={artistName}
+          artistHref={artistHref}
+          year={year}
           headingOrder={headingOrder}
           centered={centered}
           compactOnPhone={sheetOnPhone}
@@ -292,6 +270,7 @@ export const ReleasePlayDialog = ({
           takeMediaEl={takeMediaEl}
           initialTrackNumber={initialTrackNumber}
           fitPhoneSheet={sheetOnPhone}
+          stacked={[shareWidget, footer].every(Boolean)}
         />
         {shareWidget ? (
           // min-w-0: see the footer below.

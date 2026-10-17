@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types/domain/video';
 import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
@@ -63,6 +64,15 @@ const toPrismaJson = (value: unknown): Prisma.InputJsonValue | null =>
 const containsInsensitive = (value: string) => ({ contains: value, mode: 'insensitive' as const });
 
 /**
+ * Match the videos the public artist with this slug holds a video credit on
+ * (a `VideoArtist` row, primary or featured). A hidden artist's slug matches
+ * nothing. The `Video.artist` string is display copy and never matched.
+ */
+const creditedToArtistWhere = (slug: string): Prisma.VideoWhereInput => ({
+  videoArtists: { some: { artist: { is: { slug, ...publicArtistWhere } } } },
+});
+
+/**
  * Build the admin-listing `where` from domain filters. The archived, published,
  * and search clauses are combined under `AND` so their `OR` keys never collide.
  * `archived` absent/false excludes archived rows; `archived: true` is an
@@ -73,7 +83,7 @@ const containsInsensitive = (value: string) => ({ contains: value, mode: 'insens
  * at that moment.
  */
 const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
-  const { search, published, archived, visibleAt } = filters;
+  const { search, published, archived, visibleAt, artist } = filters;
   const and: Prisma.VideoWhereInput[] = [];
 
   and.push(archived ? videoWhere.archived : videoWhere.notArchived);
@@ -92,6 +102,9 @@ const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
         { description: containsInsensitive(search) },
       ],
     });
+  }
+  if (artist) {
+    and.push(creditedToArtistWhere(artist));
   }
 
   return { AND: and };
@@ -171,16 +184,17 @@ export class VideoRepository {
    * videos for the public `/videos` listing. An optional `search` narrows by
    * title/artist (case-insensitive substring) — the OR sits at the top level
    * beside `buildListWhere`'s `AND` so the clauses never collide (same shape
-   * as `searchPublished`). Ordered by `releasedOn` (default desc). Defaults:
-   * skip 0, take 5.
+   * as `searchPublished`) — and an optional `artist` slug to the videos
+   * credited to that public artist. Ordered by `releasedOn` (default desc).
+   * Defaults: skip 0, take 5.
    */
   static async findPublished(
-    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search'>
+    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search' | 'artist'>
   ): Promise<Video[]> {
-    const { sort = 'desc', skip = 0, take = 5, search } = filters;
+    const { sort = 'desc', skip = 0, take = 5, search, artist } = filters;
     return prisma.video.findMany({
       where: {
-        ...buildListWhere({ visibleAt: new Date() }),
+        ...buildListWhere({ visibleAt: new Date(), artist }),
         ...(search && {
           OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
         }),

@@ -99,6 +99,8 @@ vi.mock('./release-play-dialog', () => ({
     onOpenChange,
     onCloseAutoFocus,
     accent,
+    artistHref,
+    year,
   }: {
     open: boolean;
     releaseId: string;
@@ -113,6 +115,8 @@ vi.mock('./release-play-dialog', () => ({
     onOpenChange: (open: boolean) => void;
     onCloseAutoFocus?: (event: Event) => void;
     accent?: string;
+    artistHref?: string;
+    year?: number;
   }) =>
     open ? (
       <div
@@ -127,8 +131,11 @@ vi.mock('./release-play-dialog', () => ({
         data-initial-track-number={initialTrackNumber?.toString() ?? ''}
         data-has-footer={String(footer !== undefined)}
         data-accent={accent ?? ''}
+        data-artist-href={artistHref ?? ''}
+        data-year={year?.toString() ?? ''}
       >
         {shareWidget}
+        {footer}
         <button
           type="button"
           onClick={() => {
@@ -174,7 +181,8 @@ const CARD: SpotlightCardData = {
 
 interface CardOptions {
   caption?: 'artist-and-title' | 'releases';
-  accent?: ZineAccent;
+  accent?: ZineAccent | 'random';
+  linkedHeading?: boolean;
 }
 
 const renderCard = (overrides: Partial<SpotlightCardData> = {}, options: CardOptions = {}) => {
@@ -304,6 +312,53 @@ describe('SpotlightCard', () => {
     await user.click(playButton());
 
     expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', '');
+  });
+
+  it('frames each open in a new loud accent when the accent is random', async () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.95);
+    const user = renderCard({}, { accent: 'random' });
+
+    await user.click(playButton());
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'cyan');
+    await user.click(screen.getByRole('button', { name: 'close' }));
+    await user.click(playButton());
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'orchid');
+  });
+
+  it('links the dialog heading and adds the year and a "View all releases" footer', async () => {
+    const user = renderCard({}, { linkedHeading: true });
+
+    await user.click(playButton());
+
+    const opened = screen.getByRole('dialog');
+    expect(opened).toHaveAttribute('data-artist-href', '/artists/spot-artist');
+    expect(opened).toHaveAttribute('data-year', '2024');
+    const viewAll = screen.getByRole('link', { name: 'View all releases' });
+    expect(viewAll).toHaveAttribute('href', '/releases?artist=spot-artist');
+    // Smaller on a phone, where the sheet's cover is already at its floor.
+    expect(viewAll.parentElement).toHaveClass('text-center', 'max-sm:text-xs');
+  });
+
+  it('links nothing in the dialog for a linked heading without an artist page', async () => {
+    const user = renderCard({ artistSlug: null }, { linkedHeading: true });
+
+    await user.click(playButton());
+
+    const opened = screen.getByRole('dialog');
+    expect(opened).toHaveAttribute('data-artist-href', '');
+    expect(opened).toHaveAttribute('data-year', '2024');
+    expect(opened).toHaveAttribute('data-has-footer', 'false');
+  });
+
+  it('keeps the plain dialog heading by default', async () => {
+    const user = renderCard();
+
+    await user.click(playButton());
+
+    const opened = screen.getByRole('dialog');
+    expect(opened).toHaveAttribute('data-artist-href', '');
+    expect(opened).toHaveAttribute('data-year', '');
   });
 
   it('leaves the artist as text when there is no artist page', () => {

@@ -5,6 +5,7 @@
 
 import { renderHook } from '@testing-library/react';
 
+import { appendVideoPosterCandidatesAction } from '@/lib/actions/append-video-poster-candidates-action';
 import { archiveVideoAction } from '@/lib/actions/archive-video-action';
 import { createVideoAction } from '@/lib/actions/create-video-action';
 import { deleteVideoAction } from '@/lib/actions/delete-video-action';
@@ -18,6 +19,7 @@ import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import {
+  useAppendVideoPosterCandidatesMutation,
   useArchiveVideoMutation,
   useCreateVideoMutation,
   useDeleteVideoMutation,
@@ -59,6 +61,9 @@ vi.mock('@/lib/actions/restore-video-action', () => ({ restoreVideoAction: vi.fn
 vi.mock('@/lib/actions/delete-video-action', () => ({ deleteVideoAction: vi.fn() }));
 vi.mock('@/lib/actions/select-video-poster-action', () => ({
   selectVideoPosterAction: vi.fn(),
+}));
+vi.mock('@/lib/actions/append-video-poster-candidates-action', () => ({
+  appendVideoPosterCandidatesAction: vi.fn(),
 }));
 vi.mock('@/lib/actions/update-video-release-date-action', () => ({
   updateVideoReleaseDateAction: vi.fn(),
@@ -383,6 +388,37 @@ describe('useUpdateVideoReleaseDateMutation', () => {
 
   it('does not invalidate on failure', async () => {
     const opts = getOptions(useUpdateVideoReleaseDateMutation);
+
+    await opts.onSuccess({ success: false }, {});
+
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAppendVideoPosterCandidatesMutation', () => {
+  const frames = [{ url: 'https://cdn.example.com/f6.jpg', atSeconds: 10.7, score: 4 }];
+
+  it('calls appendVideoPosterCandidatesAction with the video id and frames', async () => {
+    vi.mocked(appendVideoPosterCandidatesAction).mockResolvedValue({ success: true });
+    const opts = getOptions<{ videoId: string; candidates: typeof frames }>(
+      useAppendVideoPosterCandidatesMutation
+    );
+
+    await opts.mutationFn({ videoId: 'v-1', candidates: frames });
+
+    expect(appendVideoPosterCandidatesAction).toHaveBeenCalledWith('v-1', frames);
+  });
+
+  it('invalidates the videos cache on success', async () => {
+    const opts = getOptions(useAppendVideoPosterCandidatesMutation);
+
+    await opts.onSuccess({ success: true }, {});
+
+    expect(invalidateQueriesMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not invalidate on failure', async () => {
+    const opts = getOptions(useAppendVideoPosterCandidatesMutation);
 
     await opts.onSuccess({ success: false }, {});
 

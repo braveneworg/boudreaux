@@ -209,3 +209,27 @@ describe('isUploadPreparing', () => {
     expect(isUploadPreparing(status, progress)).toBe(expected);
   });
 });
+
+describe('useVideoUpload — selected file', () => {
+  it('starts with no selected file', () => {
+    const { result } = setup();
+
+    expect(result.current.selectedFile).toBeNull();
+  });
+
+  it('exposes the picked file so later captures can decode it without a network trip', async () => {
+    vi.mocked(uploadVideoMultipart).mockResolvedValue({
+      success: true,
+      s3Key: 'media/videos/x/clip.mp4',
+      fileSize: 2048,
+    });
+    const file = videoFile();
+
+    const { result } = setup();
+    await act(async () => {
+      result.current.selectFile(file);
+    });
+
+    await waitFor(() => expect(result.current.selectedFile).toBe(file));
+  });
+});

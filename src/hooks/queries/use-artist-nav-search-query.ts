@@ -8,11 +8,32 @@ import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { queryKeys } from '@/lib/query-keys';
 import { fetchAndParse } from '@/utils/fetch-and-parse';
 
+/** A release row: its cover, the first track a pick plays, and its year. */
+export interface ArtistNavSearchRelease {
+  id: string;
+  title: string;
+  coverArtSrc: string | null;
+  playSrc: string | null;
+  year: number;
+}
+
+/** A video row: its poster, the signed stream URL a pick plays, and its year. */
+export interface ArtistNavSearchVideo {
+  id: string;
+  title: string;
+  posterSrc: string | null;
+  streamUrl: string | null;
+  year: number;
+  durationSeconds: number | null;
+}
+
+/** One artist of the home search, with its playable releases and live videos. */
 export interface ArtistNavSearchResult {
   artistSlug: string;
   artistName: string;
   thumbnailSrc: string | null;
-  releases: Array<{ id: string; title: string; coverArtSrc: string | null }>;
+  releases: ArtistNavSearchRelease[];
+  videos: ArtistNavSearchVideo[];
 }
 
 interface ArtistNavSearchResponse {
@@ -30,6 +51,18 @@ const artistNavSearchResponseSchema = z.object({
           id: z.string(),
           title: z.string(),
           coverArtSrc: z.string().nullable(),
+          playSrc: z.string().nullable(),
+          year: z.number().int(),
+        })
+      ),
+      videos: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          posterSrc: z.string().nullable(),
+          streamUrl: z.string().nullable(),
+          year: z.number().int(),
+          durationSeconds: z.number().nullable(),
         })
       ),
     })
@@ -37,8 +70,8 @@ const artistNavSearchResponseSchema = z.object({
 }) satisfies z.ZodType<ArtistNavSearchResponse>;
 
 /**
- * Searches artists for the nav typeahead via the `/api/artists/search` route
- * handler.
+ * Searches the home page's artists, releases and videos via the
+ * `/api/artists/search` route handler.
  *
  * Forwards the TanStack Query {@link AbortSignal} to `fetch` so the request is
  * cancelled automatically on unmount, invalidation, or a superseding refetch.
@@ -60,7 +93,8 @@ const fetchArtistNavSearch = async (
 };
 
 /**
- * React Query hook for the nav artist-search typeahead.
+ * React Query hook for the home page search (artists, their playable
+ * releases and their live videos).
  *
  * Wraps {@link fetchArtistNavSearch} with a stable query key and exposes the
  * request state. Cancellation is handled automatically via the forwarded

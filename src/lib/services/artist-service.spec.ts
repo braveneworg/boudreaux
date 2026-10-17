@@ -54,6 +54,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findFirstByName: vi.fn(),
     findMany: vi.fn(),
     searchPublished: vi.fn(),
+    searchForHomeNav: vi.fn(),
     listListed: vi.fn(),
     findPublishedBySlugWithReleases: vi.fn(),
     update: vi.fn(),
@@ -1225,6 +1226,45 @@ describe('ArtistService', () => {
       const result = await ArtistService.restoreArtist('artist-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to restore artist' });
+    });
+  });
+
+  describe('searchForHomeNav', () => {
+    it('forwards the search to the home search read', async () => {
+      vi.mocked(ArtistRepository.searchForHomeNav).mockResolvedValueOnce([mockArtist] as never);
+
+      const result = await ArtistService.searchForHomeNav({ search: 'ash', take: 20 });
+
+      expect(result).toMatchObject({ success: true, data: [mockArtist] });
+      expect(vi.mocked(ArtistRepository.searchForHomeNav).mock.calls).toEqual([
+        [{ search: 'ash', take: 20 }],
+      ]);
+    });
+
+    it('searches with no filter when given none', async () => {
+      vi.mocked(ArtistRepository.searchForHomeNav).mockResolvedValueOnce([]);
+
+      await ArtistService.searchForHomeNav();
+
+      expect(vi.mocked(ArtistRepository.searchForHomeNav).mock.calls).toEqual([[{}]]);
+    });
+
+    it('reports an unavailable database', async () => {
+      vi.mocked(ArtistRepository.searchForHomeNav).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
+
+      const result = await ArtistService.searchForHomeNav({ search: 'ash' });
+
+      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
+    });
+
+    it('reports any other failure as a failed search', async () => {
+      vi.mocked(ArtistRepository.searchForHomeNav).mockRejectedValueOnce(new Error('boom'));
+
+      const result = await ArtistService.searchForHomeNav({ search: 'ash' });
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to search artists' });
     });
   });
 

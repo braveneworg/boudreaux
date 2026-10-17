@@ -5,10 +5,13 @@
 import {
   POSTER_SAMPLE_END_SECONDS,
   POSTER_SAMPLE_START_SECONDS,
+  POSTER_SAMPLE_WINDOW_SECONDS,
   bestPosterCandidateIndex,
+  capturePosterCandidatesFromSource,
   captureVideoPosterCandidates,
   extractVideoDuration,
   extractVideoTags,
+  nextPosterWindowStart,
   posterCandidateTimes,
   scoreFrameQuality,
   type PosterCandidate,
@@ -558,5 +561,133 @@ describe('scoreFrameQuality', () => {
       height: 2,
     } as unknown as ImageData;
     expect(scoreFrameQuality(truncated)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('posterCandidateTimes — a later sample window', () => {
+  it('samples 5 times inside the window starting at the given second', () => {
+    const times = posterCandidateTimes(245, 10);
+    expect(times).toEqual([10.7, 12.1, 13.5, 14.9, 16.3]);
+  });
+
+  it('clamps the window to the duration', () => {
+    const times = posterCandidateTimes(12, 10);
+    expect(times).toHaveLength(5);
+    expect(Math.min(...times)).toBeGreaterThanOrEqual(10);
+    expect(Math.max(...times)).toBeLessThanOrEqual(12);
+  });
+
+  it('returns no times when the window starts at or past the end', () => {
+    expect(posterCandidateTimes(10, 10)).toEqual([]);
+    expect(posterCandidateTimes(10, 17)).toEqual([]);
+  });
+
+  it('keeps the window width equal to the first window', () => {
+    expect(POSTER_SAMPLE_WINDOW_SECONDS).toBe(
+      POSTER_SAMPLE_END_SECONDS - POSTER_SAMPLE_START_SECONDS
+    );
+  });
+});
+
+describe('nextPosterWindowStart', () => {
+  it('starts at the first window when nothing has been captured yet', () => {
+    expect(nextPosterWindowStart(null, 245)).toBe(POSTER_SAMPLE_START_SECONDS);
+  });
+
+  it('starts one window after the first capture', () => {
+    expect(nextPosterWindowStart(9.3, 245)).toBe(10);
+  });
+
+  it('starts one window after a later capture', () => {
+    expect(nextPosterWindowStart(16.3, 245)).toBe(17);
+  });
+
+  it('skips to the window after the one holding the latest frame', () => {
+    expect(nextPosterWindowStart(10.7, 245)).toBe(17);
+  });
+
+  it('returns null when the next window would start at or past the end', () => {
+    expect(nextPosterWindowStart(9.3, 10)).toBeNull();
+    expect(nextPosterWindowStart(1.5, 3)).toBeNull();
+  });
+
+  it('returns null for an unknown duration', () => {
+    expect(nextPosterWindowStart(9.3, null)).toBeNull();
+    expect(nextPosterWindowStart(null, Number.NaN)).toBeNull();
+    expect(nextPosterWindowStart(null, 0)).toBeNull();
+  });
+});
+
+describe('capturePosterCandidatesFromSource', () => {
+  const STREAM_URL = 'https://cdn.example.com/media/videos/vid1/clip.mp4';
+
+  /** Start a capture from a URL source and prime the captured video's metrics. */
+  const startFromUrl = (
+    windowStart: number,
+    duration = 245
+  ): { promise: Promise<PosterCandidate[]>; video: HTMLVideoElement; seeks: number[] } => {
+    const getVideo = setupDom();
+    const promise = capturePosterCandidatesFromSource({ src: STREAM_URL, windowStart });
+    const video = getVideo();
+    defineNumber(video, 'videoWidth', 320);
+    defineNumber(video, 'videoHeight', 240);
+    defineNumber(video, 'duration', duration);
+    const seeks = installCurrentTime(video);
+    return { promise, video, seeks };
+  };
+
+  it('samples the requested window from the URL source', async () => {
+    const { promise, video, seeks } = startFromUrl(10);
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    const candidates = await promise;
+    expect(candidates.map((candidate) => candidate.atSeconds)).toEqual([
+      10.7, 12.1, 13.5, 14.9, 16.3,
+    ]);
+    expect(seeks).toEqual([10.7, 12.1, 13.5, 14.9, 16.3]);
+  });
+
+  it('decodes a URL source anonymously so the canvas is not tainted', () => {
+    const { video } = startFromUrl(10);
+    expect(video.crossOrigin).toBe('anonymous');
+    expect(video.src).toBe(STREAM_URL);
+  });
+
+  it('creates and revokes no object URL for a URL source', async () => {
+    const { promise, video } = startFromUrl(10);
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    await promise;
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('resolves an empty list when the window starts past the end', async () => {
+    const { promise, video, seeks } = startFromUrl(17, 12);
+    video.dispatchEvent(new Event('loadedmetadata'));
+    await expect(promise).resolves.toEqual([]);
+    expect(seeks).toEqual([]);
+  });
+
+  it('resolves an empty list on a media error event', async () => {
+    const { promise, video } = startFromUrl(10);
+    video.dispatchEvent(new Event('error'));
+    await expect(promise).resolves.toEqual([]);
+  });
+
+  it('samples a later window from a File source through an object URL', async () => {
+    const getVideo = setupDom();
+    const promise = capturePosterCandidatesFromSource({ src: videoFile(), windowStart: 10 });
+    const video = getVideo();
+    defineNumber(video, 'videoWidth', 320);
+    defineNumber(video, 'videoHeight', 240);
+    defineNumber(video, 'duration', 245);
+    const seeks = installCurrentTime(video);
+    video.dispatchEvent(new Event('loadedmetadata'));
+    dispatchSeeks(video, 5);
+    await promise;
+    expect(seeks).toEqual([10.7, 12.1, 13.5, 14.9, 16.3]);
+    expect(video.crossOrigin).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
   });
 });

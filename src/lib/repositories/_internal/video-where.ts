@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { isPresent, isUnset } from './where-kit';
+import { allOf, isPresent, isUnset } from './where-kit';
 
 import type { Prisma } from '@prisma/client';
 
@@ -28,6 +28,15 @@ export const videoWhere = {
 export const videoLiveAt = (now: Date): Prisma.VideoWhereInput => ({
   publishedAt: { not: null, lte: now },
 });
+
+/**
+ * Public at `now`: not archived and live. What every public video read
+ * filters on — the same `AND` that `buildListWhere({ visibleAt })` in
+ * `video-repository.ts` builds for the `/videos` listing. `AND`-wrapped, so it
+ * sits beside a caller's own `OR` or `title` clause.
+ */
+export const publicVideoWhere = (now: Date): Prisma.VideoWhereInput =>
+  allOf(videoWhere.notArchived, videoLiveAt(now));
 
 /** Scheduled at `now`: published, but the go-live moment is still ahead. */
 export const videoScheduledAt = (now: Date): Prisma.VideoWhereInput => ({

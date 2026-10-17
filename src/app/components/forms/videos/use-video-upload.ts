@@ -60,6 +60,11 @@ export interface UseVideoUploadResult {
   selectFile: (file: File) => void;
   cancel: () => void;
   retry: () => void;
+  /**
+   * The file picked this session, or null. Kept so a later "Next 5 frames"
+   * capture can decode it locally instead of streaming the upload back.
+   */
+  selectedFile: File | null;
 }
 
 interface ApplyResultDeps {
@@ -122,6 +127,7 @@ export const useVideoUpload = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const lastFileRef = useRef<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Abort any in-flight upload when the form unmounts (e.g. navigating away),
   // so the XHR pool is cancelled and the best-effort abort action frees the
@@ -171,6 +177,7 @@ export const useVideoUpload = ({
         return;
       }
       lastFileRef.current = file;
+      setSelectedFile(file);
       setStatus('preparing');
       setProgress(0);
       setErrorMessage(null);
@@ -190,5 +197,5 @@ export const useVideoUpload = ({
     if (lastFileRef.current) void startUpload(lastFileRef.current);
   }, [startUpload]);
 
-  return { status, progress, errorMessage, selectFile, cancel, retry };
+  return { status, progress, errorMessage, selectFile, cancel, retry, selectedFile };
 };

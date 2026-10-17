@@ -856,3 +856,126 @@ describe('useVideoPosterStrip — draft poster fields', () => {
     expect(fields).toEqual({});
   });
 });
+
+describe('useVideoPosterStrip — next-frames batches', () => {
+  /** A later window's frames, already uploaded and persisted by the next-frames flow. */
+  const APPENDED = [uploaded(6, 10.7, 3), uploaded(7, 12.1, 8)];
+
+  it('appends a batch after the fresh capture', () => {
+    const harness = renderStrip();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.stripCandidates).toEqual([...CAPTURED, ...APPENDED]);
+  });
+
+  it('appends a batch after the stored candidates', () => {
+    const harness = renderStrip({ storedCandidates: UPLOADED, posterUrl: UPLOADED[0].url });
+
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.stripCandidates).toEqual([...UPLOADED, ...APPENDED]);
+  });
+
+  it('shows an appended frame once even when the row already carries it', () => {
+    // The append persists, the video query refetches, and the row now holds
+    // the frame too — it must not appear twice.
+    const harness = renderStrip({
+      storedCandidates: [...UPLOADED, APPENDED[0]],
+      posterUrl: UPLOADED[0].url,
+    });
+
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.stripCandidates).toEqual([...UPLOADED, ...APPENDED]);
+  });
+
+  it('keeps the current pick when a batch is appended', () => {
+    const harness = renderStrip();
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.handleSelectCandidate(2));
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.selectedIndex).toBe(2);
+  });
+
+  it('reports the latest captured timestamp across every batch', () => {
+    const harness = renderStrip({ storedCandidates: UPLOADED, posterUrl: UPLOADED[0].url });
+
+    expect(harness.current.strip.latestAtSeconds).toBe(6.5);
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.latestAtSeconds).toBe(12.1);
+  });
+
+  it('reports no latest timestamp with no candidates', () => {
+    const harness = renderStrip({ storedCandidates: [] });
+
+    expect(harness.current.strip.latestAtSeconds).toBeNull();
+  });
+
+  it('persists a pick on an appended frame in a fresh session', async () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderStrip({ isPersisted: true, effectiveVideoId: VIDEO_ID });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+    await act(async () => harness.current.strip.handleSelectCandidate(4));
+
+    expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+      videoId: VIDEO_ID,
+      candidateUrl: APPENDED[1].url,
+    });
+  });
+
+  it('offers no Save-time blob for a picked appended frame', () => {
+    mocks.alignedNow = UPLOADED;
+    const harness = renderStrip({ isPersisted: true, effectiveVideoId: VIDEO_ID });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+    act(() => harness.current.strip.handleSelectCandidate(4));
+
+    expect(harness.current.strip.selectedPosterBlob).toBeNull();
+  });
+
+  it('persists a pick on an appended frame on a stored revisit', async () => {
+    const harness = renderStrip({
+      isPersisted: true,
+      effectiveVideoId: VIDEO_ID,
+      storedCandidates: UPLOADED,
+      posterUrl: UPLOADED[0].url,
+      draftCandidateUrls: [],
+    });
+
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+    await act(async () => harness.current.strip.handleSelectCandidate(3));
+
+    expect(mocks.selectVideoPosterAsync).toHaveBeenCalledWith({
+      videoId: VIDEO_ID,
+      candidateUrl: APPENDED[0].url,
+    });
+  });
+
+  it('highlights the appended frame the live poster points at on a stored revisit', () => {
+    const harness = renderStrip({ storedCandidates: UPLOADED, posterUrl: APPENDED[0].url });
+
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+
+    expect(harness.current.strip.selectedIndex).toBe(3);
+  });
+
+  it('forgets appended frames when the file is replaced', () => {
+    const harness = renderStrip({ hasPreviousFile: true });
+
+    act(() => harness.current.strip.handlePosterCandidates(CAPTURED));
+    act(() => harness.current.strip.appendCandidates(APPENDED));
+    act(() => harness.current.strip.handlePosterCandidates([captured(2.2, 3)]));
+
+    expect(harness.current.strip.stripCandidates).toEqual([
+      expect.objectContaining({ atSeconds: 2.2 }),
+    ]);
+  });
+});

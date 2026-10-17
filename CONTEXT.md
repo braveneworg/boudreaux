@@ -166,9 +166,17 @@ _Avoid_: featured artist, featured release, spotlight artist.
 **listed artist** — an Artist shown on the public artists index and found by
 its search: published, not deleted, and directly credited (primary or
 featured) on at least one published Release. A member credit alone does not
-list an Artist. See
+list an Artist. The home search is wider: see **home search match**. See
 [ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md).
 _Avoid_: visible artist.
+
+**home search match** — a **public artist** the home page search can find: one
+with a direct credit (primary or featured) on a published Release that has a
+**playable format** with a file, or a **video credit** on a **live** Video.
+Wider than **listed artist**: an Artist with only video credits is a home
+search match but is not listed. A match lists its playable Releases and its
+live Videos; a Release that cannot be played is never a row.
+_Avoid_: findable artist.
 
 **public artist** — an Artist the public may learn of: published and not
 deleted. Nothing that identifies an Artist — name, aka names, slug, image —
@@ -262,6 +270,19 @@ extracted by ffprobe), a **description**, and **enrichment** (externally
 sourced facts such as release date; available to any category once the video
 names an artist or creator).
 
+**poster candidate** — one frame captured from a Video and stored on it as a
+choice for its poster. The first five are captured from the first **sample
+window** when the file is picked; every "Next 5 frames" press appends the
+next window's five. A Video holds at most 25. The poster is always one of
+them, unless an admin uploaded an image by hand.
+_Avoid_: thumbnail (the strip's rendering of one), frame (any decoded picture).
+
+**sample window** — the stretch of a Video that one capture samples five
+evenly spaced poster candidates from. The first window runs from 3 s to 10 s
+(the whole clip when it is that short); each later window is the next stretch
+of the same width, and the last one is clipped at the end of the Video.
+_Avoid_: segment, range, batch (the frames, not the stretch they came from).
+
 **release date** — the day-precision UTC day a Video was released. It is
 **never defaulted**: a **draft** may have none, and today only ever appears
 because a human typed it. Publishing requires one. See
@@ -288,6 +309,12 @@ videos a public surface reads; the admin dashboard's published count counts
 these alone, so a scheduled Video counts toward the draft side until it goes
 live.
 _Avoid_: visible, active.
+
+**video credit** — the `VideoArtist` row linking a Video to an Artist, primary
+or featured, parsed from the Video's artist string when it is saved. It is the
+only link between a Video and an Artist a public surface may use: `Video.artist`
+is display copy, never a join key.
+_Avoid_: video artist (the display string), artist match.
 
 **release-date lookup** — the bounded automatic search for a Video's release
 date from its title and artist, run on upload and on opening a dateless draft.

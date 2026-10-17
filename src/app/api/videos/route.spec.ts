@@ -140,6 +140,32 @@ describe('GET /api/videos', () => {
     });
   });
 
+  it('forwards the trimmed artist param to the published listing', async () => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValueOnce({
+      success: true,
+      data: [] as never,
+    });
+
+    await call('?listing=published&artist=%20marguerite-ash%20');
+
+    expect(vi.mocked(VideoService.getPublishedVideos).mock.calls).toEqual([
+      [{ sort: 'desc', skip: 0, take: 5, artist: 'marguerite-ash' }],
+    ]);
+  });
+
+  it.each(['', '%20%20'])('drops a blank artist param (%j)', async (artist) => {
+    vi.mocked(VideoService.getPublishedVideos).mockResolvedValueOnce({
+      success: true,
+      data: [] as never,
+    });
+
+    await call(`?listing=published&artist=${artist}`);
+
+    expect(vi.mocked(VideoService.getPublishedVideos).mock.calls).toEqual([
+      [{ sort: 'desc', skip: 0, take: 5 }],
+    ]);
+  });
+
   it('clamps take=500 to 50 on the admin listing', async () => {
     vi.mocked(VideoService.getVideos).mockResolvedValue({ success: true, data: [] as never });
 

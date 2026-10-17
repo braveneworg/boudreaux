@@ -100,11 +100,13 @@ const renderFrameToCanvas = (video: HTMLVideoElement): HTMLCanvasElement | null 
   return canvas;
 };
 
-/** How many early frames to sample when auto-picking a poster. */
-const POSTER_CANDIDATE_COUNT = 5;
-/** Auto-poster candidates come from this window (skips fade-ins/title cards). */
+/** How many frames one sample window yields — the "5" in "Next 5 frames". */
+export const POSTER_CANDIDATE_COUNT = 5;
+/** The first sample window (skips fade-ins/title cards). */
 export const POSTER_SAMPLE_START_SECONDS = 3;
 export const POSTER_SAMPLE_END_SECONDS = 10;
+/** Every sample window is as wide as the first one. */
+export const POSTER_SAMPLE_WINDOW_SECONDS = POSTER_SAMPLE_END_SECONDS - POSTER_SAMPLE_START_SECONDS;
 /** Width of the downscaled copy each candidate is scored on. */
 const SCORE_SAMPLE_WIDTH = 96;
 
@@ -158,20 +160,50 @@ const scoreCanvasQuality = (source: HTMLCanvasElement): number => {
 };
 
 /**
- * Evenly spaced sample times inside the poster window: `[3s, 10s]` clamped to
- * the duration, whole-video for clips of 3s or less; `[0]` when unknowable.
+ * Evenly spaced sample times inside one **sample window**. Without
+ * `windowStart` that is the first window — `[3s, 10s]` clamped to the
+ * duration, whole-video for clips of 3s or less, `[0]` when unknowable. With
+ * `windowStart` it is the window of the same width starting there, clamped to
+ * the duration; `[]` when it starts at or past the end.
  */
-export const posterCandidateTimes = (duration: number): number[] => {
+export const posterCandidateTimes = (duration: number, windowStart?: number): number[] => {
   if (!Number.isFinite(duration) || duration <= 0) {
     return [0];
   }
-  const start = duration <= POSTER_SAMPLE_START_SECONDS ? 0 : POSTER_SAMPLE_START_SECONDS;
-  const end = Math.min(POSTER_SAMPLE_END_SECONDS, duration);
+  const start =
+    windowStart ?? (duration <= POSTER_SAMPLE_START_SECONDS ? 0 : POSTER_SAMPLE_START_SECONDS);
+  const end = Math.min(start + POSTER_SAMPLE_WINDOW_SECONDS, duration);
+  if (end <= start) {
+    return [];
+  }
   const sampleWindow = end - start;
   return Array.from(
     { length: POSTER_CANDIDATE_COUNT },
     (_, index) => start + (sampleWindow * (index + 0.5)) / POSTER_CANDIDATE_COUNT
   );
+};
+
+/**
+ * Where the next sample window starts: the window after the one holding the
+ * latest captured frame, or the first window when nothing has been captured.
+ * `null` when the duration is unknown or that window would start at or past
+ * the end — there are no later frames to offer.
+ */
+export const nextPosterWindowStart = (
+  latestAtSeconds: number | null,
+  duration: number | null
+): number | null => {
+  if (duration === null || !Number.isFinite(duration) || duration <= 0) {
+    return null;
+  }
+  const windowIndex =
+    latestAtSeconds === null
+      ? 0
+      : Math.floor((latestAtSeconds - POSTER_SAMPLE_START_SECONDS) / POSTER_SAMPLE_WINDOW_SECONDS) +
+        1;
+  const start =
+    POSTER_SAMPLE_START_SECONDS + Math.max(0, windowIndex) * POSTER_SAMPLE_WINDOW_SECONDS;
+  return start < duration ? start : null;
 };
 
 /** A captured, scored poster-frame candidate. */
@@ -192,21 +224,36 @@ export const bestPosterCandidateIndex = (candidates: PosterCandidate[]): number 
     0
   );
 
+export interface CapturePosterCandidatesArgs {
+  /** The local file, or a playable URL (decoded anonymously so the canvas stays readable). */
+  src: File | string;
+  /** Start of the sample window; omitted means the first window. */
+  windowStart?: number;
+}
+
 /**
- * Capture scored JPEG poster candidates from a video file — one per sampled
- * timestamp in the 3–10s window (skipping fade-in black frames and blur when
- * the caller defaults to `bestPosterCandidateIndex`). Each frame is encoded
- * inline — render → score → `toBlob` → next seek — so at most one
+ * Capture scored JPEG poster candidates from a video source — one per sampled
+ * timestamp in the requested sample window (the first window skips fade-in
+ * black frames and blur when the caller defaults to
+ * `bestPosterCandidateIndex`). A File is decoded through an object URL that
+ * is revoked on finish; a URL is decoded with `crossOrigin = 'anonymous'`, so
+ * the CDN's CORS headers keep `drawImage` from tainting the canvas. Each frame
+ * is encoded inline — render → score → `toBlob` → next seek — so at most one
  * full-resolution canvas is alive at a time. A frame that fails to render or
- * encode is skipped; an undecodable file resolves `[]` — never rejects.
+ * encode is skipped; an undecodable source, or a window starting past the
+ * end, resolves `[]` — never rejects.
  */
-export const captureVideoPosterCandidates = (file: File): Promise<PosterCandidate[]> =>
+export const capturePosterCandidatesFromSource = ({
+  src,
+  windowStart,
+}: CapturePosterCandidatesArgs): Promise<PosterCandidate[]> =>
   new Promise((resolve) => {
-    const objectUrl = URL.createObjectURL(file);
+    const isFileSource = typeof src !== 'string';
+    const sourceUrl = isFileSource ? URL.createObjectURL(src) : src;
     const video = document.createElement('video');
     const candidates: PosterCandidate[] = [];
     const finish = (): void => {
-      URL.revokeObjectURL(objectUrl);
+      if (isFileSource) URL.revokeObjectURL(sourceUrl);
       resolve(candidates);
     };
 
@@ -224,9 +271,15 @@ export const captureVideoPosterCandidates = (file: File): Promise<PosterCandidat
     };
 
     video.preload = 'metadata';
+    if (!isFileSource) video.crossOrigin = 'anonymous';
     video.addEventListener('loadedmetadata', () => {
-      times = posterCandidateTimes(video.duration);
-      video.currentTime = times[0];
+      times = posterCandidateTimes(video.duration, windowStart);
+      const firstTime = times.at(0);
+      if (firstTime === undefined) {
+        finish();
+        return;
+      }
+      video.currentTime = firstTime;
     });
     video.addEventListener('seeked', () => {
       const atSeconds = times.at(index) ?? 0;
@@ -254,5 +307,12 @@ export const captureVideoPosterCandidates = (file: File): Promise<PosterCandidat
       }
     });
     video.addEventListener('error', () => finish());
-    video.src = objectUrl;
+    video.src = sourceUrl;
   });
+
+/**
+ * Capture the first sample window's poster candidates from a freshly selected
+ * file — the upload-time capture. See {@link capturePosterCandidatesFromSource}.
+ */
+export const captureVideoPosterCandidates = (file: File): Promise<PosterCandidate[]> =>
+  capturePosterCandidatesFromSource({ src: file });

@@ -44,3 +44,10 @@ export const VIDEO_PART_URL_BATCH_MAX = 5;
 
 /** Number of parts uploaded concurrently by the client. */
 export const VIDEO_UPLOAD_CONCURRENCY = 3;
+
+/**
+ * Most poster candidates a video may hold: the first capture's frames plus
+ * every "Next 5 frames" press. One constant feeds the candidate schema, the
+ * append rule, and the button's disabled state so the three cannot drift.
+ */
+export const VIDEO_POSTER_CANDIDATE_CAP = 25;

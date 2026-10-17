@@ -1,7 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { act, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
+
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { VideoPlayDialog } from './video-play-dialog';
@@ -50,6 +52,9 @@ beforeEach(() => {
 });
 
 const takeMediaEl = (): HTMLVideoElement | null => null;
+
+/** The open dialog's markup before the home search props existed, ids normalised. */
+const UNCHANGED_DIALOG_HTML = `<div role="dialog" id="ID" data-state="open" data-slot="dialog-content" class="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 shadow-zine-ink fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] rounded-none border-2 border-black duration-200 gap-3 p-4 sm:max-w-3xl lg:max-w-5xl" tabindex="-1" aria-describedby="ID" aria-labelledby="ID" style="pointer-events: auto;"><div data-slot="dialog-header" class="flex flex-col gap-2 text-center sm:text-left pr-8"><h2 id="ID" data-slot="dialog-title" class="font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl">Live at the Basement</h2><div data-slot="dialog-description" class="text-sm text-zinc-600" id="ID">The Band</div></div><div><div><div data-testid="video-surface">surface:Live at the Basement</div></div></div><button type="button" data-slot="dialog-close" class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent absolute top-4 right-4 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:text-zinc-950 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg><span class="sr-only">Close</span></button></div>`;
 
 const CLIP_SRC = 'https://cdn.example.com/clip.mp4';
 
@@ -143,6 +148,110 @@ describe('VideoPlayDialog', () => {
   // While the player is in picture-in-picture the modal hides and leaves the
   // page fully usable, but the surface (and so the player and its playing
   // <video>) stays mounted; leaving picture-in-picture shows it again.
+  // `/videos` passes none of the home-search props; its modal must not change.
+  it('renders the same markup as before when given none of the optional props', () => {
+    renderDialog(true);
+
+    expect(screen.getByRole('dialog').outerHTML.replace(/radix-[^"]+/g, 'ID')).toBe(
+      UNCHANGED_DIALOG_HTML
+    );
+  });
+
+  describe('home search props', () => {
+    const renderWith = (props: Partial<ComponentProps<typeof VideoPlayDialog>>) =>
+      render(
+        <VideoPlayDialog
+          title="Live at the Basement"
+          artist="The Band"
+          src={CLIP_SRC}
+          open
+          onOpenChange={vi.fn()}
+          takeMediaEl={takeMediaEl}
+          {...props}
+        />
+      );
+
+    it('leads with the artist, linked, over the title and year when asked', () => {
+      renderWith({ headingOrder: 'artist-first', artistHref: '/artists/the-band', year: 2025 });
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveAccessibleName('The Band');
+      expect(dialog).toHaveAccessibleDescription('Live at the Basement (2025)');
+      expect(screen.getByRole('link', { name: 'The Band' })).toHaveAttribute(
+        'href',
+        '/artists/the-band'
+      );
+    });
+
+    it('centers the heading lines when asked', () => {
+      renderWith({ headingOrder: 'artist-first', centered: true });
+
+      expect(screen.getByRole('heading', { name: 'The Band' })).toHaveClass('text-center');
+    });
+
+    it('takes the accent on the dialog', () => {
+      renderWith({ accent: 'orchid' });
+
+      expect(screen.getByRole('dialog')).toHaveClass('zine-accent-orchid');
+    });
+
+    // The accent shows as the player frame's offset shadow, as it does on the
+    // release player's frame.
+    it('frames the player in the accent when given one', () => {
+      renderWith({ accent: 'orchid' });
+
+      const slot = screen.getByTestId('video-surface').parentElement?.parentElement;
+      expect(slot).toHaveClass('border-2', 'border-black', 'shadow-zine');
+    });
+
+    it('renders a footer after the player, shrinkable inside the dialog grid', () => {
+      renderWith({ footer: <a href="/videos?artist=the-band">View all videos</a> });
+
+      const footer = screen.getByRole('link', { name: 'View all videos' }).parentElement;
+      expect(footer).toHaveAttribute('data-slot', 'video-play-dialog-footer');
+      expect(footer).toHaveClass('min-w-0', 'text-sm');
+      expect(
+        screen.getByTestId('video-surface').compareDocumentPosition(footer as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it('renders an action in the heading', () => {
+      renderWith({ action: <button type="button">More options</button> });
+
+      expect(document.querySelector('[data-slot="dialog-header"]')).toContainElement(
+        screen.getByRole('button', { name: 'More options' })
+      );
+    });
+
+    it('lets the opener decide where focus returns on close', async () => {
+      const onCloseAutoFocus = vi.fn();
+      const { rerender } = renderWith({ onCloseAutoFocus });
+
+      rerender(
+        <VideoPlayDialog
+          title="Live at the Basement"
+          artist="The Band"
+          src={CLIP_SRC}
+          open={false}
+          onOpenChange={vi.fn()}
+          takeMediaEl={takeMediaEl}
+          onCloseAutoFocus={onCloseAutoFocus}
+        />
+      );
+
+      await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledTimes(1));
+    });
+
+    // Videos fail closed: without a signed stream URL there is nothing to play.
+    it('says the video cannot be played, and mounts no player, without a source', () => {
+      renderWith({ src: null });
+
+      expect(screen.getByRole('alert')).toHaveTextContent('This video can’t be played right now.');
+      expect(screen.queryByTestId('video-surface')).not.toBeInTheDocument();
+    });
+  });
+
   describe('picture-in-picture', () => {
     it('hides the dialog when the player enters picture-in-picture', () => {
       renderDialog(true);

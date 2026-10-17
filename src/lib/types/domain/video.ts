@@ -149,6 +149,11 @@ export interface VideoListFilters {
    * exclude future-dated scheduled videos from the public listing.
    */
   visibleAt?: Date;
+  /**
+   * An artist slug: only the videos credited to the public artist with that
+   * slug (a `VideoArtist` row, primary or featured). Used by `/videos?artist=`.
+   */
+  artist?: string;
 }
 
 /** Count filters for the admin dashboard (Prisma-free at the boundary). */

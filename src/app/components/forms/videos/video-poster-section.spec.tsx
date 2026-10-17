@@ -10,7 +10,11 @@ import { useForm } from 'react-hook-form';
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
-import { posterCandidateToFile, VideoPosterSection } from './video-poster-section';
+import {
+  type NextFramesControl,
+  posterCandidateToFile,
+  VideoPosterSection,
+} from './video-poster-section';
 
 import type { StripCandidate } from './use-video-poster-strip';
 import type { PosterCandidate } from './video-metadata';
@@ -45,6 +49,7 @@ interface HarnessProps {
   errorMessage?: string | null;
   uploadPoster?: (file: File) => Promise<void>;
   existingPosterUrl?: string;
+  nextFrames?: NextFramesControl | null;
 }
 
 // Renders the section with a real RHF control (so `posterUrl` can be watched)
@@ -58,6 +63,7 @@ const Harness = ({
   errorMessage = null,
   uploadPoster = async () => undefined,
   existingPosterUrl,
+  nextFrames = null,
 }: HarnessProps): React.ReactElement => {
   const form = useForm<VideoFormData>({
     defaultValues: { posterUrl: existingPosterUrl ?? '' } as Partial<VideoFormData>,
@@ -72,6 +78,7 @@ const Harness = ({
       isUploading={isUploading}
       errorMessage={errorMessage}
       uploadPoster={uploadPoster}
+      nextFrames={nextFrames}
     />
   );
 };
@@ -312,5 +319,96 @@ describe('posterCandidateToFile', () => {
 
     expect(file.name).toBe('poster.jpg');
     expect(file.type).toBe('image/jpeg');
+  });
+});
+
+describe('VideoPosterSection — Next 5 frames', () => {
+  const nextFrames = (overrides: Partial<NextFramesControl> = {}): NextFramesControl => ({
+    onRequest: vi.fn(),
+    isCapturing: false,
+    blocker: null,
+    ...overrides,
+  });
+
+  it('renders the button after the strip when a video is in hand', () => {
+    render(<Harness candidates={[candidateAt(3.7), candidateAt(5.1)]} nextFrames={nextFrames()} />);
+
+    const button = screen.getByRole('button', { name: 'Next 5 frames' });
+    expect(button).toBeEnabled();
+    expect(
+      screen.getByRole('radiogroup').compareDocumentPosition(button) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('renders the button even when there is no strip to follow', () => {
+    render(<Harness nextFrames={nextFrames()} />);
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeInTheDocument();
+  });
+
+  it('renders no button without a video to read from', () => {
+    render(<Harness candidates={[candidateAt(3.7), candidateAt(5.1)]} />);
+
+    expect(screen.queryByRole('button', { name: 'Next 5 frames' })).not.toBeInTheDocument();
+  });
+
+  it('requests the next frames on click', async () => {
+    const onRequest = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness nextFrames={nextFrames({ onRequest })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Next 5 frames' }));
+
+    expect(onRequest.mock.calls).toEqual([[]]);
+  });
+
+  it('is disabled and busy while a capture is in flight', () => {
+    render(<Harness nextFrames={nextFrames({ isCapturing: true })} />);
+
+    const button = screen.getByRole('button', { name: 'Next 5 frames' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('is disabled during the upload, with no hint', () => {
+    render(<Harness nextFrames={nextFrames({ blocker: 'uploading' })} />);
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.queryByText(/frames/i, { selector: 'p' })).not.toBeInTheDocument();
+  });
+
+  it('is disabled at the cap with a hint', () => {
+    render(<Harness nextFrames={nextFrames({ blocker: 'cap' })} />);
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.getByText('Frame limit reached (25).')).toBeInTheDocument();
+  });
+
+  it('is disabled past the end of the video with a hint', () => {
+    render(<Harness nextFrames={nextFrames({ blocker: 'end' })} />);
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.getByText('No later frames in this video.')).toBeInTheDocument();
+  });
+
+  it('is disabled with a hint when the video cannot be read here', () => {
+    render(<Harness nextFrames={nextFrames({ blocker: 'no-source' })} />);
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.getByText('The video stream is not available here.')).toBeInTheDocument();
+  });
+
+  it('keeps the button while a manual poster hides the fresh strip', () => {
+    render(
+      <Harness
+        candidates={[candidateAt(3.7), candidateAt(5.1)]}
+        uploadedPosterUrl="https://cdn.example.com/poster.jpg"
+        nextFrames={nextFrames()}
+      />
+    );
+
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeInTheDocument();
   });
 });

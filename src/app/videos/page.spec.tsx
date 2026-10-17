@@ -5,9 +5,10 @@ import React from 'react';
 
 import { render, screen } from '@testing-library/react';
 
+import { queryKeys } from '@/lib/query-keys';
 import type { Video } from '@/lib/types/domain/video';
 
-import VideosPage from './page';
+import VideosPage, { generateMetadata } from './page';
 
 vi.mock('server-only', () => ({}));
 
@@ -15,8 +16,19 @@ vi.mock('server-only', () => ({}));
 const mockRedirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
+// Like Next's own, notFound throws: nothing after it runs.
+const notFound = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => mockRedirect(url),
+  notFound: () => {
+    notFound();
+    throw new Error('NEXT_NOT_FOUND');
+  },
+}));
+
+const getPublicArtist = vi.hoisted(() => vi.fn());
+vi.mock('@/app/artists/[slug]/get-public-artist', () => ({
+  getPublicArtist: (slug: string) => getPublicArtist(slug),
 }));
 
 // Mock TanStack Query SSR utilities — execute the queryFn so coverage sees it.
@@ -76,8 +88,22 @@ vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
 }));
 
 vi.mock('@/app/components/videos-content', () => ({
-  VideosContent: () => <div data-testid="videos-content">Videos Content</div>,
+  VideosContent: ({ artist, artistName }: { artist?: string; artistName?: string }) => (
+    <div
+      data-testid="videos-content"
+      data-artist={artist ?? ''}
+      data-artist-name={artistName ?? ''}
+    >
+      Videos Content
+    </div>
+  ),
 }));
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+/** The page for the given query string params. */
+const pageFor = (searchParams: SearchParams = {}) =>
+  VideosPage({ searchParams: Promise.resolve(searchParams) });
 
 const mockVideo: Video = {
   id: 'video-1',
@@ -127,31 +153,32 @@ const mockVideo: Video = {
 describe('VideosPage', () => {
   beforeEach(() => {
     mockGetPublishedVideos.mockResolvedValue({ success: true, data: [] });
+    getPublicArtist.mockResolvedValue({ displayName: 'E2E Artist' });
   });
 
   // The page is public: no session is mocked anywhere in this spec, and the
   // page must never redirect an anonymous visitor.
   it('should never redirect to signin', async () => {
-    const Page = await VideosPage();
+    const Page = await pageFor();
     render(Page);
 
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
   it('should prefetch the first published-videos page as an infinite query', async () => {
-    const Page = await VideosPage();
+    const Page = await pageFor();
     render(Page);
 
     expect(mockPrefetchInfiniteQuery).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        queryKey: ['videos', 'publishedInfinite', 'desc', ''],
+        queryKey: ['videos', 'publishedInfinite', 'desc', '', ''],
         initialPageParam: 0,
       })
     );
   });
 
   it('should read the video service directly for the first page', async () => {
-    await VideosPage();
+    await pageFor();
 
     expect(mockGetPublishedVideos).toHaveBeenCalledWith({ sort: 'desc', skip: 0, take: 5 });
   });
@@ -159,7 +186,7 @@ describe('VideosPage', () => {
   it('should shape the prefetched first page with signed stream urls', async () => {
     mockGetPublishedVideos.mockResolvedValue({ success: true, data: [mockVideo] });
 
-    await VideosPage();
+    await pageFor();
 
     // Every audit/probe/enrichment internal is stripped from the SSR payload via
     // the shared `toPublicVideoRow`; only the public row + signed URL survives.
@@ -205,7 +232,7 @@ describe('VideosPage', () => {
       data: [{ ...mockVideo, enrichmentJobToken: 'secret-job-token' }],
     });
 
-    await VideosPage();
+    await pageFor();
 
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [
       { queryFn: () => Promise<{ rows: Array<Record<string, unknown>> }> },
@@ -220,7 +247,7 @@ describe('VideosPage', () => {
       data: [{ ...mockVideo, probeData: { format: { filename: 'secret.mp4' } } }],
     });
 
-    await VideosPage();
+    await pageFor();
 
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [
       { queryFn: () => Promise<{ rows: Array<Record<string, unknown>> }> },
@@ -232,21 +259,95 @@ describe('VideosPage', () => {
   it('should degrade to an empty first page when the service fails', async () => {
     mockGetPublishedVideos.mockResolvedValue({ success: false, error: 'Database unavailable' });
 
-    await VideosPage();
+    await pageFor();
 
     const [opts] = mockPrefetchInfiniteQuery.mock.calls[0] as [{ queryFn: () => Promise<unknown> }];
     await expect(opts.queryFn()).resolves.toEqual({ rows: [], nextSkip: null });
   });
 
+  it('should prefetch the artist-filtered first page under the key the client hook uses', async () => {
+    await pageFor({ artist: 'e2e-artist' });
+
+    const [[opts]] = mockPrefetchInfiniteQuery.mock.calls as [[{ queryKey: unknown[] }]];
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', '', 'e2e-artist']);
+    expect(opts.queryKey).toEqual(queryKeys.videos.publishedInfinite('desc', '', 'e2e-artist'));
+    expect(mockGetPublishedVideos.mock.calls).toEqual([
+      [{ sort: 'desc', skip: 0, take: 5, artist: 'e2e-artist' }],
+    ]);
+  });
+
+  it('should pass the artist filter and its name to the videos content', async () => {
+    render(await pageFor({ artist: ' e2e-artist ' }));
+
+    expect(getPublicArtist.mock.calls).toEqual([['e2e-artist']]);
+    const content = screen.getByTestId('videos-content');
+    expect(content).toHaveAttribute('data-artist', 'e2e-artist');
+    expect(content).toHaveAttribute('data-artist-name', 'E2E Artist');
+  });
+
+  it('should take the first artist when the param repeats', async () => {
+    render(await pageFor({ artist: ['e2e-artist', 'e2e-band'] }));
+
+    expect(screen.getByTestId('videos-content')).toHaveAttribute('data-artist', 'e2e-artist');
+  });
+
+  it.each([{ artist: '' }, { artist: '   ' }, {}])(
+    'should ignore an empty or missing artist param (%j)',
+    async (searchParams) => {
+      render(await pageFor(searchParams));
+
+      expect(getPublicArtist).not.toHaveBeenCalled();
+      expect(screen.getByTestId('videos-content')).toHaveAttribute('data-artist', '');
+      expect(screen.getByTestId('videos-content')).toHaveAttribute('data-artist-name', '');
+      expect(mockGetPublishedVideos.mock.calls).toEqual([[{ sort: 'desc', skip: 0, take: 5 }]]);
+    }
+  );
+
+  it('should show 404 when the filter names no public artist, before prefetching', async () => {
+    getPublicArtist.mockResolvedValueOnce(null);
+
+    await expect(pageFor({ artist: 'hidden-artist' })).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFound).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
+  });
+
+  describe('generateMetadata', () => {
+    const metadataFor = (searchParams: SearchParams) =>
+      generateMetadata({ searchParams: Promise.resolve(searchParams) });
+
+    it('titles the unfiltered listing as videos', async () => {
+      await expect(metadataFor({})).resolves.toEqual({
+        title: 'Videos',
+        description: 'Stream music videos and live session footage from the label.',
+      });
+    });
+
+    it('titles a filtered listing with the artist', async () => {
+      await expect(metadataFor({ artist: 'e2e-artist' })).resolves.toEqual({
+        title: 'Videos by E2E Artist',
+        description: 'Every video by E2E Artist.',
+      });
+    });
+
+    it('titles a filter naming no public artist as not found', async () => {
+      getPublicArtist.mockResolvedValueOnce(null);
+
+      await expect(metadataFor({ artist: 'hidden-artist' })).resolves.toEqual({
+        title: 'Artist Not Found',
+      });
+    });
+  });
+
   it('should render VideosContent within the hydration boundary', async () => {
-    const Page = await VideosPage();
+    const Page = await pageFor();
     render(Page);
 
     expect(screen.getByTestId('videos-content')).toBeInTheDocument();
   });
 
   it('should render the videos content on a kraft zine panel', async () => {
-    const Page = await VideosPage();
+    const Page = await pageFor();
     const { container } = render(Page);
 
     const panel = container.querySelector('[data-slot="zine-panel"]');
@@ -254,7 +355,7 @@ describe('VideosPage', () => {
   });
 
   it('should render the videos heading as the wordmark image', async () => {
-    const Page = await VideosPage();
+    const Page = await pageFor();
     render(Page);
 
     const heading = screen.getByRole('heading', { level: 1 });

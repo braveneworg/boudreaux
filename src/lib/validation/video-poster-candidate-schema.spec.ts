@@ -1,6 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { VIDEO_POSTER_CANDIDATE_CAP } from '@/lib/constants/video-uploads';
+
 import {
   posterCandidatesSchema,
   videoPosterCandidateSchema,
@@ -37,9 +39,23 @@ describe('videoPosterCandidateSchema', () => {
 });
 
 describe('posterCandidatesSchema', () => {
-  it('rejects more than 10 candidates', () => {
+  it('caps the list at the shared candidate cap of 25', () => {
+    expect(VIDEO_POSTER_CANDIDATE_CAP).toBe(25);
+  });
+
+  it('accepts a list at the cap', () => {
     expect(
-      posterCandidatesSchema.safeParse(Array.from({ length: 11 }, () => candidate)).success
+      posterCandidatesSchema.safeParse(
+        Array.from({ length: VIDEO_POSTER_CANDIDATE_CAP }, () => candidate)
+      ).success
+    ).toBe(true);
+  });
+
+  it('rejects a list over the cap', () => {
+    expect(
+      posterCandidatesSchema.safeParse(
+        Array.from({ length: VIDEO_POSTER_CANDIDATE_CAP + 1 }, () => candidate)
+      ).success
     ).toBe(false);
   });
 });

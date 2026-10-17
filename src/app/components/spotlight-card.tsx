@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 
 import Image from 'next/image';
@@ -22,8 +22,7 @@ import {
 import { PlaySharpIcon } from './icons/play-sharp-icon';
 import { ReleasePlayDialog } from './release-play-dialog';
 import { ReleaseShareWidget } from './release-share-widget';
-
-import type { ZineAccent } from './ui/zine-panel';
+import { pickLoudZineAccent, type ZineAccent } from './ui/zine-panel';
 
 /**
  * What the caption under a cover names. `'artist-and-title'` (home): the
@@ -37,14 +36,75 @@ interface SpotlightCardProps {
   card: SpotlightCardData;
   /** The caption under the cover; `'artist-and-title'` (as on home) by default. */
   caption?: SpotlightCaption;
-  /** The page's accent, for the listening modal (see `ReleasePlayDialog`). */
-  accent?: ZineAccent;
+  /**
+   * The page's accent, for the listening modal (see `ReleasePlayDialog`), or
+   * `'random'` for a new loud accent on each open (home).
+   */
+  accent?: ZineAccent | 'random';
+  /**
+   * Link the modal's artist line to the artist's page, add the year to its
+   * title, and put a "View all releases" link under the player (home).
+   */
+  linkedHeading?: boolean;
 }
 
 interface SpotlightCardCaptionProps {
   card: SpotlightCardData;
   caption: SpotlightCaption;
 }
+
+/** The props a linked modal heading passes to `ReleasePlayDialog`. */
+interface LinkedHeadingProps {
+  artistHref?: string;
+  year?: number;
+  footer?: ReactElement;
+}
+
+/**
+ * What a linked modal heading adds: the artist's page, the year, and the link
+ * to all of the artist's releases (none of the links without an artist page).
+ * Nothing without `linkedHeading`.
+ */
+const linkedHeadingProps = (
+  { year, artistSlug }: SpotlightCardData,
+  linkedHeading: boolean | undefined
+): LinkedHeadingProps => {
+  if (!linkedHeading) return {};
+  return artistSlug
+    ? {
+        artistHref: `/artists/${artistSlug}`,
+        year,
+        // Set smaller on a phone: under the share row, the sheet's cover is
+        // already at the audio controls' 16rem floor on a 375×667 screen.
+        footer: (
+          <p className="text-center max-sm:text-xs">
+            <Link
+              href={artistReleasesHref(artistSlug)}
+              className="underline underline-offset-4 hover:no-underline"
+            >
+              View all releases
+            </Link>
+          </p>
+        ),
+      }
+    : { year };
+};
+
+/**
+ * The modal's accent: the given one, or with `'random'` a new loud accent
+ * drawn by `drawAccent` inside each opening click.
+ */
+const useOpenAccent = (
+  accent: ZineAccent | 'random' | undefined
+): { dialogAccent: ZineAccent | undefined; drawAccent: () => void } => {
+  const [drawn, setDrawn] = useState<ZineAccent | undefined>(undefined);
+  return {
+    dialogAccent: accent === 'random' ? drawn : accent,
+    drawAccent: () => {
+      if (accent === 'random') setDrawn(pickLoudZineAccent());
+    },
+  };
+};
 
 /**
  * The centered caption under a cover (see {@link SpotlightCard}): a semibold
@@ -89,11 +149,14 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
  * and a square zine play stamp shows on hover and keyboard focus. Touch
  * screens get no stamp; the page tells them to tap the cover instead. With
  * nothing playable the cover is disabled and the artist link still works.
+ * `accent` and `linkedHeading` shape the modal: the home grid draws a new
+ * loud accent per open and links its heading; `/releases` keeps cyan.
  */
 export const SpotlightCard = ({
   card,
   caption = 'artist-and-title',
   accent,
+  linkedHeading,
 }: SpotlightCardProps): ReactElement => {
   const { releaseId, title, artistName, artistSlug, coverArt, playSrc } = card;
   const {
@@ -107,6 +170,12 @@ export const SpotlightCard = ({
   const coverButtonRef = useRef<HTMLButtonElement>(null);
   const hydrated = useHydrated();
   const playable = playSrc !== null;
+  const { dialogAccent, drawAccent } = useOpenAccent(accent);
+
+  const handleCoverClick = (): void => {
+    drawAccent();
+    openPlayer();
+  };
 
   /** Closing the modal puts focus back on the cover that opened it. */
   const returnFocusToCover = (event: Event): void => {
@@ -125,7 +194,7 @@ export const SpotlightCard = ({
         data-hydrated={hydrated}
         aria-label={artistName ? `Play ${title} by ${artistName}` : `Play ${title}`}
         disabled={!playable}
-        onClick={openPlayer}
+        onClick={handleCoverClick}
         onPointerEnter={playable ? warmPlayer : undefined}
         onFocus={playable ? warmPlayer : undefined}
         className={cn(
@@ -180,7 +249,8 @@ export const SpotlightCard = ({
           headingOrder="artist-first"
           centered
           sheetOnPhone
-          accent={accent}
+          accent={dialogAccent}
+          {...linkedHeadingProps(card, linkedHeading)}
           initialTrackNumber={card.initialTrackNumber ?? undefined}
           shareWidget={
             <ReleaseShareWidget
