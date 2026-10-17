@@ -1,8 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { videoLiveAt, videoScheduledAt, videoWhere } from './video-where';
-import { isPresent, isUnset } from './where-kit';
+import { publicVideoWhere, videoLiveAt, videoScheduledAt, videoWhere } from './video-where';
+import { allOf, isPresent, isUnset } from './where-kit';
 
 describe('videoWhere', () => {
   it('draft and published are the null-safe pair over publishedAt', () => {
@@ -23,5 +23,15 @@ describe('videoWhere', () => {
   it('scheduled at now is a publishedAt still ahead of now', () => {
     const now = new Date('2026-10-01T12:00:00Z');
     expect(videoScheduledAt(now)).toEqual({ publishedAt: { gt: now } });
+  });
+
+  // The public listing's filter: `buildListWhere({ visibleAt })` in
+  // `video-repository.ts` produces this same `AND`.
+  it('public at now is not archived AND live at now', () => {
+    const now = new Date('2026-10-01T12:00:00Z');
+    expect(publicVideoWhere(now)).toEqual({
+      AND: [isUnset('archivedAt'), { publishedAt: { not: null, lte: now } }],
+    });
+    expect(publicVideoWhere(now)).toEqual(allOf(videoWhere.notArchived, videoLiveAt(now)));
   });
 });

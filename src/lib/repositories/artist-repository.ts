@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import type {
   Artist,
   ArtistDetail,
+  ArtistHomeSearchMatch,
   ArtistListFilters,
   ArtistListItem,
   ArtistListingFilters,
@@ -34,9 +35,10 @@ import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
-import { playableFormats } from './_internal/playable-formats';
+import { playableFormats, playableFormatWhere } from './_internal/playable-formats';
 import { renumberCredits } from './_internal/release-credits';
 import { releaseWhere } from './_internal/release-where';
+import { publicVideoWhere } from './_internal/video-where';
 import { isUnsetOr } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
@@ -256,6 +258,72 @@ const artistSearchSelect = {
 } as const satisfies Prisma.ArtistSelect;
 
 /**
+ * A listed release that can be played: it holds the playable format, not
+ * withdrawn, with at least one file. The home search lists only these, since
+ * a pick there starts playback at once.
+ */
+const playableListedReleaseWhere = {
+  ...releaseWhere.listed,
+  digitalFormats: { some: { ...playableFormatWhere, files: { some: {} } } },
+} as const satisfies Prisma.ReleaseWhereInput;
+
+/**
+ * Home-search select: the public-search name fields, slug and display-image
+ * candidates, the artist's playable listed releases with what a release row
+ * shows and the first file its play pick primes, and the artist's video
+ * credits on videos live at `now` with what a video row shows and the key its
+ * stream URL is signed from.
+ */
+const artistHomeSearchSelect = (now: Date) =>
+  ({
+    ...artistListingNameSelect,
+    slug: true,
+    bioImages: {
+      where: bioImageWhere.displayCandidate,
+      orderBy: { sortOrder: 'asc' },
+      select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
+    },
+    releases: {
+      where: { release: playableListedReleaseWhere },
+      select: {
+        release: {
+          select: {
+            id: true,
+            title: true,
+            coverArt: true,
+            releasedOn: true,
+            images: {
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+              select: { src: true, altText: true },
+            },
+            digitalFormats: playableFormats({
+              select: {
+                files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
+              },
+            } as const),
+          },
+        },
+      },
+    },
+    videoArtists: {
+      where: { video: { is: publicVideoWhere(now) } },
+      select: {
+        video: {
+          select: {
+            id: true,
+            title: true,
+            posterUrl: true,
+            releasedOn: true,
+            durationSeconds: true,
+            s3Key: true,
+          },
+        },
+      },
+    },
+  }) as const satisfies Prisma.ArtistSelect;
+
+/**
  * The media `Release` graph loaded behind every artist-detail release join,
  * with each credited artist read through {@link artistCreditSelect}: public
  * scalars (#765) without the bio, plus the fields `isPublicArtist` reads. The
@@ -321,9 +389,14 @@ type _ArtistSearchMatchDrift = AssertExact<
   ArtistSearchMatch,
   Prisma.ArtistGetPayload<{ select: typeof artistSearchSelect }>
 >;
+type _ArtistHomeSearchMatchDrift = AssertExact<
+  ArtistHomeSearchMatch,
+  Prisma.ArtistGetPayload<{ select: ReturnType<typeof artistHomeSearchSelect> }>
+>;
 const _artistDrift: _ArtistDrift = true;
 const _artistDetailDrift: _ArtistDetailDrift = true;
 const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
+const _artistHomeSearchMatchDrift: _ArtistHomeSearchMatchDrift = true;
 const _artistListingRecordDrift: _ArtistListingRecordDrift = true;
 const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
 
@@ -477,6 +550,61 @@ const buildListedWhere = (search: string | undefined): Prisma.ArtistWhereInput =
     ...(tokenSearch.length > 0 && { AND: tokenSearch }),
   };
 };
+
+/**
+ * Build the home search `where` (a **home search match**): a public artist
+ * with a direct credit on a playable listed release or a video credit on a
+ * video live at `now` — wider than the listed artists {@link buildListedWhere}
+ * finds — with an optional token search: every word must match one of the
+ * name fields, aka names, genres, the title of a listed release, or the title
+ * of a live video. A title match on a listed release that cannot be played
+ * still finds an artist that qualifies some other way.
+ *
+ * `publicArtistWhere` holds the only top-level `OR`, so the credit `OR` and
+ * each token's `OR` sit in `AND` members. The credit comes last: Prisma on
+ * MongoDB joins `releases` once per filter under one alias, and the last join
+ * replaces the earlier ones, so the filter that joins deepest (down to the
+ * format files) must be the last to read `releases`
+ * (docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md).
+ */
+const buildHomeSearchWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput => {
+  const liveVideo = publicVideoWhere(now);
+  const tokenSearch = search
+    ? buildTokenSearch(search, (token) => [
+        ...nameFieldClauses(token),
+        { akaNames: containsToken(token) },
+        { genres: containsToken(token) },
+        {
+          releases: { some: { release: { title: containsToken(token), ...releaseWhere.listed } } },
+        },
+        {
+          videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
+        },
+      ])
+    : [];
+  return {
+    ...publicArtistWhere,
+    AND: [
+      ...tokenSearch,
+      {
+        OR: [
+          { releases: { some: { release: playableListedReleaseWhere } } },
+          { videoArtists: { some: { video: { is: liveVideo } } } },
+        ],
+      },
+    ],
+  };
+};
+
+/** Epoch millis of a video's release date; an undated video sorts last. */
+const videoReleasedTime = ({ releasedOn }: { releasedOn: Date | null }): number =>
+  releasedOn?.getTime() ?? -Infinity;
+
+/** A home search match's videos: newest release date first, ties by title. */
+const compareVideoCredits = (
+  { video: a }: { video: { title: string; releasedOn: Date | null } },
+  { video: b }: { video: { title: string; releasedOn: Date | null } }
+): number => videoReleasedTime(b) - videoReleasedTime(a) || a.title.localeCompare(b.title);
 
 /**
  * A–Z order for the artists index and the playlist "By artist" search: by the
@@ -760,8 +888,9 @@ export class ArtistRepository {
 
   /**
    * Search listed artists — published, non-deleted, and holding a
-   * direct credit on a listed release (the playlist "By artist" search and the
-   * home-page typeahead), with the lightweight images/releases include that
+   * direct credit on a listed release (the playlist "By artist" search; the
+   * home page searches wider, {@link ArtistRepository.searchForHomeNav}), with
+   * the lightweight images/releases include that
    * search consumes. Matches are ordered by
    * displayed name and sliced here, for the same reason as the index's A–Z
    * order ({@link ArtistRepository.listListed}).
@@ -776,6 +905,33 @@ export class ArtistRepository {
       select: artistSearchSelect,
     });
     return [...matches].sort(compareByDisplayName).slice(skip, skip + take);
+  }
+
+  /**
+   * Search the home page's matches ({@link buildHomeSearchWhere}): public
+   * artists with a direct credit on a playable listed release or a video
+   * credit on a live video, each with all of its playable listed releases
+   * and all of its live videos (newest first). One `now` decides what is
+   * live for the whole read. Matches are ordered by displayed name and
+   * sliced here, as {@link ArtistRepository.searchPublished} does.
+   */
+  static async searchForHomeNav({
+    search,
+    skip = 0,
+    take = 50,
+  }: Pick<ArtistListFilters, 'search' | 'skip' | 'take'>): Promise<ArtistHomeSearchMatch[]> {
+    const now = new Date();
+    const matches = await prisma.artist.findMany({
+      where: buildHomeSearchWhere(search, now),
+      select: artistHomeSearchSelect(now),
+    });
+    return [...matches]
+      .sort(compareByDisplayName)
+      .slice(skip, skip + take)
+      .map((match) => ({
+        ...match,
+        videoArtists: [...match.videoArtists].sort(compareVideoCredits),
+      }));
   }
 
   /**

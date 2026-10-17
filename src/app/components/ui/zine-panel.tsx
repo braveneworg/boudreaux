@@ -52,6 +52,35 @@ const ACCENT_CLASS = new Map<ZineAccent, string>([
 export const getZineAccentClass = (accent: ZineAccent): string | undefined =>
   ACCENT_CLASS.get(accent);
 
+/**
+ * The accents loud enough to frame a play modal opened from the home page:
+ * every accent but yellow (the home page's own panel) and the paper tones,
+ * tan and kraft, which a modal on paper would vanish into.
+ */
+export const LOUD_ZINE_ACCENTS = [
+  'hot-pink',
+  'pink',
+  'cyan',
+  'orange',
+  'green',
+  'teal',
+  'mustard',
+  'denim',
+  'storm',
+  'orchid',
+] as const satisfies readonly ZineAccent[];
+
+/** One of {@link LOUD_ZINE_ACCENTS}. */
+export type LoudZineAccent = (typeof LOUD_ZINE_ACCENTS)[number];
+
+/**
+ * A loud accent drawn at random, a new one on each call.
+ *
+ * @param random - The source of `[0, 1)` values; injectable for tests.
+ */
+export const pickLoudZineAccent = (random: () => number = Math.random): LoudZineAccent =>
+  LOUD_ZINE_ACCENTS[Math.floor(random() * LOUD_ZINE_ACCENTS.length)];
+
 export interface ZinePanelProps extends React.ComponentProps<'section'> {
   accent: ZineAccent;
   tape?: boolean;

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
 
-import { videoLiveAt, videoScheduledAt, videoWhere } from './video-where';
+import { publicVideoWhere, videoLiveAt, videoScheduledAt, videoWhere } from './video-where';
 
 import type { Prisma } from '@prisma/client';
 
@@ -118,6 +118,12 @@ describe('videoWhere (Docker Mongo contract)', () => {
     );
     expect(await findTitles(videoWhere.archived)).toEqual(
       expectTitles((_, archived) => archived === 'set')
+    );
+  });
+
+  it('public at now matches only a live row that is not archived', async () => {
+    expect(await findTitles(publicVideoWhere(NOW))).toEqual(
+      expectTitles((published, archived) => published === 'past' && archived !== 'set')
     );
   });
 });

@@ -89,3 +89,11 @@ deleted, and directly credited, and the index is one list.)
   outside the alphabet).
   Revisit (with a stored column or a Mongo aggregation) if the listed roster
   grows past a few hundred artists.
+- 2026-10-16: the home page search widens past the listed roster (#890). It
+  finds a **home search match** (`CONTEXT.md`): a public artist with a direct
+  credit on a published release that has a playable format with a file, or a
+  **video credit** on a live video, so an artist with only video credits is
+  found there and lists its videos. The artists index, its search and the
+  playlist "By artist" search keep this decision's rule unchanged
+  (`listListed`, `searchPublished`). No new ADR: the wider rule is one
+  repository read (`searchForHomeNav`) and easy to reverse.

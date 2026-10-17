@@ -144,7 +144,7 @@ test.describe('home spotlight grid', () => {
   test('opens the modal artist first, with the tracks row under the player', async ({ page }) => {
     const dialog = await openSpotlight(page);
 
-    await expect(dialog).toHaveAccessibleDescription('E2E Album One');
+    await expect(dialog).toHaveAccessibleDescription('E2E Album One (2024)');
 
     const viewTracks = dialog.getByRole('button', { name: 'View', exact: true });
     await expect(viewTracks).toBeVisible();
@@ -159,6 +159,20 @@ test.describe('home spotlight grid', () => {
     expect(viewBox).not.toBeNull();
     expect(viewBox?.y ?? 0).toBeGreaterThanOrEqual(
       (controlsBox?.y ?? Number.POSITIVE_INFINITY) + (controlsBox?.height ?? 0)
+    );
+  });
+
+  // The home modal's byline links to the artist, and its footer to all of
+  // the artist's releases (#890).
+  test('links the modal byline and its footer to the artist', async ({ page }) => {
+    const dialog = await openSpotlight(page);
+
+    await expect(
+      dialog.getByRole('link', { name: 'E2E Featured Artist', exact: true })
+    ).toHaveAttribute('href', '/artists/e2e-artist');
+    await expect(dialog.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
+      'href',
+      '/releases?artist=e2e-artist'
     );
   });
 
@@ -194,7 +208,7 @@ test.describe('home spotlight grid', () => {
 
       const cover = await hydratedCover(page);
       const grid = page.getByRole('list').filter({ has: cover });
-      const search = page.getByRole('button', { name: 'Search artists and releases' });
+      const search = page.getByRole('button', { name: 'Search artists, releases and videos' });
       const heading = page.getByRole('img', { name: 'featured artists' });
       const [coverBox, gridBox, searchBox, headingBox] = await edgesOfAll([
         cover,
@@ -261,7 +275,7 @@ test.describe('home spotlight grid on a touch screen', () => {
   test('runs the search and the cover edge to edge with the tap hint', async ({ page }) => {
     await page.goto('/');
     const cover = await hydratedCover(page);
-    const search = page.getByRole('button', { name: 'Search artists and releases' });
+    const search = page.getByRole('button', { name: 'Search artists, releases and videos' });
     const hint = page.getByText('any release art to play or download the music');
 
     const [coverBox, searchBox, hintBox] = await Promise.all([
@@ -305,15 +319,16 @@ test.describe('home spotlight grid on a 375×667 phone', () => {
     );
     expect(overflow).toBeLessThanOrEqual(0);
 
-    // Heading, cover, controls, tracks row and share row all on screen.
+    // Heading, cover, controls, tracks row, share row and footer all on screen.
     const parts = [
       dialog.getByRole('heading', { name: 'E2E Featured Artist' }),
-      dialog.getByText('E2E Album One', { exact: true }),
+      dialog.getByText('E2E Album One (2024)', { exact: true }),
       dialog.getByRole('img', { name: 'E2E Album One cover art' }),
       dialog.locator('.video-js'),
       dialog.getByRole('button', { name: 'View', exact: true }),
       dialog.getByRole('button', { name: 'Download', exact: true }),
       dialog.locator('[data-slot="release-play-dialog-share"]'),
+      dialog.getByRole('link', { name: 'View all releases' }),
     ];
     for (const part of parts) {
       const box = await part.boundingBox();
@@ -353,6 +368,7 @@ test.describe('home spotlight modal with long titles', () => {
         dialog.getByRole('button', { name: 'View', exact: true }),
         dialog.getByRole('button', { name: 'Download', exact: true }),
         dialog.locator('[data-slot="release-play-dialog-share"]'),
+        dialog.getByRole('link', { name: 'View all releases' }),
       ]);
       for (const box of partBoxes) {
         expect(box.left).toBeGreaterThanOrEqual(Math.max(dialogBox.left, 0));

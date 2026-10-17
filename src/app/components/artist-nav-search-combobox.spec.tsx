@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { createElement } from 'react';
+import { createElement, type Ref } from 'react';
 
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
@@ -19,6 +19,33 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+// Sentinel play dialog: records the picks the combobox hands it and the
+// element focus returns to, without Radix, the release query or video.js.
+const playDialog = vi.hoisted(() => ({
+  openRelease: vi.fn(),
+  openVideo: vi.fn(),
+  returnFocusRef: undefined as { current: HTMLElement | null } | undefined,
+}));
+vi.mock('./home-search-play-dialog', async () => {
+  const { useImperativeHandle } = await import('react');
+  return {
+    HomeSearchPlayDialog: ({
+      ref,
+      returnFocusRef,
+    }: {
+      ref: Ref<unknown>;
+      returnFocusRef: { current: HTMLElement | null };
+    }) => {
+      playDialog.returnFocusRef = returnFocusRef;
+      useImperativeHandle(ref, () => ({
+        openRelease: playDialog.openRelease,
+        openVideo: playDialog.openVideo,
+      }));
+      return null;
+    },
+  };
+});
+
 vi.mock('next/image', () => ({
   __esModule: true,
   default: ({ src, alt }: { src: string; alt: string }) => createElement('img', { src, alt }),
@@ -28,7 +55,25 @@ const ceschi = {
   artistSlug: 'ceschi',
   artistName: 'Ceschi',
   thumbnailSrc: null,
-  releases: [{ id: 'r-1', title: 'Broken Bone Ballads', coverArtSrc: null }],
+  releases: [
+    {
+      id: 'r-1',
+      title: 'Broken Bone Ballads',
+      coverArtSrc: null,
+      playSrc: 'https://cdn.example.com/r-1/01.mp3',
+      year: 2024,
+    },
+  ],
+  videos: [
+    {
+      id: 'v-1',
+      title: 'Live at the Basement',
+      posterSrc: null,
+      streamUrl: 'https://cdn.example.com/v-1.mp4?signed',
+      year: 2025,
+      durationSeconds: 125,
+    },
+  ],
 };
 
 const stubSearchReturning = (results: (typeof ceschi)[]) =>
@@ -52,12 +97,12 @@ const settleDebounce = (): void => {
 };
 
 const findTrigger = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Search artists and releases' });
+  screen.getByRole('button', { name: 'Search artists, releases and videos' });
 
 /** Opens the popover and waits for the lazy-loaded panel's search field. */
 const openSearch = async (user: UserEvent): Promise<HTMLElement> => {
   await user.click(findTrigger());
-  return screen.findByPlaceholderText('Search artists & releases');
+  return screen.findByPlaceholderText('Search artists, releases & videos');
 };
 
 describe('ArtistNavSearchCombobox', () => {
@@ -69,13 +114,15 @@ describe('ArtistNavSearchCombobox', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     mockPush.mockReset();
+    playDialog.openRelease.mockReset();
+    playDialog.openVideo.mockReset();
   });
 
   it('renders a closed trigger showing the placeholder', () => {
     stubSearchReturning([]);
     renderCombobox();
 
-    expect(findTrigger()).toHaveTextContent('Search artists & releases');
+    expect(findTrigger()).toHaveTextContent('Search artists, releases & videos');
     expect(findTrigger()).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -103,7 +150,9 @@ describe('ArtistNavSearchCombobox', () => {
     stubSearchReturning([]);
     renderCombobox();
 
-    expect(screen.queryByPlaceholderText('Search artists & releases')).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText('Search artists, releases & videos')
+    ).not.toBeInTheDocument();
   });
 
   it('opens on click to the three-character hint', async () => {
@@ -167,7 +216,9 @@ describe('ArtistNavSearchCombobox', () => {
     await user.type(await openSearch(user), 'ces');
     settleDebounce();
 
-    expect(await screen.findByRole('option', { name: 'Ceschi 1 release' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('option', { name: 'Ceschi 1 release · 1 video' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Broken Bone Ballads' })).toBeInTheDocument();
   });
 
@@ -179,7 +230,7 @@ describe('ArtistNavSearchCombobox', () => {
     await user.type(await openSearch(user), 'zzz');
     settleDebounce();
 
-    expect(await screen.findByText('No artists or releases found.')).toBeInTheDocument();
+    expect(await screen.findByText('No artists, releases or videos found.')).toBeInTheDocument();
   });
 
   it('shows the error state when the search fails', async () => {
@@ -200,12 +251,12 @@ describe('ArtistNavSearchCombobox', () => {
 
     await user.type(await openSearch(user), 'ces');
     settleDebounce();
-    await user.click(await screen.findByRole('option', { name: 'Ceschi 1 release' }));
+    await user.click(await screen.findByRole('option', { name: 'Ceschi 1 release · 1 video' }));
 
     expect(mockPush).toHaveBeenCalledWith('/artists/ceschi');
   });
 
-  it('goes to the release page when a release is picked', async () => {
+  it('plays a picked release in place, bylined by its search group’s artist', async () => {
     stubSearchReturning([ceschi]);
     const user = setup();
     renderCombobox();
@@ -214,8 +265,45 @@ describe('ArtistNavSearchCombobox', () => {
     settleDebounce();
     await user.click(await screen.findByRole('option', { name: 'Broken Bone Ballads' }));
 
-    // A release pick goes to the release page; the artist page no longer takes `?release=`.
-    expect(mockPush).toHaveBeenCalledWith('/releases/r-1');
+    expect(playDialog.openRelease.mock.calls).toEqual([
+      [{ artistName: 'Ceschi', artistSlug: 'ceschi' }, ceschi.releases[0]],
+    ]);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('plays a picked video in place, bylined by its search group’s artist', async () => {
+    stubSearchReturning([ceschi]);
+    const user = setup();
+    renderCombobox();
+
+    await user.type(await openSearch(user), 'ces');
+    settleDebounce();
+    await user.click(await screen.findByRole('option', { name: 'Live at the Basement' }));
+
+    expect(playDialog.openVideo.mock.calls).toEqual([
+      [{ artistName: 'Ceschi', artistSlug: 'ceschi' }, ceschi.videos[0]],
+    ]);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('closes and clears the query before a release or video plays', async () => {
+    stubSearchReturning([ceschi]);
+    const user = setup();
+    renderCombobox();
+
+    await user.type(await openSearch(user), 'ces');
+    settleDebounce();
+    await user.click(await screen.findByRole('option', { name: 'Live at the Basement' }));
+
+    expect(findTrigger()).toHaveAttribute('aria-expanded', 'false');
+    expect(findTrigger()).toHaveTextContent('Search artists, releases & videos');
+  });
+
+  it('hands the play dialog the trigger to return focus to', () => {
+    stubSearchReturning([]);
+    renderCombobox();
+
+    expect(playDialog.returnFocusRef?.current).toBe(findTrigger());
   });
 
   it('closes and clears the query after a pick', async () => {
@@ -225,9 +313,9 @@ describe('ArtistNavSearchCombobox', () => {
 
     await user.type(await openSearch(user), 'ces');
     settleDebounce();
-    await user.click(await screen.findByRole('option', { name: 'Ceschi 1 release' }));
+    await user.click(await screen.findByRole('option', { name: 'Ceschi 1 release · 1 video' }));
 
     expect(findTrigger()).toHaveAttribute('aria-expanded', 'false');
-    expect(findTrigger()).toHaveTextContent('Search artists & releases');
+    expect(findTrigger()).toHaveTextContent('Search artists, releases & videos');
   });
 });

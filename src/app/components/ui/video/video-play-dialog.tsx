@@ -3,24 +3,25 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useRef, useState, type ReactElement, type ReactNode } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/app/components/ui/dialog';
+import { Dialog, DialogContent } from '@/app/components/ui/dialog';
+import { PlayDialogHeading } from '@/app/components/ui/play-dialog-heading';
+import { getZineAccentClass, type ZineAccent } from '@/app/components/ui/zine-panel';
+import { cn } from '@/lib/utils';
 
 import { LazyVideoSurface } from './lazy-video-surface';
 
 export interface VideoPlayDialogProps {
   title: string;
   artist: string;
-  src: string;
+  /**
+   * The stream URL, or `null` when the video has none (videos fail closed
+   * without a signed URL): the dialog then says it cannot be played.
+   */
+  src: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /**
@@ -30,7 +31,92 @@ export interface VideoPlayDialogProps {
    * per-element autoplay policies.
    */
   takeMediaEl: () => HTMLVideoElement | null;
+  /**
+   * Which line names the dialog. `'title-first'` (the default) titles it with
+   * the video and describes it with the artist; `'artist-first'` swaps them.
+   */
+  headingOrder?: 'title-first' | 'artist-first';
+  /** Center both heading lines. */
+  centered?: boolean;
+  /** The artist's page: the artist line links there when given. */
+  artistHref?: string;
+  /** The video's year, shown after the title as `Title (Year)` when given. */
+  year?: number;
+  /** The frame's accent; the dialog portals out of the page's `ZinePanel`. */
+  accent?: ZineAccent;
+  /** Rendered under the player, e.g. a "View all videos" link. */
+  footer?: ReactNode;
+  /** Rendered at the heading's right, e.g. the add-to-playlist kebab. */
+  action?: ReactNode;
+  /** Radix's close hook: the opener decides where focus returns. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
+
+interface VideoPlayDialogContentProps extends Omit<
+  VideoPlayDialogProps,
+  'src' | 'open' | 'onOpenChange' | 'takeMediaEl'
+> {
+  hasSource: boolean;
+  /** Ref callback of the player slot the surface's host moves into. */
+  attachToDialog: (slot: HTMLDivElement | null) => (() => void) | undefined;
+}
+
+/**
+ * The shown dialog: the heading, the slot the player moves into (or, without
+ * a source, the reason nothing plays), and the footer.
+ */
+const VideoPlayDialogContent = ({
+  title,
+  artist,
+  hasSource,
+  attachToDialog,
+  headingOrder = 'title-first',
+  centered = false,
+  artistHref,
+  year,
+  accent,
+  footer,
+  action,
+  onCloseAutoFocus,
+}: VideoPlayDialogContentProps): ReactElement => (
+  <DialogContent
+    className={cn('gap-3 p-4 sm:max-w-3xl lg:max-w-5xl', accent && getZineAccentClass(accent))}
+    onCloseAutoFocus={onCloseAutoFocus}
+  >
+    <PlayDialogHeading
+      title={title}
+      artistName={artist}
+      artistHref={artistHref}
+      year={year}
+      headingOrder={headingOrder}
+      centered={centered}
+      compactOnPhone={false}
+      action={action}
+    />
+    {hasSource ? (
+      // With an accent, the player is framed like the release player: a black
+      // border on the accent's offset shadow.
+      <div
+        ref={attachToDialog}
+        className={accent ? 'shadow-zine border-2 border-black' : undefined}
+      />
+    ) : (
+      <div
+        role="alert"
+        className="bg-muted text-muted-foreground flex aspect-video w-full items-center justify-center border-2 border-black p-4 text-center text-sm"
+      >
+        This video can’t be played right now.
+      </div>
+    )}
+    {footer ? (
+      // min-w-0: a grid child's intrinsic width would otherwise widen the
+      // dialog (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
+      <div data-slot="video-play-dialog-footer" className="min-w-0 text-sm">
+        {footer}
+      </div>
+    ) : null}
+  </DialogContent>
+);
 
 /**
  * Enlarged modal player for the `/videos` listing. Opened by a poster click,
@@ -56,6 +142,10 @@ export interface VideoPlayDialogProps {
  * Closing the shown dialog (Close button, Esc, an overlay click) unmounts the
  * surface once the dialog has animated out, which disposes the player and
  * stops playback. Closing it while hidden unmounts the surface at once.
+ *
+ * The home search opens it with the artist leading (linked), the year, an
+ * accent, a footer link and the add-to-playlist kebab; without those props it
+ * is the `/videos` modal as it always was.
  */
 export const VideoPlayDialog = ({
   title,
@@ -64,6 +154,7 @@ export const VideoPlayDialog = ({
   open,
   onOpenChange,
   takeMediaEl,
+  ...contentProps
 }: VideoPlayDialogProps): ReactElement => {
   const [surfaceHost] = useState(() =>
     typeof document === 'undefined' ? null : document.createElement('div')
@@ -80,7 +171,9 @@ export const VideoPlayDialog = ({
 
   const isPictureInPicture = pictureInPictureSrc !== null;
   // Kept while the closing dialog animates out, so the video leaves with it.
-  const isSurfaceMounted = open || isHostInDialog;
+  // Nothing to play without a source.
+  const mountedSrc = open || isHostInDialog ? src : null;
+  const isSurfaceMounted = mountedSrc !== null;
 
   // The host joins the document in the same commit as the surface, so the
   // surface never builds its player inside a detached node.
@@ -112,13 +205,13 @@ export const VideoPlayDialog = ({
   return (
     <>
       {isSurfaceMounted ? <div ref={attachParking} hidden /> : null}
-      {isSurfaceMounted && surfaceHost
+      {mountedSrc !== null && surfaceHost
         ? createPortal(
             <LazyVideoSurface
               title={title}
-              src={src}
+              src={mountedSrc}
               takeMediaEl={takeMediaEl}
-              onEnterPictureInPicture={() => setPictureInPictureSrc(src)}
+              onEnterPictureInPicture={() => setPictureInPictureSrc(mountedSrc)}
               onLeavePictureInPicture={(isPaused) => {
                 if (isPaused) {
                   onOpenChange(false);
@@ -131,15 +224,13 @@ export const VideoPlayDialog = ({
           )
         : null}
       <Dialog open={open && !isPictureInPicture} onOpenChange={onOpenChange}>
-        <DialogContent className="gap-3 p-4 sm:max-w-3xl lg:max-w-5xl">
-          <DialogHeader className="pr-8">
-            <DialogTitle className="font-fake-four-cutout text-xl font-normal break-words text-zinc-950 sm:text-2xl">
-              {title}
-            </DialogTitle>
-            <DialogDescription className="text-zinc-600">{artist}</DialogDescription>
-          </DialogHeader>
-          <div ref={attachToDialog} />
-        </DialogContent>
+        <VideoPlayDialogContent
+          {...contentProps}
+          title={title}
+          artist={artist}
+          hasSource={src !== null}
+          attachToDialog={attachToDialog}
+        />
       </Dialog>
     </>
   );

@@ -94,11 +94,12 @@ export class VideoService {
 
   /**
    * Get a page of published, non-archived videos for the public `/videos`
-   * listing. Pagination plus an optional title/artist search — no
+   * listing. Pagination plus an optional title/artist search and an optional
+   * artist slug (the videos credited to that public artist) — no
    * publish/archived filtering.
    */
   static async getPublishedVideos(
-    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search'>
+    filters: Pick<VideoListFilters, 'sort' | 'skip' | 'take' | 'search' | 'artist'>
   ): Promise<ServiceResponse<Video[]>> {
     try {
       const videos = await VideoRepository.findPublished(filters);

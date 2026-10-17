@@ -46,6 +46,32 @@ test.describe('Videos page — public access', () => {
   });
 });
 
+// #890: `/videos?artist=<slug>` holds only the videos that artist holds a
+// video credit on. The seed credits E2E Video Alpha, and no other live video,
+// to E2E Artist (`e2e-artist`).
+test.describe('Videos page — filtered by artist', () => {
+  test('lists only the credited video under the artist’s name', async ({ page }) => {
+    await page.goto('/videos?artist=e2e-artist');
+
+    await expect(page.getByRole('heading', { level: 2, name: 'Videos by E2E Artist' })).toBeVisible(
+      { timeout: 15_000 }
+    );
+    await expect(cardTitles(page)).toHaveText(['Videos by E2E Artist', 'E2E Video Alpha']);
+    await expect(page.getByRole('link', { name: 'View videos by all artists' })).toHaveAttribute(
+      'href',
+      '/videos'
+    );
+  });
+
+  test('shows the not-found page for an unknown artist', async ({ page }) => {
+    await page.goto('/videos?artist=no-such-artist');
+
+    // The dev server streams the shell before `notFound()` settles the status,
+    // so the page's own copy is the reliable signal, not the response code.
+    await expect(page.getByText(/torn off the wall/i)).toBeVisible({ timeout: 15_000 });
+  });
+});
+
 test.describe('Videos page — signed-in listing', () => {
   test('page 1 shows the 5 newest published videos, not the draft or archived', async ({
     userPage,

@@ -19,6 +19,7 @@ import type {
   ArtistBioImageRecord,
   ArtistBioLinkRecord,
   ArtistDetail,
+  ArtistHomeSearchMatch,
   ArtistListFilters,
   ArtistListItem,
   ArtistListingFilters,
@@ -731,9 +732,26 @@ export class ArtistService {
   }
 
   /**
+   * Search the home page's matches: public artists with a direct credit on a
+   * playable listed release or a video credit on a live video, each with its
+   * playable releases and live videos. The repository owns the Mongo-safe
+   * `where`.
+   */
+  static async searchForHomeNav(
+    params?: Pick<ArtistListFilters, 'search' | 'skip' | 'take'>
+  ): Promise<ServiceResponse<ArtistHomeSearchMatch[]>> {
+    try {
+      const artists = await ArtistRepository.searchForHomeNav(params ?? {});
+      return { success: true, data: artists };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to search artists' });
+    }
+  }
+
+  /**
    * Search current listed artists: published, non-deleted, and holding a
-   * direct credit on a published release (the playlist "By artist" search and
-   * the home-page typeahead). The repository owns the Mongo-safe `where`.
+   * direct credit on a published release (the playlist "By artist" search).
+   * The repository owns the Mongo-safe `where`.
    */
   static async searchPublishedArtists(
     params?: ArtistListFilters
