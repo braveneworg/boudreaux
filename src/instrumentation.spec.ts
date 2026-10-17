@@ -11,14 +11,14 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 const request = {
-  path: '/releases/abc',
+  path: '/artists/abc',
   method: 'GET',
   headers: { cookie: 'secret-session' },
 };
 
 const context = {
   routerKind: 'App Router',
-  routePath: '/releases/[id]',
+  routePath: '/artists/[slug]',
   routeType: 'render',
   renderSource: 'react-server-components',
   revalidateReason: undefined,
@@ -48,9 +48,9 @@ describe('onRequestError', () => {
       error,
       expect.objectContaining({
         digest: 'digest-9',
-        path: '/releases/abc',
+        path: '/artists/abc',
         method: 'GET',
-        routePath: '/releases/[id]',
+        routePath: '/artists/[slug]',
         routeType: 'render',
         routerKind: 'App Router',
         renderSource: 'react-server-components',

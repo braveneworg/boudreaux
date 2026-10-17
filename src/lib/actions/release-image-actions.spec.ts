@@ -266,7 +266,7 @@ describe('release-image-actions', () => {
 
       await deleteReleaseImageAction('image-123');
 
-      expect(revalidatePath).toHaveBeenCalledWith('/releases/[slug]', 'page');
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
       expect(revalidatePath).toHaveBeenCalledWith('/admin/releases');
     });
 
@@ -444,7 +444,7 @@ describe('release-image-actions', () => {
 
       await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
-      expect(revalidatePath).toHaveBeenCalledWith('/releases/[slug]', 'page');
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
     });
 
     it('should return error on database failure', async () => {
@@ -544,7 +544,7 @@ describe('release-image-actions', () => {
 
       await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
 
-      expect(revalidatePath).toHaveBeenCalledWith('/releases/[slug]', 'page');
+      expect(revalidatePath).toHaveBeenCalledWith('/releases');
       expect(revalidatePath).toHaveBeenCalledWith('/admin/releases');
     });
 

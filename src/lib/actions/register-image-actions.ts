@@ -80,8 +80,8 @@ export const registerReleaseImagesAction = async (
       },
     });
 
-    // Revalidate release page
-    revalidatePath(`/releases/[slug]`, 'page');
+    // Revalidate the releases listing, whose covers show the images
+    revalidatePath('/releases');
     revalidatePath('/admin/releases');
 
     return { success: true, data: results };

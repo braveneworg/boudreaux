@@ -93,7 +93,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
     });
 
     // Revalidate paths
-    revalidatePath(`/releases/[slug]`, 'page');
+    revalidatePath('/releases');
     revalidatePath('/admin/releases');
 
     return { success: true };
@@ -137,7 +137,7 @@ export const updateReleaseImageAction = async (
 
     await ImageRepository.updateMetadata(imageId, data);
 
-    revalidatePath(`/releases/[slug]`, 'page');
+    revalidatePath('/releases');
     return { success: true };
   } catch (error) {
     logger.error('Update release image action error', error);
@@ -183,7 +183,7 @@ export const reorderReleaseImagesAction = async (
     });
 
     // Revalidate paths
-    revalidatePath(`/releases/[slug]`, 'page');
+    revalidatePath('/releases');
     revalidatePath('/admin/releases');
 
     return {

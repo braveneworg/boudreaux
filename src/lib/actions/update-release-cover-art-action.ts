@@ -45,7 +45,7 @@ export const updateReleaseCoverArtAction = async (
   }
 
   revalidatePath('/');
-  revalidatePath(`/releases/${releaseId}`);
+  revalidatePath('/releases');
 
   return { success: true };
 };

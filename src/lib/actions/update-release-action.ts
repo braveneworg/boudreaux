@@ -181,7 +181,6 @@ const applyWriteResult = (
   if (response.success) {
     ReleaseService.invalidateCache();
     revalidatePath('/releases');
-    revalidatePath(`/releases/${releaseId}`);
     revalidatePath('/artists/[slug]', 'page');
   }
 };

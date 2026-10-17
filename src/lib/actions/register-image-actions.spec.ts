@@ -72,7 +72,7 @@ describe('registerReleaseImagesAction', () => {
 
     const result = await registerReleaseImagesAction('r1', images);
     expect(result).toEqual({ success: true, data: results });
-    expect(revalidatePathMock).toHaveBeenCalledWith('/releases/[slug]', 'page');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/releases');
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin/releases');
   });
 
