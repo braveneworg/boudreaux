@@ -32,6 +32,7 @@ import { useVideoQuery } from './_hooks/use-video-query';
 import { VideoEnrichmentErrorBoundary } from './videos/enrichment/video-enrichment-error-boundary';
 import { VideoEnrichmentPanel } from './videos/enrichment/video-enrichment-panel';
 import { VideoTechnicalMetadataCard } from './videos/enrichment/video-technical-metadata-card';
+import { useNextPosterFrames } from './videos/use-next-poster-frames';
 import { useVideoArtistReview } from './videos/use-video-artist-review';
 import { useVideoAutoFill } from './videos/use-video-auto-fill';
 import { useVideoDraft } from './videos/use-video-draft';
@@ -49,7 +50,11 @@ import {
   shapePublish,
 } from './videos/video-form-helpers';
 import { VideoMetadataSection } from './videos/video-metadata-section';
-import { posterCandidateToFile, VideoPosterSection } from './videos/video-poster-section';
+import {
+  type NextFramesControl,
+  posterCandidateToFile,
+  VideoPosterSection,
+} from './videos/video-poster-section';
 import { VideoProducersSection } from './videos/video-producers-section';
 import { VideoPublishSection } from './videos/video-publish-section';
 
@@ -249,9 +254,65 @@ const handleVideoUnpublish = async ({
 const getVideoPublishedAt = (video: VideoRow | null | undefined): Date | null | undefined =>
   video ? video.publishedAt : undefined;
 
+/**
+ * The form's duration field as seconds — it arrives as a string from the
+ * prefill or a number from the loaded row — or null when unset or unusable.
+ */
+const toDurationSeconds = (value: string | number | undefined): number | null => {
+  if (value === undefined || value === '') return null;
+  const seconds = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+};
+
 /** Save is blocked while the video is being prepared or uploaded, or the poster PUT is in flight. */
 const isSaveBlocked = (uploadStatus: string, isPosterUploading: boolean): boolean =>
   uploadStatus === 'preparing' || uploadStatus === 'uploading' || isPosterUploading;
+
+interface UseNextFramesControlArgs {
+  form: UseFormReturn<VideoFormData>;
+  upload: ReturnType<typeof useVideoUpload>;
+  video: VideoRow | null | undefined;
+  posterStrip: ReturnType<typeof useVideoPosterStrip>;
+  preGeneratedId: string;
+  effectiveVideoId: string | undefined;
+  isPersisted: boolean;
+}
+
+/**
+ * "Next 5 frames": decode later sample windows from the file in hand (a
+ * create session) or the row's signed stream URL (an edit visit), persist
+ * them, and grow the strip. Disabled until the row exists and the upload is
+ * done, so there is exactly one persist path for appended frames. Extracted
+ * to keep `VideoForm` under the ESLint complexity cap.
+ */
+const useNextFramesControl = ({
+  form,
+  upload,
+  video,
+  posterStrip,
+  preGeneratedId,
+  effectiveVideoId,
+  isPersisted,
+}: UseNextFramesControlArgs): NextFramesControl | null => {
+  const durationValue = useWatch({ control: form.control, name: 'durationSeconds' });
+  const s3Key = useWatch({ control: form.control, name: 's3Key' });
+  const { requestNextFrames, isCapturing, blocker } = useNextPosterFrames({
+    source: upload.selectedFile ?? video?.streamUrl ?? null,
+    durationSeconds: toDurationSeconds(durationValue) ?? video?.durationSeconds ?? null,
+    latestAtSeconds: posterStrip.latestAtSeconds,
+    candidateCount: posterStrip.stripCandidates.length,
+    preGeneratedId,
+    effectiveVideoId,
+    isPersisted,
+    isUploadBusy: upload.status === 'preparing' || upload.status === 'uploading',
+    onAppended: posterStrip.appendCandidates,
+  });
+  const onRequest = useCallback((): void => {
+    void requestNextFrames();
+  }, [requestNextFrames]);
+  // No uploaded video, no later frames to read: the section renders no button.
+  return s3Key ? { onRequest, isCapturing, blocker } : null;
+};
 
 interface PersistedRow {
   /** True once a row exists (edit mode, or a draft was created at upload). */
@@ -379,6 +440,16 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
     form,
     onPosterCandidates: posterStrip.handlePosterCandidates,
     onUploadComplete: handleUploadComplete,
+  });
+
+  const nextFrames = useNextFramesControl({
+    form,
+    upload,
+    video,
+    posterStrip,
+    preGeneratedId,
+    effectiveVideoId,
+    isPersisted,
   });
 
   useServerProbePrefill({ s3Key, preGeneratedId, uploadStatus: upload.status, form });
@@ -566,6 +637,7 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
               isUploading={poster.isUploading}
               errorMessage={poster.errorMessage}
               uploadPoster={poster.uploadPoster}
+              nextFrames={nextFrames}
             />
             <VideoPublishSection control={control} onSelectDate={handleSelectDate} />
 

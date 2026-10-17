@@ -8,13 +8,26 @@ import { useEffect, useId, useState } from 'react';
 import Image from 'next/image';
 
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, RefreshCw } from 'lucide-react';
 import { useWatch } from 'react-hook-form';
 
+import { Button } from '@/app/components/ui/button';
+import { VIDEO_POSTER_CANDIDATE_CAP } from '@/lib/constants/video-uploads';
+import { cn } from '@/lib/utils';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
+import { POSTER_CANDIDATE_COUNT } from './video-metadata';
+
+import type { NextFramesBlocker } from './use-next-poster-frames';
 import type { StripCandidate } from './use-video-poster-strip';
 import type { Control } from 'react-hook-form';
+
+/** What the "Next 5 frames" button needs from `useNextPosterFrames`. */
+export interface NextFramesControl {
+  onRequest: () => void;
+  isCapturing: boolean;
+  blocker: NextFramesBlocker | null;
+}
 
 interface VideoPosterSectionProps {
   control: Control<VideoFormData>;
@@ -35,7 +48,82 @@ interface VideoPosterSectionProps {
   errorMessage: string | null;
   /** Presign-and-PUT a poster image, writing `posterUrl` on success. */
   uploadPoster: (file: File) => Promise<void>;
+  /**
+   * The "Next 5 frames" control, or null when there is no uploaded video to
+   * read later frames from (a new video before its file is picked).
+   */
+  nextFrames: NextFramesControl | null;
 }
+
+/** The visible label — the count is the sample window's, never hand-written. */
+const NEXT_FRAMES_LABEL = `Next ${POSTER_CANDIDATE_COUNT} frames`;
+
+/** Why the button is disabled, when that is worth a line; the upload bar already says "uploading". */
+const nextFramesHint = (blocker: NextFramesBlocker | null): string | null => {
+  switch (blocker) {
+    case 'cap':
+      return `Frame limit reached (${VIDEO_POSTER_CANDIDATE_CAP}).`;
+    case 'end':
+      return 'No later frames in this video.';
+    case 'no-source':
+      return 'The video stream is not available here.';
+    default:
+      return null;
+  }
+};
+
+interface PosterDisplayArgs {
+  uploadedPosterUrl: string | null;
+  selectedCandidateUrl: string | undefined;
+  existingPosterUrl: string | undefined;
+  candidates: StripCandidate[];
+}
+
+/**
+ * What the section shows: the preview by display priority (this session's
+ * manual upload, then the highlighted thumb, then the stored poster), and
+ * whether the strip renders — two or more frames, unless a manual upload
+ * this session has replaced a fresh capture (a stored strip stays, so the
+ * manual poster can be swapped back).
+ */
+const resolvePosterDisplay = ({
+  uploadedPosterUrl,
+  selectedCandidateUrl,
+  existingPosterUrl,
+  candidates,
+}: PosterDisplayArgs): { previewSrc: string | null; showStrip: boolean } => {
+  const previewSrc = uploadedPosterUrl ?? selectedCandidateUrl ?? existingPosterUrl ?? null;
+  const hasFreshCapture = candidates.some((candidate) => 'blob' in candidate);
+  const showStrip = candidates.length > 1 && (!hasFreshCapture || uploadedPosterUrl === null);
+  return { previewSrc: previewSrc || null, showStrip };
+};
+
+/**
+ * The round-arrow "Next 5 frames" button. Each press captures the next sample
+ * window of the uploaded video and appends its frames to the strip, so the
+ * admin can pick a shot from later in the video. Disabled while a capture is
+ * in flight or while `blocker` names a reason, with a hint beside it for the
+ * reasons the page does not already show.
+ */
+const NextFramesButton = ({ onRequest, isCapturing, blocker }: NextFramesControl) => {
+  const hint = nextFramesHint(blocker);
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onRequest()}
+        disabled={isCapturing || blocker !== null}
+        aria-busy={isCapturing}
+      >
+        <RefreshCw className={cn(isCapturing && 'animate-spin')} aria-hidden />
+        {NEXT_FRAMES_LABEL}
+      </Button>
+      {hint ? <p className="text-muted-foreground text-sm">{hint}</p> : null}
+    </div>
+  );
+};
 
 /** Wrap a captured candidate frame as the `poster.jpg` JPEG File the upload expects. */
 export const posterCandidateToFile = (candidate: Blob): File =>
@@ -125,6 +213,7 @@ export const VideoPosterSection = ({
   isUploading,
   errorMessage,
   uploadPoster,
+  nextFrames,
 }: VideoPosterSectionProps): React.ReactElement => {
   const inputId = useId();
   const existingPosterUrl = useWatch({ control, name: 'posterUrl' });
@@ -152,11 +241,12 @@ export const VideoPosterSection = ({
 
   // `.at(-1)` would wrap to the last thumb — a `-1` index means "none".
   const selectedCandidateUrl = selectedIndex >= 0 ? candidateUrls.at(selectedIndex) : undefined;
-  const previewSrc = uploadedPosterUrl ?? selectedCandidateUrl ?? existingPosterUrl ?? null;
-  // A poster uploaded this session replaces the freshly captured strip, but a
-  // stored strip stays visible so a manual poster can still be swapped back.
-  const hasFreshCapture = candidates.some((candidate) => 'blob' in candidate);
-  const showStrip = candidates.length > 1 && (!hasFreshCapture || uploadedPosterUrl === null);
+  const { previewSrc, showStrip } = resolvePosterDisplay({
+    uploadedPosterUrl,
+    selectedCandidateUrl,
+    existingPosterUrl,
+    candidates,
+  });
 
   const onManualPick = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
@@ -166,7 +256,7 @@ export const VideoPosterSection = ({
   return (
     <section className="space-y-3">
       <h2 className="font-semibold">Poster</h2>
-      <PosterPreview src={previewSrc || null} />
+      <PosterPreview src={previewSrc} />
 
       {showStrip ? (
         <PosterCandidateStrip
@@ -177,6 +267,8 @@ export const VideoPosterSection = ({
           onSelectCandidate={onSelectCandidate}
         />
       ) : null}
+
+      {nextFrames ? <NextFramesButton {...nextFrames} /> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor={inputId} className="cursor-pointer text-sm font-medium underline">

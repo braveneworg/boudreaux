@@ -3,13 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { isVideoNamespacedKey } from '@/lib/constants/video-uploads';
+import { isVideoNamespacedKey, VIDEO_POSTER_CANDIDATE_CAP } from '@/lib/constants/video-uploads';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import type {
   CreateVideoData,
   UpdateVideoData,
   Video,
   VideoListFilters,
+  VideoPosterCandidate,
 } from '@/lib/types/domain/video';
 import { deleteS3Object } from '@/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
@@ -170,6 +171,43 @@ export class VideoService {
       return failFromError(error, {
         NOT_FOUND: 'Video not found',
         UNKNOWN: 'Failed to save the release date',
+      });
+    }
+  }
+
+  /**
+   * Append freshly captured, already uploaded poster frames to the video's
+   * stored candidates — a "Next 5 frames" press. A frame whose URL the row
+   * already holds is skipped, and the merged list may never exceed
+   * {@link VIDEO_POSTER_CANDIDATE_CAP}; the append is refused whole rather
+   * than truncated, so the client's count stays equal to the row's. The
+   * namespace guard on each URL belongs to the action (write-path input).
+   */
+  static async appendVideoPosterCandidates(
+    id: string,
+    incoming: VideoPosterCandidate[]
+  ): Promise<ServiceResponse<Video>> {
+    try {
+      const video = await VideoRepository.findById(id);
+      if (!video) {
+        return { success: false, error: 'Video not found', code: 'NOT_FOUND' };
+      }
+      const knownUrls = new Set(video.posterCandidates.map((candidate) => candidate.url));
+      const additions = incoming.filter((candidate) => !knownUrls.has(candidate.url));
+      const merged = [...video.posterCandidates, ...additions];
+      if (merged.length > VIDEO_POSTER_CANDIDATE_CAP) {
+        return {
+          success: false,
+          error: 'Poster frame limit reached',
+          code: 'LIMIT_EXCEEDED',
+        };
+      }
+      const updated = await VideoRepository.update(id, { posterCandidates: merged });
+      return { success: true, data: updated };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Video not found',
+        UNKNOWN: 'Failed to add poster frames',
       });
     }
   }

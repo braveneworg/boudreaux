@@ -508,6 +508,94 @@ describe('VideoService', () => {
     });
   });
 
+  describe('appendVideoPosterCandidates', () => {
+    const frame = (index: number, atSeconds: number): VideoPosterCandidate => ({
+      url: `https://cdn.example.com/media/videos/video-123/poster-candidate-${index}.jpg`,
+      atSeconds,
+      score: 10 + index,
+    });
+    const stored = [frame(1, 3.7), frame(2, 5.1)];
+    const incoming = [frame(3, 10.7), frame(4, 12.1)];
+
+    it('appends the new frames after the stored ones', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: stored,
+      });
+      const updated = { ...mockVideo, posterCandidates: [...stored, ...incoming] };
+      vi.mocked(VideoRepository.update).mockResolvedValue(updated);
+
+      const result = await VideoService.appendVideoPosterCandidates('video-123', incoming);
+
+      expect(result).toMatchObject({ success: true, data: updated });
+      expect(VideoRepository.update).toHaveBeenCalledWith('video-123', {
+        posterCandidates: [...stored, ...incoming],
+      });
+    });
+
+    it('skips a frame whose URL the row already holds', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: stored,
+      });
+      vi.mocked(VideoRepository.update).mockResolvedValue(mockVideo);
+
+      await VideoService.appendVideoPosterCandidates('video-123', [stored[1], incoming[0]]);
+
+      expect(VideoRepository.update).toHaveBeenCalledWith('video-123', {
+        posterCandidates: [...stored, incoming[0]],
+      });
+    });
+
+    it('refuses an append that would exceed the candidate cap', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: Array.from({ length: 23 }, (_, index) => frame(index + 1, index)),
+      });
+
+      const result = await VideoService.appendVideoPosterCandidates('video-123', [
+        frame(30, 30),
+        frame(31, 31),
+        frame(32, 32),
+      ]);
+
+      expect(result).toMatchObject({ success: false, code: 'LIMIT_EXCEEDED' });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts an append that lands exactly on the cap', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue({
+        ...mockVideo,
+        posterCandidates: Array.from({ length: 23 }, (_, index) => frame(index + 1, index)),
+      });
+      vi.mocked(VideoRepository.update).mockResolvedValue(mockVideo);
+
+      const result = await VideoService.appendVideoPosterCandidates('video-123', [
+        frame(30, 30),
+        frame(31, 31),
+      ]);
+
+      expect(result).toMatchObject({ success: true });
+    });
+
+    it('fails when the video is missing', async () => {
+      vi.mocked(VideoRepository.findById).mockResolvedValue(null);
+
+      const result = await VideoService.appendVideoPosterCandidates('video-123', incoming);
+
+      expect(result).toMatchObject({ success: false, error: 'Video not found' });
+      expect(VideoRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('maps an unknown error to a failure response', async () => {
+      vi.mocked(VideoRepository.findById).mockRejectedValue(new Error('Unknown error'));
+
+      const result = await VideoService.appendVideoPosterCandidates('video-123', incoming);
+
+      expect(result).toMatchObject({ success: false, error: 'Failed to add poster frames' });
+    });
+  });
+
   describe('selectVideoPoster', () => {
     const stored: VideoPosterCandidate = {
       url: 'https://cdn.example.com/media/videos/video-123/poster-candidate-1.jpg',

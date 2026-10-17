@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
+import { appendVideoPosterCandidatesAction } from '@/lib/actions/append-video-poster-candidates-action';
 import { archiveVideoAction } from '@/lib/actions/archive-video-action';
 import { createVideoAction } from '@/lib/actions/create-video-action';
 import { deleteVideoAction } from '@/lib/actions/delete-video-action';
@@ -13,6 +14,7 @@ import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-actio
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { updateVideoReleaseDateAction } from '@/lib/actions/update-video-release-date-action';
+import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
@@ -161,6 +163,29 @@ export const useSelectVideoPosterMutation = () => {
     selectVideoPoster: mutate,
     selectVideoPosterAsync: mutateAsync,
     isSelectingVideoPoster: isPending,
+  };
+};
+
+/**
+ * Mutation hook wrapping {@link appendVideoPosterCandidatesAction} — persists
+ * a "Next 5 frames" batch onto the row the moment its uploads settle, so a
+ * pick on one of those frames is instant like every other pick. Invalidates
+ * the video caches on a successful result so the detail refetches the longer
+ * candidate list.
+ */
+export const useAppendVideoPosterCandidatesMutation = () => {
+  const { mutate, mutateAsync, isPending } = useEntityMutation<
+    AdminActionResult,
+    { videoId: string; candidates: VideoPosterCandidate[] }
+  >(
+    ({ videoId, candidates }) => appendVideoPosterCandidatesAction(videoId, candidates),
+    invalidateVideoQueries
+  );
+
+  return {
+    appendVideoPosterCandidates: mutate,
+    appendVideoPosterCandidatesAsync: mutateAsync,
+    isAppendingVideoPosterCandidates: isPending,
   };
 };
 

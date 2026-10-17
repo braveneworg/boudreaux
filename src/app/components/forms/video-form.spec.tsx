@@ -63,6 +63,8 @@ const mocks = vi.hoisted(() => ({
   extractVideoDuration: vi.fn(),
   extractVideoTags: vi.fn(),
   captureVideoPosterCandidates: vi.fn(),
+  capturePosterCandidatesFromSource: vi.fn(),
+  appendVideoPosterCandidatesAsync: vi.fn(),
   getPresignedUploadUrlsAction: vi.fn(),
   uploadFileToS3: vi.fn(),
   push: vi.fn(),
@@ -103,6 +105,10 @@ vi.mock('@/hooks/mutations/use-video-mutations', () => ({
   useSelectVideoPosterMutation: () => ({
     selectVideoPosterAsync: mocks.selectVideoPosterAsync,
     isSelectingVideoPoster: false,
+  }),
+  useAppendVideoPosterCandidatesMutation: () => ({
+    appendVideoPosterCandidatesAsync: mocks.appendVideoPosterCandidatesAsync,
+    isAppendingVideoPosterCandidates: false,
   }),
   useUpdateVideoReleaseDateMutation: () => ({
     updateVideoReleaseDateAsync: mocks.updateVideoReleaseDateAsync,
@@ -145,6 +151,7 @@ vi.mock('@/app/components/forms/videos/video-metadata', async (importOriginal) =
   extractVideoDuration: mocks.extractVideoDuration,
   extractVideoTags: mocks.extractVideoTags,
   captureVideoPosterCandidates: mocks.captureVideoPosterCandidates,
+  capturePosterCandidatesFromSource: mocks.capturePosterCandidatesFromSource,
 }));
 
 vi.mock('@/lib/actions/presigned-upload-actions', () => ({
@@ -418,6 +425,8 @@ beforeEach(() => {
   mocks.extractVideoTags.mockResolvedValue({ title: 'clip' });
   mocks.extractVideoDuration.mockResolvedValue(undefined);
   mocks.captureVideoPosterCandidates.mockResolvedValue([]);
+  mocks.capturePosterCandidatesFromSource.mockResolvedValue([]);
+  mocks.appendVideoPosterCandidatesAsync.mockResolvedValue({ success: true });
   mocks.getPresignedUploadUrlsAction.mockResolvedValue({
     success: true,
     data: [
@@ -2249,5 +2258,88 @@ describe('VideoForm — artist review section (B6)', () => {
     await waitFor(() => expect(mocks.createVideoAsync).toHaveBeenCalled());
     const payload = mocks.createVideoAsync.mock.calls[0][0] as Record<string, unknown>;
     expect(payload).not.toHaveProperty('artistDetails');
+  });
+});
+
+describe('VideoForm — Next 5 frames', () => {
+  const storedCandidates = [
+    { url: 'https://cdn.example.com/candidate-1.jpg', atSeconds: 3.7, score: 4 },
+    { url: 'https://cdn.example.com/existing-poster.jpg', atSeconds: 5.1, score: 9 },
+    { url: 'https://cdn.example.com/candidate-3.jpg', atSeconds: 6.5, score: 2 },
+  ];
+  const STREAM_URL = 'https://cdn.example.com/media/videos/v1/existing.mp4';
+
+  const asEditMode = (streamUrl: string | null) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: { ...editVideo, posterCandidates: storedCandidates, streamUrl },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  it('offers no button before a video file is picked', () => {
+    render(<VideoForm />);
+
+    expect(screen.queryByRole('button', { name: 'Next 5 frames' })).not.toBeInTheDocument();
+  });
+
+  it('offers the button below the stored strip on an edit visit', async () => {
+    asEditMode(STREAM_URL);
+    render(<VideoForm videoId="v1" />);
+
+    await screen.findAllByRole('radio', { name: /^Frame at/ });
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeEnabled();
+  });
+
+  it('decodes the next window from the signed stream URL on an edit visit', async () => {
+    asEditMode(STREAM_URL);
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Next 5 frames' }));
+
+    await waitFor(() =>
+      expect(mocks.capturePosterCandidatesFromSource).toHaveBeenCalledWith({
+        src: STREAM_URL,
+        windowStart: 10,
+      })
+    );
+  });
+
+  it('appends the persisted frames to the strip after a press', async () => {
+    asEditMode(STREAM_URL);
+    mocks.capturePosterCandidatesFromSource.mockResolvedValue([
+      { blob: new Blob(['f'], { type: 'image/jpeg' }), atSeconds: 10.7, score: 3 },
+    ]);
+    const user = setup();
+    render(<VideoForm videoId="v1" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Next 5 frames' }));
+
+    expect(await screen.findByRole('radio', { name: 'Frame at 10.7s' })).toBeInTheDocument();
+    expect(mocks.appendVideoPosterCandidatesAsync).toHaveBeenCalledWith({
+      videoId: 'v1',
+      candidates: [{ url: 'https://cdn.example.com/poster.jpg', atSeconds: 10.7, score: 3 }],
+    });
+  });
+
+  it('is disabled with a hint when the row has no stream URL', async () => {
+    asEditMode(null);
+    render(<VideoForm videoId="v1" />);
+
+    expect(await screen.findByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.getByText('The video stream is not available here.')).toBeInTheDocument();
+  });
+
+  it('stays disabled after an upload until the draft row exists', async () => {
+    const user = setup();
+    render(<VideoForm />);
+
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+
+    expect(screen.getByRole('button', { name: 'Next 5 frames' })).toBeDisabled();
+    expect(screen.queryByText(/frames in this video|limit reached|not available/)).toBeNull();
   });
 });
