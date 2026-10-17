@@ -94,7 +94,12 @@ const VideoPlayDialogContent = ({
       action={action}
     />
     {hasSource ? (
-      <div ref={attachToDialog} />
+      // With an accent, the player is framed like the release player: a black
+      // border on the accent's offset shadow.
+      <div
+        ref={attachToDialog}
+        className={accent ? 'shadow-zine border-2 border-black' : undefined}
+      />
     ) : (
       <div
         role="alert"

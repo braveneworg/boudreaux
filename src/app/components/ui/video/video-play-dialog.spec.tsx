@@ -189,10 +189,19 @@ describe('VideoPlayDialog', () => {
       expect(screen.getByRole('heading', { name: 'The Band' })).toHaveClass('text-center');
     });
 
-    it('takes the accent on the dialog frame', () => {
+    it('takes the accent on the dialog', () => {
       renderWith({ accent: 'orchid' });
 
       expect(screen.getByRole('dialog')).toHaveClass('zine-accent-orchid');
+    });
+
+    // The accent shows as the player frame's offset shadow, as it does on the
+    // release player's frame.
+    it('frames the player in the accent when given one', () => {
+      renderWith({ accent: 'orchid' });
+
+      const slot = screen.getByTestId('video-surface').parentElement?.parentElement;
+      expect(slot).toHaveClass('border-2', 'border-black', 'shadow-zine');
     });
 
     it('renders a footer after the player, shrinkable inside the dialog grid', () => {
