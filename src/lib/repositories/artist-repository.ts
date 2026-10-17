@@ -221,7 +221,23 @@ const artistListingSelect = (now: Date) =>
     releases: {
       select: {
         release: {
-          select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+          select: {
+            id: true,
+            title: true,
+            releasedOn: true,
+            publishedAt: true,
+            deletedOn: true,
+            // The first MP3 track primes the card's listening modal.
+            digitalFormats: playableFormats({
+              select: {
+                files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
+              },
+            } as const),
+            // The album artist's slug names the release deep link (ADR-0015).
+            artistReleases: orderedCredits({
+              select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+            } as const),
+          },
         },
       },
     },

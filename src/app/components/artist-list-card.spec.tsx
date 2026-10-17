@@ -4,9 +4,30 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type { ArtistListingName, ArtistListingRow } from '@/lib/types/domain/artist';
+import type {
+  ArtistListingName,
+  ArtistListingNewestRelease,
+  ArtistListingRow,
+} from '@/lib/types/domain/artist';
 
 import { ArtistListCard } from './artist-list-card';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
+const openPlayer = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/use-release-play-dialog', () => ({
+  useReleasePlayDialog: () => ({
+    playerOpen: false,
+    prefetchPlayer: false,
+    openPlayer,
+    handlePlayerOpenChange: vi.fn(),
+    warmPlayer: vi.fn(),
+    takeMediaEl: () => null,
+  }),
+}));
+
+// The listening modal itself is covered by latest-release-play-link.spec.
+vi.mock('./release-play-dialog', () => ({ ReleasePlayDialog: () => null }));
 
 const name = (id: string, displayName: string): ArtistListingName => ({
   id,
@@ -36,6 +57,14 @@ const bioImage = (id: string, overrides: Partial<BioImage> = {}): BioImage => ({
   ...overrides,
 });
 
+const NEWEST: ArtistListingNewestRelease = {
+  id: 'r3',
+  title: 'Third Album',
+  releasedOn: new Date('2024-09-01T00:00:00Z'),
+  playSrc: 'https://cdn.example/r3/track-1.mp3',
+  albumArtistSlug: 'test-artist',
+};
+
 const baseArtist: ArtistListingRow = {
   id: 'a1',
   slug: 'test-artist',
@@ -56,8 +85,10 @@ const baseArtist: ArtistListingRow = {
   members: [],
   memberOf: [],
   releaseCount: 3,
-  newestRelease: { id: 'r3', title: 'Third Album', releasedOn: new Date('2024-09-01T00:00:00Z') },
+  newestRelease: NEWEST,
 };
+
+const DEEP_LINK = '/releases?artist=test-artist&release=r3';
 
 describe('ArtistListCard', () => {
   it('links the artist name to the detail page', () => {
@@ -105,7 +136,7 @@ describe('ArtistListCard', () => {
 
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
       '/artists/test-artist',
-      '/releases/r3',
+      DEEP_LINK,
       '/artists/test-artist',
     ]);
   });
@@ -252,6 +283,8 @@ describe('ArtistListCard', () => {
             id: 'r1',
             title: 'Only One',
             releasedOn: new Date('2020-05-05T00:00:00Z'),
+            playSrc: 'https://cdn.example/r1/track-1.mp3',
+            albumArtistSlug: 'test-artist',
           },
         }}
       />
@@ -263,12 +296,50 @@ describe('ArtistListCard', () => {
     expect(screen.queryByText(/releases/)).not.toBeInTheDocument();
   });
 
-  it('links the latest release title to its release page', () => {
+  it('links the latest release title to its release deep link', () => {
     render(<ArtistListCard artist={baseArtist} />);
+
+    expect(screen.getByRole('link', { name: 'Third Album' })).toHaveAttribute('href', DEEP_LINK);
+  });
+
+  it("links to the album artist's deep link when the artist is only featured", () => {
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          newestRelease: { ...NEWEST, albumArtistSlug: 'ceschi' },
+        }}
+      />
+    );
 
     expect(screen.getByRole('link', { name: 'Third Album' })).toHaveAttribute(
       'href',
-      '/releases/r3'
+      '/releases?artist=ceschi&release=r3'
+    );
+  });
+
+  it('opens the listening modal in place on a plain click of the latest release', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ArtistListCard artist={baseArtist} />);
+
+    await user.click(screen.getByRole('link', { name: 'Third Album' }));
+
+    expect(openPlayer).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the latest release as plain text when nothing is playable', () => {
+    const { container } = render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          newestRelease: { ...NEWEST, playSrc: null },
+        }}
+      />
+    );
+
+    expect(screen.queryByRole('link', { name: 'Third Album' })).not.toBeInTheDocument();
+    expect(container.querySelector('[data-slot="artist-credits"]')).toHaveTextContent(
+      'Latest: Third Album (2024), 3 releases'
     );
   });
 

@@ -59,6 +59,7 @@ import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { isPublicArtist } from '@/lib/utils/is-public-artist';
 import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
+import { getFirstTrackStreamSource } from '@/lib/utils/release-helpers';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import { sanitizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
@@ -792,7 +793,31 @@ export class ArtistService {
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
-      ...summarizeListedReleases(releases),
+      ...ArtistService.summarizeListingReleases(releases),
+    };
+  }
+
+  /**
+   * The listing row's release summary: the count and the newest listed
+   * release, the newest with its first track's stream URL (the card's
+   * listening modal) and its album artist's slug (the release deep link),
+   * `null` when that artist is hidden (ADR-0015).
+   */
+  private static summarizeListingReleases(
+    releases: ArtistListingRecord['releases']
+  ): Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'> {
+    const { releaseCount, newestRelease } = summarizeListedReleases(releases);
+    const newest = releases.find(({ release }) => release.id === newestRelease?.id)?.release;
+    return {
+      releaseCount,
+      newestRelease:
+        newestRelease && newest
+          ? {
+              ...newestRelease,
+              playSrc: getFirstTrackStreamSource(newest),
+              albumArtistSlug: publicCredits(newest.artistReleases).albumArtist?.slug ?? null,
+            }
+          : null,
     };
   }
 

@@ -97,7 +97,13 @@ const mockRow: ArtistListingRow = {
   members: [],
   memberOf: [],
   releaseCount: 1,
-  newestRelease: { id: 'r-1', title: 'LP', releasedOn: new Date('2024-01-01T00:00:00.000Z') },
+  newestRelease: {
+    id: 'r-1',
+    title: 'LP',
+    releasedOn: new Date('2024-01-01T00:00:00.000Z'),
+    playSrc: null,
+    albumArtistSlug: null,
+  },
 };
 
 describe('ArtistsIndexPage', () => {

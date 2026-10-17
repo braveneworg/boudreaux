@@ -384,7 +384,7 @@ export interface ArtistWithPublishedReleases extends Omit<
    * featured, never a band's), as the artists index summarises it; the page
    * leads with it (ADR-0006). `null` when there is none.
    */
-  newestRelease: ArtistListingNewestRelease | null;
+  newestRelease: NewestListedRelease | null;
 }
 
 /**
@@ -447,6 +447,12 @@ export interface ArtistListingReleaseRecord {
   releasedOn: Date;
   publishedAt: Date | null;
   deletedOn: Date | null;
+  /** The playable format with its first track only. */
+  digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
+  /** The full credit order, each artist with its slug and public gate fields. */
+  artistReleases: Array<{
+    artist: { slug: string; publishedOn: Date | null; deletedOn: Date | null };
+  }>;
 }
 
 /**
@@ -479,11 +485,22 @@ export interface ArtistListingRecord {
   videoArtists: Array<{ video: { releasedOn: Date | null } }>;
 }
 
-/** The newest listed release credited to an artist, as shown on the listing row. */
-export interface ArtistListingNewestRelease {
+/** The newest listed release credited to an artist (the artist page leads with it). */
+export interface NewestListedRelease {
   id: string;
   title: string;
   releasedOn: Date;
+}
+
+/**
+ * The newest listed release credited to an artist, as shown on the listing
+ * row: what its listening modal plays and the deep link names.
+ */
+export interface ArtistListingNewestRelease extends NewestListedRelease {
+  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
+  playSrc: string | null;
+  /** The album artist's slug, or `null` when that artist is hidden (ADR-0015). */
+  albumArtistSlug: string | null;
 }
 
 /**

@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { LatestRelease } from '@/app/components/latest-release-link';
+import type { LatestRelease } from '@/app/components/latest-release-play-link';
 import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
 import {
   getArtistDisplayNameForRelease,
@@ -12,22 +12,22 @@ import {
  * The latest-release line's data (decision 6): the graph's `newestRelease`
  * summary (newest listed release with a direct credit, as the artists index
  * counts it), joined to its credit row for the first track's stream URL and,
- * when the artist is only featured, the album artist's name — empty when
- * that artist is hidden (ADR-0015). `null` when the artist has no listed
+ * when the artist is only featured, the album artist's name and slug (the
+ * release deep link's artist) — empty when that artist is hidden (ADR-0015),
+ * so the page's own slug serves. `null` when the artist has no listed
  * release; the summary alone when its row is somehow missing.
  */
 export const toLatestRelease = (artist: ArtistWithPublishedReleases): LatestRelease | null => {
   const { newestRelease } = artist;
   if (!newestRelease) return null;
   const row = artist.releases.find(({ release }) => release.id === newestRelease.id);
+  const albumArtist = row?.credit === 'featured' ? row.albumArtist : null;
   return {
     id: newestRelease.id,
     title: newestRelease.title,
     releasedOn: newestRelease.releasedOn,
     playSrc: row ? getFirstTrackStreamSource(row.release) : null,
-    byName:
-      row?.credit === 'featured' && row.albumArtist
-        ? getArtistDisplayNameForRelease(row.albumArtist)
-        : null,
+    byName: albumArtist ? getArtistDisplayNameForRelease(albumArtist) : null,
+    albumArtistSlug: albumArtist?.slug ?? null,
   };
 };

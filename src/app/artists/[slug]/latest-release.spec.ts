@@ -53,6 +53,7 @@ describe('toLatestRelease', () => {
       releasedOn,
       playSrc: expect.stringContaining('releases/new/tracks/01.mp3'),
       byName: null,
+      albumArtistSlug: null,
     });
   });
 
@@ -74,6 +75,42 @@ describe('toLatestRelease', () => {
     expect(latest?.byName).toBe('Ceschi');
   });
 
+  it("names the album artist's slug when the artist is only featured on it", () => {
+    const latest = toLatestRelease(
+      graph({
+        newestRelease: { id: 'guest', title: 'Release guest', releasedOn },
+        releases: [
+          row('guest', 'featured', {
+            albumArtist: {
+              ...artistWithPublishedReleases.members[0].member,
+              slug: 'ceschi',
+            } as unknown as Row['albumArtist'],
+          }),
+        ],
+      })
+    );
+
+    expect(latest?.albumArtistSlug).toBe('ceschi');
+  });
+
+  it("names no album artist slug for the artist's own release: the page's slug serves", () => {
+    const latest = toLatestRelease(
+      graph({
+        newestRelease: { id: 'own', title: 'Release own', releasedOn },
+        releases: [
+          row('own', 'primary', {
+            albumArtist: {
+              ...artistWithPublishedReleases.members[0].member,
+              slug: 'someone-else',
+            } as unknown as Row['albumArtist'],
+          }),
+        ],
+      })
+    );
+
+    expect(latest?.albumArtistSlug).toBeNull();
+  });
+
   it('leaves the byline empty when the album artist is hidden', () => {
     const latest = toLatestRelease(
       graph({
@@ -83,6 +120,7 @@ describe('toLatestRelease', () => {
     );
 
     expect(latest?.byName).toBeNull();
+    expect(latest?.albumArtistSlug).toBeNull();
   });
 
   it('has no play source when the release holds no MP3 track', () => {
@@ -107,6 +145,7 @@ describe('toLatestRelease', () => {
       releasedOn,
       playSrc: null,
       byName: null,
+      albumArtistSlug: null,
     });
   });
 });

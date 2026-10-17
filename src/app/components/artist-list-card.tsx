@@ -16,6 +16,7 @@ import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
 import { ArtistCardPhoto } from './artist-card-photo';
+import { LatestReleasePlayLink } from './latest-release-play-link';
 
 interface ArtistListCardProps {
   artist: ArtistListingRow;
@@ -120,8 +121,10 @@ const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) 
  *
  * The card body itself is inert — no stretched link over the whole surface.
  * Three explicit links carry the navigation instead: the name opens the
- * artist page, the latest-release title opens that release, and the closing
- * link opens the biography on that same artist page. The photo does not
+ * artist page, the latest-release title opens that release's listening modal
+ * in place (its href, for modified clicks, is the release deep link; a
+ * release with nothing playable is plain text), and the closing link opens
+ * the biography on that same artist page. The photo does not
  * navigate — it enlarges in place, and the enlarged view links to the artist
  * page. There is no separate "all releases" link — it opened the same page —
  * so the release count rides on the latest line. Clicking anywhere else does
@@ -195,14 +198,12 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
 
           {newestRelease && (
             <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
-              Latest:{' '}
-              <Link
-                href={`/releases/${newestRelease.id}`}
-                className="underline underline-offset-2 hover:no-underline"
-              >
-                {newestRelease.title}
-              </Link>{' '}
-              ({newestRelease.releasedOn.getUTCFullYear()})
+              <LatestReleasePlayLink
+                release={{ ...newestRelease, byName: null }}
+                artistName={displayName}
+                slug={artist.slug}
+                variant="card"
+              />
               {artist.releaseCount > 1 && `, ${artist.releaseCount} releases`}
             </p>
           )}
