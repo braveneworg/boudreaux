@@ -81,6 +81,19 @@ export type LoudZineAccent = (typeof LOUD_ZINE_ACCENTS)[number];
 export const pickLoudZineAccent = (random: () => number = Math.random): LoudZineAccent =>
   LOUD_ZINE_ACCENTS[Math.floor(random() * LOUD_ZINE_ACCENTS.length)];
 
+/**
+ * A release's own loud accent: a string hash of its id into
+ * {@link LOUD_ZINE_ACCENTS}, so every opener frames the same release's
+ * listening modal alike, on the server and the client.
+ */
+export const zineAccentForRelease = (releaseId: string): LoudZineAccent => {
+  const hash = [...releaseId].reduce(
+    (sum, character) => (sum * 31 + (character.codePointAt(0) ?? 0)) >>> 0,
+    0
+  );
+  return LOUD_ZINE_ACCENTS[hash % LOUD_ZINE_ACCENTS.length];
+};
+
 export interface ZinePanelProps extends React.ComponentProps<'section'> {
   accent: ZineAccent;
   tape?: boolean;

@@ -23,8 +23,8 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('./social-share-widget', () => ({
-  SocialShareWidget: ({ artistUrl }: { artistUrl: string }) => (
-    <div data-testid="social-share-widget" data-url={artistUrl} />
+  SocialShareWidget: ({ artistUrl, url }: { artistUrl?: string; url?: string }) => (
+    <div data-testid="social-share-widget" data-url={url ?? artistUrl} />
   ),
 }));
 
@@ -141,7 +141,49 @@ describe('ReleaseShareWidget', () => {
     fireEvent.click(screen.getByTestId('share2-icon'));
 
     await vi.waitFor(() => {
-      expect(mockToast.success).toHaveBeenCalledWith('Artist link copied to clipboard!');
+      expect(mockToast.success).toHaveBeenCalledWith('Link copied');
+    });
+  });
+
+  describe('with a share URL', () => {
+    const SHARE_URL = `${BASE_URL}/releases?artist=spot-artist&release=0123456789abcdef01234567`;
+
+    it('shares that URL through the social links', async () => {
+      render(<ReleaseShareWidget {...defaultProps} shareUrl={SHARE_URL} />);
+
+      expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+        'data-url',
+        SHARE_URL
+      );
+    });
+
+    it('shares that URL through navigator.share', () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      stubShare(share);
+
+      render(<ReleaseShareWidget {...defaultProps} shareUrl={SHARE_URL} />);
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(share.mock.calls).toEqual([
+        [
+          {
+            title: 'Spot Album',
+            text: 'Check out Spot Artist on Fake Four Inc.!',
+            url: SHARE_URL,
+          },
+        ],
+      ]);
+    });
+
+    it('copies that URL when navigator.share is not available', () => {
+      stubShare(undefined);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      stubClipboard(writeText);
+
+      render(<ReleaseShareWidget {...defaultProps} shareUrl={SHARE_URL} />);
+      fireEvent.click(screen.getByTestId('share2-icon'));
+
+      expect(writeText.mock.calls).toEqual([[SHARE_URL]]);
     });
   });
 
