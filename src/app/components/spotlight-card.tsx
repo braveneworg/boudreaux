@@ -78,8 +78,10 @@ const linkedHeadingProps = (
     ? {
         artistHref: `/artists/${artistSlug}`,
         year,
+        // Set smaller on a phone: under the share row, the sheet's cover is
+        // already at the audio controls' 16rem floor on a 375×667 screen.
         footer: (
-          <p className="text-center">
+          <p className="text-center max-sm:text-xs">
             <Link
               href={artistReleasesHref(artistSlug)}
               className="underline underline-offset-4 hover:no-underline"

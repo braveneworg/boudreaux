@@ -112,6 +112,28 @@ const PHONE_DIALOG_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-21
  */
 const WIDE_PLAYER_CLASS = 'sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]';
 
+/**
+ * With both the share row and a footer row (the home spotlight's "View all
+ * releases"), the footer adds 24px measured in Chromium, so the sheet's and
+ * the wide reserves each grow by 2rem.
+ */
+const STACKED_PHONE_SHEET_PLAYER_CLASS = 'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]';
+const STACKED_WIDE_PLAYER_CLASS = 'sm:w-[min(100%,max(16.25rem,calc(90dvh-24rem)))]';
+
+/** The player slot's width caps: the phone one, then the one from `sm`. */
+const playerWidthClasses = (fitPhoneSheet: boolean, stacked: boolean): string => {
+  if (stacked) {
+    return cn(
+      fitPhoneSheet ? STACKED_PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
+      STACKED_WIDE_PLAYER_CLASS
+    );
+  }
+  return cn(
+    fitPhoneSheet ? PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
+    WIDE_PLAYER_CLASS
+  );
+};
+
 /** Loading placeholder shaped like the player: square cover + controls bar. */
 const ReleasePlayerSkeleton = (): ReactElement => (
   <div className="flex flex-col" aria-busy="true">
@@ -132,6 +154,8 @@ interface ReleasePlayDialogPlayerProps extends Pick<
   release: PublishedReleaseDetail | null | undefined;
   /** Size the player to fit the phone sheet below `sm`. */
   fitPhoneSheet: boolean;
+  /** Both the share row and a footer row sit under the player. */
+  stacked: boolean;
 }
 
 /**
@@ -146,14 +170,11 @@ const ReleasePlayDialogPlayer = ({
   takeMediaEl,
   initialTrackNumber,
   fitPhoneSheet,
+  stacked,
 }: ReleasePlayDialogPlayerProps): ReactElement => {
   // min-w-0: the ticker's no-wrap line would otherwise widen the dialog
   // (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
-  const slotClass = cn(
-    'mx-auto min-w-0',
-    fitPhoneSheet ? PHONE_SHEET_PLAYER_CLASS : PHONE_DIALOG_PLAYER_CLASS,
-    WIDE_PLAYER_CLASS
-  );
+  const slotClass = cn('mx-auto min-w-0', playerWidthClasses(fitPhoneSheet, stacked));
 
   if (isPending) {
     return (
@@ -249,6 +270,7 @@ export const ReleasePlayDialog = ({
           takeMediaEl={takeMediaEl}
           initialTrackNumber={initialTrackNumber}
           fitPhoneSheet={sheetOnPhone}
+          stacked={[shareWidget, footer].every(Boolean)}
         />
         {shareWidget ? (
           // min-w-0: see the footer below.

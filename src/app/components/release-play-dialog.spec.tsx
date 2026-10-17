@@ -368,6 +368,29 @@ describe('ReleasePlayDialog', () => {
     expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
   });
 
+  // The home spotlight shows the share row and the "View all releases" footer
+  // together: the cover gives up the footer row's height as well.
+  it('reserves room for both the share row and the footer under the player', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(
+      <ReleasePlayDialog
+        {...defaultProps}
+        sheetOnPhone
+        shareWidget={<div>share</div>}
+        footer={<a href="/releases?artist=jd">View all releases</a>}
+      />
+    );
+
+    const slot = screen.getByTestId('release-player').parentElement;
+    expect(slot).toHaveClass(
+      'max-sm:w-[min(100%,max(16.25rem,calc(90dvh-22rem)))]',
+      'sm:w-[min(100%,max(16.25rem,calc(90dvh-24rem)))]'
+    );
+  });
+
   it('sizes the loading skeleton like the player in the sheet', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 

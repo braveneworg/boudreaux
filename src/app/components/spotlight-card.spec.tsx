@@ -334,10 +334,10 @@ describe('SpotlightCard', () => {
     const opened = screen.getByRole('dialog');
     expect(opened).toHaveAttribute('data-artist-href', '/artists/spot-artist');
     expect(opened).toHaveAttribute('data-year', '2024');
-    expect(screen.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
-      'href',
-      '/releases?artist=spot-artist'
-    );
+    const viewAll = screen.getByRole('link', { name: 'View all releases' });
+    expect(viewAll).toHaveAttribute('href', '/releases?artist=spot-artist');
+    // Smaller on a phone, where the sheet's cover is already at its floor.
+    expect(viewAll.parentElement).toHaveClass('text-center', 'max-sm:text-xs');
   });
 
   it('links nothing in the dialog for a linked heading without an artist page', async () => {
