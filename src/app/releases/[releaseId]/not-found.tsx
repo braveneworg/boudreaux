@@ -4,7 +4,8 @@
 
 /**
  * 404 page for invalid release IDs at `/releases/[releaseId]`.
- * Displayed when `notFound()` is called from the release player page.
+ * Displayed when the old release URL names no release with a public album
+ * artist to redirect to.
  */
 import Link from 'next/link';
 

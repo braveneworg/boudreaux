@@ -181,6 +181,16 @@ describe('ReleasePlayDialog', () => {
     expect(player).toHaveAttribute('data-has-take-media-el', 'true');
   });
 
+  it('mounts the player paused when autoplay is turned off', () => {
+    mockUseReleaseQuery.mockReturnValue(
+      queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
+    );
+
+    render(<ReleasePlayDialog {...defaultProps} autoPlay={false} />);
+
+    expect(screen.getByTestId('release-player')).toHaveAttribute('data-autoplay', 'false');
+  });
+
   it('titles the dialog with the release and artist', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 

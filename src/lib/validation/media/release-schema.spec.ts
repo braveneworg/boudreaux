@@ -4,17 +4,14 @@
 import {
   publishedReleaseDetailSchema,
   publishedReleaseListingSchema,
-  releaseCarouselItemSchema,
   releaseSchema,
 } from './release-schema';
 import {
   digitalFormat,
   digitalFormatFile,
-  image,
   publishedReleaseDetail,
   publishedReleaseListing,
   release,
-  releaseScalar,
   url,
 } from './schema-fixtures';
 
@@ -40,14 +37,6 @@ describe('releaseSchema', () => {
       { id: 'ru1', releaseId: 'r1', urlId: 'u1', url: { ...url, platform: 'X' } },
     ];
     expect(() => releaseSchema.parse({ ...release, releaseUrls })).toThrow();
-  });
-});
-
-describe('releaseCarouselItemSchema', () => {
-  it('parses a release carousel item', () => {
-    expect(() =>
-      releaseCarouselItemSchema.parse({ ...releaseScalar, images: [image] })
-    ).not.toThrow();
   });
 });
 

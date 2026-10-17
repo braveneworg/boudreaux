@@ -3,105 +3,30 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Release media player page at `/releases/[releaseId]`.
- * Server Component that prefetches release data for SSR,
- * then hydrates client components for interactivity.
+ * Legacy release route at `/releases/[releaseId]`.
+ *
+ * A release is no longer a page of its own — it plays in the listening modal
+ * (ADR-0023). This route stays only to keep old links and indexed URLs
+ * working, permanently redirecting to the release deep link on the album
+ * artist's releases, `/releases?artist=<slug>&release=<id>`. An id naming no
+ * listed release, or one whose album artist is hidden, is a 404.
  */
 
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
-import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-
-import { ReleaseDetailContent } from '@/app/components/release-detail-content';
-import { ContentContainer } from '@/app/components/ui/content-container';
-import { PageContainer } from '@/app/components/ui/page-container';
-import { queryKeys } from '@/lib/query-keys';
 import { ReleaseService } from '@/lib/services/release-service';
-import { fetchApi } from '@/lib/utils/fetch-api';
-import { getQueryClient } from '@/lib/utils/get-query-client';
-import { serializeForResponse } from '@/lib/utils/serialize-for-response';
+import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
-interface ReleasePlayerPageProps {
+interface ReleaseRedirectPageProps {
   params: Promise<{ releaseId: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/**
- * Release player page — prefetches release, user status, digital formats,
- * and related releases, then hydrates the client content component.
- */
-export default async function ReleasePlayerPage({ params, searchParams }: ReleasePlayerPageProps) {
+export default async function ReleaseRedirectPage({ params }: ReleaseRedirectPageProps) {
   const { releaseId } = await params;
-  const resolvedSearchParams = await searchParams;
-  const autoPlay = resolvedSearchParams.autoplay === 'true';
-
-  const queryClient = getQueryClient();
-
-  // Fetch release directly via service (Server Component → service is server-only).
-  // This avoids an internal HTTP roundtrip (SSRF-safe) and works regardless of
-  // how the standalone server's network/host is configured.
-  const releaseResult = await ReleaseService.getReleaseWithTracks(releaseId);
-
-  if (!releaseResult.success) {
-    notFound();
-  }
-
-  // Match the API response shape: BigInt → Number, Date → string. The payload
-  // carries only the playable format, whose files are served unsigned.
-  const releaseData = JSON.parse(
-    JSON.stringify(releaseResult.data, (_key, v) => (typeof v === 'bigint' ? Number(v) : v))
-  );
-  queryClient.setQueryData(queryKeys.releases.detail(releaseId), releaseData);
-
-  // Extract primaryArtistId from release data for related releases prefetch
-  const releaseCache = queryClient.getQueryData<{
-    artistReleases?: Array<{ artist?: { id?: string } }>;
-  }>(queryKeys.releases.detail(releaseId));
-  const primaryArtistId = releaseCache?.artistReleases?.[0]?.artist?.id ?? null;
-
-  // Prefetch supplementary data in parallel (errors are swallowed by prefetchQuery)
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.userStatus(releaseId),
-      queryFn: () =>
-        fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/user-status`, {
-          forwardCookies: true,
-        }),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.digitalFormats(releaseId),
-      queryFn: () => fetchApi(`/api/releases/${encodeURIComponent(releaseId)}/digital-formats`),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.related(releaseId, primaryArtistId),
-      // Call the service directly instead of self-fetching /api/.../related.
-      // The internal HTTP roundtrip fails silently under load on the
-      // standalone server (prefetchQuery swallows the error), leaving the
-      // carousel un-hydrated and forcing a client refetch that races — the
-      // historical artist-carousel E2E flake. Mirrors the route exactly:
-      // no artistId → empty; success → releases; failure → throw (client
-      // refetch remains the fallback). serializeForResponse matches the
-      // route's JSON shape (Date → ISO string).
-      queryFn: async () => {
-        if (!primaryArtistId) {
-          return { releases: [] };
-        }
-        const result = await ReleaseService.getArtistOtherReleases(primaryArtistId, releaseId);
-        if (!result.success) {
-          throw new Error(result.error);
-        }
-        return { releases: serializeForResponse(result.data) };
-      },
-    }),
-  ]);
-
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <PageContainer>
-        <ContentContainer>
-          <ReleaseDetailContent releaseId={releaseId} autoPlay={autoPlay} />
-        </ContentContainer>
-      </PageContainer>
-    </HydrationBoundary>
-  );
+  const target = isValidObjectId(releaseId)
+    ? await ReleaseService.getPublishedReleaseRedirectTarget(releaseId)
+    : null;
+  if (!target) notFound();
+  permanentRedirect(releaseDeepLinkHref(target.artistSlug, releaseId));
 }

@@ -8,7 +8,6 @@ import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
   Release,
-  ReleaseCarouselItem,
   ReleaseListItem,
 } from '@/lib/types/media-models';
 
@@ -82,11 +81,6 @@ export const releaseListItemSchema = releaseScalarSchema.extend({
     })
   ),
 }) satisfies z.ZodType<ReleaseListItem>;
-
-/** Lightweight `Release` with only images, for the related-releases carousel. */
-export const releaseCarouselItemSchema = releaseScalarSchema.extend({
-  images: z.array(imageSchema),
-}) satisfies z.ZodType<ReleaseCarouselItem>;
 
 /** A listing credit's artist: name fields, slug, and the public gate fields. */
 const publishedReleaseListingArtistSchema = z.object({

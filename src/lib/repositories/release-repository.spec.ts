@@ -780,23 +780,56 @@ describe('ReleaseRepository', () => {
         include: detailSelect,
       });
     });
+
+    it('also requires a credit by the public artist when given a slug, band releases included', async () => {
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(null);
+
+      await ReleaseRepository.findPublishedWithTracks('release-123', 'e2e-artist');
+
+      expect(prisma.release.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'release-123',
+          ...releaseWhere.listed,
+          artistReleases: {
+            some: {
+              artist: {
+                is: {
+                  OR: [
+                    { slug: 'e2e-artist', ...publicArtistWhere },
+                    {
+                      ...publicArtistWhere,
+                      members: {
+                        some: { member: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        include: detailSelect,
+      });
+    });
   });
 
-  describe('findPublishedByArtistExcluding', () => {
-    it('filters by a public artist, excludes the current release, published-only, single image', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
+  describe('findPublishedCredits', () => {
+    it('reads a listed release’s full credit order with each artist’s slug and public gate', async () => {
+      const credits = { artistReleases: [] };
+      vi.mocked(prisma.release.findFirst).mockResolvedValue(credits as never);
 
-      await ReleaseRepository.findPublishedByArtistExcluding('artist-1', 'release-123');
+      const result = await ReleaseRepository.findPublishedCredits('release-123');
 
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: {
-          artistReleases: { some: { artistId: 'artist-1', artist: { is: publicArtistWhere } } },
-          id: { not: 'release-123' },
-          ...releaseWhere.listed,
-        },
-        orderBy: { releasedOn: 'desc' },
-        include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      expect(result).toBe(credits);
+      expect(prisma.release.findFirst).toHaveBeenCalledWith({
+        where: { id: 'release-123', ...releaseWhere.listed },
+        select: {
+          artistReleases: {
+            orderBy: creditOrderBy,
+            select: {
+              artist: { select: { slug: true, publishedOn: true, deletedOn: true } },
+            },
+          },
         },
       });
     });

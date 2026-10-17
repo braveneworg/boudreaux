@@ -21,6 +21,7 @@ import {
   SPOTLIGHT_GRID_CLASS,
 } from '@/lib/utils/spotlight-card';
 
+import { DeepLinkPlayDialog, type DeepLinkRelease } from './deep-link-play-dialog';
 import { ReleaseSearchCombobox } from './release-search-combobox';
 import { SpotlightCard } from './spotlight-card';
 
@@ -133,11 +134,19 @@ const ReleasesHeader = ({
   </div>
 );
 
-interface ReleasesContentProps {
+interface ReleasesListingProps {
   /** Artist slug from `/releases?artist=`: list only that artist's releases. */
-  artist?: string;
+  artist: string;
   /** The display name of the `artist` slug's artist, named under the wordmark. */
-  artistName?: string;
+  artistName: string;
+}
+
+interface ReleasesContentProps extends Partial<ReleasesListingProps> {
+  /**
+   * The release a deep link (`&release=<id>`) names, resolved by the page:
+   * its listening modal opens on arrival. `null` when there is none.
+   */
+  initialRelease?: DeepLinkRelease | null;
 }
 
 /**
@@ -156,11 +165,25 @@ interface ReleasesContentProps {
  * cap on the card count. The search combobox is self-contained and queries
  * the server directly (across every artist), so it is not coupled to the
  * loaded pages.
+ *
+ * With an `initialRelease` (a release deep link) that release's listening
+ * modal opens over the filtered grid on arrival.
  */
 export const ReleasesContent = ({
   artist = '',
   artistName = '',
-}: ReleasesContentProps): ReactElement => {
+  initialRelease = null,
+}: ReleasesContentProps): ReactElement => (
+  <>
+    <ReleasesListing artist={artist} artistName={artistName} />
+    {initialRelease && artist ? (
+      <DeepLinkPlayDialog release={initialRelease} artistSlug={artist} />
+    ) : null}
+  </>
+);
+
+/** The search, the wordmark and the paged cover grid, in their loading, error and empty states. */
+const ReleasesListing = ({ artist, artistName }: ReleasesListingProps): ReactElement => {
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfinitePublishedReleasesQuery('', artist);
   const showAllArtistsLink = artist !== '';
