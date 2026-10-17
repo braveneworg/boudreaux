@@ -57,10 +57,11 @@ const videoRowResponse = {
 const getOptions = (
   sort: 'asc' | 'desc' = 'desc',
   search = '',
-  overrides: InfiniteQueryOptionsOverride<PublishedVideosPaginatedResponse> = {}
+  overrides: InfiniteQueryOptionsOverride<PublishedVideosPaginatedResponse> = {},
+  artist = ''
 ): PublishedVideosQueryOptions => {
   useInfiniteQueryMock.mockReturnValue({ isPending: true });
-  renderHook(() => useInfinitePublishedVideosQuery(sort, search, overrides));
+  renderHook(() => useInfinitePublishedVideosQuery(sort, search, artist, overrides));
   return useInfiniteQueryMock.mock.calls.at(-1)?.[0] as PublishedVideosQueryOptions;
 };
 
@@ -72,19 +73,25 @@ describe('useInfinitePublishedVideosQuery', () => {
   it('keys the query by the published-infinite sort', () => {
     const opts = getOptions('asc');
 
-    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'asc', '']);
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'asc', '', '']);
   });
 
   it('defaults the sort to desc', () => {
     const opts = getOptions();
 
-    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', '']);
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', '', '']);
   });
 
   it('keys the query by the normalized search term', () => {
     const opts = getOptions('desc', '  Rock  ');
 
-    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', 'rock']);
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', 'rock', '']);
+  });
+
+  it('keys the query by the artist slug', () => {
+    const opts = getOptions('desc', '', {}, 'marguerite-ash');
+
+    expect(opts.queryKey).toEqual(['videos', 'publishedInfinite', 'desc', '', 'marguerite-ash']);
   });
 
   it('starts pagination at skip 0', () => {
@@ -131,6 +138,25 @@ describe('useInfinitePublishedVideosQuery', () => {
       `/api/videos?listing=published&skip=0&take=${PUBLISHED_VIDEOS_PAGE_SIZE}&sort=desc&search=Rock`,
       { signal }
     );
+  });
+
+  it('appends the artist param to the listing request when set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ rows: [videoRowResponse], nextSkip: null }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const opts = getOptions('desc', '', {}, 'marguerite-ash');
+    const { signal } = new AbortController();
+
+    await opts.queryFn({ pageParam: 0, signal });
+
+    expect(fetchMock.mock.calls).toEqual([
+      [
+        `/api/videos?listing=published&skip=0&take=${PUBLISHED_VIDEOS_PAGE_SIZE}&sort=desc&artist=marguerite-ash`,
+        { signal },
+      ],
+    ]);
   });
 
   it('parses the wire row back into coerced Date and bigint fields', async () => {

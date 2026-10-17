@@ -229,6 +229,16 @@ describe('VideoService', () => {
       expect(VideoRepository.findPublished).toHaveBeenCalledWith({ search: 'blues' });
     });
 
+    it('forwards the artist filter to the repository', async () => {
+      vi.mocked(VideoRepository.findPublished).mockResolvedValueOnce([]);
+
+      await VideoService.getPublishedVideos({ artist: 'marguerite-ash' });
+
+      expect(vi.mocked(VideoRepository.findPublished).mock.calls).toEqual([
+        [{ artist: 'marguerite-ash' }],
+      ]);
+    });
+
     it('maps a DataError to a failure response', async () => {
       vi.mocked(VideoRepository.findPublished).mockRejectedValue(
         new DataError('UNAVAILABLE', 'Connection failed')

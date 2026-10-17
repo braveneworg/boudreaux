@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
+import { publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
 import { VideoRepository, type VideoSummary } from './video-repository';
@@ -250,6 +251,39 @@ describe('VideoRepository', () => {
       expect(arg?.where).toEqual({
         AND: [notArchived, videoLiveAt(expect.any(Date) as Date)],
       });
+    });
+
+    // `/videos?artist=<slug>`: only the videos credited to that public artist.
+    it('narrows to the video credits of the public artist with the slug', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValueOnce([] as never);
+
+      await VideoRepository.findPublished({ artist: 'marguerite-ash' });
+
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
+      expect(arg?.where).toEqual({
+        AND: [
+          notArchived,
+          videoLiveAt(expect.any(Date) as Date),
+          {
+            videoArtists: {
+              some: { artist: { is: { slug: 'marguerite-ash', ...publicArtistWhere } } },
+            },
+          },
+        ],
+      });
+    });
+
+    it('keeps the search OR beside the artist filter', async () => {
+      vi.mocked(prisma.video.findMany).mockResolvedValueOnce([] as never);
+
+      await VideoRepository.findPublished({ artist: 'marguerite-ash', search: 'basement' });
+
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
+      expect(arg?.where?.AND).toHaveLength(3);
+      expect(arg?.where?.OR).toEqual([
+        { title: { contains: 'basement', mode: 'insensitive' } },
+        { artist: { contains: 'basement', mode: 'insensitive' } },
+      ]);
     });
   });
 

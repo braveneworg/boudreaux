@@ -291,15 +291,28 @@ describe('queryKeys', () => {
         'publishedInfinite',
         'asc',
         'rock',
+        '',
       ]);
     });
 
-    it('should default the publishedInfinite search segment to empty', () => {
+    it('should default the publishedInfinite search and artist segments to empty', () => {
       expect(queryKeys.videos.publishedInfinite('desc')).toEqual([
         'videos',
         'publishedInfinite',
         'desc',
         '',
+        '',
+      ]);
+    });
+
+    // A slug is matched as stored, so its case is kept; only the edges are trimmed.
+    it('should key publishedInfinite by the trimmed artist slug, case kept', () => {
+      expect(queryKeys.videos.publishedInfinite('desc', '', ' Marguerite-Ash ')).toEqual([
+        'videos',
+        'publishedInfinite',
+        'desc',
+        '',
+        'Marguerite-Ash',
       ]);
     });
 

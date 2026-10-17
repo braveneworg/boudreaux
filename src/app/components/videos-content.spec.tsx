@@ -101,7 +101,7 @@ describe('VideosContent sorting', () => {
   it('defaults to newest-first sort', () => {
     render(<VideosContent />);
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '', '');
   });
 
   it('sorts oldest first when that toggle is selected', async () => {
@@ -109,7 +109,7 @@ describe('VideosContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('asc', '');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('asc', '', '');
   });
 
   it('returns to newest first when that toggle is reselected', async () => {
@@ -118,7 +118,7 @@ describe('VideosContent sorting', () => {
     await userEvent.click(screen.getByRole('radio', { name: /oldest first/i }));
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '', '');
   });
 
   it('keeps the current sort when the selection is cleared', async () => {
@@ -126,7 +126,7 @@ describe('VideosContent sorting', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: /newest first/i }));
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '', '');
   });
 
   it('dresses the sort toggle in the punk-zine frame', () => {
@@ -200,7 +200,7 @@ describe('VideosContent search', () => {
 
     await userEvent.type(await openSearch(), 'basement');
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'basement');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'basement', '');
   });
 
   it('trims the search term before querying', async () => {
@@ -208,7 +208,7 @@ describe('VideosContent search', () => {
 
     await userEvent.type(await openSearch(), '  Rock ');
 
-    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'Rock');
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', 'Rock', '');
   });
 
   it('shows a no-match message when a search returns nothing', async () => {
@@ -426,6 +426,44 @@ describe('VideosContent list', () => {
     render(<VideosContent />);
 
     expect(screen.getByText(/loading more videos/i)).toBeInTheDocument();
+  });
+});
+
+describe('VideosContent artist filter', () => {
+  const ALL_ARTISTS_LINK = 'View videos by all artists';
+
+  it('lists only the filtered artist’s videos with an artist filter', () => {
+    render(<VideosContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    expect(useInfinitePublishedVideosQuery).toHaveBeenLastCalledWith('desc', '', 'e2e-artist');
+  });
+
+  it('names the filtered artist above the listing', () => {
+    render(<VideosContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Videos by E2E Artist' })
+    ).toBeInTheDocument();
+  });
+
+  it('links back to every artist’s videos when filtered', () => {
+    render(<VideosContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    expect(screen.getByRole('link', { name: ALL_ARTISTS_LINK })).toHaveAttribute('href', '/videos');
+  });
+
+  it('names no artist and shows no all-artists link without a filter', () => {
+    render(<VideosContent />);
+
+    expect(screen.queryByRole('heading', { level: 2, name: /^Videos by/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: ALL_ARTISTS_LINK })).toBeNull();
+  });
+
+  it('keeps the artist’s name in the empty state of a filtered listing', () => {
+    render(<VideosContent artist="e2e-artist" artistName="E2E Artist" />);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Videos by E2E Artist' })).toBeVisible();
+    expect(screen.getByText(/no videos yet/i)).toBeInTheDocument();
   });
 });
 
