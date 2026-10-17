@@ -164,17 +164,20 @@ shows the newest published Releases instead.
 _Avoid_: featured artist, featured release, spotlight artist.
 
 **listed artist** — an Artist shown on the public artists index and found by
-its search: published, not deleted, and directly credited (primary or
-featured) on at least one published Release. A member credit alone does not
-list an Artist. The home search is wider: see **home search match**. See
-[ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md).
+its search: a **public artist** directly credited (primary or featured) on at
+least one published Release, or holding a **video credit** on at least one
+**live** Video. A member credit alone does not list an Artist. The playlist
+"By artist" search is narrower: it reads Release credits only. See
+[ADR-0007](docs/adr/0007-artists-index-lists-only-directly-credited-artists.md)
+and
+[ADR-0022](docs/adr/0022-an-artist-with-a-live-video-is-listed.md).
 _Avoid_: visible artist.
 
 **home search match** — a **public artist** the home page search can find: one
 with a direct credit (primary or featured) on a published Release that has a
 **playable format** with a file, or a **video credit** on a **live** Video.
-Wider than **listed artist**: an Artist with only video credits is a home
-search match but is not listed. A match lists its playable Releases and its
+Narrower than **listed artist**: an Artist whose only Releases cannot be
+played is listed but is not a home search match. A match lists its playable Releases and its
 live Videos; a Release that cannot be played is never a row.
 _Avoid_: findable artist.
 
@@ -184,7 +187,7 @@ appears on a public surface unless the Artist is public. "Published" alone
 means only that a publication date is recorded; a published Artist that is
 deleted is still hidden. Whether the Artist is still on the label plays no
 part. Every **listed artist** is a public artist; a public artist with no
-direct credit is not listed. See
+direct credit and no video credit is not listed. See
 [ADR-0015](docs/adr/0015-a-release-publishes-its-credited-artists-only-by-confirmation.md)
 and
 [ADR-0016](docs/adr/0016-an-artist-is-public-whether-or-not-it-is-still-on-the-label.md).

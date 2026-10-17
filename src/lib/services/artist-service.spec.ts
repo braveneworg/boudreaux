@@ -2385,6 +2385,7 @@ describe('ArtistService', () => {
           },
         },
       ],
+      videoArtists: [{ video: { releasedOn: new Date('2025-02-01') } }],
     };
 
     const filters = { sort: 'alpha' as const, skip: 0, take: 24 };
@@ -2444,6 +2445,12 @@ describe('ArtistService', () => {
       const row = await listOne();
 
       expect(row).not.toHaveProperty('releases');
+    });
+
+    it('does not expose the raw video joins on the row', async () => {
+      const row = await listOne();
+
+      expect(row).not.toHaveProperty('videoArtists');
     });
 
     it('resolves the display images: a human choice beats the suggested images', async () => {

@@ -1344,7 +1344,8 @@ const seedTestDatabase = async () => {
     // E2E Band: a listed band whose only member is E2E Artist, with one
     // published, format-less single (no player ever sees it). Exercises the
     // the "Formed 2010" year, genre search
-    // ("Punk"), and the newest-release sort (2025 beats E2E Artist's 2024).
+    // ("Punk"), and the newest sort (2025 beats E2E Artist's 2024 release,
+    // but not the live E2E Video Alpha credited to E2E Artist — ADR-0022).
     // createdAt is pinned far in the past so the band never becomes the admin
     // list's first row (the bio-generation spec regenerates that artist).
     const e2eBand = await prisma.artist.create({

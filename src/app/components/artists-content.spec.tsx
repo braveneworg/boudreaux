@@ -110,10 +110,10 @@ describe('ArtistsContent sorting', () => {
     expect(screen.getByRole('radiogroup', { name: 'Sort artists' })).toBeInTheDocument();
   });
 
-  it('sorts by newest release when that toggle is selected', async () => {
+  it('sorts by newest when that toggle is selected', async () => {
     render(<ArtistsContent />);
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Newest release' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Newest' }));
 
     expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('newest', '');
   });
@@ -121,7 +121,7 @@ describe('ArtistsContent sorting', () => {
   it('returns to A–Z when that toggle is reselected', async () => {
     render(<ArtistsContent />);
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Newest release' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Newest' }));
     await userEvent.click(screen.getByRole('radio', { name: 'A–Z' }));
 
     expect(useInfinitePublishedArtistsQuery).toHaveBeenLastCalledWith('alpha', '');
@@ -368,7 +368,7 @@ describe('ArtistsContent list', () => {
   it('sizes each sort option to its own label so the longer one cannot overflow', () => {
     render(<ArtistsContent />);
 
-    const newest = screen.getByRole('radio', { name: 'Newest release' });
+    const newest = screen.getByRole('radio', { name: 'Newest' });
     expect(newest).toHaveClass('flex-none');
     expect(newest).not.toHaveClass('flex-1');
   });

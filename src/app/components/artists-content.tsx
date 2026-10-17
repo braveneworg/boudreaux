@@ -31,7 +31,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** The sort toggle's options, in the order they read left to right. */
 const ARTIST_SORT_OPTIONS: ReadonlyArray<{ value: ArtistListingSort; label: string }> = [
   { value: 'alpha', label: 'A–Z' },
-  { value: 'newest', label: 'Newest release' },
+  { value: 'newest', label: 'Newest' },
 ];
 
 /** Whether a toggle value is one of the listing's sort orders. */
@@ -114,7 +114,7 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
 /**
  * Client content island for the public `/artists` index.
  *
- * Pages through listed artists (ADR-0007) with infinite scroll; the first page
+ * Pages through listed artists (ADR-0007, ADR-0022) with infinite scroll; the first page
  * is hydrated from the SSR prefetch (A–Z). The index is one list: whether an
  * artist is still on the label plays no part (ADR-0016). A toolbar carries an
  * A–Z / newest-release sort toggle and a debounced search combobox — whose
