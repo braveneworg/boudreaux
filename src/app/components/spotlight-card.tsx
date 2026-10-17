@@ -53,11 +53,7 @@ interface SpotlightCardCaptionProps {
   caption: SpotlightCaption;
 }
 
-/**
- * The centered caption under a cover (see {@link SpotlightCard}): a semibold
- * artist line, a link when the artist has a slug and plain text when not, and
- * none when there is no artist name; then the title line.
- */
+/** The props a linked modal heading passes to `ReleasePlayDialog`. */
 interface LinkedHeadingProps {
   artistHref?: string;
   year?: number;
@@ -110,6 +106,11 @@ const useOpenAccent = (
   };
 };
 
+/**
+ * The centered caption under a cover (see {@link SpotlightCard}): a semibold
+ * artist line, a link when the artist has a slug and plain text when not, and
+ * none when there is no artist name; then the title line.
+ */
 const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): ReactElement => {
   const { title, year, artistName, artistSlug } = card;
   const onReleases = caption === 'releases';
