@@ -76,6 +76,8 @@ export interface UseDownloadDialogStateReturn {
   handlePurchaseError: (msg: string) => void;
   handleOpenChange: (nextOpen: boolean) => void;
   handleDialogDownloadComplete: () => void;
+  /** Leave the free step for the paid path: Pay what you want selected on the download step. */
+  handleChoosePaid: () => void;
 }
 
 const INITIAL_STEP: DialogStep = 'download';
@@ -159,6 +161,15 @@ const resolvePremiumCents = (
     return { ok: false, field: 'finalAmount', message: 'Minimum amount is $0.50' };
   }
   return { ok: true, cents };
+};
+
+/** Back to the download step with Pay what you want selected: the paid path. */
+const choosePaidPath = (
+  form: ReturnType<typeof useForm<DownloadFormSchemaType>>,
+  setStep: Dispatch<SetStateAction<DialogStep>>
+): void => {
+  form.setValue('downloadOption', 'premium-digital');
+  setStep('download');
 };
 
 /** State setters + values the dialog step handlers close over. */
@@ -263,7 +274,6 @@ const useDownloadDialogHandlers = (deps: DialogHandlerDeps): DialogHandlers => {
     () => handleOpenChange(false),
     [handleOpenChange]
   );
-
   return {
     handleSubmit,
     handleEmailConfirm,
@@ -333,6 +343,8 @@ export const useDownloadDialogState = ({
     setPurchaseError,
   });
 
+  const handleChoosePaid = (): void => choosePaidPath(form, setStep);
+
   return {
     open,
     step,
@@ -352,5 +364,6 @@ export const useDownloadDialogState = ({
     effectiveSuggestedPrice,
     displayAmount,
     ...handlers,
+    handleChoosePaid,
   };
 };
