@@ -2461,6 +2461,16 @@ describe('ArtistService', () => {
       return result.success ? result.data[0]?.newestRelease : undefined;
     };
 
+    it('has no newest release when the artist has no listed release', async () => {
+      vi.mocked(ArtistRepository.listListed).mockResolvedValueOnce([
+        { ...listingRecord, releases: [listingRecord.releases[3]] },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists(filters);
+
+      expect(result.success ? result.data[0]?.newestRelease : 'unexpected').toBeNull();
+    });
+
     it('gives the newest release no stream when it has no MP3 track', async () => {
       await expect(listWithNewest({ digitalFormats: [] })).resolves.toHaveProperty('playSrc', null);
     });

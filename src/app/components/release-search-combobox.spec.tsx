@@ -290,6 +290,19 @@ describe('ReleaseSearchCombobox', () => {
     expect(screen.getByLabelText('Search releases')).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('opens a pick with no cover art without one', async () => {
+    stubFetchReturning([
+      { ...mockReleases[0], coverArt: '', images: [] },
+    ] as unknown as PublishedReleaseListing[]);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.click(await screen.findByText('Midnight Serenade'));
+
+    expect(playDialog.openRelease.mock.calls[0]?.[1]).toHaveProperty('coverArtSrc', null);
+  });
+
   it('does nothing when an unplayable result is selected', async () => {
     stubFetchReturning(mockReleases);
     const user = setupUser();

@@ -292,6 +292,17 @@ describe('ReleasesPage', () => {
       ]);
     });
 
+    it('seeds BigInt fields as numbers, as the API serves them', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: true,
+        data: releaseWithTracks({ totalFileSize: BigInt(5_000_000) }),
+      });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(mockSetQueryData.mock.calls[0]?.[1]).toHaveProperty('totalFileSize', 5_000_000);
+    });
+
     it('takes the first release when the param repeats, trimmed', async () => {
       mockGetReleaseWithTracks.mockResolvedValueOnce({ success: true, data: releaseWithTracks() });
 

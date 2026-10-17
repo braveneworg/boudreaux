@@ -88,7 +88,7 @@ export const pickLoudZineAccent = (random: () => number = Math.random): LoudZine
  */
 export const zineAccentForRelease = (releaseId: string): LoudZineAccent => {
   const hash = [...releaseId].reduce(
-    (sum, character) => (sum * 31 + (character.codePointAt(0) ?? 0)) >>> 0,
+    (sum, character) => (sum * 31 + character.charCodeAt(0)) >>> 0,
     0
   );
   return LOUD_ZINE_ACCENTS[hash % LOUD_ZINE_ACCENTS.length];
