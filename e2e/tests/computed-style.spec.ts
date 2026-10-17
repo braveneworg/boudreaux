@@ -138,13 +138,23 @@ test.describe('Computed styles of shipped design decisions', () => {
       await resolvedColor(videosSort, '--card-accent-soft')
     );
 
+    // The search and its "(N videos)" count share the poster column: the row
+    // that holds them spans it, and the search ends before the count.
     const search = page.getByRole('button', { name: 'Search videos', exact: true });
     const posterColumn = page.getByRole('article').first().locator(':scope > *').first();
-    const [searchBox, posterBox] = await Promise.all([
-      search.boundingBox(),
-      posterColumn.boundingBox(),
-    ]);
-    expect(Math.abs((searchBox?.width ?? 0) - (posterBox?.width ?? -10))).toBeLessThanOrEqual(1);
+    await expect(search).toBeVisible();
+    await expect(posterColumn).toBeVisible();
+    const posterBox = await posterColumn.boundingBox();
+    const { rowWidth, searchRight, countLeft } = await search.evaluate((searchEl) => {
+      const countEl = searchEl.nextElementSibling;
+      return {
+        rowWidth: searchEl.parentElement?.getBoundingClientRect().width ?? 0,
+        searchRight: searchEl.getBoundingClientRect().right,
+        countLeft: countEl?.getBoundingClientRect().left ?? 0,
+      };
+    });
+    expect(Math.abs(rowWidth - (posterBox?.width ?? -10))).toBeLessThanOrEqual(1);
+    expect(countLeft).toBeGreaterThanOrEqual(searchRight);
   });
 
   // #757, #758: iOS zooms into a focused field under 16px.
