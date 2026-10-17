@@ -220,4 +220,51 @@ test.describe('Admin video poster capture', () => {
       expect(posterCandidates.map(({ url }) => url)).not.toContain(posterUrl);
     }).toPass({ timeout: 30_000 });
   });
+
+  // "Next 5 frames": a press captures the next sample window (10–12 s of the
+  // 12 s fixture), uploads it, stores it on the row with no Save, and grows the
+  // strip; a pick on one of the new frames is instant like any other. The
+  // window after that would start at 17 s, past the end, so the button then
+  // disables with its hint.
+  test('Next 5 frames appends a later window and a pick on it sticks', async ({ adminPage }) => {
+    test.slow();
+    const id = await uploadSource(adminPage, 'Next');
+    const frames = adminPage.getByRole('radiogroup', { name: 'Captured poster frames' });
+    await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES, { timeout: 30_000 });
+    await expect(async () => {
+      const { posterCandidates } = await storedPoster(id);
+      expect(posterCandidates).toHaveLength(CAPTURED_FRAMES);
+    }).toPass({ timeout: 30_000 });
+
+    const nextFrames = adminPage.getByRole('button', { name: 'Next 5 frames' });
+    await expect(nextFrames).toBeEnabled({ timeout: 15_000 });
+    await nextFrames.click();
+
+    await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES * 2, { timeout: 30_000 });
+    await expect(async () => {
+      const { posterCandidates } = await storedPoster(id);
+      expect(posterCandidates).toHaveLength(CAPTURED_FRAMES * 2);
+    }).toPass({ timeout: 30_000 });
+    // Every appended frame sits after the first window.
+    const labels = await frames
+      .getByRole('radio')
+      .evaluateAll((radios) => radios.map((radio) => radio.getAttribute('aria-label') ?? ''));
+    const seconds = labels.map((label) => Number(label.replace(/^Frame at |s$/g, '')));
+    expect(seconds.slice(CAPTURED_FRAMES).every((at) => at >= 10)).toBe(true);
+
+    await expect(nextFrames).toBeDisabled();
+    await expect(adminPage.getByText('No later frames in this video.')).toBeVisible();
+
+    const appended = frames.getByRole('radio').nth(CAPTURED_FRAMES);
+    const pickedName = await appended.getAttribute('aria-label');
+    await appended.click();
+    await expect(adminPage.getByText('Poster updated.')).toBeVisible({ timeout: 15_000 });
+    await adminPage.reload();
+    await expect(frames.getByRole('radio')).toHaveCount(CAPTURED_FRAMES * 2, { timeout: 15_000 });
+    await expect(frames.getByRole('radio', { checked: true })).toHaveAttribute(
+      'aria-label',
+      pickedName ?? '',
+      { timeout: 15_000 }
+    );
+  });
 });
