@@ -380,32 +380,47 @@ picked it or the release-date lookup filled it; Save and Publish still carry
 the whole form.
 
 **async job lifecycle** — the shared shape of every background job (bio
-generation, video enrichment): `pending → processing → succeeded/failed`, an
-atomic token claim, progress checkpoints, and client polling. Its decisions
-live in one pure, client-safe module with two deliberately different gate
-questions: **blocksNewTrigger** (a fresh `pending` blocks a new trigger — a
-queued job is a job) and **runnerShouldSkip** (only a fresh `processing` blocks
-the runner — `pending` is the handoff it consumes; collapsing the two
+generation, images-from-links, video enrichment): `pending → processing →
+succeeded/failed`, an atomic token claim, progress checkpoints, and client
+polling. Its decisions live in one pure, client-safe module, and its two
+gates are deliberately different: **blocksNewTrigger** (a fresh `pending`
+blocks a new trigger — a queued job is a job) and the **runner gate**, the
+begin write (`mayBeginRunWhere`: only a fresh `processing` stops a run from
+beginning — `pending` is the handoff it consumes; collapsing the two
 deadlocks). An in-flight job older than the **stale window** (`STALE_JOB_MS`,
 above the Lambda's ceiling) is **stale-coerced** to `failed` on read, without
 writing; the **client poll deadline** (`CLIENT_POLL_DEADLINE_MS`) exceeds the
-stale window so the server's coercion resolves the UI first. Its client
-half, **job run** (`useJobRun`), tracks one run from its trigger to one
-surfaced outcome: it re-reads the status before tracking, so a terminal
-state cached from a previous run is never this run's result, and resumes a
-run found in flight after a reload.
-_Defined in_ `src/lib/utils/async-job-lifecycle.ts` and
+stale window so the server's coercion resolves the UI first. Its server half
+is the **job runner**. Its client half, **job run** (`useJobRun`), tracks one
+run from its trigger to one surfaced outcome: it re-reads the status before
+tracking, so a terminal state cached from a previous run is never this run's
+result, and resumes a run found in flight after a reload.
+_Defined in_ `src/lib/utils/async-job-lifecycle.ts`,
+`src/lib/services/job-runner/` and
 `src/app/components/forms/_hooks/use-job-run.ts`.
+
+**job runner** — the server half of the **async job lifecycle**: one module
+every background job plugs into through an adapter, which supplies the job's
+state reads and writes, its Lambda payload, its fake data and its copy. The
+runner owns the rest once: the trigger (not found, refused, in-flight echo,
+`pending`), the run (begin, token, signing key, invoke), the stale-coerced
+status view, the single-use claim, progress checkpoints and the completion.
+The Lambda invoke is a port with a production adapter and one local adapter
+shared by every job (`BIO_GENERATOR_FAKE=true`), which POSTs signed
+checkpoints and callbacks to the real routes.
+_Defined in_ `src/lib/services/job-runner/`.
 
 **signed callback** — a Lambda → app callback or progress POST whose raw body
 is HMAC-signed in the `x-job-signature` header with a **job signing key**: a
 per-job key the app derives at dispatch from the app-only `JOB_CALLBACK_SECRET`
 and the job token, hands to the Lambda inside the invoke payload, and never
 stores. The route re-derives the key from the stored token and verifies before
-the token compare, so a leaked job token alone can't forge a callback.
+the token compare, so a leaked job token alone can't forge a callback. One
+route factory serves every job's callback and progress routes.
 See [ADR-0014](docs/adr/0014-lambda-callbacks-are-hmac-signed.md).
-_Defined in_ `packages/job-contract/src/signing.ts` and
-`src/lib/services/lambda-dispatch.ts`.
+_Defined in_ `packages/job-contract/src/signing.ts`,
+`src/lib/services/lambda-dispatch.ts` and
+`src/lib/decorators/signed-callback-route.ts`.
 
 **bio generation job** — an asynchronous run that produces an Artist's bio via
 the `bio-generator` Lambda, following the **async job lifecycle** and reporting

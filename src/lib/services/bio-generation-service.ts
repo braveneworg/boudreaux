@@ -3,21 +3,21 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
-
-import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { MAX_LAMBDA_RELEASES } from '@fakefour/job-contract';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
-import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import {
+  ArtistRepository,
+  type BioGenerationStateRecord,
+} from '@/lib/repositories/artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
+import type { JobAdapter, JobTypes } from '@/lib/services/job-runner/types';
 import type { BioImageFingerprint } from '@/lib/types/domain/artist';
 import type { ReleaseCoverSource } from '@/lib/types/domain/release';
-import type { Json } from '@/lib/types/domain/shared';
 import { replaceBioImagePlaceholders } from '@/lib/utils/bio-image-placeholders';
 import { buildCdnImageVariantUrl } from '@/lib/utils/build-cdn-image-variant-url';
 import { composeBioFigures, type BioFigureImageMeta } from '@/lib/utils/compose-bio-figures';
-import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
 import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
@@ -31,29 +31,15 @@ import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import {
   bioProgressSchema,
   type BioGenerationData,
-  type BioGenerationResult,
   type BioGenerationStatusResult,
   type BioProgress,
   type BioProgressPayload,
   type BioStatus,
   type GeneratedBioContent,
 } from '@/lib/validation/bio-generation-schema';
-import {
-  isInFlightJobStatus,
-  resolveStaleJobView,
-  toAsyncJobStatus,
-} from '@/utils/async-job-lifecycle';
 
-import { type BioGenerationLambdaInput } from './bio-generation-fixture';
-import { dispatchBioGenerationLocally } from './bio-generation-local-dispatch';
+import { fakeBioGeneration, type BioGenerationLambdaInput } from './bio-generation-fixture';
 import { BioImageService } from './bio-image-service';
-import {
-  getLambdaClient,
-  signingKeyForJob,
-  tokensMatch,
-  verifyJobCallback,
-  type CallbackProof,
-} from './lambda-dispatch';
 
 /** Derive a public real name for the metadata lookup (skip if pseudonymous). */
 const deriveRealName = (artist: {
@@ -558,25 +544,6 @@ export const persistGeneratedBio = async (
 };
 
 /**
- * Discriminated outcome of {@link BioGenerationService.runGenerationJob}. The
- * job is always dispatched across the seam (`dispatched`) and finished by the
- * completion callback, whether the AWS invoke or the local adapter carried it;
- * a run that never got that far resolves to `failed` with a message.
- */
-export type RunGenerationJobResult =
-  { status: 'dispatched' } | { status: 'skipped' } | { status: 'failed'; error: string };
-
-/** The artist row, once loaded and known to exist. */
-type LoadedArtist = NonNullable<Awaited<ReturnType<typeof ArtistRepository.findById>>>;
-
-/** Shared pre-invoke context: the artist, its catalog, and the built Lambda input. */
-type GenerationPrep = {
-  artist: LoadedArtist;
-  releases: ReleaseCoverSource[];
-  input: BioGenerationLambdaInput;
-};
-
-/**
  * Cap on how many reference images the Lambda receives per run — enough to give
  * Rekognition a strong face signal without inflating the invoke payload.
  */
@@ -603,16 +570,21 @@ export const buildReferenceImageUrls = (customBioImageUrls: string[]): string[] 
   return result;
 };
 
+/** What a bio trigger hands the run: the admin's optional reference links and description. */
+interface BioGenerationInput {
+  links?: string[];
+  description?: string;
+}
+
 /**
  * Read the artist, guard it has a usable name, prefetch its published releases
- * (non-fatal on failure), and assemble the Lambda input. Shared by the fake and
- * real generation paths. Returns a typed error when the artist is missing or has
- * no name to ground on.
+ * (non-fatal on failure), and assemble the Lambda input. Returns a typed error
+ * when the artist is missing or has no name to ground on.
  */
 const prepareGeneration = async (
   artistId: string,
-  opts: { links?: string[]; description?: string }
-): Promise<{ ok: true; prep: GenerationPrep } | { ok: false; error: string }> => {
+  opts: BioGenerationInput
+): Promise<{ ok: true; request: BioGenerationLambdaInput } | { ok: false; error: string }> => {
   const artist = await ArtistRepository.findById(artistId);
   if (!artist) {
     return { ok: false, error: 'Artist not found.' };
@@ -649,7 +621,7 @@ const prepareGeneration = async (
 
   const referenceImageUrls = buildReferenceImageUrls(customBioImageUrls);
 
-  const input: BioGenerationLambdaInput = {
+  const request: BioGenerationLambdaInput = {
     artistId: artist.id,
     displayName,
     realName: deriveRealName(artist),
@@ -664,153 +636,94 @@ const prepareGeneration = async (
     referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
   };
 
-  return { ok: true, prep: { artist, releases, input } };
+  return { ok: true, request };
 };
 
+/** The bio generation job's types (see the job runner). */
+interface BioGenerationJobTypes extends JobTypes {
+  record: BioGenerationStateRecord;
+  input: BioGenerationInput;
+  request: BioGenerationLambdaInput;
+  data: BioGenerationData;
+  claim: { slug: string };
+  persisted: void;
+  checkpoint: BioProgressPayload;
+  progress: BioProgress;
+}
+
 /**
- * Real (async) path: mint a per-job token + callback URL, store the token, and
- * fire the `Event` invoke. Leaves the artist `processing` — the Lambda's
- * callback finishes the job. Fails (clearing the token) when the callback URL is
- * unconfigured or the invoke cannot be dispatched.
+ * Observable in-flight window for the local adapter. The real Lambda takes
+ * minutes and streams stage checkpoints; the fixture resolves instantly, so the
+ * adapter pauses to give the polled admin timeline (2.5s) a window to render a
+ * checkpoint before the run completes. Overridable via
+ * `BIO_GENERATOR_FAKE_DELAY_MS`; unit tests set `0`.
  */
-const dispatchGeneration = async (prep: GenerationPrep): Promise<RunGenerationJobResult> => {
-  const jobToken = randomUUID();
-  const base = resolveEnrichmentBaseUrl();
-  if (!base) {
-    const error = 'Bio generator callback URL is not configured';
-    await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error });
-    return { status: 'failed', error };
-  }
-
-  const callbackUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/callback`;
-  const progressUrl = `${base}/api/artists/${prep.artist.id}/bio-generation/progress`;
-  // Derived before the token is stored, so a missing secret fails the job
-  // (via runGenerationJob's catch) without leaving a claimable token behind.
-  const signingKey = signingKeyForJob({
-    kind: 'bio-generation',
-    entityId: prep.artist.id,
-    jobToken,
-  });
-
-  await ArtistRepository.setBioJobToken(prep.artist.id, jobToken);
-  const ack = await BioGenerationService.generate({
-    ...prep.input,
-    callbackUrl,
-    progressUrl,
-    jobToken,
-    signingKey,
-  });
-  if (!ack.ok) {
-    await ArtistRepository.setBioStatus(prep.artist.id, 'failed', { error: ack.error });
-    await ArtistRepository.setBioJobToken(prep.artist.id, null);
-    return { status: 'failed', error: ack.error };
-  }
-
-  return { status: 'dispatched' };
-};
+const FAKE_BIO_DELAY_MS = 4000;
 
 /**
- * Coerce a stored (loosely-typed JSON) progress value into a validated
- * {@link BioProgress}, returning `null` for absent or malformed data so the
- * timeline degrades to "no stage" rather than surfacing a garbage checkpoint.
+ * The bio generation job, as the job runner sees it: the artist's `bio*`
+ * lifecycle columns, the bio callback and progress routes, the Lambda input,
+ * and the persistence that replaces the artist's bio content.
  */
-const parseStoredProgress = (value: Json | null): BioProgress | null => {
-  const parsed = bioProgressSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+export const bioGenerationJob: JobAdapter<BioGenerationJobTypes> = {
+  kind: 'bio-generation',
+  copy: {
+    notFound: 'Artist not found.',
+    noCallbackUrl: 'Bio generator callback URL is not configured',
+    notConfigured: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+    unreachable: 'Failed to reach the bio generator',
+    runFailed: 'Bio generation failed unexpectedly.',
+    persistFailed: 'Bio persistence failed.',
+  },
+  callbackPath: (artistId) => `/api/artists/${artistId}/bio-generation/callback`,
+  progress: {
+    path: (artistId) => `/api/artists/${artistId}/bio-generation/progress`,
+    schema: bioProgressSchema,
+    write: (artistId, progress) => ArtistRepository.setBioProgress(artistId, progress),
+  },
+  fake: {
+    delayMs: FAKE_BIO_DELAY_MS,
+    checkpoint: () => ({ stage: 'vision-gating', counts: { candidates: 3 } }),
+    result: (payload) => fakeBioGeneration(payload),
+  },
+
+  read: (artistId) => ArtistRepository.getBioGenerationState(artistId),
+  state: ({ bioStatus, bioStartedAt, bioError, bioJobToken, bioProgress }) => ({
+    status: bioStatus,
+    startedAt: bioStartedAt,
+    error: bioError ?? null,
+    jobToken: bioJobToken,
+    progress: bioProgress,
+  }),
+  claimContext: ({ slug }) => ({ slug }),
+
+  markPending: (artistId, startedAt) =>
+    ArtistRepository.setBioStatus(artistId, 'pending', { error: null, startedAt }),
+  begin: (artistId, now) => ArtistRepository.beginBioRun(artistId, now),
+  setToken: (artistId, token) => ArtistRepository.setBioJobToken(artistId, token),
+  claimToken: (artistId, token) => ArtistRepository.claimBioJobToken(artistId, token),
+  recordFailed: (artistId, error) => ArtistRepository.setBioStatus(artistId, 'failed', { error }),
+  recordSucceeded: (artistId) =>
+    ArtistRepository.setBioStatus(artistId, 'succeeded', { error: null }),
+
+  prepare: prepareGeneration,
+  // Re-fetches the catalog for the release links (non-fatal on failure); the
+  // slug names the artist's own releases listing in each deep link.
+  persist: async (artistId, data, { slug }) => {
+    const releases = await ReleaseRepository.findPublishedByArtistWithCovers(artistId).catch(
+      () => [] as ReleaseCoverSource[]
+    );
+    await persistGeneratedBio(artistId, data, releases, slug);
+  },
 };
 
 /**
- * Service boundary for AI bio generation. Owns the full business flow: read the
- * artist, invoke the `bio-generator` Lambda, sanitize the result, and persist
- * it through the repository. The low-level {@link BioGenerationService.generate}
- * is the Lambda/fixture seam used internally and in unit tests.
- *
- * In E2E and local dev (`BIO_GENERATOR_FAKE=true`) the Lambda call returns a
- * deterministic fixture so flows are testable without AWS or a Gemini key.
+ * Service boundary for AI bio generation: the polled status read. The job
+ * itself runs through the job runner with {@link bioGenerationJob}.
  */
 export class BioGenerationService {
-  /**
-   * Fires a fire-and-forget `Event` invoke of the bio-generator Lambda. The
-   * Lambda returns 202 immediately and POSTs its result to the callback URL, so
-   * there is no response body to read. Never throws across the boundary.
-   *
-   * @param input - Artist names/context plus `callbackUrl`/`jobToken` for the
-   *   out-of-band completion callback.
-   * @returns A fire acknowledgement — `{ ok: true }` once dispatched, or a typed
-   *   error when the function name is unset or the invoke cannot be reached.
-   */
-  static async generate(
-    input: BioGenerationLambdaInput
-  ): Promise<{ ok: true } | { ok: false; error: string }> {
-    // Adapter selection, made once, at the seam. The local adapter POSTs the
-    // same progress and callback the Lambda does, so everything downstream of
-    // this line is identical on both paths.
-    if (process.env.BIO_GENERATOR_FAKE === 'true') {
-      return dispatchBioGenerationLocally(input);
-    }
-
-    const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
-    if (!functionName) {
-      return {
-        ok: false,
-        error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-      };
-    }
-
-    try {
-      const command = new InvokeCommand({
-        FunctionName: functionName,
-        // Fire-and-forget: 202 + empty payload; the result arrives via callback.
-        InvocationType: 'Event',
-        Payload: Buffer.from(JSON.stringify(input)),
-      });
-      await getLambdaClient().send(command);
-      return { ok: true };
-    } catch (error) {
-      loggers.media.error('Bio generation invoke failed', error);
-      return { ok: false, error: 'Failed to reach the bio generator' };
-    }
-  }
-
-  /**
-   * Runs a generation as a background job and records its lifecycle on the
-   * artist. Flips to `processing`, prepares the shared input, then branches:
-   * the fake/E2E path finishes in-process and sets `succeeded`; the real path
-   * fires an async `Event` invoke, leaving the artist `processing` for the
-   * Lambda's callback to complete. Never throws — it is scheduled via Next.js
-   * `after()`, where an unhandled rejection would be lost.
-   *
-   * @param artistId - The artist to generate for.
-   * @param opts - Optional admin-supplied reference links and description.
-   */
-  static async runGenerationJob(
-    artistId: string,
-    opts: { links?: string[]; description?: string } = {}
-  ): Promise<RunGenerationJobResult> {
-    // One conditional write begins the run; a second runner for the same job
-    // (the trigger and a retry, two admins) loses here instead of invoking
-    // the Lambda twice.
-    if (!(await ArtistRepository.beginBioRun(artistId, new Date()))) {
-      return { status: 'skipped' };
-    }
-    try {
-      const prepared = await prepareGeneration(artistId, opts);
-      if (!prepared.ok) {
-        await ArtistRepository.setBioStatus(artistId, 'failed', { error: prepared.error });
-        return { status: 'failed', error: prepared.error };
-      }
-
-      return await dispatchGeneration(prepared.prep);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Bio generation failed unexpectedly.';
-      await ArtistRepository.setBioStatus(artistId, 'failed', { error: message });
-      return { status: 'failed', error: message };
-    }
-  }
-
   private static buildBioContent(
-    state: NonNullable<Awaited<ReturnType<typeof ArtistRepository.getBioGenerationState>>>,
+    state: BioGenerationStateRecord,
     status: BioStatus | null
   ): GeneratedBioContent | null {
     const hasPersistedMedia = state.bioImages.length > 0 || state.bioLinks.length > 0;
@@ -840,156 +753,10 @@ export class BioGenerationService {
       return null;
     }
 
-    // The shared read-time stale coercion: an in-flight job past STALE_JOB_MS
-    // reads as `failed` with the timeout copy (non-persistent — a late
-    // completion callback can still claim the underlying row).
-    const { status, error } = resolveStaleJobView({
-      status: toAsyncJobStatus(state.bioStatus),
-      startedAt: state.bioStartedAt,
-      error: state.bioError ?? null,
-    });
+    // The runner's status view: stale-coerced, with progress only while in flight.
+    const { status, error, progress } = jobRunner.view(bioGenerationJob, state);
     const content = BioGenerationService.buildBioContent(state, status);
 
-    // Surface progress only while the (post-coercion) status is in flight; once
-    // terminal — succeeded, failed, or stale-coerced to failed — there is no
-    // live stage to show, so the timeline resolves rather than lingering.
-    const progress = isInFlightJobStatus(status) ? parseStoredProgress(state.bioProgress) : null;
-
     return { status, error, content, progress };
-  }
-
-  /**
-   * Verifies an async completion callback and atomically claims the job so it can
-   * only be completed once, even under concurrent duplicate callbacks (AWS `Event`
-   * invoke is at-least-once and the Lambda's callback POST can retry). Returns the
-   * artist slug (for revalidation) only when the job is `processing`, the stored
-   * token constant-time-matches the callback's token, AND this caller wins the
-   * atomic `claimBioJobToken` (a conditional `updateMany` that clears the
-   * single-use token as it matches). Returns `null` — without touching the token —
-   * when the artist is missing, the job is not in flight, no token is stored, the
-   * body's signature does not verify under the key derived from the STORED token
-   * (ADR-0014 — a leaked token alone can't forge a callback), the token
-   * mismatches (so a forged callback can neither DoS a real one nor attempt
-   * the claim), or another concurrent callback already claimed the job.
-   *
-   * @param artistId - The artist whose in-flight job the callback targets.
-   * @param jobToken - The per-job token the callback presents.
-   * @param proof - The request's signature header and raw body.
-   */
-  static async verifyAndClaimCallback(
-    artistId: string,
-    jobToken: string,
-    proof: CallbackProof
-  ): Promise<{ slug: string } | null> {
-    const state = await ArtistRepository.getBioGenerationState(artistId);
-    if (!state || state.bioStatus !== 'processing' || !state.bioJobToken) {
-      return null;
-    }
-    const identity = {
-      kind: 'bio-generation',
-      entityId: artistId,
-      jobToken: state.bioJobToken,
-    } as const;
-    if (!verifyJobCallback(identity, proof)) {
-      return null; // unsigned or mis-signed — never reach the token compare or the claim
-    }
-    if (!tokensMatch(state.bioJobToken, jobToken)) {
-      return null; // do NOT attempt the claim on a mismatched/forged callback
-    }
-    const claimed = await ArtistRepository.claimBioJobToken(artistId, jobToken);
-    if (!claimed) {
-      return null; // a concurrent callback already won the atomic claim
-    }
-    return { slug: state.slug };
-  }
-
-  /**
-   * Records a per-stage progress checkpoint for an in-flight generation job. The
-   * progress channel VERIFIES the per-job token (constant-time, via the same
-   * {@link tokensMatch} the callback uses) but NEVER claims it — claiming is
-   * exclusive to {@link verifyAndClaimCallback}, so a stream of progress POSTs
-   * can never consume the single-use token and lock out the real completion.
-   * Writes only when the artist exists, has a stored token that matches, AND the
-   * job is `processing`; any gate failure returns `false` without writing. The
-   * server stamps `at` so the client cannot forge the checkpoint time.
-   * Repository errors are caught and logged, never thrown — a lost checkpoint is
-   * cosmetic and must not break the generation run.
-   *
-   * @param artistId - The artist whose in-flight job the checkpoint targets.
-   * @param jobToken - The per-job token presented by the checkpoint (verified, not claimed).
-   * @param payload - The stage/detail/counts checkpoint; the server stamps `at`.
-   * @param proof - The request's signature header and raw body (ADR-0014).
-   * @returns `true` iff the checkpoint was persisted.
-   */
-  static async recordProgress(
-    artistId: string,
-    jobToken: string,
-    payload: BioProgressPayload,
-    proof: CallbackProof
-  ): Promise<boolean> {
-    try {
-      const state = await ArtistRepository.getBioGenerationState(artistId);
-      if (!state || !state.bioJobToken) {
-        return false;
-      }
-      const identity = {
-        kind: 'bio-generation',
-        entityId: artistId,
-        jobToken: state.bioJobToken,
-      } as const;
-      if (!verifyJobCallback(identity, proof)) {
-        return false; // unsigned or mis-signed — records nothing
-      }
-      if (!tokensMatch(state.bioJobToken, jobToken)) {
-        return false; // verify only — a mismatched token records nothing
-      }
-      if (state.bioStatus !== 'processing') {
-        return false;
-      }
-
-      await ArtistRepository.setBioProgress(artistId, {
-        ...payload,
-        at: new Date().toISOString(),
-      });
-      return true;
-    } catch (error) {
-      loggers.media.error('bio_progress_record_failed', error);
-      return false;
-    }
-  }
-
-  /**
-   * Completes a claimed async job by persisting the Lambda's result and recording
-   * the terminal status. A non-ok result flips the artist to `failed` with the
-   * Lambda's error. An ok result re-fetches the artist's published releases
-   * (non-fatal on failure), persists the sanitized/re-hosted bio, and flips to
-   * `succeeded`; a persistence failure flips to `failed` instead. Never throws —
-   * it runs post-response via `after()`.
-   *
-   * @param artistId - The artist whose job is completing.
-   * @param result - The Lambda's validated generation result.
-   * @param artistSlug - The artist's slug: the release links' deep links name it.
-   */
-  static async completeCallback(
-    artistId: string,
-    result: BioGenerationResult,
-    artistSlug: string
-  ): Promise<void> {
-    if (!result.ok) {
-      await ArtistRepository.setBioStatus(artistId, 'failed', { error: result.error });
-      return;
-    }
-
-    const releases = await ReleaseRepository.findPublishedByArtistWithCovers(artistId).catch(
-      () => [] as ReleaseCoverSource[]
-    );
-
-    try {
-      await persistGeneratedBio(artistId, result.data, releases, artistSlug);
-      await ArtistRepository.setBioStatus(artistId, 'succeeded', { error: null });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Bio persistence failed.';
-      await ArtistRepository.setBioStatus(artistId, 'failed', { error: message });
-    }
   }
 }

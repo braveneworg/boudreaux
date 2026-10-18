@@ -6,10 +6,9 @@ import { STALE_JOB_MS } from '@/utils/async-job-lifecycle';
 import { isUnset } from './where-kit';
 
 /**
- * The runner gate (`runnerShouldSkip`) as a Prisma `where`, so a runner can
- * claim a job with ONE conditional write instead of read-then-write: a job
- * may begin unless it is `processing` with a start fresher than the stale
- * window. `pending` is the trigger's handoff and never blocks; an in-flight
+ * The runner gate as a Prisma `where`, so a runner can claim a job with ONE
+ * conditional write instead of read-then-write: a job may begin unless it is
+ * `processing` with a start fresher than the stale window. `pending` is the trigger's handoff and never blocks; an in-flight
  * job with no recorded start reads as abandoned (see the lifecycle module).
  * Two runners racing for one job both pass a read; only one passes this
  * write. Proved by `async-job-where.contract.spec.ts`.

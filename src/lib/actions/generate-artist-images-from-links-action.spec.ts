@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { gateAction } from '@/lib/auth/action-gate';
-import { STALE_JOB_MS } from '@/utils/async-job-lifecycle';
 
 import { generateArtistImagesFromLinksAction } from './generate-artist-images-from-links-action';
 
@@ -20,23 +19,25 @@ vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: (e: unknown) => logSecur
 
 vi.mock('@/lib/auth/action-gate');
 
-const getImageLinksJobStateMock = vi.fn();
-const setImageLinksStatusMock = vi.fn();
-vi.mock('@/lib/repositories/artist-repository', () => ({
-  ArtistRepository: {
-    getImageLinksJobState: (id: string) => getImageLinksJobStateMock(id),
-    setImageLinksStatus: (id: string, status: string, opts: unknown) =>
-      setImageLinksStatusMock(id, status, opts),
-  },
+const triggerMock = vi.hoisted(() => vi.fn());
+const runMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/services/job-runner/job-runner', () => ({
+  jobRunner: { trigger: triggerMock, run: runMock },
 }));
 
-const runJobMock = vi.fn();
-vi.mock('@/lib/services/image-links-service', () => ({
-  ImageLinksService: { runJob: (id: string) => runJobMock(id) },
-}));
+const imageLinksJob = vi.hoisted(() => ({ kind: 'image-links' }));
+vi.mock('@/lib/services/image-links-service', () => ({ imageLinksJob }));
 
+const loggerErrorMock = vi.fn();
 vi.mock('@/lib/utils/logger', () => ({
-  loggers: { media: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } },
+  loggers: {
+    media: {
+      error: (...args: unknown[]) => loggerErrorMock(...args),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    },
+  },
 }));
 
 const VALID_ID = 'a'.repeat(24);
@@ -48,87 +49,80 @@ beforeEach(() => {
     success: true,
     session: { user: { id: 'admin-1' } } as never,
   });
-  getImageLinksJobStateMock.mockResolvedValue({
-    imageLinksStatus: null,
-    imageLinksStartedAt: null,
+  triggerMock.mockReset().mockResolvedValue({
+    success: true,
+    data: { status: 'pending', started: true },
   });
-  setImageLinksStatusMock.mockResolvedValue(undefined);
-  runJobMock.mockResolvedValue({ status: 'dispatched' });
+  runMock.mockReset().mockResolvedValue({ status: 'dispatched' });
 });
 
 describe('generateArtistImagesFromLinksAction', () => {
-  it('returns the gate refusal without touching the repository', async () => {
+  it('returns the gate refusal without touching the job runner', async () => {
     vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
 
     expect(result).toEqual(REFUSAL);
-    expect(getImageLinksJobStateMock).not.toHaveBeenCalled();
+    expect(triggerMock).not.toHaveBeenCalled();
   });
 
-  it('returns an error for invalid input without touching the repository', async () => {
-    const result = await generateArtistImagesFromLinksAction({ artistId: 'not-an-id' });
+  it('returns an error for invalid input without touching the job runner', async () => {
+    const result = await generateArtistImagesFromLinksAction({ artistId: 'nope' });
 
     expect(result).toEqual({ success: false, error: 'Invalid image generation request.' });
-    expect(getImageLinksJobStateMock).not.toHaveBeenCalled();
+    expect(triggerMock).not.toHaveBeenCalled();
   });
 
-  it('returns not-found when the artist does not exist', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(null);
+  it('triggers the images-from-links job for the artist', async () => {
+    await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
+
+    expect(triggerMock.mock.calls).toEqual([[imageLinksJob, VALID_ID]]);
+  });
+
+  it('returns the refusal copy when the trigger refuses', async () => {
+    triggerMock.mockResolvedValueOnce({
+      success: false,
+      error: 'Artist not found.',
+      code: 'NOT_FOUND',
+    });
 
     const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
 
     expect(result).toEqual({ success: false, error: 'Artist not found.' });
-    expect(setImageLinksStatusMock).not.toHaveBeenCalled();
+    expect(afterCallback).toBeNull();
   });
 
-  it('marks the job pending, defers the dispatch to after() and audits the trigger', async () => {
-    const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
-
-    expect(result).toEqual({ success: true, status: 'pending' });
-    expect(setImageLinksStatusMock).toHaveBeenCalledWith(
-      VALID_ID,
-      'pending',
-      expect.objectContaining({ error: null, startedAt: expect.any(Date) })
-    );
-    expect(runJobMock).not.toHaveBeenCalled();
-    expect(afterCallback).toBeTypeOf('function');
-    await afterCallback?.();
-    expect(runJobMock.mock.calls).toEqual([[VALID_ID]]);
-    expect(logSecurityEventMock).toHaveBeenCalledWith({
-      event: 'media.artist.updated',
-      userId: 'admin-1',
-      metadata: { artistId: VALID_ID, action: 'images-from-links-triggered' },
-    });
-  });
-
-  it('does not start a second run while one is in flight', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce({
-      imageLinksStatus: 'processing',
-      imageLinksStartedAt: new Date(),
+  it('echoes an in-flight run without scheduling or auditing another', async () => {
+    triggerMock.mockResolvedValueOnce({
+      success: true,
+      data: { status: 'processing', started: false },
     });
 
     const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
 
     expect(result).toEqual({ success: true, status: 'processing' });
-    expect(setImageLinksStatusMock).not.toHaveBeenCalled();
     expect(afterCallback).toBeNull();
+    expect(logSecurityEventMock).not.toHaveBeenCalled();
   });
 
-  it('starts a new run over a stale in-flight job', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce({
-      imageLinksStatus: 'processing',
-      imageLinksStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-    });
-
+  it('returns pending, runs the job after the response and audits the trigger', async () => {
     const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
 
     expect(result).toEqual({ success: true, status: 'pending' });
-    expect(afterCallback).toBeTypeOf('function');
+    expect(runMock).not.toHaveBeenCalled();
+    expect(logSecurityEventMock).toHaveBeenCalledWith({
+      event: 'media.artist.updated',
+      userId: 'admin-1',
+      metadata: { artistId: VALID_ID, action: 'images-from-links-triggered' },
+    });
+
+    await afterCallback?.();
+
+    expect(runMock.mock.calls).toEqual([[imageLinksJob, VALID_ID, undefined]]);
   });
 
-  it('returns a typed error when the repository throws', async () => {
-    getImageLinksJobStateMock.mockRejectedValueOnce(new Error('db'));
+  it('returns a typed error and logs when triggering throws', async () => {
+    triggerMock.mockRejectedValueOnce(new Error('db down'));
 
     const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
 
@@ -136,5 +130,6 @@ describe('generateArtistImagesFromLinksAction', () => {
       success: false,
       error: 'Image generation failed to start. Please try again.',
     });
+    expect(loggerErrorMock).toHaveBeenCalledTimes(1);
   });
 });

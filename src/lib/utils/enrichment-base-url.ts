@@ -8,9 +8,8 @@ import 'server-only';
  * env every publicly-reachable absolute link uses, e.g. email/notification
  * URLs), with any trailing slash trimmed so appended paths have exactly one
  * separator. Returns `null` when the base URL is unconfigured, so callers can
- * fail an async job rather than dispatch an un-answerable invoke (fake/E2E
- * paths never reach it). Both the bio and video enrichment pipelines derive
- * their callback/progress URLs from this base.
+ * fail an async job rather than dispatch an un-answerable invoke. The job
+ * runner derives every job's callback/progress URLs from this base.
  */
 export const resolveEnrichmentBaseUrl = (): string | null => {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
