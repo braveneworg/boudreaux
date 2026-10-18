@@ -27,14 +27,22 @@ phone. None of the specs asserted that audio played either.
 
 ## The fix
 
-Before hydration the title renders as a link-styled
-`<button type="button">` with no href and the same click handler. A click
-before the JavaScript runs does nothing, and React replays a click made
-during hydration to the handler. Once `useHydrated()` is true, the title
-is the `next/link` with the deep link, so modified clicks still open it in
-a new tab. jsx-a11y rejects an `<a>` with an `onClick` and no href
-(`anchor-is-valid`, `preferButton`), and the repo never suppresses lint,
-so the pre-hydration element is a button.
+Before hydration the title renders as a `<button type="button">` with no
+href and the same click handler. A click before the JavaScript runs does
+nothing, and React replays a click made during hydration to the handler.
+Once `useHydrated()` is true, the title is the `next/link` with the deep
+link, so modified clicks still open it in a new tab. jsx-a11y rejects an
+`<a>` with an `onClick` and no href (`anchor-is-valid`, `preferButton`),
+and the repo never suppresses lint, so the pre-hydration element is a
+button.
+
+A button box is atomic. Even with `display: inline` it stays one box, so a
+long title jumps to its own line and the hydration swap reflows it. The
+button is `display: contents` instead, and its text is an inline `<span>`
+carrying the link's classes and `cursor-pointer`. Measured in Chromium, the
+span wraps into the same line boxes as the link. The cost is that a
+`display: contents` button cannot take keyboard focus, the same as the
+href-less `<a>` it stands in for, and only until hydration.
 
 ## Rules
 
