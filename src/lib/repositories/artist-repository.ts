@@ -821,9 +821,9 @@ export class ArtistRepository {
    * Neither order can be sorted in the database: `alpha` ranks by the name an
    * artist is displayed under, which is composed from the name parts when no
    * `displayName` is stored (a DB sort on `displayName` files those nulls
-   * first, outside the alphabet), and `newest` by each artist's latest listed
-   * release, a relation aggregate Prisma on MongoDB cannot sort by (an artist
-   * with only videos has no listed release and sorts last). The listed
+   * first, outside the alphabet), and `newest` by the later of each artist's
+   * latest listed release and latest live video (ADR-0022), an aggregate over
+   * two relations Prisma on MongoDB cannot sort by. The listed
    * artists are read whole and ordered + sliced here; there are few of them,
    * and ADR-0007 records the revisit trigger.
    */
