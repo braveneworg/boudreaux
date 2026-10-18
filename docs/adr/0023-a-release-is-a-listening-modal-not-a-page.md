@@ -43,6 +43,13 @@ no page; its permalink is the release deep link.**
   searches, a collection row and a bio's release link. A playable release
   opens on a plain left click, and its href, for modified clicks, is the
   deep link. A release with no MP3 track is plain text.
+  - **The latest-release line carries its href only once hydrated**
+    (amended 2026-10-18, #900). Before then the server markup is a
+    link-styled button with no href, so a click before the JavaScript runs
+    stays on the page, and one during hydration opens the modal. A click
+    that followed the deep link landed on `/releases` with the modal paused,
+    where the visitor expected it playing in place. Once hydrated, modified
+    clicks still open the deep link.
 - **Each release has its own accent.** It is a stable hash of the release id
   into the ten loud zine accents (`zineAccentForRelease`). The accent is the
   same on the server and the client, and the same from every opener this
