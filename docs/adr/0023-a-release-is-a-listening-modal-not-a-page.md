@@ -33,10 +33,11 @@ no page; its permalink is the release deep link.**
   (`docs/lessons/react-nextjs/one-shot-handoff-in-an-effect-is-not-strictmode-safe.md`).
 - **The old URL redirects.** `/releases/<id>` is a 308 to the deep link on
   the album artist's releases. A release whose album artist is hidden
-  (ADR-0015), or no listed release with that id, is a 404. The URL is
-  served by a route handler rather than a page. Under the root and
-  `/releases` loading boundaries, a page streams a `200` before a redirect
-  can set the status.
+  (ADR-0015), or no listed release with that id, is a 404 that renders the
+  themed "release not found" page. The proxy decides both before the page
+  renders. Under the root and `/releases` loading boundaries, a page streams
+  a `200` before a redirect or `notFound()` can set the status, and a route
+  handler cannot render the themed page.
 - **Every opener opens the modal in place.** These openers are the artists
   index card and the artist page's latest release, the home and `/releases`
   searches, a collection row and a bio's release link. A playable release

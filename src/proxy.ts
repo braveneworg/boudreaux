@@ -6,6 +6,8 @@ import type { NextRequest } from 'next/server';
 
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
+import { legacyReleaseId, legacyReleaseResponse } from '@/lib/legacy-release-url';
+
 // Must match `advanced.cookiePrefix` in src/lib/auth.ts.
 const COOKIE_PREFIX = 'boudreaux';
 
@@ -121,6 +123,12 @@ const handleAdminAuthorization = async (
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // The public legacy release URL: a 308 to its deep link, or a themed 404.
+  const releaseId = legacyReleaseId(pathname);
+  if (releaseId !== null) {
+    return legacyReleaseResponse(request, releaseId);
+  }
+
   const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
   // Presence-only check at the edge — cheap, no DB hit.
   const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX }));
@@ -165,10 +173,12 @@ export const config = {
     /*
      * Match authentication-protected routes explicitly. /videos is public
      * (like /releases) and deliberately unmatched.
+     * - /releases/:releaseId, the public legacy release URL (not a gate)
      * - /profile and all sub-routes
      * - /admin and all sub-routes
      * - /api/admin and all sub-routes
      */
+    '/releases/:releaseId',
     '/profile',
     '/profile/:path*',
     '/admin',

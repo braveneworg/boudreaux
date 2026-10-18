@@ -3,10 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * 404 page for invalid release IDs at `/releases/[releaseId]`.
- * The segment is now a route handler (`route.ts`), whose `notFound()` serves
- * a bare 404 without rendering this page; it is kept until a decision on the
- * old URL's 404 copy (#896).
+ * 404 page for the legacy release URL `/releases/[releaseId]` when the id has
+ * no release deep link to redirect to. The proxy gives it the `404` status
+ * (`src/lib/legacy-release-url.ts`).
  */
 import Link from 'next/link';
 
