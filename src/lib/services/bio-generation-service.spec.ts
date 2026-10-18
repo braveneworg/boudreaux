@@ -2,15 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { deriveJobSigningKey, signJobBody } from '@fakefour/job-contract/signing';
-
-import type {
-  BioGenerationData,
-  BioGenerationResult,
-} from '@/lib/validation/bio-generation-schema';
-import { STALE_JOB_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
-
 import {
+  bioGenerationCallbackSchema,
+  bioProgressPostSchema,
+  type BioGenerationData,
+} from '@/lib/validation/bio-generation-schema';
+
+import { fakeBioGeneration } from './bio-generation-fixture';
+import {
+  bioGenerationJob,
   BioGenerationService,
   MAX_LAMBDA_RELEASES,
   persistGeneratedBio,
@@ -22,11 +22,10 @@ vi.mock('server-only', () => ({}));
 
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
-const sendMock = vi.hoisted(() => vi.fn());
 const findByIdMock = vi.hoisted(() => vi.fn());
 const replaceBioContentMock = vi.hoisted(() => vi.fn());
 const setBioStatusMock = vi.hoisted(() => vi.fn());
-const beginBioRunMock = vi.hoisted(() => vi.fn((_id: string, _now: Date) => Promise.resolve(true)));
+const beginBioRunMock = vi.hoisted(() => vi.fn());
 const setBioJobTokenMock = vi.hoisted(() => vi.fn());
 const claimBioJobTokenMock = vi.hoisted(() => vi.fn());
 const setBioProgressMock = vi.hoisted(() => vi.fn());
@@ -45,16 +44,6 @@ const findFingerprintsMock = vi.hoisted(() =>
   )
 );
 const findPublishedByArtistWithCoversMock = vi.hoisted(() => vi.fn());
-const fakeBioGenerationMock = vi.hoisted(() => vi.fn());
-
-vi.mock('@aws-sdk/client-lambda', () => ({
-  LambdaClient: class {
-    send = sendMock;
-  },
-  InvokeCommand: class {
-    constructor(public input: unknown) {}
-  },
-}));
 
 vi.mock('@/lib/utils/logger', () => ({
   loggers: { media: { warn: mockLoggerWarn, error: mockLoggerError } },
@@ -86,10 +75,6 @@ vi.mock('@/lib/repositories/release-repository', () => ({
   },
 }));
 
-vi.mock('./bio-generation-fixture', () => ({
-  fakeBioGeneration: (input: BioGenerationLambdaInput) => fakeBioGenerationMock(input),
-}));
-
 const rehostWithVariantsMock = vi.fn();
 const rehostImagesMock = vi.fn();
 vi.mock('./bio-image-service', () => ({
@@ -114,117 +99,8 @@ vi.mock('@/lib/utils/validate-bio-links', () => ({
   validateBioLinks: (links: Array<{ url: string }>) => validateBioLinksMock(links),
 }));
 
-/** The subset of a `fetch` init the local adapter sends (typed so calls stay inspectable). */
-type PostInit = { method: string; headers: Record<string, string>; body: string; cache: string };
-
-/**
- * Stubbed `fetch` capturing the local (fake) adapter's progress + callback POSTs.
- * Installed only by the fake-path suite; `mockReset()` restores this 202 default.
- */
-const fetchMock = vi.fn(
-  async (_url: string, _init: PostInit): Promise<{ ok: boolean; status: number }> => ({
-    ok: true,
-    status: 202,
-  })
-);
-
-/** URLs the local adapter POSTed to, in call order. */
-const postedUrls = (): string[] => fetchMock.mock.calls.map(([url]) => url);
-
-/** The JSON body POSTed to `url`, or undefined when the adapter never posted there. */
-const postedBody = (url: string): Record<string, unknown> | undefined => {
-  const call = fetchMock.mock.calls.find(([posted]) => posted === url);
-  return call ? JSON.parse(call[1].body) : undefined;
-};
-
-/** Shape of a captured `InvokeCommand` instance (our mock stores its input). */
-type SentCommand = {
-  input: { InvocationType?: string; FunctionName?: string; Payload?: Uint8Array };
-};
-
-/** The last `InvokeCommand` passed to `LambdaClient.send`. */
-const lastCommand = (): SentCommand => sendMock.mock.calls.at(-1)?.[0] as SentCommand;
-
-/** Decode the JSON payload the invoke carried back to a lambda input. */
-const decodePayload = (command: SentCommand): BioGenerationLambdaInput =>
-  JSON.parse(Buffer.from(command.input.Payload as Uint8Array).toString('utf-8'));
-
-const APP_SECRET = 'app-callback-secret-'.padEnd(40, 'x');
-const CALLBACK_BODY = '{"jobToken":"stored-token","result":{"ok":false,"error":"x"}}';
-
-/** The signing key the app derives for artist `a1` and `jobToken` (ADR-0014). */
-const keyFor = (jobToken: string, entityId = 'a1'): string =>
-  deriveJobSigningKey(APP_SECRET, { kind: 'bio-generation', entityId, jobToken });
-
-/** A callback proof signed the way the Lambda signs it, under the key for `storedToken`. */
-const proofFor = (storedToken: string, rawBody = CALLBACK_BODY) => ({
-  signature: signJobBody(keyFor(storedToken), rawBody, Date.now() / 1000),
-  rawBody,
-});
-
 afterEach(() => {
   vi.unstubAllEnvs();
-});
-
-describe('BioGenerationService.generate', () => {
-  beforeEach(() => {
-    sendMock.mockReset().mockResolvedValue({ StatusCode: 202 });
-    mockLoggerError.mockReset();
-    delete process.env.BIO_GENERATOR_FAKE;
-  });
-
-  it('returns an error when the function name is not configured', async () => {
-    delete process.env.BIO_GENERATOR_LAMBDA_NAME;
-
-    const result = await BioGenerationService.generate({ artistId: 'a1', displayName: 'Nas' });
-
-    expect(result).toEqual({
-      ok: false,
-      error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-    });
-    expect(sendMock).not.toHaveBeenCalled();
-  });
-
-  it('fires an async Event invoke and returns a fire acknowledgement', async () => {
-    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-
-    const result = await BioGenerationService.generate({
-      artistId: 'a1',
-      displayName: 'Nas',
-      callbackUrl: 'https://fakefourrecords.com/api/artists/a1/bio-generation/callback',
-      jobToken: 'tok-123',
-    });
-
-    expect(result).toEqual({ ok: true });
-    expect(lastCommand().input.InvocationType).toBe('Event');
-  });
-
-  it('targets the configured function and carries the callback token in the payload', async () => {
-    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-
-    await BioGenerationService.generate({
-      artistId: 'a1',
-      displayName: 'Nas',
-      callbackUrl: 'https://fakefourrecords.com/api/artists/a1/bio-generation/callback',
-      jobToken: 'tok-123',
-    });
-
-    expect(lastCommand().input.FunctionName).toBe('fakefour-bio-generator');
-    const payload = decodePayload(lastCommand());
-    expect(payload.callbackUrl).toBe(
-      'https://fakefourrecords.com/api/artists/a1/bio-generation/callback'
-    );
-    expect(payload.jobToken).toBe('tok-123');
-  });
-
-  it('returns an error when the invoke throws', async () => {
-    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-    sendMock.mockRejectedValue(new Error('network down'));
-
-    const result = await BioGenerationService.generate({ artistId: 'a1', displayName: 'Nas' });
-
-    expect(result).toEqual({ ok: false, error: 'Failed to reach the bio generator' });
-  });
 });
 
 describe('persistGeneratedBio', () => {
@@ -1402,9 +1278,7 @@ describe('persistGeneratedBio link validation', () => {
   });
 });
 
-describe('BioGenerationService.runGenerationJob', () => {
-  const CALLBACK_BASE = 'https://fakefourrecords.com';
-
+describe('bioGenerationJob.prepare', () => {
   const artist = {
     id: 'a'.repeat(24),
     firstName: 'Thom',
@@ -1420,596 +1294,435 @@ describe('BioGenerationService.runGenerationJob', () => {
     formedOn: null as Date | null,
   };
 
-  const fakeOk: BioGenerationResult = {
-    ok: true,
-    data: {
-      shortBio: 's',
-      longBio: '<p>l</p>',
-      altBio: '<p>a</p>',
-      genres: 'rock',
-      images: [],
-      links: [],
-      model: 'fake/deterministic',
-    },
+  /** The Lambda request the adapter prepares for `artist`; throws on a refusal. */
+  const requestFor = async (
+    opts: { links?: string[]; description?: string } = {}
+  ): Promise<BioGenerationLambdaInput> => {
+    const prepared = await bioGenerationJob.prepare(artist.id, opts);
+    if (!prepared.ok) throw new Error(prepared.error);
+    return prepared.request;
   };
 
   beforeEach(() => {
-    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
-    setBioStatusMock.mockReset().mockResolvedValue(undefined);
-    setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
-    setBioProgressMock.mockReset().mockResolvedValue(undefined);
     findByIdMock.mockReset().mockResolvedValue(artist);
     findCustomBioImageUrlsMock.mockReset().mockResolvedValue([]);
     findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
-    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
-    rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
-    fakeBioGenerationMock.mockReset().mockReturnValue(fakeOk);
-    sendMock.mockReset().mockResolvedValue({ StatusCode: 202 });
     mockLoggerWarn.mockReset();
-    mockLoggerError.mockReset();
-    delete process.env.BIO_GENERATOR_FAKE;
-    delete process.env.BIO_GENERATOR_LAMBDA_NAME;
   });
 
-  // The fake is now an ADAPTER selected inside `generate`, below the dispatch
-  // seam: it POSTs a real progress checkpoint and a real completion callback to
-  // the same routes the Lambda uses, carrying the same jobToken. So the fake path
-  // dispatches exactly like the real one — it no longer persists in-process, and
-  // the artist stays `processing` until the POSTed callback completes it.
-  describe('fake path', () => {
-    const progressUrl = `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/progress`;
-    const callbackUrl = `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/callback`;
+  it('fails when the artist does not exist', async () => {
+    findByIdMock.mockResolvedValue(null);
 
-    beforeEach(() => {
-      vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-      // The local adapter derives its callback/progress URLs from the public base.
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      // Keep unit runs instant — the observable delay is proven separately.
-      vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
-      // Restores the baked-in 202 response; the adapter goes over the wire now.
-      fetchMock.mockReset();
-      vi.stubGlobal('fetch', fetchMock);
-    });
-
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
-
-    it('dispatches rather than completing in-process', async () => {
-      const result = await BioGenerationService.runGenerationJob(artist.id, { links: ['u'] });
-
-      expect(result).toEqual({ status: 'dispatched' });
-      expect(replaceBioContentMock).not.toHaveBeenCalled();
-    });
-
-    it('leaves the artist processing for the POSTed callback to finish', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
-      expect(setBioStatusMock).not.toHaveBeenCalled();
-    });
-
-    it('skips without invoking the Lambda when another runner already began the job', async () => {
-      beginBioRunMock.mockResolvedValueOnce(false);
-
-      const result = await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(result).toEqual({ status: 'skipped' });
-      expect(setBioJobTokenMock).not.toHaveBeenCalled();
-      expect(setBioStatusMock).not.toHaveBeenCalled();
-    });
-
-    it('stores a job token exactly once without invoking the Lambda', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(setBioJobTokenMock).toHaveBeenCalledTimes(1);
-      expect(setBioJobTokenMock.mock.calls[0]).toEqual([artist.id, expect.any(String)]);
-      expect(sendMock).not.toHaveBeenCalled();
-    });
-
-    it('posts the fixture result to the callback route under the stored job token', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const token = setBioJobTokenMock.mock.calls[0][1];
-      expect(postedBody(callbackUrl)).toEqual({ jobToken: token, result: fakeOk });
-    });
-
-    it('posts a fixture error as the callback result rather than failing in-process', async () => {
-      // The fixture's outcome no longer decides `runGenerationJob`'s outcome: it
-      // travels on the wire, and `completeCallback` is what flips to `failed`.
-      fakeBioGenerationMock.mockReturnValue({ ok: false, error: 'fixture down' });
-
-      const result = await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(result).toEqual({ status: 'dispatched' });
-      expect(postedBody(callbackUrl)?.result).toEqual({ ok: false, error: 'fixture down' });
-    });
-
-    it('posts the vision-gating checkpoint to the progress route, not the repository', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const token = setBioJobTokenMock.mock.calls[0][1];
-      expect(postedBody(progressUrl)).toEqual({
-        jobToken: token,
-        stage: 'vision-gating',
-        counts: { candidates: 3 },
-      });
-      // The server stamps `at` inside the progress route now — nothing is
-      // written straight to the repository from the generation job.
-      expect(setBioProgressMock).not.toHaveBeenCalled();
-    });
-
-    it('posts the progress checkpoint before the completion callback', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
-    });
-
-    it('still posts the checkpoint when the fixture fails', async () => {
-      // Stage checkpoints precede the outcome on the real Lambda too, so a
-      // failing fixture must not suppress the progress POST.
-      fakeBioGenerationMock.mockReturnValue({ ok: false, error: 'fixture down' });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
-    });
-
-    it('does not arm a timer when the fake delay is zero', async () => {
-      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(setTimeoutSpy).not.toHaveBeenCalled();
-      setTimeoutSpy.mockRestore();
-    });
-
-    it('waits the configured fake delay before posting the completion callback', async () => {
-      vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '4000');
-      vi.useFakeTimers();
-      try {
-        const promise = BioGenerationService.runGenerationJob(artist.id);
-        // Let the prep + checkpoint microtasks settle; the run then parks on the
-        // delay timer, so the completion callback has not been posted yet.
-        await vi.advanceTimersByTimeAsync(0);
-        expect(postedUrls()).toEqual([progressUrl]);
-
-        await vi.advanceTimersByTimeAsync(4000);
-        await promise;
-        expect(postedUrls()).toEqual([progressUrl, callbackUrl]);
-      } finally {
-        vi.useRealTimers();
-      }
+    expect(await bioGenerationJob.prepare(artist.id, {})).toEqual({
+      ok: false,
+      error: 'Artist not found.',
     });
   });
 
-  describe('real path — dispatch', () => {
-    beforeEach(() => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
+  it('fails when the artist has no name to generate from', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      displayName: null,
+      firstName: '',
+      surname: '',
+      akaNames: null,
     });
 
-    it('stores a job token then fires an Event invoke and returns dispatched', async () => {
-      const result = await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(result).toEqual({ status: 'dispatched' });
-      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
-      const [tokenId, token] = setBioJobTokenMock.mock.calls[0];
-      expect(tokenId).toBe(artist.id);
-      expect(token).toEqual(expect.any(String));
-      expect(lastCommand().input.InvocationType).toBe('Event');
-      // Store exactly once on the happy path — guards against a spurious
-      // token clear slipping into the successful-dispatch path.
-      expect(setBioJobTokenMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('sends a payload carrying the derived callback URL and the stored job token', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const token = setBioJobTokenMock.mock.calls[0][1];
-      const payload = decodePayload(lastCommand());
-      expect(payload.callbackUrl).toBe(
-        `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/callback`
-      );
-      expect(payload.jobToken).toBe(token);
-    });
-
-    it('sends a payload carrying the per-job signing key derived from the stored token', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const token = setBioJobTokenMock.mock.calls[0][1] as string;
-      const payload = decodePayload(lastCommand());
-      expect(payload.signingKey).toBe(keyFor(token, artist.id));
-    });
-
-    it('fails without storing a token or invoking when JOB_CALLBACK_SECRET is unset', async () => {
-      vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
-
-      const result = await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(result).toMatchObject({
-        status: 'failed',
-        error: expect.stringContaining('JOB_CALLBACK_SECRET'),
-      });
-      expect(setBioJobTokenMock).not.toHaveBeenCalled();
-      expect(sendMock).not.toHaveBeenCalled();
-    });
-
-    it('sends a payload carrying the derived progress URL', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const payload = decodePayload(lastCommand());
-      expect(payload.progressUrl).toBe(
-        `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/progress`
-      );
-    });
-
-    it('trims a trailing slash on the base URL so the path has exactly one slash', async () => {
-      // A base URL configured WITH a trailing slash must not double the slash
-      // before `/api/...` (closes a B6 coverage gap on the derivation).
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', `${CALLBACK_BASE}/`);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const payload = decodePayload(lastCommand());
-      expect(payload.callbackUrl).toBe(
-        `${CALLBACK_BASE}/api/artists/${artist.id}/bio-generation/callback`
-      );
-    });
-
-    it('leaves the artist processing — no succeeded/failed flip, no persist', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(beginBioRunMock).toHaveBeenCalledWith(artist.id, expect.any(Date));
-      expect(setBioStatusMock).not.toHaveBeenCalled();
-      expect(replaceBioContentMock).not.toHaveBeenCalled();
-    });
-
-    it('does not write a synthetic progress checkpoint (the Lambda owns progress)', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(setBioProgressMock).not.toHaveBeenCalled();
+    expect(await bioGenerationJob.prepare(artist.id, {})).toEqual({
+      ok: false,
+      error: 'Artist has no name to generate a bio from.',
     });
   });
 
-  describe('real path — input building', () => {
-    let generateSpy: ReturnType<typeof vi.spyOn>;
+  it('forwards the artist names and the admin links and description', async () => {
+    const request = await requestFor({ links: ['https://example.com'], description: 'Band.' });
 
-    beforeEach(() => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      generateSpy = vi.spyOn(BioGenerationService, 'generate').mockResolvedValue({ ok: true });
-    });
-
-    afterEach(() => {
-      generateSpy.mockRestore();
-    });
-
-    it('forwards the artist real name and optional links to generation', async () => {
-      await BioGenerationService.runGenerationJob(artist.id, { links: ['https://example.com'] });
-
-      expect(generateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          displayName: 'Radiohead',
-          realName: 'Thom Yorke',
-          links: ['https://example.com'],
-        })
-      );
-    });
-
-    /**
-     * The Lambda caps `releases` at 100. It rejects an over-cap payload
-     * wholesale, and because the invoke is fire-and-forget the rejection is
-     * invisible until the 17-minute stale sweep — so the cap has to be honoured
-     * on this side, not discovered on the other.
-     */
-    it('caps the releases payload at the limit the Lambda accepts', async () => {
-      findPublishedByArtistWithCoversMock.mockResolvedValue(
-        Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
-          id: `r${index}`,
-          title: `Release ${index}`,
-          releasedOn: new Date('2020-01-01'),
-          coverArt: null,
-        }))
-      );
-
-      await BioGenerationService.runGenerationJob(artist.id, {});
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.releases).toHaveLength(MAX_LAMBDA_RELEASES);
-    });
-
-    it('keeps the most recent releases when it caps them', async () => {
-      findPublishedByArtistWithCoversMock.mockResolvedValue(
-        Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
-          id: `r${index}`,
-          title: `Release ${index}`,
-          releasedOn: new Date('2020-01-01'),
-          coverArt: null,
-        }))
-      );
-
-      await BioGenerationService.runGenerationJob(artist.id, {});
-
-      // The repository returns newest-first, so the cap takes from the front.
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.releases?.[0]?.title).toBe('Release 0');
-    });
-
-    it('omits the real name when the artist is pseudonymous', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, isPseudonymous: true });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ realName: undefined }));
-    });
-
-    it('grounds on the real name when displayName is blank', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, displayName: '   ' });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ displayName: 'Thom Yorke' })
-      );
-    });
-
-    it('falls back to the first aka name when no display or real name exists', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        displayName: null,
-        firstName: '',
-        surname: '',
-        akaNames: 'Tommy, Tom',
-      });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ displayName: 'Tommy' }));
-    });
-
-    it('omits the real name when first and surname are blank but not pseudonymous', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, firstName: ' ', surname: ' ' });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ realName: undefined }));
-    });
-
-    it('forwards undefined akaNames and genres when the artist has none', async () => {
-      findByIdMock.mockResolvedValue({ ...artist, akaNames: null, genres: null });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ akaNames: undefined, existingGenres: undefined })
-      );
-    });
-
-    it('derives the real name including the middle name', async () => {
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        firstName: 'Julio',
-        middleName: 'Francisco',
-        surname: 'Ramos',
-        bornOn: new Date('1982-05-01'),
-        displayName: 'Julio Ramos',
-      });
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(generateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ realName: 'Julio Francisco Ramos', bornOn: '1982-05-01' })
-      );
-    });
-
-    it('omits dates the artist record does not have', async () => {
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.bornOn).toBeUndefined();
-      expect(input.diedOn).toBeUndefined();
-      expect(input.formedOn).toBeUndefined();
-    });
-
-    it('passes label releases to the lambda input', async () => {
-      findPublishedByArtistWithCoversMock.mockResolvedValue([
-        {
-          id: 'rel1',
-          title: 'Label Album',
-          releasedOn: new Date('2020-02-02T00:00:00Z'),
-          coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
-        },
-      ]);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.releases).toEqual([
-        {
-          title: 'Label Album',
-          releasedOn: '2020-02-02',
-          url: '/releases?artist=radiohead&release=rel1',
-        },
-      ]);
-    });
-
-    it('omits releases and logs a warning when the cover lookup fails', async () => {
-      findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('db down'));
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.releases).toBeUndefined();
-      expect(mockLoggerWarn).toHaveBeenCalledWith(
-        'bio_release_covers_failed',
-        expect.objectContaining({ artistId: artist.id })
-      );
-    });
-
-    it('builds referenceImageUrls from the custom bio images', async () => {
-      findCustomBioImageUrlsMock.mockResolvedValue([
-        'https://cdn.fakefour.com/custom/a.jpg',
-        'https://cdn.fakefour.com/custom/b.jpg',
-      ]);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toEqual([
-        'https://cdn.fakefour.com/custom/a.jpg',
-        'https://cdn.fakefour.com/custom/b.jpg',
-      ]);
-    });
-
-    it('keeps only absolute http(s) reference URLs and caps the list at three', async () => {
-      findCustomBioImageUrlsMock.mockResolvedValue([
-        'https://cdn.fakefour.com/1.jpg',
-        '/relative/2.jpg',
-        'javascript:alert(1)',
-        'https://cdn.fakefour.com/3.jpg',
-        'https://cdn.fakefour.com/4.jpg',
-        'https://cdn.fakefour.com/5.jpg',
-      ]);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toEqual([
-        'https://cdn.fakefour.com/1.jpg',
-        'https://cdn.fakefour.com/3.jpg',
-        'https://cdn.fakefour.com/4.jpg',
-      ]);
-    });
-
-    it('dedupes reference URLs case-insensitively', async () => {
-      findCustomBioImageUrlsMock.mockResolvedValue([
-        'https://cdn.fakefour.com/A.jpg',
-        'https://cdn.fakefour.com/a.jpg',
-      ]);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toEqual(['https://cdn.fakefour.com/A.jpg']);
-    });
-
-    it('omits referenceImageUrls entirely when no absolute URLs are available', async () => {
-      findCustomBioImageUrlsMock.mockResolvedValue(['/relative/only.jpg']);
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toBeUndefined();
-    });
-
-    it('omits referenceImageUrls and warns when the custom-image lookup fails', async () => {
-      findCustomBioImageUrlsMock.mockRejectedValue(new Error('db down'));
-
-      await BioGenerationService.runGenerationJob(artist.id);
-
-      const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
-      expect(input.referenceImageUrls).toBeUndefined();
-      expect(mockLoggerWarn).toHaveBeenCalledWith(
-        'bio_custom_reference_images_failed',
-        expect.objectContaining({ artistId: artist.id })
-      );
+    expect(request).toMatchObject({
+      artistId: artist.id,
+      displayName: 'Radiohead',
+      realName: 'Thom Yorke',
+      links: ['https://example.com'],
+      description: 'Band.',
+      existingGenres: 'rock',
     });
   });
 
-  describe('real path — failures', () => {
-    it('fails and clears the token when the invoke cannot be dispatched', async () => {
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      // BIO_GENERATOR_LAMBDA_NAME is unset → generate returns a not-configured error.
+  /**
+   * The Lambda caps `releases` at 100. It rejects an over-cap payload
+   * wholesale, and because the invoke is fire-and-forget the rejection is
+   * invisible until the 17-minute stale sweep — so the cap has to be honoured
+   * on this side, not discovered on the other.
+   */
+  it('caps the releases payload at the limit the Lambda accepts', async () => {
+    findPublishedByArtistWithCoversMock.mockResolvedValue(
+      Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
+        id: `r${index}`,
+        title: `Release ${index}`,
+        releasedOn: new Date('2020-01-01'),
+        coverArt: null,
+      }))
+    );
 
-      const result = await BioGenerationService.runGenerationJob(artist.id);
+    const request = await requestFor();
 
-      expect(result).toEqual({
-        status: 'failed',
-        error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-      });
-      expect(setBioStatusMock.mock.calls[0]).toEqual([
-        artist.id,
-        'failed',
-        { error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)' },
-      ]);
-      expect(setBioJobTokenMock.mock.calls.at(-1)).toEqual([artist.id, null]);
+    expect(request.releases).toHaveLength(MAX_LAMBDA_RELEASES);
+  });
+
+  it('keeps the most recent releases when it caps them', async () => {
+    findPublishedByArtistWithCoversMock.mockResolvedValue(
+      Array.from({ length: MAX_LAMBDA_RELEASES + 25 }, (_, index) => ({
+        id: `r${index}`,
+        title: `Release ${index}`,
+        releasedOn: new Date('2020-01-01'),
+        coverArt: null,
+      }))
+    );
+
+    const request = await requestFor();
+
+    // The repository returns newest-first, so the cap takes from the front.
+    expect(request.releases?.[0]?.title).toBe('Release 0');
+  });
+
+  it('omits the real name when the artist is pseudonymous', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, isPseudonymous: true });
+
+    expect((await requestFor()).realName).toBeUndefined();
+  });
+
+  it('grounds on the real name when displayName is blank', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, displayName: '   ' });
+
+    expect((await requestFor()).displayName).toBe('Thom Yorke');
+  });
+
+  it('falls back to the first aka name when no display or real name exists', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      displayName: null,
+      firstName: '',
+      surname: '',
+      akaNames: 'Tommy, Tom',
     });
 
-    it('fails without minting a token when the callback URL is not configured', async () => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      delete process.env.NEXT_PUBLIC_BASE_URL;
+    expect((await requestFor()).displayName).toBe('Tommy');
+  });
 
-      const result = await BioGenerationService.runGenerationJob(artist.id);
+  it('omits the real name when first and surname are blank but not pseudonymous', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, firstName: ' ', surname: ' ' });
 
-      expect(result).toEqual({
-        status: 'failed',
-        error: 'Bio generator callback URL is not configured',
-      });
-      expect(setBioStatusMock.mock.calls[0]).toEqual([
-        artist.id,
-        'failed',
-        { error: 'Bio generator callback URL is not configured' },
-      ]);
-      expect(setBioJobTokenMock).not.toHaveBeenCalled();
-      expect(sendMock).not.toHaveBeenCalled();
+    expect((await requestFor()).realName).toBeUndefined();
+  });
+
+  it('forwards undefined akaNames and genres when the artist has none', async () => {
+    findByIdMock.mockResolvedValue({ ...artist, akaNames: null, genres: null });
+
+    expect(await requestFor()).toMatchObject({ akaNames: undefined, existingGenres: undefined });
+  });
+
+  it('derives the real name including the middle name', async () => {
+    findByIdMock.mockResolvedValue({
+      ...artist,
+      firstName: 'Julio',
+      middleName: 'Francisco',
+      surname: 'Ramos',
+      bornOn: new Date('1982-05-01'),
+      displayName: 'Julio Ramos',
     });
 
-    it('fails when the artist does not exist', async () => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      findByIdMock.mockResolvedValue(null);
-
-      const result = await BioGenerationService.runGenerationJob(artist.id);
-
-      expect(result).toEqual({ status: 'failed', error: 'Artist not found.' });
-      expect(setBioStatusMock.mock.calls[0]).toEqual([
-        artist.id,
-        'failed',
-        { error: 'Artist not found.' },
-      ]);
-      expect(sendMock).not.toHaveBeenCalled();
+    expect(await requestFor()).toMatchObject({
+      realName: 'Julio Francisco Ramos',
+      bornOn: '1982-05-01',
     });
+  });
 
-    it('fails when the artist has no name to generate from', async () => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      findByIdMock.mockResolvedValue({
-        ...artist,
-        displayName: null,
-        firstName: '',
-        surname: '',
-        akaNames: null,
-      });
+  it('omits dates the artist record does not have', async () => {
+    const request = await requestFor();
 
-      const result = await BioGenerationService.runGenerationJob(artist.id);
+    expect(request.bornOn).toBeUndefined();
+    expect(request.diedOn).toBeUndefined();
+    expect(request.formedOn).toBeUndefined();
+  });
 
-      expect(result).toEqual({
-        status: 'failed',
-        error: 'Artist has no name to generate a bio from.',
-      });
+  it('passes label releases to the lambda input', async () => {
+    findPublishedByArtistWithCoversMock.mockResolvedValue([
+      {
+        id: 'rel1',
+        title: 'Label Album',
+        releasedOn: new Date('2020-02-02T00:00:00Z'),
+        coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
+      },
+    ]);
+
+    expect((await requestFor()).releases).toEqual([
+      {
+        title: 'Label Album',
+        releasedOn: '2020-02-02',
+        url: '/releases?artist=radiohead&release=rel1',
+      },
+    ]);
+  });
+
+  it('omits releases and logs a warning when the cover lookup fails', async () => {
+    findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('db down'));
+
+    const request = await requestFor();
+
+    expect(request.releases).toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'bio_release_covers_failed',
+      expect.objectContaining({ artistId: artist.id })
+    );
+  });
+
+  it('builds referenceImageUrls from the custom bio images', async () => {
+    findCustomBioImageUrlsMock.mockResolvedValue([
+      'https://cdn.fakefour.com/custom/a.jpg',
+      'https://cdn.fakefour.com/custom/b.jpg',
+    ]);
+
+    expect((await requestFor()).referenceImageUrls).toEqual([
+      'https://cdn.fakefour.com/custom/a.jpg',
+      'https://cdn.fakefour.com/custom/b.jpg',
+    ]);
+  });
+
+  it('keeps only absolute http(s) reference URLs and caps the list at three', async () => {
+    findCustomBioImageUrlsMock.mockResolvedValue([
+      'https://cdn.fakefour.com/1.jpg',
+      '/relative/2.jpg',
+      'javascript:alert(1)',
+      'https://cdn.fakefour.com/3.jpg',
+      'https://cdn.fakefour.com/4.jpg',
+      'https://cdn.fakefour.com/5.jpg',
+    ]);
+
+    expect((await requestFor()).referenceImageUrls).toEqual([
+      'https://cdn.fakefour.com/1.jpg',
+      'https://cdn.fakefour.com/3.jpg',
+      'https://cdn.fakefour.com/4.jpg',
+    ]);
+  });
+
+  it('dedupes reference URLs case-insensitively', async () => {
+    findCustomBioImageUrlsMock.mockResolvedValue([
+      'https://cdn.fakefour.com/A.jpg',
+      'https://cdn.fakefour.com/a.jpg',
+    ]);
+
+    expect((await requestFor()).referenceImageUrls).toEqual(['https://cdn.fakefour.com/A.jpg']);
+  });
+
+  it('omits referenceImageUrls entirely when no absolute URLs are available', async () => {
+    findCustomBioImageUrlsMock.mockResolvedValue(['/relative/only.jpg']);
+
+    expect((await requestFor()).referenceImageUrls).toBeUndefined();
+  });
+
+  it('omits referenceImageUrls and warns when the custom-image lookup fails', async () => {
+    findCustomBioImageUrlsMock.mockRejectedValue(new Error('db down'));
+
+    const request = await requestFor();
+
+    expect(request.referenceImageUrls).toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'bio_custom_reference_images_failed',
+      expect.objectContaining({ artistId: artist.id })
+    );
+  });
+});
+
+describe('bioGenerationJob — the artist bio columns', () => {
+  const ID = 'a1';
+  const START = new Date('2026-10-18T12:00:00.000Z');
+  const record = {
+    bioStatus: 'processing',
+    bioError: 'earlier',
+    bioStartedAt: START,
+    bioJobToken: 'tok',
+    bioProgress: { stage: 'drafting', at: START.toISOString() },
+    bioGeneratedAt: null,
+    slug: 'radiohead',
+    shortBio: null,
+    bio: null,
+    altBio: null,
+    genres: null,
+    bioModel: null,
+    bioImages: [],
+    bioLinks: [],
+  };
+
+  it('reads the generation state', async () => {
+    getBioGenerationStateMock.mockResolvedValueOnce(record);
+
+    expect(await bioGenerationJob.read(ID)).toBe(record);
+    expect(getBioGenerationStateMock).toHaveBeenCalledWith(ID);
+  });
+
+  it('maps the bio lifecycle columns onto the job state', () => {
+    expect(bioGenerationJob.state(record)).toEqual({
+      status: 'processing',
+      startedAt: START,
+      error: 'earlier',
+      jobToken: 'tok',
+      progress: record.bioProgress,
     });
+  });
 
-    it('flips to failed and never throws when dispatch throws', async () => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      setBioJobTokenMock.mockRejectedValue(new Error('DB down'));
+  it('hands a won claim the artist slug', () => {
+    expect(bioGenerationJob.claimContext(record)).toEqual({ slug: 'radiohead' });
+  });
 
-      const result = await BioGenerationService.runGenerationJob(artist.id);
+  it('answers on the bio callback and progress routes', () => {
+    expect(bioGenerationJob.callbackPath(ID)).toBe('/api/artists/a1/bio-generation/callback');
+    expect(bioGenerationJob.progress?.path(ID)).toBe('/api/artists/a1/bio-generation/progress');
+  });
 
-      expect(result).toEqual({ status: 'failed', error: 'DB down' });
-      expect(setBioStatusMock.mock.calls[0]).toEqual([artist.id, 'failed', { error: 'DB down' }]);
+  it.each([
+    [
+      'marks pending with a cleared error and its start',
+      () => bioGenerationJob.markPending(ID, START),
+      setBioStatusMock,
+      [ID, 'pending', { error: null, startedAt: START }],
+    ],
+    [
+      'begins with the conditional write',
+      () => bioGenerationJob.begin(ID, START),
+      beginBioRunMock,
+      [ID, START],
+    ],
+    [
+      'stores the token',
+      () => bioGenerationJob.setToken(ID, 'tok'),
+      setBioJobTokenMock,
+      [ID, 'tok'],
+    ],
+    [
+      'claims the token',
+      () => bioGenerationJob.claimToken(ID, 'tok'),
+      claimBioJobTokenMock,
+      [ID, 'tok'],
+    ],
+    [
+      'records failed with its error',
+      () => bioGenerationJob.recordFailed(ID, 'boom'),
+      setBioStatusMock,
+      [ID, 'failed', { error: 'boom' }],
+    ],
+    [
+      'records succeeded with a cleared error',
+      () => bioGenerationJob.recordSucceeded(ID, undefined),
+      setBioStatusMock,
+      [ID, 'succeeded', { error: null }],
+    ],
+    [
+      'writes a checkpoint to the bio progress column',
+      () => bioGenerationJob.progress?.write(ID, { stage: 'drafting', at: START.toISOString() }),
+      setBioProgressMock,
+      [ID, { stage: 'drafting', at: START.toISOString() }],
+    ],
+  ])('%s', async (_name, write, repositoryMethod, args) => {
+    await write();
+
+    expect(repositoryMethod.mock.calls).toEqual([args]);
+  });
+
+  it('keeps its copy byte-identical', () => {
+    expect(bioGenerationJob.copy).toEqual({
+      notFound: 'Artist not found.',
+      noCallbackUrl: 'Bio generator callback URL is not configured',
+      notConfigured: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+      unreachable: 'Failed to reach the bio generator',
+      runFailed: 'Bio generation failed unexpectedly.',
+      persistFailed: 'Bio persistence failed.',
     });
+  });
+});
 
-    it('uses a default message when a non-Error value is thrown', async () => {
-      vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', CALLBACK_BASE);
-      setBioJobTokenMock.mockRejectedValue('boom');
+describe('bioGenerationJob.fake', () => {
+  const payload = {
+    artistId: 'a'.repeat(24),
+    displayName: 'Radiohead',
+    callbackUrl: 'https://fakefourrecords.com/api/artists/a1/bio-generation/callback',
+    progressUrl: 'https://fakefourrecords.com/api/artists/a1/bio-generation/progress',
+    jobToken: 'tok',
+    signingKey: 'k'.repeat(64),
+  };
 
-      const result = await BioGenerationService.runGenerationJob(artist.id);
+  it('checkpoints the vision gate as a valid progress POST', () => {
+    const checkpoint = bioGenerationJob.fake.checkpoint?.(payload);
 
-      expect(result).toEqual({ status: 'failed', error: 'Bio generation failed unexpectedly.' });
-    });
+    expect(checkpoint).toEqual({ stage: 'vision-gating', counts: { candidates: 3 } });
+    expect(bioProgressPostSchema.safeParse({ jobToken: 'tok', ...checkpoint }).success).toBe(true);
+  });
+
+  it('answers with the fixture generation as a valid callback', () => {
+    const result = bioGenerationJob.fake.result(payload);
+
+    expect(result).toEqual(fakeBioGeneration(payload));
+    expect(bioGenerationCallbackSchema.safeParse({ jobToken: 'tok', result }).success).toBe(true);
+  });
+
+  /**
+   * The fixture resolves at once, so the dwell gives the polled admin
+   * timeline (2.5s) a window to render the checkpoint before the run ends.
+   */
+  it('dwells four seconds by default', () => {
+    expect(bioGenerationJob.fake.delayMs).toBe(4000);
+  });
+});
+
+describe('bioGenerationJob.persist', () => {
+  const okData: BioGenerationData = {
+    shortBio: 's',
+    longBio: '<p>l</p>',
+    altBio: '<p>a</p>',
+    genres: 'rock',
+    images: [],
+    links: [],
+    model: 'gemini-2.5-pro',
+  };
+
+  beforeEach(() => {
+    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
+    findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
+    rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
+  });
+
+  it('persists the bio', async () => {
+    await bioGenerationJob.persist('a1', okData, { slug: 'radiohead' });
+
+    expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("links the artist's releases by their deep link on the artist's own listing", async () => {
+    findPublishedByArtistWithCoversMock.mockResolvedValueOnce([
+      { id: 'rel1', title: 'Label Album', releasedOn: null, coverUrl: null },
+    ]);
+
+    await bioGenerationJob.persist('a1', okData, { slug: 'radiohead' });
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.links).toContainEqual(
+      expect.objectContaining({ url: '/releases?artist=radiohead&release=rel1', kind: 'release' })
+    );
+  });
+
+  it('still persists, without release links, when the catalog lookup fails', async () => {
+    findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('mongo down'));
+
+    await bioGenerationJob.persist('a1', okData, { slug: 'radiohead' });
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.links).toEqual([]);
+  });
+
+  it('lets a persistence error reach the job runner', async () => {
+    replaceBioContentMock.mockRejectedValue(new Error('DB down'));
+
+    await expect(bioGenerationJob.persist('a1', okData, { slug: 'radiohead' })).rejects.toThrow(
+      'DB down'
+    );
   });
 });
 
@@ -2055,50 +1768,6 @@ describe('BioGenerationService.getGenerationStatus', () => {
     const result = await BioGenerationService.getGenerationStatus('a1');
 
     expect(result?.progress).toEqual(checkpoint);
-  });
-
-  it('returns null progress once the job has succeeded', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'succeeded', bioProgress: checkpoint })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.progress).toBeNull();
-  });
-
-  it('returns null progress when a failed job still holds a stale checkpoint', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'failed', bioError: 'boom', bioProgress: checkpoint })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.progress).toBeNull();
-  });
-
-  it('returns null progress when an in-flight job is stale-coerced to failed', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({
-        bioStatus: 'processing',
-        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-        bioProgress: checkpoint,
-      })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.progress).toBeNull();
-  });
-
-  it('discards a malformed stored progress blob', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'processing', bioProgress: { stage: 'not-a-real-stage' } })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.progress).toBeNull();
   });
 
   it('returns null when the artist is missing', async () => {
@@ -2147,32 +1816,6 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     expect(result?.status).toBe('processing');
     expect(result?.content).toBeNull();
-  });
-
-  /**
-   * A row marked in-flight with no recorded start cannot be shown to be
-   * running. It used to read as `processing` forever, so the polling UI hung
-   * until its 20-minute client deadline; the trigger path meanwhile treated the
-   * same row as abandoned and allowed a new run. Both now agree it is stale.
-   */
-  it('coerces an in-flight job with no recorded start to failed', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'processing', bioStartedAt: null })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.status).toBe('failed');
-  });
-
-  it('surfaces the stale-job error for an in-flight job with no recorded start', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'pending', bioStartedAt: null })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.error).toContain('timed out');
   });
 
   /**
@@ -2249,55 +1892,6 @@ describe('BioGenerationService.getGenerationStatus', () => {
     const result = await BioGenerationService.getGenerationStatus('a1');
 
     expect(result?.content?.links[0].origin).toBe('generated');
-  });
-
-  it('coerces a processing job older than STALE_JOB_MS to failed on read', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({
-        bioStatus: 'processing',
-        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-      })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.status).toBe('failed');
-  });
-
-  it('surfaces a timed-out error when coercing a stale in-flight job', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({
-        bioStatus: 'processing',
-        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-      })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.error).toBe(STALE_JOB_TIMEOUT_MESSAGE);
-  });
-
-  it('coerces a stale pending job (dispatch never started) to failed', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({
-        bioStatus: 'pending',
-        bioStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-      })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.status).toBe('failed');
-  });
-
-  it('leaves a processing job started within STALE_JOB_MS as processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(
-      state({ bioStatus: 'processing', bioStartedAt: new Date(Date.now() - 60_000) })
-    );
-
-    const result = await BioGenerationService.getGenerationStatus('a1');
-
-    expect(result?.status).toBe('processing');
   });
 
   it('reports a failed job with its error and no content', async () => {
@@ -2379,528 +1973,5 @@ describe('BioGenerationService.getGenerationStatus', () => {
 
     expect(result?.status).toBe('failed');
     expect(result?.content?.links).toHaveLength(1);
-  });
-});
-
-describe('BioGenerationService.verifyAndClaimCallback', () => {
-  const claimState = (overrides: Record<string, unknown> = {}) => ({
-    bioStatus: 'processing',
-    bioError: null,
-    bioStartedAt: null,
-    bioJobToken: 'stored-token',
-    bioGeneratedAt: null,
-    slug: 'radiohead',
-    shortBio: null,
-    bio: null,
-    altBio: null,
-    genres: null,
-    bioModel: null,
-    bioImages: [],
-    bioLinks: [],
-    ...overrides,
-  });
-
-  beforeEach(() => {
-    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
-    getBioGenerationStateMock.mockReset();
-    setBioJobTokenMock.mockReset().mockResolvedValue(undefined);
-    claimBioJobTokenMock.mockReset().mockResolvedValue(true);
-  });
-
-  it('returns the slug when the token matches and the claim is won', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-    claimBioJobTokenMock.mockResolvedValue(true);
-
-    const result = await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('stored-token')
-    );
-
-    expect(result).toEqual({ slug: 'radiohead' });
-  });
-
-  it('atomically claims the token (single-use) on a successful match', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-
-    await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('stored-token')
-    );
-
-    expect(claimBioJobTokenMock).toHaveBeenCalledWith('a1', 'stored-token');
-  });
-
-  it('returns null when a concurrent callback already won the claim', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-    claimBioJobTokenMock.mockResolvedValue(false);
-
-    expect(
-      await BioGenerationService.verifyAndClaimCallback(
-        'a1',
-        'stored-token',
-        proofFor('stored-token')
-      )
-    ).toBeNull();
-  });
-
-  it('returns null when the artist has no state', async () => {
-    getBioGenerationStateMock.mockResolvedValue(null);
-
-    expect(
-      await BioGenerationService.verifyAndClaimCallback(
-        'a1',
-        'stored-token',
-        proofFor('stored-token')
-      )
-    ).toBeNull();
-  });
-
-  it('does not attempt a claim when the artist has no state', async () => {
-    getBioGenerationStateMock.mockResolvedValue(null);
-
-    await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('stored-token')
-    );
-
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null when the status is not processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioStatus: 'succeeded' }));
-
-    expect(
-      await BioGenerationService.verifyAndClaimCallback(
-        'a1',
-        'stored-token',
-        proofFor('stored-token')
-      )
-    ).toBeNull();
-  });
-
-  it('does not attempt a claim when the status is not processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioStatus: 'succeeded' }));
-
-    await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('stored-token')
-    );
-
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null when there is no stored token', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: null }));
-
-    expect(
-      await BioGenerationService.verifyAndClaimCallback(
-        'a1',
-        'stored-token',
-        proofFor('stored-token')
-      )
-    ).toBeNull();
-  });
-
-  it('does not attempt a claim when there is no stored token', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: null }));
-
-    await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('stored-token')
-    );
-
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null when an equal-length token does not match', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'aaaaaaaaaaaa' }));
-
-    expect(
-      await BioGenerationService.verifyAndClaimCallback(
-        'a1',
-        'bbbbbbbbbbbb',
-        proofFor('aaaaaaaaaaaa')
-      )
-    ).toBeNull();
-  });
-
-  it('does NOT attempt the claim on a mismatched (forged) callback', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-
-    await BioGenerationService.verifyAndClaimCallback('a1', 'forged', proofFor('stored-token'));
-
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null and never claims on an unsigned callback, even with the right token', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-
-    const result = await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token', {
-      signature: null,
-      rawBody: CALLBACK_BODY,
-    });
-
-    expect(result).toBeNull();
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null and never claims when the signature was made under another token’s key', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-
-    const result = await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      proofFor('leaked-and-guessed')
-    );
-
-    expect(result).toBeNull();
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null and never claims when the signed body differs from the received body', async () => {
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-    const tampered = { ...proofFor('stored-token'), rawBody: `${CALLBACK_BODY} ` };
-
-    const result = await BioGenerationService.verifyAndClaimCallback(
-      'a1',
-      'stored-token',
-      tampered
-    );
-
-    expect(result).toBeNull();
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null and never claims when JOB_CALLBACK_SECRET is unset (fail closed)', async () => {
-    const proof = proofFor('stored-token');
-    vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
-    getBioGenerationStateMock.mockResolvedValue(claimState({ bioJobToken: 'stored-token' }));
-
-    const result = await BioGenerationService.verifyAndClaimCallback('a1', 'stored-token', proof);
-
-    expect(result).toBeNull();
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('BioGenerationService.recordProgress', () => {
-  const progressState = (overrides: Record<string, unknown> = {}) => ({
-    bioStatus: 'processing',
-    bioError: null,
-    bioStartedAt: null,
-    bioJobToken: 'stored-token',
-    bioProgress: null,
-    imageLinksStatus: null,
-    imageLinksError: null,
-    imageLinksStartedAt: null,
-    imageLinksJobToken: null,
-    imageLinksAddedCount: null,
-    bioGeneratedAt: null,
-    slug: 'radiohead',
-    shortBio: null,
-    bio: null,
-    altBio: null,
-    genres: null,
-    bioModel: null,
-    bioImages: [],
-    bioLinks: [],
-    ...overrides,
-  });
-
-  beforeEach(() => {
-    vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
-    getBioGenerationStateMock.mockReset();
-    setBioProgressMock.mockReset().mockResolvedValue(undefined);
-    claimBioJobTokenMock.mockReset();
-    mockLoggerError.mockReset();
-  });
-
-  it('returns true on a valid processing job with a matching token', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      {
-        stage: 'drafting',
-      },
-      proofFor('stored-token')
-    );
-
-    expect(result).toBe(true);
-  });
-
-  it('writes the checkpoint payload with a server-stamped ISO at timestamp', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-
-    await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      {
-        stage: 'commons',
-        detail: 'Wikimedia Commons',
-        counts: { images: 4 },
-      },
-      proofFor('stored-token')
-    );
-
-    const [artistId, progress] = setBioProgressMock.mock.calls[0];
-    expect(artistId).toBe('a1');
-    expect(progress).toMatchObject({
-      stage: 'commons',
-      detail: 'Wikimedia Commons',
-      counts: { images: 4 },
-    });
-    expect(new Date(progress.at).toISOString()).toBe(progress.at);
-  });
-
-  it('never claims the token (claiming is exclusive to the completion callback)', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-
-    await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      { stage: 'drafting' },
-      proofFor('stored-token')
-    );
-
-    expect(claimBioJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns false when the token does not match', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: 'stored-token' }));
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'forged-token',
-      {
-        stage: 'drafting',
-      },
-      proofFor('stored-token')
-    );
-
-    expect(result).toBe(false);
-  });
-
-  it('does not write when the token does not match', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: 'stored-token' }));
-
-    await BioGenerationService.recordProgress(
-      'a1',
-      'forged-token',
-      { stage: 'drafting' },
-      proofFor('stored-token')
-    );
-
-    expect(setBioProgressMock).not.toHaveBeenCalled();
-  });
-
-  it('returns false when the status is not processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState({ bioStatus: 'pending' }));
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      {
-        stage: 'drafting',
-      },
-      proofFor('stored-token')
-    );
-
-    expect(result).toBe(false);
-  });
-
-  it('does not write when the status is not processing', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState({ bioStatus: 'pending' }));
-
-    await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      { stage: 'drafting' },
-      proofFor('stored-token')
-    );
-
-    expect(setBioProgressMock).not.toHaveBeenCalled();
-  });
-
-  it('returns false when the artist has no state', async () => {
-    getBioGenerationStateMock.mockResolvedValue(null);
-
-    expect(
-      await BioGenerationService.recordProgress(
-        'a1',
-        'stored-token',
-        { stage: 'drafting' },
-        proofFor('stored-token')
-      )
-    ).toBe(false);
-  });
-
-  it('returns false when there is no stored token', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState({ bioJobToken: null }));
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      {
-        stage: 'drafting',
-      },
-      proofFor('stored-token')
-    );
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false and logs without throwing when the repo write fails', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-    setBioProgressMock.mockRejectedValue(new Error('DB down'));
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      {
-        stage: 'drafting',
-      },
-      proofFor('stored-token')
-    );
-
-    expect(result).toBe(false);
-  });
-
-  it('logs the failure when the repo write throws', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-    setBioProgressMock.mockRejectedValue(new Error('DB down'));
-
-    await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      { stage: 'drafting' },
-      proofFor('stored-token')
-    );
-
-    expect(mockLoggerError).toHaveBeenCalled();
-  });
-
-  it('returns false and writes nothing on an unsigned checkpoint', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      { stage: 'drafting' },
-      { signature: null, rawBody: CALLBACK_BODY }
-    );
-
-    expect(result).toBe(false);
-    expect(setBioProgressMock).not.toHaveBeenCalled();
-  });
-
-  it('returns false and writes nothing when the signature was made under another token’s key', async () => {
-    getBioGenerationStateMock.mockResolvedValue(progressState());
-
-    const result = await BioGenerationService.recordProgress(
-      'a1',
-      'stored-token',
-      { stage: 'drafting' },
-      proofFor('leaked-and-guessed')
-    );
-
-    expect(result).toBe(false);
-    expect(setBioProgressMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('BioGenerationService.completeCallback', () => {
-  const okData: BioGenerationData = {
-    shortBio: 's',
-    longBio: '<p>l</p>',
-    altBio: '<p>a</p>',
-    genres: 'rock',
-    images: [],
-    links: [],
-    model: 'gemini-2.5-pro',
-  };
-
-  beforeEach(() => {
-    setBioStatusMock.mockReset().mockResolvedValue(undefined);
-    replaceBioContentMock.mockReset().mockResolvedValue(undefined);
-    findPublishedByArtistWithCoversMock.mockReset().mockResolvedValue([]);
-    rehostImagesMock.mockReset().mockResolvedValue({ results: [], duplicateAliases: new Map() });
-  });
-
-  it('persists the bio on an ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("links the artist's releases by their deep link on the artist's own listing", async () => {
-    findPublishedByArtistWithCoversMock.mockResolvedValueOnce([
-      { id: 'rel1', title: 'Label Album', releasedOn: null, coverUrl: null },
-    ]);
-
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    const [, content] = replaceBioContentMock.mock.calls[0];
-    expect(content.links).toContainEqual(
-      expect.objectContaining({ url: '/releases?artist=radiohead&release=rel1', kind: 'release' })
-    );
-  });
-
-  it('flips to succeeded on an ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
-  });
-
-  it('does not persist on a non-ok result', async () => {
-    await BioGenerationService.completeCallback(
-      'a1',
-      { ok: false, error: 'lambda blew up' },
-      'radiohead'
-    );
-
-    expect(replaceBioContentMock).not.toHaveBeenCalled();
-  });
-
-  it('flips to failed with the error on a non-ok result', async () => {
-    await BioGenerationService.completeCallback(
-      'a1',
-      { ok: false, error: 'lambda blew up' },
-      'radiohead'
-    );
-
-    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'lambda blew up' });
-  });
-
-  it('flips to failed when persistence throws', async () => {
-    replaceBioContentMock.mockRejectedValue(new Error('DB down'));
-
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'DB down' });
-  });
-
-  it('uses a fallback message when persistence throws a non-Error', async () => {
-    replaceBioContentMock.mockRejectedValue('boom');
-
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', {
-      error: 'Bio persistence failed.',
-    });
-  });
-
-  it('falls back to empty releases when the catalog lookup fails', async () => {
-    findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('mongo down'));
-
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
-
-    expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
   });
 });

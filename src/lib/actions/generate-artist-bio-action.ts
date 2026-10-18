@@ -8,18 +8,14 @@ import 'server-only';
 import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import { bioGenerationJob } from '@/lib/services/bio-generation-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
   type GenerateArtistBioActionResult,
 } from '@/lib/validation/bio-generation-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
-
-import {
-  resolveInFlightBioStatus,
-  runBioGenerationAfterResponse,
-} from './generate-artist-bio-action-helpers';
 
 const logger = loggers.media;
 
@@ -52,32 +48,20 @@ export const generateArtistBioAction = async (
   const { artistId, links, description } = parsed.data;
 
   try {
-    const state = await ArtistRepository.getBioGenerationState(artistId);
-    if (!state) {
-      return { success: false, error: 'Artist not found.' };
+    // The job runner refuses a missing artist and echoes a run genuinely in
+    // flight instead of starting a second one.
+    const triggered = await jobRunner.trigger(bioGenerationJob, artistId);
+    if (!triggered.success) {
+      return { success: false, error: triggered.error };
+    }
+    if (!triggered.data.started) {
+      return { success: true, status: triggered.data.status };
     }
 
-    // Don't start a second run while one is genuinely in flight.
-    const inFlightStatus = resolveInFlightBioStatus(state);
-    if (inFlightStatus) {
-      return { success: true, status: inFlightStatus };
-    }
-
-    await ArtistRepository.setBioStatus(artistId, 'pending', {
-      error: null,
-      startedAt: new Date(),
-    });
-
-    // Run the heavy work after the response is sent. `runGenerationJob` records
-    // its own succeeded/failed status and never throws; the after-response helper
-    // only revalidates the public pages once a completed outcome finishes.
-    after(() =>
-      runBioGenerationAfterResponse({
-        artistId,
-        links,
-        description,
-      })
-    );
+    // Run the heavy work after the response is sent. The run records its own
+    // failed status and never throws; the completion callback route finishes
+    // the job and revalidates the artist's pages.
+    after(() => jobRunner.run(bioGenerationJob, artistId, { links, description }));
 
     // Audit the accepted trigger here — under async the job returns after DISPATCH,
     // so completion is not observable in-process; the trigger is what we can log.

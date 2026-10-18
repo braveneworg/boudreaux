@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { verifyJobSignature } from '@fakefour/job-contract/signing';
 
+import { bioGenerationJob } from '@/lib/services/bio-generation-service';
+
 import { jobInvoker, lambdaJobInvoker, localJobInvoker } from './job-invoker';
 
 import type { JobAdapter, JobCopy, JobPayload, JobTypes } from './types';
@@ -311,5 +313,26 @@ describe('jobInvoker', () => {
 
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('one local adapter for every kind', () => {
+  const dispatch = {
+    callbackUrl: CALLBACK_URL,
+    progressUrl: PROGRESS_URL,
+    jobToken: 'tok-123',
+    signingKey: SIGNING_KEY,
+  };
+
+  it('bio generation: a signed checkpoint to the progress URL, then a signed callback', async () => {
+    await localJobInvoker.invoke(bioGenerationJob, {
+      artistId: 'a'.repeat(24),
+      displayName: 'Radiohead',
+      ...dispatch,
+    });
+
+    expect(postedUrls()).toEqual([PROGRESS_URL, CALLBACK_URL]);
+    expect(postIsSignedWith(PROGRESS_URL, SIGNING_KEY)).toBe(true);
+    expect(postIsSignedWith(CALLBACK_URL, SIGNING_KEY)).toBe(true);
   });
 });
