@@ -8,7 +8,6 @@ import {
   isInFlightJobStatus,
   isStaleJob,
   resolveStaleJobView,
-  runnerShouldSkip,
   STALE_JOB_MS,
   STALE_JOB_TIMEOUT_MESSAGE,
   toAsyncJobStatus,
@@ -150,35 +149,6 @@ describe('blocksNewTrigger', () => {
 
   it('never blocks on a never-run job', () => {
     expect(blocksNewTrigger(null, null)).toBe(false);
-  });
-});
-
-describe('runnerShouldSkip', () => {
-  it('skips while a fresh job is already processing', () => {
-    expect(runnerShouldSkip('processing', new Date())).toBe(true);
-  });
-
-  /**
-   * The deliberate difference from blocksNewTrigger: `pending` is the handoff
-   * the runner exists to consume. If pending blocked the runner too, the
-   * trigger's own pending write would deadlock every run.
-   */
-  it('does not skip on a fresh pending job — pending is the handoff', () => {
-    expect(runnerShouldSkip('pending', new Date())).toBe(false);
-  });
-
-  it('does not skip on a stale processing job', () => {
-    const startedAt = new Date(Date.now() - (STALE_JOB_MS + 60_000));
-
-    expect(runnerShouldSkip('processing', startedAt)).toBe(false);
-  });
-
-  it('does not skip on a settled job', () => {
-    expect(runnerShouldSkip('succeeded', new Date())).toBe(false);
-  });
-
-  it('does not skip on a never-run job', () => {
-    expect(runnerShouldSkip(null, null)).toBe(false);
   });
 });
 

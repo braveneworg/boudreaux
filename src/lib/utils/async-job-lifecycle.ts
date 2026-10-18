@@ -5,22 +5,23 @@
 /**
  * The async job lifecycle, as one pure decision module.
  *
- * Bio generation and video enrichment run the same background-job shape:
- * `pending → processing → succeeded/failed`, an atomic token claim, progress
- * checkpoints, a read-time stale coercion, and client polling with a give-up
- * deadline. This module owns the lifecycle's *decisions* — both jobs consume
- * it. It never writes: status transitions and the token claim stay in the
+ * Bio generation, images-from-links and video enrichment run the same
+ * background-job shape: `pending → processing → succeeded/failed`, an atomic
+ * token claim, progress checkpoints, a read-time stale coercion, and client
+ * polling with a give-up deadline. This module owns the lifecycle's
+ * *decisions* — all three jobs consume it, through the job runner on the
+ * server. It never writes: status transitions and the token claim stay in the
  * repositories, and it is deliberately client-safe (no `server-only`) so
  * polling hooks and admin panels consume the same facts the server does.
  *
- * The two gate questions are named and deliberately different:
+ * The two gates are deliberately different:
  *
  * - {@link blocksNewTrigger} — a fresh `pending` blocks a new trigger.
  *   A queued job is a job; triggering again would double-run it.
- * - {@link runnerShouldSkip} — only a fresh `processing` blocks the runner.
- *   `pending` must NOT block here: it is the handoff the runner exists to
- *   consume. Collapsing these two questions into one predicate deadlocks
- *   every run on its own trigger write.
+ * - The runner gate is the begin write (`mayBeginRunWhere`): only a fresh
+ *   `processing` stops a run from beginning. `pending` must NOT block there:
+ *   it is the handoff the runner exists to consume. Collapsing the two gates
+ *   into one predicate deadlocks every run on its own trigger write.
  *
  * **Writers must uphold the matching invariant: anything that marks a job
  * in-flight has to record `startedAt` in the same write.** A job is in flight
@@ -103,16 +104,6 @@ export const blocksNewTrigger = (
   status: AsyncJobStatus | null | undefined,
   startedAt: Date | null | undefined
 ): boolean => isInFlightJobStatus(status) && !isStaleJob(startedAt, STALE_JOB_MS);
-
-/**
- * Runner gate: only a fresh `processing` job makes the runner skip. `pending`
- * must not block — it is the trigger's handoff, the very state the runner
- * consumes (see the module doc for why this is not {@link blocksNewTrigger}).
- */
-export const runnerShouldSkip = (
-  status: AsyncJobStatus | null | undefined,
-  startedAt: Date | null | undefined
-): boolean => status === 'processing' && !isStaleJob(startedAt, STALE_JOB_MS);
 
 /** A status read after the stale coercion: what the polling client should see. */
 export interface StaleJobView {

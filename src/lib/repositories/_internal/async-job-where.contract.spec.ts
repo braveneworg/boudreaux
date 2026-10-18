@@ -9,9 +9,9 @@ import { STALE_JOB_MS } from '@/utils/async-job-lifecycle';
 import { mayBeginRunWhere } from './async-job-where';
 
 // Contract: on a real MongoDB, `mayBeginRunWhere` matches exactly the jobs
-// `runnerShouldSkip` would not skip, for every way the status and start can
-// be stored — and two runners racing to begin one job see exactly one
-// winner. Runs only under `pnpm run test:db`.
+// the runner gate lets begin — all but a fresh `processing` — for every way
+// the status and start can be stored, and two runners racing to begin one
+// job see exactly one winner. Runs only under `pnpm run test:db`.
 
 const NOW = new Date('2026-10-03T12:00:00.000Z');
 const FRESH = new Date(NOW.getTime() - 60_000);
