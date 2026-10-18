@@ -5,7 +5,10 @@
 
 import { useState, type ReactElement, type ReactNode } from 'react';
 
-import { ReleasePlayDialog } from '@/app/components/release-play-dialog';
+import {
+  ReleasePlayDialog,
+  type ReleasePlayDialogLayout,
+} from '@/app/components/release-play-dialog';
 import { ReleaseShareWidget } from '@/app/components/release-share-widget';
 import {
   pickLoudZineAccent,
@@ -34,13 +37,6 @@ export interface ListeningModalRelease {
   playSrc: string | null;
 }
 
-/**
- * The modal's layout. `'dialog'` (the default) titles it with the release and
- * describes it with the artist. `'sheet'` leads with the artist on centered
- * heading lines and slides up as a bottom sheet on phones.
- */
-export type ListeningModalLayout = 'dialog' | 'sheet';
-
 /** What an opener decides about its listening modal. */
 export interface ListeningModalOptions {
   /**
@@ -58,7 +54,8 @@ export interface ListeningModalOptions {
    * artist's page, as the spotlight does (ADR-0023).
    */
   share?: 'release-deep-link' | 'artist-page';
-  layout?: ListeningModalLayout;
+  /** The heading and phone layout (see `ReleasePlayDialogLayout`). */
+  layout?: ReleasePlayDialogLayout;
   /** The artist's page: the artist line links there when given. */
   artistHref?: string;
   /** The release year, shown after the title when given. */
@@ -129,7 +126,6 @@ export const useListeningModal = ({
   release,
   accent,
   share,
-  layout,
   openOnArrival,
   onClose,
   ...presentation
@@ -158,7 +154,6 @@ export const useListeningModal = ({
     if (!next) close();
   };
 
-  const sheet = layout === 'sheet';
   const modal = release ? (
     <ReleasePlayDialog
       {...presentation}
@@ -170,9 +165,6 @@ export const useListeningModal = ({
       takeMediaEl={takeMediaEl}
       autoPlay={openedBy !== 'arrival'}
       prefetch={warmed}
-      headingOrder={sheet ? 'artist-first' : 'title-first'}
-      centered={sheet}
-      sheetOnPhone={sheet}
       accent={accentFor(release, accent, drawnAccent)}
       shareWidget={
         <ReleaseShareWidget

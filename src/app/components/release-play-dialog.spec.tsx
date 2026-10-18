@@ -219,28 +219,28 @@ describe('ReleasePlayDialog', () => {
     expect(dialog).toHaveAccessibleDescription('John Doe');
   });
 
-  it('leads with the artist when the heading order is artist-first', () => {
+  it('leads with the artist in the sheet layout', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAccessibleName('John Doe');
     expect(dialog).toHaveAccessibleDescription('Midnight Serenade');
   });
 
-  it('leads with the release when artist-first has no artist to name', () => {
+  it('leads with the release in the sheet layout when there is no artist to name', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} artistName={null} headingOrder="artist-first" />);
+    render(<ReleasePlayDialog {...defaultProps} artistName={null} layout="sheet" />);
 
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Midnight Serenade');
   });
 
-  it('centers both heading lines when asked', () => {
+  it('centers both heading lines in the sheet layout', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" centered />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     expect(screen.getByText('John Doe')).toHaveClass('text-center');
     expect(screen.getByText('Midnight Serenade')).toHaveClass('text-center');
@@ -261,7 +261,7 @@ describe('ReleasePlayDialog', () => {
     render(
       <ReleasePlayDialog
         {...defaultProps}
-        headingOrder="artist-first"
+        layout="sheet"
         artistHref="/artists/john-doe"
         year={2024}
       />
@@ -279,7 +279,7 @@ describe('ReleasePlayDialog', () => {
   it('links no artist and shows no year by default', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     expect(screen.queryByRole('link', { name: 'John Doe' })).toBeNull();
     expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Midnight Serenade');
@@ -328,10 +328,10 @@ describe('ReleasePlayDialog', () => {
     expect(screen.getByRole('dialog').className).not.toMatch(/zine-accent-/);
   });
 
-  it('slides up from the bottom as a full-width sheet on a phone when asked', () => {
+  it('slides up from the bottom as a full-width sheet on a phone in the sheet layout', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     expect(screen.getByRole('dialog')).toHaveClass(
       'max-sm:inset-x-0',
@@ -350,7 +350,7 @@ describe('ReleasePlayDialog', () => {
   it('fades the sheet in without the slide under reduced motion', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     expect(screen.getByRole('dialog')).toHaveClass(
       'max-sm:motion-reduce:data-[state=open]:slide-in-from-bottom-0',
@@ -371,7 +371,7 @@ describe('ReleasePlayDialog', () => {
       queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
     );
 
-    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     const slot = screen.getByTestId('release-player').parentElement;
     expect(slot).toHaveAttribute('data-slot', 'release-play-dialog-player');
@@ -388,7 +388,7 @@ describe('ReleasePlayDialog', () => {
     render(
       <ReleasePlayDialog
         {...defaultProps}
-        sheetOnPhone
+        layout="sheet"
         shareWidget={<div>share</div>}
         footer={<a href="/releases?artist=jd">View all releases</a>}
       />
@@ -404,27 +404,27 @@ describe('ReleasePlayDialog', () => {
   it('sizes the loading skeleton like the player in the sheet', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} sheetOnPhone />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     const slot = screen.getByRole('status').closest('[data-slot="release-play-dialog-player"]');
     expect(slot).toHaveClass('max-sm:w-[min(100%,max(16.25rem,calc(90dvh-20rem)))]');
   });
 
   describe.each([
-    { variant: 'in the sheet', sheetOnPhone: true },
-    { variant: 'by default', sheetOnPhone: false },
-  ])('the player slot $variant', ({ sheetOnPhone }) => {
+    { variant: 'in the sheet', layout: 'sheet' },
+    { variant: 'in the dialog', layout: 'dialog' },
+  ] as const)('the player slot $variant', ({ layout }) => {
     const playerSlot = (): HTMLElement | null => {
       mockUseReleaseQuery.mockReturnValue(
         queryState({ data: { id: 'release-1', title: 'Midnight Serenade' } })
       );
-      render(<ReleasePlayDialog {...defaultProps} sheetOnPhone={sheetOnPhone} />);
+      render(<ReleasePlayDialog {...defaultProps} layout={layout} />);
       return screen.getByTestId('release-player').parentElement;
     };
 
     const skeletonSlot = (): HTMLElement | null => {
       mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
-      render(<ReleasePlayDialog {...defaultProps} sheetOnPhone={sheetOnPhone} />);
+      render(<ReleasePlayDialog {...defaultProps} layout={layout} />);
       return screen.getByRole('status').closest('[data-slot="release-play-dialog-player"]');
     };
 
@@ -461,7 +461,7 @@ describe('ReleasePlayDialog', () => {
   it('sets the heading lines smaller on a phone in the sheet', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" sheetOnPhone />);
+    render(<ReleasePlayDialog {...defaultProps} layout="sheet" />);
 
     expect(screen.getByText('John Doe')).toHaveClass('max-sm:text-lg', 'max-sm:leading-tight');
     expect(screen.getByText('Midnight Serenade')).toHaveClass('max-sm:text-xs');
@@ -470,10 +470,10 @@ describe('ReleasePlayDialog', () => {
   it('keeps the heading sizes by default', () => {
     mockUseReleaseQuery.mockReturnValue(queryState({ isPending: true }));
 
-    render(<ReleasePlayDialog {...defaultProps} headingOrder="artist-first" />);
+    render(<ReleasePlayDialog {...defaultProps} />);
 
-    expect(screen.getByText('John Doe')).not.toHaveClass('max-sm:text-lg');
-    expect(screen.getByText('Midnight Serenade')).not.toHaveClass('max-sm:text-xs');
+    expect(screen.getByText('Midnight Serenade')).not.toHaveClass('max-sm:text-lg');
+    expect(screen.getByText('John Doe')).not.toHaveClass('max-sm:text-xs');
   });
 
   it('renders no share widget slot when none is given', () => {

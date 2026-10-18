@@ -15,6 +15,16 @@ import { cn } from '@/lib/utils';
 
 import { ReleasePlayer } from './release-player';
 
+/**
+ * The modal's layout. `'dialog'` (the default) titles it with the release and
+ * describes it with the artist, and stays a centered dialog on phones.
+ * `'sheet'` leads with the artist (the release when there is no artist to
+ * name) on centered heading lines, and below the `sm` breakpoint slides up
+ * from the bottom as a full-width sheet, with the player and heading sized so
+ * the whole sheet fits the screen without scrolling.
+ */
+export type ReleasePlayDialogLayout = 'dialog' | 'sheet';
+
 export interface ReleasePlayDialogProps {
   releaseId: string;
   title: string;
@@ -46,14 +56,7 @@ export interface ReleasePlayDialogProps {
   onCloseAutoFocus?: (event: Event) => void;
   /** Rendered under the player, e.g. a "View all releases" link. */
   footer?: ReactNode;
-  /**
-   * Which line names the dialog. `'title-first'` (the default) titles it with
-   * the release and describes it with the artist; `'artist-first'` swaps the
-   * two, and falls back to the release when there is no artist to name.
-   */
-  headingOrder?: 'title-first' | 'artist-first';
-  /** Center both heading lines. */
-  centered?: boolean;
+  layout?: ReleasePlayDialogLayout;
   /** The artist's page: the artist line links there when given. */
   artistHref?: string;
   /** The release year, shown after the title as `Title (Year)` when given. */
@@ -62,12 +65,6 @@ export interface ReleasePlayDialogProps {
   initialTrackNumber?: number;
   /** Rendered under the player, e.g. a `ReleaseShareWidget`. */
   shareWidget?: ReactNode;
-  /**
-   * Below the `sm` breakpoint, slide up from the bottom as a full-width sheet
-   * instead of centering, with the player and heading sized so the whole
-   * sheet fits the screen without scrolling.
-   */
-  sheetOnPhone?: boolean;
   /**
    * The opening page's accent. The dialog portals to `<body>`, out of the
    * page's `ZinePanel`, so without it the player frame and buttons take the
@@ -213,15 +210,14 @@ const ReleasePlayDialogPlayer = ({
 };
 
 /**
- * Listening-station modal for a release. Opened by a cover in the home and
- * `/releases` grids, a release card's Play button or the artist page's latest
- * release — the click gesture source-primes the card's track (audio starts
- * immediately) while this dialog fetches the `withTracks` release detail and
- * mounts the full {@link ReleasePlayer}, which adopts the playing element.
- * Kept to a tasteful width, with the square cover shrunk to fit the screen's
- * height so the whole modal shows without scrolling (down to the controls'
- * 16rem minimum); `sheetOnPhone` makes it a bottom sheet on phones instead,
- * and `accent` gives it the opening page's accent.
+ * The listening modal for a release. Every opener gets it from
+ * `useListeningModal`: the opening click source-primes the release's track
+ * (audio starts immediately) while this dialog fetches the `withTracks`
+ * release detail and mounts the full {@link ReleasePlayer}, which adopts the
+ * playing element. Kept to a tasteful width, with the square cover shrunk to
+ * fit the screen's height so the whole modal shows without scrolling (down to
+ * the controls' 16rem minimum); the `'sheet'` layout makes it a bottom sheet
+ * on phones instead, and `accent` gives it the opener's accent.
  * Closing unmounts the player, which disposes video.js and stops playback.
  */
 export const ReleasePlayDialog = ({
@@ -235,13 +231,11 @@ export const ReleasePlayDialog = ({
   prefetch = false,
   onCloseAutoFocus,
   footer,
-  headingOrder = 'title-first',
-  centered = false,
+  layout = 'dialog',
   artistHref,
   year,
   initialTrackNumber,
   shareWidget,
-  sheetOnPhone = false,
   accent,
 }: ReleasePlayDialogProps): ReactElement => {
   const {
@@ -249,13 +243,14 @@ export const ReleasePlayDialog = ({
     isError,
     data: release,
   } = useReleaseQuery(releaseId, { enabled: open || prefetch });
+  const sheet = layout === 'sheet';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
           'max-h-[90dvh] gap-3 overflow-y-auto p-4 sm:max-w-md lg:max-w-lg',
-          sheetOnPhone && PHONE_SHEET_CLASS,
+          sheet && PHONE_SHEET_CLASS,
           accent && getZineAccentClass(accent)
         )}
         onCloseAutoFocus={onCloseAutoFocus}
@@ -265,9 +260,9 @@ export const ReleasePlayDialog = ({
           artistName={artistName}
           artistHref={artistHref}
           year={year}
-          headingOrder={headingOrder}
-          centered={centered}
-          compactOnPhone={sheetOnPhone}
+          headingOrder={sheet ? 'artist-first' : 'title-first'}
+          centered={sheet}
+          compactOnPhone={sheet}
         />
         <ReleasePlayDialogPlayer
           isPending={isPending}
@@ -277,7 +272,7 @@ export const ReleasePlayDialog = ({
           takeMediaEl={takeMediaEl}
           autoPlay={autoPlay}
           initialTrackNumber={initialTrackNumber}
-          fitPhoneSheet={sheetOnPhone}
+          fitPhoneSheet={sheet}
           stacked={[shareWidget, footer].every(Boolean)}
         />
         {shareWidget ? (
