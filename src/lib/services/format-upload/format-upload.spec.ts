@@ -351,6 +351,28 @@ describe('FormatUpload.receive', () => {
   });
 });
 
+describe('FormatUpload receive, then confirm', () => {
+  it('keys names with runs of dots so its own confirm accepts the batch', async () => {
+    const received = await Promise.all(
+      ['03 - Wait... What.wav', 'a..b.wav'].map((fileName) =>
+        upload.receive(wavInput({ fileName }))
+      )
+    );
+    const s3Keys = received.map((result) => (result.success ? result.data.s3Key : ''));
+
+    const confirmed = await upload.confirm(
+      confirmInput(
+        s3Keys.map((s3Key) => fileOf(s3Key, { fileSize: 4, mimeType: 'audio/wav' })),
+        { formatType: 'WAV' }
+      )
+    );
+
+    expect(s3Keys.filter((s3Key) => s3Key.includes('..'))).toEqual([]);
+    expect(confirmed.success && confirmed.data.fileCount).toBe(2);
+    expect(s3Keys.filter(isStored)).toEqual(s3Keys);
+  });
+});
+
 describe('FormatUpload.checkNewReleaseTitle', () => {
   it('refuses a title another Release holds, with the copy', async () => {
     vi.mocked(ReleaseService.findByTitleInsensitive).mockResolvedValueOnce({

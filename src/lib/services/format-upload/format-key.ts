@@ -12,7 +12,8 @@ export const formatKeyPrefix = (releaseId: string, formatType: DigitalFormatType
 /**
  * The key a received file is stored under: the format's prefix, the time it
  * was received, and the file name with every character outside
- * `[a-zA-Z0-9.-]` replaced by `-`.
+ * `[a-zA-Z0-9.-]`, and every run of dots, replaced by `-`. A run of dots
+ * would read as traversal to {@link isFormatKey}, which then refuses the key.
  */
 export const buildFormatKey = ({
   releaseId,
@@ -23,7 +24,7 @@ export const buildFormatKey = ({
   formatType: DigitalFormatType;
   fileName: string;
 }): string =>
-  `${formatKeyPrefix(releaseId, formatType)}${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '-')}`;
+  `${formatKeyPrefix(releaseId, formatType)}${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]|\.{2,}/g, '-')}`;
 
 /** True when `s3Key` sits under the format's prefix and does not traverse out of it. */
 export const isFormatKey = (
