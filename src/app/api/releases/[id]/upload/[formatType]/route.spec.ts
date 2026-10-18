@@ -182,6 +182,22 @@ describe('PUT /api/releases/[id]/upload/[formatType]', () => {
     });
   });
 
+  it('answers a request without a content type as VALIDATION_FAILED', async () => {
+    const request = makeRequest();
+    request.headers.delete('content-type');
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: RELEASE_ID, formatType: 'WAV' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'VALIDATION_FAILED',
+      message: 'Invalid MIME type. Expected: audio/wav, audio/x-wav, audio/wave',
+    });
+  });
+
   it('refuses a request without a body', async () => {
     const response = await put({ body: null });
 

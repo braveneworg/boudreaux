@@ -517,6 +517,20 @@ describe('ReleaseDigitalFormatRepository', () => {
       });
     });
 
+    it('records a total size of 0 when the aggregate sums nothing', async () => {
+      tx.releaseDigitalFormatFile.aggregate.mockResolvedValueOnce({
+        _count: 0,
+        _sum: { fileSize: null },
+      });
+
+      await repository.replaceTracks(mockReleaseId, 'FLAC', []);
+
+      expect(tx.releaseDigitalFormat.update).toHaveBeenCalledWith({
+        where: { id: 'format-1' },
+        data: { trackCount: 0, totalFileSize: BigInt(0) },
+      });
+    });
+
     it('surfaces a failed transaction as a DataError', async () => {
       vi.mocked(prisma.$transaction).mockRejectedValueOnce(new Error('Transaction aborted'));
 
