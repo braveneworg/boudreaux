@@ -1,493 +1,256 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
-import { Readable } from 'node:stream';
-import { ReadableStream } from 'node:stream/web';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import { NextRequest } from 'next/server';
 
+import NodeID3 from 'node-id3';
+
+import { readLocalFormatObject } from '@/lib/services/format-upload/format-object-store';
 import { loggers } from '@/lib/utils/logger';
 
 import { PUT } from './route';
 
-// Polyfill ReadableStream for jsdom env
-globalThis.ReadableStream = ReadableStream as unknown as typeof globalThis.ReadableStream;
-
+// The real format upload module runs behind this route, sending files to the
+// local object store (`E2E_MODE`); only the session is mocked.
 const mockAuth = vi.fn();
 vi.mock('@/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-const mockValidateFileInfo = vi.fn();
-vi.mock('@/lib/services/upload-service', () => {
-  return {
-    UploadService: class MockUploadService {
-      validateFileInfo = mockValidateFileInfo;
-    },
-  };
-});
+const RELEASE_ID = '507f1f77bcf86cd799439011';
+const MP3_FIXTURE = join(process.cwd(), 'public/e2e/audio/e2e-track-320.mp3');
+const WAV_BYTES = new Uint8Array([82, 73, 70, 70]);
 
-const mockGetS3Client = vi.fn();
-const mockGetS3BucketName = vi.fn();
-vi.mock('@/lib/utils/s3-client', () => ({
-  getS3Client: (...args: unknown[]) => mockGetS3Client(...args),
-  getS3BucketName: (...args: unknown[]) => mockGetS3BucketName(...args),
-}));
-
-const mockUploadDone = vi.fn();
-const mockUploadOn = vi.fn();
-vi.mock('@aws-sdk/lib-storage', () => {
-  return {
-    Upload: class MockUpload {
-      done = mockUploadDone;
-      on = mockUploadOn;
-    },
-  };
-});
-
-// Mock audio-metadata
-const mockWriteComment = vi.fn();
-const mockSupportsComment = vi.fn();
-vi.mock('@/lib/audio-metadata', () => ({
-  writeComment: (...args: unknown[]) => mockWriteComment(...args),
-  supportsComment: (...args: unknown[]) => mockSupportsComment(...args),
-}));
-
-// Mock node:stream/promises (pipeline)
-vi.mock('node:stream/promises', () => ({
-  pipeline: vi.fn().mockResolvedValue(undefined),
-}));
-
-// Mock node:fs (createWriteStream, createReadStream)
-vi.mock('node:fs', () => ({
-  createWriteStream: vi.fn().mockReturnValue({ on: vi.fn(), end: vi.fn() }),
-  createReadStream: vi.fn().mockReturnValue(
-    new Readable({
-      read() {
-        this.push(null);
-      },
-    })
-  ),
-}));
-
-// Mock node:fs/promises (stat, unlink)
-vi.mock('node:fs/promises', () => ({
-  stat: vi.fn().mockResolvedValue({ size: 50_000_000 }),
-  unlink: vi.fn().mockResolvedValue(undefined),
-}));
-
-// Mock node:os (tmpdir)
-vi.mock('node:os', () => ({
-  tmpdir: vi.fn().mockReturnValue('/tmp'),
-}));
-
-// Mock node:path (join)
-vi.mock('node:path', () => ({
-  join: vi.fn((...parts: string[]) => parts.join('/')),
-  extname: vi.fn((filePath: string) => {
-    const dotIndex = filePath.lastIndexOf('.');
-    return dotIndex >= 0 ? filePath.slice(dotIndex) : '';
-  }),
-}));
-
-// Mock node:crypto (randomUUID)
-vi.mock('node:crypto', () => ({
-  randomUUID: vi.fn().mockReturnValue('test-uuid-1234'),
-}));
-
-// Mock Readable.fromWeb to avoid actual stream conversion
-vi.spyOn(Readable, 'fromWeb').mockReturnValue(
-  new Readable({
-    read() {
-      this.push(null);
-    },
-  })
-);
-
-const makeBody = (): ReadableStream =>
+const streamOf = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
   new ReadableStream({
     start(controller) {
-      controller.enqueue(Buffer.from('mock file data'));
+      controller.enqueue(bytes);
       controller.close();
     },
   });
 
-const makeRequest = (overrides?: {
+interface RequestOptions {
+  formatType?: string;
   headers?: Record<string, string>;
-  noBody?: boolean;
-}): NextRequest => {
-  const defaultHeaders: Record<string, string> = {
-    'x-file-name': encodeURIComponent('album.mp3'),
-    'x-file-size': '50000000',
-    'content-type': 'audio/mpeg',
-  };
+  body?: ReadableStream<Uint8Array> | null;
+  signal?: AbortSignal;
+}
 
-  const headers = { ...defaultHeaders, ...overrides?.headers };
-
-  return new NextRequest('http://localhost:3000/api/releases/release-1/upload/MP3_320KBPS', {
+/** A PUT of a small WAV unless the options say otherwise. */
+const makeRequest = ({ formatType = 'WAV', headers, body, signal }: RequestOptions = {}) =>
+  new NextRequest(`http://localhost:3000/api/releases/${RELEASE_ID}/upload/${formatType}`, {
     method: 'PUT',
-    headers,
-    body: overrides?.noBody ? undefined : (makeBody() as unknown as string),
+    headers: {
+      'x-file-name': encodeURIComponent('take.wav'),
+      'x-file-size': String(WAV_BYTES.byteLength),
+      'content-type': 'audio/wav',
+      ...headers,
+    },
+    body: body === undefined ? streamOf(WAV_BYTES) : body,
     duplex: 'half',
-  });
-};
+    ...(signal && { signal }),
+  } as ConstructorParameters<typeof NextRequest>[1]);
 
-const makeParams = (id = 'release-1', formatType = 'MP3_320KBPS') => ({
-  params: Promise.resolve({ id, formatType }),
+const put = (options: RequestOptions = {}) =>
+  PUT(makeRequest(options), {
+    params: Promise.resolve({ id: RELEASE_ID, formatType: options.formatType ?? 'WAV' }),
+  });
+
+beforeEach(() => {
+  mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' } });
+  vi.stubEnv('E2E_MODE', 'true');
+  vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://example.com');
+  vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://fallback.example.com');
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('PUT /api/releases/[id]/upload/[formatType]', () => {
-  beforeEach(() => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
-    });
-    mockValidateFileInfo.mockReturnValue({ valid: true });
-    mockGetS3Client.mockReturnValue({ send: vi.fn() });
-    mockGetS3BucketName.mockReturnValue('test-bucket');
-    mockUploadDone.mockResolvedValue({});
-    mockUploadOn.mockReturnValue(undefined);
-    mockWriteComment.mockResolvedValue(undefined);
-    mockSupportsComment.mockReturnValue(true);
-    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://example.com');
-    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://fallback.example.com');
-  });
+  it('returns 401 without a session', async () => {
+    mockAuth.mockResolvedValueOnce(null);
 
-  it('should return 401 when user is not authenticated (withAdmin)', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await put();
 
     expect(response.status).toBe(401);
-    expect(body.error).toBe('Authentication required');
+    expect((await response.json()).error).toBe('Authentication required');
   });
 
-  it('should return 403 when user is not admin (withAdmin)', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', role: 'user', email: 'user@test.com' },
-    });
+  it('returns 403 for a non-admin', async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: 'user-1', role: 'user', email: 'u@test.com' } });
 
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await put();
 
     expect(response.status).toBe(403);
-    expect(body.error).toBe('Insufficient permissions');
+    expect((await response.json()).error).toBe('Insufficient permissions');
   });
 
-  it('should return 400 for invalid format type', async () => {
-    const response = await PUT(makeRequest(), makeParams('release-1', 'INVALID_FORMAT'));
-    const body = await response.json();
+  it('stores an MP3 under the key shape, tagged with the Visit comment', async () => {
+    const bytes = await readFile(MP3_FIXTURE);
 
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_FORMAT');
-  });
-
-  it('should return 400 when file name header is missing', async () => {
-    const response = await PUT(
-      new NextRequest('http://localhost:3000/api/releases/release-1/upload/MP3_320KBPS', {
-        method: 'PUT',
-        headers: { 'x-file-size': '50000000', 'content-type': 'audio/mpeg' },
-        body: makeBody() as unknown as string,
-        duplex: 'half',
-      }),
-      makeParams()
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('MISSING_METADATA');
-  });
-
-  it('should return 400 when file size is invalid (NaN)', async () => {
-    const response = await PUT(
-      makeRequest({ headers: { 'x-file-size': 'not-a-number' } }),
-      makeParams()
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_SIZE');
-  });
-
-  it('should return 400 when file size is zero', async () => {
-    const response = await PUT(makeRequest({ headers: { 'x-file-size': '0' } }), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_SIZE');
-  });
-
-  it('should return 400 when file size is negative', async () => {
-    const response = await PUT(makeRequest({ headers: { 'x-file-size': '-100' } }), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('INVALID_SIZE');
-  });
-
-  it('should return 400 when validation fails', async () => {
-    mockValidateFileInfo.mockReturnValue({ valid: false, error: 'File exceeds size limit' });
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('VALIDATION_FAILED');
-  });
-
-  it('should return 200 on successful upload', async () => {
-    const response = await PUT(makeRequest(), makeParams());
+    const response = await put({
+      formatType: 'MP3_320KBPS',
+      headers: {
+        'x-file-name': encodeURIComponent('album.mp3'),
+        'x-file-size': String(bytes.byteLength),
+        'content-type': 'audio/mpeg',
+      },
+      body: streamOf(bytes),
+    });
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.s3Key).toContain('releases/release-1/digital-formats/MP3_320KBPS/');
-    expect(body.contentType).toBe('audio/mpeg');
-  });
-
-  it('should include trackNumber when x-track-number header is provided', async () => {
-    const response = await PUT(makeRequest({ headers: { 'x-track-number': '3' } }), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.trackNumber).toBe(3);
-    expect(body.s3Key).toContain('tracks/3-');
-  });
-
-  it('should decode URI-encoded file names', async () => {
-    const response = await PUT(
-      makeRequest({ headers: { 'x-file-name': encodeURIComponent('My Album (Deluxe).mp3') } }),
-      makeParams()
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.s3Key).toContain('My-Album--Deluxe-.mp3');
-  });
-
-  it('should return 500 on unexpected error', async () => {
-    const errorSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
-    mockUploadDone.mockRejectedValue(new Error('S3 upload failed'));
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error).toBe('INTERNAL_ERROR');
-    expect(body.message).toBe('Upload failed. Please try again.');
-
-    errorSpy.mockRestore();
-  });
-
-  it('should handle non-Error throw in error handler', async () => {
-    const errorSpy = vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
-    mockUploadDone.mockRejectedValue('string error');
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.message).toBe('Upload failed. Please try again.');
-
-    errorSpy.mockRestore();
-  });
-
-  it('should return 400 when request body is empty', async () => {
-    const response = await PUT(makeRequest({ noBody: true }), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe('NO_BODY');
-    expect(body.message).toBe('Request body is empty.');
-  });
-
-  it('should use default mime type when content-type header is empty', async () => {
-    const response = await PUT(makeRequest({ headers: { 'content-type': '' } }), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-  });
-
-  it('should return undefined trackNumber when x-track-number header is absent', async () => {
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.trackNumber).toBeUndefined();
-  });
-
-  it('should register httpUploadProgress handler', async () => {
-    await PUT(makeRequest(), makeParams());
-
-    expect(mockUploadOn).toHaveBeenCalledWith('httpUploadProgress', expect.any(Function));
-  });
-
-  it('should handle progress callback with loaded bytes', async () => {
-    mockUploadOn.mockImplementation(
-      (event: string, callback: (progress: { loaded?: number }) => void) => {
-        if (event === 'httpUploadProgress') {
-          callback({ loaded: 25000000 });
-        }
-      }
-    );
-    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
-
-    await PUT(makeRequest(), makeParams());
-
-    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
-    infoSpy.mockRestore();
-  });
-
-  it('should handle progress callback without loaded property', async () => {
-    mockUploadOn.mockImplementation(
-      (event: string, callback: (progress: { loaded?: number }) => void) => {
-        if (event === 'httpUploadProgress') {
-          callback({});
-        }
-      }
-    );
-    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
-
-    await PUT(makeRequest(), makeParams());
-
-    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('progress'));
-    infoSpy.mockRestore();
-  });
-
-  it('should call writeComment during upload', async () => {
-    await PUT(makeRequest(), makeParams());
-
-    expect(mockSupportsComment).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.mp3');
-    expect(mockWriteComment).toHaveBeenCalledWith(
-      '/tmp/upload-test-uuid-1234.mp3',
+    expect(body).toEqual({
+      success: true,
+      s3Key: expect.stringMatching(
+        /^releases\/507f1f77bcf86cd799439011\/digital-formats\/MP3_320KBPS\/\d+-album\.mp3$/
+      ),
+      contentType: 'audio/mpeg',
+    });
+    const stored = readLocalFormatObject(body.s3Key);
+    expect(NodeID3.read(stored?.body ?? Buffer.alloc(0)).comment?.text).toBe(
       'Visit https://example.com/'
     );
   });
 
-  it('should skip writeComment for formats that do not support comments (e.g. WAV)', async () => {
-    mockSupportsComment.mockReturnValue(false);
+  it('decodes a URI-encoded file name into the key', async () => {
+    const response = await put({
+      headers: { 'x-file-name': encodeURIComponent('My Album (Deluxe).wav') },
+    });
 
-    const response = await PUT(
-      makeRequest({
-        headers: {
-          'x-file-name': encodeURIComponent('album.wav'),
-          'content-type': 'audio/wav',
-        },
-      }),
-      makeParams('release-1', 'WAV')
-    );
+    expect((await response.json()).s3Key).toMatch(/\/WAV\/\d+-My-Album--Deluxe-\.wav$/);
+  });
+
+  it('ignores an x-track-number header: the key has no track segment', async () => {
+    const response = await put({ headers: { 'x-track-number': '3' } });
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(mockSupportsComment).toHaveBeenCalledWith('/tmp/upload-test-uuid-1234.wav');
-    expect(mockWriteComment).not.toHaveBeenCalled();
+    expect(body.s3Key).not.toContain('tracks/');
+    expect(body).not.toHaveProperty('trackNumber');
   });
 
-  it('should use NEXT_PUBLIC_BASE_URL when NEXT_PUBLIC_HOST_NAME is missing', async () => {
-    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', undefined);
+  it('refuses an unknown format type', async () => {
+    const response = await put({ formatType: 'INVALID_FORMAT' });
 
-    await PUT(makeRequest(), makeParams());
-
-    expect(mockWriteComment).toHaveBeenCalledWith(
-      '/tmp/upload-test-uuid-1234.mp3',
-      'Visit https://fallback.example.com/'
-    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'INVALID_FORMAT',
+      message: 'Invalid digital format type.',
+    });
   });
 
-  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are missing', async () => {
+  it.each(['x-file-name', 'x-file-size'])('refuses a request without %s', async (header) => {
+    const request = makeRequest();
+    request.headers.delete(header);
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: RELEASE_ID, formatType: 'WAV' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'MISSING_METADATA',
+      message: 'x-file-name and x-file-size headers are required.',
+    });
+  });
+
+  it.each(['not-a-number', '0', '-100'])('refuses an x-file-size of %s', async (size) => {
+    const response = await put({ headers: { 'x-file-size': size } });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'INVALID_SIZE',
+      message: 'x-file-size must be a positive integer.',
+    });
+  });
+
+  it('answers a file the format does not take as VALIDATION_FAILED', async () => {
+    const response = await put({ headers: { 'content-type': 'audio/mpeg' } });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'VALIDATION_FAILED',
+      message: 'Invalid MIME type. Expected: audio/wav, audio/x-wav, audio/wave',
+    });
+  });
+
+  it('refuses a request without a body', async () => {
+    const response = await put({ body: null });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'NO_BODY',
+      message: 'Request body is empty.',
+    });
+  });
+
+  it('answers a missing base URL as SERVER_CONFIGURATION_ERROR', async () => {
     vi.stubEnv('NEXT_PUBLIC_HOST_NAME', undefined);
     vi.stubEnv('NEXT_PUBLIC_BASE_URL', undefined);
+    vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
-    expect(body.message).toBe(
-      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.'
-    );
-  });
-
-  it('should return 500 when NEXT_PUBLIC_HOST_NAME and NEXT_PUBLIC_BASE_URL are invalid', async () => {
-    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'not-a-url');
-    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'also-not-a-url');
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await put();
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe('SERVER_CONFIGURATION_ERROR');
-    expect(body.message).toBe(
-      'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL must be a valid absolute URL.'
-    );
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'SERVER_CONFIGURATION_ERROR',
+      message:
+        'Server configuration is invalid: NEXT_PUBLIC_HOST_NAME or NEXT_PUBLIC_BASE_URL is not set.',
+    });
   });
 
-  it('should return 500 when writeComment throws', async () => {
-    mockWriteComment.mockRejectedValue(new Error('Unsupported format'));
+  it('answers a failed transfer as INTERNAL_ERROR', async () => {
+    vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('socket hang up'));
+      },
+    });
 
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await put({ body });
 
     expect(response.status).toBe(500);
-    expect(body.success).toBe(false);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Upload failed. Please try again.',
+    });
   });
 
-  it('should show "?" progress percentage when actualFileSize is zero', async () => {
-    const { stat } = await import('node:fs/promises');
-    vi.mocked(stat).mockResolvedValue({ size: 0 } as never);
-    mockUploadOn.mockImplementation(
-      (event: string, callback: (progress: { loaded?: number }) => void) => {
-        if (event === 'httpUploadProgress') {
-          callback({ loaded: 100 });
-        }
-      }
-    );
-    const infoSpy = vi.spyOn(loggers.s3, 'info').mockImplementation(() => {});
+  it('answers an unexpected failure, such as a malformed file name, as INTERNAL_ERROR', async () => {
+    vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
 
-    await PUT(makeRequest(), makeParams());
+    const response = await put({ headers: { 'x-file-name': '%E0%A4%A' } });
 
-    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('?%'));
-    infoSpy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Upload failed. Please try again.',
+    });
   });
 
-  it('should handle non-Error throw during temp file cleanup', async () => {
-    const { unlink } = await import('node:fs/promises');
-    vi.mocked(unlink).mockRejectedValue('string cleanup error');
-    const warnSpy = vi.spyOn(loggers.s3, 'warn').mockImplementation(() => {});
+  it('hands the request signal over: an aborted request stores nothing', async () => {
+    vi.spyOn(loggers.s3, 'error').mockImplementation(() => {});
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_002);
+    const controller = new AbortController();
+    controller.abort();
 
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
+    const response = await put({ signal: controller.signal });
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[upload-proxy] Failed to clean up temp file',
-      expect.objectContaining({ error: 'string cleanup error' })
-    );
-
-    warnSpy.mockRestore();
-  });
-
-  it('should log Error details during temp file cleanup failure', async () => {
-    const { unlink } = await import('node:fs/promises');
-    vi.mocked(unlink).mockRejectedValue(new Error('ENOENT'));
-    const warnSpy = vi.spyOn(loggers.s3, 'warn').mockImplementation(() => {});
-
-    const response = await PUT(makeRequest(), makeParams());
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[upload-proxy] Failed to clean up temp file',
-      expect.objectContaining({
-        error: expect.objectContaining({ message: 'ENOENT' }),
-      })
-    );
-
-    warnSpy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(
+      readLocalFormatObject(`releases/${RELEASE_ID}/digital-formats/WAV/1700000000002-take.wav`)
+    ).toBeNull();
   });
 });

@@ -477,8 +477,6 @@ const eslintConfig = [
     files: [
       'scripts/**/*.{ts,tsx}',
       'docs/**/*.{js,mjs}',
-      // `*` (not the literal `[id]`/`[formatType]`) — minimatch reads `[...]` as a char class.
-      'src/app/api/releases/*/upload/*/route.ts',
       'src/lib/services/format-upload/*.ts',
       'src/lib/audio-metadata/ffmpeg.ts',
       // Reads the adjacent SAM template (compile-time constant URL) to lint its wiring.
