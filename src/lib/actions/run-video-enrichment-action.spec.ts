@@ -4,10 +4,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { VideoRepository } from '@/lib/repositories/video-repository';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
+import {
+  VideoEnrichmentService,
+  videoEnrichmentJob,
+} from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
-import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 import { runVideoEnrichmentAction } from './run-video-enrichment-action';
@@ -18,10 +20,9 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({ after: (cb: () => Promise<void>) => afterMock(cb) }));
 vi.mock('@/lib/auth/action-gate');
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: vi.fn() }));
-vi.mock('@/lib/repositories/video-repository', () => ({
-  VideoRepository: { getEnrichmentState: vi.fn(), setEnrichmentStatus: vi.fn() },
-}));
+vi.mock('@/lib/services/job-runner/job-runner', () => ({ jobRunner: { trigger: vi.fn() } }));
 vi.mock('@/lib/services/video-enrichment-service', () => ({
+  videoEnrichmentJob: { kind: 'video-enrichment' },
   VideoEnrichmentService: { runEnrichmentJob: vi.fn() },
 }));
 vi.mock('@/lib/services/video-probe-service', () => ({
@@ -37,131 +38,87 @@ vi.mock('@/lib/utils/logger', () => ({
 const VIDEO_ID = 'f'.repeat(24);
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
-const baseState = (overrides: Partial<VideoEnrichmentState> = {}): VideoEnrichmentState => ({
-  id: VIDEO_ID,
-  enrichmentStatus: null,
-  enrichmentError: null,
-  enrichmentStartedAt: null,
-  enrichmentJobToken: null,
-  enrichmentProgress: null,
-  enrichedAt: null,
-  category: 'MUSIC',
-  artist: 'Ceschi',
-  title: 'Bite Through Stone',
-  releasedOn: new Date('2021-04-09T00:00:00.000Z'),
-  description: null,
-  s3Key: 'media/videos/abc.mp4',
-  ...overrides,
-});
-
 beforeEach(() => {
   afterMock.mockReset();
   vi.mocked(gateAction).mockResolvedValue({
     success: true,
     session: { user: { id: 'admin-1', role: 'admin' } } as never,
   });
-  vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-  vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
+  vi.mocked(jobRunner.trigger).mockResolvedValue({
+    success: true,
+    data: { status: 'pending', started: true },
+  });
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
   vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
 });
 
 describe('runVideoEnrichmentAction', () => {
-  it('returns the gate refusal without reading the video', async () => {
+  it('returns the gate refusal without triggering the job', async () => {
     vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 
     expect(result).toEqual(REFUSAL);
-    expect(VideoRepository.getEnrichmentState).not.toHaveBeenCalled();
+    expect(jobRunner.trigger).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed video id', async () => {
     const result = await runVideoEnrichmentAction('not-an-object-id');
 
     expect(result).toEqual({ success: false, error: 'Invalid video id.', code: 'INVALID_INPUT' });
+    expect(jobRunner.trigger).not.toHaveBeenCalled();
   });
 
-  it('returns an error when the video does not exist', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
+  it('triggers the video enrichment job for the video', async () => {
+    await runVideoEnrichmentAction(VIDEO_ID);
 
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
-
-    expect(result).toEqual({ success: false, error: 'Video not found.', code: 'NOT_FOUND' });
+    expect(vi.mocked(jobRunner.trigger).mock.calls).toEqual([[videoEnrichmentJob, VIDEO_ID]]);
   });
 
-  it('refuses to run when the persisted artist is blank', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
-
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
-
-    expect(result).toEqual({
-      success: false,
+  it.each([
+    { code: 'NOT_FOUND' as const, error: 'Video not found.' },
+    {
+      code: 'VALIDATION' as const,
       error: 'Add an artist or creator and save before running enrichment.',
-      code: 'VALIDATION',
-    });
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    },
+  ])('returns the $code refusal with its code without scheduling anything', async (refusal) => {
+    vi.mocked(jobRunner.trigger).mockResolvedValueOnce({ success: false, ...refusal });
+
+    const result = await runVideoEnrichmentAction(VIDEO_ID);
+
+    expect(result).toEqual({ success: false, ...refusal });
     expect(afterMock).not.toHaveBeenCalled();
   });
 
-  it('accepts an INFORMATIONAL video that names a creator', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
-    );
-
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
-
-    expect(result).toEqual({ success: true, status: 'pending' });
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'pending');
-  });
-
-  it('echoes a fresh in-flight status instead of double-triggering', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentStartedAt: new Date() })
-    );
+  it('echoes an in-flight run without scheduling or auditing another', async () => {
+    vi.mocked(jobRunner.trigger).mockResolvedValueOnce({
+      success: true,
+      data: { status: 'processing', started: false },
+    });
 
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 
     expect(result).toEqual({ success: true, status: 'processing' });
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+    expect(afterMock).not.toHaveBeenCalled();
+    expect(logSecurityEvent).not.toHaveBeenCalled();
   });
 
-  it('echoes a fresh pending status instead of double-triggering', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'pending', enrichmentStartedAt: new Date() })
-    );
-
+  it('returns pending and schedules the probe, then the enrichment, after the response', async () => {
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 
     expect(result).toEqual({ success: true, status: 'pending' });
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
-  });
-
-  it('supersedes a stale in-flight job', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({
-        enrichmentStatus: 'processing',
-        enrichmentStartedAt: new Date(Date.now() - 18 * 60 * 1000),
-      })
-    );
-
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
-
-    expect(result).toEqual({ success: true, status: 'pending' });
-  });
-
-  it('marks the job pending and schedules the probe + enrichment after the response', async () => {
-    const result = await runVideoEnrichmentAction(VIDEO_ID);
-
-    expect(result).toEqual({ success: true, status: 'pending' });
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'pending');
     await afterMock.mock.calls[0][0]();
     expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(VIDEO_ID);
     expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(VIDEO_ID);
+    expect(vi.mocked(VideoProbeService.probeAndPersist).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(VideoEnrichmentService.runEnrichmentJob).mock.invocationCallOrder[0]
+    );
   });
 
   it('still runs enrichment when the probe fails (probe never blocks)', async () => {
-    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValue(new Error('ffprobe missing'));
+    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValueOnce(
+      new Error('ffprobe missing')
+    );
 
     await runVideoEnrichmentAction(VIDEO_ID);
     await afterMock.mock.calls[0][0]();
@@ -179,8 +136,8 @@ describe('runVideoEnrichmentAction', () => {
     });
   });
 
-  it('returns a typed error when the state read throws', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
+  it('returns a typed error when the trigger throws', async () => {
+    vi.mocked(jobRunner.trigger).mockRejectedValueOnce(new Error('db down'));
 
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 

@@ -2,198 +2,48 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import {
+  VIDEO_ENRICHMENT_CALLBACK_LIMIT,
+  videoEnrichmentCallbackLimiter,
+} from '@/lib/config/rate-limit-tiers';
+import { signedCallbackRoute } from '@/lib/decorators/signed-callback-route';
+import { videoEnrichmentJob } from '@/lib/services/video-enrichment-service';
+import { videoEnrichmentCallbackSchema } from '@/lib/validation/video-enrichment-schema';
 
-import { NextRequest } from 'next/server';
+import { dynamic } from './route';
 
-import { POST } from './route';
-
-const limiterCheckMock = vi.hoisted(() => vi.fn());
-const afterMock = vi.hoisted(() => vi.fn());
-const verifyAndClaimCallbackMock = vi.hoisted(() => vi.fn());
-const completeCallbackMock = vi.hoisted(() => vi.fn());
-
-// A next/server stub that mirrors the global setup but also exposes `after`,
-// capturing its callback so the "background" work can be run on demand.
-vi.mock('next/server', () => {
-  class MockNextRequest extends Request {
-    nextUrl: URL;
-    constructor(url: string | URL, options?: RequestInit) {
-      super(url, options);
-      this.nextUrl = new URL(url);
-    }
-  }
-  class MockNextResponse extends Response {}
-  Object.assign(MockNextResponse, {
-    json: (data: unknown, init?: { status?: number }) => ({
-      status: init?.status ?? 200,
-      json: async () => data,
-    }),
-  });
-  return {
-    NextRequest: MockNextRequest,
-    NextResponse: MockNextResponse,
-    after: (cb: () => Promise<void>) => afterMock(cb),
-  };
-});
-
-vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  videoEnrichmentCallbackLimiter: { check: limiterCheckMock },
-  VIDEO_ENRICHMENT_CALLBACK_LIMIT: 20,
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/decorators/signed-callback-route', () => ({
+  signedCallbackRoute: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('@/lib/services/video-enrichment-service', () => ({
-  VideoEnrichmentService: {
-    verifyAndClaimCallback: (id: string, token: string, proof: unknown) =>
-      verifyAndClaimCallbackMock(id, token, proof),
-    completeCallback: (id: string, result: unknown) => completeCallbackMock(id, result),
-  },
-}));
+/** The options this route handed the factory at import, read before any mock is cleared. */
+const options = vi.mocked(signedCallbackRoute).mock.calls[0]?.[0];
 
-vi.mock('@/lib/utils/logger', () => ({
-  loggers: new Proxy(
-    {},
-    { get: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }
-  ),
-}));
-
-const VIDEO_ID = 'f'.repeat(24);
-const ARTIST_ID = 'a'.repeat(24);
-
-const validBody = {
-  jobToken: 'stored-token',
-  result: {
-    ok: true,
-    data: {
-      artists: [
-        {
-          artistId: ARTIST_ID,
-          suggestions: [
-            {
-              field: 'bornOn',
-              value: '1985-03-15',
-              confidence: 'high',
-              sources: [{ url: 'https://musicbrainz.org/artist/x' }],
-            },
-          ],
-        },
-      ],
-      model: 'gemini-2.5-flash',
-    },
-  },
-};
-
-const SIGNATURE = 't=1790424000,v1=' + 'ab'.repeat(32);
-
-const buildRequest = (body: string, signature: string | null = SIGNATURE): NextRequest =>
-  new NextRequest(`http://localhost:3000/api/videos/${VIDEO_ID}/enrichment/callback`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-real-ip': '203.0.113.7',
-      ...(signature === null ? {} : { 'x-job-signature': signature }),
-    },
-    body,
-  });
-
-const callRoute = (body: string, signature: string | null = SIGNATURE) =>
-  POST(buildRequest(body, signature), { params: Promise.resolve({ id: VIDEO_ID }) });
-
-beforeEach(() => {
-  limiterCheckMock.mockReset().mockResolvedValue(undefined);
-  afterMock.mockReset();
-  verifyAndClaimCallbackMock.mockReset();
-  completeCallbackMock.mockReset().mockResolvedValue(undefined);
-});
-
+// The protocol is pinned once, in `signed-callback-route.spec.ts`; this spec
+// pins only what this route decides.
 describe('POST /api/videos/[id]/enrichment/callback', () => {
-  it('returns 202 when the token claim succeeds', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(true);
-
-    const response = await callRoute(JSON.stringify(validBody));
-
-    expect(response.status).toBe(202);
-  });
-
-  it('runs completeCallback in the background after a successful claim', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(true);
-
-    await callRoute(JSON.stringify(validBody));
-    await afterMock.mock.calls[0][0]();
-
-    expect(completeCallbackMock).toHaveBeenCalledWith(VIDEO_ID, validBody.result);
-  });
-
-  it('returns 202 when the token claim fails (anti-enumeration)', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(false);
-
-    const response = await callRoute(JSON.stringify(validBody));
-
-    expect(response.status).toBe(202);
-  });
-
-  it('does not schedule background work when the token claim fails', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(false);
-
-    await callRoute(JSON.stringify(validBody));
-
-    expect(afterMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects malformed JSON with 400', async () => {
-    const response = await callRoute('{not json');
-
-    expect(response.status).toBe(400);
-  });
-
-  it('rejects an oversized body with 413', async () => {
-    const oversized = JSON.stringify({ ...validBody, jobToken: 'x'.repeat(600 * 1024) });
-
-    const response = await callRoute(oversized);
-
-    expect(response.status).toBe(413);
-  });
-
-  it('rejects a body that fails the schema with 400', async () => {
-    const response = await callRoute(JSON.stringify({ jobToken: '' }));
-
-    expect(response.status).toBe(400);
-  });
-
-  it('does not claim when the schema rejects the body', async () => {
-    await callRoute(JSON.stringify({ jobToken: '' }));
-
-    expect(verifyAndClaimCallbackMock).not.toHaveBeenCalled();
-  });
-
-  it('returns 429 when the rate limit is exceeded', async () => {
-    limiterCheckMock.mockRejectedValue(new Error('rate limited'));
-
-    const response = await callRoute(JSON.stringify(validBody));
-
-    expect(response.status).toBe(429);
-  });
-
-  it('hands the service the signature header and the raw body as the callback proof', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(false);
-    const body = JSON.stringify(validBody);
-
-    await callRoute(body);
-
-    expect(verifyAndClaimCallbackMock).toHaveBeenCalledWith(VIDEO_ID, 'stored-token', {
-      signature: SIGNATURE,
-      rawBody: body,
+  it('is the video enrichment job’s callback channel, under its own limiter', () => {
+    expect(options).toMatchObject({
+      job: videoEnrichmentJob,
+      channel: 'callback',
+      schema: videoEnrichmentCallbackSchema,
+      limiter: videoEnrichmentCallbackLimiter,
+      limit: VIDEO_ENRICHMENT_CALLBACK_LIMIT,
     });
   });
 
-  it('hands the service a null signature when the header is absent', async () => {
-    verifyAndClaimCallbackMock.mockResolvedValue(false);
-    const body = JSON.stringify(validBody);
+  it('caps the body at 512 KiB', () => {
+    expect(options?.maxBodyBytes).toBe(512 * 1024);
+  });
 
-    await callRoute(body, null);
+  // Revalidating `videos.detail` would reset the admin form mid-edit; the
+  // panel polls the enrichment query key instead.
+  it('runs no completion hook', () => {
+    expect(options).not.toHaveProperty('onComplete');
+  });
 
-    expect(verifyAndClaimCallbackMock).toHaveBeenCalledWith(VIDEO_ID, 'stored-token', {
-      signature: null,
-      rawBody: body,
-    });
+  it('renders dynamically', () => {
+    expect(dynamic).toBe('force-dynamic');
   });
 });

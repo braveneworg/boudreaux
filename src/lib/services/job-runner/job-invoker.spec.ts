@@ -5,6 +5,7 @@ import { verifyJobSignature } from '@fakefour/job-contract/signing';
 
 import { bioGenerationJob } from '@/lib/services/bio-generation-service';
 import { imageLinksJob } from '@/lib/services/image-links-service';
+import { videoEnrichmentJob } from '@/lib/services/video-enrichment-service';
 
 import { jobInvoker, lambdaJobInvoker, localJobInvoker } from './job-invoker';
 
@@ -329,6 +330,22 @@ describe('one local adapter for every kind', () => {
     await localJobInvoker.invoke(bioGenerationJob, {
       artistId: 'a'.repeat(24),
       displayName: 'Radiohead',
+      ...dispatch,
+    });
+
+    expect(postedUrls()).toEqual([PROGRESS_URL, CALLBACK_URL]);
+    expect(postIsSignedWith(PROGRESS_URL, SIGNING_KEY)).toBe(true);
+    expect(postIsSignedWith(CALLBACK_URL, SIGNING_KEY)).toBe(true);
+  });
+
+  it('video enrichment: a signed checkpoint to the progress URL, then a signed callback', async () => {
+    await localJobInvoker.invoke(videoEnrichmentJob, {
+      task: 'video-enrichment',
+      videoId: 'f'.repeat(24),
+      title: 'Bite Through Stone',
+      artistDisplay: 'Ceschi',
+      category: 'MUSIC',
+      artists: [{ artistId: 'a'.repeat(24), name: 'Ceschi', role: 'primary' }],
       ...dispatch,
     });
 

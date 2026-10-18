@@ -3,9 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
-
-import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { z } from 'zod';
 
 import {
@@ -15,6 +12,8 @@ import {
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
+import type { JobAdapter, JobDispatch, JobTypes } from '@/lib/services/job-runner/types';
 import type { Json } from '@/lib/types/domain/shared';
 import type { UpdateVideoData } from '@/lib/types/domain/video';
 import type {
@@ -23,7 +22,6 @@ import type {
   VideoEnrichmentSuggestionRecord,
 } from '@/lib/types/domain/video-enrichment';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
-import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
 import {
   isReleaseDay,
@@ -33,38 +31,23 @@ import {
 } from '@/lib/utils/validation/iso-date';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 import {
-  isEnrichmentEligible,
+  enrichmentIneligibilityReason,
   SUGGESTION_CONFIDENCES,
   VIDEO_LEVEL_SUGGESTION_FIELDS,
   VIDEO_SUGGESTION_FIELDS,
   videoEnrichmentProgressSchema,
   videoSuggestionSourceSchema,
-  type EnrichmentStatus,
+  type EnrichmentIneligibilityReason,
   type SuggestionConfidence,
   type VideoEnrichmentData,
   type VideoEnrichmentProgress,
-  type VideoEnrichmentResult,
+  type VideoEnrichmentProgressPost,
   type VideoEnrichmentStatusResult,
-  type VideoProgressStage,
   type VideoSuggestion,
   type VideoSuggestionField,
 } from '@/lib/validation/video-enrichment-schema';
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
-import {
-  isInFlightJobStatus,
-  resolveStaleJobView,
-  toAsyncJobStatus,
-} from '@/utils/async-job-lifecycle';
 
-import {
-  getLambdaClient,
-  resolveFakeDelayMs,
-  signingKeyForJob,
-  sleep,
-  tokensMatch,
-  verifyJobCallback,
-  type CallbackProof,
-} from './lambda-dispatch';
 import { decideEnrichmentAutoApply } from './video-editorial-rules';
 import { videoEnrichmentFixture } from './video-enrichment-fixture';
 
@@ -131,12 +114,6 @@ const toLambdaArtists = (rows: VideoArtistWithArtist[]): VideoEnrichmentLambdaIn
     };
   });
 
-/** Parse a stored progress JSON into the validated shape, or null. */
-const parseStoredProgress = (value: Json | null): VideoEnrichmentProgress | null => {
-  const parsed = videoEnrichmentProgressSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-};
-
 const storedSourcesSchema = z.array(videoSuggestionSourceSchema);
 
 /** Map a stored suggestion row onto the wire shape (null = malformed row). */
@@ -156,31 +133,6 @@ const toStatusSuggestion = (
     sources: sources.success ? sources.data : [],
     note: row.note,
     status: row.status as 'pending' | 'applied' | 'dismissed',
-  };
-};
-
-/** The status/error/progress triple after read-time stale coercion. */
-interface StatusView {
-  status: EnrichmentStatus | null;
-  error: string | null;
-  progress: VideoEnrichmentProgress | null;
-}
-
-/**
- * The shared read-time stale coercion: an in-flight job older than the stale
- * window reads as `failed` with the timeout copy (non-persistent — a late
- * callback can still claim). Progress surfaces only while in flight.
- */
-const resolveStatusView = (state: VideoEnrichmentState): StatusView => {
-  const { status, error } = resolveStaleJobView({
-    status: toAsyncJobStatus(state.enrichmentStatus),
-    startedAt: state.enrichmentStartedAt,
-    error: state.enrichmentError ?? null,
-  });
-  return {
-    status,
-    error,
-    progress: isInFlightJobStatus(status) ? parseStoredProgress(state.enrichmentProgress) : null,
   };
 };
 
@@ -495,110 +447,175 @@ const buildPendingRows = ({
 };
 
 // ---------------------------------------------------------------------------
-// Job dispatch helpers
+// The job adapter
 // ---------------------------------------------------------------------------
 
-/**
- * Fake-path dwell between the synthetic `processing` checkpoint and completion.
- * The real Lambda takes seconds; the fake path is otherwise instantaneous, so
- * without a pause the 2.5s status poll can never observe the in-flight
- * (`Enriching…`) chip — worst on a re-run whose start and end are both
- * `succeeded`. Mirrors the bio pipeline and shares its env override
- * (`BIO_GENERATOR_FAKE_DELAY_MS`); unit tests set `0`. Never used on the real path.
- */
-const DEFAULT_FAKE_ENRICHMENT_DELAY_MS = 4000;
-
-/**
- * Fake/E2E path: one synthetic checkpoint (the first stage the real Lambda
- * posts for the category — `web-search` for INFORMATIONAL, which skips the
- * music lookups), a dwell, then persist the category's fixture.
- */
-const runFakeEnrichment = async (
-  state: VideoEnrichmentState,
-  rows: VideoArtistWithArtist[]
-): Promise<void> => {
-  const informational = state.category === 'INFORMATIONAL';
-  await VideoRepository.setEnrichmentProgress(state.id, {
-    stage: informational ? 'web-search' : 'musicbrainz',
-    counts: { artists: rows.length },
-    at: new Date().toISOString(),
-  });
-  // Dwell while `processing` so the polling client can render the in-flight chip.
-  await sleep(resolveFakeDelayMs(DEFAULT_FAKE_ENRICHMENT_DELAY_MS));
-  const data = videoEnrichmentFixture({
-    artists: rows.map(({ artistId }) => ({ artistId })),
-    category: state.category,
-    title: state.title,
-  });
-  await VideoEnrichmentService.completeCallback(state.id, { ok: true, data });
+/** Actionable copy per failing part of the eligibility rule. */
+const ineligibleCopyFor = (reason: EnrichmentIneligibilityReason): string => {
+  switch (reason) {
+    case 'artist':
+      return 'Add an artist or creator and save before running enrichment.';
+    default: {
+      // Unreachable while every reason has a case above; a new reason added
+      // to the union stops compiling here.
+      const unhandled: never = reason;
+      return unhandled;
+    }
+  }
 };
 
-/** Real path: mint a token, store it, fire the fire-and-forget Event invoke. */
-const dispatchEnrichment = async (
-  state: VideoEnrichmentState,
-  rows: VideoArtistWithArtist[]
-): Promise<void> => {
-  const base = resolveEnrichmentBaseUrl();
-  if (!base) {
-    await VideoRepository.setEnrichmentStatus(state.id, 'failed', {
-      error: 'Video enrichment callback URL is not configured',
-    });
-    return;
-  }
-  const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
-  if (!functionName) {
-    await VideoRepository.setEnrichmentStatus(state.id, 'failed', {
-      error: 'Video enrichment is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-    });
-    return;
-  }
-  if (rows.length === 0) {
-    await VideoRepository.setEnrichmentStatus(state.id, 'failed', {
-      error: 'No linked artists to enrich.',
-    });
-    return;
-  }
+/** The invoke payload without the runner's dispatch fields. */
+type VideoEnrichmentRequest = Omit<VideoEnrichmentLambdaInput, keyof JobDispatch>;
 
-  const jobToken = randomUUID();
-  // Derived before the token is stored, so a missing secret fails the job
-  // (via runEnrichmentJob's catch) without leaving a claimable token behind.
-  const signingKey = signingKeyForJob({ kind: 'video-enrichment', entityId: state.id, jobToken });
-  await VideoRepository.setEnrichmentJobToken(state.id, jobToken);
-  const input: VideoEnrichmentLambdaInput = {
-    task: 'video-enrichment',
-    videoId: state.id,
-    title: state.title,
-    artistDisplay: state.artist,
-    category: state.category,
-    releasedOn: releaseDayFromStored(state.releasedOn) ?? undefined,
-    artists: toLambdaArtists(rows),
-    callbackUrl: `${base}/api/videos/${state.id}/enrichment/callback`,
-    progressUrl: `${base}/api/videos/${state.id}/enrichment/progress`,
-    jobToken,
-    signingKey,
+/**
+ * Reads the video and its linked artists and assembles the Lambda request.
+ * Returns a typed error when the video is gone or no artist is linked.
+ */
+const prepareEnrichment = async (
+  videoId: string
+): Promise<{ ok: true; request: VideoEnrichmentRequest } | { ok: false; error: string }> => {
+  const state = await VideoRepository.getEnrichmentState(videoId);
+  if (!state) return { ok: false, error: 'Video not found.' };
+  const rows = await VideoArtistRepository.findByVideoId(videoId);
+  if (rows.length === 0) return { ok: false, error: 'No linked artists to enrich.' };
+
+  return {
+    ok: true,
+    request: {
+      task: 'video-enrichment',
+      videoId: state.id,
+      title: state.title,
+      artistDisplay: state.artist,
+      category: state.category,
+      releasedOn: releaseDayFromStored(state.releasedOn) ?? undefined,
+      artists: toLambdaArtists(rows),
+    },
   };
-  try {
-    const command = new InvokeCommand({
-      FunctionName: functionName,
-      InvocationType: 'Event',
-      Payload: Buffer.from(JSON.stringify(input)),
-    });
-    await getLambdaClient().send(command);
-  } catch (error) {
-    logger.error('video_enrichment_invoke_failed', error);
-    await VideoRepository.setEnrichmentStatus(state.id, 'failed', {
-      error: 'Failed to reach the enrichment generator',
-    });
-    await VideoRepository.setEnrichmentJobToken(state.id, null);
-  }
 };
 
 /**
- * Service boundary for async video-metadata enrichment. Clones the proven
- * artist-bio pipeline: fire-and-forget Lambda `Event` invoke, single-use
- * per-job token, token-guarded callback/progress channels, and read-time
- * stale-job coercion. In E2E/local dev (`BIO_GENERATOR_FAKE=true`) the run
- * completes in-process from a deterministic fixture.
+ * Completes an ok result: filters, fences and merges the suggestions (see
+ * {@link buildPendingRows}), replaces the pending rows, and applies by itself
+ * what the editorial rules allow (see {@link takeAutoApplied}). A video gone
+ * since dispatch persists nothing.
+ */
+const persistEnrichment = async (videoId: string, data: VideoEnrichmentData): Promise<void> => {
+  const state = await VideoRepository.getEnrichmentState(videoId);
+  if (!state) return;
+  const rows = await VideoArtistRepository.findByVideoId(videoId);
+  const facts = await VideoEnrichmentSuggestionRepository.findExistingFacts(videoId);
+  const pending = buildPendingRows({ data, state, rows, facts });
+  const { autoApplied, remaining } = takeAutoApplied(state, pending, new Date());
+  await VideoEnrichmentSuggestionRepository.replacePending(videoId, remaining);
+  for (const row of autoApplied) {
+    await VideoRepository.update(videoId, toAppliedUpdate(row));
+    await VideoEnrichmentSuggestionRepository.createApplied(videoId, row);
+  }
+};
+
+/** The video enrichment job's types (see the job runner). */
+interface VideoEnrichmentJobTypes extends JobTypes {
+  record: VideoEnrichmentState;
+  /** A run takes nothing from its trigger: it reads the video and its artists. */
+  input: undefined;
+  request: VideoEnrichmentRequest;
+  data: VideoEnrichmentData;
+  /** Nothing to hand on: the callback revalidates no page. */
+  claim: Record<string, never>;
+  persisted: void;
+  checkpoint: Omit<VideoEnrichmentProgressPost, 'jobToken'>;
+  progress: VideoEnrichmentProgress;
+}
+
+/**
+ * Fake-path dwell between the checkpoint and the callback. The real Lambda
+ * takes seconds; the fixture is instantaneous, so without a pause the 2.5s
+ * status poll can never observe the in-flight (`Enriching…`) chip — worst on
+ * a re-run whose start and end are both `succeeded`.
+ */
+const FAKE_ENRICHMENT_DELAY_MS = 4000;
+
+/**
+ * The video enrichment job, as the job runner sees it: the video's
+ * `enrichment*` lifecycle columns, the enrichment callback and progress
+ * routes, the eligibility rule, the Lambda request, and the suggestion
+ * persistence.
+ */
+export const videoEnrichmentJob: JobAdapter<VideoEnrichmentJobTypes> = {
+  kind: 'video-enrichment',
+  copy: {
+    notFound: 'Video not found.',
+    noCallbackUrl: 'Video enrichment callback URL is not configured',
+    notConfigured: 'Video enrichment is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+    unreachable: 'Failed to reach the enrichment generator',
+    runFailed: 'Video enrichment failed unexpectedly.',
+    persistFailed: 'Video enrichment persistence failed.',
+  },
+  callbackPath: (videoId) => `/api/videos/${videoId}/enrichment/callback`,
+  progress: {
+    path: (videoId) => `/api/videos/${videoId}/enrichment/progress`,
+    schema: videoEnrichmentProgressSchema,
+    write: (videoId, progress) => VideoRepository.setEnrichmentProgress(videoId, progress),
+  },
+  // The first stage the real Lambda posts for the category — `web-search`
+  // for INFORMATIONAL, which skips the music lookups — then the category's
+  // fixture for the artists the payload carries.
+  fake: {
+    delayMs: FAKE_ENRICHMENT_DELAY_MS,
+    checkpoint: ({ category, artists }) => ({
+      stage: category === 'INFORMATIONAL' ? 'web-search' : 'musicbrainz',
+      counts: { artists: artists.length },
+    }),
+    result: ({ artists, category, title }) => ({
+      ok: true,
+      data: videoEnrichmentFixture({
+        artists: artists.map(({ artistId }) => ({ artistId })),
+        category,
+        title,
+      }),
+    }),
+  },
+
+  read: (videoId) => VideoRepository.getEnrichmentState(videoId),
+  state: ({
+    enrichmentStatus,
+    enrichmentStartedAt,
+    enrichmentError,
+    enrichmentJobToken,
+    enrichmentProgress,
+  }) => ({
+    status: enrichmentStatus,
+    startedAt: enrichmentStartedAt,
+    error: enrichmentError ?? null,
+    jobToken: enrichmentJobToken,
+    progress: enrichmentProgress,
+  }),
+  claimContext: () => ({}),
+  // A video whose persisted artist is blank (see `isEnrichmentEligible`) is
+  // refused before any status write, so it is never stranded at `pending`.
+  refusal: (state) => {
+    const reason = enrichmentIneligibilityReason(state);
+    return reason ? ineligibleCopyFor(reason) : null;
+  },
+
+  // The repository stamps the start itself on every in-flight write.
+  markPending: (videoId) => VideoRepository.setEnrichmentStatus(videoId, 'pending'),
+  begin: (videoId, now) => VideoRepository.beginEnrichmentRun(videoId, now),
+  setToken: (videoId, token) => VideoRepository.setEnrichmentJobToken(videoId, token),
+  claimToken: (videoId, token) => VideoRepository.claimEnrichmentJobToken(videoId, token),
+  recordFailed: (videoId, error) =>
+    VideoRepository.setEnrichmentStatus(videoId, 'failed', { error }),
+  recordSucceeded: (videoId) =>
+    VideoRepository.setEnrichmentStatus(videoId, 'succeeded', { error: null }),
+
+  prepare: (videoId) => prepareEnrichment(videoId),
+  persist: (videoId, data) => persistEnrichment(videoId, data),
+};
+
+/**
+ * Service boundary for async video-metadata enrichment: the artist sync and
+ * the polled status read. The job itself runs through the job runner with
+ * {@link videoEnrichmentJob}, like every other background job.
  */
 export class VideoEnrichmentService {
   /**
@@ -656,34 +673,11 @@ export class VideoEnrichmentService {
   }
 
   /**
-   * Run enrichment as a background job. Ineligible videos (see
-   * `isEnrichmentEligible`: a blank artist, in any category) return silently;
-   * refuses to double-dispatch while a non-stale job is already `processing`
-   * (a `pending` handoff from the trigger action proceeds). The fake/E2E path
-   * finishes in-process; the real path fires an Event invoke and leaves the
-   * video `processing` for the callback to complete. Never throws — it runs
-   * via `after()`, where an unhandled rejection would be lost.
+   * Runs enrichment as a background job through the job runner. Never throws
+   * — it runs via `after()`.
    */
   static async runEnrichmentJob(videoId: string): Promise<void> {
-    try {
-      const state = await VideoRepository.getEnrichmentState(videoId);
-      if (!state || !isEnrichmentEligible(state)) return;
-      // One conditional write begins the run (the runner gate as a `where`):
-      // the trigger action and the post-save dispatch can both reach here for
-      // one video, and only one of them invokes the Lambda.
-      if (!(await VideoRepository.beginEnrichmentRun(videoId, new Date()))) return;
-      const rows = await VideoArtistRepository.findByVideoId(videoId);
-
-      if (process.env.BIO_GENERATOR_FAKE === 'true') {
-        await runFakeEnrichment(state, rows);
-        return;
-      }
-      await dispatchEnrichment(state, rows);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Video enrichment failed unexpectedly.';
-      await VideoRepository.setEnrichmentStatus(videoId, 'failed', { error: message });
-    }
+    await jobRunner.run(videoEnrichmentJob, videoId, undefined);
   }
 
   /**
@@ -698,7 +692,7 @@ export class VideoEnrichmentService {
     const rows = await VideoArtistRepository.findByVideoId(videoId);
     const stored = await VideoEnrichmentSuggestionRepository.findByVideoId(videoId);
 
-    const { status, error, progress } = resolveStatusView(state);
+    const { status, error, progress } = jobRunner.view(videoEnrichmentJob, state);
 
     return {
       status,
@@ -711,101 +705,5 @@ export class VideoEnrichmentService {
         .map(toStatusSuggestion)
         .filter((row): row is VideoEnrichmentStatusResult['suggestions'][number] => row !== null),
     };
-  }
-
-  /**
-   * Verify an async completion callback and atomically claim the single-use
-   * job token (signature check under the key derived from the STORED token
-   * (ADR-0014), constant-time compare, then a conditional updateMany that
-   * clears the token). Returns false — without touching the token — when the
-   * video is missing, the job is not processing, no token is stored, the
-   * signature is absent or wrong, the token mismatches, or another callback
-   * already claimed it.
-   */
-  static async verifyAndClaimCallback(
-    videoId: string,
-    jobToken: string,
-    proof: CallbackProof
-  ): Promise<boolean> {
-    const state = await VideoRepository.getEnrichmentState(videoId);
-    if (!state || state.enrichmentStatus !== 'processing' || !state.enrichmentJobToken) {
-      return false;
-    }
-    const identity = {
-      kind: 'video-enrichment',
-      entityId: videoId,
-      jobToken: state.enrichmentJobToken,
-    } as const;
-    if (!verifyJobCallback(identity, proof)) {
-      return false;
-    }
-    if (!tokensMatch(state.enrichmentJobToken, jobToken)) {
-      return false; // never attempt the claim on a mismatched/forged callback
-    }
-    return VideoRepository.claimEnrichmentJobToken(videoId, jobToken);
-  }
-
-  /**
-   * Record a per-stage checkpoint. VERIFIES the per-job token but NEVER
-   * claims it (claiming is exclusive to the callback). Writes only while the
-   * job is `processing`; the server stamps `at` so the client cannot forge
-   * checkpoint times. Errors are logged, never thrown.
-   */
-  static async recordProgress(
-    videoId: string,
-    jobToken: string,
-    checkpoint: { stage: VideoProgressStage; counts?: Record<string, number> },
-    proof: CallbackProof
-  ): Promise<void> {
-    try {
-      const state = await VideoRepository.getEnrichmentState(videoId);
-      if (!state?.enrichmentJobToken) return;
-      const identity = {
-        kind: 'video-enrichment',
-        entityId: videoId,
-        jobToken: state.enrichmentJobToken,
-      } as const;
-      if (!verifyJobCallback(identity, proof)) return;
-      if (!tokensMatch(state.enrichmentJobToken, jobToken)) return;
-      if (state.enrichmentStatus !== 'processing') return;
-      await VideoRepository.setEnrichmentProgress(videoId, {
-        ...checkpoint,
-        at: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error('video_enrichment_progress_failed', error);
-    }
-  }
-
-  /**
-   * Complete a claimed job: a non-ok result flips to `failed`; an ok result
-   * filters/fences/merges the suggestions (see {@link buildPendingRows}),
-   * replaces the pending rows, applies by itself what the editorial rules
-   * allow (see {@link takeAutoApplied}), and flips to
-   * `succeeded`. Never throws — it runs post-response via `after()`.
-   */
-  static async completeCallback(videoId: string, result: VideoEnrichmentResult): Promise<void> {
-    if (!result.ok) {
-      await VideoRepository.setEnrichmentStatus(videoId, 'failed', { error: result.error });
-      return;
-    }
-    try {
-      const state = await VideoRepository.getEnrichmentState(videoId);
-      if (!state) return;
-      const rows = await VideoArtistRepository.findByVideoId(videoId);
-      const facts = await VideoEnrichmentSuggestionRepository.findExistingFacts(videoId);
-      const pending = buildPendingRows({ data: result.data, state, rows, facts });
-      const { autoApplied, remaining } = takeAutoApplied(state, pending, new Date());
-      await VideoEnrichmentSuggestionRepository.replacePending(videoId, remaining);
-      for (const row of autoApplied) {
-        await VideoRepository.update(videoId, toAppliedUpdate(row));
-        await VideoEnrichmentSuggestionRepository.createApplied(videoId, row);
-      }
-      await VideoRepository.setEnrichmentStatus(videoId, 'succeeded', { error: null });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Video enrichment persistence failed.';
-      await VideoRepository.setEnrichmentStatus(videoId, 'failed', { error: message });
-    }
   }
 }

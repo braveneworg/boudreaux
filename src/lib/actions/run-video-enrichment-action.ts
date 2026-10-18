@@ -8,53 +8,18 @@ import 'server-only';
 import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { VideoRepository } from '@/lib/repositories/video-repository';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
+import {
+  VideoEnrichmentService,
+  videoEnrichmentJob,
+} from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { loggers } from '@/lib/utils/logger';
 import { objectIdSchema } from '@/lib/validation/bio-generation-schema';
-import {
-  enrichmentIneligibilityReason,
-  type EnrichmentIneligibilityReason,
-  type EnrichmentStatus,
-  type RunVideoEnrichmentActionResult,
-} from '@/lib/validation/video-enrichment-schema';
-import { blocksNewTrigger, toAsyncJobStatus } from '@/utils/async-job-lifecycle';
+import type { RunVideoEnrichmentActionResult } from '@/lib/validation/video-enrichment-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 const logger = loggers.media;
-
-/** Actionable copy per failing part of the eligibility rule. */
-const ineligibleCopyFor = (reason: EnrichmentIneligibilityReason): string => {
-  switch (reason) {
-    case 'artist':
-      return 'Add an artist or creator and save before running enrichment.';
-    default: {
-      // Unreachable while every reason has a case above; a new reason added
-      // to the union stops compiling here.
-      const unhandled: never = reason;
-      return unhandled;
-    }
-  }
-};
-
-/**
- * If an enrichment job blocks a new trigger ({@link blocksNewTrigger}:
- * genuinely in flight and not yet stale), return that status so the caller
- * echoes it instead of starting a duplicate run; otherwise null (mirrors
- * `resolveInFlightBioStatus`).
- */
-const resolveInFlightEnrichmentStatus = (state: {
-  enrichmentStatus: string | null;
-  enrichmentStartedAt: Date | null;
-}): EnrichmentStatus | null => {
-  const status = toAsyncJobStatus(state.enrichmentStatus);
-
-  if (blocksNewTrigger(status, state.enrichmentStartedAt)) {
-    return status === 'processing' ? 'processing' : 'pending';
-  }
-  return null;
-};
 
 /**
  * The heavy probe → enrich flow, run via `after()` once the response is sent.
@@ -97,26 +62,15 @@ export const runVideoEnrichmentAction = async (
   }
 
   try {
-    const state = await VideoRepository.getEnrichmentState(videoId);
-    if (!state) {
-      return { success: false, error: 'Video not found.', code: 'NOT_FOUND' };
+    // The job runner refuses a missing or ineligible video before any status
+    // write, and echoes a run genuinely in flight instead of starting another.
+    const triggered = await jobRunner.trigger(videoEnrichmentJob, videoId);
+    if (!triggered.success) {
+      return { success: false, error: triggered.error, code: triggered.code };
     }
-
-    // Eligibility gate — checked BEFORE any status write, so an ineligible
-    // video can never be stranded at `pending` awaiting a dispatch that the
-    // service would refuse.
-    const ineligibleReason = enrichmentIneligibilityReason(state);
-    if (ineligibleReason) {
-      return { success: false, error: ineligibleCopyFor(ineligibleReason), code: 'VALIDATION' };
+    if (!triggered.data.started) {
+      return { success: true, status: triggered.data.status };
     }
-
-    // Don't start a second run while one is genuinely in flight.
-    const inFlightStatus = resolveInFlightEnrichmentStatus(state);
-    if (inFlightStatus) {
-      return { success: true, status: inFlightStatus };
-    }
-
-    await VideoRepository.setEnrichmentStatus(videoId, 'pending');
 
     after(() => runEnrichmentAfterResponse(videoId));
 

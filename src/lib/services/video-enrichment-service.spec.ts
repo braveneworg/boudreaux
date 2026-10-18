@@ -2,41 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { deriveJobSigningKey, signJobBody } from '@fakefour/job-contract/signing';
-
 import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { ArtistService } from '@/lib/services/artist-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
 import type {
   VideoEnrichmentState,
   VideoEnrichmentSuggestionRecord,
 } from '@/lib/types/domain/video-enrichment';
-import type {
-  VideoEnrichmentResult,
-  VideoSuggestionField,
+import {
+  videoEnrichmentCallbackSchema,
+  videoEnrichmentProgressPostSchema,
+  type VideoEnrichmentResult,
+  type VideoSuggestionField,
 } from '@/lib/validation/video-enrichment-schema';
 import { splitFeaturedArtists } from '@/utils/artist-name-split';
-import { STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
 
-import { INFORMATIONAL_FIXTURE_DESCRIPTION } from './video-enrichment-fixture';
-import { VideoEnrichmentService } from './video-enrichment-service';
+import { videoEnrichmentFixture } from './video-enrichment-fixture';
+import { videoEnrichmentJob, VideoEnrichmentService } from './video-enrichment-service';
 
 vi.mock('server-only', () => ({}));
-
-const sendMock = vi.hoisted(() => vi.fn());
-vi.mock('@aws-sdk/client-lambda', () => ({
-  LambdaClient: class {
-    send = sendMock;
-  },
-  InvokeCommand: class {
-    constructor(
-      readonly input: { FunctionName?: string; InvocationType?: string; Payload?: Uint8Array }
-    ) {}
-  },
-}));
-vi.mock('@smithy/node-http-handler', () => ({ NodeHttpHandler: class {} }));
 
 vi.mock('@/lib/repositories/video-repository', () => ({
   VideoRepository: {
@@ -115,32 +102,7 @@ const artistRow = (overrides: Partial<VideoArtistWithArtist> = {}): VideoArtistW
   ...overrides,
 });
 
-/** The InvokeCommand payload sent to the mocked Lambda client, parsed. */
-const sentPayload = (): Record<string, unknown> => {
-  const command = sendMock.mock.calls[0][0] as { input: { Payload: Uint8Array } };
-  return JSON.parse(Buffer.from(command.input.Payload).toString('utf8'));
-};
-
-const APP_SECRET = 'app-callback-secret-'.padEnd(40, 'x');
-const CALLBACK_BODY = '{"jobToken":"stored","result":{"ok":false,"error":"x"}}';
-
-/** The signing key the app derives for this video and `jobToken` (ADR-0014). */
-const keyFor = (jobToken: string): string =>
-  deriveJobSigningKey(APP_SECRET, { kind: 'video-enrichment', entityId: VIDEO_ID, jobToken });
-
-/** A callback proof signed the way the Lambda signs it, under the key for `storedToken`. */
-const proofFor = (storedToken: string, rawBody = CALLBACK_BODY) => ({
-  signature: signJobBody(keyFor(storedToken), rawBody, Date.now() / 1000),
-  rawBody,
-});
-
 beforeEach(() => {
-  vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
-  vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'bio-fn');
-  vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://example.com');
-  vi.stubEnv('BIO_GENERATOR_FAKE', 'false');
-  // Neutralize the fake-path dwell so fake-path tests never wait a real timer.
-  vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
   vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(VideoRepository.setEnrichmentJobToken).mockResolvedValue(undefined);
   vi.mocked(VideoRepository.setEnrichmentProgress).mockResolvedValue(undefined);
@@ -153,7 +115,6 @@ beforeEach(() => {
   vi.mocked(VideoEnrichmentSuggestionRepository.deletePendingForArtists).mockResolvedValue(
     undefined
   );
-  sendMock.mockResolvedValue({});
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -298,191 +259,102 @@ describe('syncVideoArtists', () => {
 });
 
 describe('runEnrichmentJob', () => {
-  it('runs an INFORMATIONAL video that names a creator', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('runs the video enrichment job through the job runner', async () => {
+    const run = vi.spyOn(jobRunner, 'run').mockResolvedValueOnce({ status: 'skipped' });
+
+    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+
+    expect(run.mock.calls).toEqual([[videoEnrichmentJob, VIDEO_ID, undefined]]);
+  });
+});
+
+describe('videoEnrichmentJob.refusal', () => {
+  it('refuses a video whose artist is blank, with the trigger copy', () => {
+    expect(videoEnrichmentJob.refusal?.(baseState({ artist: '   ' }))).toBe(
+      'Add an artist or creator and save before running enrichment.'
     );
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.beginEnrichmentRun).toHaveBeenCalledWith(VIDEO_ID, expect.any(Date));
-    expect(sentPayload().category).toBe('INFORMATIONAL');
   });
 
-  it('does nothing for a video whose artist is blank', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState({ artist: '   ' }));
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.beginEnrichmentRun).not.toHaveBeenCalled();
+  it('accepts an INFORMATIONAL video that names a creator', () => {
+    expect(
+      videoEnrichmentJob.refusal?.(
+        baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
+      )
+    ).toBeNull();
   });
+});
 
-  // The runner gate is the conditional write: when another runner has already
-  // begun the job (the trigger action and the post-save dispatch can both reach
-  // here), this one loses the write and never invokes the Lambda.
-  it('refuses to double-dispatch when another runner already began the job', async () => {
-    vi.mocked(VideoRepository.beginEnrichmentRun).mockResolvedValueOnce(false);
+describe('videoEnrichmentJob.prepare', () => {
+  /** The Lambda request the adapter prepares for the video; throws on a refusal. */
+  const requestFor = async (): Promise<Record<string, unknown>> => {
+    const prepared = await videoEnrichmentJob.prepare(VIDEO_ID, undefined);
+    if (!prepared.ok) throw new Error(prepared.error);
+    return prepared.request;
+  };
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sendMock).not.toHaveBeenCalled();
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
-  });
-
-  it('completes in-process from the fixture on the fake path', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
+  beforeEach(() => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(
-      VIDEO_ID,
-      expect.arrayContaining([
-        expect.objectContaining({ artistId: ARTIST_ID, field: 'bornOn', value: '1985-03-15' }),
-      ])
-    );
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
-      error: null,
-    });
   });
 
-  it('emits one synthetic progress checkpoint on the fake path', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(
-      VIDEO_ID,
-      expect.objectContaining({ stage: 'musicbrainz' })
-    );
-  });
-
-  it('persists a description-only result for an INFORMATIONAL video on the fake path', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    // A stored description keeps the fixture row pending instead of auto-applied.
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL', description: 'Existing prose.' })
-    );
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
-      expect.objectContaining({
-        artistId: null,
-        field: 'description',
-        value: INFORMATIONAL_FIXTURE_DESCRIPTION,
-      }),
-    ]);
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
-      error: null,
-    });
-  });
-
-  it('checkpoints web-search, not musicbrainz, for an INFORMATIONAL video on the fake path', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ category: 'INFORMATIONAL' })
-    );
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledTimes(1);
-    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(
-      VIDEO_ID,
-      expect.objectContaining({ stage: 'web-search' })
-    );
-  });
-
-  it('does not arm a timer on the fake path when the dwell is zero', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(setTimeoutSpy).not.toHaveBeenCalled();
-    setTimeoutSpy.mockRestore();
-  });
-
-  it('dwells the configured fake delay before flipping to succeeded', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '4000');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-    vi.useFakeTimers();
-    try {
-      const promise = VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-      // Let the synchronous prep + checkpoint microtasks settle; the run then
-      // parks on the dwell timer, so no success flip has happened yet.
-      await vi.advanceTimersByTimeAsync(0);
-      expect(
-        vi
-          .mocked(VideoRepository.setEnrichmentStatus)
-          .mock.calls.some(([, status]) => status === 'succeeded')
-      ).toBe(false);
-
-      await vi.advanceTimersByTimeAsync(4000);
-      await promise;
-      expect(
-        vi
-          .mocked(VideoRepository.setEnrichmentStatus)
-          .mock.calls.some(([, status]) => status === 'succeeded')
-      ).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('stores a job token and fires an Event invoke with the callback URLs', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    const payload = sentPayload();
-    const storedToken = vi.mocked(VideoRepository.setEnrichmentJobToken).mock.calls[0][1];
-    expect(payload).toMatchObject({
+  it('builds the video-enrichment request from the video and its linked artists', async () => {
+    expect(await requestFor()).toEqual({
       task: 'video-enrichment',
       videoId: VIDEO_ID,
       title: 'Bite Through Stone',
       artistDisplay: 'Ceschi',
+      category: 'MUSIC',
       releasedOn: '2021-04-09',
-      callbackUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/callback`,
-      progressUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/progress`,
-      signingKey: keyFor(storedToken as string),
-      jobToken: storedToken,
+      artists: [
+        {
+          artistId: ARTIST_ID,
+          name: 'Ceschi',
+          role: 'primary',
+          known: { firstName: 'Francisco', surname: 'Ramos', displayName: 'Ceschi' },
+        },
+      ],
     });
   });
 
-  it('omits releasedOn from the payload when the draft has no release date', async () => {
+  it('sends the INFORMATIONAL category for a creator video', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
+      baseState({ category: 'INFORMATIONAL', artist: 'Narrator Nell' })
+    );
+
+    expect((await requestFor()).category).toBe('INFORMATIONAL');
+  });
+
+  it('omits releasedOn when the draft has no release date', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({ releasedOn: null })
     );
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sentPayload()).not.toHaveProperty('releasedOn');
+    expect(await requestFor()).toHaveProperty('releasedOn', undefined);
   });
 
-  it('sends the video category in the Lambda payload', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
+  it('fails when the video has no linked artists to enrich', async () => {
+    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+    expect(await videoEnrichmentJob.prepare(VIDEO_ID, undefined)).toEqual({
+      ok: false,
+      error: 'No linked artists to enrich.',
+    });
+  });
 
-    expect(sentPayload().category).toBe('MUSIC');
+  it('fails when the video is gone', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
+
+    expect(await videoEnrichmentJob.prepare(VIDEO_ID, undefined)).toEqual({
+      ok: false,
+      error: 'Video not found.',
+    });
   });
 
   it('sends the linked artists with their known identity fields', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
       artistRow({
         artist: {
@@ -496,9 +368,7 @@ describe('runEnrichmentJob', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sentPayload().artists).toEqual([
+    expect((await requestFor()).artists).toEqual([
       {
         artistId: ARTIST_ID,
         name: 'Ceschi',
@@ -514,72 +384,12 @@ describe('runEnrichmentJob', () => {
     ]);
   });
 
-  it('fails the job and clears the token when the invoke throws', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-    sendMock.mockRejectedValue(new Error('network'));
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'Failed to reach the enrichment generator',
-    });
-    expect(VideoRepository.setEnrichmentJobToken).toHaveBeenLastCalledWith(VIDEO_ID, null);
-  });
-
-  it('fails the job when the base URL is unconfigured', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_URL', '');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'Video enrichment callback URL is not configured',
-    });
-  });
-
-  it('fails the job when the Lambda function name is unconfigured', async () => {
-    vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', '');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'Video enrichment is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-    });
-  });
-
-  it('fails the job when the video has no linked artists to enrich', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'No linked artists to enrich.',
-    });
-  });
-
-  it('never fires an invoke when the video has no linked artists', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([]);
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sendMock).not.toHaveBeenCalled();
-  });
-
-  it('maps a FEATURED join row onto the featured role in the payload', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
+  it('maps a FEATURED join row onto the featured role', async () => {
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
       artistRow({ role: 'FEATURED' }),
     ]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sentPayload().artists).toEqual([
+    expect((await requestFor()).artists).toEqual([
       {
         artistId: ARTIST_ID,
         name: 'Ceschi',
@@ -590,7 +400,6 @@ describe('runEnrichmentJob', () => {
   });
 
   it('omits the identity fields a mononym artist has left empty', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
       artistRow({
         artist: {
@@ -604,15 +413,12 @@ describe('runEnrichmentJob', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sentPayload().artists).toEqual([
+    expect((await requestFor()).artists).toEqual([
       { artistId: ARTIST_ID, name: 'Sole', role: 'primary', known: { displayName: 'Sole' } },
     ]);
   });
 
   it('sends a middle name as part of the known identity block', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
       artistRow({
         artist: {
@@ -626,9 +432,7 @@ describe('runEnrichmentJob', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(sentPayload().artists).toEqual([
+    expect((await requestFor()).artists).toEqual([
       {
         artistId: ARTIST_ID,
         name: 'Francisco Ramos',
@@ -639,7 +443,6 @@ describe('runEnrichmentJob', () => {
   });
 
   it('omits the known block entirely for an artist shell with no identity fields', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
       artistRow({
         artist: {
@@ -653,53 +456,163 @@ describe('runEnrichmentJob', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+    expect((await requestFor()).artists).toEqual([
+      { artistId: ARTIST_ID, name: '', role: 'primary' },
+    ]);
+  });
+});
 
-    expect(sentPayload().artists).toEqual([{ artistId: ARTIST_ID, name: '', role: 'primary' }]);
+describe('videoEnrichmentJob — the video enrichment columns', () => {
+  const START = new Date('2026-10-18T12:00:00.000Z');
+  const progress = { stage: 'wikidata', counts: { artists: 2 }, at: START.toISOString() };
+  const record = baseState({
+    enrichmentStatus: 'processing',
+    enrichmentError: 'earlier',
+    enrichmentStartedAt: START,
+    enrichmentJobToken: 'tok',
+    enrichmentProgress: progress,
   });
 
-  it('fails the job with the thrown message when the state read rejects', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
+  it('reads the enrichment state', async () => {
+    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValueOnce(record);
 
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
+    expect(await videoEnrichmentJob.read(VIDEO_ID)).toBe(record);
+    expect(VideoRepository.getEnrichmentState).toHaveBeenCalledWith(VIDEO_ID);
+  });
 
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'db down',
+  it('maps the enrichment lifecycle columns onto the job state', () => {
+    expect(videoEnrichmentJob.state(record)).toEqual({
+      status: 'processing',
+      startedAt: START,
+      error: 'earlier',
+      jobToken: 'tok',
+      progress,
     });
   });
 
-  it('fails the job with a generic message when the rejection is not an Error', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue('socket hang up');
-
-    await VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'Video enrichment failed unexpectedly.',
-    });
+  it('answers on the enrichment callback and progress routes', () => {
+    expect(videoEnrichmentJob.callbackPath(VIDEO_ID)).toBe(
+      `/api/videos/${VIDEO_ID}/enrichment/callback`
+    );
+    expect(videoEnrichmentJob.progress?.path(VIDEO_ID)).toBe(
+      `/api/videos/${VIDEO_ID}/enrichment/progress`
+    );
   });
 
-  it('falls back to the default 4s dwell when the delay override is not a number', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-    vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', 'not-a-number');
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
-    vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
-    vi.useFakeTimers();
-    try {
-      const promise = VideoEnrichmentService.runEnrichmentJob(VIDEO_ID);
-      // One millisecond short of the default dwell the run must still be parked.
-      await vi.advanceTimersByTimeAsync(3999);
+  it.each([
+    [
+      'marks pending; the repository stamps the start itself',
+      () => videoEnrichmentJob.markPending(VIDEO_ID, START),
+      VideoRepository.setEnrichmentStatus,
+      [VIDEO_ID, 'pending'],
+    ],
+    [
+      'begins with the conditional write',
+      () => videoEnrichmentJob.begin(VIDEO_ID, START),
+      VideoRepository.beginEnrichmentRun,
+      [VIDEO_ID, START],
+    ],
+    [
+      'stores the token',
+      () => videoEnrichmentJob.setToken(VIDEO_ID, 'tok'),
+      VideoRepository.setEnrichmentJobToken,
+      [VIDEO_ID, 'tok'],
+    ],
+    [
+      'claims the token',
+      () => videoEnrichmentJob.claimToken(VIDEO_ID, 'tok'),
+      VideoRepository.claimEnrichmentJobToken,
+      [VIDEO_ID, 'tok'],
+    ],
+    [
+      'records failed with its error',
+      () => videoEnrichmentJob.recordFailed(VIDEO_ID, 'boom'),
+      VideoRepository.setEnrichmentStatus,
+      [VIDEO_ID, 'failed', { error: 'boom' }],
+    ],
+    [
+      'records succeeded with a cleared error',
+      () => videoEnrichmentJob.recordSucceeded(VIDEO_ID, undefined),
+      VideoRepository.setEnrichmentStatus,
+      [VIDEO_ID, 'succeeded', { error: null }],
+    ],
+    [
+      'writes a checkpoint to the enrichment progress column',
+      () => videoEnrichmentJob.progress?.write(VIDEO_ID, { stage: 'wikidata', at: progress.at }),
+      VideoRepository.setEnrichmentProgress,
+      [VIDEO_ID, { stage: 'wikidata', at: progress.at }],
+    ],
+  ])('%s', async (_name, write, repositoryMethod, args) => {
+    await write();
+
+    expect(vi.mocked(repositoryMethod).mock.calls).toEqual([args]);
+  });
+
+  it('keeps its copy byte-identical', () => {
+    expect(videoEnrichmentJob.copy).toEqual({
+      notFound: 'Video not found.',
+      noCallbackUrl: 'Video enrichment callback URL is not configured',
+      notConfigured: 'Video enrichment is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+      unreachable: 'Failed to reach the enrichment generator',
+      runFailed: 'Video enrichment failed unexpectedly.',
+      persistFailed: 'Video enrichment persistence failed.',
+    });
+  });
+});
+
+describe('videoEnrichmentJob.fake', () => {
+  const payload = (category: 'MUSIC' | 'INFORMATIONAL') => ({
+    task: 'video-enrichment' as const,
+    videoId: VIDEO_ID,
+    title: 'Bite Through Stone',
+    artistDisplay: 'Ceschi',
+    category,
+    artists: [
+      { artistId: ARTIST_ID, name: 'Ceschi', role: 'primary' as const },
+      { artistId: OTHER_ID, name: 'Sole', role: 'featured' as const },
+    ],
+    callbackUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/callback`,
+    progressUrl: `https://example.com/api/videos/${VIDEO_ID}/enrichment/progress`,
+    jobToken: 'tok',
+    signingKey: 'k'.repeat(64),
+  });
+
+  it.each([
+    ['MUSIC', 'musicbrainz'],
+    ['INFORMATIONAL', 'web-search'],
+  ] as const)(
+    '%s: checkpoints the first stage the Lambda posts, as a valid progress POST',
+    (category, stage) => {
+      const checkpoint = videoEnrichmentJob.fake.checkpoint?.(payload(category));
+
+      expect(checkpoint).toEqual({ stage, counts: { artists: 2 } });
       expect(
-        vi
-          .mocked(VideoRepository.setEnrichmentStatus)
-          .mock.calls.some(([, status]) => status === 'succeeded')
-      ).toBe(false);
-
-      // Drain the remaining dwell so the run settles before timers are restored.
-      await vi.advanceTimersByTimeAsync(1);
-      await promise;
-    } finally {
-      vi.useRealTimers();
+        videoEnrichmentProgressPostSchema.safeParse({ jobToken: 'tok', ...checkpoint }).success
+      ).toBe(true);
     }
+  );
+
+  it.each(['MUSIC', 'INFORMATIONAL'] as const)(
+    '%s: answers with the category fixture as a valid callback',
+    (category) => {
+      const result = videoEnrichmentJob.fake.result(payload(category));
+
+      expect(result).toEqual({
+        ok: true,
+        data: videoEnrichmentFixture({
+          artists: [{ artistId: ARTIST_ID }, { artistId: OTHER_ID }],
+          category,
+          title: 'Bite Through Stone',
+        }),
+      });
+      expect(videoEnrichmentCallbackSchema.safeParse({ jobToken: 'tok', result }).success).toBe(
+        true
+      );
+    }
+  );
+
+  it('dwells four seconds by default', () => {
+    expect(videoEnrichmentJob.fake.delayMs).toBe(4000);
   });
 });
 
@@ -710,22 +623,6 @@ describe('getEnrichmentStatus', () => {
     const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
 
     expect(result).toBeNull();
-  });
-
-  it('coerces a stale processing job to failed on read', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({
-        enrichmentStatus: 'processing',
-        enrichmentStartedAt: new Date(Date.now() - 18 * 60 * 1000),
-      })
-    );
-
-    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
-
-    expect(result).toMatchObject({
-      status: 'failed',
-      error: STALE_JOB_TIMEOUT_MESSAGE,
-    });
   });
 
   it('reports an empty currentReleasedOn for a draft without a release date', async () => {
@@ -881,47 +778,6 @@ describe('getEnrichmentStatus', () => {
     });
   });
 
-  it('reports no progress when the stored checkpoint is malformed', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({
-        enrichmentStatus: 'processing',
-        enrichmentStartedAt: new Date(),
-        enrichmentProgress: { stage: 'not-a-stage' },
-      })
-    );
-
-    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
-
-    expect(result?.progress).toBeNull();
-  });
-
-  it('withholds progress once the job has left the in-flight states', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({
-        enrichmentStatus: 'succeeded',
-        enrichmentProgress: {
-          stage: 'finalizing',
-          counts: { artists: 2 },
-          at: '2026-07-19T12:00:00.000Z',
-        },
-      })
-    );
-
-    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
-
-    expect(result?.progress).toBeNull();
-  });
-
-  it('reads a stored status outside the lifecycle union as never-enriched', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'archived' })
-    );
-
-    const result = await VideoEnrichmentService.getEnrichmentStatus(VIDEO_ID);
-
-    expect(result?.status).toBeNull();
-  });
-
   it('reports a null birth date for an artist with none stored', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
       baseState({ enrichmentStatus: 'succeeded' })
@@ -973,224 +829,13 @@ describe('getEnrichmentStatus', () => {
   });
 });
 
-describe('verifyAndClaimCallback', () => {
-  it('returns false on a token mismatch without attempting the claim', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
+describe('videoEnrichmentJob.persist', () => {
+  /** Persists an ok callback result's data, as the job runner's completion does. */
+  const persist = async (result: VideoEnrichmentResult): Promise<void> => {
+    if (!result.ok) throw new Error('persist takes an ok result');
+    await videoEnrichmentJob.persist(VIDEO_ID, result.data, {});
+  };
 
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(
-      VIDEO_ID,
-      'forged',
-      proofFor('stored')
-    );
-
-    expect(result).toBe(false);
-    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
-  });
-
-  it('claims atomically when the token matches a processing job', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-    vi.mocked(VideoRepository.claimEnrichmentJobToken).mockResolvedValue(true);
-
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(
-      VIDEO_ID,
-      'stored',
-      proofFor('stored')
-    );
-
-    expect(result).toBe(true);
-    expect(VideoRepository.claimEnrichmentJobToken).toHaveBeenCalledWith(VIDEO_ID, 'stored');
-  });
-
-  it('returns false without claiming when the video state is missing', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
-
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(
-      VIDEO_ID,
-      'stored',
-      proofFor('stored')
-    );
-
-    expect(result).toBe(false);
-    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
-  });
-
-  it('returns false without claiming when the job is not processing', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'succeeded', enrichmentJobToken: 'stored' })
-    );
-
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(
-      VIDEO_ID,
-      'stored',
-      proofFor('stored')
-    );
-
-    expect(result).toBe(false);
-    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
-  });
-
-  it('returns false and never claims on an unsigned callback, even with the right token', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(VIDEO_ID, 'stored', {
-      signature: null,
-      rawBody: CALLBACK_BODY,
-    });
-
-    expect(result).toBe(false);
-    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
-  });
-
-  it('returns false and never claims when the signature was made under another token’s key', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    const result = await VideoEnrichmentService.verifyAndClaimCallback(
-      VIDEO_ID,
-      'stored',
-      proofFor('guess')
-    );
-
-    expect(result).toBe(false);
-    expect(VideoRepository.claimEnrichmentJobToken).not.toHaveBeenCalled();
-  });
-});
-
-describe('recordProgress', () => {
-  it('stamps the checkpoint server-side when the token matches', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      {
-        stage: 'wikidata',
-        counts: { artists: 1 },
-      },
-      proofFor('stored')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).toHaveBeenCalledWith(VIDEO_ID, {
-      stage: 'wikidata',
-      counts: { artists: 1 },
-      at: expect.any(String),
-    });
-  });
-
-  it('writes nothing when the job is not processing', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'succeeded', enrichmentJobToken: 'stored' })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      { stage: 'wikidata' },
-      proofFor('stored')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('writes nothing when the token does not match', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'forged',
-      { stage: 'wikidata' },
-      proofFor('stored')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('writes nothing when the job has no stored token to verify against', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: null })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      { stage: 'wikidata' },
-      proofFor('stored')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('writes nothing when the video no longer exists', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      { stage: 'wikidata' },
-      proofFor('stored')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('swallows a repository failure instead of throwing', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockRejectedValue(new Error('db down'));
-
-    await expect(
-      VideoEnrichmentService.recordProgress(
-        VIDEO_ID,
-        'stored',
-        { stage: 'wikidata' },
-        proofFor('stored')
-      )
-    ).resolves.toBeUndefined();
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('writes nothing on an unsigned checkpoint', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      { stage: 'wikidata' },
-      { signature: null, rawBody: CALLBACK_BODY }
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-
-  it('writes nothing when the signature was made under another token’s key', async () => {
-    vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(
-      baseState({ enrichmentStatus: 'processing', enrichmentJobToken: 'stored' })
-    );
-
-    await VideoEnrichmentService.recordProgress(
-      VIDEO_ID,
-      'stored',
-      { stage: 'wikidata' },
-      proofFor('guess')
-    );
-
-    expect(VideoRepository.setEnrichmentProgress).not.toHaveBeenCalled();
-  });
-});
-
-describe('completeCallback', () => {
   const okResult = (suggestionValue: string) => ({
     ok: true as const,
     data: {
@@ -1216,16 +861,8 @@ describe('completeCallback', () => {
     vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([artistRow()]);
   });
 
-  it('flips to failed on an error result', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, { ok: false, error: 'boom' });
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(VIDEO_ID, 'failed', {
-      error: 'boom',
-    });
-  });
-
-  it('persists new facts as pending and flips to succeeded', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+  it('persists new facts as pending', async () => {
+    await persist(okResult('1985-03-15'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
       {
@@ -1237,9 +874,6 @@ describe('completeCallback', () => {
         note: null,
       },
     ]);
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
-      error: null,
-    });
   });
 
   it('drops a suggestion equal to the current value at day precision', async () => {
@@ -1256,7 +890,7 @@ describe('completeCallback', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+    await persist(okResult('1985-03-15'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
@@ -1266,7 +900,7 @@ describe('completeCallback', () => {
       { artistId: ARTIST_ID, field: 'bornOn', value: '1985-03-15' },
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+    await persist(okResult('1985-03-15'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
@@ -1285,7 +919,7 @@ describe('completeCallback', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [
@@ -1314,7 +948,7 @@ describe('completeCallback', () => {
   });
 
   it('emits the release-date suggestion only when it differs from the admin date', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1333,7 +967,7 @@ describe('completeCallback', () => {
   });
 
   it('persists a differing release date as a video-level suggestion', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1360,7 +994,7 @@ describe('completeCallback', () => {
       baseState({ releasedOn: null })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1392,7 +1026,7 @@ describe('completeCallback', () => {
       baseState({ releasedOn: null })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1419,7 +1053,7 @@ describe('completeCallback', () => {
       baseState({ releasedOn: null })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1446,7 +1080,7 @@ describe('completeCallback', () => {
       baseState({ description: 'The admin wrote this earlier.' })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1479,7 +1113,7 @@ describe('completeCallback', () => {
   });
 
   it('auto-applies the description to a video without one', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1507,9 +1141,6 @@ describe('completeCallback', () => {
     );
     // The applied row never enters the pending batch.
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'succeeded', {
-      error: null,
-    });
   });
 
   it('treats a whitespace-only stored description as blank for auto-apply', async () => {
@@ -1517,7 +1148,7 @@ describe('completeCallback', () => {
       baseState({ description: '   ' })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1542,7 +1173,7 @@ describe('completeCallback', () => {
       baseState({ description: 'Handwritten by the admin.' })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1564,29 +1195,27 @@ describe('completeCallback', () => {
     ]);
   });
 
-  it('flips to failed when the auto-apply description write fails', async () => {
+  it('lets a failed auto-apply description write reach the job runner', async () => {
     // Once-mock: tests shuffle within the file and clearMocks does not reset
     // implementations, so a persistent rejection would poison other tests.
     vi.mocked(VideoRepository.update).mockRejectedValueOnce(new Error('db down'));
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
-      ok: true,
-      data: {
-        artists: [],
-        video: {
-          description: {
-            value: 'Fresh prose naming the artist.',
-            confidence: 'medium',
-            sources: [{ url: 'https://example.com/review' }],
+    await expect(
+      persist({
+        ok: true,
+        data: {
+          artists: [],
+          video: {
+            description: {
+              value: 'Fresh prose naming the artist.',
+              confidence: 'medium',
+              sources: [{ url: 'https://example.com/review' }],
+            },
           },
+          model: 'gemini-2.5-flash',
         },
-        model: 'gemini-2.5-flash',
-      },
-    });
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'db down',
-    });
+      })
+    ).rejects.toThrow('db down');
   });
 
   it('drops a description equal to the stored one (case-insensitive)', async () => {
@@ -1595,7 +1224,7 @@ describe('completeCallback', () => {
       baseState({ description: 'An Existing Description.' })
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1631,7 +1260,7 @@ describe('completeCallback', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1662,7 +1291,7 @@ describe('completeCallback', () => {
       { artistId: null, field: 'featuredArtist', value: 'New Name' },
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1687,16 +1316,12 @@ describe('completeCallback', () => {
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
-  it('flips to failed when persistence throws', async () => {
-    vi.mocked(VideoEnrichmentSuggestionRepository.replacePending).mockRejectedValue(
+  it('lets a persistence error reach the job runner', async () => {
+    vi.mocked(VideoEnrichmentSuggestionRepository.replacePending).mockRejectedValueOnce(
       new Error('db down')
     );
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'db down',
-    });
+    await expect(persist(okResult('1985-03-15'))).rejects.toThrow('db down');
   });
 
   /** One artist-scoped suggestion, for the filtering/fencing cases. */
@@ -1724,61 +1349,46 @@ describe('completeCallback', () => {
     },
   });
 
-  it('flips to failed with a generic message when persistence rejects a non-Error', async () => {
-    vi.mocked(VideoEnrichmentSuggestionRepository.replacePending).mockRejectedValue(
-      'socket closed'
-    );
-
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenLastCalledWith(VIDEO_ID, 'failed', {
-      error: 'Video enrichment persistence failed.',
-    });
-  });
-
   it('persists nothing when the video disappeared before the callback landed', async () => {
     vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(null);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, okResult('1985-03-15'));
+    await persist(okResult('1985-03-15'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).not.toHaveBeenCalled();
   });
 
   it('ignores a video-level field misfiled at artist scope', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('releasedOn', '2020-06-01'));
+    await persist(artistFact('releasedOn', '2020-06-01'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('drops an artist suggestion whose value is only whitespace', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', '   '));
+    await persist(artistFact('firstName', '   '));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('ignores suggestions for an artist no longer linked to the video', async () => {
-    await VideoEnrichmentService.completeCallback(
-      VIDEO_ID,
-      artistFact('firstName', 'Timothy', OTHER_ID)
-    );
+    await persist(artistFact('firstName', 'Timothy', OTHER_ID));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('drops a first name that differs from the current one only by case', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', 'FRANCISCO'));
+    await persist(artistFact('firstName', 'FRANCISCO'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('drops a surname that differs from the current one only by case', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('surname', 'ramos'));
+    await persist(artistFact('surname', 'ramos'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('drops a display name that differs from the current one only by case', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('displayName', 'CESCHI'));
+    await persist(artistFact('displayName', 'CESCHI'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
@@ -1797,13 +1407,13 @@ describe('completeCallback', () => {
       }),
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('middleName', '  Xavier  '));
+    await persist(artistFact('middleName', '  Xavier  '));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, []);
   });
 
   it('keeps a first name that genuinely differs from the current one', async () => {
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, artistFact('firstName', 'Franco'));
+    await persist(artistFact('firstName', 'Franco'));
 
     expect(VideoEnrichmentSuggestionRepository.replacePending).toHaveBeenCalledWith(VIDEO_ID, [
       expect.objectContaining({ artistId: ARTIST_ID, field: 'firstName', value: 'Franco' }),
@@ -1815,7 +1425,7 @@ describe('completeCallback', () => {
       { artistId: null, field: 'releasedOn', value: '2020-06-01' },
     ]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
@@ -1836,7 +1446,7 @@ describe('completeCallback', () => {
   it('drops a description that is only whitespace', async () => {
     vi.mocked(splitFeaturedArtists).mockReturnValue([{ name: 'Ceschi', role: 'primary' }]);
 
-    await VideoEnrichmentService.completeCallback(VIDEO_ID, {
+    await persist({
       ok: true,
       data: {
         artists: [],
