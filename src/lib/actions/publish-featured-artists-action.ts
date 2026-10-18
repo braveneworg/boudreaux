@@ -7,9 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { loggers } from '@/lib/utils/logger';
 import { cache } from '@/lib/utils/simple-cache';
-import { requireRole } from '@/utils/auth/require-role';
 
 import type { AdminActionResult } from './run-admin-entity-action';
 
@@ -18,10 +18,9 @@ import type { AdminActionResult } from './run-admin-entity-action';
  * Called from the admin UI to ensure the public landing page shows fresh content.
  */
 export const publishFeaturedArtistsToSiteAction = async (): Promise<AdminActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
 
   try {
@@ -30,6 +29,10 @@ export const publishFeaturedArtistsToSiteAction = async (): Promise<AdminActionR
     return { success: true };
   } catch (error) {
     loggers.media.error('Failed to publish featured artists to site', error);
-    return { success: false, error: 'Failed to publish featured artists to landing page' };
+    return {
+      success: false,
+      error: 'Failed to publish featured artists to landing page',
+      code: 'UNKNOWN',
+    };
   }
 };

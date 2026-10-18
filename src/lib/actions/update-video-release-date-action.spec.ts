@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { updateVideoReleaseDateAction } from './update-video-release-date-action';
 
@@ -14,14 +14,15 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const videoId = '507f1f77bcf86cd799439011';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(VideoService.updateVideoReleaseDate).mockResolvedValue({
     success: true,
@@ -30,32 +31,41 @@ beforeEach(() => {
 });
 
 describe('updateVideoReleaseDateAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await updateVideoReleaseDateAction(videoId, '2020-06-01');
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(VideoService.updateVideoReleaseDate).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid video id without calling the service', async () => {
     const result = await updateVideoReleaseDateAction('not-an-id', '2020-06-01');
 
-    expect(result).toEqual({ success: false, error: 'Invalid video ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid video ID', code: 'INVALID_INPUT' });
     expect(VideoService.updateVideoReleaseDate).not.toHaveBeenCalled();
   });
 
   it('rejects a date that is not a calendar day without calling the service', async () => {
     const result = await updateVideoReleaseDateAction(videoId, '2021-02-30');
 
-    expect(result).toEqual({ success: false, error: 'Invalid release date' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid release date',
+      code: 'INVALID_INPUT',
+    });
     expect(VideoService.updateVideoReleaseDate).not.toHaveBeenCalled();
   });
 
   it('rejects an ISO datetime without calling the service', async () => {
     const result = await updateVideoReleaseDateAction(videoId, '2020-06-01T00:00:00.000Z');
 
-    expect(result).toEqual({ success: false, error: 'Invalid release date' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid release date',
+      code: 'INVALID_INPUT',
+    });
     expect(VideoService.updateVideoReleaseDate).not.toHaveBeenCalled();
   });
 
@@ -109,6 +119,7 @@ describe('updateVideoReleaseDateAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'A published video must keep a release date',
+      code: 'VALIDATION',
     });
   });
 
@@ -117,6 +128,10 @@ describe('updateVideoReleaseDateAction', () => {
 
     const result = await updateVideoReleaseDateAction(videoId, '2020-06-01');
 
-    expect(result).toEqual({ success: false, error: 'Failed to save the release date' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to save the release date',
+      code: 'UNKNOWN',
+    });
   });
 });

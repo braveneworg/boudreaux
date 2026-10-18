@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { deleteFeaturedArtistAction } from './delete-featured-artist-action';
 
@@ -14,17 +14,18 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/featured-artists-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = {
   user: { id: 'user-123', role: 'admin', email: 'admin@example.com' },
 };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const featuredArtistId = '507f1f77bcf86cd799439011';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(FeaturedArtistsService.hardDeleteFeaturedArtist).mockResolvedValue({
     success: true,
@@ -33,18 +34,23 @@ beforeEach(() => {
 });
 
 describe('deleteFeaturedArtistAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await deleteFeaturedArtistAction(featuredArtistId);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(FeaturedArtistsService.hardDeleteFeaturedArtist).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid featured artist id', async () => {
     const result = await deleteFeaturedArtistAction('not-an-id');
 
-    expect(result).toEqual({ success: false, error: 'Invalid featured artist ID' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid featured artist ID',
+      code: 'INVALID_INPUT',
+    });
   });
 
   it('hard-deletes the featured artist via the service', async () => {
@@ -85,7 +91,11 @@ describe('deleteFeaturedArtistAction', () => {
 
     const result = await deleteFeaturedArtistAction(featuredArtistId);
 
-    expect(result).toEqual({ success: false, error: 'Featured artist not found' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Featured artist not found',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('does not log a security event when the service fails', async () => {
@@ -107,6 +117,10 @@ describe('deleteFeaturedArtistAction', () => {
 
     const result = await deleteFeaturedArtistAction(featuredArtistId);
 
-    expect(result).toEqual({ success: false, error: 'Failed to delete featured artist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to delete featured artist',
+      code: 'UNKNOWN',
+    });
   });
 });

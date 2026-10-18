@@ -5,10 +5,10 @@
 
 import 'server-only';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   tourDateCreateSchema,
@@ -18,6 +18,7 @@ import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
+import { refusedFormState } from './form-state-helpers';
 import {
   attemptRemoveFallback,
   attemptSetTimeFallback,
@@ -36,7 +37,11 @@ export const createTourDateAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   const permittedFieldNames = [
     'tourId',
@@ -111,10 +116,11 @@ export const updateTourDateAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
-  if (!session?.user?.id) {
-    throw new Error('Invalid admin session: missing user id for audit logging.');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
   }
+  const { session } = gate;
 
   const permittedFieldNames = [
     'startDate',
@@ -180,15 +186,14 @@ export const updateTourDateAction = async (
  * Server action to delete a tour date
  */
 export const deleteTourDateAction = async (tourDateId: string): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(tourDateId)) {
-    return { success: false, error: 'Invalid tour date ID' };
+    return { success: false, error: 'Invalid tour date ID', code: 'INVALID_INPUT' };
   }
 
   try {
@@ -206,7 +211,7 @@ export const deleteTourDateAction = async (tourDateId: string): Promise<AdminAct
 
     return { success: true };
   } catch {
-    return { success: false, error: 'Failed to delete tour date' };
+    return { success: false, error: 'Failed to delete tour date', code: 'UNKNOWN' };
   }
 };
 
@@ -219,21 +224,20 @@ export const updateHeadlinerSetTimeAction = async (
   tourDateId?: string,
   artistId?: string
 ): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(headlinerId)) {
-    return { success: false, error: 'Invalid headliner ID' };
+    return { success: false, error: 'Invalid headliner ID', code: 'INVALID_INPUT' };
   }
 
   const parsedSetTime = setTime ? new Date(setTime) : null;
 
   if (setTime && parsedSetTime && isNaN(parsedSetTime.getTime())) {
-    return { success: false, error: 'Invalid set time format' };
+    return { success: false, error: 'Invalid set time format', code: 'INVALID_INPUT' };
   }
 
   try {
@@ -265,7 +269,7 @@ export const updateHeadlinerSetTimeAction = async (
     }
 
     logger.error('[updateHeadlinerSetTimeAction]', error);
-    return { success: false, error: 'Failed to update set time' };
+    return { success: false, error: 'Failed to update set time', code: 'UNKNOWN' };
   }
 };
 
@@ -278,15 +282,14 @@ export const removeHeadlinerAction = async (
   tourDateId?: string,
   artistId?: string
 ): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(headlinerId)) {
-    return { success: false, error: 'Invalid headliner ID' };
+    return { success: false, error: 'Invalid headliner ID', code: 'INVALID_INPUT' };
   }
 
   try {
@@ -312,7 +315,7 @@ export const removeHeadlinerAction = async (
     }
 
     logger.error('[removeHeadlinerAction]', error);
-    return { success: false, error: 'Failed to remove headliner' };
+    return { success: false, error: 'Failed to remove headliner', code: 'UNKNOWN' };
   }
 };
 
@@ -323,20 +326,19 @@ export const reorderHeadlinersAction = async (
   tourDateId: string,
   headlinerIds: string[]
 ): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(tourDateId)) {
-    return { success: false, error: 'Invalid tour date ID' };
+    return { success: false, error: 'Invalid tour date ID', code: 'INVALID_INPUT' };
   }
 
   for (const id of headlinerIds) {
     if (!OBJECT_ID_REGEX.test(id)) {
-      return { success: false, error: 'Invalid headliner ID in list' };
+      return { success: false, error: 'Invalid headliner ID in list', code: 'INVALID_INPUT' };
     }
   }
 
@@ -354,6 +356,6 @@ export const reorderHeadlinersAction = async (
     return { success: true };
   } catch (error) {
     logger.error('[reorderHeadlinersAction]', error);
-    return { success: false, error: 'Failed to reorder headliners' };
+    return { success: false, error: 'Failed to reorder headliners', code: 'UNKNOWN' };
   }
 };

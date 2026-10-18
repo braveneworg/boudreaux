@@ -4,10 +4,10 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { appendVideoPosterCandidatesAction } from './append-video-poster-candidates-action';
 
@@ -15,9 +15,10 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const videoId = '507f1f77bcf86cd799439011';
 
 /** A frame inside this video's own S3 namespace on the pinned CDN domain. */
@@ -36,7 +37,7 @@ beforeEach(() => {
   vi.stubEnv('CDN_DOMAIN', 'cdn.example.com');
   vi.stubEnv('AWS_S3_BUCKET_NAME', 'my-bucket');
   vi.stubEnv('S3_BUCKET', '');
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(VideoService.appendVideoPosterCandidates).mockResolvedValue({
     success: true,
@@ -45,18 +46,19 @@ beforeEach(() => {
 });
 
 describe('appendVideoPosterCandidatesAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await appendVideoPosterCandidatesAction(videoId, candidates);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(VideoService.appendVideoPosterCandidates).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid video id without calling the service', async () => {
     const result = await appendVideoPosterCandidatesAction('not-an-id', candidates);
 
-    expect(result).toEqual({ success: false, error: 'Invalid video ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid video ID', code: 'INVALID_INPUT' });
     expect(VideoService.appendVideoPosterCandidates).not.toHaveBeenCalled();
   });
 
@@ -65,14 +67,22 @@ describe('appendVideoPosterCandidatesAction', () => {
       { url: 'javascript:alert(1)', atSeconds: 1, score: 1 },
     ]);
 
-    expect(result).toEqual({ success: false, error: 'Invalid poster frames' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid poster frames',
+      code: 'INVALID_INPUT',
+    });
     expect(VideoService.appendVideoPosterCandidates).not.toHaveBeenCalled();
   });
 
   it('rejects an empty candidate list without calling the service', async () => {
     const result = await appendVideoPosterCandidatesAction(videoId, []);
 
-    expect(result).toEqual({ success: false, error: 'Invalid poster frames' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid poster frames',
+      code: 'INVALID_INPUT',
+    });
     expect(VideoService.appendVideoPosterCandidates).not.toHaveBeenCalled();
   });
 
@@ -85,7 +95,11 @@ describe('appendVideoPosterCandidatesAction', () => {
 
     const result = await appendVideoPosterCandidatesAction(videoId, [ownFrame(6), foreign]);
 
-    expect(result).toEqual({ success: false, error: 'Invalid poster frames' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid poster frames',
+      code: 'INVALID_INPUT',
+    });
     expect(VideoService.appendVideoPosterCandidates).not.toHaveBeenCalled();
   });
 
@@ -127,7 +141,11 @@ describe('appendVideoPosterCandidatesAction', () => {
 
     const result = await appendVideoPosterCandidatesAction(videoId, candidates);
 
-    expect(result).toEqual({ success: false, error: 'Poster frame limit reached' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Poster frame limit reached',
+      code: 'LIMIT_EXCEEDED',
+    });
   });
 
   it('handles an unexpected service error', async () => {
@@ -137,6 +155,10 @@ describe('appendVideoPosterCandidatesAction', () => {
 
     const result = await appendVideoPosterCandidatesAction(videoId, candidates);
 
-    expect(result).toEqual({ success: false, error: 'Failed to add poster frames' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to add poster frames',
+      code: 'UNKNOWN',
+    });
   });
 });

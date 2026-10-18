@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { publishReleaseAction } from './publish-release-action';
 
@@ -14,15 +14,16 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/release-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const releaseId = '507f1f77bcf86cd799439011';
 const artistId = '507f1f77bcf86cd799439012';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(ReleaseService.publishRelease).mockResolvedValue({
     success: true,
@@ -31,18 +32,19 @@ beforeEach(() => {
 });
 
 describe('publishReleaseAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await publishReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(ReleaseService.publishRelease).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid release id', async () => {
     const result = await publishReleaseAction('not-an-id');
 
-    expect(result).toEqual({ success: false, error: 'Invalid release ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid release ID', code: 'INVALID_INPUT' });
   });
 
   it('publishes with no decisions when none are given', async () => {
@@ -76,7 +78,7 @@ describe('publishReleaseAction', () => {
     });
 
     expect({ result, calls: vi.mocked(ReleaseService.publishRelease).mock.calls }).toEqual({
-      result: { success: false, error: 'Invalid artist decisions' },
+      result: { success: false, error: 'Invalid artist decisions', code: 'INVALID_INPUT' },
       calls: [],
     });
   });
@@ -119,7 +121,7 @@ describe('publishReleaseAction', () => {
 
     const result = await publishReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Release not found' });
+    expect(result).toEqual({ success: false, error: 'Release not found', code: 'NOT_FOUND' });
   });
 
   it('handles an unexpected service error', async () => {
@@ -127,6 +129,6 @@ describe('publishReleaseAction', () => {
 
     const result = await publishReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Failed to publish release' });
+    expect(result).toEqual({ success: false, error: 'Failed to publish release', code: 'UNKNOWN' });
   });
 });

@@ -29,7 +29,7 @@ export const updateArtistBioImageAltAction = async (
     perform: async (id) => {
       const parsed = updateBioImageAltInputSchema.safeParse(input);
       if (!parsed.success) {
-        return { success: false, error: parsed.error.issues[0].message };
+        return { success: false, error: parsed.error.issues[0].message, code: 'INVALID_INPUT' };
       }
       const alt = parsed.data.alt === null ? null : sanitizeBioText(parsed.data.alt);
       await ArtistService.updateBioImageAlt(id, alt);

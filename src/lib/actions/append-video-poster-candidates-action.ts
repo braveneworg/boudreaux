@@ -36,7 +36,7 @@ export const appendVideoPosterCandidatesAction = async (
     perform: async (id) => {
       const parsed = posterCandidatesSchema.min(1).safeParse(candidates);
       if (!parsed.success || !areCandidatesForVideo(parsed.data, id)) {
-        return { success: false, error: INVALID_FRAMES_ERROR };
+        return { success: false, error: INVALID_FRAMES_ERROR, code: 'INVALID_INPUT' };
       }
       return VideoService.appendVideoPosterCandidates(id, parsed.data);
     },

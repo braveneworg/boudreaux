@@ -28,7 +28,7 @@ export const updateArtistBioImageAttributionAction = async (
     perform: async (id) => {
       const parsed = updateBioImageAttributionInputSchema.safeParse(input);
       if (!parsed.success) {
-        return { success: false, error: parsed.error.issues[0].message };
+        return { success: false, error: parsed.error.issues[0].message, code: 'INVALID_INPUT' };
       }
       const attribution =
         parsed.data.attribution === null ? null : sanitizeBioText(parsed.data.attribution);

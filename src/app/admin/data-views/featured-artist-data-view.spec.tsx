@@ -278,6 +278,7 @@ describe('FeaturedArtistDataView', () => {
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
         success: false,
         error: 'Failed to publish',
+        code: 'UNKNOWN',
       });
       vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
         toInfiniteResult(mockRows) as never
@@ -296,9 +297,10 @@ describe('FeaturedArtistDataView', () => {
 
     it('should show fallback error toast when publish action fails without an error message', async () => {
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      // Outside the declared result type: the view keeps a fallback for it.
       vi.mocked(publishFeaturedArtistsToSiteAction).mockResolvedValue({
         success: false,
-      });
+      } as never);
       vi.mocked(useInfiniteFeaturedArtistsQuery).mockReturnValue(
         toInfiniteResult(mockRows) as never
       );

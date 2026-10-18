@@ -7,10 +7,10 @@ import 'server-only';
 
 import { after } from 'next/server';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { objectIdSchema } from '@/lib/validation/bio-generation-schema';
 import {
@@ -85,17 +85,21 @@ const runEnrichmentAfterResponse = async (videoId: string): Promise<void> => {
 export const runVideoEnrichmentAction = async (
   videoId: string
 ): Promise<RunVideoEnrichmentActionResult> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   const parsedId = objectIdSchema.safeParse(videoId);
   if (!parsedId.success) {
-    return { success: false, error: 'Invalid video id.' };
+    return { success: false, error: 'Invalid video id.', code: 'INVALID_INPUT' };
   }
 
   try {
     const state = await VideoRepository.getEnrichmentState(videoId);
     if (!state) {
-      return { success: false, error: 'Video not found.' };
+      return { success: false, error: 'Video not found.', code: 'NOT_FOUND' };
     }
 
     // Eligibility gate — checked BEFORE any status write, so an ineligible
@@ -103,7 +107,7 @@ export const runVideoEnrichmentAction = async (
     // service would refuse.
     const ineligibleReason = enrichmentIneligibilityReason(state);
     if (ineligibleReason) {
-      return { success: false, error: ineligibleCopyFor(ineligibleReason) };
+      return { success: false, error: ineligibleCopyFor(ineligibleReason), code: 'VALIDATION' };
     }
 
     // Don't start a second run while one is genuinely in flight.
@@ -129,6 +133,10 @@ export const runVideoEnrichmentAction = async (
       videoId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { success: false, error: 'Video enrichment failed to start. Please try again.' };
+    return {
+      success: false,
+      error: 'Video enrichment failed to start. Please try again.',
+      code: 'UNKNOWN',
+    };
   }
 };

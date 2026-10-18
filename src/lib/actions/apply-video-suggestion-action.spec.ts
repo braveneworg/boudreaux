@@ -5,18 +5,18 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { VideoEnrichmentSuggestionRecord } from '@/lib/types/domain/video-enrichment';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 import { applyVideoSuggestionAction } from './apply-video-suggestion-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: vi.fn() }));
 vi.mock('@/lib/repositories/video-enrichment-suggestion-repository', () => ({
   VideoEnrichmentSuggestionRepository: {
@@ -41,6 +41,7 @@ vi.mock('@/lib/utils/logger', () => ({
 const VIDEO_ID = 'f'.repeat(24);
 const ARTIST_ID = 'a'.repeat(24);
 const SUGGESTION_ID = 'c'.repeat(24);
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const suggestion = (
   overrides: Partial<VideoEnrichmentSuggestionRecord> = {}
@@ -75,7 +76,10 @@ const artistRow = {
 };
 
 beforeEach(() => {
-  vi.mocked(requireRole).mockResolvedValue({ user: { id: 'admin-1', role: 'admin' } } as never);
+  vi.mocked(gateAction).mockResolvedValue({
+    success: true,
+    session: { user: { id: 'admin-1', role: 'admin' } } as never,
+  });
   vi.mocked(VideoEnrichmentSuggestionRepository.findById).mockResolvedValue(suggestion());
   vi.mocked(VideoEnrichmentSuggestionRepository.markApplied).mockResolvedValue(true);
   vi.mocked(VideoEnrichmentSuggestionRepository.markDismissed).mockResolvedValue(true);
@@ -84,10 +88,23 @@ beforeEach(() => {
 });
 
 describe('applyVideoSuggestionAction', () => {
+  it('returns the gate refusal without reading the suggestion', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
+
+    const result = await applyVideoSuggestionAction({ suggestionId: SUGGESTION_ID, op: 'apply' });
+
+    expect(result).toEqual(REFUSAL);
+    expect(VideoEnrichmentSuggestionRepository.findById).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid input', async () => {
     const result = await applyVideoSuggestionAction({ suggestionId: 'nope', op: 'apply' });
 
-    expect(result).toEqual({ success: false, error: 'Invalid suggestion request.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid suggestion request.',
+      code: 'INVALID_INPUT',
+    });
   });
 
   it('dismisses a pending suggestion', async () => {
@@ -108,7 +125,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'dismiss',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('applies a pending artist suggestion through the field whitelist', async () => {
@@ -182,7 +203,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('does not resolve a releasedOn suggestion that is no longer pending', async () => {
@@ -195,7 +220,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
     expect(VideoEnrichmentSuggestionRepository.markApplied).not.toHaveBeenCalled();
   });
 
@@ -212,6 +241,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'This suggestion applies in the edit form, not on the server.',
+      code: 'VALIDATION',
     });
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
   });
@@ -229,6 +259,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'This suggestion applies in the edit form, not on the server.',
+      code: 'VALIDATION',
     });
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
   });
@@ -262,6 +293,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'A description suggestion is never dismissed.',
+      code: 'VALIDATION',
     });
     expect(VideoEnrichmentSuggestionRepository.markDismissed).not.toHaveBeenCalled();
   });
@@ -274,7 +306,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'dismiss',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
     expect(VideoEnrichmentSuggestionRepository.markDismissed).not.toHaveBeenCalled();
   });
 
@@ -288,7 +324,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggested value is not a valid date.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggested value is not a valid date.',
+      code: 'VALIDATION',
+    });
   });
 
   it('rejects an impossible calendar day for bornOn (2021-02-30)', async () => {
@@ -301,7 +341,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggested value is not a valid date.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggested value is not a valid date.',
+      code: 'VALIDATION',
+    });
   });
 
   it('rejects a zero month for bornOn (2021-00-10)', async () => {
@@ -314,7 +358,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggested value is not a valid date.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggested value is not a valid date.',
+      code: 'VALIDATION',
+    });
   });
 
   it('rejects non-date junk for bornOn', async () => {
@@ -327,7 +375,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggested value is not a valid date.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggested value is not a valid date.',
+      code: 'VALIDATION',
+    });
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
   });
 
@@ -354,7 +406,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('conflicts when expectedCurrent no longer matches (day-precision dates)', async () => {
@@ -367,6 +423,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'The current value has changed — review before applying.',
+      code: 'VALIDATION',
     });
     expect(ArtistService.applyEnrichedField).not.toHaveBeenCalled();
   });
@@ -391,6 +448,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'The current value has changed — review before applying.',
+      code: 'VALIDATION',
     });
   });
 
@@ -480,7 +538,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Unsupported suggestion field.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Unsupported suggestion field.',
+      code: 'VALIDATION',
+    });
   });
 
   it('rejects a non-whitelisted field as unsupported', async () => {
@@ -493,7 +555,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Unsupported suggestion field.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Unsupported suggestion field.',
+      code: 'VALIDATION',
+    });
   });
 
   it('errors when the artist is no longer linked to the video', async () => {
@@ -507,6 +573,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'Artist is no longer linked to this video.',
+      code: 'NOT_FOUND',
     });
   });
 
@@ -518,7 +585,11 @@ describe('applyVideoSuggestionAction', () => {
       op: 'apply',
     });
 
-    expect(result).toEqual({ success: false, error: 'Suggestion was already resolved.' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Suggestion was already resolved.',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('audits and revalidates the admin paths after an apply', async () => {
@@ -549,6 +620,7 @@ describe('applyVideoSuggestionAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'Suggestion update failed. Please try again.',
+      code: 'UNKNOWN',
     });
   });
 });

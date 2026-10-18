@@ -7,10 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import type { ServerSession } from '@/lib/auth/get-server-session';
+import { gateAction } from '@/lib/auth/action-gate';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 import type { FormState } from '@/lib/types/form-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeBannerHtmlServer } from '@/lib/utils/sanitize-banner-html';
 import {
@@ -75,16 +74,11 @@ export const createOrUpdateBannerNotificationAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  let session: ServerSession;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return {
-      fields: {},
-      success: false,
-      errors: { _form: ['Unauthorized'] },
-    };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return { fields: {}, success: false, errors: { _form: [gate.error] } };
   }
+  const { session } = gate;
 
   const raw = {
     slotNumber: payload.get('slotNumber'),
@@ -135,10 +129,9 @@ export const createOrUpdateBannerNotificationAction = async (
 export const deleteBannerNotificationAction = async (
   slotNumber: number
 ): Promise<AdminActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
 
   logger.info(`Delete banner notification for slot ${slotNumber}`, {
@@ -149,7 +142,7 @@ export const deleteBannerNotificationAction = async (
   const result = await BannerNotificationService.deleteNotification(slotNumber);
 
   if (!result.success) {
-    return { success: false, error: result.error };
+    return { success: false, error: result.error, code: result.code };
   }
 
   revalidatePath('/');
@@ -165,22 +158,21 @@ export const deleteBannerNotificationAction = async (
 export const updateRotationIntervalAction = async (
   interval: number
 ): Promise<AdminActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
 
   const parsed = rotationIntervalSchema.safeParse({ interval });
 
   if (!parsed.success) {
-    return { success: false, error: 'Invalid interval (must be 3-15)' };
+    return { success: false, error: 'Invalid interval (must be 3-15)', code: 'INVALID_INPUT' };
   }
 
   const result = await BannerNotificationService.updateRotationInterval(parsed.data.interval);
 
   if (!result.success) {
-    return { success: false, error: result.error };
+    return { success: false, error: result.error, code: result.code };
   }
 
   revalidatePath('/');

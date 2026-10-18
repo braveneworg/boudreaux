@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { deleteReleaseAction } from './delete-release-action';
 
@@ -14,17 +14,18 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/release-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = {
   user: { id: 'user-123', role: 'admin', email: 'admin@example.com' },
 };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const releaseId = '507f1f77bcf86cd799439011';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(ReleaseService.deleteRelease).mockResolvedValue({
     success: true,
@@ -33,18 +34,19 @@ beforeEach(() => {
 });
 
 describe('deleteReleaseAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await deleteReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(ReleaseService.deleteRelease).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid release id', async () => {
     const result = await deleteReleaseAction('not-an-id');
 
-    expect(result).toEqual({ success: false, error: 'Invalid release ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid release ID', code: 'INVALID_INPUT' });
   });
 
   it('hard-deletes the release via the service', async () => {
@@ -85,7 +87,7 @@ describe('deleteReleaseAction', () => {
 
     const result = await deleteReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Release not found' });
+    expect(result).toEqual({ success: false, error: 'Release not found', code: 'NOT_FOUND' });
   });
 
   it('handles an unexpected service error', async () => {
@@ -93,6 +95,6 @@ describe('deleteReleaseAction', () => {
 
     const result = await deleteReleaseAction(releaseId);
 
-    expect(result).toEqual({ success: false, error: 'Failed to delete release' });
+    expect(result).toEqual({ success: false, error: 'Failed to delete release', code: 'UNKNOWN' });
   });
 });

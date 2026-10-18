@@ -26,7 +26,7 @@ export const publishReleaseAction = async (
 ): Promise<AdminActionResult> => {
   const parsed = creditDecisionsSchema.safeParse(decisions);
   if (!parsed.success) {
-    return { success: false, error: 'Invalid artist decisions' };
+    return { success: false, error: 'Invalid artist decisions', code: 'INVALID_INPUT' };
   }
 
   return runAdminEntityAction({

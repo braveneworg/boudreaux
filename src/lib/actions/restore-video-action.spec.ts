@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { restoreVideoAction } from './restore-video-action';
 
@@ -14,14 +14,15 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const videoId = '507f1f77bcf86cd799439011';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(VideoService.restoreVideo).mockResolvedValue({
     success: true,
@@ -30,18 +31,19 @@ beforeEach(() => {
 });
 
 describe('restoreVideoAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await restoreVideoAction(videoId);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(VideoService.restoreVideo).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid video id', async () => {
     const result = await restoreVideoAction('not-an-id');
 
-    expect(result).toEqual({ success: false, error: 'Invalid video ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid video ID', code: 'INVALID_INPUT' });
   });
 
   it('restores the video via the service', async () => {
@@ -82,7 +84,7 @@ describe('restoreVideoAction', () => {
 
     const result = await restoreVideoAction(videoId);
 
-    expect(result).toEqual({ success: false, error: 'Video not found' });
+    expect(result).toEqual({ success: false, error: 'Video not found', code: 'NOT_FOUND' });
   });
 
   it('handles an unexpected service error', async () => {
@@ -90,6 +92,6 @@ describe('restoreVideoAction', () => {
 
     const result = await restoreVideoAction(videoId);
 
-    expect(result).toEqual({ success: false, error: 'Failed to restore video' });
+    expect(result).toEqual({ success: false, error: 'Failed to restore video', code: 'UNKNOWN' });
   });
 });

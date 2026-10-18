@@ -4,12 +4,12 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import { DataError } from '@/lib/types/domain/errors';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
-import { requireRole } from '@/utils/auth/require-role';
 
 import {
   createTourDateAction,
@@ -25,8 +25,11 @@ vi.mock('next/cache');
 vi.mock('../repositories/tours/tour-date-repository');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/auth/get-action-state');
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+const REFUSED_FORM = { fields: {}, success: false, errors: { general: ['Unauthorized'] } };
 
 describe('Tour Date Headliner Actions', () => {
   const mockSession = {
@@ -43,25 +46,28 @@ describe('Tour Date Headliner Actions', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
   describe('updateHeadlinerSetTimeAction', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await updateHeadlinerSetTimeAction(validObjectId, '2026-03-08T20:00:00Z');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(TourDateRepository.updateHeadlinerSetTime).not.toHaveBeenCalled();
     });
 
     it('should validate headliner ID format', async () => {
       const result = await updateHeadlinerSetTimeAction('invalid-id', '2026-03-08T20:00:00Z');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid headliner ID');
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid headliner ID',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should update set time and return success', async () => {
@@ -89,8 +95,11 @@ describe('Tour Date Headliner Actions', () => {
     it('should reject invalid date format', async () => {
       const result = await updateHeadlinerSetTimeAction(validObjectId, 'not-a-date');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid set time format');
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid set time format',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should log security event on success', async () => {
@@ -123,8 +132,11 @@ describe('Tour Date Headliner Actions', () => {
 
       const result = await updateHeadlinerSetTimeAction(validObjectId, '2026-03-08T20:00:00.000Z');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to update set time');
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update set time',
+        code: 'UNKNOWN',
+      });
     });
 
     it('falls back to tourDate+artist lookup when the repository reports NOT_FOUND and IDs are valid', async () => {
@@ -169,7 +181,11 @@ describe('Tour Date Headliner Actions', () => {
         validObjectId3
       );
 
-      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update set time',
+        code: 'UNKNOWN',
+      });
     });
 
     it('returns failure when the NOT_FOUND fallback itself throws', async () => {
@@ -186,7 +202,11 @@ describe('Tour Date Headliner Actions', () => {
         validObjectId3
       );
 
-      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update set time',
+        code: 'UNKNOWN',
+      });
     });
 
     it('does not attempt fallback when NOT_FOUND fires but tourDateId/artistId are invalid', async () => {
@@ -201,25 +221,32 @@ describe('Tour Date Headliner Actions', () => {
       );
 
       expect(TourDateRepository.updateHeadlinerSetTimeByTourDateAndArtist).not.toHaveBeenCalled();
-      expect(result).toEqual({ success: false, error: 'Failed to update set time' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update set time',
+        code: 'UNKNOWN',
+      });
     });
   });
 
   describe('removeHeadlinerAction', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await removeHeadlinerAction(validObjectId);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(TourDateRepository.removeHeadliner).not.toHaveBeenCalled();
     });
 
     it('should validate headliner ID format', async () => {
       const result = await removeHeadlinerAction('invalid-id');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid headliner ID');
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid headliner ID',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should remove headliner and return success', async () => {
@@ -258,8 +285,11 @@ describe('Tour Date Headliner Actions', () => {
 
       const result = await removeHeadlinerAction(validObjectId);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to remove headliner');
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to remove headliner',
+        code: 'UNKNOWN',
+      });
     });
 
     it('falls back to tourDate+artist removal when the repository reports NOT_FOUND and IDs are valid', async () => {
@@ -292,7 +322,11 @@ describe('Tour Date Headliner Actions', () => {
 
       const result = await removeHeadlinerAction(validObjectId, validObjectId2, validObjectId3);
 
-      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to remove headliner',
+        code: 'UNKNOWN',
+      });
     });
 
     it('returns failure when the NOT_FOUND fallback itself throws', async () => {
@@ -304,7 +338,11 @@ describe('Tour Date Headliner Actions', () => {
 
       const result = await removeHeadlinerAction(validObjectId, validObjectId2, validObjectId3);
 
-      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to remove headliner',
+        code: 'UNKNOWN',
+      });
     });
 
     it('does not attempt fallback when NOT_FOUND fires but tourDateId/artistId are invalid', async () => {
@@ -314,34 +352,44 @@ describe('Tour Date Headliner Actions', () => {
       const result = await removeHeadlinerAction(validObjectId, 'invalid-id', validObjectId3);
 
       expect(TourDateRepository.removeHeadlinerByTourDateAndArtist).not.toHaveBeenCalled();
-      expect(result).toEqual({ success: false, error: 'Failed to remove headliner' });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to remove headliner',
+        code: 'UNKNOWN',
+      });
     });
   });
 
   describe('reorderHeadlinersAction', () => {
     const headlinerIds = [validObjectId, validObjectId2, validObjectId3];
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await reorderHeadlinersAction(validObjectId, headlinerIds);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(TourDateRepository.reorderHeadliners).not.toHaveBeenCalled();
     });
 
     it('should validate tour date ID format', async () => {
       const result = await reorderHeadlinersAction('invalid-id', headlinerIds);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid tour date ID');
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid tour date ID',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should validate all headliner IDs in the list', async () => {
       const result = await reorderHeadlinersAction(validObjectId, [validObjectId, 'invalid-id']);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid headliner ID in list');
+      expect(result).toEqual({
+        success: false,
+        error: 'Invalid headliner ID in list',
+        code: 'INVALID_INPUT',
+      });
     });
 
     it('should reorder headliners and return success', async () => {
@@ -385,8 +433,11 @@ describe('Tour Date Headliner Actions', () => {
 
       const result = await reorderHeadlinersAction(validObjectId, headlinerIds);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to reorder headliners');
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to reorder headliners',
+        code: 'UNKNOWN',
+      });
     });
   });
 });
@@ -414,7 +465,7 @@ describe('createTourDateAction', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
     vi.mocked(TourDateRepository.create).mockResolvedValue(mockTourDate as never);
     vi.mocked(getActionState).mockReturnValue({
@@ -423,12 +474,13 @@ describe('createTourDateAction', () => {
     } as never);
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('resolves the gate refusal as a form error without creating a tour date', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(createTourDateAction(initialFormState, mockFormData)).rejects.toThrow(
-      'Unauthorized'
-    );
+    const result = await createTourDateAction(initialFormState, mockFormData);
+
+    expect(result).toEqual(REFUSED_FORM);
+    expect(TourDateRepository.create).not.toHaveBeenCalled();
   });
 
   it('returns validation errors when parsed fails', async () => {
@@ -541,7 +593,7 @@ describe('updateTourDateAction', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
     vi.mocked(TourDateRepository.update).mockResolvedValue(mockTourDate as never);
     vi.mocked(getActionState).mockReturnValue({
@@ -550,20 +602,13 @@ describe('updateTourDateAction', () => {
     } as never);
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('resolves the gate refusal as a form error without updating the tour date', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(
-      updateTourDateAction(tourDateId, initialFormState, mockFormData)
-    ).rejects.toThrow();
-  });
+    const result = await updateTourDateAction(tourDateId, initialFormState, mockFormData);
 
-  it('throws when session has no user id', async () => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
-
-    await expect(updateTourDateAction(tourDateId, initialFormState, mockFormData)).rejects.toThrow(
-      'Invalid admin session: missing user id for audit logging.'
-    );
+    expect(result).toEqual(REFUSED_FORM);
+    expect(TourDateRepository.update).not.toHaveBeenCalled();
   });
 
   it('returns validation errors when parsed fails', async () => {
@@ -668,25 +713,28 @@ describe('deleteTourDateAction', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
     vi.mocked(TourDateRepository.delete).mockResolvedValue(undefined as never);
   });
 
-  it('returns unauthorized when role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without touching the repository', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await deleteTourDateAction(validTourDateId);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Unauthorized');
+    expect(result).toEqual(REFUSAL);
+    expect(TourDateRepository.delete).not.toHaveBeenCalled();
   });
 
   it('returns error for invalid tour date ID format', async () => {
     const result = await deleteTourDateAction('not-a-valid-object-id');
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Invalid tour date ID');
+    expect(result).toEqual({
+      success: false,
+      error: 'Invalid tour date ID',
+      code: 'INVALID_INPUT',
+    });
   });
 
   it('deletes the tour date and returns success', async () => {
@@ -719,7 +767,10 @@ describe('deleteTourDateAction', () => {
 
     const result = await deleteTourDateAction(validTourDateId);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Failed to delete tour date');
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to delete tour date',
+      code: 'UNKNOWN',
+    });
   });
 });

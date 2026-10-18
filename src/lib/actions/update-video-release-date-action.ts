@@ -31,7 +31,7 @@ export const updateVideoReleaseDateAction = async (
     perform: async (id) => {
       const parsed = videoReleaseDateSchema.safeParse(releasedOn);
       if (!parsed.success) {
-        return { success: false, error: 'Invalid release date' };
+        return { success: false, error: 'Invalid release date', code: 'INVALID_INPUT' };
       }
       return VideoService.updateVideoReleaseDate(id, parsed.data ? new Date(parsed.data) : null);
     },

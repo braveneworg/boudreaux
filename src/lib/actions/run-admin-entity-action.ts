@@ -5,26 +5,31 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
+import type { ActionGateCode } from '@/lib/auth/action-gate';
+import type { DataErrorCode } from '@/lib/types/domain/errors';
 import type { AuditEvent } from '@/lib/utils/audit-log';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 /**
  * The plain success/error result shared by admin-gated Server Actions (delete,
  * publish, publish-to-site, …) and consumed by their mutation hooks, which map
  * it to a toast. Distinct from form Server Actions, which return `FormState`.
+ * A failure carries its code (ADR-0001): the service's `DataErrorCode`, or the
+ * action gate's refusal code.
  */
-export interface AdminActionResult {
-  success: boolean;
-  error?: string;
-}
+export type AdminActionResult =
+  { success: true } | { success: false; error: string; code: DataErrorCode | ActionGateCode };
 
 /**
  * A service call that resolves to a success/error result (ServiceResponse-shaped).
  * Receives the acting admin's id for writes that record who made them.
  */
-type EntityServiceCall = (id: string, adminUserId: string) => Promise<AdminActionResult>;
+type EntityServiceCall = (
+  id: string,
+  adminUserId: string
+) => Promise<{ success: true } | { success: false; error: string; code: DataErrorCode }>;
 
 interface RunAdminEntityActionConfig {
   /** The target entity id (validated as a Mongo ObjectId). */
@@ -48,7 +53,7 @@ interface RunAdminEntityActionConfig {
  * publish, restore). Centralizes the common contract — admin gate → ObjectId
  * validation → service call → audit log → path revalidation → plain result —
  * so each action file is a thin, declarative config. Returns the plain
- * `{ success, error? }` shape the mutation hooks map to a toast.
+ * {@link AdminActionResult} the mutation hooks map to a toast.
  */
 export const runAdminEntityAction = async ({
   id,
@@ -59,22 +64,21 @@ export const runAdminEntityAction = async ({
   revalidate,
   failureError,
 }: RunAdminEntityActionConfig): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!isValidObjectId(id)) {
-    return { success: false, error: `Invalid ${entityLabel} ID` };
+    return { success: false, error: `Invalid ${entityLabel} ID`, code: 'INVALID_INPUT' };
   }
 
   try {
     const result = await perform(id, session.user.id);
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: result.error, code: result.code };
     }
 
     logSecurityEvent({ event, userId: session.user.id, metadata: { [metadataKey]: id } });
@@ -85,6 +89,6 @@ export const runAdminEntityAction = async ({
 
     return { success: true };
   } catch {
-    return { success: false, error: failureError };
+    return { success: false, error: failureError, code: 'UNKNOWN' };
   }
 };

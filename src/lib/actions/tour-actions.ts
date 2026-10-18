@@ -7,14 +7,16 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { TourService } from '@/lib/services/tours/tour-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { tourCreateSchema, tourUpdateSchema } from '@/lib/validation/tours/tour-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
+
+import { refusedFormState } from './form-state-helpers';
 
 import type { AdminActionResult } from './run-admin-entity-action';
 
@@ -25,7 +27,11 @@ export const createTourAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'] as const;
 
@@ -84,10 +90,11 @@ export const updateTourAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
-  if (!session?.user?.id) {
-    throw new Error('Invalid admin session: missing user id for audit logging.');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
   }
+  const { session } = gate;
 
   const permittedFieldNames = ['title', 'subtitle', 'subtitle2', 'description', 'notes'] as const;
 
@@ -145,15 +152,14 @@ export const updateTourAction = async (
  * Server action to delete a tour
  */
 export const deleteTourAction = async (tourId: string): Promise<AdminActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(tourId)) {
-    return { success: false, error: 'Invalid tour ID' };
+    return { success: false, error: 'Invalid tour ID', code: 'INVALID_INPUT' };
   }
 
   try {
@@ -172,6 +178,6 @@ export const deleteTourAction = async (tourId: string): Promise<AdminActionResul
 
     return { success: true };
   } catch {
-    return { success: false, error: 'Failed to delete tour' };
+    return { success: false, error: 'Failed to delete tour', code: 'UNKNOWN' };
   }
 };

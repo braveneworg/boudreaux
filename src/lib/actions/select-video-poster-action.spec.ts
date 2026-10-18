@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { selectVideoPosterAction } from './select-video-poster-action';
 
@@ -14,15 +14,16 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const videoId = '507f1f77bcf86cd799439011';
 const candidateUrl = 'https://cdn.example.com/media/videos/vid1/poster-candidate-1.jpg';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(VideoService.selectVideoPoster).mockResolvedValue({
     success: true,
@@ -31,25 +32,26 @@ beforeEach(() => {
 });
 
 describe('selectVideoPosterAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await selectVideoPosterAction(videoId, candidateUrl);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(VideoService.selectVideoPoster).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid video id without calling the service', async () => {
     const result = await selectVideoPosterAction('not-an-id', candidateUrl);
 
-    expect(result).toEqual({ success: false, error: 'Invalid video ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid video ID', code: 'INVALID_INPUT' });
     expect(VideoService.selectVideoPoster).not.toHaveBeenCalled();
   });
 
   it('rejects a candidate URL that is not http(s) without calling the service', async () => {
     const result = await selectVideoPosterAction(videoId, 'javascript:alert(1)');
 
-    expect(result).toEqual({ success: false, error: 'Invalid poster URL' });
+    expect(result).toEqual({ success: false, error: 'Invalid poster URL', code: 'INVALID_INPUT' });
     expect(VideoService.selectVideoPoster).not.toHaveBeenCalled();
   });
 
@@ -58,7 +60,7 @@ describe('selectVideoPosterAction', () => {
 
     const result = await selectVideoPosterAction(videoId, longUrl);
 
-    expect(result).toEqual({ success: false, error: 'Invalid poster URL' });
+    expect(result).toEqual({ success: false, error: 'Invalid poster URL', code: 'INVALID_INPUT' });
     expect(VideoService.selectVideoPoster).not.toHaveBeenCalled();
   });
 
@@ -103,6 +105,7 @@ describe('selectVideoPosterAction', () => {
     expect(result).toEqual({
       success: false,
       error: "Poster is not one of this video's candidates",
+      code: 'INVALID_INPUT',
     });
   });
 
@@ -111,6 +114,6 @@ describe('selectVideoPosterAction', () => {
 
     const result = await selectVideoPosterAction(videoId, candidateUrl);
 
-    expect(result).toEqual({ success: false, error: 'Failed to set the poster' });
+    expect(result).toEqual({ success: false, error: 'Failed to set the poster', code: 'UNKNOWN' });
   });
 });

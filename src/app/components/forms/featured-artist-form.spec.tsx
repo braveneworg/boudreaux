@@ -797,6 +797,7 @@ describe('FeaturedArtistForm', () => {
       vi.mocked(deleteFeaturedArtistAction).mockResolvedValue({
         success: false,
         error: 'Featured artist not found',
+        code: 'NOT_FOUND',
       });
       render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
 

@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { BannerNotificationService } from '@/lib/services/banner-notification-service';
 import type { FormState } from '@/lib/types/form-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import {
   createOrUpdateBannerNotificationAction,
@@ -15,7 +15,7 @@ import {
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/services/banner-notification-service', () => ({
   BannerNotificationService: {
     upsertNotification: vi.fn(),
@@ -30,6 +30,7 @@ vi.mock('@/lib/utils/logger', () => ({
 const mockSession = {
   user: { id: 'user-123', role: 'admin', email: 'admin@test.com' },
 };
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const initialFormState: FormState = {
   fields: {},
@@ -57,21 +58,20 @@ const validPayload: Record<string, string> = {
 describe('banner-notification-action', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
   describe('createOrUpdateBannerNotificationAction', () => {
-    it('should return unauthorized when requireRole rejects', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal as a form error without calling the service', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await createOrUpdateBannerNotificationAction(
         initialFormState,
         buildFormData(validPayload)
       );
 
-      expect(result.success).toBe(false);
-      expect(result.errors?._form).toContain('Unauthorized');
+      expect(result).toEqual({ fields: {}, success: false, errors: { _form: ['Unauthorized'] } });
       expect(BannerNotificationService.upsertNotification).not.toHaveBeenCalled();
     });
 
@@ -201,12 +201,12 @@ describe('banner-notification-action', () => {
   });
 
   describe('deleteBannerNotificationAction', () => {
-    it('should return unauthorized when requireRole rejects', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without calling the service', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await deleteBannerNotificationAction(1);
 
-      expect(result).toEqual({ success: false, error: 'Unauthorized' });
+      expect(result).toEqual(REFUSAL);
       expect(BannerNotificationService.deleteNotification).not.toHaveBeenCalled();
     });
 
@@ -214,11 +214,12 @@ describe('banner-notification-action', () => {
       vi.mocked(BannerNotificationService.deleteNotification).mockResolvedValue({
         success: false,
         error: 'Not found',
+        code: 'NOT_FOUND',
       } as never);
 
       const result = await deleteBannerNotificationAction(2);
 
-      expect(result).toEqual({ success: false, error: 'Not found' });
+      expect(result).toEqual({ success: false, error: 'Not found', code: 'NOT_FOUND' });
     });
 
     it('should return success and revalidate paths', async () => {
@@ -236,12 +237,12 @@ describe('banner-notification-action', () => {
   });
 
   describe('updateRotationIntervalAction', () => {
-    it('should return unauthorized when requireRole rejects', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without calling the service', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await updateRotationIntervalAction(5);
 
-      expect(result).toEqual({ success: false, error: 'Unauthorized' });
+      expect(result).toEqual(REFUSAL);
       expect(BannerNotificationService.updateRotationInterval).not.toHaveBeenCalled();
     });
 
@@ -251,6 +252,7 @@ describe('banner-notification-action', () => {
       expect(result).toEqual({
         success: false,
         error: 'Invalid interval (must be 3-15)',
+        code: 'INVALID_INPUT',
       });
       expect(BannerNotificationService.updateRotationInterval).not.toHaveBeenCalled();
     });
@@ -261,6 +263,7 @@ describe('banner-notification-action', () => {
       expect(result).toEqual({
         success: false,
         error: 'Invalid interval (must be 3-15)',
+        code: 'INVALID_INPUT',
       });
       expect(BannerNotificationService.updateRotationInterval).not.toHaveBeenCalled();
     });
@@ -269,11 +272,12 @@ describe('banner-notification-action', () => {
       vi.mocked(BannerNotificationService.updateRotationInterval).mockResolvedValue({
         success: false,
         error: 'Update failed',
+        code: 'UNAVAILABLE',
       } as never);
 
       const result = await updateRotationIntervalAction(5);
 
-      expect(result).toEqual({ success: false, error: 'Update failed' });
+      expect(result).toEqual({ success: false, error: 'Update failed', code: 'UNAVAILABLE' });
     });
 
     it('should return success and revalidate path', async () => {

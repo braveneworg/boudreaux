@@ -458,6 +458,7 @@ describe('ReleaseForm — delete (hard)', () => {
     vi.mocked(deleteReleaseAction).mockResolvedValue({
       success: false,
       error: 'Release not found',
+      code: 'NOT_FOUND',
     });
     render(<ReleaseForm releaseId={releaseId} />);
 

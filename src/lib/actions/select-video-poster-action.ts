@@ -35,7 +35,7 @@ export const selectVideoPosterAction = async (
     entityLabel: 'video',
     perform: async (id) => {
       if (!candidateUrlSchema.safeParse(candidateUrl).success) {
-        return { success: false, error: 'Invalid poster URL' };
+        return { success: false, error: 'Invalid poster URL', code: 'INVALID_INPUT' };
       }
       return VideoService.selectVideoPoster(id, candidateUrl);
     },

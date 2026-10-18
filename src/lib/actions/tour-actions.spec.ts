@@ -4,12 +4,12 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { TourService } from '@/lib/services/tours/tour-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { createTourAction, deleteTourAction, updateTourAction } from './tour-actions';
 
@@ -19,7 +19,9 @@ vi.mock('../services/tours/tour-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 describe('Tour Actions', () => {
   const mockSession = {
@@ -32,7 +34,7 @@ describe('Tour Actions', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -62,12 +64,13 @@ describe('Tour Actions', () => {
       } as never);
     });
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without creating a tour', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(createTourAction(initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
+      const result = await createTourAction(initialFormState, mockFormData);
+
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(TourService.create).not.toHaveBeenCalled();
     });
 
     it('should validate input and create tour', async () => {
@@ -193,12 +196,13 @@ describe('Tour Actions', () => {
       } as never);
     });
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without updating the tour', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(updateTourAction(tourId, initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
+      const result = await updateTourAction(tourId, initialFormState, mockFormData);
+
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(TourService.update).not.toHaveBeenCalled();
     });
 
     it('should validate input and update tour', async () => {
@@ -258,14 +262,6 @@ describe('Tour Actions', () => {
       expect(result.errors?.title).toEqual(['Title is too long']);
     });
 
-    it('should throw when session is missing a user id', async () => {
-      vi.mocked(requireRole).mockResolvedValue({ user: { id: null } } as never);
-
-      await expect(updateTourAction(tourId, initialFormState, mockFormData)).rejects.toThrow(
-        'Invalid admin session: missing user id for audit logging.'
-      );
-    });
-
     it('should handle service errors', async () => {
       vi.mocked(TourService.update).mockRejectedValue(new Error('Database error'));
 
@@ -321,20 +317,19 @@ describe('Tour Actions', () => {
       } as never);
     });
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without deleting the tour', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await deleteTourAction(tourId);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(TourService.delete).not.toHaveBeenCalled();
     });
 
     it('should validate tour ID format', async () => {
       const result = await deleteTourAction('invalid-id');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid tour ID');
+      expect(result).toEqual({ success: false, error: 'Invalid tour ID', code: 'INVALID_INPUT' });
     });
 
     it('should delete tour and return success', async () => {
@@ -366,8 +361,7 @@ describe('Tour Actions', () => {
 
       const result = await deleteTourAction(tourId);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to delete tour');
+      expect(result).toEqual({ success: false, error: 'Failed to delete tour', code: 'UNKNOWN' });
     });
   });
 });
