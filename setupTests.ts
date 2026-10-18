@@ -33,7 +33,7 @@ vi.mock('@/lib/prisma', () => ({
 // Global safety-net mock for the better-auth server instance. `src/lib/auth.ts`
 // calls `betterAuth({...})` at module load, which pulls in the whole better-auth
 // graph — measured at up to ~700ms of import time per spec file, paid by every
-// spec whose imports reach it through a server action's `requireRole` (form
+// spec whose imports reach it through a server action's `gateAction` (form
 // components, data views, most action specs). No unit test may hit a real auth
 // API, so the default is an inert `auth.api` whose every method is a fresh
 // `vi.fn()` returning undefined (no session). Specs needing behaviour supply
