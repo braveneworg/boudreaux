@@ -403,7 +403,7 @@ export type ArtistListingSort = 'alpha' | 'newest';
 
 /** Pagination, search, and sort for the public artists index. */
 export interface ArtistListingFilters {
-  /** Case-insensitive term matched against names, aka names, genres, and release titles. */
+  /** Case-insensitive term matched against names, aka names, genres, release titles, and live video titles. */
   search?: string;
   sort: ArtistListingSort;
   skip: number;
