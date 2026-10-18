@@ -213,8 +213,22 @@ describe('LatestReleasePlayLink', () => {
       expect(title).toHaveAttribute('type', 'button');
       expect(title).not.toHaveAttribute('href');
       expect(title).not.toHaveAttribute('aria-haspopup');
-      expect(title).toHaveClass('underline', 'underline-offset-4');
       expect(screen.queryByRole('link', { name: 'Night Shift' })).not.toBeInTheDocument();
+    });
+
+    // A button box is atomic: it cannot wrap inside the line like the link,
+    // so the hydration swap would reflow a long title. The button draws no
+    // box, and its text is an inline span styled like the link.
+    it('draws no box of its own, its text styled like the link with a pointer', () => {
+      renderLink();
+
+      const title = screen.getByRole('button', { name: 'Night Shift' });
+      expect(title).toHaveClass('contents');
+      expect(within(title).getByText('Night Shift')).toHaveClass(
+        'underline',
+        'underline-offset-4',
+        'cursor-pointer'
+      );
     });
 
     it('keeps the card styling on the card variant', () => {
@@ -222,7 +236,11 @@ describe('LatestReleasePlayLink', () => {
 
       const title = screen.getByRole('button', { name: 'Night Shift' });
       expect(title).not.toHaveAttribute('href');
-      expect(title).toHaveClass('underline', 'underline-offset-2');
+      expect(within(title).getByText('Night Shift')).toHaveClass(
+        'underline',
+        'underline-offset-2',
+        'cursor-pointer'
+      );
     });
 
     it('opens the player on a plain left click', async () => {

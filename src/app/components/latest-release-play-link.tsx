@@ -133,8 +133,10 @@ export const LatestReleasePlayLink = ({
           // No href until hydrated: a click before the JavaScript runs stays
           // on the page, and one during hydration is replayed to handleClick.
           // A button, as jsx-a11y asks of a link-styled control with no href.
-          <button type="button" onClick={handleClick} className={linkClass}>
-            {release.title}
+          // A button box cannot wrap inside the line, so it draws none: its
+          // text is an inline span that wraps and looks like the link.
+          <button type="button" onClick={handleClick} className="contents">
+            <span className={cn('cursor-pointer', linkClass)}>{release.title}</span>
           </button>
         )}
         <ReleasePlayDialog
