@@ -490,6 +490,11 @@ describe('videoEnrichmentJob — the video enrichment columns', () => {
     });
   });
 
+  // The callback revalidates no page, so a won claim has nothing to hand on.
+  it('hands a won claim an empty context', () => {
+    expect(videoEnrichmentJob.claimContext(record)).toEqual({});
+  });
+
   it('answers on the enrichment callback and progress routes', () => {
     expect(videoEnrichmentJob.callbackPath(VIDEO_ID)).toBe(
       `/api/videos/${VIDEO_ID}/enrichment/callback`
