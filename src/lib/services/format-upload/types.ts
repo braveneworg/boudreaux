@@ -79,6 +79,9 @@ export interface ConfirmInput {
   userId: string;
 }
 
+/** What the confirm action takes: confirm's input without the admin, which the gate supplies. */
+export type FormatUploadConfirmation = Omit<ConfirmInput, 'userId'>;
+
 /** A confirmed format upload. `releaseId` is always the one confirm was given. */
 export interface ConfirmedFormatUpload {
   releaseId: string;
