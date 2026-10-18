@@ -482,6 +482,18 @@ describe('abortVideoUploadAction', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  it('reports a failure when reading the session throws', async () => {
+    vi.mocked(gateAction).mockRejectedValueOnce(new Error('Database unavailable'));
+
+    const result = await abortVideoUploadAction(validInput);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to abort video upload: Database unavailable',
+    });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed abort payload', async () => {
     const result = await abortVideoUploadAction({ ...validInput, uploadId: '' });
 

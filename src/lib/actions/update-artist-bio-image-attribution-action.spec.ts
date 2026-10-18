@@ -51,6 +51,16 @@ describe('updateArtistBioImageAttributionAction', () => {
     expect(ArtistService.updateBioImageAttribution).not.toHaveBeenCalled();
   });
 
+  it('rejects attribution over the schema cap as invalid input', async () => {
+    const result = await updateArtistBioImageAttributionAction({
+      imageId,
+      attribution: 'a'.repeat(501),
+    });
+
+    expect(result).toMatchObject({ success: false, code: 'INVALID_INPUT' });
+    expect(ArtistService.updateBioImageAttribution).not.toHaveBeenCalled();
+  });
+
   it('sanitizes the attribution and updates via the service', async () => {
     const result = await updateArtistBioImageAttributionAction({
       imageId,

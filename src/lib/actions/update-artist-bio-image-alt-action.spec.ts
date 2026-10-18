@@ -51,7 +51,7 @@ describe('updateArtistBioImageAltAction', () => {
   it('rejects alt text over the schema cap', async () => {
     const result = await updateArtistBioImageAltAction({ imageId, alt: 'a'.repeat(501) });
 
-    expect(result.success).toBe(false);
+    expect(result).toMatchObject({ success: false, code: 'INVALID_INPUT' });
     expect(ArtistService.updateBioImageAlt).not.toHaveBeenCalled();
   });
 
