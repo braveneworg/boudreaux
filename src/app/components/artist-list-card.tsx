@@ -122,9 +122,9 @@ const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) 
  * The card body itself is inert — no stretched link over the whole surface.
  * Three explicit links carry the navigation instead: the name opens the
  * artist page, the latest-release title opens that release's listening modal
- * in place (its href, for modified clicks, is the release deep link; a
- * release with nothing playable is plain text), and the closing link opens
- * the biography on that same artist page. The photo does not
+ * in place (once hydrated, its href, for modified clicks, is the release
+ * deep link; a release with nothing playable is plain text), and the closing
+ * link opens the biography on that same artist page. The photo does not
  * navigate — it enlarges in place, and the enlarged view links to the artist
  * page. There is no separate "all releases" link — it opened the same page —
  * so the release count rides on the latest line. Clicking anywhere else does
