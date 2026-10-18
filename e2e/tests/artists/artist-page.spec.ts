@@ -3,9 +3,51 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { test, expect } from '../../fixtures/base.fixture';
 import { scrollToLoad } from '../../helpers/infinite-scroll';
-import { expectSharesDeepLink } from '../../helpers/release-deep-link';
+import { accentOf, expectSharesDeepLink } from '../../helpers/release-deep-link';
+import { blockAutoplayWithoutGesture } from '../../helpers/strict-autoplay';
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+
+/**
+ * Hold every client script chunk until the returned release is called, so the
+ * page stays server markup with no JavaScript running. Stylesheets pass: the
+ * dev server serves its CSS from the same path, and a held stylesheet stops
+ * the HTML parser at the next inline script.
+ */
+const holdClientChunks = async (page: Page): Promise<() => void> => {
+  let release = (): void => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/_next/static/chunks/**', async (route) => {
+    if (route.request().resourceType() === 'script') await gate;
+    await route.continue();
+  });
+  return release;
+};
+
+/**
+ * Click a hydrated latest-release title under a strict autoplay policy and
+ * expect E2E Album Three to play in place: the URL stays put, and the modal
+ * opens in a loud accent with track 1 running from the click's gesture.
+ */
+const expectPlaysInPlace = async (page: Page, latest: Locator, url: RegExp): Promise<void> => {
+  // The click is intercepted only once hydrated: the popup marker says so.
+  await expect(latest).toHaveAttribute('aria-haspopup', 'dialog', { timeout: 15_000 });
+  await latest.click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'E2E Album Three' })).toBeVisible();
+  await expect(page).toHaveURL(url);
+  expect(await accentOf(dialog)).toMatch(/^zine-accent-(?!yellow|tan|kraft)/);
+  const audio = dialog.locator('audio.vjs-tech');
+  await expect(audio).toBeAttached({ timeout: 10_000 });
+  await expect
+    .poll(() => audio.evaluate((element) => (element as HTMLAudioElement).currentTime), {
+      timeout: 5_000,
+    })
+    .toBeGreaterThan(0);
+};
 
 test.describe('Artist Page', () => {
   // The page leads with the newest release the artist holds a direct credit
@@ -18,10 +60,12 @@ test.describe('Artist Page', () => {
         timeout: 15_000,
       });
       // "E2E Album Three" (Sep 2024) is the newest of the artist's own albums.
+      // The title carries its deep link only once hydrated.
       const latest = page.getByRole('link', { name: 'E2E Album Three' });
       await expect(latest).toHaveAttribute(
         'href',
-        /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/
+        /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/,
+        { timeout: 15_000 }
       );
       // The line says what the release is, with the label outside the link.
       await expect(page.getByText('Latest Release: E2E Album Three (2024)')).toBeVisible();
@@ -32,6 +76,34 @@ test.describe('Artist Page', () => {
       await expect(
         page.getByRole('heading', { level: 2, name: 'Releases by E2E Artist' })
       ).toBeVisible();
+    });
+
+    // A click before the JavaScript runs must not follow a deep link to
+    // /releases, where the modal would open paused (ADR-0023).
+    test('serves the latest release title with no href before hydration', async ({ page }) => {
+      const releaseChunks = await holdClientChunks(page);
+      try {
+        await page.goto('/artists/e2e-artist', { waitUntil: 'commit' });
+
+        const title = page.getByRole('button', { name: 'E2E Album Three' });
+        await expect(title).toHaveCount(1, { timeout: 15_000 });
+        await expect(title).not.toHaveAttribute('href');
+      } finally {
+        releaseChunks();
+      }
+    });
+
+    test('one click plays the latest release in place under a strict autoplay policy', async ({
+      page,
+    }) => {
+      await blockAutoplayWithoutGesture(page);
+      await page.goto('/artists/e2e-artist');
+
+      await expectPlaysInPlace(
+        page,
+        page.getByRole('link', { name: 'E2E Album Three' }),
+        /\/artists\/e2e-artist$/
+      );
     });
 
     test('plays the latest release in place on a click, and returns focus on close', async ({
@@ -487,6 +559,38 @@ test.describe('Artist Page', () => {
       await expect(dialog.getByRole('heading', { name: 'E2E Album Three' })).toBeVisible();
       await expect(page).toHaveURL(/\/artists$/);
       await expectSharesDeepLink(dialog, releaseId ?? '');
+    });
+
+    test("serves the card's latest release title with no href before hydration", async ({
+      page,
+    }) => {
+      const releaseChunks = await holdClientChunks(page);
+      try {
+        await page.goto('/artists', { waitUntil: 'commit' });
+
+        const title = cards(page)
+          .filter({ hasText: 'E2E Album Three' })
+          .getByRole('button', { name: 'E2E Album Three' });
+        await expect(title).toHaveCount(1, { timeout: 15_000 });
+        await expect(title).not.toHaveAttribute('href');
+      } finally {
+        releaseChunks();
+      }
+    });
+
+    test("one click plays the card's latest release in place under a strict autoplay policy", async ({
+      page,
+    }) => {
+      await blockAutoplayWithoutGesture(page);
+      await page.goto('/artists');
+
+      await expectPlaysInPlace(
+        page,
+        cards(page)
+          .filter({ hasText: 'E2E Album Three' })
+          .getByRole('link', { name: 'E2E Album Three' }),
+        /\/artists$/
+      );
     });
 
     test('a release with nothing to play is plain text on its card', async ({ page }) => {

@@ -47,3 +47,9 @@ export const expectSharesDeepLink = async (
     .poll(() => sms.getAttribute('href'), { timeout: 15_000 })
     .toContain(encodeURIComponent(releaseDeepLink(releaseId, artistSlug)));
 };
+
+/** The `zine-accent-*` class framing a listening modal. */
+export const accentOf = async (dialog: Locator): Promise<string | undefined> =>
+  (await dialog.getAttribute('class'))
+    ?.split(/\s+/)
+    .find((name) => name.startsWith('zine-accent-'));
