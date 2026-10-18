@@ -5,14 +5,14 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const authMock = vi.fn();
+const gateActionMock = vi.fn();
 const findAllByUserMock = vi.fn();
 const deleteByIdMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
-vi.mock('@/auth', () => ({ auth: authMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('@/lib/repositories/purchase-repository', () => ({
   PurchaseRepository: {
@@ -23,21 +23,32 @@ vi.mock('@/lib/repositories/purchase-repository', () => ({
 
 const { getCollectionAction, deletePurchaseAction } = await import('./collection-actions');
 
+const passAs = (user: Record<string, string>) => ({ success: true, session: { user } });
+
 describe('getCollectionAction', () => {
   beforeEach(() => {
-    authMock.mockReset();
+    gateActionMock.mockReset();
     findAllByUserMock.mockReset();
   });
 
-  it('returns auth error when session is missing', async () => {
-    authMock.mockResolvedValue(null);
+  it('returns the gate refusal with an empty collection, without reading purchases', async () => {
+    gateActionMock.mockResolvedValue({
+      success: false,
+      error: 'Unauthorized',
+      code: 'UNAUTHENTICATED',
+    });
     const result = await getCollectionAction();
-    expect(result).toEqual({ success: false, error: 'Authentication required', data: [] });
+    expect(result).toEqual({
+      success: false,
+      error: 'Unauthorized',
+      code: 'UNAUTHENTICATED',
+      data: [],
+    });
     expect(findAllByUserMock).not.toHaveBeenCalled();
   });
 
   it('returns purchases for the authenticated user', async () => {
-    authMock.mockResolvedValue({ user: { id: 'u1' } });
+    gateActionMock.mockResolvedValue(passAs({ id: 'u1' }));
     const artist = { id: 'a1', publishedOn: new Date('2024-01-01'), deletedOn: null };
     const purchases = [
       { id: 'p1', release: { artistReleases: [{ artist }] } },
@@ -56,7 +67,7 @@ describe('getCollectionAction', () => {
   });
 
   it('returns failure when the repository throws', async () => {
-    authMock.mockResolvedValue({ user: { id: 'u1' } });
+    gateActionMock.mockResolvedValue(passAs({ id: 'u1' }));
     findAllByUserMock.mockRejectedValue(new Error('db down'));
     const result = await getCollectionAction();
     expect(result).toEqual({ success: false, error: 'Failed to load collection', data: [] });
@@ -65,27 +76,21 @@ describe('getCollectionAction', () => {
 
 describe('deletePurchaseAction', () => {
   beforeEach(() => {
-    authMock.mockReset();
+    gateActionMock.mockReset();
     deleteByIdMock.mockReset();
     revalidatePathMock.mockReset();
   });
 
-  it('rejects unauthenticated callers', async () => {
-    authMock.mockResolvedValue(null);
+  it('returns the gate refusal without deleting the purchase', async () => {
+    const refusal = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
+    gateActionMock.mockResolvedValue(refusal);
     const result = await deletePurchaseAction('p1');
-    expect(result).toEqual({ success: false, error: 'Authentication required' });
-    expect(deleteByIdMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects non-admin callers', async () => {
-    authMock.mockResolvedValue({ user: { id: 'u1', role: 'user' } });
-    const result = await deletePurchaseAction('p1');
-    expect(result).toEqual({ success: false, error: 'Insufficient permissions' });
+    expect(result).toEqual(refusal);
     expect(deleteByIdMock).not.toHaveBeenCalled();
   });
 
   it('deletes a purchase for admin and revalidates the path', async () => {
-    authMock.mockResolvedValue({ user: { id: 'admin', role: 'admin' } });
+    gateActionMock.mockResolvedValue(passAs({ id: 'admin', role: 'admin' }));
     deleteByIdMock.mockResolvedValue(undefined);
     const result = await deletePurchaseAction('p1');
     expect(result).toEqual({ success: true });
@@ -94,7 +99,7 @@ describe('deletePurchaseAction', () => {
   });
 
   it('returns failure when the repository throws', async () => {
-    authMock.mockResolvedValue({ user: { id: 'admin', role: 'admin' } });
+    gateActionMock.mockResolvedValue(passAs({ id: 'admin', role: 'admin' }));
     deleteByIdMock.mockRejectedValue(new Error('db error'));
     const result = await deletePurchaseAction('p1');
     expect(result).toEqual({ success: false, error: 'Failed to delete purchase' });

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatMessageRepository } from '@/lib/repositories/chat-message-repository';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
 import { CHAT_EVENTS, triggerChatEvent } from '@/lib/utils/pusher-server';
@@ -11,7 +11,7 @@ import { deleteChatMessageAction } from './delete-chat-message-action';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('@/lib/services/chat-admin-service', () => ({
   ChatAdminService: {
@@ -34,25 +34,21 @@ const adminSession = { user: { id: 'admin-1', role: 'admin' } };
 beforeEach(() => vi.clearAllMocks());
 
 describe('deleteChatMessageAction', () => {
-  it('returns unauthorized when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it.each([
+    ['UNAUTHENTICATED', 'unauthorized'],
+    ['FORBIDDEN', 'forbidden'],
+    ['BANNED', 'forbidden'],
+  ] as const)('maps a %s gate refusal to %s without deleting', async (code, error) => {
+    vi.mocked(gateAction).mockResolvedValue({ success: false, error: 'refused', code });
 
     const result = await deleteChatMessageAction({ messageId: 'msg-1', scope: 'message' });
 
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(result).toEqual({ success: false, error });
     expect(ChatAdminService.hideMessage).not.toHaveBeenCalled();
   });
 
-  it('returns forbidden when the user is not an admin', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'u', role: 'member' } } as never);
-
-    const result = await deleteChatMessageAction({ messageId: 'msg-1', scope: 'message' });
-
-    expect(result).toEqual({ success: false, error: 'forbidden' });
-  });
-
   it('returns invalid when the messageId is blank', async () => {
-    vi.mocked(auth).mockResolvedValue(adminSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
 
     const result = await deleteChatMessageAction({ messageId: '   ', scope: 'message' });
 
@@ -60,7 +56,7 @@ describe('deleteChatMessageAction', () => {
   });
 
   it('returns invalid when the scope is unknown', async () => {
-    vi.mocked(auth).mockResolvedValue(adminSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
 
     const result = await deleteChatMessageAction({
       messageId: 'msg-1',
@@ -71,7 +67,7 @@ describe('deleteChatMessageAction', () => {
   });
 
   it('hides a single message and broadcasts the deletion', async () => {
-    vi.mocked(auth).mockResolvedValue(adminSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
     vi.mocked(ChatAdminService.hideMessage).mockResolvedValue({} as never);
 
     const result = await deleteChatMessageAction({ messageId: 'msg-1', scope: 'message' });
@@ -87,7 +83,7 @@ describe('deleteChatMessageAction', () => {
   });
 
   it('returns not_found when scope=user but the target message is missing', async () => {
-    vi.mocked(auth).mockResolvedValue(adminSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
     vi.mocked(ChatMessageRepository.findById).mockResolvedValue(null);
 
     const result = await deleteChatMessageAction({ messageId: 'msg-x', scope: 'user' });
@@ -97,7 +93,7 @@ describe('deleteChatMessageAction', () => {
   });
 
   it('hides every visible message by the author and broadcasts one event per id', async () => {
-    vi.mocked(auth).mockResolvedValue(adminSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
     vi.mocked(ChatMessageRepository.findById).mockResolvedValue({
       id: 'msg-1',
       userId: 'user-9',

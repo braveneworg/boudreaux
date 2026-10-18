@@ -4,15 +4,15 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { SmsBlastService } from '@/lib/services/sms-blast-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { sendSmsBlastAction } from './send-sms-blast-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/services/sms-blast-service', () => ({
   SmsBlastService: {
     sendBlast: vi.fn(),
@@ -29,6 +29,8 @@ vi.mock('@/lib/utils/rate-limit', () => ({
   })),
 }));
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 const mockSession = {
   user: {
     id: 'user-admin-1',
@@ -43,7 +45,7 @@ describe('sendSmsBlastAction', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockRateLimitCheck.mockResolvedValue(undefined);
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(SmsBlastService.sendBlast).mockResolvedValue({
       success: true,
       data: { blastId: 'blast-abc', recipientCount: 100, sentCount: 98, failedCount: 2 },
@@ -55,12 +57,12 @@ describe('sendSmsBlastAction', () => {
   });
 
   describe('authorization', () => {
-    it('returns Unauthorized when requireRole throws', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('returns the gate refusal without calling the service', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await sendSmsBlastAction({ message: validMessage });
 
-      expect(result).toEqual({ success: false, error: 'Unauthorized' });
+      expect(result).toEqual(REFUSAL);
       expect(SmsBlastService.sendBlast).not.toHaveBeenCalled();
     });
   });

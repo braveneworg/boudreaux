@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { SignupSettingsService } from '@/lib/services/signup-settings-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { signupsPausedSchema } from '@/lib/validation/signups-paused-schema';
 
 export type SetSignupsPausedActionResult =
@@ -17,9 +17,8 @@ export type SetSignupsPausedActionResult =
 export const setSignupsPausedAction = async (input: {
   paused: boolean;
 }): Promise<SetSignupsPausedActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
 

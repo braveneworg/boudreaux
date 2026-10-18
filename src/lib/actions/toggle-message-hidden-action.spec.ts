@@ -5,13 +5,13 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
+const gateActionMock = vi.fn();
 const hideMock = vi.fn();
 const unhideMock = vi.fn();
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('@/lib/services/chat-admin-service', () => ({
   ChatAdminService: {
@@ -30,19 +30,21 @@ const { toggleMessageHiddenAction } = await import('./toggle-message-hidden-acti
 
 describe('toggleMessageHiddenAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     hideMock.mockReset();
     unhideMock.mockReset();
   });
 
-  it('returns unauthorized when requireRole throws', async () => {
-    requireRoleMock.mockRejectedValue(Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without hiding', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
     const result = await toggleMessageHiddenAction({ messageId: VALID_ID, hidden: true });
     expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(hideMock).not.toHaveBeenCalled();
+    expect(unhideMock).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed messageId', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await toggleMessageHiddenAction({ messageId: 'bad', hidden: true });
     expect(result.success).toBe(false);
     const error = !result.success ? result.error : null;
@@ -50,7 +52,7 @@ describe('toggleMessageHiddenAction', () => {
   });
 
   it('hides with admin id when hidden=true', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     hideMock.mockResolvedValue({});
 
     await toggleMessageHiddenAction({ messageId: VALID_ID, hidden: true });
@@ -60,7 +62,7 @@ describe('toggleMessageHiddenAction', () => {
   });
 
   it('unhides when hidden=false', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     unhideMock.mockResolvedValue({});
 
     await toggleMessageHiddenAction({ messageId: VALID_ID, hidden: false });
@@ -70,19 +72,12 @@ describe('toggleMessageHiddenAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await toggleMessageHiddenAction(
       null as unknown as Parameters<typeof toggleMessageHiddenAction>[0]
     );
     expect(result.success).toBe(false);
     const fieldErrors = !result.success ? result.fieldErrors : undefined;
     expect(fieldErrors).toHaveProperty('_form');
-  });
-
-  it('returns unauthorized when the session lacks a user id', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: '' } });
-    const result = await toggleMessageHiddenAction({ messageId: VALID_ID, hidden: true });
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
-    expect(hideMock).not.toHaveBeenCalled();
   });
 });

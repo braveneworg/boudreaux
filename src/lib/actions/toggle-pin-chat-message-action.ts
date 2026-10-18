@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import {
   ChatService,
   MAX_PINNED_CHAT_MESSAGES,
@@ -34,13 +34,14 @@ interface TogglePinChatMessageInput {
 export const togglePinChatMessageAction = async (
   input: TogglePinChatMessageInput
 ): Promise<TogglePinChatMessageActionResult> => {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { success: false, error: 'unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return {
+      success: false,
+      error: gate.code === 'UNAUTHENTICATED' ? 'unauthorized' : 'forbidden',
+    };
   }
-  if ((session.user as { role?: string | null }).role !== 'admin') {
-    return { success: false, error: 'forbidden' };
-  }
+  const { session } = gate;
 
   const messageId = input.messageId?.trim();
   if (!messageId) {

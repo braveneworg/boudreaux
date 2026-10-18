@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatService, type ChatMessageDto } from '@/lib/services/chat-service';
 import { chatReactionSchema } from '@/lib/validation/chat-message-schema';
 
@@ -26,10 +26,11 @@ interface ToggleChatReactionInput {
 export const toggleChatReactionAction = async (
   input: ToggleChatReactionInput
 ): Promise<ToggleChatReactionActionResult> => {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { success: false, error: 'unauthorized' };
+  const gate = await gateAction('signed-in');
+  if (!gate.success) {
+    return { success: false, error: gate.code === 'BANNED' ? 'disabled' : 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = chatReactionSchema.safeParse(input);
   if (!parsed.success) {

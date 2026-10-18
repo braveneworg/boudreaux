@@ -3,9 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
 
-import type { ServerSession } from '@/lib/auth/get-server-session';
+import { gateAction } from '@/lib/auth/action-gate';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { setRuntimeLogLevel } from '@/lib/utils/logger';
 import type { LogLevelState } from '@/lib/utils/logger';
 import { setLogLevelSchema } from '@/lib/validation/log-level-schema';
@@ -23,12 +22,11 @@ export type SetLogLevelActionResult =
 export const setLogLevelAction = async (
   input: SetLogLevelInput
 ): Promise<SetLogLevelActionResult> => {
-  let session: ServerSession;
-  try {
-    session = await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = setLogLevelSchema.safeParse(input);
   if (!parsed.success) {

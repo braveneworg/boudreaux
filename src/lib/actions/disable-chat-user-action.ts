@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   disableChatUserSchema,
@@ -39,12 +39,11 @@ export type DisableChatUserActionResult =
 export const disableChatUserAction = async (
   input: DisableChatUserInput
 ): Promise<DisableChatUserActionResult> => {
-  let session: Awaited<ReturnType<typeof requireRole>>;
-  try {
-    session = await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = disableChatUserSchema.safeParse(input);
   if (!parsed.success) {
@@ -59,7 +58,6 @@ export const disableChatUserAction = async (
   }
 
   const adminId = session.user.id;
-  if (!adminId) return { success: false, error: 'unauthorized' };
 
   await ChatAdminService.disableChatUser({
     userId: parsed.data.userId,
@@ -82,9 +80,8 @@ export const disableChatUserAction = async (
 export const enableChatUserAction = async (
   input: EnableChatUserInput
 ): Promise<DisableChatUserActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
 

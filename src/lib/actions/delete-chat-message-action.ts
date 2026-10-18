@@ -5,7 +5,7 @@
 
 import 'server-only';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatMessageRepository } from '@/lib/repositories/chat-message-repository';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
 import { CHAT_EVENTS, triggerChatEvent } from '@/lib/utils/pusher-server';
@@ -32,8 +32,15 @@ interface DeleteChatMessageInput {
 export const deleteChatMessageAction = async (
   input: DeleteChatMessageInput
 ): Promise<DeleteChatMessageActionResult> => {
-  const session = await auth();
-  const validation = validateDeleteChatRequest(session, input);
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return {
+      success: false,
+      error: gate.code === 'UNAUTHENTICATED' ? 'unauthorized' : 'forbidden',
+    };
+  }
+
+  const validation = validateDeleteChatRequest(gate.session.user.id, input);
   if (!validation.ok) {
     return { success: false, error: validation.error };
   }

@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { updateChatUserSchema } from '@/lib/validation/chat-user-admin-schema';
 
@@ -35,9 +35,8 @@ interface UpdateChatUserInput {
 export const updateChatUserAction = async (
   input: UpdateChatUserInput
 ): Promise<UpdateChatUserActionResult> => {
-  try {
-    await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
 

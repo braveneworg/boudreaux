@@ -7,10 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import type { ServerSession } from '@/lib/auth/get-server-session';
+import { gateAction } from '@/lib/auth/action-gate';
 import { SmsBlastService } from '@/lib/services/sms-blast-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { smsBlastSchema } from '@/lib/validation/sms-blast-schema';
 
@@ -43,12 +42,11 @@ export const sendSmsBlastAction = async ({
 }: {
   message: string;
 }): Promise<SendSmsBlastResult> => {
-  let session: ServerSession;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   const parsed = smsBlastSchema.safeParse({ message });
   if (!parsed.success) {

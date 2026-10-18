@@ -5,14 +5,14 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
+const gateActionMock = vi.fn();
 const disableMock = vi.fn();
 const enableMock = vi.fn();
 const revalidateMock = vi.fn();
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidateMock }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('@/lib/services/chat-admin-service', () => ({
   ChatAdminService: {
@@ -31,21 +31,21 @@ const { disableChatUserAction, enableChatUserAction } = await import('./disable-
 
 describe('disableChatUserAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     disableMock.mockReset();
     enableMock.mockReset();
     revalidateMock.mockReset();
   });
 
-  it('returns unauthorized when requireRole throws', async () => {
-    requireRoleMock.mockRejectedValue(Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without disabling', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
     const result = await disableChatUserAction({ userId: VALID_ID });
     expect(result).toEqual({ success: false, error: 'unauthorized' });
     expect(disableMock).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed userId as invalid', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await disableChatUserAction({ userId: 'not-an-id' });
     expect(result.success).toBe(false);
     const error = !result.success ? result.error : null;
@@ -53,7 +53,7 @@ describe('disableChatUserAction', () => {
   });
 
   it('disables with admin id + reason captured', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     disableMock.mockResolvedValue({});
 
     const result = await disableChatUserAction({ userId: VALID_ID, reason: 'spam' });
@@ -68,7 +68,7 @@ describe('disableChatUserAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await disableChatUserAction(
       null as unknown as Parameters<typeof disableChatUserAction>[0]
     );
@@ -76,31 +76,25 @@ describe('disableChatUserAction', () => {
     const fieldErrors = !result.success ? result.fieldErrors : undefined;
     expect(fieldErrors).toHaveProperty('_form');
   });
-
-  it('returns unauthorized when the session lacks a user id', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: '' } });
-    const result = await disableChatUserAction({ userId: VALID_ID });
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
-    expect(disableMock).not.toHaveBeenCalled();
-  });
 });
 
 describe('enableChatUserAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     disableMock.mockReset();
     enableMock.mockReset();
     revalidateMock.mockReset();
   });
 
-  it('returns unauthorized when requireRole throws', async () => {
-    requireRoleMock.mockRejectedValue(Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without enabling', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
     const result = await enableChatUserAction({ userId: VALID_ID });
     expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(enableMock).not.toHaveBeenCalled();
   });
 
   it('re-enables with the validated userId', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     enableMock.mockResolvedValue({});
 
     const result = await enableChatUserAction({ userId: VALID_ID });
@@ -110,7 +104,7 @@ describe('enableChatUserAction', () => {
   });
 
   it('rejects a malformed userId with a field-scoped error', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await enableChatUserAction({ userId: 'not-an-id' });
     expect(result.success).toBe(false);
     const fieldErrors = !result.success ? result.fieldErrors : undefined;
@@ -119,7 +113,7 @@ describe('enableChatUserAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await enableChatUserAction(
       null as unknown as Parameters<typeof enableChatUserAction>[0]
     );

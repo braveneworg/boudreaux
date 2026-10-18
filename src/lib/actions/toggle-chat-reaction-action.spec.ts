@@ -2,14 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatService } from '@/lib/services/chat-service';
 
 import { toggleChatReactionAction } from './toggle-chat-reaction-action';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('@/lib/services/chat-service', () => ({
   ChatService: { toggleReaction: vi.fn() },
@@ -20,17 +20,23 @@ const validInput = { messageId: 'abcdef1234567890abcdef12', emoji: '🔥' };
 beforeEach(() => vi.clearAllMocks());
 
 describe('toggleChatReactionAction', () => {
-  it('returns unauthorized when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it.each([
+    ['UNAUTHENTICATED', 'unauthorized'],
+    ['BANNED', 'disabled'],
+  ] as const)('maps a %s gate refusal to %s without reacting', async (code, error) => {
+    vi.mocked(gateAction).mockResolvedValue({ success: false, error: 'refused', code });
 
     const result = await toggleChatReactionAction(validInput);
 
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(result).toEqual({ success: false, error });
     expect(ChatService.toggleReaction).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid messageId via Zod', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'user-1' } } as never,
+    });
 
     const result = await toggleChatReactionAction({ messageId: 'bad', emoji: '🔥' });
 
@@ -41,7 +47,10 @@ describe('toggleChatReactionAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'user-1' } } as never,
+    });
 
     const result = await toggleChatReactionAction(
       null as unknown as Parameters<typeof toggleChatReactionAction>[0]
@@ -54,7 +63,10 @@ describe('toggleChatReactionAction', () => {
   });
 
   it('forwards a valid toggle to the service and returns the DTO', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'user-1' } } as never,
+    });
     vi.mocked(ChatService.toggleReaction).mockResolvedValue({
       success: true,
       data: { id: 'msg-1' } as never,
@@ -71,7 +83,10 @@ describe('toggleChatReactionAction', () => {
   });
 
   it('passes through service errors (not_found, disabled)', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'user-1' } } as never,
+    });
     vi.mocked(ChatService.toggleReaction).mockResolvedValue({
       success: false,
       error: 'not_found',

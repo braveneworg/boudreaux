@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { withPublicReleaseByline } from '@/lib/utils/artist-release-credits';
 import { loggers } from '@/lib/utils/logger';
@@ -17,11 +17,11 @@ import { loggers } from '@/lib/utils/logger';
  * Returns an array of purchase records with release details.
  */
 export const getCollectionAction = async () => {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return { success: false, error: 'Authentication required', data: [] };
+  const gate = await gateAction('signed-in');
+  if (!gate.success) {
+    return { ...gate, data: [] };
   }
+  const { session } = gate;
 
   try {
     const purchases = (await PurchaseRepository.findAllByUser(session.user.id)).map(
@@ -38,14 +38,9 @@ export const getCollectionAction = async () => {
  * Delete a purchase record by ID. Admin-only operation for testing purposes.
  */
 export const deletePurchaseAction = async (purchaseId: string) => {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return { success: false, error: 'Authentication required' };
-  }
-
-  if (session.user.role !== 'admin') {
-    return { success: false, error: 'Insufficient permissions' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
 
   try {

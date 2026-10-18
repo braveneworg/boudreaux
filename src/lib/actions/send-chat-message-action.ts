@@ -7,7 +7,7 @@ import 'server-only';
 
 import { headers } from 'next/headers';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatService, type ChatMessageDto } from '@/lib/services/chat-service';
 import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
 import { loggers } from '@/lib/utils/logger';
@@ -44,10 +44,11 @@ interface SendChatMessageInput {
 export const sendChatMessageAction = async (
   input: SendChatMessageInput
 ): Promise<SendChatMessageActionResult> => {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.email) {
-    return { success: false, error: 'unauthorized' };
+  const gate = await gateAction('signed-in');
+  if (!gate.success) {
+    return { success: false, error: gate.code === 'BANNED' ? 'disabled' : 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = sendChatMessageSchema.safeParse(input);
   if (!parsed.success) {
