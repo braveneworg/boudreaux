@@ -7,25 +7,23 @@ import { useImperativeHandle, useState, type ReactElement, type Ref, type RefObj
 
 import Link from 'next/link';
 
-import {
-  pickLoudZineAccent,
-  zineAccentForRelease,
-  type ZineAccent,
-} from '@/app/components/ui/zine-panel';
+import { pickLoudZineAccent, type ZineAccent } from '@/app/components/ui/zine-panel';
 import { VideoPlayDialog } from '@/components/ui/video/video-play-dialog';
 import type {
   ArtistNavSearchRelease,
   ArtistNavSearchVideo,
 } from '@/hooks/queries/use-artist-nav-search-query';
+import {
+  useListeningModal,
+  type ListeningModalOptions,
+  type ListeningModalRelease,
+} from '@/hooks/use-listening-modal';
 import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { artistVideosHref } from '@/lib/utils/artist-videos-href';
-import { releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
 
 import { AddToPlaylistMenu } from './playlists/add-to-playlist-menu';
 import { videoMediaItem } from './playlists/player-media-item';
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
 
 /** The artist whose search group a picked row sat in: the modal's byline. */
 export interface HomeSearchPickArtist {
@@ -51,10 +49,14 @@ export interface HomeSearchPlayDialogHandle {
   openVideo: (artist: HomeSearchPickArtist, video: ArtistNavSearchVideo) => void;
 }
 
-type HomeSearchSelection = { accent: ZineAccent } & (
-  | (HomeSearchReleaseArtist & { kind: 'release'; item: ArtistNavSearchRelease })
-  | (HomeSearchPickArtist & { kind: 'video'; item: ArtistNavSearchVideo })
-);
+type HomeSearchReleasePick = HomeSearchReleaseArtist & {
+  kind: 'release';
+  item: ArtistNavSearchRelease;
+};
+
+type HomeSearchSelection =
+  | HomeSearchReleasePick
+  | (HomeSearchPickArtist & { kind: 'video'; item: ArtistNavSearchVideo; accent: ZineAccent });
 
 interface HomeSearchPlayDialogProps {
   ref: Ref<HomeSearchPlayDialogHandle>;
@@ -75,9 +77,39 @@ const ViewAllLink = ({ href, children }: { href: string; children: string }): Re
   </p>
 );
 
+/** A release pick as its listening modal opens it. */
+const toListeningRelease = ({
+  artistName,
+  artistSlug,
+  item,
+}: HomeSearchReleasePick): ListeningModalRelease => ({
+  id: item.id,
+  title: item.title,
+  artistName,
+  artistSlug,
+  playSrc: item.playSrc,
+});
+
+/**
+ * A release pick's byline: the title's year, and with a public album artist a
+ * link to their page and to all their releases.
+ */
+const releasePickByline = (
+  pick: HomeSearchReleasePick | null
+): Pick<ListeningModalOptions, 'artistHref' | 'year' | 'footer'> => {
+  if (!pick) return {};
+  const { artistSlug, item } = pick;
+  if (!artistSlug) return { year: item.year };
+  return {
+    artistHref: `/artists/${artistSlug}`,
+    year: item.year,
+    footer: <ViewAllLink href={artistReleasesHref(artistSlug)}>View all releases</ViewAllLink>,
+  };
+};
+
 /**
  * The play modal behind the home and `/releases` searches: a picked release
- * plays in the release modal (a bottom sheet on phones), framed in the
+ * plays in its listening modal (a bottom sheet on phones), framed in the
  * release's own accent and sharing its deep link; a picked video plays in the
  * video modal, framed in a loud accent drawn per pick. Each has the artist as
  * a linked byline, the title with its year, and a "View all releases" or
@@ -85,11 +117,11 @@ const ViewAllLink = ({ href, children }: { href: string; children: string }): Re
  * album artist is hidden has no artist to link). The video modal carries the
  * add-to-playlist kebab, which shows only to a signed-in visitor.
  *
- * It owns the primed handoffs, so `openRelease` / `openVideo` start playback
- * inside the pick's gesture; the combobox imports it statically for that
- * reason. Closing stops an element the player never took, and once the closed
- * modal has gone the pick is discarded and focus returns to the search
- * trigger. Hiding the video modal for picture-in-picture is not a close.
+ * It owns both openers, so `openRelease` / `openVideo` start playback inside
+ * the pick's gesture; the combobox imports it statically for that reason.
+ * Closing stops an element the player never took, and once the closed modal
+ * has gone the pick is discarded and focus returns to the search trigger.
+ * Hiding the video modal for picture-in-picture is not a close.
  */
 export const HomeSearchPlayDialog = ({
   ref,
@@ -97,110 +129,82 @@ export const HomeSearchPlayDialog = ({
   pickAccent = pickLoudZineAccent,
 }: HomeSearchPlayDialogProps): ReactElement | null => {
   const [selection, setSelection] = useState<HomeSearchSelection | null>(null);
-  const [open, setOpen] = useState(false);
-  const audio = usePrimedMediaHandoff('audio');
+  const [videoOpen, setVideoOpen] = useState(false);
   const media = usePrimedMediaHandoff('video');
+
+  /** Once a closed modal has gone: forget the pick, focus the search trigger. */
+  const forgetPick = (event: Event): void => {
+    event.preventDefault();
+    setSelection(null);
+    returnFocusRef.current?.focus();
+  };
+
+  const releasePick = selection?.kind === 'release' ? selection : null;
+  const listening = useListeningModal({
+    release: releasePick && toListeningRelease(releasePick),
+    layout: 'sheet',
+    onCloseAutoFocus: forgetPick,
+    ...releasePickByline(releasePick),
+  });
 
   useImperativeHandle(ref, () => ({
     openRelease: (artist, release) => {
-      if (release.playSrc) audio.primeMediaEl(release.playSrc);
-      setSelection({
-        ...artist,
-        kind: 'release',
-        item: release,
-        accent: zineAccentForRelease(release.id),
-      });
-      setOpen(true);
+      const pick: HomeSearchReleasePick = { ...artist, kind: 'release', item: release };
+      listening.open(toListeningRelease(pick));
+      setSelection(pick);
     },
     openVideo: (artist, video) => {
       if (video.streamUrl) media.primeMediaEl(video.streamUrl);
       setSelection({ ...artist, kind: 'video', item: video, accent: pickAccent() });
-      setOpen(true);
+      setVideoOpen(true);
     },
   }));
 
-  if (!selection) return null;
+  if (selection?.kind !== 'video') return listening.modal;
 
-  const handleOpenChange = (next: boolean): void => {
+  const handleVideoOpenChange = (next: boolean): void => {
     if (!next) {
       // Closed before the player took the element: stop it, or the
       // gesture-started playback goes on with no UI attached.
-      audio.discardMediaEl();
       media.discardMediaEl();
     }
-    setOpen(next);
+    setVideoOpen(next);
   };
 
   /**
-   * Once a closed modal has gone: forget the pick, focus the search trigger.
    * Radix fires this whenever the dialog's content unmounts, and the video
    * modal unmounts it to hide while its player is in picture-in-picture, still
    * open. Then the pick stays, or the player would be disposed and the modal
    * could never come back. (A picture-in-picture window closed paused closes
    * the modal while it is hidden; the closed pick then waits for the next.)
    */
-  const handleCloseAutoFocus = (event: Event): void => {
-    if (open) return;
-    event.preventDefault();
-    setSelection(null);
-    returnFocusRef.current?.focus();
+  const handleVideoCloseAutoFocus = (event: Event): void => {
+    if (videoOpen) return;
+    forgetPick(event);
   };
 
-  const { artistName, artistSlug, accent } = selection;
-  const shared = {
-    open,
-    onOpenChange: handleOpenChange,
-    onCloseAutoFocus: handleCloseAutoFocus,
-    headingOrder: 'artist-first',
-    centered: true,
-    accent,
-    artistHref: artistSlug ? `/artists/${artistSlug}` : undefined,
-    year: selection.item.year,
-  } as const;
-
-  if (selection.kind === 'release') {
-    const { item: release } = selection;
-    return (
-      <ReleasePlayDialog
-        {...shared}
-        releaseId={release.id}
-        title={release.title}
-        artistName={artistName}
-        takeMediaEl={audio.takeMediaEl}
-        sheetOnPhone
-        shareWidget={
-          <ReleaseShareWidget
-            artistSlug={artistSlug}
-            artistName={artistName}
-            releaseTitle={release.title}
-            shareUrl={artistSlug ? releaseDeepLinkUrl(artistSlug, release.id) : undefined}
-          />
-        }
-        footer={
-          artistSlug ? (
-            <ViewAllLink href={artistReleasesHref(artistSlug)}>View all releases</ViewAllLink>
-          ) : undefined
-        }
-      />
-    );
-  }
-
-  // Narrowed to the video pick, whose artist always has a name and a page.
-  const { item: video, artistName: videoArtist, artistSlug: videoArtistSlug } = selection;
+  const { item: video, artistName, artistSlug, accent } = selection;
   return (
     <VideoPlayDialog
-      {...shared}
+      open={videoOpen}
+      onOpenChange={handleVideoOpenChange}
+      onCloseAutoFocus={handleVideoCloseAutoFocus}
+      headingOrder="artist-first"
+      centered
+      accent={accent}
+      artistHref={`/artists/${artistSlug}`}
+      year={video.year}
       title={video.title}
-      artist={videoArtist}
+      artist={artistName}
       src={video.streamUrl}
       takeMediaEl={media.takeMediaEl}
-      footer={<ViewAllLink href={artistVideosHref(videoArtistSlug)}>View all videos</ViewAllLink>}
+      footer={<ViewAllLink href={artistVideosHref(artistSlug)}>View all videos</ViewAllLink>}
       action={
         <AddToPlaylistMenu
           item={videoMediaItem({
             videoId: video.id,
             title: video.title,
-            artistName: videoArtist,
+            artistName,
             coverArt: video.posterSrc,
             duration: video.durationSeconds,
           })}

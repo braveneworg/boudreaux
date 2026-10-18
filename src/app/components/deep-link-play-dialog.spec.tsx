@@ -1,14 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
-
 import { DeepLinkPlayDialog, type DeepLinkRelease } from './deep-link-play-dialog';
-
-import type { ReleasePlayDialogProps } from './release-play-dialog';
 
 const replace = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
@@ -28,25 +24,25 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-const dialogProps = vi.hoisted(() => ({ current: null as ReleasePlayDialogProps | null }));
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: (props: ReleasePlayDialogProps) => {
-    dialogProps.current = props;
-    return props.open ? (
-      <div role="dialog" aria-label={props.title}>
-        {props.shareWidget}
-        {props.footer}
-        <button type="button" onClick={() => props.onOpenChange(false)}>
-          close
-        </button>
-      </div>
-    ) : null;
-  },
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
+vi.mock('@/hooks/queries/use-release-query', () => ({
+  useReleaseQuery: () => ({
+    isPending: false,
+    isError: false,
+    data: { id: '0123456789abcdef01234567', title: 'E2E Album One' },
+  }),
 }));
 
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({ shareUrl }: { shareUrl?: string }) => (
-    <div data-testid="share-widget" data-share-url={shareUrl} />
+vi.mock('./release-player', () => ({
+  ReleasePlayer: ({ autoPlay }: { autoPlay: boolean }) => (
+    <div data-testid="release-player" data-autoplay={String(autoPlay)} />
+  ),
+}));
+
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
   ),
 }));
 
@@ -63,53 +59,45 @@ const renderDialog = () => {
   return userEvent.setup({ delay: null });
 };
 
-const props = (): ReleasePlayDialogProps => {
-  if (!dialogProps.current) throw new Error('ReleasePlayDialog was not rendered');
-  return dialogProps.current;
-};
+const dialog = (): HTMLElement => screen.getByRole('dialog');
 
 describe('DeepLinkPlayDialog', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
-    dialogProps.current = null;
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   });
 
-  it('opens the release on arrival', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('opens the release on arrival, the artist leading the heading and the year after the title', () => {
     renderDialog();
 
-    expect(screen.getByRole('dialog', { name: 'E2E Album One' })).toBeInTheDocument();
-    expect(props()).toMatchObject({
-      releaseId: RELEASE.id,
-      title: 'E2E Album One',
-      artistName: 'E2E Artist',
-      year: 2024,
-      open: true,
-    });
+    expect(dialog()).toHaveAccessibleName('E2E Artist');
+    expect(dialog()).toHaveAccessibleDescription('E2E Album One (2024)');
   });
 
   it('opens unprimed and paused: there was no gesture to play from', () => {
     renderDialog();
 
-    expect(props().takeMediaEl()).toBeNull();
-    expect(props().autoPlay).toBe(false);
+    expect(screen.getByTestId('release-player')).toHaveAttribute('data-autoplay', 'false');
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
-  it("frames the modal in the release's own accent, artist first, centered, a sheet on phones", () => {
+  it('slides up as a sheet on phones', () => {
     renderDialog();
 
-    expect(props()).toMatchObject({
-      accent: zineAccentForRelease(RELEASE.id),
-      headingOrder: 'artist-first',
-      centered: true,
-      sheetOnPhone: true,
-    });
+    expect(dialog()).toHaveClass('max-sm:bottom-0');
   });
 
-  it('shares the release deep link', () => {
+  it('shares the release deep link', async () => {
     renderDialog();
 
-    expect(screen.getByTestId('share-widget')).toHaveAttribute(
-      'data-share-url',
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
       `https://fakefour.test/releases?artist=e2e-artist&release=${RELEASE.id}`
     );
   });
@@ -117,7 +105,7 @@ describe('DeepLinkPlayDialog', () => {
   it("drops the release from the URL on close, so back or refresh doesn't reopen it", async () => {
     const user = renderDialog();
 
-    await user.click(screen.getByRole('button', { name: 'close' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(replace.mock.calls).toEqual([['/releases?artist=e2e-artist', { scroll: false }]]);
@@ -126,7 +114,7 @@ describe('DeepLinkPlayDialog', () => {
   it("links to the artist's releases under the player", () => {
     renderDialog();
 
-    expect(screen.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
+    expect(within(dialog()).getByRole('link', { name: 'View all releases' })).toHaveAttribute(
       'href',
       '/releases?artist=e2e-artist'
     );
@@ -135,7 +123,7 @@ describe('DeepLinkPlayDialog', () => {
   it('closes onto the listing from "View all releases" on a plain click', async () => {
     const user = renderDialog();
 
-    await user.click(screen.getByRole('link', { name: 'View all releases' }));
+    await user.click(within(dialog()).getByRole('link', { name: 'View all releases' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(replace.mock.calls).toEqual([['/releases?artist=e2e-artist', { scroll: false }]]);
@@ -144,11 +132,11 @@ describe('DeepLinkPlayDialog', () => {
   it('leaves a modified click on "View all releases" to the browser', () => {
     renderDialog();
 
-    const link = screen.getByRole('link', { name: 'View all releases' });
+    const link = within(dialog()).getByRole('link', { name: 'View all releases' });
     const notCanceled = fireEvent.click(link, { metaKey: true });
 
     expect(notCanceled).toBe(true);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(dialog()).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 });

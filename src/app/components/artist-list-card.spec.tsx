@@ -14,20 +14,12 @@ import { ArtistListCard } from './artist-list-card';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
-const openPlayer = vi.hoisted(() => vi.fn());
-vi.mock('@/hooks/use-release-play-dialog', () => ({
-  useReleasePlayDialog: () => ({
-    playerOpen: false,
-    prefetchPlayer: false,
-    openPlayer,
-    handlePlayerOpenChange: vi.fn(),
-    warmPlayer: vi.fn(),
-    takeMediaEl: () => null,
-  }),
+// The listening modal itself is covered by latest-release-play-link.spec;
+// here it only shows whether it opened.
+vi.mock('./release-play-dialog', () => ({
+  ReleasePlayDialog: ({ open, title }: { open: boolean; title: string }) =>
+    open ? <div role="dialog" aria-label={title} /> : null,
 }));
-
-// The listening modal itself is covered by latest-release-play-link.spec.
-vi.mock('./release-play-dialog', () => ({ ReleasePlayDialog: () => null }));
 
 const name = (id: string, displayName: string): ArtistListingName => ({
   id,
@@ -324,7 +316,7 @@ describe('ArtistListCard', () => {
 
     await user.click(screen.getByRole('link', { name: 'Third Album' }));
 
-    expect(openPlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Third Album' })).toBeInTheDocument();
   });
 
   it('shows the latest release as plain text when nothing is playable', () => {

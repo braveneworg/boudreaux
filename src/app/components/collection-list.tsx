@@ -32,21 +32,22 @@ import {
   DialogTrigger,
 } from '@/app/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/app/components/ui/toggle-group';
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
 import { useCollectionDownload } from '@/hooks/use-collection-download';
-import { useReleasePlayDialog, type ReleasePlayDialogState } from '@/hooks/use-release-play-dialog';
+import {
+  useListeningModal,
+  type ListeningModal,
+  type ListeningModalRelease,
+} from '@/hooks/use-listening-modal';
 import { deletePurchaseAction } from '@/lib/actions/collection-actions';
 import { MAX_RELEASE_DOWNLOAD_COUNT } from '@/lib/constants';
 import { FORMAT_LABELS } from '@/lib/constants/digital-formats';
 import { cn } from '@/lib/utils';
 import { computeResetInHours } from '@/lib/utils/download-reset';
 import { isPlainLeftClick } from '@/lib/utils/is-plain-left-click';
-import { releaseDeepLinkHref, releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
+import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
 import { getReleaseCoverArt } from '@/lib/utils/release-helpers';
 
 import { FormatProgressList } from './format-progress-list';
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
 
 import type { FormatProgress } from './format-progress-list';
 
@@ -149,7 +150,7 @@ export const CollectionList = ({ purchases, isAdmin }: CollectionListProps) => {
 interface ReleaseOpenerProps {
   /** The release deep link; `null` when the album artist is hidden, then a button opens. */
   href: string | null;
-  player: ReleasePlayDialogState;
+  listening: ListeningModal;
   /**
    * The cover: a second way into the same modal, kept out of the tab order
    * and the accessibility tree so the title is the one named opener.
@@ -166,7 +167,7 @@ interface ReleaseOpenerProps {
  */
 const ReleaseOpener = ({
   href,
-  player,
+  listening,
   decorative = false,
   className,
   children,
@@ -175,7 +176,7 @@ const ReleaseOpener = ({
   const handleClick = (event: MouseEvent<HTMLElement>): void => {
     if (!isPlainLeftClick(event)) return;
     event.preventDefault();
-    player.openPlayer();
+    listening.open();
   };
 
   if (!href) {
@@ -183,8 +184,8 @@ const ReleaseOpener = ({
       <button
         type="button"
         onClick={handleClick}
-        onPointerEnter={player.warmPlayer}
-        onFocus={player.warmPlayer}
+        onPointerEnter={listening.warm}
+        onFocus={listening.warm}
         aria-haspopup="dialog"
         className={cn('text-left', className)}
         {...hidden}
@@ -199,8 +200,8 @@ const ReleaseOpener = ({
       href={href}
       prefetch={false}
       onClick={handleClick}
-      onPointerEnter={player.warmPlayer}
-      onFocus={player.warmPlayer}
+      onPointerEnter={listening.warm}
+      onFocus={listening.warm}
       aria-haspopup="dialog"
       className={className}
       {...hidden}
@@ -210,14 +211,14 @@ const ReleaseOpener = ({
   );
 };
 
-interface RowOpenerSlotProps extends Pick<ReleaseOpenerProps, 'href' | 'player' | 'children'> {
+interface RowOpenerSlotProps extends Pick<ReleaseOpenerProps, 'href' | 'listening' | 'children'> {
   playable: boolean;
 }
 
 /** The row's cover: the modal's second opener when playable, else plain. */
-const CollectionCover = ({ playable, href, player, children }: RowOpenerSlotProps) =>
+const CollectionCover = ({ playable, href, listening, children }: RowOpenerSlotProps) =>
   playable ? (
-    <ReleaseOpener href={href} player={player} decorative className="shrink-0">
+    <ReleaseOpener href={href} listening={listening} decorative className="shrink-0">
       {children}
     </ReleaseOpener>
   ) : (
@@ -225,11 +226,11 @@ const CollectionCover = ({ playable, href, player, children }: RowOpenerSlotProp
   );
 
 /** The row's title: the modal's named opener when playable, else plain. */
-const CollectionTitle = ({ playable, href, player, children }: RowOpenerSlotProps) =>
+const CollectionTitle = ({ playable, href, listening, children }: RowOpenerSlotProps) =>
   playable ? (
     <ReleaseOpener
       href={href}
-      player={player}
+      listening={listening}
       className="block max-w-full truncate font-semibold text-zinc-900 hover:underline"
     >
       {children}
@@ -242,39 +243,17 @@ const CollectionTitle = ({ playable, href, player, children }: RowOpenerSlotProp
 const deepLinkHref = ({ release }: CollectionPurchase): string | null =>
   release.albumArtist ? releaseDeepLinkHref(release.albumArtist.slug, release.id) : null;
 
-interface CollectionPlayDialogProps {
-  purchase: CollectionPurchase;
-  artistName: string | null;
-  player: ReleasePlayDialogState;
-}
-
 /**
- * A purchase's listening modal, in the release's own accent, sharing its deep
- * link. Nothing for a purchase with nothing playable.
+ * The purchase's release as its listening modal opens it, sharing its deep
+ * link when the album artist is public; `null` when nothing is playable.
  */
-const CollectionPlayDialog = ({ purchase, artistName, player }: CollectionPlayDialogProps) => {
-  const { id, title, albumArtist, playSrc } = purchase.release;
+const toListeningRelease = (
+  { release }: CollectionPurchase,
+  artistName: string | null
+): ListeningModalRelease | null => {
+  const { id, title, albumArtist, playSrc } = release;
   if (playSrc === null) return null;
-  return (
-    <ReleasePlayDialog
-      releaseId={id}
-      title={title}
-      artistName={artistName}
-      open={player.playerOpen}
-      onOpenChange={player.handlePlayerOpenChange}
-      takeMediaEl={player.takeMediaEl}
-      prefetch={player.prefetchPlayer}
-      accent={zineAccentForRelease(id)}
-      shareWidget={
-        <ReleaseShareWidget
-          artistSlug={albumArtist?.slug ?? null}
-          artistName={artistName}
-          releaseTitle={title}
-          shareUrl={albumArtist ? releaseDeepLinkUrl(albumArtist.slug, id) : undefined}
-        />
-      }
-    />
-  );
+  return { id, title, artistName, artistSlug: albumArtist?.slug ?? null, playSrc };
 };
 
 interface CollectionListItemProps {
@@ -306,14 +285,14 @@ const CollectionListItem = memo(
         formatType: f.formatType,
         fileName: f.files[0]?.fileName ?? '',
       }));
-    const player = useReleasePlayDialog(purchase.release.playSrc);
+    const listening = useListeningModal({ release: toListeningRelease(purchase, artistName) });
     const playable = purchase.release.playSrc !== null;
     const href = deepLinkHref(purchase);
 
     return (
       <div className="shadow-zine-sm flex min-w-0 items-center gap-4 border-2 border-black bg-white p-4">
         {/* Cover Art */}
-        <CollectionCover playable={playable} href={href} player={player}>
+        <CollectionCover playable={playable} href={href} listening={listening}>
           {coverArt ? (
             <Image
               src={coverArt.src}
@@ -331,7 +310,7 @@ const CollectionListItem = memo(
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <CollectionTitle playable={playable} href={href} player={player}>
+          <CollectionTitle playable={playable} href={href} listening={listening}>
             {purchase.release.title}
           </CollectionTitle>
           {artistName && (
@@ -390,7 +369,7 @@ const CollectionListItem = memo(
             </AlertDialog>
           )}
         </div>
-        <CollectionPlayDialog purchase={purchase} artistName={artistName} player={player} />
+        {listening.modal}
       </div>
     );
   }

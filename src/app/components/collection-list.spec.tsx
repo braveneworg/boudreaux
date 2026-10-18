@@ -14,9 +14,6 @@ import { triggerDownload } from '@/lib/utils/trigger-download';
 import { createQueryWrapper } from '@/test-utils/create-query-wrapper';
 
 import { CollectionList } from './collection-list';
-import { zineAccentForRelease } from './ui/zine-panel';
-
-import type { ReleasePlayDialogProps } from './release-play-dialog';
 
 vi.mock('@/lib/actions/collection-actions', () => ({
   deletePurchaseAction: vi.fn(),
@@ -34,30 +31,20 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => createElement('img', props),
 }));
 
-const playDialog = vi.hoisted(() => ({
-  playerOpen: false,
-  openPlayer: vi.fn(),
-  handlePlayerOpenChange: vi.fn(),
-  warmPlayer: vi.fn(),
-  takeMediaEl: vi.fn(() => null),
-}));
-vi.mock('@/hooks/use-release-play-dialog', () => ({
-  useReleasePlayDialog: () => ({ ...playDialog, prefetchPlayer: false }),
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
+const releaseQuery = vi.hoisted(() => ({ useReleaseQuery: vi.fn() }));
+vi.mock('@/hooks/queries/use-release-query', () => ({
+  useReleaseQuery: (...args: unknown[]): unknown => releaseQuery.useReleaseQuery(...args),
 }));
 
-// The listening modal itself is covered by release-play-dialog.spec; here it
-// records what each row opens.
-const releaseDialogProps = vi.hoisted(() => ({ current: [] as ReleasePlayDialogProps[] }));
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: (props: ReleasePlayDialogProps) => {
-    releaseDialogProps.current.push(props);
-    return props.open ? <div role="dialog">{props.shareWidget}</div> : null;
-  },
+vi.mock('./release-player', () => ({
+  ReleasePlayer: () => <div data-testid="release-player" />,
 }));
 
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({ shareUrl }: { shareUrl?: string }) => (
-    <div data-testid="share-widget" data-share-url={shareUrl ?? ''} />
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
   ),
 }));
 
@@ -377,8 +364,18 @@ describe('CollectionList listening modal', () => {
       src: 'https://example.com/cover.jpg',
       alt: 'Cover',
     });
-    playDialog.playerOpen = false;
-    releaseDialogProps.current = [];
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    releaseQuery.useReleaseQuery.mockReturnValue({
+      isPending: true,
+      isError: false,
+      data: undefined,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const renderRow = (purchase = buildPurchase()) =>
@@ -386,10 +383,13 @@ describe('CollectionList listening modal', () => {
       wrapper: createQueryWrapper(),
     });
 
+  const titleLink = (): HTMLElement =>
+    screen.getByRole('link', { name: 'Test Album', hidden: true });
+
   it('links the title to the release deep link', () => {
     renderRow();
 
-    expect(screen.getByRole('link', { name: 'Test Album' })).toHaveAttribute('href', DEEP_LINK);
+    expect(titleLink()).toHaveAttribute('href', DEEP_LINK);
   });
 
   it('makes the cover the same opener, out of the tab order', () => {
@@ -401,13 +401,17 @@ describe('CollectionList listening modal', () => {
     expect(cover).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('opens the listening modal in place from the title on a plain click', async () => {
+  it("opens the listening modal in place from the title on a plain click, playing the release's track", async () => {
     const user = userEvent.setup({ delay: null });
     renderRow();
 
-    await user.click(screen.getByRole('link', { name: 'Test Album' }));
+    await user.click(titleLink());
 
-    expect(playDialog.openPlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Test Album' })).toBeInTheDocument();
+    expect(vi.mocked(HTMLMediaElement.prototype.play).mock.instances[0]).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/rel-1/01.mp3'
+    );
   });
 
   it('opens the listening modal in place from the cover on a plain click', () => {
@@ -415,32 +419,36 @@ describe('CollectionList listening modal', () => {
 
     fireEvent.click(screen.getByAltText('Cover'));
 
-    expect(playDialog.openPlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Test Album' })).toBeInTheDocument();
   });
 
   it('leaves a modified click on the title to the browser', () => {
     renderRow();
 
-    const notCanceled = fireEvent.click(screen.getByRole('link', { name: 'Test Album' }), {
-      metaKey: true,
-    });
+    const notCanceled = fireEvent.click(titleLink(), { metaKey: true });
 
     expect(notCanceled).toBe(true);
-    expect(playDialog.openPlayer).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it("frames the modal in the release's own accent and shares its deep link", () => {
-    playDialog.playerOpen = true;
+  it('warms the listening modal when the title is hovered', async () => {
+    const user = userEvent.setup({ delay: null });
     renderRow();
 
-    expect(releaseDialogProps.current.at(-1)).toMatchObject({
-      releaseId: 'rel-1',
-      title: 'Test Album',
-      artistName: 'JDoe',
-      accent: zineAccentForRelease('rel-1'),
-    });
-    expect(screen.getByTestId('share-widget')).toHaveAttribute(
-      'data-share-url',
+    await user.hover(titleLink());
+
+    expect(releaseQuery.useReleaseQuery).toHaveBeenLastCalledWith('rel-1', { enabled: true });
+  });
+
+  it('describes the modal by the album artist and shares its deep link', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderRow();
+
+    await user.click(titleLink());
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('JDoe');
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
       `https://fakefour.test${DEEP_LINK}`
     );
   });
@@ -453,7 +461,7 @@ describe('CollectionList listening modal', () => {
     expect(screen.queryByRole('link', { name: 'Test Album' })).not.toBeInTheDocument();
     expect(screen.getByText('Test Album')).toBeInTheDocument();
     expect(screen.getByAltText('Cover').closest('a')).toBeNull();
-    expect(releaseDialogProps.current).toEqual([]);
+    expect(releaseQuery.useReleaseQuery).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument();
   });
 
@@ -461,13 +469,15 @@ describe('CollectionList listening modal', () => {
     const user = userEvent.setup({ delay: null });
     const purchase = buildPurchase();
     purchase.release.albumArtist = null;
-    playDialog.playerOpen = true;
     renderRow(purchase);
 
     await user.click(screen.getByRole('button', { name: 'Test Album' }));
 
-    expect(playDialog.openPlayer).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('share-widget')).toHaveAttribute('data-share-url', '');
+    expect(screen.getByRole('dialog', { name: 'Test Album' })).toBeInTheDocument();
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
+      'https://fakefour.test'
+    );
   });
 });
 

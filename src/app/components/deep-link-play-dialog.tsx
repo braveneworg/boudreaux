@@ -3,19 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
 import type { MouseEvent, ReactElement } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
+import { useListeningModal } from '@/hooks/use-listening-modal';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { isPlainLeftClick } from '@/lib/utils/is-plain-left-click';
-import { releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
-
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
 
 /** The release a deep link opens, as the `/releases` page resolved it. */
 export interface DeepLinkRelease {
@@ -47,57 +42,38 @@ const FOOTER_LINK_CLASS = 'underline underline-offset-4 hover:no-underline';
 export const DeepLinkPlayDialog = ({
   release,
   artistSlug,
-}: DeepLinkPlayDialogProps): ReactElement => {
+}: DeepLinkPlayDialogProps): ReactElement | null => {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
   const allReleasesHref = artistReleasesHref(artistSlug);
-
-  const close = (): void => {
-    setOpen(false);
-    router.replace(allReleasesHref, { scroll: false });
-  };
-
-  const handleOpenChange = (next: boolean): void => {
-    if (!next) close();
-  };
 
   // A plain click closes onto the listing; a modified click (a new tab) is the
   // browser's and leaves the modal here.
   const viewAllReleases = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (!isPlainLeftClick(event)) return;
     event.preventDefault();
-    close();
+    listening.close();
   };
 
-  return (
-    <ReleasePlayDialog
-      releaseId={release.id}
-      title={release.title}
-      artistName={release.artistName}
-      year={release.year}
-      open={open}
-      onOpenChange={handleOpenChange}
-      takeMediaEl={() => null}
-      autoPlay={false}
-      accent={zineAccentForRelease(release.id)}
-      headingOrder="artist-first"
-      centered
-      sheetOnPhone
-      shareWidget={
-        <ReleaseShareWidget
-          artistSlug={artistSlug}
-          artistName={release.artistName}
-          releaseTitle={release.title}
-          shareUrl={releaseDeepLinkUrl(artistSlug, release.id)}
-        />
-      }
-      footer={
-        <p className="text-center">
-          <Link href={allReleasesHref} onClick={viewAllReleases} className={FOOTER_LINK_CLASS}>
-            View all releases
-          </Link>
-        </p>
-      }
-    />
-  );
+  const listening = useListeningModal({
+    release: {
+      id: release.id,
+      title: release.title,
+      artistName: release.artistName,
+      artistSlug,
+      playSrc: release.playSrc,
+    },
+    openOnArrival: true,
+    onClose: () => router.replace(allReleasesHref, { scroll: false }),
+    layout: 'sheet',
+    year: release.year,
+    footer: (
+      <p className="text-center">
+        <Link href={allReleasesHref} onClick={viewAllReleases} className={FOOTER_LINK_CLASS}>
+          View all releases
+        </Link>
+      </p>
+    ),
+  });
+
+  return listening.modal;
 };
