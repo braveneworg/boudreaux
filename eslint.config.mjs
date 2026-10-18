@@ -469,7 +469,8 @@ const eslintConfig = [
   // The project forbids inline eslint-disable comments. `detect-non-literal-fs-filename`
   // is purely syntactic (it flags any non-literal path argument with no "validated/safe"
   // escape), so code doing real file I/O on runtime-computed paths cannot satisfy it:
-  // CLI/build scripts, the os-tmpdir upload temp file, and the ffmpeg sibling temp file.
+  // CLI/build scripts, the format upload module's temp file (and the stored copy the
+  // local object store reads back), and the ffmpeg sibling temp file.
   // These paths are all server-generated, never user input. Every other rule is satisfied
   // in code repo-wide, except the nginx and Grafana dashboard config guards below.
   {
@@ -478,6 +479,7 @@ const eslintConfig = [
       'docs/**/*.{js,mjs}',
       // `*` (not the literal `[id]`/`[formatType]`) — minimatch reads `[...]` as a char class.
       'src/app/api/releases/*/upload/*/route.ts',
+      'src/lib/services/format-upload/*.ts',
       'src/lib/audio-metadata/ffmpeg.ts',
       // Reads the adjacent SAM template (compile-time constant URL) to lint its wiring.
       'bio-generator/src/template.spec.ts',
