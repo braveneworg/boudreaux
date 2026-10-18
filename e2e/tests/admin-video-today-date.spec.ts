@@ -23,10 +23,13 @@ const E2E_DATABASE_URL =
 const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
 
 const STAMP = randomUUID().slice(0, 8);
+const ARTIST_NAME = `ZZ E2E Today Artist ${STAMP}`;
 let videoId: string | undefined;
+let artistId: string | undefined;
 
 test.afterAll(async () => {
   if (videoId) await deleteVideoCascade(videoId);
+  if (artistId) await prisma.artist.deleteMany({ where: { id: artistId } });
   await prisma.$disconnect();
 });
 
@@ -38,7 +41,7 @@ test('a today-dated release suggestion stays pending on a dateless draft', async
   ({ id: videoId } = await prisma.video.create({
     data: {
       title: `E2E Today ${STAMP} ${E2E_TODAY_RELEASE_MARKER}`,
-      artist: `ZZ E2E Today Artist ${STAMP}`,
+      artist: ARTIST_NAME,
       category: 'MUSIC',
       s3Key: `media/videos/e2e/e2e-today-${STAMP}.mp4`,
       fileName: 'e2e-today.mp4',
@@ -48,6 +51,18 @@ test('a today-dated release suggestion stays pending on a dateless draft', async
     },
     select: { id: true },
   }));
+  // Enrichment reads the video's linked artists, as on a saved video: saving
+  // the form links one artist per name in the artist field.
+  ({ id: artistId } = await prisma.artist.create({
+    data: {
+      firstName: 'ZZ',
+      surname: `E2E Today ${STAMP}`,
+      slug: `zz-e2e-today-artist-${STAMP}`,
+      displayName: ARTIST_NAME,
+    },
+    select: { id: true },
+  }));
+  await prisma.videoArtist.create({ data: { videoId, artistId, role: 'PRIMARY', sortOrder: 0 } });
 
   await adminPage.goto(`/admin/videos/${videoId}`);
   const dateInput = adminPage.getByPlaceholder('mm/dd/yyyy').first();
