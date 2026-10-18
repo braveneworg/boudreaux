@@ -7,8 +7,8 @@ import 'server-only';
 
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { IMAGE_VARIANT_SUFFIX_REGEX } from '@/lib/constants/image-variants';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { generateVariantsFromBuffer, getExtension } from '@/lib/utils/image-variants';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
@@ -87,7 +87,10 @@ const validateSourceKey = (
 export const generateImageVariantsAction = async (
   cdnUrl: string
 ): Promise<GenerateImageVariantsResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return { success: false, variantsGenerated: 0, error: gate.error };
+  }
 
   const parsed = generateImageVariantsSchema.safeParse({ cdnUrl });
   if (!parsed.success) {

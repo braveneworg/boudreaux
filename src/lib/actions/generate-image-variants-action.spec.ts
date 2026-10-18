@@ -2,15 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { IMAGE_VARIANT_DEVICE_SIZES } from '@/lib/constants/image-variants';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { generateImageVariantsAction } from './generate-image-variants-action';
 
 const SIZE_COUNT = IMAGE_VARIANT_DEVICE_SIZES.length;
 
 vi.mock('server-only', () => ({}));
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockS3Send = vi.fn();
 vi.mock('@/lib/utils/s3-client', () => ({
@@ -42,12 +42,17 @@ const fakeS3Body = (buffer: Buffer): AsyncIterable<Uint8Array> => ({
   },
 });
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('generateImageVariantsAction', () => {
   const imageBuffer = Buffer.from('fake-image-data');
   const resizedBuffer = Buffer.from('resized');
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { role: 'admin' } } as never,
+    });
     mockS3Send.mockReset();
     mockSharpInstance.metadata.mockReset();
     mockSharpInstance.toBuffer.mockReset();
@@ -58,16 +63,15 @@ describe('generateImageVariantsAction', () => {
     mockSharpInstance.toBuffer.mockResolvedValue(resizedBuffer);
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without reading the image', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(
-      generateImageVariantsAction(
-        'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
-      )
-    ).rejects.toThrow('Unauthorized');
+    const result = await generateImageVariantsAction(
+      'https://cdn.fakefourrecords.com/media/releases/coverart/album-cover.jpg'
+    );
 
-    expect(requireRole).toHaveBeenCalledWith('admin');
+    expect(result).toEqual({ success: false, variantsGenerated: 0, error: 'Unauthorized' });
+    expect(mockS3Send).not.toHaveBeenCalled();
   });
 
   it('generates JPG + WebP variants for every device size, regardless of original width', async () => {

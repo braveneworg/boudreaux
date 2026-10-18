@@ -14,10 +14,9 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
 import { VIDEO_KEY_PREFIX, VIDEO_PART_SIZE } from '@/lib/constants/video-uploads';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
@@ -72,20 +71,6 @@ interface AbortVideoUploadRequest {
 
 /** Shape returned when an action rejects a request before doing any work. */
 type ErrorResult = { success: false; error: string };
-
-/**
- * Enforce admin access. Returns an error result when the session is missing;
- * a non-admin caller causes `requireRole` to throw, which the caller's
- * try/catch converts into an error result. Returns `null` when authorized.
- */
-const requireAdminSession = async (): Promise<ErrorResult | null> => {
-  await requireRole('admin');
-  const session = await auth();
-  if (!session) {
-    return { success: false, error: 'Authentication required' };
-  }
-  return null;
-};
 
 /**
  * Reject spoofed S3 keys before any SDK call: keys must sit under the video
@@ -266,8 +251,10 @@ export const initiateVideoUploadAction = async (
   ActionResult<{ s3Key: string; uploadId: string; partSize: number; partCount: number }>
 > => {
   try {
-    const authError = await requireAdminSession();
-    if (authError) return authError;
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const parsed = initiateVideoUploadSchema.safeParse(input);
     if (!parsed.success) {
@@ -304,8 +291,10 @@ export const presignVideoPartsAction = async (
   input: PresignVideoPartsRequest
 ): Promise<ActionResult<Array<{ partNumber: number; url: string }>>> => {
   try {
-    const authError = await requireAdminSession();
-    if (authError) return authError;
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const parsed = presignVideoPartsSchema.safeParse(input);
     if (!parsed.success) {
@@ -331,8 +320,10 @@ export const completeVideoUploadAction = async (
   input: CompleteVideoUploadRequest
 ): Promise<ActionResult<{ s3Key: string; fileSize: number }>> => {
   try {
-    const authError = await requireAdminSession();
-    if (authError) return authError;
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const parsed = completeVideoUploadSchema.safeParse(input);
     if (!parsed.success) {
@@ -363,8 +354,10 @@ export const abortVideoUploadAction = async (
   input: AbortVideoUploadRequest
 ): Promise<ActionResult<null>> => {
   try {
-    const authError = await requireAdminSession();
-    if (authError) return authError;
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const parsed = abortVideoUploadSchema.safeParse(input);
     if (!parsed.success) {

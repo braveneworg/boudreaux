@@ -6,9 +6,9 @@
 
 import 'server-only';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { deleteFormatFilesSchema } from '@/lib/validation/admin-asset-schemas';
@@ -72,7 +72,10 @@ const deleteFormatFilesActionHandler = async (
 export const deleteFormatFilesAction = async (
   params: DeleteFormatFilesParams
 ): Promise<ActionResult<{ deletedCount: number }>> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
 
   const parsed = deleteFormatFilesSchema.safeParse(params);
   if (!parsed.success) {

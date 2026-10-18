@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
 import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 
 import { updateReleaseAction } from './update-release-action';
@@ -17,7 +17,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/release-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const RELEASE_ID = '507f1f77bcf86cd799439011';
 const ARTIST_ID = '507f1f77bcf86cd799439022';
@@ -35,7 +35,10 @@ const buildValues = (overrides: Record<string, unknown> = {}): Record<string, un
 
 describe('updateReleaseAction with the real schema', () => {
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { id: 'admin-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'admin-1' } } as never,
+    });
     vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
       success: true,
       data: { id: RELEASE_ID },

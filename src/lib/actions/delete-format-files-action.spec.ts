@@ -5,14 +5,14 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
+const gateActionMock = vi.fn();
 const findByReleaseAndFormatMock = vi.fn();
 const updateTrackCountsMock = vi.fn();
 const findAllByFormatIdMock = vi.fn();
 const deleteAllByFormatIdMock = vi.fn();
 const deleteS3ObjectMock = vi.fn();
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
   ReleaseDigitalFormatRepository: class MockFormatRepo {
@@ -34,7 +34,7 @@ const { deleteFormatFilesAction } = await import('./delete-format-files-action')
 
 describe('deleteFormatFilesAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     findByReleaseAndFormatMock.mockReset();
     updateTrackCountsMock.mockReset();
     findAllByFormatIdMock.mockReset();
@@ -42,16 +42,21 @@ describe('deleteFormatFilesAction', () => {
     deleteS3ObjectMock.mockReset();
   });
 
-  it('rejects when the caller is not an admin', async () => {
-    requireRoleMock.mockRejectedValue(new Error('forbidden'));
-    await expect(
-      deleteFormatFilesAction({ releaseId: '507f1f77bcf86cd799439011', formatType: 'FLAC' })
-    ).rejects.toThrow('forbidden');
+  it('returns the gate refusal without touching the repository', async () => {
+    const refusal = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
+    gateActionMock.mockResolvedValue(refusal);
+
+    const result = await deleteFormatFilesAction({
+      releaseId: '507f1f77bcf86cd799439011',
+      formatType: 'FLAC',
+    });
+
+    expect(result).toEqual(refusal);
     expect(findByReleaseAndFormatMock).not.toHaveBeenCalled();
   });
 
   it('rejects malformed release IDs before touching the repository', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     const result = await deleteFormatFilesAction({
       releaseId: 'not-an-objectid',
       formatType: 'FLAC',
@@ -61,7 +66,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('rejects unknown format types before touching the repository', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     const result = await deleteFormatFilesAction({
       releaseId: '507f1f77bcf86cd799439011',
       formatType: 'EXE' as never,
@@ -71,7 +76,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('returns failure when the format is not found', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     findByReleaseAndFormatMock.mockResolvedValue(null);
     const result = await deleteFormatFilesAction({
       releaseId: '507f1f77bcf86cd799439011',
@@ -84,7 +89,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('deletes S3 objects and DB rows and resets format counts', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     findByReleaseAndFormatMock.mockResolvedValue({ id: 'fmt1' });
     findAllByFormatIdMock.mockResolvedValue([{ s3Key: 'a/b.flac' }, { s3Key: 'c/d.flac' }]);
     deleteS3ObjectMock.mockResolvedValue(undefined);
@@ -102,7 +107,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('still succeeds if some S3 deletions fail (best-effort)', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     findByReleaseAndFormatMock.mockResolvedValue({ id: 'fmt1' });
     findAllByFormatIdMock.mockResolvedValue([{ s3Key: 'a/b' }, { s3Key: 'c/d' }]);
     deleteS3ObjectMock.mockRejectedValueOnce(new Error('s3 down')).mockResolvedValueOnce(undefined);
@@ -117,7 +122,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('skips files without an s3Key', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     findByReleaseAndFormatMock.mockResolvedValue({ id: 'fmt1' });
     findAllByFormatIdMock.mockResolvedValue([{ s3Key: '' }, { s3Key: null }, { s3Key: 'x' }]);
     deleteS3ObjectMock.mockResolvedValue(undefined);
@@ -130,7 +135,7 @@ describe('deleteFormatFilesAction', () => {
   });
 
   it('returns failure when the repository throws', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin' } } });
     findByReleaseAndFormatMock.mockRejectedValue(new Error('boom'));
     const result = await deleteFormatFilesAction({
       releaseId: '507f1f77bcf86cd799439011',

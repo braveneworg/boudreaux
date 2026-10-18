@@ -8,8 +8,7 @@ import 'server-only';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-import { auth } from '@/auth';
-import { requireRole } from '@/lib/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
@@ -234,12 +233,11 @@ export const getPresignedUploadUrlsAction = async (
   });
 
   try {
-    await requireRole('admin');
-    const session = await auth();
-
-    if (!session) {
-      return { success: false, error: 'Authentication required' };
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
     }
+    const { session } = gate;
 
     if (files.length === 0) {
       logger.warn('No files provided for upload', { entityType, entityId });

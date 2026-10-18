@@ -2,40 +2,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ReleaseScalars } from '@/lib/types/domain/release';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { findOrCreateReleaseAction, type ReleaseMetadata } from './find-or-create-release-action';
-
-/**
- * Minimal session shape these tests mock `auth()` with. The action only reads
- * `session.user.id` and `session.user.role`; this stand-in keeps the fixtures
- * type-safe without depending on the legacy auth library's `Session` type.
- */
-interface Session {
-  user: { id: string; role: string; name?: string; email?: string };
-  expires: string;
-}
 
 vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
-vi.mock('@/auth');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('../services/release-service');
 vi.mock('../services/artist-service');
 vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
-vi.mock('../utils/auth/require-role');
 vi.mock('next/cache');
 
-const mockAuth = vi.mocked(auth) as unknown as ReturnType<
-  typeof vi.fn<() => Promise<Session | null>>
->;
-const mockRequireRole = vi.mocked(requireRole);
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const mockReleaseFindByTitle = vi.mocked(
   ReleaseService.findByTitleInsensitive
 ) as unknown as ReturnType<
@@ -50,28 +35,14 @@ const mockReleaseServiceCreate = vi.mocked(ReleaseService.createRelease);
 
 describe('findOrCreateReleaseAction', () => {
   beforeEach(() => {
-    // Default auth setup - admin user
-    mockAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        role: 'admin',
-        name: 'Test Admin',
-        email: 'admin@test.com',
-      },
-      expires: new Date(Date.now() + 86400000).toISOString(),
-    });
-
     mockForRelease.mockResolvedValue({ success: true, data: { awaiting: [], stayHidden: [] } });
 
-    mockRequireRole.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        role: 'admin',
-        name: 'Test Admin',
-        email: 'admin@test.com',
-      },
-      expires: new Date(Date.now() + 86400000).toISOString(),
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-123', role: 'admin', name: 'Test Admin', email: 'admin@test.com' },
+      } as never,
+    });
   });
 
   describe('validation', () => {
@@ -101,55 +72,13 @@ describe('findOrCreateReleaseAction', () => {
       });
     });
 
-    it('should require admin role', async () => {
-      const metadata: ReleaseMetadata = {
-        album: 'Test Album',
-      };
+    it('returns the gate refusal without looking up the release', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+      const result = await findOrCreateReleaseAction({ album: 'Test Album' });
 
-      await expect(findOrCreateReleaseAction(metadata)).rejects.toThrow('Unauthorized');
-      expect(mockRequireRole).toHaveBeenCalledWith('admin');
-    });
-  });
-
-  describe('authentication', () => {
-    it('should reject if session is missing', async () => {
-      mockAuth.mockResolvedValue(null);
-
-      const metadata: ReleaseMetadata = {
-        album: 'Test Album',
-      };
-
-      const result = await findOrCreateReleaseAction(metadata);
-
-      expect(result).toEqual({
-        success: false,
-        error: 'You must be a logged in admin user to manage releases',
-      });
-    });
-
-    it('should reject if user is not admin', async () => {
-      mockAuth.mockResolvedValue({
-        user: {
-          id: 'user-123',
-          role: 'user',
-          name: 'Test User',
-          email: 'user@test.com',
-        },
-        expires: new Date(Date.now() + 86400000).toISOString(),
-      });
-
-      const metadata: ReleaseMetadata = {
-        album: 'Test Album',
-      };
-
-      const result = await findOrCreateReleaseAction(metadata);
-
-      expect(result).toEqual({
-        success: false,
-        error: 'You must be a logged in admin user to manage releases',
-      });
+      expect(result).toEqual(REFUSAL);
+      expect(mockReleaseFindByTitle).not.toHaveBeenCalled();
     });
   });
 

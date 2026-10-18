@@ -6,10 +6,10 @@
 
 import 'server-only';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { UploadService } from '@/lib/services/upload-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import {
@@ -32,7 +32,7 @@ import {
  * Server Action: Confirm digital format upload after S3 transfer
  *
  * Flow:
- * 1. Validate user is admin (via withAuth decorator)
+ * 1. Validate user is admin (via the action gate, `gateAction('admin')`)
  * 2. Validate confirmation data with Zod schema
  * 3. Verify S3 object exists at specified key
  * 4. Create ReleaseDigitalFormat record in database
@@ -133,7 +133,10 @@ const confirmDigitalFormatUploadActionHandler = async (
 export const confirmDigitalFormatUploadAction = async (
   params: UploadConfirmationParams
 ): Promise<ActionResult<{ id: string }>> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
   return confirmDigitalFormatUploadActionHandler(params);
 };
 
@@ -212,6 +215,9 @@ const confirmMultiTrackUploadActionHandler = async (
 export const confirmMultiTrackUploadAction = async (
   params: MultiTrackUploadConfirmationParams
 ): Promise<ActionResult<{ formatId: string; fileCount: number }>> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
   return confirmMultiTrackUploadActionHandler(params);
 };

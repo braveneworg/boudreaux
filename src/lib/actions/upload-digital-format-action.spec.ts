@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { requireRole } from '@/lib/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 
 import { uploadDigitalFormatAction } from './upload-digital-format-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockValidateFileInfo = vi.fn();
 const mockGeneratePresignedUploadUrl = vi.fn();
@@ -29,13 +29,15 @@ const createFormData = (data: Record<string, string>): FormData => {
   return formData;
 };
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('uploadDigitalFormatAction', () => {
   const mockSession = {
     user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     mockValidateFileInfo.mockReturnValue({ valid: true });
     mockGeneratePresignedUploadUrl.mockResolvedValue({
       uploadUrl: 'https://s3.example.com/presigned',
@@ -44,9 +46,8 @@ describe('uploadDigitalFormatAction', () => {
     });
   });
 
-  it('should require admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
-
+  it('returns the gate refusal without generating an upload URL', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
     const formData = createFormData({
       releaseId: 'release-123',
       formatType: 'MP3_320KBPS',
@@ -55,8 +56,10 @@ describe('uploadDigitalFormatAction', () => {
       mimeType: 'audio/mpeg',
     });
 
-    await expect(uploadDigitalFormatAction(formData)).rejects.toThrow('Unauthorized');
-    expect(requireRole).toHaveBeenCalledWith('admin');
+    const result = await uploadDigitalFormatAction(formData);
+
+    expect(result).toEqual(REFUSAL);
+    expect(mockGeneratePresignedUploadUrl).not.toHaveBeenCalled();
   });
 
   it('should return presigned URL on successful validation', async () => {

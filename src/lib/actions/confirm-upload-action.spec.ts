@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { requireRole } from '@/lib/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 
 import {
   confirmDigitalFormatUploadAction,
@@ -10,7 +10,7 @@ import {
 } from './confirm-upload-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockVerifyS3ObjectExists = vi.fn();
 vi.mock('../utils/s3-client', () => ({
@@ -50,6 +50,8 @@ vi.mock('../repositories/release-digital-format-file-repository', () => {
   };
 });
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('confirmDigitalFormatUploadAction', () => {
   const mockSession = {
     user: { id: 'admin-1', role: 'admin', email: 'admin@test.com' },
@@ -65,7 +67,7 @@ describe('confirmDigitalFormatUploadAction', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     mockVerifyS3ObjectExists.mockResolvedValue(true);
     mockCreateFormatMetadata.mockReturnValue({
       releaseId: validParams.releaseId,
@@ -79,11 +81,13 @@ describe('confirmDigitalFormatUploadAction', () => {
     mockRepoCreate.mockResolvedValue({ id: 'format-1' });
   });
 
-  it('should require admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(confirmDigitalFormatUploadAction(validParams)).rejects.toThrow('Unauthorized');
-    expect(requireRole).toHaveBeenCalledWith('admin');
+    const result = await confirmDigitalFormatUploadAction(validParams);
+
+    expect(result).toEqual(REFUSAL);
+    expect(mockRepoCreate).not.toHaveBeenCalled();
   });
 
   it('should return success with format id on valid confirmation', async () => {
@@ -203,7 +207,7 @@ describe('confirmMultiTrackUploadAction', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     mockVerifyS3ObjectExists.mockResolvedValue(true);
     mockRepoUpsertParent.mockResolvedValue({ id: 'format-1' });
     mockFileRepoDeleteAllByFormatId.mockResolvedValue(0);
@@ -211,10 +215,13 @@ describe('confirmMultiTrackUploadAction', () => {
     mockRepoUpdateTrackCounts.mockResolvedValue({});
   });
 
-  it('should require admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(confirmMultiTrackUploadAction(validParams)).rejects.toThrow('Unauthorized');
+    const result = await confirmMultiTrackUploadAction(validParams);
+
+    expect(result).toEqual(REFUSAL);
+    expect(mockRepoUpsertParent).not.toHaveBeenCalled();
   });
 
   it('should return success with formatId and fileCount', async () => {
