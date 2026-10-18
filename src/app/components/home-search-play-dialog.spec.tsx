@@ -18,17 +18,13 @@ const audio = vi.hoisted(() => ({
   takeMediaEl: vi.fn(() => null),
   discardMediaEl: vi.fn(),
 }));
-vi.mock('@/hooks/use-primed-audio-handoff', () => ({
-  usePrimedAudioHandoff: () => audio,
-}));
-
 const media = vi.hoisted(() => ({
   primeMediaEl: vi.fn(),
   takeMediaEl: vi.fn(() => null),
   discardMediaEl: vi.fn(),
 }));
 vi.mock('@/hooks/use-primed-media-handoff', () => ({
-  usePrimedMediaHandoff: () => media,
+  usePrimedMediaHandoff: (kind: 'audio' | 'video') => (kind === 'audio' ? audio : media),
 }));
 
 interface DialogProps {

@@ -17,7 +17,6 @@ import type {
   ArtistNavSearchRelease,
   ArtistNavSearchVideo,
 } from '@/hooks/queries/use-artist-nav-search-query';
-import { usePrimedAudioHandoff } from '@/hooks/use-primed-audio-handoff';
 import { usePrimedMediaHandoff } from '@/hooks/use-primed-media-handoff';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { artistVideosHref } from '@/lib/utils/artist-videos-href';
@@ -99,8 +98,8 @@ export const HomeSearchPlayDialog = ({
 }: HomeSearchPlayDialogProps): ReactElement | null => {
   const [selection, setSelection] = useState<HomeSearchSelection | null>(null);
   const [open, setOpen] = useState(false);
-  const audio = usePrimedAudioHandoff();
-  const media = usePrimedMediaHandoff();
+  const audio = usePrimedMediaHandoff('audio');
+  const media = usePrimedMediaHandoff('video');
 
   useImperativeHandle(ref, () => ({
     openRelease: (artist, release) => {

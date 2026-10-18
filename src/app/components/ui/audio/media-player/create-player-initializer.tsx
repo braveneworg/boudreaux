@@ -124,7 +124,7 @@ export interface PlayerInitializerRefs {
   audioElRef: MutableRefObject<HTMLAudioElement | null>;
   /**
    * One-shot supplier of an audio element primed (and usually already
-   * playing) inside the user's play gesture — see `usePrimedAudioHandoff`.
+   * playing) inside the user's play gesture — see `usePrimedMediaHandoff`.
    * When absent or exhausted, the initializer creates its own element.
    */
   takeMediaElRef: MutableRefObject<(() => HTMLAudioElement | null) | undefined>;

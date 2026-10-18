@@ -178,7 +178,7 @@ export const VideosContent = ({ artist = '', artistName }: VideosContentProps): 
   // carry their own dialogs, this one belongs to the combobox selection.
   const [selected, setSelected] = useState<VideoRow | null>(null);
   const [playerOpen, setPlayerOpen] = useState(false);
-  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff();
+  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff('video');
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });

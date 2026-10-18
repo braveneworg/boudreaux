@@ -37,7 +37,7 @@ export const VideoPlayer = ({
   className,
 }: VideoPlayerProps): ReactElement => {
   const [activated, setActivated] = useState(false);
-  const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff();
+  const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff('video');
 
   const activatePlayback = (): void => {
     // Start playback of the real source inside the click gesture — allowed by

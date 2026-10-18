@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 
-import { usePrimedAudioHandoff } from './use-primed-audio-handoff';
+import { usePrimedMediaHandoff } from './use-primed-media-handoff';
 
 /** State and handlers for a surface that opens the release play dialog. */
 export interface ReleasePlayDialogState {
@@ -39,7 +39,7 @@ export interface ReleasePlayDialogState {
 export const useReleasePlayDialog = (playSrc: string | null): ReleasePlayDialogState => {
   const [playerOpen, setPlayerOpen] = useState(false);
   const [prefetchPlayer, setPrefetchPlayer] = useState(false);
-  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedAudioHandoff();
+  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff('audio');
 
   const openPlayer = (): void => {
     if (!playSrc) return;

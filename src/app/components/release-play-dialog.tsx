@@ -23,7 +23,7 @@ export interface ReleasePlayDialogProps {
   onOpenChange: (open: boolean) => void;
   /**
    * One-shot supplier of the audio element primed (and already playing)
-   * during the opening click gesture (see `usePrimedAudioHandoff`) — adopting
+   * during the opening click gesture (see `usePrimedMediaHandoff`) — adopting
    * THAT element is what lets playback survive strict autoplay policies while
    * the release detail and lazy player chunk load.
    */
