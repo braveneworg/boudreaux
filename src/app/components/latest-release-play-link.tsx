@@ -56,8 +56,10 @@ const CARD_LINK_CLASS = 'underline underline-offset-2 hover:no-underline';
  * An artist's latest release, the title opening its listening modal in place
  * (the `/releases` Play flow): a plain left click primes track 1 inside the
  * gesture and opens the modal; modified clicks and the keyboard's
- * open-in-new-tab follow the href, the release deep link. The `aria-haspopup`
- * appears once hydrated, so the server markup is the plain link. A release
+ * open-in-new-tab follow the href, the release deep link. The link and its
+ * `aria-haspopup` appear once hydrated: the server markup is a link-styled
+ * button with no href, so a click before the JavaScript runs never leaves
+ * the page for the deep link, where the modal would open paused. A release
  * with nothing playable shows its title as plain text. The modal takes the
  * release's own accent, shares the deep link, and its "View all releases"
  * footer closes it before listing the artist's releases.
@@ -87,7 +89,7 @@ export const LatestReleasePlayLink = ({
   const deepLinkSlug = release.albumArtistSlug ?? slug;
   const year = release.releasedOn.getUTCFullYear();
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+  const handleClick = (event: MouseEvent<HTMLElement>): void => {
     if (!isPlainLeftClick(event)) return;
     event.preventDefault();
     openPlayer();
@@ -107,23 +109,36 @@ export const LatestReleasePlayLink = ({
     linkRef.current?.focus();
   };
 
+  const linkClass = variant === 'card' ? CARD_LINK_CLASS : PAGE_LINK_CLASS;
+
   const title =
     release.playSrc === null ? (
       <span>{release.title}</span>
     ) : (
       <>
-        <Link
-          ref={linkRef}
-          href={releaseDeepLinkHref(deepLinkSlug, release.id)}
-          prefetch={false}
-          onClick={handleClick}
-          onPointerEnter={warmPlayer}
-          onFocus={warmPlayer}
-          aria-haspopup={hydrated ? 'dialog' : undefined}
-          className={variant === 'card' ? CARD_LINK_CLASS : PAGE_LINK_CLASS}
-        >
-          {release.title}
-        </Link>
+        {hydrated ? (
+          <Link
+            ref={linkRef}
+            href={releaseDeepLinkHref(deepLinkSlug, release.id)}
+            prefetch={false}
+            onClick={handleClick}
+            onPointerEnter={warmPlayer}
+            onFocus={warmPlayer}
+            aria-haspopup="dialog"
+            className={linkClass}
+          >
+            {release.title}
+          </Link>
+        ) : (
+          // No href until hydrated: a click before the JavaScript runs stays
+          // on the page, and one during hydration is replayed to handleClick.
+          // A button, as jsx-a11y asks of a link-styled control with no href.
+          // A button box cannot wrap inside the line, so it draws none: its
+          // text is an inline span that wraps and looks like the link.
+          <button type="button" onClick={handleClick} className="contents">
+            <span className={cn('cursor-pointer', linkClass)}>{release.title}</span>
+          </button>
+        )}
         <ReleasePlayDialog
           releaseId={release.id}
           title={release.title}

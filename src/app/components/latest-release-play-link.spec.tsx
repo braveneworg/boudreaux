@@ -201,11 +201,62 @@ describe('LatestReleasePlayLink', () => {
     );
   });
 
-  it('is a plain link before hydration, so the server markup matches', () => {
-    hydrated.value = false;
-    renderLink();
+  describe('before hydration', () => {
+    beforeEach(() => {
+      hydrated.value = false;
+    });
 
-    expect(screen.getByRole('link', { name: 'Night Shift' })).not.toHaveAttribute('aria-haspopup');
+    it('renders the title as a link-styled button with no href, so a click before the JS runs stays put', () => {
+      renderLink();
+
+      const title = screen.getByRole('button', { name: 'Night Shift' });
+      expect(title).toHaveAttribute('type', 'button');
+      expect(title).not.toHaveAttribute('href');
+      expect(title).not.toHaveAttribute('aria-haspopup');
+      expect(screen.queryByRole('link', { name: 'Night Shift' })).not.toBeInTheDocument();
+    });
+
+    // A button box is atomic: it cannot wrap inside the line like the link,
+    // so the hydration swap would reflow a long title. The button draws no
+    // box, and its text is an inline span styled like the link.
+    it('draws no box of its own, its text styled like the link with a pointer', () => {
+      renderLink();
+
+      const title = screen.getByRole('button', { name: 'Night Shift' });
+      expect(title).toHaveClass('contents');
+      expect(within(title).getByText('Night Shift')).toHaveClass(
+        'underline',
+        'underline-offset-4',
+        'cursor-pointer'
+      );
+    });
+
+    it('keeps the card styling on the card variant', () => {
+      renderLink({}, 'card');
+
+      const title = screen.getByRole('button', { name: 'Night Shift' });
+      expect(title).not.toHaveAttribute('href');
+      expect(within(title).getByText('Night Shift')).toHaveClass(
+        'underline',
+        'underline-offset-2',
+        'cursor-pointer'
+      );
+    });
+
+    it('opens the player on a plain left click', async () => {
+      const user = renderLink();
+
+      await user.click(screen.getByRole('button', { name: 'Night Shift' }));
+
+      expect(dialog.openPlayer).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the title as plain text when nothing is playable', () => {
+      renderLink({ playSrc: null });
+
+      expect(screen.queryByRole('button', { name: 'Night Shift' })).not.toBeInTheDocument();
+      expect(screen.getByText('Night Shift').tagName).toBe('SPAN');
+    });
   });
 
   it('opens the player on a plain left click instead of navigating', async () => {

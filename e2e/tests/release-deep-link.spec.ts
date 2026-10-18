@@ -6,13 +6,12 @@ import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/base.fixture';
 import {
+  accentOf,
   expectSharesDeepLink,
   openReleaseDeepLink,
   releaseDeepLink,
 } from '../helpers/release-deep-link';
 import { isAnyMediaPlaying } from '../helpers/strict-autoplay';
-
-import type { Locator } from '@playwright/test';
 
 /**
  * The release deep link, `/releases?artist=<slug>&release=<id>` (ADR-0023):
@@ -47,12 +46,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await prisma.$disconnect();
 });
-
-/** The `zine-accent-*` class framing a dialog. */
-const accentOf = async (dialog: Locator): Promise<string | undefined> =>
-  (await dialog.getAttribute('class'))
-    ?.split(/\s+/)
-    .find((name) => name.startsWith('zine-accent-'));
 
 const RELEASES_GRID_HEADING = { level: 2, name: 'Releases by E2E Artist' } as const;
 
