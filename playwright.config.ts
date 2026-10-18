@@ -69,7 +69,10 @@ export default defineConfig({
     timeout: IS_CI ? 60_000 : 120_000, // 1 min in CI (pre-built), 2 min locally
     env: {
       NODE_ENV: IS_CI ? 'production' : 'development',
-      HOSTNAME: E2E_HOST,
+      // Bind every interface, not 127.0.0.1. NextURL renames a 127.0.0.1
+      // host to localhost, so the router sees the proxy's same-URL rewrite
+      // as another origin and proxies the request to itself until it hangs.
+      HOSTNAME: '0.0.0.0',
       PORT: E2E_PORT,
       E2E_MODE: 'true',
       DATABASE_URL: E2E_DATABASE_URL,
