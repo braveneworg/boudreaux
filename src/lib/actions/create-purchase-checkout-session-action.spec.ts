@@ -298,7 +298,7 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
       expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
         expect.objectContaining({
-          return_url: 'https://myapp.example.com/releases/release-123',
+          return_url: 'https://myapp.example.com/collection',
         })
       );
     });
@@ -359,7 +359,7 @@ describe('createPurchaseCheckoutSessionAction', () => {
 
       expect(vi.mocked(stripe.checkout.sessions.create)).toHaveBeenCalledWith(
         expect.objectContaining({
-          return_url: 'http://localhost:3000/releases/release-123',
+          return_url: 'http://localhost:3000/collection',
         })
       );
     });

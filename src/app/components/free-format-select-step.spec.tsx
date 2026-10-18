@@ -15,10 +15,13 @@ vi.mock('@/lib/utils/trigger-download', () => ({
   triggerDownload: vi.fn(),
 }));
 
+const onChoosePaid = vi.fn();
+
 describe('FreeFormatSelectStep', () => {
   it('renders the instructional message with aria-live="polite"', () => {
     render(
       <FreeFormatSelectStep
+        onChoosePaid={onChoosePaid}
         releaseId="release-123"
         availableFreeFormats={['MP3_320KBPS', 'AAC']}
       />,
@@ -33,7 +36,11 @@ describe('FreeFormatSelectStep', () => {
   it('restricts combobox options to FREE_FORMAT_TYPES intersected with publishedFormats', async () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
-      <FreeFormatSelectStep releaseId="release-123" availableFreeFormats={['MP3_320KBPS']} />,
+      <FreeFormatSelectStep
+        onChoosePaid={onChoosePaid}
+        releaseId="release-123"
+        availableFreeFormats={['MP3_320KBPS']}
+      />,
       { wrapper: createQueryWrapper() }
     );
 
@@ -49,6 +56,7 @@ describe('FreeFormatSelectStep', () => {
   it('disables the download button until at least one free format is selected', () => {
     render(
       <FreeFormatSelectStep
+        onChoosePaid={onChoosePaid}
         releaseId="release-123"
         availableFreeFormats={['MP3_320KBPS', 'AAC']}
       />,
@@ -63,6 +71,7 @@ describe('FreeFormatSelectStep', () => {
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
     render(
       <FreeFormatSelectStep
+        onChoosePaid={onChoosePaid}
         releaseId="release-123"
         availableFreeFormats={['MP3_320KBPS', 'AAC']}
       />,
@@ -82,9 +91,16 @@ describe('FreeFormatSelectStep', () => {
   });
 
   it('renders defensive empty-state copy when availableFreeFormats is empty', () => {
-    render(<FreeFormatSelectStep releaseId="release-123" availableFreeFormats={[]} />, {
-      wrapper: createQueryWrapper(),
-    });
+    render(
+      <FreeFormatSelectStep
+        onChoosePaid={onChoosePaid}
+        releaseId="release-123"
+        availableFreeFormats={[]}
+      />,
+      {
+        wrapper: createQueryWrapper(),
+      }
+    );
 
     const empty = screen.getByText('No free formats available for this release');
     expect(empty).toBeInTheDocument();
@@ -101,6 +117,7 @@ describe('FreeFormatSelectStep', () => {
       vi.setSystemTime(new Date('2026-05-08T12:00:00Z'));
       render(
         <FreeFormatSelectStep
+          onChoosePaid={onChoosePaid}
           releaseId="release-123"
           availableFreeFormats={['MP3_320KBPS', 'AAC']}
           capReachedResetsAtIso="2026-05-08T13:30:00Z"
@@ -118,6 +135,7 @@ describe('FreeFormatSelectStep', () => {
       vi.setSystemTime(new Date('2026-05-08T12:00:00Z'));
       render(
         <FreeFormatSelectStep
+          onChoosePaid={onChoosePaid}
           releaseId="release-123"
           availableFreeFormats={['MP3_320KBPS', 'AAC']}
           capReachedResetsAtIso="2026-05-08T13:30:00Z"
@@ -136,39 +154,42 @@ describe('FreeFormatSelectStep', () => {
       expect(countdown).toHaveTextContent(/1h 29m|1h 30m/);
     });
 
-    it('renders a CTA link to the premium / sign-in path', () => {
+    it('offers the paid path as a button, not a link', () => {
       render(
         <FreeFormatSelectStep
           releaseId="release-123"
           availableFreeFormats={['MP3_320KBPS', 'AAC']}
           capReachedResetsAtIso="2026-05-08T13:30:00Z"
+          onChoosePaid={onChoosePaid}
         />,
         { wrapper: createQueryWrapper() }
       );
 
-      const cta = screen.getByRole('link', { name: /pay what you want/i });
-      expect(cta).toBeInTheDocument();
-      expect(cta).toHaveAttribute('href', '/releases/release-123#purchase');
+      expect(screen.getByRole('button', { name: /pay what you want/i })).toBeInTheDocument();
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
 
-    it('respects an explicit premiumCtaHref override', () => {
+    it('switches to the paid path when "Pay what you want" is pressed', async () => {
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <FreeFormatSelectStep
           releaseId="release-123"
           availableFreeFormats={['MP3_320KBPS', 'AAC']}
           capReachedResetsAtIso="2026-05-08T13:30:00Z"
-          premiumCtaHref="/sign-in?redirect=/releases/release-123"
+          onChoosePaid={onChoosePaid}
         />,
         { wrapper: createQueryWrapper() }
       );
 
-      const cta = screen.getByRole('link', { name: /pay what you want/i });
-      expect(cta).toHaveAttribute('href', '/sign-in?redirect=/releases/release-123');
+      await user.click(screen.getByRole('button', { name: /pay what you want/i }));
+
+      expect(onChoosePaid).toHaveBeenCalledTimes(1);
     });
 
     it('does NOT render the format combobox when cap-reached', () => {
       render(
         <FreeFormatSelectStep
+          onChoosePaid={onChoosePaid}
           releaseId="release-123"
           availableFreeFormats={['MP3_320KBPS', 'AAC']}
           capReachedResetsAtIso="2026-05-08T13:30:00Z"
@@ -182,9 +203,17 @@ describe('FreeFormatSelectStep', () => {
 
   describe('loading state', () => {
     it('renders a spinner when isLoading and no formats are yet available', () => {
-      render(<FreeFormatSelectStep releaseId="release-123" availableFreeFormats={[]} isLoading />, {
-        wrapper: createQueryWrapper(),
-      });
+      render(
+        <FreeFormatSelectStep
+          onChoosePaid={onChoosePaid}
+          releaseId="release-123"
+          availableFreeFormats={[]}
+          isLoading
+        />,
+        {
+          wrapper: createQueryWrapper(),
+        }
+      );
 
       expect(screen.getByRole('status')).toBeInTheDocument();
       expect(screen.queryByRole('combobox')).not.toBeInTheDocument();

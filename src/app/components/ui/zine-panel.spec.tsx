@@ -7,6 +7,7 @@ import {
   getZineAccentClass,
   LOUD_ZINE_ACCENTS,
   pickLoudZineAccent,
+  zineAccentForRelease,
   ZinePanel,
   type ZineAccent,
 } from './zine-panel';
@@ -271,5 +272,33 @@ describe('pickLoudZineAccent', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.25);
 
     expect(pickLoudZineAccent()).toBe('cyan');
+  });
+});
+
+describe('zineAccentForRelease', () => {
+  const ids = Array.from({ length: 100 }, (_, index) =>
+    index.toString(16).padStart(24, '0').replace(/^0/, 'a')
+  );
+
+  it('gives the same release the same accent on every call', () => {
+    expect(ids.map(zineAccentForRelease)).toEqual(ids.map(zineAccentForRelease));
+  });
+
+  it('only ever gives a loud accent', () => {
+    const accents = ids.map(zineAccentForRelease);
+
+    expect(accents.every((accent) => LOUD_ZINE_ACCENTS.includes(accent))).toBe(true);
+  });
+
+  it('spreads releases across the whole loud palette', () => {
+    expect(new Set(ids.map(zineAccentForRelease))).toEqual(new Set(LOUD_ZINE_ACCENTS));
+  });
+
+  it('never draws at random', () => {
+    const random = vi.spyOn(Math, 'random');
+
+    zineAccentForRelease('0123456789abcdef01234567');
+
+    expect(random).not.toHaveBeenCalled();
   });
 });

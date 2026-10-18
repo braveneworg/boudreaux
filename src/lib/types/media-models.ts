@@ -7,7 +7,6 @@ import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
   Release,
-  ReleaseCarouselItem,
   ReleaseListItem,
   ReleaseScalars,
 } from '@/lib/types/domain/release';
@@ -32,13 +31,7 @@ export type { Artist, ArtistWithPublishedReleases };
 // Release output types are now hand-written, Prisma-free domain types
 // (drift-checked in release-repository). Imported above for local use,
 // re-exported for back-compat with existing importers of `@/lib/types/media-models`.
-export type {
-  PublishedReleaseDetail,
-  PublishedReleaseListing,
-  Release,
-  ReleaseCarouselItem,
-  ReleaseListItem,
-};
+export type { PublishedReleaseDetail, PublishedReleaseListing, Release, ReleaseListItem };
 
 // FeaturedArtist types are now hand-written, Prisma-free domain types
 // (drift-checked in featured-artist-repository). Imported above for local use,

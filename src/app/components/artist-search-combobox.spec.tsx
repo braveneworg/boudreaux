@@ -38,7 +38,13 @@ const makeArtist = (overrides: Partial<ArtistListingRow>): ArtistListingRow => (
   members: [],
   memberOf: [],
   releaseCount: 1,
-  newestRelease: { id: 'r-1', title: 'Debut LP', releasedOn: new Date(2024, 0, 1) },
+  newestRelease: {
+    id: 'r-1',
+    title: 'Debut LP',
+    releasedOn: new Date(2024, 0, 1),
+    playSrc: null,
+    albumArtistSlug: null,
+  },
   ...overrides,
 });
 
@@ -60,7 +66,13 @@ const alpha = makeArtist({
       displayOrder: null,
     },
   ],
-  newestRelease: { id: 'r-a', title: 'Alpha Sessions', releasedOn: new Date(2025, 0, 1) },
+  newestRelease: {
+    id: 'r-a',
+    title: 'Alpha Sessions',
+    releasedOn: new Date(2025, 0, 1),
+    playSrc: null,
+    albumArtistSlug: null,
+  },
 });
 const bravo = makeArtist({
   id: 'a-bravo',

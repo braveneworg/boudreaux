@@ -5,7 +5,7 @@
 /**
  * Whether `href` represents the page the user is currently on. The root path
  * matches exactly; every other path also matches its sub-routes (e.g.
- * `/releases` stays active on `/releases/123`).
+ * `/artists` stays active on `/artists/ceschi`).
  */
 export const isActiveHref = (href: string, pathname: string): boolean =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);

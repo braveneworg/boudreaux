@@ -15,14 +15,13 @@ import type {
   PublishedReleaseFilters,
   PublishedReleaseListing,
   Release,
-  ReleaseCarouselItem,
   ReleaseForDeletion,
   ReleaseListQuery,
   ReleaseListItem,
   ReleaseScalars,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
-import { withPublicByline } from '@/lib/utils/artist-release-credits';
+import { publicCredits, withPublicByline } from '@/lib/utils/artist-release-credits';
 import { NO_CREDIT_DECISIONS, type CreditDecisions } from '@/lib/utils/credit-confirmation';
 import {
   invalidatePublicNameCaches,
@@ -396,13 +395,18 @@ export class ReleaseService {
   }
 
   /**
-   * Get a single published release with digital format files for the media player page.
-   * Returns MP3_320KBPS files sorted by track number for audio playback.
+   * Get a single published release with digital format files for the listening modal.
+   * Returns MP3_320KBPS files sorted by track number for audio playback. With an
+   * `artist` slug, only a release that artist holds a release credit on is found
+   * (the `/releases?artist=` filter's rule).
    * Returns `{ success: false }` when the release is not found or not published.
    */
-  static async getReleaseWithTracks(id: string): Promise<ServiceResponse<PublishedReleaseDetail>> {
+  static async getReleaseWithTracks(
+    id: string,
+    artist?: string
+  ): Promise<ServiceResponse<PublishedReleaseDetail>> {
     try {
-      const release = await ReleaseRepository.findPublishedWithTracks(id);
+      const release = await ReleaseRepository.findPublishedWithTracks(id, artist);
 
       if (!release) {
         return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
@@ -415,23 +419,17 @@ export class ReleaseService {
   }
 
   /**
-   * Get other published releases by an artist, excluding the current release.
-   * Used for the "more by this artist" carousel on the media player page.
+   * Where the old release URL `/releases/<id>` now leads: the public album
+   * artist's slug, for the release deep link. `null` when no listed release
+   * has the id, or its album artist is hidden — the link then never falls to
+   * the next credit (ADR-0015).
    */
-  static async getArtistOtherReleases(
-    artistId: string,
-    excludeReleaseId: string
-  ): Promise<ServiceResponse<ReleaseCarouselItem[]>> {
-    try {
-      const releases = await ReleaseRepository.findPublishedByArtistExcluding(
-        artistId,
-        excludeReleaseId
-      );
-
-      return { success: true, data: releases };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to fetch artist releases' });
-    }
+  static async getPublishedReleaseRedirectTarget(
+    id: string
+  ): Promise<{ artistSlug: string } | null> {
+    const release = await ReleaseRepository.findPublishedCredits(id);
+    const albumArtist = release ? publicCredits(release.artistReleases).albumArtist : null;
+    return albumArtist ? { artistSlug: albumArtist.slug } : null;
   }
 
   /**

@@ -25,16 +25,20 @@ vi.mock('@tanstack/react-query', () => ({
   HydrationBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+const mockSetQueryData = vi.fn();
 vi.mock('@/lib/utils/get-query-client', () => ({
   getQueryClient: () => ({
     prefetchInfiniteQuery: mockPrefetchInfiniteQuery,
+    setQueryData: mockSetQueryData,
   }),
 }));
 
 const mockGetPublishedReleases = vi.fn().mockResolvedValue({ success: true, data: [] });
+const mockGetReleaseWithTracks = vi.fn();
 vi.mock('@/lib/services/release-service', () => ({
   ReleaseService: {
     getPublishedReleases: (...args: unknown[]) => mockGetPublishedReleases(...args),
+    getReleaseWithTracks: (...args: unknown[]) => mockGetReleaseWithTracks(...args),
   },
 }));
 
@@ -72,11 +76,20 @@ vi.mock('@/app/components/ui/heading', () => ({
 }));
 
 vi.mock('@/app/components/releases-content', () => ({
-  ReleasesContent: ({ artist, artistName }: { artist?: string; artistName?: string }) => (
+  ReleasesContent: ({
+    artist,
+    artistName,
+    initialRelease,
+  }: {
+    artist?: string;
+    artistName?: string;
+    initialRelease?: unknown;
+  }) => (
     <div
       data-testid="releases-content"
       data-artist={artist ?? ''}
       data-artist-name={artistName ?? ''}
+      data-initial-release={JSON.stringify(initialRelease ?? null)}
     >
       Releases Content
     </div>
@@ -102,6 +115,23 @@ beforeEach(() => {
 });
 
 type SearchParams = Record<string, string | string[] | undefined>;
+
+const RELEASE_ID = '0123456789abcdef01234567';
+
+/** A playable release as `getReleaseWithTracks` returns it. */
+const releaseWithTracks = (overrides: Record<string, unknown> = {}) => ({
+  id: RELEASE_ID,
+  title: 'E2E Album One',
+  releasedOn: new Date('2024-03-01T00:00:00.000Z'),
+  albumArtist: { firstName: 'E2E', surname: 'Artist', displayName: 'E2E Artist' },
+  artistReleases: [],
+  digitalFormats: [{ files: [{ s3Key: 'releases/e2e/track-one.mp3', trackNumber: 1 }] }],
+  ...overrides,
+});
+
+/** The `initialRelease` the page handed the releases content. */
+const initialRelease = (): unknown =>
+  JSON.parse(screen.getByTestId('releases-content').getAttribute('data-initial-release') ?? '');
 
 /** Render the page for the given query string params. */
 const renderPage = async (searchParams: SearchParams = {}) =>
@@ -233,6 +263,107 @@ describe('ReleasesPage', () => {
     expect(mockPrefetchInfiniteQuery).not.toHaveBeenCalled();
   });
 
+  describe('release deep link', () => {
+    it('opens the release when it is listed under the artist filter and playable', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({ success: true, data: releaseWithTracks() });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(mockGetReleaseWithTracks.mock.calls).toEqual([[RELEASE_ID, 'e2e-artist']]);
+      expect(initialRelease()).toEqual({
+        id: RELEASE_ID,
+        title: 'E2E Album One',
+        artistName: 'E2E Artist',
+        playSrc: expect.stringContaining('releases/e2e/track-one.mp3'),
+        year: 2024,
+      });
+    });
+
+    it('seeds the release detail so the modal mounts without a skeleton', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({ success: true, data: releaseWithTracks() });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(mockSetQueryData.mock.calls).toEqual([
+        [
+          queryKeys.releases.detail(RELEASE_ID),
+          expect.objectContaining({ id: RELEASE_ID, releasedOn: '2024-03-01T00:00:00.000Z' }),
+        ],
+      ]);
+    });
+
+    it('seeds BigInt fields as numbers, as the API serves them', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: true,
+        data: releaseWithTracks({ totalFileSize: BigInt(5_000_000) }),
+      });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(mockSetQueryData.mock.calls[0]?.[1]).toHaveProperty('totalFileSize', 5_000_000);
+    });
+
+    it('takes the first release when the param repeats, trimmed', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({ success: true, data: releaseWithTracks() });
+
+      await renderPage({ artist: 'e2e-artist', release: [` ${RELEASE_ID} `, 'other'] });
+
+      expect(mockGetReleaseWithTracks.mock.calls).toEqual([[RELEASE_ID, 'e2e-artist']]);
+    });
+
+    it('names no artist when the album artist is hidden', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: true,
+        data: releaseWithTracks({ albumArtist: null }),
+      });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(initialRelease()).toHaveProperty('artistName', null);
+    });
+
+    it('shows the plain grid when the release is not under the filter or not listed', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: false,
+        error: 'Release not found',
+      });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(initialRelease()).toBeNull();
+      expect(mockSetQueryData).not.toHaveBeenCalled();
+    });
+
+    it('shows the plain grid when the release has nothing playable', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: true,
+        data: releaseWithTracks({ digitalFormats: [] }),
+      });
+
+      await renderPage({ artist: 'e2e-artist', release: RELEASE_ID });
+
+      expect(initialRelease()).toBeNull();
+      expect(mockSetQueryData).not.toHaveBeenCalled();
+    });
+
+    it.each(['garbage', '', `${RELEASE_ID}0`])(
+      'looks nothing up for a release that is not an ObjectId (%j)',
+      async (release) => {
+        await renderPage({ artist: 'e2e-artist', release });
+
+        expect(mockGetReleaseWithTracks).not.toHaveBeenCalled();
+        expect(initialRelease()).toBeNull();
+      }
+    );
+
+    it('looks nothing up without an artist filter', async () => {
+      await renderPage({ release: RELEASE_ID });
+
+      expect(mockGetReleaseWithTracks).not.toHaveBeenCalled();
+      expect(initialRelease()).toBeNull();
+    });
+  });
+
   describe('generateMetadata', () => {
     const metadataFor = (searchParams: SearchParams) =>
       generateMetadata({ searchParams: Promise.resolve(searchParams) });
@@ -246,6 +377,27 @@ describe('ReleasesPage', () => {
 
     it('titles a filtered listing with the artist', async () => {
       await expect(metadataFor({ artist: 'e2e-artist' })).resolves.toEqual({
+        title: 'Releases by E2E Artist',
+        description: 'Every release by E2E Artist.',
+      });
+    });
+
+    it('titles a deep link with the release', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({ success: true, data: releaseWithTracks() });
+
+      await expect(metadataFor({ artist: 'e2e-artist', release: RELEASE_ID })).resolves.toEqual({
+        title: 'E2E Album One',
+        description: 'Every release by E2E Artist.',
+      });
+    });
+
+    it('titles a deep link to an unplayable release as the artist listing', async () => {
+      mockGetReleaseWithTracks.mockResolvedValueOnce({
+        success: false,
+        error: 'Release not found',
+      });
+
+      await expect(metadataFor({ artist: 'e2e-artist', release: RELEASE_ID })).resolves.toEqual({
         title: 'Releases by E2E Artist',
         description: 'Every release by E2E Artist.',
       });

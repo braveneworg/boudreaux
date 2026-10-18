@@ -29,6 +29,8 @@ const release = {
 };
 let memberSlugFound: string[] = [];
 let hiddenSlugFound: string[] = [];
+/** The release ids the deep-link read finds under the member's slug, of all seeded. */
+let deepLinkFound: string[] = [];
 
 const slugOf = (label: string): string => `${prefix}${label}`;
 
@@ -95,6 +97,12 @@ beforeAll(async () => {
 
   memberSlugFound = await findIds(slugOf('member'));
   hiddenSlugFound = await findIds(slugOf('hidden-member'));
+  const reads = await Promise.all(
+    Object.values(release).map((id) =>
+      ReleaseRepository.findPublishedWithTracks(id, slugOf('member'))
+    )
+  );
+  deepLinkFound = reads.flatMap((row) => (row ? [row.id] : []));
 });
 
 afterAll(async () => {
@@ -128,5 +136,9 @@ describe('published releases filtered by artist (Docker Mongo contract)', () => 
 
   it('matches nothing for a hidden artist, band releases included', () => {
     expect(hiddenSlugFound).toEqual([]);
+  });
+
+  it('finds a deep-linked release under the same credit rule as the listing', () => {
+    expect([...deepLinkFound].sort()).toEqual([...memberSlugFound].sort());
   });
 });

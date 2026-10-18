@@ -229,6 +229,7 @@ describe('BioGenerationService.generate', () => {
 
 describe('persistGeneratedBio', () => {
   const artistId = 'a'.repeat(24);
+  const artistSlug = 'radiohead';
 
   const baseData: BioGenerationData = {
     shortBio: '<b>Short</b> teaser',
@@ -276,7 +277,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('returns the assembled sanitized content', async () => {
-    const content = await persistGeneratedBio(artistId, baseData, []);
+    const content = await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(content.longBio).not.toContain('<script>');
     expect(content.longBio).not.toContain('javascript:');
@@ -290,7 +291,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('keeps the emphasis markup in the sanitized short bio', async () => {
-    const content = await persistGeneratedBio(artistId, baseData, []);
+    const content = await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(content.shortBio).toBe('<b>Short</b> teaser');
   });
@@ -302,7 +303,8 @@ describe('persistGeneratedBio', () => {
         shortBio: '<p>Teaser. <img src="https://cdn.example/x.webp" alt="x"> The end.</p>',
         longBio: '<p>Full bio. <img src="https://cdn.example/x.webp" alt="x"></p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.shortBio).not.toContain('<img');
@@ -312,7 +314,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('sanitizes the alt bio and persists it via the repository', async () => {
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.altBio).toContain('<strong>promo</strong>');
@@ -322,7 +324,7 @@ describe('persistGeneratedBio', () => {
   // A human's display-image choice outlives regeneration (ADR-0008): the job
   // persists its suggestion in isPrimary and never a display position.
   it('persists images without a display position, keeping isPrimary as the suggestion', async () => {
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.images[0]).toMatchObject({ isPrimary: true });
@@ -333,7 +335,8 @@ describe('persistGeneratedBio', () => {
     const content = await persistGeneratedBio(
       artistId,
       withData({ altBio: '<p>Promo <img src="image:0" alt="x"></p>' }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.altBio).toContain(
@@ -343,7 +346,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('persists re-hosted images with attribution via the repository', async () => {
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(rehostImagesMock).toHaveBeenCalledWith(
       [{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }],
@@ -368,7 +371,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('re-hosts via rehostImages (not rehostWithVariants) at generation time', async () => {
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(rehostImagesMock).toHaveBeenCalledWith(
       [{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }],
@@ -384,7 +387,7 @@ describe('persistGeneratedBio', () => {
     ];
     findFingerprintsMock.mockResolvedValueOnce(survivors);
 
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     // Generated rows are about to be replaced, so only custom + linked rows
     // may shadow a newly discovered image.
@@ -397,7 +400,7 @@ describe('persistGeneratedBio', () => {
   it('re-hosts without a pool seed when the fingerprint lookup fails', async () => {
     findFingerprintsMock.mockRejectedValueOnce(new Error('db down'));
 
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(rehostImagesMock.mock.calls).toEqual([
       [[{ url: 'https://upload.wikimedia.org/a.jpg', index: 0 }], artistId, []],
@@ -418,7 +421,8 @@ describe('persistGeneratedBio', () => {
     const content = await persistGeneratedBio(
       artistId,
       withData({ altBio: '<p>Promo <img src="image:0" alt="x"></p>' }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.altBio).toContain('src="https://cdn/linked.webp"');
@@ -440,7 +444,7 @@ describe('persistGeneratedBio', () => {
       duplicateAliases: new Map(),
     });
 
-    const content = await persistGeneratedBio(artistId, baseData, []);
+    const content = await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     const [, persisted] = replaceBioContentMock.mock.calls[0];
     expect(persisted.images[0]).toMatchObject({
@@ -456,7 +460,8 @@ describe('persistGeneratedBio', () => {
     const content = await persistGeneratedBio(
       artistId,
       withData({ longBio: '<p>Intro</p><img src="image:0" alt="Portrait"><p>More</p>' }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio).toContain(
@@ -471,7 +476,8 @@ describe('persistGeneratedBio', () => {
     const content = await persistGeneratedBio(
       artistId,
       withData({ longBio: '<p>Intro</p><img src="image:0" alt="x">' }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio).not.toContain('image:0');
@@ -513,7 +519,8 @@ describe('persistGeneratedBio', () => {
         ],
         longBio: '<p>Bio <img src="image:1" alt="same photo"> text</p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio).toContain(survivorUrl);
@@ -534,7 +541,8 @@ describe('persistGeneratedBio', () => {
           { label: 'Bandcamp', url: 'https://radiohead.bandcamp.com', kind: 'streaming' },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -553,7 +561,8 @@ describe('persistGeneratedBio', () => {
           { label: 'Evil', url: 'javascript:alert(1)', kind: 'other' },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -564,35 +573,40 @@ describe('persistGeneratedBio', () => {
   it('drops an image whose re-host fails without aborting persistence', async () => {
     rehostImagesMock.mockResolvedValueOnce({ results: [null], duplicateAliases: new Map() });
 
-    await persistGeneratedBio(artistId, baseData, []);
+    await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.images).toHaveLength(0);
   });
 
   it('persists null genres when the data returns no genres', async () => {
-    await persistGeneratedBio(artistId, withData({ genres: null }), []);
+    await persistGeneratedBio(artistId, withData({ genres: null }), [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.genres).toBeNull();
   });
 
   it('persists null genres when the value sanitizes down to an empty string', async () => {
-    await persistGeneratedBio(artistId, withData({ genres: '<script></script>' }), []);
+    await persistGeneratedBio(artistId, withData({ genres: '<script></script>' }), [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.genres).toBeNull();
   });
 
   it('normalises the generated genres into the stored lowercase-dashed form', async () => {
-    await persistGeneratedBio(artistId, withData({ genres: 'Indie Rock, Post Punk' }), []);
+    await persistGeneratedBio(
+      artistId,
+      withData({ genres: 'Indie Rock, Post Punk' }),
+      [],
+      artistSlug
+    );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.genres).toBe('indie-rock,post-punk');
   });
 
   it('drops genres the model repeated in a different case', async () => {
-    await persistGeneratedBio(artistId, withData({ genres: 'Punk, punk' }), []);
+    await persistGeneratedBio(artistId, withData({ genres: 'Punk, punk' }), [], artistSlug);
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.genres).toBe('punk');
@@ -621,7 +635,8 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -651,7 +666,8 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -663,7 +679,8 @@ describe('persistGeneratedBio', () => {
     await persistGeneratedBio(
       artistId,
       withData({ links: [{ label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Radiohead' }] }),
-      []
+      [],
+      artistSlug
     );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
@@ -671,42 +688,73 @@ describe('persistGeneratedBio', () => {
   });
 
   it('appends kind:release links for the artist published releases', async () => {
-    await persistGeneratedBio(artistId, baseData, [
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
-    ]);
+    await persistGeneratedBio(
+      artistId,
+      baseData,
+      [
+        {
+          id: '665f1f77bcf86cd799439021',
+          title: 'Sad, Fat Luck',
+          releasedOn: null,
+          coverUrl: null,
+        },
+      ],
+      artistSlug
+    );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     expect(content.links).toContainEqual(
       expect.objectContaining({
         label: 'Sad, Fat Luck',
-        url: '/releases/665f1f77bcf86cd799439021',
+        url: '/releases?artist=radiohead&release=665f1f77bcf86cd799439021',
         kind: 'release',
       })
     );
   });
 
   it('does not duplicate a release link already present', async () => {
-    await persistGeneratedBio(artistId, baseData, [
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
-      { id: '665f1f77bcf86cd799439021', title: 'Sad, Fat Luck', releasedOn: null, coverUrl: null },
-    ]);
+    await persistGeneratedBio(
+      artistId,
+      baseData,
+      [
+        {
+          id: '665f1f77bcf86cd799439021',
+          title: 'Sad, Fat Luck',
+          releasedOn: null,
+          coverUrl: null,
+        },
+        {
+          id: '665f1f77bcf86cd799439021',
+          title: 'Sad, Fat Luck',
+          releasedOn: null,
+          coverUrl: null,
+        },
+      ],
+      artistSlug
+    );
 
     const [, content] = replaceBioContentMock.mock.calls[0];
     const matches = content.links.filter(
-      (link: { url: string }) => link.url === '/releases/665f1f77bcf86cd799439021'
+      (link: { url: string }) =>
+        link.url === '/releases?artist=radiohead&release=665f1f77bcf86cd799439021'
     );
     expect(matches).toHaveLength(1);
   });
 
   it('appends internal cover images with kind cover and CDN thumbnail', async () => {
-    const content = await persistGeneratedBio(artistId, baseData, [
-      {
-        id: 'rel1',
-        title: 'Label Album',
-        releasedOn: new Date('2020-02-02T00:00:00Z'),
-        coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
-      },
-    ]);
+    const content = await persistGeneratedBio(
+      artistId,
+      baseData,
+      [
+        {
+          id: 'rel1',
+          title: 'Label Album',
+          releasedOn: new Date('2020-02-02T00:00:00Z'),
+          coverUrl: 'https://cdn.fakefour.com/media/releases/rel1/cover.jpg',
+        },
+      ],
+      artistSlug
+    );
 
     const cover = content.images.find((image) => image.kind === 'cover');
     expect(cover).toMatchObject({
@@ -725,14 +773,19 @@ describe('persistGeneratedBio', () => {
       duplicateAliases: new Map(),
     });
 
-    const content = await persistGeneratedBio(artistId, baseData, [
-      {
-        id: 'rel1',
-        title: 'Label Album',
-        releasedOn: new Date('2020-02-02T00:00:00Z'),
-        coverUrl,
-      },
-    ]);
+    const content = await persistGeneratedBio(
+      artistId,
+      baseData,
+      [
+        {
+          id: 'rel1',
+          title: 'Label Album',
+          releasedOn: new Date('2020-02-02T00:00:00Z'),
+          coverUrl,
+        },
+      ],
+      artistSlug
+    );
 
     const matching = content.images.filter((image) => image.url === coverUrl);
     expect(matching).toHaveLength(1);
@@ -755,14 +808,15 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images[0].licenseUrl).toBe('https://creativecommons.org/licenses/by-sa/4.0/');
   });
 
   it('defaults licenseUrl to null when the discovered image omits it', async () => {
-    const content = await persistGeneratedBio(artistId, baseData, []);
+    const content = await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(content.images[0].licenseUrl).toBeNull();
   });
@@ -784,7 +838,8 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images[0].licenseUrl).toBeNull();
@@ -807,7 +862,8 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images[0].sourceUrl).toBeNull();
@@ -831,7 +887,8 @@ describe('persistGeneratedBio', () => {
           },
         ],
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images[0].hasFace).toBe(true);
@@ -839,7 +896,7 @@ describe('persistGeneratedBio', () => {
   });
 
   it('defaults hasFace and faceScore to null when the discovered image omits them', async () => {
-    const content = await persistGeneratedBio(artistId, baseData, []);
+    const content = await persistGeneratedBio(artistId, baseData, [], artistSlug);
 
     expect(content.images[0].hasFace).toBeNull();
     expect(content.images[0].faceScore).toBeNull();
@@ -848,6 +905,7 @@ describe('persistGeneratedBio', () => {
 
 describe('persistGeneratedBio image-rank sort', () => {
   const artistId = 'a'.repeat(24);
+  const artistSlug = 'radiohead';
 
   // A discovered image whose fields default to a non-primary, unlicensed,
   // face-unscored row.
@@ -905,7 +963,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         image({ url: 'l', license: 'CC BY 4.0' }),
         image({ url: 'p', isPrimary: true }),
       ]),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images.map((img) => img.url)).toEqual([cdn('p'), cdn('l'), cdn('u')]);
@@ -923,7 +982,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         image({ url: 'none' }),
         image({ url: 'f95', faceScore: 95 }),
       ]),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images.map((img) => img.url)).toEqual([cdn('f95'), cdn('f60'), cdn('none')]);
@@ -937,7 +997,8 @@ describe('persistGeneratedBio image-rank sort', () => {
     const content = await persistGeneratedBio(
       artistId,
       buildData([image({ url: 'unlicensed' }), image({ url: 'licensed', license: 'CC BY 4.0' })]),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images.map((img) => img.url)).toEqual([cdn('licensed'), cdn('unlicensed')]);
@@ -954,7 +1015,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         image({ url: 'face99', faceScore: 99 }),
         image({ url: 'primary', isPrimary: true }),
       ]),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images.map((img) => img.url)).toEqual([cdn('primary'), cdn('face99')]);
@@ -971,7 +1033,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         image({ url: 'l', license: 'CC BY 4.0' }),
         image({ url: 'p', isPrimary: true }),
       ]),
-      []
+      [],
+      artistSlug
     );
 
     const persisted = replaceBioContentMock.mock.calls[0][1].images;
@@ -991,7 +1054,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         image({ url: 'l', license: 'CC BY 4.0' }),
         image({ url: 'u2' }),
       ]),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.images.map((img) => img.url)).toEqual([cdn('l'), cdn('u1'), cdn('u2')]);
@@ -1010,7 +1074,8 @@ describe('persistGeneratedBio image-rank sort', () => {
         ...buildData([image({ url: 'u' }), image({ url: 'l', license: 'CC BY 4.0' })]),
         longBio: '<p>Here: <img src="image:0" alt="x"></p>',
       },
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio).toContain(`src="${cdn('u')}"`);
@@ -1020,6 +1085,7 @@ describe('persistGeneratedBio image-rank sort', () => {
 
 describe('persistGeneratedBio figure composition', () => {
   const artistId = 'a'.repeat(24);
+  const artistSlug = 'radiohead';
 
   // A discovered image with minimal caption metadata (schema requires a
   // non-null attribution).
@@ -1087,7 +1153,8 @@ describe('persistGeneratedBio figure composition', () => {
         longBio:
           '<p>Intro</p><img src="image:0" alt=""><p>Middle</p><img src="image:1" alt=""><p>End</p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     const rightAt = content.longBio.indexOf('bio-figure--right');
@@ -1118,7 +1185,8 @@ describe('persistGeneratedBio figure composition', () => {
           tokens.map((_, index) => `<p>x</p><img src="image:${index}" alt="">`).join('') +
           '<p>end</p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio.match(/<figure\b/g)).toHaveLength(5);
@@ -1151,7 +1219,8 @@ describe('persistGeneratedBio figure composition', () => {
         ],
         longBio: '<p>Intro</p><img src="image:1" alt=""><p>End</p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.longBio).toContain('bio-figure--right');
@@ -1172,7 +1241,8 @@ describe('persistGeneratedBio figure composition', () => {
         shortBio: '<p>Teaser <img src="image:0" alt=""> end.</p>',
         longBio: '<p>Long</p><img src="image:0" alt="">',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.shortBio).not.toContain('<img');
@@ -1189,7 +1259,8 @@ describe('persistGeneratedBio figure composition', () => {
         longBio: '<p>Long</p>',
         altBio: '<p>Alt <img src="image:0" alt="x"></p>',
       }),
-      []
+      [],
+      artistSlug
     );
 
     expect(content.altBio).toContain(`<img src="${cdn('p0')}"`);
@@ -1199,6 +1270,7 @@ describe('persistGeneratedBio figure composition', () => {
 
 describe('persistGeneratedBio link validation', () => {
   const artistId = 'a'.repeat(24);
+  const artistSlug = 'radiohead';
 
   const link = (label: string, url: string): BioGenerationData['links'][number] => ({
     label,
@@ -1240,7 +1312,8 @@ describe('persistGeneratedBio link validation', () => {
         link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead'),
         link('Evil', 'javascript:alert(1)'),
       ]),
-      [release]
+      [release],
+      artistSlug
     );
 
     expect(validateBioLinksMock).toHaveBeenCalledTimes(1);
@@ -1252,12 +1325,13 @@ describe('persistGeneratedBio link validation', () => {
     await persistGeneratedBio(
       artistId,
       buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
-      [release]
+      [release],
+      artistSlug
     );
 
     expect(persistedLinks().map(({ url }) => url)).toEqual([
       'https://en.wikipedia.org/wiki/Radiohead',
-      '/releases/665f1f77bcf86cd799439021',
+      '/releases?artist=radiohead&release=665f1f77bcf86cd799439021',
     ]);
   });
 
@@ -1273,13 +1347,14 @@ describe('persistGeneratedBio link validation', () => {
         link('Dead', 'https://dead.example.com/'),
         link('Also alive', 'https://also.example.com/'),
       ]),
-      [release]
+      [release],
+      artistSlug
     );
 
     expect(persistedLinks().map(({ url }) => url)).toEqual([
       'https://alive.example.com/',
       'https://also.example.com/',
-      '/releases/665f1f77bcf86cd799439021',
+      '/releases?artist=radiohead&release=665f1f77bcf86cd799439021',
     ]);
     expect(persistedLinks().map(({ sortOrder }) => sortOrder)).toEqual([0, 1, 2]);
   });
@@ -1290,7 +1365,8 @@ describe('persistGeneratedBio link validation', () => {
     await persistGeneratedBio(
       artistId,
       buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
-      []
+      [],
+      artistSlug
     );
 
     expect(validateBioLinksMock).not.toHaveBeenCalled();
@@ -1305,7 +1381,8 @@ describe('persistGeneratedBio link validation', () => {
     await persistGeneratedBio(
       artistId,
       buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
-      []
+      [],
+      artistSlug
     );
 
     expect(validateBioLinksMock).not.toHaveBeenCalled();
@@ -1317,7 +1394,8 @@ describe('persistGeneratedBio link validation', () => {
     await persistGeneratedBio(
       artistId,
       buildData([link('Wikipedia', 'https://en.wikipedia.org/wiki/Radiohead')]),
-      []
+      [],
+      artistSlug
     );
 
     expect(validateBioLinksMock).not.toHaveBeenCalled();
@@ -1748,7 +1826,11 @@ describe('BioGenerationService.runGenerationJob', () => {
 
       const input = generateSpy.mock.calls[0][0] as BioGenerationLambdaInput;
       expect(input.releases).toEqual([
-        { title: 'Label Album', releasedOn: '2020-02-02', url: '/releases/rel1' },
+        {
+          title: 'Label Album',
+          releasedOn: '2020-02-02',
+          url: '/releases?artist=radiohead&release=rel1',
+        },
       ]);
     });
 
@@ -2752,25 +2834,46 @@ describe('BioGenerationService.completeCallback', () => {
   });
 
   it('persists the bio on an ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
 
     expect(replaceBioContentMock).toHaveBeenCalledTimes(1);
   });
 
+  it("links the artist's releases by their deep link on the artist's own listing", async () => {
+    findPublishedByArtistWithCoversMock.mockResolvedValueOnce([
+      { id: 'rel1', title: 'Label Album', releasedOn: null, coverUrl: null },
+    ]);
+
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
+
+    const [, content] = replaceBioContentMock.mock.calls[0];
+    expect(content.links).toContainEqual(
+      expect.objectContaining({ url: '/releases?artist=radiohead&release=rel1', kind: 'release' })
+    );
+  });
+
   it('flips to succeeded on an ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
 
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
   });
 
   it('does not persist on a non-ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: false, error: 'lambda blew up' });
+    await BioGenerationService.completeCallback(
+      'a1',
+      { ok: false, error: 'lambda blew up' },
+      'radiohead'
+    );
 
     expect(replaceBioContentMock).not.toHaveBeenCalled();
   });
 
   it('flips to failed with the error on a non-ok result', async () => {
-    await BioGenerationService.completeCallback('a1', { ok: false, error: 'lambda blew up' });
+    await BioGenerationService.completeCallback(
+      'a1',
+      { ok: false, error: 'lambda blew up' },
+      'radiohead'
+    );
 
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'lambda blew up' });
   });
@@ -2778,7 +2881,7 @@ describe('BioGenerationService.completeCallback', () => {
   it('flips to failed when persistence throws', async () => {
     replaceBioContentMock.mockRejectedValue(new Error('DB down'));
 
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
 
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', { error: 'DB down' });
   });
@@ -2786,7 +2889,7 @@ describe('BioGenerationService.completeCallback', () => {
   it('uses a fallback message when persistence throws a non-Error', async () => {
     replaceBioContentMock.mockRejectedValue('boom');
 
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
 
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'failed', {
       error: 'Bio persistence failed.',
@@ -2796,7 +2899,7 @@ describe('BioGenerationService.completeCallback', () => {
   it('falls back to empty releases when the catalog lookup fails', async () => {
     findPublishedByArtistWithCoversMock.mockRejectedValue(new Error('mongo down'));
 
-    await BioGenerationService.completeCallback('a1', { ok: true, data: okData });
+    await BioGenerationService.completeCallback('a1', { ok: true, data: okData }, 'radiohead');
 
     expect(setBioStatusMock).toHaveBeenCalledWith('a1', 'succeeded', { error: null });
   });

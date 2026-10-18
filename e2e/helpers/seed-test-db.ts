@@ -1500,6 +1500,22 @@ const seedTestDatabase = async () => {
       mp3FormatIdByReleaseId.set(release.id, format.id);
     }
 
+    // The long bio links E2E Album One twice, once its id exists: as a release
+    // deep link, which opens the listening modal in place, and in the old
+    // `/releases/<id>` form that the bio backfill rewrites. The link texts
+    // leave the album title out, so the page's other `E2E Album One` locators
+    // stay unambiguous.
+    await prisma.artist.update({
+      where: { id: e2eArtist.id },
+      data: {
+        bio:
+          '<p><strong>E2E Artist</strong> makes immersive soundscapes.</p>' +
+          '<p>Seeded long bio with an <a href="https://en.wikipedia.org/wiki/Music">inline link</a> for the full bio page.</p>' +
+          `<p>Hear <a href="/releases?artist=e2e-artist&amp;release=${e2eRelease1.id}">the first album</a> right here, or see the <a href="/releases/${e2eRelease1.id}">old album page</a>.</p>` +
+          '<p><img src="https://cdn.fakefourrecords.com/media/artists/e2e-artist/bio/inline.jpg" alt="E2E inline bio image" width="1200" height="800"></p>',
+      },
+    });
+
     // The spotlight plays E2E Album One, so its card opens a playable modal.
     const albumOneMp3FormatId = mp3FormatIdByReleaseId.get(e2eRelease1.id);
     if (!albumOneMp3FormatId) {

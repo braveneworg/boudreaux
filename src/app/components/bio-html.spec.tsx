@@ -47,6 +47,26 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+// The client link is covered by bio-release-link.spec; here it records what
+// the bio hands it, rendering the anchor the server markup must keep.
+vi.mock('./bio-release-link', () => ({
+  BioReleaseLink: ({
+    href,
+    artistSlug,
+    releaseId,
+    children,
+  }: {
+    href: string;
+    artistSlug: string;
+    releaseId: string;
+    children: React.ReactNode;
+  }) => (
+    <a href={href} data-bio-release-link={`${artistSlug}:${releaseId}`}>
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock('@/lib/utils/api-base-url', () => ({
   getApiBaseUrl: () => 'https://fakefourrecords.com',
 }));
@@ -119,6 +139,24 @@ describe('BioHtml', () => {
     expect(
       screen.getByRole('link', { name: 'Album' }).querySelector('svg')
     ).not.toBeInTheDocument();
+  });
+
+  it('opens a release deep link through the listening-modal link, keeping its href', () => {
+    const href = '/releases?artist=e2e-artist&amp;release=0123456789abcdef01234567';
+    render(<BioHtml html={`<p><a href="${href}">E2E Album One</a></p>`} />);
+
+    const link = screen.getByRole('link', { name: 'E2E Album One' });
+    expect(link).toHaveAttribute(
+      'href',
+      '/releases?artist=e2e-artist&release=0123456789abcdef01234567'
+    );
+    expect(link).toHaveAttribute('data-bio-release-link', 'e2e-artist:0123456789abcdef01234567');
+  });
+
+  it('leaves any other internal link a plain link', () => {
+    render(<BioHtml html='<p><a href="/releases?artist=e2e-artist">All</a></p>' />);
+
+    expect(screen.getByRole('link', { name: 'All' })).not.toHaveAttribute('data-bio-release-link');
   });
 
   it('treats an absolute same-origin URL as internal', () => {

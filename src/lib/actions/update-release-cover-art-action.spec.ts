@@ -90,7 +90,7 @@ describe('updateReleaseCoverArtAction', () => {
       [VALID_RELEASE_ID, { coverArt: VALID_COVER_URL }],
     ]);
     expect(revalidatePath).toHaveBeenCalledWith('/');
-    expect(revalidatePath).toHaveBeenCalledWith(`/releases/${VALID_RELEASE_ID}`);
+    expect(vi.mocked(revalidatePath).mock.calls).toEqual([['/'], ['/releases']]);
   });
 
   it('returns the underlying error message when the repository throws an Error', async () => {

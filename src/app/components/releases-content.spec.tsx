@@ -82,6 +82,20 @@ vi.mock('@/hooks/use-release-play-dialog', () => ({
   }),
 }));
 
+vi.mock('./deep-link-play-dialog', () => ({
+  DeepLinkPlayDialog: ({
+    release,
+    artistSlug,
+  }: {
+    release: { id: string; title: string };
+    artistSlug: string;
+  }) => (
+    <div role="dialog" aria-label={release.title} data-artist-slug={artistSlug}>
+      {release.id}
+    </div>
+  ),
+}));
+
 vi.mock('./release-search-combobox', () => ({
   ReleaseSearchCombobox: () => <div data-testid="release-search-combobox" />,
 }));
@@ -251,6 +265,38 @@ describe('ReleasesContent', () => {
     render(<ReleasesContent artist="e2e-artist" />);
 
     expect(vi.mocked(useInfinitePublishedReleasesQuery)).toHaveBeenLastCalledWith('', 'e2e-artist');
+  });
+
+  it('opens the deep-linked release over the filtered grid', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(
+      <ReleasesContent
+        artist="e2e-artist"
+        artistName="E2E Artist"
+        initialRelease={{
+          id: 'release-1',
+          title: 'Midnight Serenade',
+          artistName: 'E2E Artist',
+          playSrc: 'https://cdn.example/track-1.mp3',
+          year: 2024,
+        }}
+      />
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Midnight Serenade' })).toHaveAttribute(
+      'data-artist-slug',
+      'e2e-artist'
+    );
+    expect(screen.getAllByTestId('spotlight-card')).toHaveLength(2);
+  });
+
+  it('opens no modal without a deep-linked release', () => {
+    mockPages([{ rows: twoRows, nextSkip: null }]);
+
+    render(<ReleasesContent artist="e2e-artist" artistName="E2E Artist" initialRelease={null} />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows no link to every artist’s releases without an artist filter', () => {

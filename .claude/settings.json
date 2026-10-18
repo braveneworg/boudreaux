@@ -28,6 +28,8 @@
       "Bash(pnpm mongo:restore *)",
       "Bash(pnpm run backfill:coverart *)",
       "Bash(pnpm backfill:coverart *)",
+      "Bash(pnpm run backfill:bio-release-links *)",
+      "Bash(pnpm backfill:bio-release-links *)",
       "Bash(pnpm run backfill:credit-positions *)",
       "Bash(pnpm backfill:credit-positions *)",
       "Bash(pnpm run check:query-plans *)",

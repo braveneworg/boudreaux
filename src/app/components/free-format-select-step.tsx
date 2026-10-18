@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 'use client';
 
-import Link from 'next/link';
-
 import { Loader2 } from 'lucide-react';
 
 import { FormatBundleDownload } from '@/app/components/format-bundle-download';
@@ -41,17 +39,14 @@ interface FreeFormatSelectStepProps {
   isLoading?: boolean;
   /**
    * When set, the cap has been exhausted and the component renders a disabled
-   * state with a live countdown to {@link capReachedResetsAtIso} plus a CTA to
-   * the premium / sign-in path. Sourced from
+   * state with a live countdown to {@link capReachedResetsAtIso} plus a
+   * "Pay what you want" button that calls {@link onChoosePaid}. Sourced from
    * `freeStatus.blockedReason === 'cap-reached'` and from `403 CAP_REACHED`
    * mid-attempt responses on the bundle endpoint.
    */
   capReachedResetsAtIso?: string | null;
-  /**
-   * Destination for the premium / sign-in CTA shown alongside the countdown.
-   * Defaults to the Pay-What-You-Want purchase entry for the release.
-   */
-  premiumCtaHref?: string;
+  /** Switch the dialog to the paid (Pay what you want) path, from the cap-reached CTA. */
+  onChoosePaid: () => void;
   onDownloadComplete?: () => void;
 }
 
@@ -69,7 +64,7 @@ export const FreeFormatSelectStep = ({
   availableFreeFormats,
   isLoading = false,
   capReachedResetsAtIso,
-  premiumCtaHref,
+  onChoosePaid,
   onDownloadComplete,
 }: FreeFormatSelectStepProps) => {
   if (isLoading && availableFreeFormats.length === 0) {
@@ -97,7 +92,6 @@ export const FreeFormatSelectStep = ({
   }
 
   if (capReachedResetsAtIso) {
-    const ctaHref = premiumCtaHref ?? `/releases/${releaseId}#purchase`;
     return (
       <div className="space-y-4" data-testid="free-cap-reached">
         <p
@@ -120,8 +114,8 @@ export const FreeFormatSelectStep = ({
         >
           Download limit reached
         </Button>
-        <Button asChild type="button" variant="default" className="w-full">
-          <Link href={ctaHref}>Pay what you want</Link>
+        <Button type="button" variant="default" className="w-full" onClick={onChoosePaid}>
+          Pay what you want
         </Button>
       </div>
     );

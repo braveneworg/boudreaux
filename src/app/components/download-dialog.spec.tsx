@@ -165,10 +165,12 @@ vi.mock('@/app/components/free-format-select-step', () => ({
     releaseId,
     availableFreeFormats,
     onDownloadComplete,
+    onChoosePaid,
   }: {
     releaseId: string;
     availableFreeFormats: ReadonlyArray<string>;
     onDownloadComplete?: () => void;
+    onChoosePaid: () => void;
   }) => (
     <div
       data-testid="free-format-select-step"
@@ -181,6 +183,9 @@ vi.mock('@/app/components/free-format-select-step', () => ({
           Trigger free complete
         </button>
       )}
+      <button data-testid="mock-choose-paid-btn" onClick={onChoosePaid}>
+        Choose paid
+      </button>
     </div>
   ),
 }));
@@ -421,6 +426,25 @@ describe('DownloadDialog — dialog lifecycle', () => {
 
     expect(await screen.findByTestId('free-format-select-step')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('switches from the free step to the paid path with Pay what you want selected', async () => {
+    const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <DownloadDialog {...defaultProps}>
+        <button>Open Download</button>
+      </DownloadDialog>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Download' }));
+    await user.click(screen.getByRole('radio', { name: /free/i }));
+    await user.click(screen.getByRole('button', { name: 'Download' }));
+    await user.click(await screen.findByTestId('mock-choose-paid-btn'));
+
+    expect(screen.queryByTestId('free-format-select-step')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /premium/i })).toBeChecked();
+    expect(await screen.findByLabelText('Custom amount')).toBeInTheDocument();
   });
 
   it('should reset the form when the dialog is closed and reopened', async () => {

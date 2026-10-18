@@ -80,6 +80,12 @@ test('a release pick plays it in a modal bylined by its artist', async ({ page }
     '/releases?artist=e2e-artist'
   );
   await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+  // The share row shares the release deep link on the artist's releases.
+  await expect(dialog.getByRole('link', { name: 'Share via SMS' })).toHaveAttribute(
+    'href',
+    /%2Freleases%3Fartist%3De2e-artist%26release%3D[a-f0-9]{24}/,
+    { timeout: 15_000 }
+  );
 
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toHaveCount(0);

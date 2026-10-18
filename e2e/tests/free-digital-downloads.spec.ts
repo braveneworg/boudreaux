@@ -7,6 +7,8 @@ import http from 'node:http';
 import { devices, expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 
+import { openReleaseDeepLink } from '../helpers/release-deep-link';
+
 /**
  * 007-free-digital-downloads — User Story 1 (Anonymous Free Download)
  *
@@ -56,7 +58,7 @@ test.describe('Free digital downloads (007 US1) — Pixel 7 emulation', () => {
     page,
     context,
   }) => {
-    await page.goto(`/releases/${e2eRelease1Id}`);
+    await openReleaseDeepLink(page, e2eRelease1Id);
 
     // Step 1: open the dialog.
     const downloadButton = page.getByRole('button', { name: 'Download' });

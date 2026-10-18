@@ -29,6 +29,11 @@ export interface ReleasePlayDialogProps {
    */
   takeMediaEl: () => HTMLAudioElement | null;
   /**
+   * Start track 1 once the player is ready (the default). `false` opens it
+   * paused, for a modal opened without a gesture (a release deep link).
+   */
+  autoPlay?: boolean;
+  /**
    * Start fetching the release detail before the dialog opens (e.g. on
    * hover/focus of the Play button) so the player mounts without a skeleton.
    */
@@ -147,7 +152,7 @@ const ReleasePlayerSkeleton = (): ReactElement => (
 
 interface ReleasePlayDialogPlayerProps extends Pick<
   ReleasePlayDialogProps,
-  'releaseId' | 'takeMediaEl' | 'initialTrackNumber'
+  'releaseId' | 'takeMediaEl' | 'initialTrackNumber' | 'autoPlay'
 > {
   isPending: boolean;
   isError: boolean;
@@ -168,6 +173,7 @@ const ReleasePlayDialogPlayer = ({
   release,
   releaseId,
   takeMediaEl,
+  autoPlay,
   initialTrackNumber,
   fitPhoneSheet,
   stacked,
@@ -196,7 +202,7 @@ const ReleasePlayDialogPlayer = ({
     <div data-slot="release-play-dialog-player" className={slotClass}>
       <ReleasePlayer
         release={release}
-        autoPlay
+        autoPlay={autoPlay ?? true}
         releaseId={releaseId}
         releaseTitle={release.title}
         takeMediaEl={takeMediaEl}
@@ -225,6 +231,7 @@ export const ReleasePlayDialog = ({
   open,
   onOpenChange,
   takeMediaEl,
+  autoPlay,
   prefetch = false,
   onCloseAutoFocus,
   footer,
@@ -268,6 +275,7 @@ export const ReleasePlayDialog = ({
           release={release}
           releaseId={releaseId}
           takeMediaEl={takeMediaEl}
+          autoPlay={autoPlay}
           initialTrackNumber={initialTrackNumber}
           fitPhoneSheet={sheetOnPhone}
           stacked={[shareWidget, footer].every(Boolean)}

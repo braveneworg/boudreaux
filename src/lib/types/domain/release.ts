@@ -207,8 +207,8 @@ export type PublishedReleaseListing = PublishedReleaseListingRow & {
 };
 
 /**
- * Narrow artist name-part projection for the media-player detail page, plus
- * the fields `isPublicArtist` reads.
+ * Narrow artist name-part projection for the listening modal's release
+ * detail, plus the fields `isPublicArtist` reads.
  */
 export type PublishedReleaseDetailArtist = {
   id: string;
@@ -223,7 +223,7 @@ export type PublishedReleaseDetailArtist = {
 };
 
 /**
- * Published release detail for the media player page at `/releases/[releaseId]`.
+ * Published release detail for the listening modal (`ReleasePlayDialog`).
  * Includes digital format files for audio playback, unbounded images, narrowed
  * artist info, and release URLs. Mirrors `publishedReleaseDetailInclude`.
  */
@@ -235,24 +235,28 @@ export type PublishedReleaseDetailRow = ReleaseScalars & {
   releaseUrls: ReleaseUrlRecord[];
 };
 
-/** The detail row as the player page receives it: public credits and the byline. */
+/** The detail row as the listening modal receives it: public credits and the byline. */
 export type PublishedReleaseDetail = PublishedReleaseDetailRow & {
   albumArtist: PublishedReleaseDetailArtist | null;
 };
 
 /**
- * Lightweight release for the "other releases by this artist" carousel — release
- * scalars plus images for cover-art display. Mirrors the carousel include.
+ * A listed release's full credit order, each artist with its slug and public
+ * gate fields. Mirrors `publishedReleaseCreditsSelect`; the release redirect
+ * reads the album artist's page from it.
  */
-export type ReleaseCarouselItem = ReleaseScalars & {
-  images: ImageRecord[];
-};
+export interface PublishedReleaseCredits {
+  artistReleases: Array<{
+    artist: { slug: string; publishedOn: Date | null; deletedOn: Date | null };
+  }>;
+}
 
 /**
  * Narrow projection for bio release-link injection — just the id and title.
  * Produced by `ReleaseRepository.findPublishedByArtist` and consumed by the
- * bio-generation service to append internal `/releases/:id` links after
- * generation (the lambda has no DB access).
+ * bio-generation service to append internal release deep links
+ * (`/releases?artist=<slug>&release=<id>`) after generation (the lambda has
+ * no DB access).
  */
 export interface ReleaseLinkSource {
   id: string;

@@ -122,7 +122,8 @@ Guest identity resolution moves to its own module; `PurchaseService` keeps
 
 ## Enforcement (2026-10-04)
 
-The gate had a side door. The public release page (`/releases/[id]` and
+The gate had a side door. The public release page (`/releases/[id]`, since
+replaced by the listening modal (ADR-0023), and
 `GET /api/releases/[id]?withTracks=true`), the public artist page
 (`GET /api/artists/slug/[slug]?withReleases=true`) and the featured artists
 (home page, `GET /api/featured-artists?active=true`) loaded every format of

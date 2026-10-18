@@ -6,16 +6,15 @@
  * GET /api/releases/[id]/download
  *
  * DEPRECATED: This legacy route now permanently redirects (301) to the
- * release page where users can access the format-specific bundle download
- * via the download dialog. This preserves existing email links and bookmarks.
+ * buyer's collection, where every purchase's format-specific bundle download
+ * sits behind its download dialog (ADR-0023: the collection is the receipt).
+ * This preserves existing email links and bookmarks.
  *
  * Replaced by: /api/releases/[id]/download/bundle (format-specific ZIP streaming)
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id: releaseId } = await params;
-
+export async function GET() {
   return new Response(null, {
     status: 301,
-    headers: { Location: `/releases/${releaseId}` },
+    headers: { Location: '/collection' },
   });
 }

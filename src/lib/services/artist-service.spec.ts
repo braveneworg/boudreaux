@@ -2339,6 +2339,10 @@ describe('ArtistService', () => {
       suffix: null,
     });
 
+    const albumCredit = (slug: string, publishedOn: Date | null = new Date('2024-01-01')) => ({
+      artist: { slug, publishedOn, deletedOn: null },
+    });
+
     const listedRelease = (id: string, title: string, releasedOn: string) => ({
       release: {
         id,
@@ -2346,6 +2350,8 @@ describe('ArtistService', () => {
         releasedOn: new Date(releasedOn),
         publishedAt: new Date('2024-01-01'),
         deletedOn: null,
+        digitalFormats: [{ files: [{ s3Key: `releases/${id}/track-1.mp3` }] }],
+        artistReleases: [albumCredit('e2e-artist')],
       },
     });
 
@@ -2382,6 +2388,8 @@ describe('ArtistService', () => {
             releasedOn: new Date('2030-01-01'),
             publishedAt: null,
             deletedOn: null,
+            digitalFormats: [],
+            artistReleases: [albumCredit('e2e-artist')],
           },
         },
       ],
@@ -2438,7 +2446,47 @@ describe('ArtistService', () => {
         id: 'r-3',
         title: 'E2E Album Three',
         releasedOn: new Date('2024-09-01'),
+        playSrc: expect.stringContaining('releases/r-3/track-1.mp3'),
+        albumArtistSlug: 'e2e-artist',
       });
+    });
+
+    /** List the record with the newest release (`r-3`) replaced by `release`'s fields. */
+    const listWithNewest = async (release: Record<string, unknown>) => {
+      const newest = listedRelease('r-3', 'E2E Album Three', '2024-09-01');
+      vi.mocked(ArtistRepository.listListed).mockResolvedValueOnce([
+        { ...listingRecord, releases: [{ release: { ...newest.release, ...release } }] },
+      ] as never);
+      const result = await ArtistService.listPublishedArtists(filters);
+      return result.success ? result.data[0]?.newestRelease : undefined;
+    };
+
+    it('has no newest release when the artist has no listed release', async () => {
+      vi.mocked(ArtistRepository.listListed).mockResolvedValueOnce([
+        { ...listingRecord, releases: [listingRecord.releases[3]] },
+      ] as never);
+
+      const result = await ArtistService.listPublishedArtists(filters);
+
+      expect(result.success ? result.data[0]?.newestRelease : 'unexpected').toBeNull();
+    });
+
+    it('gives the newest release no stream when it has no MP3 track', async () => {
+      await expect(listWithNewest({ digitalFormats: [] })).resolves.toHaveProperty('playSrc', null);
+    });
+
+    it("names the album artist's slug when the artist is only featured", async () => {
+      await expect(
+        listWithNewest({ artistReleases: [albumCredit('ceschi'), albumCredit('e2e-artist')] })
+      ).resolves.toHaveProperty('albumArtistSlug', 'ceschi');
+    });
+
+    it('names no album artist slug when the album artist is hidden', async () => {
+      await expect(
+        listWithNewest({
+          artistReleases: [albumCredit('hidden', null), albumCredit('e2e-artist')],
+        })
+      ).resolves.toHaveProperty('albumArtistSlug', null);
     });
 
     it('does not expose the raw release joins on the row', async () => {

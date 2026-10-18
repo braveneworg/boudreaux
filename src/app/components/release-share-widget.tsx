@@ -34,26 +34,30 @@ interface ReleaseShareWidgetProps {
   /** The artist the share text names; `null` names the release. */
   artistName: string | null;
   releaseTitle: string;
+  /** The URL to share instead of the artist's page, e.g. the release deep link. */
+  shareUrl?: string;
 }
 
 /**
  * Share row for a release: the native share sheet (or a copied link) behind
- * the share icon, then the social links. Every share points at the artist's
- * page.
+ * the share icon, then the social links. Every share points at `shareUrl`
+ * when given, else at the artist's page.
  */
 export const ReleaseShareWidget = ({
   artistSlug,
   artistName,
   releaseTitle,
+  shareUrl,
 }: ReleaseShareWidgetProps) => {
   const baseUrl = process.env.NEXT_PUBLIC_HOST_NAME ?? 'https://fakefourrecords.com';
   const artistUrl = artistSlug ? `${baseUrl}/artists/${artistSlug}` : baseUrl;
+  const url = shareUrl ?? artistUrl;
 
   const handleShare2IconClick = useCallback(() => {
     const shareData = {
       title: releaseTitle,
       text: `Check out ${artistName ?? releaseTitle} on Fake Four Inc.!`,
-      url: artistUrl,
+      url,
     };
 
     if (navigator.share) {
@@ -68,20 +72,20 @@ export const ReleaseShareWidget = ({
         });
     } else {
       navigator.clipboard
-        .writeText(artistUrl)
+        .writeText(url)
         .then(() => {
-          toast.success('Artist link copied to clipboard!');
+          toast.success('Link copied');
         })
         .catch(() => toast.error('Failed to copy link to clipboard'));
     }
-  }, [artistName, artistUrl, releaseTitle]);
+  }, [artistName, url, releaseTitle]);
   return (
     <>
       <div className="mx-auto mt-3 -mb-3 flex max-w-90 items-center justify-center overflow-hidden">
         <span className="-mb-3.25 inline-block size-10">
           <Share2Icon onClick={handleShare2IconClick} size={22} className="ml-2 opacity-60" />
         </span>
-        <SocialShareWidget artistUrl={artistUrl} />
+        <SocialShareWidget url={url} />
       </div>
       <Separator className="mx-auto mt-3 mb-1 max-h-px min-h-px max-w-[calc(100%-2rem)] bg-zinc-300" />
     </>

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { test, expect } from '../../fixtures/base.fixture';
 import { scrollToLoad } from '../../helpers/infinite-scroll';
+import { expectSharesDeepLink } from '../../helpers/release-deep-link';
 
 import type { Page } from '@playwright/test';
 
@@ -18,7 +19,10 @@ test.describe('Artist Page', () => {
       });
       // "E2E Album Three" (Sep 2024) is the newest of the artist's own albums.
       const latest = page.getByRole('link', { name: 'E2E Album Three' });
-      await expect(latest).toHaveAttribute('href', /^\/releases\/[a-f0-9]{24}$/);
+      await expect(latest).toHaveAttribute(
+        'href',
+        /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/
+      );
       // The line says what the release is, with the label outside the link.
       await expect(page.getByText('Latest Release: E2E Album Three (2024)')).toBeVisible();
 
@@ -154,6 +158,27 @@ test.describe('Artist Page', () => {
       // `_w{width}` variant convention (custom CDN loader, no `unoptimized`).
       const inlineImage = page.getByRole('img', { name: 'E2E inline bio image' });
       await expect(inlineImage).toHaveAttribute('srcset', /_w\d+/);
+    });
+
+    test('a release deep link in the bio opens the listening modal in place', async ({ page }) => {
+      await page.goto('/artists/e2e-artist');
+
+      const albumLink = page.getByRole('link', { name: 'the first album' });
+      // The server markup keeps the plain anchor and its deep link.
+      await expect(albumLink).toHaveAttribute(
+        'href',
+        /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/
+      );
+      // The click is intercepted only once hydrated: the popup marker says so.
+      await expect(albumLink).toHaveAttribute('aria-haspopup', 'dialog', { timeout: 15_000 });
+      await albumLink.click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('heading', { name: 'E2E Album One' })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(dialog.locator('.video-js')).toBeVisible({ timeout: 15_000 });
+      await expect(page).toHaveURL(/\/artists\/e2e-artist$/);
     });
 
     test('permanently redirects the old /bio URL to the artist page', async ({ page }) => {
@@ -437,6 +462,39 @@ test.describe('Artist Page', () => {
       await expect(bandCard).toHaveCount(1);
       await expect(bandCard).not.toContainText('Members:');
       await expect(bandCard).toContainText('Latest: E2E Band Single (2025)');
+    });
+
+    test('the latest release opens its listening modal in place, sharing its deep link', async ({
+      page,
+    }) => {
+      await page.goto('/artists');
+
+      const artistCard = cards(page).filter({ hasText: 'E2E Album Three' });
+      const latest = artistCard.getByRole('link', { name: 'E2E Album Three' });
+      await expect(latest).toHaveAttribute(
+        'href',
+        /^\/releases\?artist=e2e-artist&release=[a-f0-9]{24}$/,
+        { timeout: 15_000 }
+      );
+      const releaseId = new URL(
+        (await latest.getAttribute('href')) ?? '',
+        'http://localhost'
+      ).searchParams.get('release');
+      await expect(latest).toHaveAttribute('aria-haspopup', 'dialog', { timeout: 15_000 });
+      await latest.click();
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('heading', { name: 'E2E Album Three' })).toBeVisible();
+      await expect(page).toHaveURL(/\/artists$/);
+      await expectSharesDeepLink(dialog, releaseId ?? '');
+    });
+
+    test('a release with nothing to play is plain text on its card', async ({ page }) => {
+      await page.goto('/artists');
+
+      const bandCard = cards(page).filter({ hasText: 'Formed 2010' });
+      await expect(bandCard).toContainText('Latest: E2E Band Single (2025)', { timeout: 15_000 });
+      await expect(bandCard.getByRole('link', { name: 'E2E Band Single' })).toHaveCount(0);
     });
 
     // ADR-0022: "Newest" ranks by the later of an artist's newest release and

@@ -151,19 +151,24 @@ export class PurchaseRepository {
                     firstName: true,
                     surname: true,
                     displayName: true,
+                    // The album artist's slug names the release deep link.
+                    slug: true,
                     publishedOn: true,
                     deletedOn: true,
                   },
                 },
               },
             }),
+            // Every active format the buyer owns. The first file's key lets
+            // the collection route resolve the MP3 track the listening modal
+            // plays; the route keeps the keys on the server.
             digitalFormats: {
               where: allOf(digitalFormatWhere.active, digitalFormatWhere.hasFiles),
               select: {
                 formatType: true,
                 fileName: true,
                 files: {
-                  select: { fileName: true },
+                  select: { fileName: true, s3Key: true },
                   orderBy: { trackNumber: 'asc' },
                   take: 1,
                 },

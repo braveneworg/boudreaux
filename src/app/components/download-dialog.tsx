@@ -155,6 +155,7 @@ const renderDialogStep = (
             availableFreeFormats={state.availableFreeFormats}
             isLoading={state.isFreeStatusPending}
             capReachedResetsAtIso={state.freeCapResetsAtIso}
+            onChoosePaid={state.handleChoosePaid}
             onDownloadComplete={state.handleDialogDownloadComplete}
           />
 

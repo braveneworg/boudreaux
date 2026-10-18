@@ -378,7 +378,13 @@ describe('Artist API Routes', () => {
       members: [],
       memberOf: [],
       releaseCount: 1,
-      newestRelease: { id: 'r-1', title: 'LP', releasedOn: new Date('2024-01-01') },
+      newestRelease: {
+        id: 'r-1',
+        title: 'LP',
+        releasedOn: new Date('2024-01-01'),
+        playSrc: null,
+        albumArtistSlug: null,
+      },
     };
 
     const callPublished = (query = '') =>

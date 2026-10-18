@@ -64,8 +64,8 @@ vi.mock('@/app/components/display-image-collage', () => ({
   ),
 }));
 
-vi.mock('@/app/components/latest-release-link', () => ({
-  LatestReleaseLink: ({
+vi.mock('@/app/components/latest-release-play-link', () => ({
+  LatestReleasePlayLink: ({
     release,
     slug,
   }: {

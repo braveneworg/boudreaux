@@ -1020,7 +1020,7 @@ describe('updateReleaseAction', () => {
 
       expect(ReleaseService.invalidateCache).toHaveBeenCalled();
       expect(revalidatePath).toHaveBeenCalledWith('/releases');
-      expect(revalidatePath).toHaveBeenCalledWith(`/releases/${mockReleaseId}`);
+      expect(revalidatePath).not.toHaveBeenCalledWith(`/releases/${mockReleaseId}`);
       expect(revalidatePath).toHaveBeenCalledWith('/artists/[slug]', 'page');
     });
 

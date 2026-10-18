@@ -36,7 +36,7 @@ vi.mock('@/lib/repositories/release-repository', () => ({
     clearFeaturedArtistReferences: vi.fn().mockResolvedValue(undefined),
     findPublished: vi.fn(),
     findPublishedWithTracks: vi.fn(),
-    findPublishedByArtistExcluding: vi.fn(),
+    findPublishedCredits: vi.fn(),
     findByTitleInsensitive: vi.fn(),
     findPublishedTitleById: vi.fn(),
     findTitleById: vi.fn(),
@@ -1135,7 +1135,20 @@ describe('ReleaseService', () => {
 
       await ReleaseService.getReleaseWithTracks('release-123');
 
-      expect(ReleaseRepository.findPublishedWithTracks).toHaveBeenCalledWith('release-123');
+      expect(ReleaseRepository.findPublishedWithTracks).toHaveBeenCalledWith(
+        'release-123',
+        undefined
+      );
+    });
+
+    it('passes an artist slug on to the repository', async () => {
+      vi.mocked(ReleaseRepository.findPublishedWithTracks).mockResolvedValueOnce(null);
+
+      await ReleaseService.getReleaseWithTracks('release-123', 'e2e-artist');
+
+      expect(vi.mocked(ReleaseRepository.findPublishedWithTracks).mock.calls).toEqual([
+        ['release-123', 'e2e-artist'],
+      ]);
     });
 
     it('should return error when release not found', async () => {
@@ -1164,65 +1177,54 @@ describe('ReleaseService', () => {
     });
   });
 
-  describe('getArtistOtherReleases', () => {
-    const mockOtherRelease = {
-      ...mockRelease,
-      id: 'release-456',
-      title: 'Other Album',
-    };
-
-    it('should return other published releases by the artist', async () => {
-      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([
-        mockOtherRelease,
-      ] as never);
-
-      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(result.success).toBe(true);
-      const { data } = result as unknown as { data: { id: string }[] };
-      expect(data).toHaveLength(1);
-      expect(data[0].id).toBe('release-456');
+  describe('getPublishedReleaseRedirectTarget', () => {
+    const credit = (slug: string, gate: { publishedOn: Date | null; deletedOn: Date | null }) => ({
+      artist: { slug, ...gate },
     });
+    const visible = { publishedOn: new Date('2024-01-01'), deletedOn: null };
 
-    it('should delegate to the repository with artistId and exclude id', async () => {
-      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([] as never);
-
-      await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(ReleaseRepository.findPublishedByArtistExcluding).toHaveBeenCalledWith(
-        'artist-1',
-        'release-123'
-      );
-    });
-
-    it('should return empty array when no other releases exist', async () => {
-      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockResolvedValue([] as never);
-
-      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(result).toMatchObject({ success: true, data: [] });
-    });
-
-    it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockRejectedValue(initError);
-
-      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should handle unknown errors', async () => {
-      vi.mocked(ReleaseRepository.findPublishedByArtistExcluding).mockRejectedValue(
-        Error('Unknown')
-      );
-
-      const result = await ReleaseService.getArtistOtherReleases('artist-1', 'release-123');
-
-      expect(result).toMatchObject({
-        success: false,
-        error: 'Failed to fetch artist releases',
+    it("names the album artist's slug", async () => {
+      vi.mocked(ReleaseRepository.findPublishedCredits).mockResolvedValueOnce({
+        artistReleases: [credit('album-artist', visible), credit('guest', visible)],
       });
+
+      await expect(
+        ReleaseService.getPublishedReleaseRedirectTarget('release-123')
+      ).resolves.toEqual({ artistSlug: 'album-artist' });
+      expect(vi.mocked(ReleaseRepository.findPublishedCredits).mock.calls).toEqual([
+        ['release-123'],
+      ]);
+    });
+
+    it('is null when the album artist is hidden, never handing the link to the next credit', async () => {
+      vi.mocked(ReleaseRepository.findPublishedCredits).mockResolvedValueOnce({
+        artistReleases: [
+          credit('hidden', { publishedOn: null, deletedOn: null }),
+          credit('guest', visible),
+        ],
+      });
+
+      await expect(
+        ReleaseService.getPublishedReleaseRedirectTarget('release-123')
+      ).resolves.toBeNull();
+    });
+
+    it('is null when the release has no credits', async () => {
+      vi.mocked(ReleaseRepository.findPublishedCredits).mockResolvedValueOnce({
+        artistReleases: [],
+      });
+
+      await expect(
+        ReleaseService.getPublishedReleaseRedirectTarget('release-123')
+      ).resolves.toBeNull();
+    });
+
+    it('is null when no listed release has the id', async () => {
+      vi.mocked(ReleaseRepository.findPublishedCredits).mockResolvedValueOnce(null);
+
+      await expect(
+        ReleaseService.getPublishedReleaseRedirectTarget('release-123')
+      ).resolves.toBeNull();
     });
   });
 

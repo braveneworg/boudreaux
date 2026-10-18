@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { type ReactNode } from 'react';
+import { useImperativeHandle, type ReactNode, type Ref, type RefObject } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -11,6 +11,8 @@ import userEvent from '@testing-library/user-event';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
 
 import { ReleaseSearchCombobox } from './release-search-combobox';
+
+import type { HomeSearchPlayDialogHandle } from './home-search-play-dialog';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -24,6 +26,26 @@ vi.mock('next/navigation', () => ({
   }),
   usePathname: () => '/releases',
   useSearchParams: () => new URLSearchParams(),
+}));
+
+// The play modal itself is covered by home-search-play-dialog.spec; here it
+// records what the combobox opens and where focus is to return.
+const playDialog = vi.hoisted(() => ({
+  openRelease: vi.fn(),
+  returnFocusRef: null as RefObject<HTMLElement | null> | null,
+}));
+vi.mock('./home-search-play-dialog', () => ({
+  HomeSearchPlayDialog: ({
+    ref,
+    returnFocusRef,
+  }: {
+    ref: Ref<HomeSearchPlayDialogHandle>;
+    returnFocusRef: RefObject<HTMLElement | null>;
+  }) => {
+    playDialog.returnFocusRef = returnFocusRef;
+    useImperativeHandle(ref, () => ({ openRelease: playDialog.openRelease, openVideo: vi.fn() }));
+    return null;
+  },
 }));
 
 vi.mock('next/image', () => ({
@@ -65,7 +87,7 @@ const mockReleases = [
       deletedOn: null,
     },
     releaseUrls: [],
-    digitalFormats: [],
+    digitalFormats: [{ files: [{ s3Key: 'audio/release-1/track-1.mp3' }] }],
   },
   {
     id: 'release-2',
@@ -124,6 +146,7 @@ describe('ReleaseSearchCombobox', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     mockPush.mockReset();
+    playDialog.openRelease.mockReset();
   });
 
   it('renders the search trigger button', () => {
@@ -238,7 +261,7 @@ describe('ReleaseSearchCombobox', () => {
     expect(await screen.findByText('Midnight Serenade')).toBeInTheDocument();
   });
 
-  it('navigates to the release page when a result is selected', async () => {
+  it('opens a playable pick in the listening modal in place, without navigating', async () => {
     stubFetchReturning(mockReleases);
     const user = setupUser();
     renderCombobox();
@@ -251,7 +274,75 @@ describe('ReleaseSearchCombobox', () => {
     });
     await user.click(screen.getByText('Midnight Serenade'));
 
-    expect(mockPush).toHaveBeenCalledWith('/releases/release-1');
+    expect(playDialog.openRelease.mock.calls).toEqual([
+      [
+        { artistName: 'John Doe', artistSlug: 'john-doe' },
+        {
+          id: 'release-1',
+          title: 'Midnight Serenade',
+          coverArtSrc: 'https://example.com/cover1.jpg',
+          playSrc: expect.stringContaining('audio/release-1/track-1.mp3'),
+          year: 2024,
+        },
+      ],
+    ]);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Search releases')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('opens a pick with no cover art without one', async () => {
+    stubFetchReturning([
+      { ...mockReleases[0], coverArt: '', images: [] },
+    ] as unknown as PublishedReleaseListing[]);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.click(await screen.findByText('Midnight Serenade'));
+
+    expect(playDialog.openRelease.mock.calls[0]?.[1]).toHaveProperty('coverArtSrc', null);
+  });
+
+  it('does nothing when an unplayable result is selected', async () => {
+    stubFetchReturning(mockReleases);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    const row = (await screen.findByText('Morning Glory')).closest('[cmdk-item]');
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(screen.getByText('Morning Glory'));
+
+    expect(playDialog.openRelease).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('opens a pick with no public album artist without a byline', async () => {
+    stubFetchReturning([
+      {
+        ...mockReleases[0],
+        artistReleases: [],
+        albumArtist: null,
+      },
+    ] as unknown as PublishedReleaseListing[]);
+    const user = setupUser();
+    renderCombobox();
+
+    await user.click(screen.getByLabelText('Search releases'));
+    await user.click(await screen.findByText('Midnight Serenade'));
+
+    expect(playDialog.openRelease.mock.calls[0]?.[0]).toEqual({
+      artistName: null,
+      artistSlug: null,
+    });
+  });
+
+  it('returns focus to the search trigger when the modal closes', () => {
+    stubFetchReturning(mockReleases);
+    renderCombobox();
+
+    expect(playDialog.returnFocusRef?.current).toBe(screen.getByLabelText('Search releases'));
   });
 
   it('renders a cover art thumbnail when present', async () => {

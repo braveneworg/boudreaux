@@ -6,7 +6,7 @@ import { notFound } from 'next/navigation';
 import { AllReleasesLink } from '@/app/components/all-releases-link';
 import { ArtistBio } from '@/app/components/artist-bio';
 import { DisplayImageCollage } from '@/app/components/display-image-collage';
-import { LatestReleaseLink } from '@/app/components/latest-release-link';
+import { LatestReleasePlayLink } from '@/app/components/latest-release-play-link';
 import { ContactLinkSection, LinkSection } from '@/app/components/link-section';
 import { Badge } from '@/app/components/ui/badge';
 import { ContentContainer } from '@/app/components/ui/content-container';
@@ -88,10 +88,11 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                 {displayName}
               </ZineHeading>
               {latest ? (
-                <LatestReleaseLink
+                <LatestReleasePlayLink
                   release={latest}
                   artistName={displayName}
                   slug={slug}
+                  variant="page"
                   className="text-lg"
                 />
               ) : artist.releases.length > 0 ? (

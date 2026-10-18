@@ -10,8 +10,8 @@ import type {
   PublishedReleaseListingRow,
   PublishedReleaseFilters,
   Release,
+  PublishedReleaseCredits,
   ReleaseScalars,
-  ReleaseCarouselItem,
   ReleaseCoverSource,
   ReleaseCountFilters,
   ReleaseForDeletion,
@@ -173,11 +173,11 @@ const publishedReleaseListingSelect = {
 } as const satisfies Prisma.ReleaseSelect;
 
 /**
- * Include for the media player page at /releases/[releaseId]. Artist rows are
- * narrowed to the name-part set consumed by `getArtistDisplayName` — the player
- * never renders artist images/labels/urls or the artist's other releases. The
- * page is public, so it carries only the playable format (`playableFormats`);
- * the download dialog reads the formats on offer from its own query.
+ * Include for the listening modal's release detail. Artist rows are narrowed
+ * to the name-part set consumed by `getArtistDisplayName` — the player never
+ * renders artist images/labels/urls or the artist's other releases. The read
+ * is public, so it carries only the playable format (`playableFormats`); the
+ * download dialog reads the formats on offer from its own query.
  */
 const publishedReleaseDetailInclude = {
   images: {
@@ -198,18 +198,19 @@ const publishedReleaseDetailInclude = {
   },
 } as const satisfies Prisma.ReleaseInclude;
 
-/** Carousel include — release scalars plus one cover-art image. */
-const releaseCarouselInclude = {
-  images: {
-    orderBy: { sortOrder: 'asc' },
-    take: 1,
-  },
-} as const satisfies Prisma.ReleaseInclude;
+/**
+ * A listed release's full credit order with each artist's slug and public
+ * gate fields: enough to name the album artist's page (ADR-0015).
+ */
+const publishedReleaseCreditsSelect = {
+  artistReleases: orderedCredits({
+    select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+  } as const),
+} as const satisfies Prisma.ReleaseSelect;
 
 /**
  * Narrow select for bio cover-source rows: id, title, releasedOn, and the
- * first image's `src` for mapping to `coverUrl`. Mirrors the cover-image
- * ordering from `releaseCarouselInclude`.
+ * first image's `src` for mapping to `coverUrl`, cover images in `sortOrder`.
  */
 const releaseCoverSourceSelect = {
   id: true,
@@ -249,9 +250,9 @@ type _PublishedReleaseDetailDrift = AssertExact<
   PublishedReleaseDetailRow,
   Prisma.ReleaseGetPayload<{ include: typeof publishedReleaseDetailInclude }>
 >;
-type _ReleaseCarouselItemDrift = AssertExact<
-  ReleaseCarouselItem,
-  Prisma.ReleaseGetPayload<{ include: typeof releaseCarouselInclude }>
+type _PublishedReleaseCreditsDrift = AssertExact<
+  PublishedReleaseCredits,
+  Prisma.ReleaseGetPayload<{ select: typeof publishedReleaseCreditsSelect }>
 >;
 type _ReleaseForDeletionDrift = AssertExact<
   ReleaseForDeletion,
@@ -262,7 +263,7 @@ const _releaseScalarsDrift: _ReleaseScalarsDrift = true;
 const _releaseListItemDrift: _ReleaseListItemDrift = true;
 const _publishedReleaseListingDrift: _PublishedReleaseListingDrift = true;
 const _publishedReleaseDetailDrift: _PublishedReleaseDetailDrift = true;
-const _releaseCarouselItemDrift: _ReleaseCarouselItemDrift = true;
+const _publishedReleaseCreditsDrift: _PublishedReleaseCreditsDrift = true;
 const _releaseForDeletionDrift: _ReleaseForDeletionDrift = true;
 
 // =============================================================================
@@ -654,34 +655,31 @@ export class ReleaseRepository {
 
   /**
    * Fetch a single published, non-deleted release with the detail projection
-   * (tracks ordered by trackNumber). Returns `null` when missing/unpublished.
+   * (tracks ordered by trackNumber). With an `artist` slug, only a release the
+   * public artist holds a release credit on matches, as the listing's artist
+   * filter rules ({@link creditedToArtistWhere}). Returns `null` when missing,
+   * unpublished or not credited to that artist.
    */
-  static async findPublishedWithTracks(id: string): Promise<PublishedReleaseDetailRow | null> {
+  static async findPublishedWithTracks(
+    id: string,
+    artist?: string
+  ): Promise<PublishedReleaseDetailRow | null> {
     return prisma.release.findFirst({
-      where: { id, ...releaseWhere.listed },
+      where: { id, ...releaseWhere.listed, ...(artist && creditedToArtistWhere(artist)) },
       include: publishedReleaseDetailInclude,
     }) as Promise<PublishedReleaseDetailRow | null>;
   }
 
   /**
-   * Fetch other published, non-deleted releases by a public artist, excluding
-   * the current release. Includes one image for cover-art display. Ordered by
-   * `releasedOn` desc. A hidden artist's id returns nothing, so the id cannot
-   * be used to list a hidden artist's releases.
+   * Fetch a listed release's full credit order, each artist with its slug and
+   * public gate fields. Returns `null` when the release is missing, unpublished
+   * or soft-deleted.
    */
-  static async findPublishedByArtistExcluding(
-    artistId: string,
-    excludeReleaseId: string
-  ): Promise<ReleaseCarouselItem[]> {
-    return prisma.release.findMany({
-      where: {
-        artistReleases: { some: { artistId, artist: { is: publicArtistWhere } } },
-        id: { not: excludeReleaseId },
-        ...releaseWhere.listed,
-      },
-      orderBy: { releasedOn: 'desc' },
-      include: releaseCarouselInclude,
-    }) as Promise<ReleaseCarouselItem[]>;
+  static async findPublishedCredits(id: string): Promise<PublishedReleaseCredits | null> {
+    return prisma.release.findFirst({
+      where: { id, ...releaseWhere.listed },
+      select: publishedReleaseCreditsSelect,
+    });
   }
 
   /**

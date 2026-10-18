@@ -62,8 +62,6 @@ export const queryKeys = {
         context.labelNotes?.trim() ?? '',
       ] as const,
     userStatus: (id: string) => [...queryKeys.releases.all, 'userStatus', id] as const,
-    related: (id: string, artistId?: string | null) =>
-      [...queryKeys.releases.all, 'related', id, artistId ?? ''] as const,
     /** A release's credits awaiting confirmation and staying hidden (ADR-0015). */
     credits: (id: string) => [...queryKeys.releases.all, 'credits', id] as const,
     digitalFormats: (id: string) => [...queryKeys.releases.all, 'digitalFormats', id] as const,

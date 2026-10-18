@@ -47,7 +47,13 @@ const wireRow = {
   members: [],
   memberOf: [wireName],
   releaseCount: 3,
-  newestRelease: { id: 'r-3', title: 'E2E Album Three', releasedOn: '2024-09-01T00:00:00.000Z' },
+  newestRelease: {
+    id: 'r-3',
+    title: 'E2E Album Three',
+    releasedOn: '2024-09-01T00:00:00.000Z',
+    playSrc: 'https://cdn.example/r-3/track-1.mp3',
+    albumArtistSlug: 'e2e-artist',
+  },
 };
 
 describe('artistListingRowSchema', () => {

@@ -237,11 +237,28 @@ describe('PurchaseRepository', () => {
               firstName: true,
               surname: true,
               displayName: true,
+              // The album artist's slug names the release deep link.
+              slug: true,
               publishedOn: true,
               deletedOn: true,
             },
           },
         },
+      });
+    });
+
+    it("reads each format's first track with its key, for the listening modal's stream", async () => {
+      vi.mocked(prisma.releasePurchase.findMany).mockResolvedValueOnce([] as never);
+
+      await PurchaseRepository.findAllByUser('user-123');
+
+      const args = vi.mocked(prisma.releasePurchase.findMany).mock.calls.at(-1)?.[0] as {
+        include: { release: { select: { digitalFormats: { select: { files: unknown } } } } };
+      };
+      expect(args.include.release.select.digitalFormats.select.files).toEqual({
+        select: { fileName: true, s3Key: true },
+        orderBy: { trackNumber: 'asc' },
+        take: 1,
       });
     });
 

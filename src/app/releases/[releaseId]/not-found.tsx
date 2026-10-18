@@ -4,7 +4,9 @@
 
 /**
  * 404 page for invalid release IDs at `/releases/[releaseId]`.
- * Displayed when `notFound()` is called from the release player page.
+ * The segment is now a route handler (`route.ts`), whose `notFound()` serves
+ * a bare 404 without rendering this page; it is kept until a decision on the
+ * old URL's 404 copy (#896).
  */
 import Link from 'next/link';
 

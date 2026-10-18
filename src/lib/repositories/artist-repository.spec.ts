@@ -12,6 +12,7 @@ import {
 import { artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
+import { creditOrderBy } from './_internal/credit-order';
 import { playableFormatWhere } from './_internal/playable-formats';
 import { releaseWhere } from './_internal/release-where';
 import { publicVideoWhere } from './_internal/video-where';
@@ -1044,7 +1045,25 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.releases).toEqual({
         select: {
           release: {
-            select: { id: true, title: true, releasedOn: true, publishedAt: true, deletedOn: true },
+            select: {
+              id: true,
+              title: true,
+              releasedOn: true,
+              publishedAt: true,
+              deletedOn: true,
+              // The first MP3 track primes the card's listening modal.
+              digitalFormats: {
+                where: playableFormatWhere,
+                select: {
+                  files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
+                },
+              },
+              // The album artist's slug names the release deep link (ADR-0015).
+              artistReleases: {
+                orderBy: creditOrderBy,
+                select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+              },
+            },
           },
         },
       });

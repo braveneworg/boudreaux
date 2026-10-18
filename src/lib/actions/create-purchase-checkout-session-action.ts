@@ -85,7 +85,7 @@ const createStripeSession = async (params: SessionParams): Promise<ActionResult>
       metadata: { type: 'release_purchase', releaseId, ...(userId ? { userId } : {}) },
     },
     metadata: { type: 'release_purchase', releaseId, ...(userId ? { userId } : {}) },
-    return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/releases/${releaseId}`,
+    return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/collection`,
   });
 
   if (!session.client_secret) {

@@ -111,7 +111,7 @@ const LinkDialog = ({
       <DialogHeader>
         <DialogTitle>Insert link</DialogTitle>
         <DialogDescription>
-          Enter an http(s) URL or a site-relative path like /releases/slug.
+          Enter an http(s) URL or a site-relative path like /releases?artist=slug.
         </DialogDescription>
       </DialogHeader>
       <LabeledTextField
