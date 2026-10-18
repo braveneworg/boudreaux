@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.453.0] - 2026-10-18
+
+### Changed
+
+- One job-run module behind the async job lifecycle for all three background jobs (#913)
+- One Server Action gate with session, role and ban checks and a typed failure code (#912)
+
 ## [4.452.0] - 2026-10-18
 
 ### Changed
