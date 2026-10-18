@@ -7,6 +7,8 @@ import { dirname, join } from 'path';
 
 import { checkServerActionGates } from './check-server-action-gates';
 
+const REPO_ROOT = join(__dirname, '..');
+
 /** A throwaway project tree: relative path -> file contents. */
 type Tree = Record<string, string>;
 
@@ -187,5 +189,60 @@ describe('checkServerActionGates', () => {
     expect(checkServerActionGates(root).violations).toEqual([
       "src/lib/actions/dynamic-action.ts: dynamicAction must call gateAction with 'admin' or 'signed-in' as a string literal",
     ]);
+  });
+});
+
+describe('this repository', () => {
+  const report = checkServerActionGates(REPO_ROOT);
+
+  it('gates every Server Action or declares its module public', () => {
+    expect(report.violations).toEqual([]);
+  });
+
+  it('declares exactly these modules public', () => {
+    const publicModules = [
+      ...new Set(
+        report.exports.filter(({ access }) => access === 'public').map(({ file }) => file)
+      ),
+    ].sort();
+
+    expect(publicModules).toEqual([
+      'src/lib/actions/check-guest-purchase-action.ts',
+      'src/lib/actions/confirm-turnstile-action.ts',
+      'src/lib/actions/contact-action.ts',
+      'src/lib/actions/create-purchase-checkout-session-action.ts',
+      'src/lib/actions/create-purchase-session-action.ts',
+      'src/lib/actions/get-featured-artists.ts',
+      'src/lib/actions/signin-action.ts',
+      'src/lib/actions/signup-action.ts',
+      'src/lib/actions/stash-signup-consent-action.ts',
+      'src/lib/utils/verify-turnstile.ts',
+    ]);
+  });
+
+  it('gates exactly these exports as signed-in', () => {
+    const signedIn = report.exports
+      .filter(({ access }) => access === 'signed-in')
+      .map(({ name }) => name)
+      .sort();
+
+    expect(signedIn).toEqual(
+      [
+        'addPlaylistItemAction',
+        'changeEmailAction',
+        'changeUsernameAction',
+        'createPlaylistAction',
+        'deletePlaylistAction',
+        'generatePlaylistCoverUploadUrlsAction',
+        'getCollectionAction',
+        'removePlaylistItemAction',
+        'reorderPlaylistItemsAction',
+        'sendChatMessageAction',
+        'submitAbuseReportAction',
+        'toggleChatReactionAction',
+        'updatePlaylistAction',
+        'updateProfileAction',
+      ].sort()
+    );
   });
 });

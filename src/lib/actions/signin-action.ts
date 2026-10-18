@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
+// action-gate: public: signs a guest in
 
 import 'server-only';
 import { headers } from 'next/headers';

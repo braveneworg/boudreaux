@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
+// action-gate: public: reads the featured artists the landing page shows everyone
 
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { FeaturedArtist } from '@/lib/types/media-models';

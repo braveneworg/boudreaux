@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
+// action-gate: public: guest checkout; the session is read only for an optional buyer identity
 
 import 'server-only';
 
