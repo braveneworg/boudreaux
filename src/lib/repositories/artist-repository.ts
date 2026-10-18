@@ -579,19 +579,24 @@ const buildReleaseCreditedWhere = (search: string | undefined): Prisma.ArtistWhe
 };
 
 /**
- * Build the public artists index `where` (a **listed artist**): a public
- * artist with a direct credit on a listed release or a video credit on a
- * video live at `now` (ADR-0022), with an optional token search — every word
- * must match one of the name fields, aka names, genres, the title of a listed
- * release, or the title of a live video. Whether the artist is still on the
- * label plays no part (ADR-0016).
+ * Build the `where` for a public artist with a direct credit on a release
+ * matching `creditedRelease` or a video credit on a video live at `now`, with
+ * an optional token search: every word must match one of the name fields, aka
+ * names, genres, the title of a listed release, or the title of a live video.
+ * Whether the artist is still on the label plays no part (ADR-0016).
  *
  * `publicArtistWhere` holds the only top-level `OR`, so the credit `OR` and
- * each token's `OR` sit in `AND` members. The credit comes last: two filters
- * on one relation share one join on MongoDB, and the last one wins
+ * each token's `OR` sit in `AND` members. The credit comes last: Prisma on
+ * MongoDB joins a relation once per filter under one alias, and the last join
+ * replaces the earlier ones, so the filter that joins deepest (the credit, down
+ * to the format files for the home search) must be the last to read `releases`
  * (docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md).
  */
-const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput => {
+const buildReleaseOrVideoWhere = (
+  search: string | undefined,
+  now: Date,
+  creditedRelease: Prisma.ReleaseWhereInput
+): Prisma.ArtistWhereInput => {
   const liveVideo = publicVideoWhere(now);
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
@@ -610,7 +615,7 @@ const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistW
       ...tokenSearch,
       {
         OR: [
-          { releases: { some: { release: releaseWhere.listed } } },
+          { releases: { some: { release: creditedRelease } } },
           { videoArtists: { some: { video: { is: liveVideo } } } },
         ],
       },
@@ -619,48 +624,22 @@ const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistW
 };
 
 /**
- * Build the home search `where` (a **home search match**): a public artist
- * with a direct credit on a playable listed release or a video credit on a
- * video live at `now` — narrower than the listed artists
- * {@link buildListedWhere} finds, whose releases need not be playable — with
- * an optional token search: every word must match one of the
- * name fields, aka names, genres, the title of a listed release, or the title
- * of a live video. A title match on a listed release that cannot be played
- * still finds an artist that qualifies some other way.
- *
- * `publicArtistWhere` holds the only top-level `OR`, so the credit `OR` and
- * each token's `OR` sit in `AND` members. The credit comes last: Prisma on
- * MongoDB joins `releases` once per filter under one alias, and the last join
- * replaces the earlier ones, so the filter that joins deepest (down to the
- * format files) must be the last to read `releases`
- * (docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md).
+ * Build the public artists index `where` (a **listed artist**, ADR-0022): a
+ * public artist with a direct credit on a listed release or a video credit on
+ * a live video. See {@link buildReleaseOrVideoWhere}.
  */
-const buildHomeSearchWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput => {
-  const liveVideo = publicVideoWhere(now);
-  const tokenSearch = search
-    ? buildTokenSearch(search, (token) => [
-        ...nameFieldClauses(token),
-        { akaNames: containsToken(token) },
-        { genres: containsToken(token) },
-        listedReleaseTitleClause(token),
-        {
-          videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
-        },
-      ])
-    : [];
-  return {
-    ...publicArtistWhere,
-    AND: [
-      ...tokenSearch,
-      {
-        OR: [
-          { releases: { some: { release: playableListedReleaseWhere } } },
-          { videoArtists: { some: { video: { is: liveVideo } } } },
-        ],
-      },
-    ],
-  };
-};
+const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput =>
+  buildReleaseOrVideoWhere(search, now, releaseWhere.listed);
+
+/**
+ * Build the home search `where` (a **home search match**): like
+ * {@link buildListedWhere}, but the release credit must be on a playable
+ * listed release. A title match on a listed release that cannot be played
+ * still finds an artist that qualifies some other way. See
+ * {@link buildReleaseOrVideoWhere}.
+ */
+const buildHomeSearchWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput =>
+  buildReleaseOrVideoWhere(search, now, playableListedReleaseWhere);
 
 /** Epoch millis of a video's release date; an undated video sorts last. */
 const videoReleasedTime = ({ releasedOn }: { releasedOn: Date | null }): number =>
@@ -821,9 +800,9 @@ export class ArtistRepository {
    * Neither order can be sorted in the database: `alpha` ranks by the name an
    * artist is displayed under, which is composed from the name parts when no
    * `displayName` is stored (a DB sort on `displayName` files those nulls
-   * first, outside the alphabet), and `newest` by each artist's latest listed
-   * release, a relation aggregate Prisma on MongoDB cannot sort by (an artist
-   * with only videos has no listed release and sorts last). The listed
+   * first, outside the alphabet), and `newest` by the later of each artist's
+   * latest listed release and latest live video (ADR-0022), an aggregate over
+   * two relations Prisma on MongoDB cannot sort by. The listed
    * artists are read whole and ordered + sliced here; there are few of them,
    * and ADR-0007 records the revisit trigger.
    */
