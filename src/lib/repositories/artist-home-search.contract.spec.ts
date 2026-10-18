@@ -25,6 +25,9 @@ const TOKEN = `hs${stamp}`;
 const VIDEO_TITLE_TOKEN = `vt${stamp}`;
 const UNPLAYABLE_TITLE_TOKEN = `ut${stamp}`;
 const BOTH_VIDEO_TOKEN = `bv${stamp}`;
+// Only the scheduled video of `both` carries it, while a live video credits
+// `both`: the search clause and the credit clause both join `videoArtists`.
+const SCHEDULED_VIDEO_TOKEN = `sv${stamp}`;
 
 const PAST = new Date('2026-01-01T00:00:00.000Z');
 const OLDER = new Date('2025-01-01T00:00:00.000Z');
@@ -158,7 +161,10 @@ beforeAll(async () => {
     publishedAt: PAST,
     releasedOn: PAST,
   });
-  await createVideo(`${prefix}both-scheduled`, both, { publishedAt: FUTURE, releasedOn: PAST });
+  await createVideo(`${prefix}both-scheduled ${SCHEDULED_VIDEO_TOKEN}`, both, {
+    publishedAt: FUTURE,
+    releasedOn: PAST,
+  });
 
   const withdrawn = await createArtist('withdrawn-mp3', PAST);
   await createRelease('withdrawn-mp3', withdrawn, [{ ...MP3(), withdrawn: true }]);
@@ -268,6 +274,10 @@ describe('home search (Docker Mongo contract)', () => {
     expect(ours(await homeSearch(VIDEO_TITLE_TOKEN))).toEqual(['video-only']);
   });
 
+  it('never finds an artist by the title of a video that is not live yet', async () => {
+    expect(ours(await homeSearch(SCHEDULED_VIDEO_TOKEN))).toEqual([]);
+  });
+
   it('finds an artist by the title of an unplayable release, without listing it', async () => {
     const matches = await homeSearch(UNPLAYABLE_TITLE_TOKEN);
 
@@ -339,5 +349,16 @@ describe('home search (Docker Mongo contract)', () => {
     });
 
     expect(ours(listed)).toEqual(['video-only']);
+  });
+
+  it('never finds an artist on the artists index by the title of a video not live yet', async () => {
+    const listed = await ArtistRepository.listListed({
+      search: SCHEDULED_VIDEO_TOKEN,
+      sort: 'alpha',
+      skip: 0,
+      take: 100,
+    });
+
+    expect(ours(listed)).toEqual([]);
   });
 });
