@@ -254,6 +254,19 @@ encodings the **free tier** may take; every other format needs
 **entitlement**. See
 [ADR-0018](docs/adr/0018-download-entitlement-is-decided-by-one-gate.md).
 
+**format upload** — one server-side module that owns a **digital format**'s
+upload from the PUT to the confirmed rows: the key shape
+(`releases/<id>/digital-formats/<format>/…`), the file checks, the comment
+tag, verification, the format rows, and every cleanup — the files of a
+batch cancelled before its confirm, the files of a failed confirm, and the
+files of the tracks a re-upload replaced. Its files go through an
+object-store port, `FormatObjectStore`, with an S3 adapter and a local
+in-memory adapter for E2E (`E2E_MODE`), chosen per call by
+`formatObjectStore`. A new Release takes its album title from the MP3
+metadata; a title another Release holds is refused before any file is
+sent, and again at confirm.
+_Defined in_ `src/lib/services/format-upload/`.
+
 **withdrawn format** — a **digital format** an admin has soft-deleted. The
 **free tier** never gets it; an entitled **download subject** may still
 download it until it is hard-deleted, when its files are gone for good.
