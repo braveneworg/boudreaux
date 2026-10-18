@@ -9,13 +9,12 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { toast } from 'sonner';
 
-import {
-  confirmDigitalFormatUploadAction,
-  confirmMultiTrackUploadAction,
-} from '@/lib/actions/confirm-upload-action';
 import { deleteFormatFilesAction } from '@/lib/actions/delete-format-files-action';
-import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-action';
-import type { FindOrCreateReleaseResult } from '@/lib/actions/find-or-create-release-action';
+import {
+  checkNewReleaseTitleAction,
+  confirmFormatUploadAction,
+  discardFormatUploadAction,
+} from '@/lib/actions/format-upload-actions';
 import { getFileExtensionForFormat, getDefaultMimeType } from '@/lib/constants/digital-formats';
 import { FORMAT_CONFIGS } from '@/lib/constants/format-configs';
 import type { DigitalFormatType, UploadState } from '@/types/digital-format';
@@ -45,6 +44,15 @@ interface UploadCallbacks {
   onMetadataExtracted?: (metadata: ExtractedAudioMetadata) => void;
 }
 
+/** Files a run uploaded that its confirm has not taken yet. */
+interface UnconfirmedUpload {
+  releaseId: string;
+  s3Keys: string[];
+}
+
+/** An uploaded file as confirm takes it: the list entry plus its MIME type. */
+type UploadedTrack = UploadedFileInfo & { mimeType: string };
+
 /**
  * State values, setters, and refs owned by {@link useUploadState}. Module-scope
  * upload helpers receive this bundle (instead of many params) so they can drive
@@ -73,6 +81,8 @@ interface UploadStateBundle {
   uploadButtonRefs: React.RefObject<Record<string, HTMLButtonElement | null>>;
   /** In-flight upload controller per format; absent when nothing is uploading. */
   abortControllers: React.RefObject<Map<DigitalFormatType, AbortController>>;
+  /** Per format, what a cancel discards: uploaded files whose confirm has not started. */
+  unconfirmedUploads: React.RefObject<Map<DigitalFormatType, UnconfirmedUpload>>;
 }
 
 /** Shared dependency bundle for the heavy upload helpers. */
@@ -124,6 +134,17 @@ const beginUpload = (state: UploadStateBundle, formatType: DigitalFormatType): A
 /** Drop the controller once a flow settles so a later cancel cannot reset a finished format. */
 const endUpload = (state: UploadStateBundle, formatType: DigitalFormatType): void => {
   state.abortControllers.current.delete(formatType);
+  state.unconfirmedUploads.current.delete(formatType);
+};
+
+/** Note a file the run uploaded, so a cancel before its confirm discards it. */
+const recordUnconfirmedKey = (
+  state: UploadStateBundle,
+  formatType: DigitalFormatType,
+  { releaseId, s3Key }: { releaseId: string; s3Key: string }
+): void => {
+  const s3Keys = state.unconfirmedUploads.current.get(formatType)?.s3Keys ?? [];
+  state.unconfirmedUploads.current.set(formatType, { releaseId, s3Keys: [...s3Keys, s3Key] });
 };
 
 /** Run an upload flow for `formatType`, dropping its controller however it settles. */
@@ -154,18 +175,48 @@ const failFormat = (ctx: UploadContext, formatType: DigitalFormatType, message: 
   toast.error(`${formatLabel(formatType)} upload failed`, { description: message });
 };
 
-/** A find-or-create result with its release id + title resolved to strings. */
-interface ResolvedAutoCreate extends FindOrCreateReleaseResult {
-  releaseId: string;
-  releaseTitle: string;
-}
+/** True when the upload creates its Release: the first MP3 320kbps upload in create mode. */
+const createsRelease = (ctx: UploadContext, formatType: DigitalFormatType): boolean =>
+  Boolean(ctx.callbacks.onReleaseAutoCreated) && formatType === 'MP3_320KBPS';
+
+/** The title a new Release takes from the extracted album metadata. */
+const newReleaseTitle = (metadata: ExtractedAudioMetadata): string =>
+  metadata.album ?? 'Untitled Release';
 
 /**
- * Type guard: a find-or-create result succeeded and carries both a release id and
- * title. Used so the auto-create branches can narrow without inline `||` chains.
+ * Create mode: why the album title is refused, asked before any file is sent,
+ * or null when the title is free (or the upload creates no Release).
  */
-const isAutoCreateResolved = (result: FindOrCreateReleaseResult): result is ResolvedAutoCreate =>
-  result.success && !!result.releaseId && !!result.releaseTitle;
+const takenTitleRefusal = async (
+  ctx: UploadContext,
+  formatType: DigitalFormatType,
+  metadata: ExtractedAudioMetadata
+): Promise<string | null> => {
+  if (!createsRelease(ctx, formatType) || !ctx.releaseId) return null;
+
+  const check = await checkNewReleaseTitleAction({
+    releaseId: ctx.releaseId,
+    title: newReleaseTitle(metadata),
+  });
+  return check.success ? null : (check.error ?? 'Failed to create release');
+};
+
+/** Show a release that could not be created: the format's error plus a toast. */
+const failReleaseCreation = (
+  ctx: UploadContext,
+  formatType: DigitalFormatType,
+  message: string
+): void => {
+  setFormatError(ctx.state, formatType, message);
+  toast.error('Failed to create release', { description: message });
+};
+
+/** What a confirm sends: a format's uploaded files and, in create mode, its album metadata. */
+interface ConfirmOperation {
+  formatType: DigitalFormatType;
+  files: UploadedTrack[];
+  extractedMetadata: ExtractedAudioMetadata;
+}
 
 /** Per-format batch operation inputs, bundled to keep helper arity ≤ 4. */
 interface BatchOperation {
@@ -212,15 +263,17 @@ const failedUpload = (file: File, error: string): SingleUploadResult => ({
 });
 
 /**
- * Upload a single file to the server proxy and return the result. Does NOT set
- * terminal upload state or show toasts — callers handle that.
+ * Upload a single file to the server proxy and return the result, noting its
+ * key for a cancel to discard. Does NOT set terminal upload state or show
+ * toasts — callers handle that.
  */
 const uploadSingleFileToS3 = async (
-  releaseId: string | undefined,
+  ctx: UploadContext,
   formatType: DigitalFormatType,
   file: File,
   signal: AbortSignal
 ): Promise<SingleUploadResult> => {
+  const { releaseId } = ctx;
   const uploadStartTime = performance.now();
   console.info(
     `[upload] ${formatType}: START file="${file.name}" size=${(file.size / 1024 / 1024).toFixed(1)}MB type="${file.type}"`
@@ -270,6 +323,7 @@ const uploadSingleFileToS3 = async (
       return failedUpload(file, uploadResult.message ?? 'Upload failed');
     }
 
+    recordUnconfirmedKey(ctx.state, formatType, { releaseId, s3Key: uploadResult.s3Key });
     const totalElapsed = ((performance.now() - uploadStartTime) / 1000).toFixed(1);
     console.info(`[upload] ${formatType}: SUCCESS in ${totalElapsed}s`);
 
@@ -319,7 +373,7 @@ const extractBatchMetadata = async (
 
 /** Aggregate result of uploading a batch of files sequentially. */
 interface SequentialUploadResult {
-  successFiles: UploadedFileInfo[];
+  successFiles: UploadedTrack[];
   s3Keys: string[];
   failCount: number;
 }
@@ -336,7 +390,7 @@ const uploadFilesSequentially = async (
   files: File[],
   signal: AbortSignal
 ): Promise<SequentialUploadResult> => {
-  const successFiles: UploadedFileInfo[] = [];
+  const successFiles: UploadedTrack[] = [];
   const s3Keys: string[] = [];
   let failCount = 0;
 
@@ -355,7 +409,7 @@ const uploadFilesSequentially = async (
       },
     }));
 
-    const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file, signal);
+    const result = await uploadSingleFileToS3(ctx, formatType, file, signal);
     if (signal.aborted) break;
 
     if (result.success && result.s3Key) {
@@ -363,6 +417,7 @@ const uploadFilesSequentially = async (
       successFiles.push({
         fileName: file.name,
         fileSize: file.size,
+        mimeType: file.type,
         s3Key: result.s3Key,
         title: trackMeta.title,
         duration: trackMeta.duration,
@@ -391,42 +446,31 @@ const uploadFilesSequentially = async (
 };
 
 /**
- * Confirm a set of uploaded files against an existing release: single-file action
- * for one file, multi-track action for several. Returns the confirm success flag.
+ * Confirm a format's uploaded files under the hook's own release id, with the
+ * album metadata when the confirm creates the Release. From here the confirm
+ * owns the files, so a cancel no longer discards them.
  */
 const confirmUploadedFiles = async (
-  releaseId: string,
-  formatType: DigitalFormatType,
-  successFiles: UploadedFileInfo[],
-  files: File[]
-): Promise<boolean> => {
-  if (successFiles.length === 1) {
-    const cr = await confirmDigitalFormatUploadAction({
-      releaseId,
-      formatType,
-      s3Key: successFiles[0].s3Key,
-      fileName: successFiles[0].fileName,
-      fileSize: successFiles[0].fileSize,
-      mimeType: files[0].type,
-    });
-    return cr.success;
+  ctx: UploadContext,
+  { formatType, files, extractedMetadata }: ConfirmOperation
+): ReturnType<typeof confirmFormatUploadAction> => {
+  /* v8 ignore start -- defensive guard: an uploaded file is impossible without
+     a releaseId, since uploadSingleFileToS3 returns { success: false } when
+     releaseId is falsy. */
+  if (!ctx.releaseId) {
+    return { success: false, error: 'Cannot confirm upload: missing release ID' };
   }
+  /* v8 ignore stop */
 
-  const fileByName = new Map(files.map((f) => [f.name, f]));
-  const cr = await confirmMultiTrackUploadAction({
-    releaseId,
+  ctx.state.unconfirmedUploads.current.delete(formatType);
+  return confirmFormatUploadAction({
+    releaseId: ctx.releaseId,
     formatType,
-    files: successFiles.map((f, idx) => ({
-      trackNumber: idx + 1,
-      s3Key: f.s3Key,
-      fileName: f.fileName,
-      fileSize: f.fileSize,
-      mimeType: fileByName.get(f.fileName)?.type || '',
-      title: f.title,
-      duration: f.duration,
-    })),
+    files,
+    ...(createsRelease(ctx, formatType) && {
+      newRelease: { ...extractedMetadata, album: newReleaseTitle(extractedMetadata) },
+    }),
   });
-  return cr.success;
 };
 
 /** Apply the shared success state (terminal status, file lists, selection) for a batch. */
@@ -448,50 +492,35 @@ const applyBatchSuccessState = (ctx: UploadContext, op: BatchOperation): void =>
 };
 
 /**
- * Create-mode batch branch: auto-create the release on the first MP3_320KBPS
- * batch, confirm the uploads, then set success state and toast.
+ * Create-mode batch branch: confirm the uploads, which creates the release on
+ * the first MP3_320KBPS batch, then set success state and toast.
  */
 const runBatchAutoCreateConfirm = async (ctx: UploadContext, op: BatchOperation): Promise<void> => {
   const { formatType, files, extractedMetadata } = op;
   const { successFiles, failCount } = op.upload;
 
-  const autoCreateResult = await findOrCreateReleaseAction({
-    ...extractedMetadata,
-    album: extractedMetadata.album ?? 'Untitled Release',
-    id: ctx.releaseId,
+  const confirmed = await confirmUploadedFiles(ctx, {
+    formatType,
+    files: successFiles,
+    extractedMetadata,
   });
 
-  if (!isAutoCreateResolved(autoCreateResult)) {
-    const errMsg = autoCreateResult.error ?? 'Failed to create release';
-    setFormatError(ctx.state, formatType, errMsg);
-    toast.error('Failed to create release', { description: errMsg });
-    return;
-  }
-
-  const resolvedReleaseId = autoCreateResult.releaseId;
-  const resolvedReleaseTitle = autoCreateResult.releaseTitle;
-
-  const confirmOk = await confirmUploadedFiles(resolvedReleaseId, formatType, successFiles, files);
-
-  if (!confirmOk) {
+  if (!confirmed.success || !confirmed.data) {
     failFormat(ctx, formatType, 'Failed to confirm upload');
     return;
   }
 
   applyBatchSuccessState(ctx, op);
 
-  ctx.callbacks.onReleaseAutoCreated?.({
-    releaseId: resolvedReleaseId,
-    releaseTitle: resolvedReleaseTitle,
-    metadata: extractedMetadata,
-  });
+  const { releaseId, releaseTitle } = confirmed.data;
+  ctx.callbacks.onReleaseAutoCreated?.({ releaseId, releaseTitle, metadata: extractedMetadata });
 
   if (failCount > 0) {
     toast.warning(
-      `${formatLabel(formatType)}: ${successFiles.length} of ${files.length} files uploaded — release "${resolvedReleaseTitle}" created`
+      `${formatLabel(formatType)}: ${successFiles.length} of ${files.length} files uploaded — release "${releaseTitle}" created`
     );
   } else {
-    toast.success(`Release "${resolvedReleaseTitle}" created with ${successFiles.length} files`);
+    toast.success(`Release "${releaseTitle}" created with ${successFiles.length} files`);
   }
   console.info(`[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`);
 };
@@ -501,21 +530,16 @@ const runBatchAutoCreateConfirm = async (ctx: UploadContext, op: BatchOperation)
  * state and toast. Returns `true` when it returned early (caller skips final log).
  */
 const runBatchEditConfirm = async (ctx: UploadContext, op: BatchOperation): Promise<boolean> => {
-  const { formatType, files } = op;
+  const { formatType, files, extractedMetadata } = op;
   const { successFiles, failCount } = op.upload;
 
-  /* v8 ignore start -- defensive guard: successFiles is non-empty here, which
-     is impossible without a releaseId, since uploadSingleFile returns
-     { success: false } when releaseId is falsy. */
-  if (!ctx.releaseId) {
-    failFormat(ctx, formatType, 'Cannot confirm upload: missing release ID');
-    return true;
-  }
-  /* v8 ignore stop */
+  const confirmed = await confirmUploadedFiles(ctx, {
+    formatType,
+    files: successFiles,
+    extractedMetadata,
+  });
 
-  const confirmOk = await confirmUploadedFiles(ctx.releaseId, formatType, successFiles, files);
-
-  if (!confirmOk) {
+  if (!confirmed.success) {
     failFormat(ctx, formatType, 'Failed to confirm upload');
     console.info(`[batch-upload] Complete: ${successFiles.length} success, ${failCount} failed`);
     return true;
@@ -562,7 +586,12 @@ const runBatchUpload = async (
   }));
 
   const extractedMetadata = await extractBatchMetadata(ctx, formatType, files[0]);
+  const titleRefusal = await takenTitleRefusal(ctx, formatType, extractedMetadata);
   if (signal.aborted) return;
+  if (titleRefusal) {
+    failReleaseCreation(ctx, formatType, titleRefusal);
+    return;
+  }
   const upload = await uploadFilesSequentially(ctx, formatType, files, signal);
   if (signal.aborted) return;
   const op: BatchOperation = { formatType, files, upload, extractedMetadata };
@@ -570,7 +599,7 @@ const runBatchUpload = async (
   if (upload.successFiles.length > 0) {
     ctx.state.setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
 
-    if (ctx.callbacks.onReleaseAutoCreated && formatType === 'MP3_320KBPS') {
+    if (createsRelease(ctx, formatType)) {
       await runBatchAutoCreateConfirm(ctx, op);
       return;
     }
@@ -632,9 +661,17 @@ const applySingleFileSuccessState = (
   }));
 };
 
+/** The one uploaded file of a single-file upload, as confirm takes it. */
+const uploadedTrackOf = (file: File, s3Key: string): UploadedTrack => ({
+  fileName: file.name,
+  fileSize: file.size,
+  mimeType: file.type,
+  s3Key,
+});
+
 /**
- * Create-mode single-file branch: auto-create the release on the first
- * MP3_320KBPS upload, confirm it, then set success state and toast.
+ * Create-mode single-file branch: confirm the upload, which creates the release
+ * on the first MP3_320KBPS upload, then set success state and toast.
  */
 const runSingleAutoCreateConfirm = async (
   ctx: UploadContext,
@@ -643,45 +680,23 @@ const runSingleAutoCreateConfirm = async (
   const { formatType, file, s3Key, extractedMetadata } = op;
   ctx.state.setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
 
-  const autoCreateResult = await findOrCreateReleaseAction({
-    ...extractedMetadata,
-    album: extractedMetadata.album ?? 'Untitled Release',
-    id: ctx.releaseId,
-  });
-
-  if (!isAutoCreateResolved(autoCreateResult)) {
-    const errMsg = autoCreateResult.error ?? 'Failed to create release';
-    setFormatError(ctx.state, formatType, errMsg);
-    toast.error('Failed to create release', { description: errMsg });
-    return;
-  }
-
-  const resolvedReleaseId = autoCreateResult.releaseId;
-  const resolvedReleaseTitle = autoCreateResult.releaseTitle;
-
-  const confirmResult = await confirmDigitalFormatUploadAction({
-    releaseId: resolvedReleaseId,
+  const confirmed = await confirmUploadedFiles(ctx, {
     formatType,
-    s3Key,
-    fileName: file.name,
-    fileSize: file.size,
-    mimeType: file.type,
+    files: [uploadedTrackOf(file, s3Key)],
+    extractedMetadata,
   });
 
-  if (!confirmResult.success) {
-    failFormat(ctx, formatType, confirmResult.error ?? 'Failed to confirm upload');
+  if (!confirmed.success || !confirmed.data) {
+    failFormat(ctx, formatType, confirmed.error ?? 'Failed to confirm upload');
     return;
   }
 
   applySingleFileSuccessState(ctx, formatType, file, s3Key);
 
-  ctx.callbacks.onReleaseAutoCreated?.({
-    releaseId: resolvedReleaseId,
-    releaseTitle: resolvedReleaseTitle,
-    metadata: extractedMetadata,
-  });
+  const { releaseId, releaseTitle } = confirmed.data;
+  ctx.callbacks.onReleaseAutoCreated?.({ releaseId, releaseTitle, metadata: extractedMetadata });
 
-  toast.success(`Release "${resolvedReleaseTitle}" created`);
+  toast.success(`Release "${releaseTitle}" created`);
 };
 
 /**
@@ -695,23 +710,12 @@ const runSingleEditConfirm = async (
   s3Key: string
 ): Promise<void> => {
   // Edit mode (or create mode non-MP3_320 after release exists): confirm directly
-  /* v8 ignore start -- defensive guard: a successful uploadSingleFile result
-     (asserted above) is impossible without a releaseId, since uploadSingleFile
-     returns { success: false } when releaseId is falsy. */
-  if (!ctx.releaseId) {
-    failFormat(ctx, formatType, 'Cannot confirm upload: missing release ID');
-    return;
-  }
-  /* v8 ignore stop */
   ctx.state.setUploadStates((prev) => ({ ...prev, [formatType]: { status: 'confirming' } }));
   try {
-    const confirmResult = await confirmDigitalFormatUploadAction({
-      releaseId: ctx.releaseId,
+    const confirmResult = await confirmUploadedFiles(ctx, {
       formatType,
-      s3Key,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
+      files: [uploadedTrackOf(file, s3Key)],
+      extractedMetadata: {},
     });
     if (!confirmResult.success) {
       throw new Error(confirmResult.error || 'Failed to confirm upload');
@@ -748,9 +752,14 @@ const runFileUpload = async (
   }));
 
   const extractedMetadata = await extractSingleFileMetadata(ctx, formatType, file);
+  const titleRefusal = await takenTitleRefusal(ctx, formatType, extractedMetadata);
   if (signal.aborted) return;
+  if (titleRefusal) {
+    failReleaseCreation(ctx, formatType, titleRefusal);
+    return;
+  }
 
-  const result = await uploadSingleFileToS3(ctx.releaseId, formatType, file, signal);
+  const result = await uploadSingleFileToS3(ctx, formatType, file, signal);
   if (signal.aborted) return;
 
   if (!result.success || !result.s3Key) {
@@ -760,8 +769,8 @@ const runFileUpload = async (
 
   const s3Key: string = result.s3Key;
 
-  // In create mode, auto-create the release on the first MP3_320KBPS upload
-  if (ctx.callbacks.onReleaseAutoCreated && formatType === 'MP3_320KBPS') {
+  // In create mode, the confirm creates the release on the first MP3_320KBPS upload
+  if (createsRelease(ctx, formatType)) {
     await runSingleAutoCreateConfirm(ctx, { formatType, file, s3Key, extractedMetadata });
     return;
   }
@@ -941,17 +950,24 @@ const removeFile = (state: UploadStateBundle, formatType: DigitalFormatType): vo
 /**
  * Cancel a format's in-flight upload: abort its request, drop the controller,
  * reset the format to idle, and announce it. No-op when nothing is uploading.
- * Files already uploaded in the batch were never confirmed, so nothing is
- * recorded against the release.
+ * Files the run already uploaded are discarded — unless its confirm has
+ * started, which then owns them.
  */
 const cancelUpload = (state: UploadStateBundle, formatType: DigitalFormatType): void => {
   const controller = state.abortControllers.current.get(formatType);
   if (!controller) return;
 
+  const unconfirmed = state.unconfirmedUploads.current.get(formatType);
   controller.abort();
   endUpload(state, formatType);
   removeFile(state, formatType);
   toast.info(`${formatLabel(formatType)} upload cancelled`);
+
+  if (unconfirmed) {
+    discardFormatUploadAction({ ...unconfirmed, formatType }).catch((error: unknown) => {
+      console.warn(`[upload] ${formatType}: could not discard the cancelled files`, error);
+    });
+  }
 };
 
 /**
@@ -1081,6 +1097,9 @@ const useUploadState = (existingFormats: ExistingFormat[]): UploadStateBundle =>
   // Abort controller per format for cancelling an in-flight upload
   const abortControllers = useRef(new Map<DigitalFormatType, AbortController>());
 
+  // Uploaded files per format that a cancel discards until their confirm starts
+  const unconfirmedUploads = useRef(new Map<DigitalFormatType, UnconfirmedUpload>());
+
   return {
     selectedFiles,
     setSelectedFiles,
@@ -1103,6 +1122,7 @@ const useUploadState = (existingFormats: ExistingFormat[]): UploadStateBundle =>
     fileInputRefs,
     uploadButtonRefs,
     abortControllers,
+    unconfirmedUploads,
   };
 };
 

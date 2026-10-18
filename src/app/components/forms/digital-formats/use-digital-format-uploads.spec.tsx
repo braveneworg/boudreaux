@@ -5,12 +5,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 
-import {
-  confirmDigitalFormatUploadAction,
-  confirmMultiTrackUploadAction,
-} from '@/lib/actions/confirm-upload-action';
 import { deleteFormatFilesAction } from '@/lib/actions/delete-format-files-action';
-import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-action';
+import {
+  checkNewReleaseTitleAction,
+  confirmFormatUploadAction,
+  discardFormatUploadAction,
+} from '@/lib/actions/format-upload-actions';
 import type { DigitalFormatType } from '@/types/digital-format';
 
 import { extractAudioMetadata, extractTrackMetadata } from './audio-metadata';
@@ -18,13 +18,10 @@ import { useDigitalFormatUploads } from './use-digital-format-uploads';
 
 import type { ExistingFormat } from './types';
 
-vi.mock('@/lib/actions/confirm-upload-action', () => ({
-  confirmDigitalFormatUploadAction: vi.fn(),
-  confirmMultiTrackUploadAction: vi.fn(),
-}));
-
-vi.mock('@/lib/actions/find-or-create-release-action', () => ({
-  findOrCreateReleaseAction: vi.fn(),
+vi.mock('@/lib/actions/format-upload-actions', () => ({
+  checkNewReleaseTitleAction: vi.fn(),
+  confirmFormatUploadAction: vi.fn(),
+  discardFormatUploadAction: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/delete-format-files-action', () => ({
@@ -46,6 +43,19 @@ vi.mock('sonner', () => ({
 }));
 
 const mockReleaseId = '507f1f77bcf86cd799439011';
+
+const TAKEN_COPY =
+  'A release titled "E2E Album One" already exists. Open it from Releases to upload its formats.';
+
+/** A confirm that went through, for the release the hook was given. */
+const confirmed = (releaseTitle = 'My Album') => ({
+  success: true,
+  data: { releaseId: mockReleaseId, releaseTitle, formatId: 'fmt', fileCount: 1, created: true },
+});
+
+/** The arguments of every confirm the hook sent, in order. */
+const confirmCalls = () =>
+  vi.mocked(confirmFormatUploadAction).mock.calls.map(([params]) => params);
 
 /** Build a fetch mock that resolves to a successful upload response. */
 const mockFetchSuccess = (s3Key = 'uploads/key'): typeof fetch =>
@@ -81,6 +91,12 @@ const renderUploads = (overrides: Partial<Parameters<typeof useDigitalFormatUplo
 
 beforeEach(() => {
   global.fetch = mockFetchSuccess();
+  vi.mocked(checkNewReleaseTitleAction).mockResolvedValue({ success: true, data: null });
+  vi.mocked(confirmFormatUploadAction).mockResolvedValue(confirmed());
+  vi.mocked(discardFormatUploadAction).mockResolvedValue({
+    success: true,
+    data: { deletedCount: 0 },
+  });
   vi.mocked(extractAudioMetadata).mockResolvedValue({});
   vi.mocked(extractTrackMetadata).mockResolvedValue({});
   vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -253,10 +269,6 @@ describe('useDigitalFormatUploads', () => {
       // We force this by uploading the FLAC file directly with a releaseId,
       // then assert the success path; the missing-id branch is covered by the
       // batch variant below. Here we ensure handleFileUpload confirms in edit mode.
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const { result } = renderUploads();
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
 
@@ -271,7 +283,7 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('errors when confirm action rejects in edit mode', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'confirm failed',
       });
@@ -292,7 +304,7 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('falls back to a default confirm error message in edit mode', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({ success: false });
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({ success: false });
       const { result } = renderUploads();
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
 
@@ -312,10 +324,6 @@ describe('useDigitalFormatUploads', () => {
 
   describe('handleFileUpload — single valid file', () => {
     it('uploads and confirms a single valid file in edit mode', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const { result } = renderUploads();
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
 
@@ -326,6 +334,16 @@ describe('useDigitalFormatUploads', () => {
       });
 
       expect(toast.success).toHaveBeenCalledWith('FLAC uploaded successfully');
+      expect(confirmCalls()).toEqual([
+        {
+          releaseId: mockReleaseId,
+          formatType: 'FLAC',
+          files: [
+            { fileName: 'a.flac', fileSize: 1, mimeType: 'audio/flac', s3Key: 'uploads/key' },
+          ],
+        },
+      ]);
+      expect(checkNewReleaseTitleAction).not.toHaveBeenCalled();
     });
 
     it('sets an error state when the proxy upload fails with no message', async () => {
@@ -371,16 +389,40 @@ describe('useDigitalFormatUploads', () => {
   });
 
   describe('handleFileUpload — create mode (single MP3_320KBPS file)', () => {
-    it('auto-creates the release and confirms a single MP3 file', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Solo Album',
-        created: true,
+    it('checks the title, then confirms with its own release id and the new release', async () => {
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce(confirmed('Solo Album'));
+      const onReleaseAutoCreated = vi.fn();
+      const { result } = renderUploads({ onReleaseAutoCreated });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
       });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
+
+      expect(vi.mocked(checkNewReleaseTitleAction).mock.calls).toEqual([
+        [{ releaseId: mockReleaseId, title: 'Untitled Release' }],
+      ]);
+      expect(confirmCalls()).toEqual([
+        {
+          releaseId: mockReleaseId,
+          formatType: 'MP3_320KBPS',
+          files: [{ fileName: 'a.mp3', fileSize: 1, mimeType: 'audio/mpeg', s3Key: 'uploads/key' }],
+          newRelease: { album: 'Untitled Release' },
+        },
+      ]);
+      expect(onReleaseAutoCreated.mock.calls).toEqual([
+        [{ releaseId: mockReleaseId, releaseTitle: 'Solo Album', metadata: {} }],
+      ]);
+      expect(toast.success).toHaveBeenCalledWith('Release "Solo Album" created');
+    });
+
+    it('refuses a taken title before any upload, with the copy as the error and a toast', async () => {
+      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'E2E Album One' });
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({
+        success: false,
+        error: TAKEN_COPY,
       });
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
@@ -392,18 +434,38 @@ describe('useDigitalFormatUploads', () => {
         } as unknown as React.ChangeEvent<HTMLInputElement>);
       });
 
-      expect(onReleaseAutoCreated).toHaveBeenCalled();
-      expect(toast.success).toHaveBeenCalledWith('Release "Solo Album" created');
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(result.current.getUploadState('MP3_320KBPS')).toEqual({
+        status: 'error',
+        message: TAKEN_COPY,
+      });
+      expect(result.current.errorMessages.MP3_320KBPS).toBe(TAKEN_COPY);
+      expect(toast.error).toHaveBeenCalledWith('Failed to create release', {
+        description: TAKEN_COPY,
+      });
+      expect(confirmFormatUploadAction).not.toHaveBeenCalled();
+      expect(onReleaseAutoCreated).not.toHaveBeenCalled();
+    });
+
+    it('skips the title check without a release id, and the upload then fails', async () => {
+      const { result } = renderUploads({ releaseId: undefined, onReleaseAutoCreated: vi.fn() });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(checkNewReleaseTitleAction).not.toHaveBeenCalled();
+      expect(result.current.getUploadState('MP3_320KBPS')).toEqual({
+        status: 'error',
+        message: 'No release ID',
+      });
     });
 
     it('errors when the single-file create-mode confirm fails', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Solo Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({ success: false });
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({ success: false });
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
       const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
@@ -420,8 +482,8 @@ describe('useDigitalFormatUploads', () => {
       });
     });
 
-    it('errors when findOrCreateReleaseAction fails for a single file', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({ success: false });
+    it('falls back to a default refusal when the title check fails without an error', async () => {
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({ success: false });
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
       const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
@@ -440,11 +502,19 @@ describe('useDigitalFormatUploads', () => {
   });
 
   describe('handleBatchUpload — edit mode', () => {
-    it('confirms multiple files via confirmMultiTrackUploadAction', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
+    it('confirms every uploaded file in one call, in order, with its track metadata', async () => {
+      vi.mocked(extractTrackMetadata)
+        .mockResolvedValueOnce({ title: 'One', duration: 61 })
+        .mockResolvedValueOnce({ title: 'Two', duration: 62 });
+      let call = 0;
+      global.fetch = vi.fn().mockImplementation(() => {
+        call += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, s3Key: `k${call}` }),
+        });
+      }) as unknown as typeof fetch;
       const { result } = renderUploads();
       const files = [
         new File(['a'], '01.flac', { type: 'audio/flac' }),
@@ -457,14 +527,33 @@ describe('useDigitalFormatUploads', () => {
         } as unknown as React.ChangeEvent<HTMLInputElement>);
       });
 
-      expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
+      expect(confirmCalls()).toEqual([
+        {
+          releaseId: mockReleaseId,
+          formatType: 'FLAC',
+          files: [
+            {
+              fileName: '01.flac',
+              fileSize: 1,
+              mimeType: 'audio/flac',
+              s3Key: 'k1',
+              title: 'One',
+              duration: 61,
+            },
+            {
+              fileName: '02.flac',
+              fileSize: 1,
+              mimeType: 'audio/flac',
+              s3Key: 'k2',
+              title: 'Two',
+              duration: 62,
+            },
+          ],
+        },
+      ]);
     });
 
     it('shows a warning toast when some files fail in a batch', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       let call = 0;
       global.fetch = vi.fn().mockImplementation(() => {
         call += 1;
@@ -498,7 +587,7 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('errors when multi-track confirm fails in edit mode', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'multi fail',
       });
@@ -542,11 +631,7 @@ describe('useDigitalFormatUploads', () => {
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('all files failed'));
     });
 
-    it('confirms a single successful file in a batch via the single-file action', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
+    it('confirms the one matching file of a folder', async () => {
       const { result } = renderUploads();
       // Two files, but only one will be a valid FLAC match in the folder.
       const files = [
@@ -560,23 +645,15 @@ describe('useDigitalFormatUploads', () => {
         } as unknown as React.ChangeEvent<HTMLInputElement>);
       });
 
-      expect(confirmDigitalFormatUploadAction).toHaveBeenCalled();
+      expect(confirmCalls().map(({ files }) => files.map(({ fileName }) => fileName))).toEqual([
+        ['only.flac'],
+      ]);
     });
   });
 
   describe('handleBatchUpload — create mode (MP3_320KBPS)', () => {
     it('auto-creates the release and shows a warning toast on partial failure', async () => {
       vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'My Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
 
       let call = 0;
       global.fetch = vi.fn().mockImplementation(() => {
@@ -612,9 +689,12 @@ describe('useDigitalFormatUploads', () => {
       expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('1 of 2 files uploaded'));
     });
 
-    it('errors when findOrCreateReleaseAction fails during a batch', async () => {
-      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({ success: false, error: 'db down' });
+    it('refuses a taken title before any file of the batch is sent', async () => {
+      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'E2E Album One' });
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({
+        success: false,
+        error: TAKEN_COPY,
+      });
 
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
@@ -629,21 +709,19 @@ describe('useDigitalFormatUploads', () => {
         } as unknown as React.ChangeEvent<HTMLInputElement>);
       });
 
-      expect(toast.error).toHaveBeenCalledWith(
-        'Failed to create release',
-        expect.objectContaining({ description: 'db down' })
-      );
+      expect(vi.mocked(checkNewReleaseTitleAction).mock.calls).toEqual([
+        [{ releaseId: mockReleaseId, title: 'E2E Album One' }],
+      ]);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(result.current.errorMessages.MP3_320KBPS).toBe(TAKEN_COPY);
+      expect(toast.error).toHaveBeenCalledWith('Failed to create release', {
+        description: TAKEN_COPY,
+      });
     });
 
     it('errors when multi-track confirm fails in create mode', async () => {
       vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'My Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({ success: false });
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({ success: false });
 
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
@@ -665,17 +743,7 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('shows a success toast when a full batch succeeds in create mode', async () => {
-      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'My Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
+      vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album', year: 2020 });
 
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
@@ -691,6 +759,14 @@ describe('useDigitalFormatUploads', () => {
       });
 
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('created with 2 files'));
+      expect(
+        confirmCalls().map(({ releaseId, newRelease }) => ({ releaseId, newRelease }))
+      ).toEqual([{ releaseId: mockReleaseId, newRelease: { album: 'My Album', year: 2020 } }]);
+      expect(onReleaseAutoCreated).toHaveBeenCalledWith({
+        releaseId: mockReleaseId,
+        releaseTitle: 'My Album',
+        metadata: { album: 'My Album', year: 2020 },
+      });
     });
   });
 
@@ -813,10 +889,6 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('uploads matching files from a dropped directory (sorting comparator)', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
       const f2 = new File(['b'], '10-track.flac', { type: 'audio/flac' });
       const f1 = new File(['a'], '2-track.flac', { type: 'audio/flac' });
       const makeEntry = (file: File) => ({
@@ -855,7 +927,9 @@ describe('useDigitalFormatUploads', () => {
         } as unknown as React.DragEvent<HTMLDivElement>);
       });
 
-      expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
+      expect(confirmCalls().map(({ files }) => files.map(({ fileName }) => fileName))).toEqual([
+        ['2-track.flac', '10-track.flac'],
+      ]);
     });
 
     it('shows an error toast when reading folder contents throws', async () => {
@@ -1131,10 +1205,6 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('reports a format as uploading while a batch is in flight', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
       // A fetch that never resolves keeps the state in `uploading`.
       global.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
       const { result } = renderUploads();
@@ -1155,10 +1225,6 @@ describe('useDigitalFormatUploads', () => {
 
   describe('uploadSingleFile — mime + extension fallbacks', () => {
     it('uploads a file with an empty mime type using the default mime', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const fetchSpy = mockFetchSuccess();
       global.fetch = fetchSpy;
       const { result } = renderUploads();
@@ -1244,16 +1310,6 @@ describe('useDigitalFormatUploads', () => {
         album: 'My Album',
         coverArt: 'data:image/png;base64,abc',
       });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'My Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const onMetadataExtracted = vi.fn();
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
@@ -1274,16 +1330,6 @@ describe('useDigitalFormatUploads', () => {
       // Metadata has keys but no coverArt → exercises the `coverArt ? … : undefined`
       // ternary's false branch in the single-file console.info.
       vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'My Album', artist: 'Artist' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'My Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const onMetadataExtracted = vi.fn();
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
@@ -1302,16 +1348,6 @@ describe('useDigitalFormatUploads', () => {
 
     it('does not call onMetadataExtracted when no metadata is extracted', async () => {
       vi.mocked(extractAudioMetadata).mockResolvedValue({});
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Untitled Release',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const onMetadataExtracted = vi.fn();
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
@@ -1329,7 +1365,7 @@ describe('useDigitalFormatUploads', () => {
 
   describe('handleFileUpload — edit-mode confirm throws non-Error', () => {
     it('uses the default message when the confirm action throws a non-Error', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockRejectedValue('explode');
+      vi.mocked(confirmFormatUploadAction).mockRejectedValueOnce('explode');
       const { result } = renderUploads();
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
 
@@ -1354,16 +1390,6 @@ describe('useDigitalFormatUploads', () => {
         artist: 'Some Artist',
         coverArt: 'data:image/png;base64,abc',
       });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Untitled Release',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
       const onMetadataExtracted = vi.fn();
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
@@ -1384,16 +1410,6 @@ describe('useDigitalFormatUploads', () => {
     it('skips metadata forwarding when batch extraction yields nothing', async () => {
       // Empty metadata → the `Object.keys(...).length > 0` guard is false in batch mode.
       vi.mocked(extractAudioMetadata).mockResolvedValue({});
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Untitled Release',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
       const onMetadataExtracted = vi.fn();
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onMetadataExtracted, onReleaseAutoCreated });
@@ -1413,16 +1429,6 @@ describe('useDigitalFormatUploads', () => {
 
     it('records the album title when batch metadata includes an album', async () => {
       vi.mocked(extractAudioMetadata).mockResolvedValue({ album: 'Batch Album' });
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Batch Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'fmt', fileCount: 2 },
-      });
       const onReleaseAutoCreated = vi.fn();
       const { result } = renderUploads({ onReleaseAutoCreated });
       const files = [
@@ -1464,10 +1470,6 @@ describe('useDigitalFormatUploads', () => {
 
   describe('handleDrop — items present but not a directory', () => {
     it('falls through to single-file handling when the dropped entry is a file', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
       const fileEntry = { isFile: true, isDirectory: false, name: 'a.flac' };
       const { result } = renderUploads();
@@ -1486,10 +1488,6 @@ describe('useDigitalFormatUploads', () => {
     });
 
     it('falls through to single-file handling when webkitGetAsEntry is absent', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'fmt' },
-      });
       const file = new File(['x'], 'a.flac', { type: 'audio/flac' });
       const { result } = renderUploads();
 
@@ -1529,12 +1527,13 @@ describe('useDigitalFormatUploads', () => {
 
       expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
       expect(result.current.selectedFiles.FLAC).toBeUndefined();
-      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(confirmFormatUploadAction).not.toHaveBeenCalled();
+      expect(discardFormatUploadAction).not.toHaveBeenCalled();
       expect(toast.info).toHaveBeenCalledWith('FLAC upload cancelled');
       expect(toast.error).not.toHaveBeenCalled();
     });
 
-    it('stops a batch after the in-flight file and never confirms the partial batch', async () => {
+    it('stops a batch mid-way and discards exactly the files it already uploaded', async () => {
       const abortable = mockFetchUntilAborted();
       global.fetch = vi
         .fn()
@@ -1543,12 +1542,18 @@ describe('useDigitalFormatUploads', () => {
           status: 200,
           json: () => Promise.resolve({ success: true, s3Key: 'k1' }),
         })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, s3Key: 'k2' }),
+        })
         .mockImplementation(abortable) as unknown as typeof fetch;
       const { result } = renderUploads();
       const files = [
         new File(['a'], '01.flac', { type: 'audio/flac' }),
         new File(['b'], '02.flac', { type: 'audio/flac' }),
         new File(['c'], '03.flac', { type: 'audio/flac' }),
+        new File(['d'], '04.flac', { type: 'audio/flac' }),
       ];
       let uploadRun: Promise<void> = Promise.resolve();
 
@@ -1560,11 +1565,100 @@ describe('useDigitalFormatUploads', () => {
         await uploadRun;
       });
 
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch).toHaveBeenCalledTimes(3);
       expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
-      expect(confirmMultiTrackUploadAction).not.toHaveBeenCalled();
-      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(confirmFormatUploadAction).not.toHaveBeenCalled();
+      expect(vi.mocked(discardFormatUploadAction).mock.calls).toEqual([
+        [{ releaseId: mockReleaseId, formatType: 'FLAC', s3Keys: ['k1', 'k2'] }],
+      ]);
       expect(toast.info).toHaveBeenCalledWith('FLAC upload cancelled');
+    });
+
+    it('discards nothing once the confirm has started, which owns the files', async () => {
+      vi.mocked(confirmFormatUploadAction).mockReturnValueOnce(new Promise(() => {}));
+      const { result } = renderUploads();
+      const files = [
+        new File(['a'], '01.flac', { type: 'audio/flac' }),
+        new File(['b'], '02.flac', { type: 'audio/flac' }),
+      ];
+
+      act(() => {
+        void result.current.handleFileInputChange('FLAC', changeEvent(files));
+      });
+      await vi.waitFor(() => expect(confirmFormatUploadAction).toHaveBeenCalledTimes(1));
+      act(() => {
+        result.current.handleCancelUpload('FLAC');
+      });
+
+      expect(toast.info).toHaveBeenCalledWith('FLAC upload cancelled');
+      expect(discardFormatUploadAction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a single file', [new File(['a'], 'a.mp3', { type: 'audio/mpeg' })]],
+      [
+        'a batch',
+        [
+          new File(['a'], '01.mp3', { type: 'audio/mpeg' }),
+          new File(['b'], '02.mp3', { type: 'audio/mpeg' }),
+        ],
+      ],
+    ])('sends no file of %s when cancelled during the title check', async (_case, files) => {
+      let answerCheck = (): void => {};
+      vi.mocked(checkNewReleaseTitleAction).mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerCheck = () => resolve({ success: true, data: null });
+        })
+      );
+      const { result } = renderUploads({ onReleaseAutoCreated: vi.fn() });
+      let uploadRun: Promise<void> = Promise.resolve();
+
+      await act(async () => {
+        uploadRun = result.current.handleFileInputChange('MP3_320KBPS', changeEvent(files));
+      });
+      await act(async () => {
+        result.current.handleCancelUpload('MP3_320KBPS');
+        answerCheck();
+        await uploadRun;
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(result.current.getUploadState('MP3_320KBPS')).toEqual({ status: 'idle' });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('logs a discard that fails and keeps the cancel', async () => {
+      vi.mocked(discardFormatUploadAction).mockRejectedValueOnce(new Error('offline'));
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, s3Key: 'k1' }),
+        })
+        .mockImplementation(mockFetchUntilAborted()) as unknown as typeof fetch;
+      const { result } = renderUploads();
+      const files = [
+        new File(['a'], '01.flac', { type: 'audio/flac' }),
+        new File(['b'], '02.flac', { type: 'audio/flac' }),
+      ];
+      let uploadRun: Promise<void> = Promise.resolve();
+
+      await act(async () => {
+        uploadRun = result.current.handleFileInputChange('FLAC', changeEvent(files));
+      });
+      await act(async () => {
+        result.current.handleCancelUpload('FLAC');
+        await uploadRun;
+      });
+
+      await vi.waitFor(() =>
+        expect(console.warn).toHaveBeenCalledWith(
+          '[upload] FLAC: could not discard the cancelled files',
+          expect.any(Error)
+        )
+      );
+      expect(result.current.getUploadState('FLAC')).toEqual({ status: 'idle' });
     });
 
     it('is a no-op for a format with no upload in flight', () => {
