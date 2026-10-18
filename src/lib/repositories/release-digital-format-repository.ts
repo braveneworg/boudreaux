@@ -8,6 +8,7 @@ import type { DigitalFormatType } from '@/lib/constants/digital-formats';
 import { prisma } from '@/lib/prisma';
 
 import { digitalFormatWhere } from './_internal/digital-format-where';
+import { runQuery } from './_internal/map-prisma-error';
 
 import type { Prisma, ReleaseDigitalFormat, ReleaseDigitalFormatFile } from '@prisma/client';
 
@@ -15,6 +16,24 @@ import type { Prisma, ReleaseDigitalFormat, ReleaseDigitalFormatFile } from '@pr
 export type ReleaseDigitalFormatWithFiles = ReleaseDigitalFormat & {
   files: ReleaseDigitalFormatFile[];
 };
+
+/** One track file a replacement writes. */
+export interface TrackFileInput {
+  trackNumber: number;
+  s3Key: string;
+  fileName: string;
+  fileSize: bigint;
+  mimeType: string;
+  title?: string;
+  duration?: number;
+}
+
+/** What a track replacement wrote, and the keys of the tracks it replaced. */
+export interface TrackReplacement {
+  formatId: string;
+  fileCount: number;
+  replacedKeys: string[];
+}
 
 /**
  * Repository for ReleaseDigitalFormat data access
@@ -213,6 +232,85 @@ export class ReleaseDigitalFormatRepository {
         deletedAt: null, // Restore if soft-deleted
       },
     });
+  }
+
+  /**
+   * Replace a format's track files in one transaction: upsert the parent (or
+   * restore it when soft-deleted), delete its old tracks, create the new ones
+   * and recount. A failure part-way leaves the previous tracks and counts.
+   * Bulk-creates with one `createMany` — never concurrent `create`s, which
+   * race Prisma's read-back on fresh collections.
+   */
+  async replaceTracks(
+    releaseId: string,
+    formatType: DigitalFormatType,
+    files: ReadonlyArray<TrackFileInput>
+  ): Promise<TrackReplacement> {
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        const parent = await tx.releaseDigitalFormat.upsert({
+          where: { releaseId_formatType: { releaseId, formatType } },
+          create: { release: { connect: { id: releaseId } }, formatType, trackCount: 0 },
+          update: { deletedAt: null },
+        });
+        const replaced = await tx.releaseDigitalFormatFile.findMany({
+          where: { formatId: parent.id },
+          select: { s3Key: true },
+        });
+        await tx.releaseDigitalFormatFile.deleteMany({ where: { formatId: parent.id } });
+        const created = await tx.releaseDigitalFormatFile.createMany({
+          data: files.map((file) => ({
+            formatId: parent.id,
+            trackNumber: file.trackNumber,
+            s3Key: file.s3Key,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            mimeType: file.mimeType,
+            ...(file.title && { title: file.title }),
+            ...(file.duration && { duration: file.duration }),
+          })),
+        });
+        const aggregation = await tx.releaseDigitalFormatFile.aggregate({
+          where: { formatId: parent.id },
+          _count: true,
+          _sum: { fileSize: true },
+        });
+        await tx.releaseDigitalFormat.update({
+          where: { id: parent.id },
+          data: {
+            trackCount: aggregation._count,
+            totalFileSize: aggregation._sum.fileSize ?? BigInt(0),
+          },
+        });
+        return {
+          formatId: parent.id,
+          fileCount: created.count,
+          replacedKeys: replaced.map(({ s3Key }) => s3Key),
+        };
+      })
+    );
+  }
+
+  /**
+   * The keys, out of `keys`, that a format row (the legacy single-file key)
+   * or a track row references. Withdrawn formats count: their files are kept
+   * until the format is hard-deleted.
+   */
+  async findReferencedS3Keys(keys: ReadonlyArray<string>): Promise<string[]> {
+    if (keys.length === 0) {
+      return [];
+    }
+
+    const where = { s3Key: { in: [...keys] } };
+    const [formats, files] = await Promise.all([
+      prisma.releaseDigitalFormat.findMany({ where, select: { s3Key: true } }),
+      prisma.releaseDigitalFormatFile.findMany({ where, select: { s3Key: true } }),
+    ]);
+    const referenced = [...formats, ...files]
+      .map(({ s3Key }) => s3Key)
+      .filter((s3Key): s3Key is string => s3Key !== null);
+
+    return [...new Set(referenced)];
   }
 
   /**
