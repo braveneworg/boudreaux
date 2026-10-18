@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { cache } from '@/lib/utils/simple-cache';
 
 import { updateFeaturedArtistAction } from './update-featured-artist-action';
@@ -15,7 +15,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/featured-artists-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/simple-cache', () => ({
   cache: { deleteByPrefix: vi.fn() },
 }));
@@ -25,6 +25,8 @@ const ARTIST_A = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const ARTIST_B = 'bbbbbbbbbbbbbbbbbbbbbbbb';
 const DIGITAL_FORMAT_ID = 'cccccccccccccccccccccccc';
 const RELEASE_ID = 'dddddddddddddddddddddddd';
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 
@@ -59,7 +61,7 @@ const lastUpdateData = () =>
   vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mock.calls[0][1];
 
 beforeEach(() => {
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockResolvedValue({
     success: true,
@@ -68,12 +70,13 @@ beforeEach(() => {
 });
 
 describe('updateFeaturedArtistAction', () => {
-  it('requires an admin session', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('resolves the gate refusal as a form error without updating the featured artist', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload())).rejects.toThrow(
-      'Unauthorized'
-    );
+    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+
+    expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+    expect(FeaturedArtistsService.updateFeaturedArtist).not.toHaveBeenCalled();
   });
 
   it('reports success with the featured artist id', async () => {

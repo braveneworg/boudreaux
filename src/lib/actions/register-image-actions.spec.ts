@@ -5,16 +5,14 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
-const authMock = vi.fn();
+const gateActionMock = vi.fn();
 const releaseExistsMock = vi.fn();
 const registerForReleaseMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const logSecurityEventMock = vi.fn();
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
-vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('../services/release-service', () => ({
   ReleaseService: { existsById: releaseExistsMock },
@@ -33,22 +31,25 @@ const images = [{ s3Key: 'k1', cdnUrl: 'https://cdn/x', caption: 'c', altText: '
 
 describe('registerReleaseImagesAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
-    authMock.mockReset();
+    gateActionMock.mockReset();
     releaseExistsMock.mockReset();
     registerForReleaseMock.mockReset();
     revalidatePathMock.mockReset();
     logSecurityEventMock.mockReset();
   });
 
-  it('rejects when requireRole throws', async () => {
-    requireRoleMock.mockRejectedValueOnce(new Error('forbidden'));
-    await expect(registerReleaseImagesAction('r1', images)).rejects.toThrow('forbidden');
+  it('returns the gate refusal without touching the release', async () => {
+    const refusal = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
+    gateActionMock.mockResolvedValue(refusal);
+
+    const result = await registerReleaseImagesAction('r1', images);
+
+    expect(result).toEqual(refusal);
+    expect(releaseExistsMock).not.toHaveBeenCalled();
   });
 
   it('returns failure when the image service throws', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
-    authMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     releaseExistsMock.mockResolvedValue(true);
     registerForReleaseMock.mockRejectedValueOnce(new Error('boom'));
     const result = await registerReleaseImagesAction('r1', images);
@@ -56,16 +57,14 @@ describe('registerReleaseImagesAction', () => {
   });
 
   it('returns Release not found when release does not exist', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
-    authMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     releaseExistsMock.mockResolvedValue(false);
     const result = await registerReleaseImagesAction('r1', images);
     expect(result).toEqual({ success: false, error: 'Release not found' });
   });
 
   it('registers images and revalidates paths on success', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
-    authMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     releaseExistsMock.mockResolvedValue(true);
     const results = [{ id: 'img1', src: 'x', sortOrder: 0 }];
     registerForReleaseMock.mockResolvedValue(results);
@@ -74,12 +73,5 @@ describe('registerReleaseImagesAction', () => {
     expect(result).toEqual({ success: true, data: results });
     expect(revalidatePathMock).toHaveBeenCalledWith('/releases');
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin/releases');
-  });
-
-  it('returns Unauthorized when session lacks admin role', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
-    authMock.mockResolvedValue({ user: { id: 'u1', role: 'user' } });
-    const result = await registerReleaseImagesAction('r1', images);
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
   });
 });

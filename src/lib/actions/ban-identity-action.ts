@@ -8,8 +8,8 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { banIdentitySchema, type BanIdentityInput } from '@/lib/validation/abuse-report-schema';
 
@@ -26,12 +26,11 @@ export type BanIdentityActionResult =
 export const banIdentityAction = async (
   input: BanIdentityInput
 ): Promise<BanIdentityActionResult> => {
-  let session: Awaited<ReturnType<typeof requireRole>>;
-  try {
-    session = await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = banIdentitySchema.safeParse(input);
   if (!parsed.success) {
@@ -46,7 +45,6 @@ export const banIdentityAction = async (
   }
 
   const adminId = session.user.id;
-  if (!adminId) return { success: false, error: 'unauthorized' };
 
   const adminHeaders = await headers();
 

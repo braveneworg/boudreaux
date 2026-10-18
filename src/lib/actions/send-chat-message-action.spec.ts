@@ -4,14 +4,14 @@
 
 import { headers } from 'next/headers';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatService } from '@/lib/services/chat-service';
 
 import { sendChatMessageAction } from './send-chat-message-action';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('next/headers', () => ({ headers: vi.fn() }));
 
@@ -31,27 +31,25 @@ beforeEach(() => {
 describe('sendChatMessageAction', () => {
   const validInput = { body: 'hello', fingerprint: 'abcdef1234567890' };
 
-  it('returns unauthorized when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it.each([
+    ['UNAUTHENTICATED', 'unauthorized'],
+    ['BANNED', 'disabled'],
+  ] as const)('maps a %s gate refusal to %s without sending', async (code, error) => {
+    vi.mocked(gateAction).mockResolvedValue({ success: false, error: 'refused', code });
 
     const result = await sendChatMessageAction(validInput);
 
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(result).toEqual({ success: false, error });
     expect(ChatService.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('returns unauthorized when the session has no email', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
-
-    const result = await sendChatMessageAction(validInput);
-
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
-  });
-
   it('returns invalid with field errors when the Zod validation fails', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
 
     const result = await sendChatMessageAction({ body: '', fingerprint: 'short' });
 
@@ -62,9 +60,12 @@ describe('sendChatMessageAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
 
     const result = await sendChatMessageAction(
       null as unknown as Parameters<typeof sendChatMessageAction>[0]
@@ -77,9 +78,12 @@ describe('sendChatMessageAction', () => {
   });
 
   it('forwards the resolved IP and user fields to the service', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
     vi.mocked(ChatService.sendMessage).mockResolvedValue({
       success: true,
       data: { id: 'msg-1' } as never,
@@ -100,9 +104,12 @@ describe('sendChatMessageAction', () => {
   });
 
   it('passes through rate_limited with retryAfterSeconds', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
     vi.mocked(ChatService.sendMessage).mockResolvedValue({
       success: false,
       error: 'rate_limited',
@@ -119,9 +126,12 @@ describe('sendChatMessageAction', () => {
   });
 
   it('passes through disabled', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
     vi.mocked(ChatService.sendMessage).mockResolvedValue({
       success: false,
       error: 'disabled',
@@ -133,9 +143,12 @@ describe('sendChatMessageAction', () => {
   });
 
   it('returns success + DTO on the happy path', async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: 'user-1', email: 'octo@example.com' },
-    } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: {
+        user: { id: 'user-1', email: 'octo@example.com' },
+      } as never,
+    });
     const dto = { id: 'msg-1' };
     vi.mocked(ChatService.sendMessage).mockResolvedValue({
       success: true,

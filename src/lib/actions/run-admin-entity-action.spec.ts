@@ -4,15 +4,15 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { runAdminEntityAction } from './run-admin-entity-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const id = '507f1f77bcf86cd799439011';
@@ -29,25 +29,29 @@ const baseConfig = () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
 });
 
 describe('runAdminEntityAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without performing the mutation', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce({
+      success: false,
+      error: 'Account suspended',
+      code: 'BANNED',
+    });
     const config = baseConfig();
 
     const result = await runAdminEntityAction(config);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual({ success: false, error: 'Account suspended', code: 'BANNED' });
     expect(config.perform).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid object id using the entity label', async () => {
     const result = await runAdminEntityAction({ ...baseConfig(), id: 'nope' });
 
-    expect(result).toEqual({ success: false, error: 'Invalid release ID' });
+    expect(result).toEqual({ success: false, error: 'Invalid release ID', code: 'INVALID_INPUT' });
   });
 
   it('performs the mutation and returns success', async () => {
@@ -83,17 +87,21 @@ describe('runAdminEntityAction', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/releases');
   });
 
-  it('surfaces a service failure result without logging or revalidating', async () => {
+  it('surfaces a service failure with its code, without logging or revalidating', async () => {
     const config = {
       ...baseConfig(),
       perform: vi.fn(() =>
-        Promise.resolve({ success: false as const, error: 'Release not found' })
+        Promise.resolve({
+          success: false as const,
+          error: 'Release not found',
+          code: 'NOT_FOUND' as const,
+        })
       ),
     };
 
     const result = await runAdminEntityAction(config);
 
-    expect(result).toEqual({ success: false, error: 'Release not found' });
+    expect(result).toEqual({ success: false, error: 'Release not found', code: 'NOT_FOUND' });
     expect(logSecurityEvent).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
@@ -106,6 +114,6 @@ describe('runAdminEntityAction', () => {
 
     const result = await runAdminEntityAction(config);
 
-    expect(result).toEqual({ success: false, error: 'Failed to delete release' });
+    expect(result).toEqual({ success: false, error: 'Failed to delete release', code: 'UNKNOWN' });
   });
 });

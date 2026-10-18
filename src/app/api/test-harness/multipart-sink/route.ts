@@ -23,9 +23,10 @@ import { VIDEO_PART_SIZE } from '@/lib/constants/video-uploads';
  *    `E2E_MODE + NODE_ENV=production` (unless env validation is deliberately
  *    skipped, which only the CI E2E standalone server does).
  * 2. Only an upload id minted by `initiateVideoUploadAction` — which is behind
- *    `requireRole('admin')` and Zod validation — is accepted; anything else
- *    409s. That unguessable id is the analogue of the presigned signature the
- *    real S3 endpoint checks, which likewise carries no session.
+ *    the action gate (`gateAction('admin')`) and Zod validation — is
+ *    accepted; anything else 409s. That unguessable id is the analogue of the
+ *    presigned signature the real S3 endpoint checks, which likewise carries
+ *    no session.
  * 3. Nothing is accepted or persisted beyond what the flow needs: the body is
  *    measured and digested, then discarded. No bytes reach disk, the DB, or any
  *    response; the S3 key is never taken from the request, only looked up from

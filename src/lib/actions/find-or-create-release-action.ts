@@ -7,12 +7,11 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { Format } from '@/lib/types/media-models';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { needsCreditDecisions, type CreditConfirmation } from '@/lib/utils/credit-confirmation';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -316,14 +315,6 @@ const handleCreateResponse = async (
   };
 };
 
-const getAdminUserId = async (): Promise<string | null> => {
-  const session = await auth();
-  if (!session || !session.user || !session.user.id || session.user.role !== 'admin') {
-    return null;
-  }
-  return session.user.id;
-};
-
 /**
  * Find an existing release by title (case-insensitive) or create a new one
  * from audio metadata. This action requires admin role.
@@ -336,7 +327,11 @@ export const findOrCreateReleaseAction = async (
   metadata: ReleaseMetadata,
   options: FindOrCreateReleaseOptions = {}
 ): Promise<FindOrCreateReleaseResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   if (!metadata.album || metadata.album.trim() === '') {
     return { success: false, error: 'Album name is required to find or create a release' };
@@ -345,13 +340,7 @@ export const findOrCreateReleaseAction = async (
   const albumTitle = metadata.album.trim();
 
   try {
-    const userId = await getAdminUserId();
-
-    if (!userId) {
-      return { success: false, error: 'You must be a logged in admin user to manage releases' };
-    }
-
-    const ctx: ReleaseActionContext = { albumTitle, userId, options };
+    const ctx: ReleaseActionContext = { albumTitle, userId: session.user.id, options };
     const existingRelease = await ReleaseService.findByTitleInsensitive(albumTitle);
 
     if (existingRelease) {

@@ -4,12 +4,12 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { updateReleaseAction } from './update-release-action';
 
@@ -21,7 +21,9 @@ vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 describe('updateReleaseAction', () => {
   const mockReleaseId = '507f1f77bcf86cd799439011';
@@ -49,7 +51,7 @@ describe('updateReleaseAction', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -172,14 +174,13 @@ describe('updateReleaseAction', () => {
   });
 
   describe('Authorization', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without updating the release', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(
-        updateReleaseAction(mockReleaseId, initialFormState, mockFormData)
-      ).rejects.toThrow('Unauthorized');
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(requireRole).toHaveBeenCalledWith('admin');
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
     });
 
     it('should reject invalid releaseId format', async () => {

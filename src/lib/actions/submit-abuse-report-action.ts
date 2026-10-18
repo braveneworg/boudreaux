@@ -7,7 +7,7 @@ import 'server-only';
 
 import { headers } from 'next/headers';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { dispatchAbuseReportNotifications } from '@/lib/services/abuse-report-notifications';
 import { AbuseReportService } from '@/lib/services/abuse-report-service';
 import { extractClientIpFromHeaders } from '@/lib/utils/extract-client-ip';
@@ -42,10 +42,11 @@ export type SubmitAbuseReportActionResult =
 export const submitAbuseReportAction = async (
   input: SubmitAbuseReportInput
 ): Promise<SubmitAbuseReportActionResult> => {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const gate = await gateAction('signed-in');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = submitAbuseReportSchema.safeParse(input);
   if (!parsed.success) {

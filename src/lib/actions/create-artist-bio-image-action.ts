@@ -7,11 +7,11 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import {
@@ -38,12 +38,11 @@ export interface CreateBioImageActionResult {
 export const createArtistBioImageAction = async (
   input: CreateBioImageInput
 ): Promise<CreateBioImageActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   const parsed = createBioImageInputSchema.safeParse(input);
   if (!parsed.success) {

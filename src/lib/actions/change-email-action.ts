@@ -4,9 +4,11 @@
 'use server';
 
 import 'server-only';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { auth, signOut } from '@/auth';
+import { auth } from '@/lib/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -14,7 +16,7 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { changeEmailActionSchema } from '@/lib/validation/change-email-schema';
 
 import { applyChangeEmailError } from './change-email-action-helpers';
-import { setGeneralFormError } from './form-state-helpers';
+import { refusalCopy, setGeneralFormError } from './form-state-helpers';
 
 export const changeEmailAction = async (
   _initialState: FormState,
@@ -34,14 +36,15 @@ export const changeEmailAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id) {
+      const gate = await gateAction('signed-in');
+      if (!gate.success) {
         formState.success = false;
-        setGeneralFormError(formState, ['You must be logged in to change your email']);
+        setGeneralFormError(formState, [
+          refusalCopy(gate, 'You must be logged in to change your email'),
+        ]);
         return formState;
       }
+      const { session } = gate;
 
       // Use the current email from session as previousEmail if not provided
       const previousEmail = parsed.data.previousEmail || session.user.email || '';
@@ -73,8 +76,9 @@ export const changeEmailAction = async (
   }
 
   if (formState.success) {
-    // Sign the user out to force re-authentication with new email
-    await signOut({ redirect: false }); // User is redirected
+    // Sign the user out to force re-authentication with new email; the
+    // redirect below takes them to the success page.
+    await auth.api.signOut({ headers: await headers() });
 
     return redirect(
       `/success/change-email?email=${encodeURIComponent(formState.fields.email as string)}`

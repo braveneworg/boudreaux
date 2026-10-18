@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
 
@@ -13,7 +13,7 @@ import { updateProfileAction } from './update-profile-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/repositories/user-repository');
 vi.mock('@/lib/utils/audit-log');
 
@@ -25,7 +25,10 @@ const buildProfileFormData = (entries: Record<string, string>): FormData => {
 
 describe('updateProfileAction with the real schema', () => {
   beforeEach(() => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'user-1' } } as never,
+    });
   });
 
   it('saves a numeric ZIP code and phone as strings and the switches as booleans', async () => {

@@ -4,32 +4,38 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { updateReleaseCoverArtAction } from './update-release-cover-art-action';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('../repositories/release-repository');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 const VALID_RELEASE_ID = '507f1f77bcf86cd799439011';
 const VALID_COVER_URL = 'https://cdn.example.com/cover.webp';
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('updateReleaseCoverArtAction', () => {
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { role: 'admin' } } as never,
+    });
     vi.mocked(ReleaseRepository.updateData).mockResolvedValue({} as never);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without updating the cover art', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(updateReleaseCoverArtAction(VALID_RELEASE_ID, VALID_COVER_URL)).rejects.toThrow(
-      'Unauthorized'
-    );
+    const result = await updateReleaseCoverArtAction(VALID_RELEASE_ID, VALID_COVER_URL);
+
+    expect(result).toEqual(REFUSAL);
+    expect(ReleaseRepository.updateData).not.toHaveBeenCalled();
   });
 
   it('rejects malformed release IDs', async () => {

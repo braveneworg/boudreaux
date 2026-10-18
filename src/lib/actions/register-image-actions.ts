@@ -7,10 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageService } from '@/lib/services/image-service';
 import { ReleaseService } from '@/lib/services/release-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
@@ -51,15 +50,13 @@ export const registerReleaseImagesAction = async (
   releaseId: string,
   images: RegisterImageInput[]
 ): Promise<RegisterImageActionResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   try {
-    const session = await auth();
-
-    if (!session?.user?.id || session?.user?.role !== 'admin') {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     if (!(await ReleaseService.existsById(releaseId))) {
       return { success: false, error: 'Release not found' };
     }

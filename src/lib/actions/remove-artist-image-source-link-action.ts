@@ -7,9 +7,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageLinksService } from '@/lib/services/image-links-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { removeImageSourceLinkInputSchema } from '@/lib/validation/image-links-schema';
 
@@ -26,12 +26,11 @@ export interface RemoveImageSourceLinkActionResult {
 export const removeArtistImageSourceLinkAction = async (
   input: unknown
 ): Promise<RemoveImageSourceLinkActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   const parsed = removeImageSourceLinkInputSchema.safeParse(input);
   if (!parsed.success) {

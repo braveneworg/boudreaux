@@ -5,7 +5,7 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const authMock = vi.fn();
+const gateActionMock = vi.fn();
 const submitMock = vi.fn();
 const dispatchMock = vi.fn();
 const headersMock = vi.fn();
@@ -14,8 +14,8 @@ vi.mock('next/headers', () => ({
   headers: headersMock,
 }));
 
-vi.mock('@/auth', () => ({
-  auth: authMock,
+vi.mock('@/lib/auth/action-gate', () => ({
+  gateAction: gateActionMock,
 }));
 
 vi.mock('@/lib/services/abuse-report-service', () => ({
@@ -49,14 +49,14 @@ const { submitAbuseReportAction } = await import('./submit-abuse-report-action')
 
 describe('submitAbuseReportAction', () => {
   beforeEach(() => {
-    authMock.mockReset();
+    gateActionMock.mockReset();
     submitMock.mockReset();
     dispatchMock.mockReset();
     headersMock.mockResolvedValue(buildHeaders());
   });
 
-  it('returns unauthorized when there is no session', async () => {
-    authMock.mockResolvedValue(null);
+  it('returns unauthorized for a gate refusal without submitting', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'BANNED' });
 
     const result = await submitAbuseReportAction({ reportedUsername: 'target' });
 
@@ -65,7 +65,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('rejects an empty username as invalid', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
 
     const result = await submitAbuseReportAction({ reportedUsername: '' });
 
@@ -76,7 +76,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('passes the auth session id (never client input) as the reporter id', async () => {
-    authMock.mockResolvedValue({ user: { id: 'session-r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'session-r1' } } });
     submitMock.mockResolvedValue({ ok: true });
     dispatchMock.mockResolvedValue(undefined);
 
@@ -90,7 +90,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('fans out admin notifications on success', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
     submitMock.mockResolvedValue({ ok: true });
     dispatchMock.mockResolvedValue(undefined);
 
@@ -101,7 +101,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('surfaces rate_limited results with retryAfterSeconds', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
     submitMock.mockResolvedValue({
       ok: false,
       code: 'rate_limited',
@@ -120,7 +120,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('surfaces self_report results', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
     submitMock.mockResolvedValue({ ok: false, code: 'self_report' });
 
     const result = await submitAbuseReportAction({ reportedUsername: 'r1' });
@@ -129,7 +129,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('does not let a notification failure mask the success result', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
     submitMock.mockResolvedValue({ ok: true });
     dispatchMock.mockRejectedValue(Error('SES blip'));
 
@@ -139,7 +139,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('tolerates a non-Error notification rejection', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
     submitMock.mockResolvedValue({ ok: true });
     // A non-Error throw exercises the `: 'unknown'` side of the log.
     dispatchMock.mockRejectedValue('boom');
@@ -150,7 +150,7 @@ describe('submitAbuseReportAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    authMock.mockResolvedValue({ user: { id: 'r1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'r1' } } });
 
     const result = await submitAbuseReportAction(
       null as unknown as Parameters<typeof submitAbuseReportAction>[0]

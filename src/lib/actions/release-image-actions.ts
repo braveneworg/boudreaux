@@ -7,14 +7,12 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { ImageListingRecord } from '@/lib/types/domain/image';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { logSecurityEvent } from '@/utils/audit-log';
 
-import { isAdminSession } from './image-action-auth';
 import { deleteS3Object, extractS3KeyFromImageSrc } from './release-image-actions-helpers';
 
 import type { AdminActionResult } from './run-admin-entity-action';
@@ -50,20 +48,18 @@ const toImageUploadResult = (img: ImageListingRecord): ImageUploadResultItem => 
  * Server action to delete a release image
  */
 export const deleteReleaseImageAction = async (imageId: string): Promise<AdminActionResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   try {
-    const session = await auth();
-
-    if (!isAdminSession(session)) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     // Get the image to find the src URL
     const image = await ImageRepository.findSourceById(imageId);
 
     if (!image) {
-      return { success: false, error: 'Image not found' };
+      return { success: false, error: 'Image not found', code: 'NOT_FOUND' };
     }
 
     // Extract S3 key from URL and delete from S3
@@ -99,7 +95,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
     return { success: true };
   } catch (error) {
     logger.error('Delete release image action error', error);
-    return { success: false, error: 'Failed to delete image' };
+    return { success: false, error: 'Failed to delete image', code: 'UNKNOWN' };
   }
 };
 
@@ -109,6 +105,11 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
 export const getReleaseImagesAction = async (
   releaseId: string
 ): Promise<ImageUploadActionResult> => {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+
   try {
     const images = await ImageRepository.findListingByRelease(releaseId);
 
@@ -126,22 +127,19 @@ export const updateReleaseImageAction = async (
   imageId: string,
   data: { caption?: string; altText?: string }
 ): Promise<AdminActionResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
 
   try {
-    const session = await auth();
-
-    if (!isAdminSession(session)) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     await ImageRepository.updateMetadata(imageId, data);
 
     revalidatePath('/releases');
     return { success: true };
   } catch (error) {
     logger.error('Update release image action error', error);
-    return { success: false, error: 'Failed to update image' };
+    return { success: false, error: 'Failed to update image', code: 'UNKNOWN' };
   }
 };
 
@@ -154,15 +152,13 @@ export const reorderReleaseImagesAction = async (
   releaseId: string,
   imageIds: string[]
 ): Promise<ImageUploadActionResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   try {
-    const session = await auth();
-
-    if (!isAdminSession(session)) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     if (!imageIds || imageIds.length === 0) {
       return { success: false, error: 'No image IDs provided' };
     }

@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   toggleMessageHiddenSchema,
@@ -33,12 +33,11 @@ export type ToggleMessageHiddenActionResult =
 export const toggleMessageHiddenAction = async (
   input: ToggleMessageHiddenInput
 ): Promise<ToggleMessageHiddenActionResult> => {
-  let session: Awaited<ReturnType<typeof requireRole>>;
-  try {
-    session = await requireRole('admin');
-  } catch {
+  const gate = await gateAction('admin');
+  if (!gate.success) {
     return { success: false, error: 'unauthorized' };
   }
+  const { session } = gate;
 
   const parsed = toggleMessageHiddenSchema.safeParse(input);
   if (!parsed.success) {
@@ -53,7 +52,6 @@ export const toggleMessageHiddenAction = async (
   }
 
   const adminId = session.user.id;
-  if (!adminId) return { success: false, error: 'unauthorized' };
 
   if (parsed.data.hidden) {
     await ChatAdminService.hideMessage({ messageId: parsed.data.messageId, adminId });

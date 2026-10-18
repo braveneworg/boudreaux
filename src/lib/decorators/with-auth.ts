@@ -14,6 +14,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 import { auth } from '@/auth';
+import { refusalFor } from '@/lib/auth/action-gate';
+import type { ActionGateCode } from '@/lib/auth/action-gate';
 import { DataError } from '@/lib/types/domain/errors';
 import { extractRequestMetadata, logSecurityEvent } from '@/lib/utils/audit-log';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
@@ -87,6 +89,22 @@ const logUnauthorized = (request: NextRequest, status: 401 | 403, userId?: strin
   });
 };
 
+/**
+ * Answer a request the shared access rule ({@link refusalFor}) refused: 401 for
+ * no session, 403 for a banned account, 403 naming the required role otherwise.
+ */
+const refuse = (request: NextRequest, code: ActionGateCode, userId?: string): NextResponse => {
+  if (code === 'UNAUTHENTICATED') {
+    logUnauthorized(request, 401);
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  logUnauthorized(request, 403, userId);
+  return code === 'BANNED'
+    ? NextResponse.json({ error: 'Account suspended' }, { status: 403 })
+    : NextResponse.json({ error: 'Insufficient permissions', required: 'admin' }, { status: 403 });
+};
+
 // Authentication decorator
 // Usage: Wrap API route handlers that require authentication
 // Example: export const GET = withAuth(async (req, res, session) => { ... });
@@ -96,18 +114,11 @@ export const withAuth =
     runWithRequestContext(resolveRequestId(request.headers), async () => {
       const session = await auth();
 
-      // Check authentication and validate session structure
-      if (!session?.user?.id) {
-        logUnauthorized(request, 401);
-        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-      }
-
-      // Defense-in-depth on top of better-auth ban enforcement: a just-banned
-      // user can still present a session cookie within the cookie-cache window,
-      // so refuse it centrally rather than relying on session revocation alone.
-      if (session.user.banned) {
-        logUnauthorized(request, 403, session.user.id);
-        return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+      // The action gate's rule: no session, then a banned account (the cookie
+      // cache can still carry a just-banned user's session).
+      const refusal = refusalFor(session, 'signed-in');
+      if (refusal !== null) {
+        return refuse(request, refusal, session?.user?.id);
       }
 
       // Call the original handler with session
@@ -124,28 +135,12 @@ export const withAdmin =
   async (request: NextRequest, context: { params: Promise<unknown> }) =>
     runWithRequestContext(resolveRequestId(request.headers), async () => {
       const session = await auth();
-      const role = 'admin';
 
-      // Check authentication first and validate session structure
-      if (!session?.user?.id) {
-        logUnauthorized(request, 401);
-        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-      }
-
-      // A banned account is refused before the role check, so a banned admin is
-      // suspended rather than told it has insufficient permissions.
-      if (session.user.banned) {
-        logUnauthorized(request, 403, session.user.id);
-        return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
-      }
-
-      // Check role authorization
-      if (session.user?.role !== role) {
-        logUnauthorized(request, 403, session.user.id);
-        return NextResponse.json(
-          { error: 'Insufficient permissions', required: role },
-          { status: 403 }
-        );
+      // The action gate's rule: a banned account is refused before the role
+      // check, so a banned admin is suspended rather than forbidden.
+      const refusal = refusalFor(session, 'admin');
+      if (refusal !== null) {
+        return refuse(request, refusal, session?.user?.id);
       }
 
       return runWithErrorBoundary(request, () =>

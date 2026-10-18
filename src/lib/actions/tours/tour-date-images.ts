@@ -6,9 +6,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
 import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import type { PresignedUrlResponse } from '@/lib/validation/tours/image-schema';
 import {
@@ -42,7 +42,10 @@ export const generateTourDateUploadUrlAction = async (
   request: TourDateImageUploadRequest
 ): Promise<TourDateImageActionResponse<PresignedUrlResponse>> => {
   try {
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const validated = tourDateImageUploadRequestSchema.parse(request);
 
@@ -82,7 +85,11 @@ export const confirmTourDateUploadAction = async (
   uploadData: TourDateConfirmUploadRequest
 ): Promise<TourDateImageActionResponse<TourDateImageMetadata>> => {
   try {
-    const session = await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const { session } = gate;
 
     const validated = tourDateConfirmUploadSchema.parse(uploadData);
 
@@ -146,7 +153,10 @@ export const deleteTourDateImageAction = async (
   request: TourDateDeleteImageRequest
 ): Promise<TourDateImageActionResponse<void>> => {
   try {
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const validated = tourDateDeleteImageSchema.parse(request);
 
@@ -196,7 +206,10 @@ export const reorderTourDateImagesAction = async (
   request: TourDateImageReorder
 ): Promise<TourDateImageActionResponse<void>> => {
   try {
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const validated = tourDateImageReorderSchema.parse(request);
 
@@ -240,7 +253,10 @@ export const updateTourDateImageAltTextAction = async (
   request: TourDateUpdateImageAltText
 ): Promise<TourDateImageActionResponse<void>> => {
   try {
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     const validated = tourDateUpdateImageAltTextSchema.parse(request);
 

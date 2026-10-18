@@ -7,13 +7,13 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { ArtistService, type ArtistEnrichedField } from '@/lib/services/artist-service';
 import { decideSuggestionDismiss } from '@/lib/services/video-editorial-rules';
 import type { VideoEnrichmentSuggestionRecord } from '@/lib/types/domain/video-enrichment';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { isRealCalendarDate } from '@/lib/utils/validation/iso-date';
 import {
@@ -28,16 +28,19 @@ const logger = loggers.media;
 const ALREADY_RESOLVED: ApplyVideoSuggestionActionResult = {
   success: false,
   error: 'Suggestion was already resolved.',
+  code: 'NOT_FOUND',
 };
 
 const CURRENT_DRIFTED: ApplyVideoSuggestionActionResult = {
   success: false,
   error: 'The current value has changed — review before applying.',
+  code: 'VALIDATION',
 };
 
 const INVALID_DATE: ApplyVideoSuggestionActionResult = {
   success: false,
   error: 'Suggested value is not a valid date.',
+  code: 'VALIDATION',
 };
 
 /** The artist fields the server may apply (releasedOn stays client-side). */
@@ -119,7 +122,11 @@ const dismissSuggestion = async (
   // A description suggestion is applied or ignored, never dismissed (ADR-0005).
   const decision = decideSuggestionDismiss(suggestion);
   if (!decision.ok) {
-    return { success: false, error: 'A description suggestion is never dismissed.' };
+    return {
+      success: false,
+      error: 'A description suggestion is never dismissed.',
+      code: 'VALIDATION',
+    };
   }
   const dismissed = await VideoEnrichmentSuggestionRepository.markDismissed(suggestionId);
   if (!dismissed) return ALREADY_RESOLVED;
@@ -162,13 +169,17 @@ const loadApplicableSuggestion = async (suggestionId: string): Promise<LoadedSug
       result: {
         success: false,
         error: 'This suggestion applies in the edit form, not on the server.',
+        code: 'VALIDATION',
       },
     };
   }
   const field = toArtistField(suggestion.field);
   const { artistId } = suggestion;
   if (!field || !artistId) {
-    return { kind: 'rejected', result: { success: false, error: 'Unsupported suggestion field.' } };
+    return {
+      kind: 'rejected',
+      result: { success: false, error: 'Unsupported suggestion field.', code: 'VALIDATION' },
+    };
   }
   // Date-valued fields are written as Prisma `DateTime`; validate strict
   // real-calendar validity BEFORE any write so `2020-13-45` / `2021-02-30`
@@ -221,7 +232,11 @@ const applySuggestion = async (
   const rows = await VideoArtistRepository.findByVideoId(suggestion.videoId);
   const current = rows.find((row) => row.artistId === artistId)?.artist;
   if (!current) {
-    return { success: false, error: 'Artist is no longer linked to this video.' };
+    return {
+      success: false,
+      error: 'Artist is no longer linked to this video.',
+      code: 'NOT_FOUND',
+    };
   }
   if (hasCurrentDrift(field, current, expectedCurrent)) {
     return CURRENT_DRIFTED;
@@ -264,11 +279,15 @@ const applySuggestion = async (
 export const applyVideoSuggestionAction = async (
   input: unknown
 ): Promise<ApplyVideoSuggestionActionResult> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   const parsed = applyVideoSuggestionInputSchema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: 'Invalid suggestion request.' };
+    return { success: false, error: 'Invalid suggestion request.', code: 'INVALID_INPUT' };
   }
   const { suggestionId, op, expectedCurrent } = parsed.data;
 
@@ -281,6 +300,10 @@ export const applyVideoSuggestionAction = async (
       suggestionId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { success: false, error: 'Suggestion update failed. Please try again.' };
+    return {
+      success: false,
+      error: 'Suggestion update failed. Please try again.',
+      code: 'UNKNOWN',
+    };
   }
 };

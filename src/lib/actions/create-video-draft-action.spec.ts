@@ -3,12 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { runVideoPostSave } from '@/lib/services/video-post-save-service';
 import type * as VideoPostSaveService from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 
 import { createVideoDraftAction } from './create-video-draft-action';
@@ -23,7 +23,7 @@ vi.mock('@/lib/repositories/video-repository', () => ({
 }));
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 // Mock only the executor; the planner stays real so these tests exercise the
 // actual gate that decides both the `pending` write and the dispatch.
 vi.mock('@/lib/services/video-post-save-service', async (importOriginal) => {
@@ -44,6 +44,8 @@ vi.mock('next/server', () => ({
   },
 }));
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const ID = '65a1b2c3d4e5f6a7b8c9d0e1';
 const validInput = {
@@ -60,7 +62,7 @@ beforeEach(() => {
   // this CDN host to derive the S3 key it namespace-checks.
   vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
   vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(confirmVideoUpload).mockResolvedValue(null);
   vi.mocked(runVideoPostSave).mockResolvedValue(undefined);
@@ -76,10 +78,13 @@ afterEach(() => {
 });
 
 describe('createVideoDraftAction', () => {
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns the gate refusal without creating the draft', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(createVideoDraftAction(validInput)).rejects.toThrow('Unauthorized');
+    const result = await createVideoDraftAction(validInput);
+
+    expect(result).toEqual(REFUSAL);
+    expect(VideoService.createVideo).not.toHaveBeenCalled();
   });
 
   it('creates an unpublished draft with fallbacks and kicks the pipeline', async () => {

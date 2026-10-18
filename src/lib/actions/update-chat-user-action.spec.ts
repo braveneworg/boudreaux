@@ -4,8 +4,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ChatAdminService } from '@/lib/services/chat-admin-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { updateChatUserAction } from './update-chat-user-action';
 
@@ -13,7 +13,7 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('@/lib/services/chat-admin-service', () => ({
   ChatAdminService: {
@@ -24,9 +24,11 @@ vi.mock('@/lib/services/chat-admin-service', () => ({
 
 beforeEach(() => vi.clearAllMocks());
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('updateChatUserAction', () => {
-  it('returns unauthorized when requireRole throws', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without updating the user', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await updateChatUserAction({
       userId: 'abcdef1234567890abcdef12',
@@ -38,7 +40,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('rejects an empty patch as invalid', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     const result = await updateChatUserAction({ userId: 'abcdef1234567890abcdef12' });
 
@@ -48,7 +50,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('rejects a malformed userId before reaching the service', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     const result = await updateChatUserAction({ userId: 'not-an-id', disabled: true });
 
@@ -60,7 +62,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('applies disabled=true and revalidates the admin path', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     const result = await updateChatUserAction({
       userId: 'abcdef1234567890abcdef12',
@@ -74,7 +76,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('applies disabled=false to re-enable a user', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     await updateChatUserAction({ userId: 'abcdef1234567890abcdef12', disabled: false });
 
@@ -82,7 +84,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('clears the abuse flag when clearFlag is true', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     await updateChatUserAction({ userId: 'abcdef1234567890abcdef12', clearFlag: true });
 
@@ -90,7 +92,7 @@ describe('updateChatUserAction', () => {
   });
 
   it('can do both operations in one call', async () => {
-    vi.mocked(requireRole).mockResolvedValue({} as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: {} as never });
 
     await updateChatUserAction({
       userId: 'abcdef1234567890abcdef12',

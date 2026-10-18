@@ -344,6 +344,7 @@ describe('ArtistForm', () => {
       vi.mocked(archiveArtistAction).mockResolvedValue({
         success: false,
         error: 'Artist not found',
+        code: 'NOT_FOUND',
       });
       render(<ArtistForm artistId={artistId} />);
 

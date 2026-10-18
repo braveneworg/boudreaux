@@ -3,19 +3,36 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen } from '@testing-library/react';
 
+import { gateAction } from '@/lib/auth/action-gate';
+
 import AdminLayout from './layout';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({
-  requireRole: vi.fn(),
-}));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('./components/admin-nav', () => ({
   AdminNav: () => <nav data-testid="admin-nav">AdminNav</nav>,
 }));
 
 describe('AdminLayout', () => {
+  beforeEach(() => {
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { id: 'admin-1', role: 'admin' } } as never,
+    });
+  });
+
+  it('throws the refusal copy to the error boundary when the gate refuses', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce({
+      success: false,
+      error: 'Account suspended',
+      code: 'BANNED',
+    });
+
+    await expect(AdminLayout({ children: <div /> })).rejects.toThrow('Account suspended');
+  });
+
   it('applies the kraft zine accent to the content container', async () => {
     const { container } = render(await AdminLayout({ children: <div data-testid="probe" /> }));
 

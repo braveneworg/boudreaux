@@ -2,15 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // Mock server-only first to prevent errors from imported modules
-import { auth } from '@/auth';
-import { requireRole } from '@/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 import { getS3BucketName } from '@/utils/s3-client';
 
 import { getPresignedUploadUrlsAction } from './presigned-upload-actions';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/auth');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('../utils/logger', () => ({
   loggers: {
     presignedUrls: {
@@ -47,6 +45,8 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: (...args: unknown[]) => mockGetSignedUrl(...args),
 }));
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('presigned-upload-actions', () => {
   const mockSession = {
     user: {
@@ -57,8 +57,7 @@ describe('presigned-upload-actions', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
-    vi.mocked(auth).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     mockGetSignedUrl.mockResolvedValue('https://s3.amazonaws.com/presigned-url?signature=abc');
 
     // Set environment variables
@@ -92,62 +91,18 @@ describe('presigned-upload-actions', () => {
         expect(upload.cdnUrl).toBe(upload.uploadUrl);
         expect(mockGetSignedUrl).not.toHaveBeenCalled();
       });
-
-      it('still requires an admin', async () => {
-        vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
-
-        const result = await getPresignedUploadUrlsAction('videos', 'video-123', [
-          { fileName: 'poster.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
-
-        expect(result.success).toBe(false);
-      });
     });
 
     describe('authorization', () => {
-      it('should require admin role', async () => {
-        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+      it('returns the gate refusal without signing an upload URL', async () => {
+        vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
         const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
           { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
         ]);
 
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Unauthorized');
-        expect(requireRole).toHaveBeenCalledWith('admin');
-      });
-
-      it('should return error when user is not logged in', async () => {
-        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
-          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Unauthorized');
-      });
-
-      it('should return error when user is not admin', async () => {
-        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
-          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Unauthorized');
-      });
-
-      it('should return error when user session has no id', async () => {
-        vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-        const result = await getPresignedUploadUrlsAction('artists', 'artist-123', [
-          { fileName: 'test.jpg', contentType: 'image/jpeg', fileSize: 1024 },
-        ]);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Unauthorized');
+        expect(result).toEqual(REFUSAL);
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
       });
     });
 

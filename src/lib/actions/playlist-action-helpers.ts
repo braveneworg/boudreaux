@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { auth } from '@/auth';
 import { DataError } from '@/lib/types/domain/errors';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
 import type { PlaylistActionResult } from '@/lib/types/domain/playlist';
@@ -11,15 +10,14 @@ import { loggers } from '@/lib/utils/logger';
 import { fieldErrorsFromZodIssues } from '@/lib/utils/zod-field-errors';
 
 /**
- * Shared plumbing for the playlist Server Actions (auth gate + failure-shape
- * mapping). Lives outside the `'use server'` modules because those may only
+ * Shared plumbing for the playlist Server Actions (failure-shape mapping).
+ * Lives outside the `'use server'` modules because those may only
  * export async functions — sync helpers and constants must be imported from a
  * plain server-only module.
  */
 
 const logger = loggers.media;
 
-const UNAUTHORIZED_MESSAGE = 'Unauthorized';
 const INVALID_INPUT_MESSAGE = 'Invalid input';
 const DUPLICATE_TITLE_MESSAGE = 'A playlist with this title already exists';
 
@@ -38,23 +36,6 @@ const USER_FACING_CODES: ReadonlySet<DataErrorCode> = new Set([
   'INVALID_INPUT',
   'LIMIT_EXCEEDED',
 ]);
-
-/**
- * Resolve the signed-in session user's id, or null when there is no session,
- * the session has no user id, or the account is banned (defense-in-depth on
- * top of the better-auth ban enforcement).
- */
-export const getAuthorizedUserId = async (): Promise<string | null> => {
-  const session = await auth();
-  const user = session?.user;
-  if (!user?.id || user.banned) return null;
-  return user.id;
-};
-
-export const unauthorizedFailure = (): PlaylistActionResult<never> => ({
-  success: false,
-  error: UNAUTHORIZED_MESSAGE,
-});
 
 /** Map a failed Zod parse into the field-errors failure shape. */
 export const invalidInputFailure = (issues: ZodIssues): PlaylistActionResult<never> => ({

@@ -7,6 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { ServiceResponse } from '@/lib/services/service.types';
@@ -16,12 +17,13 @@ import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
 import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
+
+import { refusedFormState } from './form-state-helpers';
 
 const buildReleaseCreateInput = (data: ReleaseFormData, preGeneratedId: string | undefined) => {
   const {
@@ -143,19 +145,25 @@ const createAndPublish = async ({
   return published.success ? { response } : { response, creditFailure: published.error };
 };
 
+/** The ObjectId the client pre-generated for the new release, when it is a valid one. */
+const readPreGeneratedId = (payload: FormData): string | undefined => {
+  const raw = payload.get('preGeneratedId');
+  return typeof raw === 'string' && isValidObjectId(raw) ? raw : undefined;
+};
+
 export const createReleaseAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   // Read the pre-generated ObjectId set by the client before calling getActionState,
   // since getActionState strips fields not in permittedFieldNames.
-  const rawPreGeneratedId = payload.get('preGeneratedId');
-  const preGeneratedId =
-    typeof rawPreGeneratedId === 'string' && isValidObjectId(rawPreGeneratedId)
-      ? rawPreGeneratedId
-      : undefined;
+  const preGeneratedId = readPreGeneratedId(payload);
 
   const permittedFieldNames = [
     'title',

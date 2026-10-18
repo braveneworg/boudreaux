@@ -8,8 +8,8 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { UploadService } from '@/lib/services/upload-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { digitalFormatTypeSchema } from '@/lib/validation/digital-format-type-schema';
 import type { ActionResult, PresignedUploadResponse } from '@/types/digital-format';
@@ -30,7 +30,7 @@ const uploadActionSchema = z.object({
  * Server Action: Generate presigned upload URL for digital format
  *
  * Flow:
- * 1. Validate user is admin (via withAuth decorator)
+ * 1. Validate user is admin (via the action gate, `gateAction('admin')`)
  * 2. Validate file metadata with Zod schema
  * 3. Check format-specific size and MIME type constraints
  * 4. Generate presigned S3 upload URL (15-minute expiration)
@@ -112,6 +112,9 @@ const uploadDigitalFormatActionHandler = async (
 export const uploadDigitalFormatAction = async (
   formData: FormData
 ): Promise<ActionResult<PresignedUploadResponse>> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
   return uploadDigitalFormatActionHandler(formData);
 };

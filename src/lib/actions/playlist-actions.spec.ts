@@ -4,7 +4,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import {
   PLAYLIST_COVER_UPLOAD_LIMIT,
   playlistCoverUploadLimiter,
@@ -22,7 +22,7 @@ import {
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
@@ -84,8 +84,14 @@ const detail: PlaylistDetailResponse = {
   items: [],
 };
 
-const signIn = (user: { id?: string; banned?: boolean | null } = { id: USER_ID }): void => {
-  vi.mocked(auth).mockResolvedValue({ user } as never);
+const REFUSAL = {
+  success: false as const,
+  error: 'Unauthorized',
+  code: 'UNAUTHENTICATED' as const,
+};
+
+const signIn = (user: { id: string } = { id: USER_ID }): void => {
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: { user } as never });
 };
 
 const validCreateInput = { title: 'Road Trip', isPublic: false };
@@ -105,66 +111,41 @@ beforeEach(() => {
 });
 
 describe('playlist actions authorization', () => {
-  it('rejects createPlaylistAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from createPlaylistAction without creating', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await createPlaylistAction(validCreateInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.createWithItems).not.toHaveBeenCalled();
   });
 
-  it('rejects createPlaylistAction when the session user has no id', async () => {
-    signIn({ id: '' });
-
-    const result = await createPlaylistAction(validCreateInput);
-
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-  });
-
-  it('rejects createPlaylistAction when the user is banned', async () => {
-    signIn({ id: USER_ID, banned: true });
-
-    const result = await createPlaylistAction(validCreateInput);
-
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-    expect(PlaylistService.createWithItems).not.toHaveBeenCalled();
-  });
-
-  it('rejects updatePlaylistAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from updatePlaylistAction without updating', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await updatePlaylistAction({ playlistId: PLAYLIST_ID, title: 'X' });
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.update).not.toHaveBeenCalled();
   });
 
-  it('rejects deletePlaylistAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from deletePlaylistAction without deleting', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await deletePlaylistAction({ playlistId: PLAYLIST_ID });
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.delete).not.toHaveBeenCalled();
   });
 
-  it('rejects generatePlaylistCoverUploadUrlsAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from generatePlaylistCoverUploadUrlsAction before rate limiting', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await generatePlaylistCoverUploadUrlsAction(validUploadInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-    expect(mockGetSignedUrl).not.toHaveBeenCalled();
-  });
-
-  it('rejects generatePlaylistCoverUploadUrlsAction for a banned user before rate limiting', async () => {
-    signIn({ id: USER_ID, banned: true });
-
-    const result = await generatePlaylistCoverUploadUrlsAction(validUploadInput);
-
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(playlistCoverUploadLimiter.check).not.toHaveBeenCalled();
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 });
 

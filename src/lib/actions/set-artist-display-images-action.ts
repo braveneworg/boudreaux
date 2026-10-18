@@ -7,10 +7,11 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
+import type { ActionGateCode } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   setDisplayImagesInputSchema,
@@ -21,8 +22,8 @@ import {
 export interface SetDisplayImagesActionResult {
   success: boolean;
   error?: string;
-  /** The service's stable failure code, so the client can branch on it. */
-  code?: DataErrorCode;
+  /** The service's stable failure code, or the action gate's refusal code, so the client can branch on it. */
+  code?: DataErrorCode | ActionGateCode;
 }
 
 /**
@@ -35,12 +36,11 @@ export interface SetDisplayImagesActionResult {
 export const setArtistDisplayImagesAction = async (
   input: SetDisplayImagesInput
 ): Promise<SetDisplayImagesActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   const parsed = setDisplayImagesInputSchema.safeParse(input);
   if (!parsed.success) {

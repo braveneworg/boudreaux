@@ -5,7 +5,7 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
+const gateActionMock = vi.fn();
 const createFeaturedArtistMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const logSecurityEventMock = vi.fn();
@@ -15,7 +15,7 @@ vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
 vi.mock('@/lib/utils/simple-cache', () => ({ cache: { deleteByPrefix: deleteByPrefixMock } }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('../services/featured-artists-service', () => ({
   FeaturedArtistsService: { createFeaturedArtist: createFeaturedArtistMock },
@@ -49,22 +49,24 @@ const initialFormState = {
 
 describe('createFeaturedArtistAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     createFeaturedArtistMock.mockReset();
     revalidatePathMock.mockReset();
     logSecurityEventMock.mockReset();
     deleteByPrefixMock.mockReset();
   });
 
-  it('throws when admin session lacks a user id', async () => {
-    requireRoleMock.mockResolvedValue({ user: {} });
-    await expect(createFeaturedArtistAction(initialFormState, buildFormData({}))).rejects.toThrow(
-      'Session user id is required'
-    );
+  it('resolves the gate refusal as a form error without creating the featured artist', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
+
+    const result = await createFeaturedArtistAction(initialFormState, buildFormData({}));
+
+    expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+    expect(createFeaturedArtistMock).not.toHaveBeenCalled();
   });
 
   it('returns validation errors when required fields are missing', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     const result = await createFeaturedArtistAction(
       initialFormState,
       buildFormData({ position: '-1' })
@@ -74,7 +76,7 @@ describe('createFeaturedArtistAction', () => {
   });
 
   it('creates a featured artist with valid input', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     createFeaturedArtistMock.mockResolvedValue({ success: true, data: { id: 'fa-1' } });
 
     const result = await createFeaturedArtistAction(
@@ -100,7 +102,7 @@ describe('createFeaturedArtistAction', () => {
   });
 
   it('surfaces service errors as form errors', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     createFeaturedArtistMock.mockResolvedValue({ success: false, error: 'service failed' });
 
     const result = await createFeaturedArtistAction(
@@ -118,7 +120,7 @@ describe('createFeaturedArtistAction', () => {
   });
 
   it('handles unexpected exceptions via setUnknownError', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     createFeaturedArtistMock.mockRejectedValue(new Error('boom'));
 
     const result = await createFeaturedArtistAction(
@@ -136,7 +138,7 @@ describe('createFeaturedArtistAction', () => {
   });
 
   it('connects digitalFormat and release when their ids are provided', async () => {
-    requireRoleMock.mockResolvedValue(adminSession);
+    gateActionMock.mockResolvedValue({ success: true, session: adminSession });
     createFeaturedArtistMock.mockResolvedValue({ success: true, data: { id: 'fa-1' } });
 
     await createFeaturedArtistAction(

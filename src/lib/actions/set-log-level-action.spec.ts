@@ -2,17 +2,15 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { gateAction } from '@/lib/auth/action-gate';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { setRuntimeLogLevel } from '@/lib/utils/logger';
 
 import { setLogLevelAction } from './set-log-level-action';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({
-  requireRole: vi.fn(),
-}));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('@/lib/utils/audit-log', () => ({
   logSecurityEvent: vi.fn(),
@@ -33,12 +31,16 @@ vi.mock('@/lib/utils/logger', () => ({
 const adminSession = { user: { id: 'admin-1', email: 'a@example.com', role: 'admin' } };
 
 beforeEach(() => {
-  vi.mocked(requireRole).mockResolvedValue(adminSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: adminSession as never });
 });
 
 describe('setLogLevelAction', () => {
-  it('returns unauthorized when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('maps a BANNED gate refusal to unauthorized without changing the level', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce({
+      success: false,
+      error: 'Account suspended',
+      code: 'BANNED',
+    });
 
     const result = await setLogLevelAction({ level: 'debug' });
 

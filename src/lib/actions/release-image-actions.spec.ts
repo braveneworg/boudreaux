@@ -4,10 +4,9 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import { logSecurityEvent } from '@/utils/audit-log';
-import { requireRole } from '@/utils/auth/require-role';
 
 import {
   deleteReleaseImageAction,
@@ -20,10 +19,9 @@ vi.mock('server-only', () => ({}));
 
 // Mock all dependencies
 vi.mock('next/cache');
-vi.mock('@/auth');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('../repositories/image-repository');
 vi.mock('../utils/audit-log');
-vi.mock('../utils/auth/require-role');
 
 // Mock S3 with proper class syntax
 const mockS3Send = vi.fn().mockResolvedValue({});
@@ -42,6 +40,8 @@ vi.mock('@/lib/utils/s3-client', () => ({
   getS3Client: () => ({ send: mockS3Send }),
 }));
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('release-image-actions', () => {
   const mockSession = {
     user: {
@@ -52,8 +52,7 @@ describe('release-image-actions', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
-    vi.mocked(auth).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
 
     // Set environment variables
@@ -65,43 +64,13 @@ describe('release-image-actions', () => {
   });
 
   describe('deleteReleaseImageAction', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-      await expect(deleteReleaseImageAction('image-123')).rejects.toThrow('Unauthorized');
-
-      expect(requireRole).toHaveBeenCalledWith('admin');
-    });
-
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await deleteReleaseImageAction('image-123');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user is not admin', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user' },
-      } as never);
-
-      const result = await deleteReleaseImageAction('image-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session has no id', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { role: 'admin' },
-      } as never);
-
-      const result = await deleteReleaseImageAction('image-123');
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(ImageRepository.findSourceById).not.toHaveBeenCalled();
     });
 
     it('should skip S3 delete when no S3 bucket configured', async () => {
@@ -176,8 +145,7 @@ describe('release-image-actions', () => {
 
       const result = await deleteReleaseImageAction('nonexistent-image');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Image not found');
+      expect(result).toEqual({ success: false, error: 'Image not found', code: 'NOT_FOUND' });
     });
 
     it('should delete image from S3 and database', async () => {
@@ -275,12 +243,20 @@ describe('release-image-actions', () => {
 
       const result = await deleteReleaseImageAction('image-123');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to delete image');
+      expect(result).toEqual({ success: false, error: 'Failed to delete image', code: 'UNKNOWN' });
     });
   });
 
   describe('getReleaseImagesAction', () => {
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
+
+      const result = await getReleaseImagesAction('release-123');
+
+      expect(result).toEqual(REFUSAL);
+      expect(ImageRepository.findListingByRelease).not.toHaveBeenCalled();
+    });
+
     it('should return images for a release', async () => {
       const mockImages = [
         {
@@ -362,45 +338,13 @@ describe('release-image-actions', () => {
   });
 
   describe('updateReleaseImageAction', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-      await expect(
-        updateReleaseImageAction('image-123', { caption: 'New caption' })
-      ).rejects.toThrow('Unauthorized');
-
-      expect(requireRole).toHaveBeenCalledWith('admin');
-    });
-
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user is not admin', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user' },
-      } as never);
-
-      const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session has no id', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { role: 'admin' },
-      } as never);
-
-      const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(ImageRepository.updateMetadata).not.toHaveBeenCalled();
     });
 
     it('should update image caption', async () => {
@@ -452,51 +396,18 @@ describe('release-image-actions', () => {
 
       const result = await updateReleaseImageAction('image-123', { caption: 'New caption' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to update image');
+      expect(result).toEqual({ success: false, error: 'Failed to update image', code: 'UNKNOWN' });
     });
   });
 
   describe('reorderReleaseImagesAction', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-      await expect(
-        reorderReleaseImagesAction('release-123', ['image-1', 'image-2'])
-      ).rejects.toThrow('Unauthorized');
-
-      expect(requireRole).toHaveBeenCalledWith('admin');
-    });
-
-    it('should return error when user is not logged in', async () => {
-      vi.mocked(auth).mockResolvedValue(null as never);
+    it('returns the gate refusal without touching the repository', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
       const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user is not admin', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { id: 'user-123', role: 'user' },
-      } as never);
-
-      const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
-    });
-
-    it('should return error when user session has no id', async () => {
-      vi.mocked(auth).mockResolvedValue({
-        user: { role: 'admin' },
-      } as never);
-
-      const result = await reorderReleaseImagesAction('release-123', ['image-1', 'image-2']);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Unauthorized');
+      expect(result).toEqual(REFUSAL);
+      expect(ImageRepository.reorder).not.toHaveBeenCalled();
     });
 
     it('should return error when no image IDs provided', async () => {

@@ -11,6 +11,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { z } from 'zod';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import {
   PLAYLIST_COVER_UPLOAD_LIMIT,
   playlistCoverUploadLimiter,
@@ -31,13 +32,7 @@ import {
 } from '@/lib/validation/playlist-schema';
 import type { PlaylistCoverUploadInput } from '@/lib/validation/playlist-schema';
 
-import {
-  failureFromError,
-  getAuthorizedUserId,
-  invalidInputFailure,
-  PLAYLISTS_PATH,
-  unauthorizedFailure,
-} from './playlist-action-helpers';
+import { failureFromError, invalidInputFailure, PLAYLISTS_PATH } from './playlist-action-helpers';
 
 const PLAYLIST_NOT_FOUND_MESSAGE = 'Playlist not found';
 const UPLOAD_URL_EXPIRY_SECONDS = 900;
@@ -100,8 +95,9 @@ const buildCoverUploadTarget = async (
 export const createPlaylistAction = async (
   input: unknown
 ): Promise<PlaylistActionResult<PlaylistDetailResponse>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = createPlaylistInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
@@ -120,8 +116,9 @@ export const createPlaylistAction = async (
 export const updatePlaylistAction = async (
   input: unknown
 ): Promise<PlaylistActionResult<PlaylistDetailResponse>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = updatePlaylistInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
@@ -139,8 +136,9 @@ export const updatePlaylistAction = async (
 export const deletePlaylistAction = async (input: {
   playlistId: string;
 }): Promise<PlaylistActionResult<{ deleted: true }>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = deletePlaylistInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
@@ -161,8 +159,9 @@ export const deletePlaylistAction = async (input: {
 export const generatePlaylistCoverUploadUrlsAction = async (
   input: unknown
 ): Promise<PlaylistActionResult<PlaylistCoverUploadTarget[]>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = playlistCoverUploadInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {

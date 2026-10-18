@@ -4,9 +4,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import { cache } from '@/lib/utils/simple-cache';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { updateFeaturedArtistCoverArtAction } from './update-featured-artist-cover-art-action';
 
@@ -17,7 +17,7 @@ vi.mock('../repositories/featured-artist-repository', () => ({
     updateCoverArt: vi.fn(),
   },
 }));
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('../utils/simple-cache', () => ({ cache: { deleteByPrefix: vi.fn() } }));
 
 const mockUpdateCoverArt = vi.mocked(FeaturedArtistRepository.updateCoverArt);
@@ -25,19 +25,28 @@ const mockUpdateCoverArt = vi.mocked(FeaturedArtistRepository.updateCoverArt);
 const VALID_FEATURED_ARTIST_ID = '507f1f77bcf86cd799439011';
 const VALID_COVER_URL = 'https://cdn.example.com/cover.webp';
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('updateFeaturedArtistCoverArtAction', () => {
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { role: 'admin' } } as never,
+    });
     mockUpdateCoverArt.mockResolvedValue(undefined);
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without updating the cover art', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(
-      updateFeaturedArtistCoverArtAction(VALID_FEATURED_ARTIST_ID, VALID_COVER_URL)
-    ).rejects.toThrow('Unauthorized');
+    const result = await updateFeaturedArtistCoverArtAction(
+      VALID_FEATURED_ARTIST_ID,
+      VALID_COVER_URL
+    );
+
+    expect(result).toEqual(REFUSAL);
+    expect(mockUpdateCoverArt).not.toHaveBeenCalled();
   });
 
   it('rejects malformed featured artist IDs', async () => {

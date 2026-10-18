@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { requireRole } from '@/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 
 import { finalizeCoverArtUploadAction } from './finalize-cover-art-upload-action';
 
 vi.mock('server-only', () => ({}));
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 
 // Use vi.hoisted so the spy refs exist before vi.mock factories evaluate.
 // Without this, the closure in CloudFrontClient's mockImplementation can
@@ -49,20 +49,31 @@ const listResponse = (keys: string[]) => ({
 
 const RELEASE_ID = '69d473d0aed0e7b1d16243ac';
 
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 describe('finalizeCoverArtUploadAction', () => {
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue({ user: { role: 'admin' } } as never);
+    vi.mocked(gateAction).mockResolvedValue({
+      success: true,
+      session: { user: { role: 'admin' } } as never,
+    });
     mockS3Send.mockReset();
     mockCfSend.mockReset();
     mockCfSend.mockResolvedValue({ Invalidation: { Id: 'INV123' } });
     vi.unstubAllEnvs();
   });
 
-  it('requires admin role', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
-    await expect(
-      finalizeCoverArtUploadAction('releases', RELEASE_ID, `media/releases/${RELEASE_ID}/cover.png`)
-    ).rejects.toThrow('Unauthorized');
+  it('returns the gate refusal without listing or deleting objects', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
+
+    const result = await finalizeCoverArtUploadAction(
+      'releases',
+      RELEASE_ID,
+      `media/releases/${RELEASE_ID}/cover.png`
+    );
+
+    expect(result).toEqual({ success: false, deletedKeys: [], error: 'Unauthorized' });
+    expect(mockS3Send).not.toHaveBeenCalled();
   });
 
   it('rejects unknown entity types', async () => {

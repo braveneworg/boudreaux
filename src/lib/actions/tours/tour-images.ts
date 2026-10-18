@@ -6,9 +6,9 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageRepository } from '@/lib/repositories/tours/image-repository';
 import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   confirmUploadSchema,
@@ -43,7 +43,10 @@ export const generateUploadUrlAction = async (
 ): Promise<TourImageActionResponse<PresignedUrlResponse>> => {
   try {
     // Require admin authentication
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     // Validate request
     const validated = imageUploadRequestSchema.parse(request);
@@ -86,7 +89,11 @@ export const confirmUploadAction = async (
 ): Promise<TourImageActionResponse<ImageMetadata>> => {
   try {
     // Require admin authentication
-    const session = await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const { session } = gate;
 
     // Validate metadata
     const validated = confirmUploadSchema.parse(uploadData);
@@ -153,7 +160,10 @@ export const deleteImageAction = async (
 ): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     // Validate request
     const validated = deleteImageSchema.parse(request);
@@ -206,7 +216,10 @@ export const reorderImagesAction = async (
 ): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     // Validate request
     const validated = imageReorderSchema.parse(request);
@@ -253,7 +266,10 @@ export const updateImageAltTextAction = async (
 ): Promise<TourImageActionResponse<void>> => {
   try {
     // Require admin authentication
-    await requireRole('admin');
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
 
     // Validate request
     const validated = updateImageAltTextSchema.parse(request);

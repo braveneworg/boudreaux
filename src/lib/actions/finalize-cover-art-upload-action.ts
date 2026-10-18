@@ -8,7 +8,7 @@ import 'server-only';
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 import { DeleteObjectsCommand, ListObjectsV2Command, type _Object } from '@aws-sdk/client-s3';
 
-import { requireRole } from '@/lib/utils/auth/require-role';
+import { gateAction } from '@/lib/auth/action-gate';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
@@ -168,7 +168,10 @@ export const finalizeCoverArtUploadAction = async (
   entityId: string,
   newCoverKey: string
 ): Promise<FinalizeCoverArtUploadResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return { success: false, deletedKeys: [], error: gate.error };
+  }
 
   if (!ALLOWED_ENTITY_TYPES.has(entityType)) {
     return { success: false, deletedKeys: [], error: `Disallowed entityType: ${entityType}` };

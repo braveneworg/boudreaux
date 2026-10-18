@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { cache } from '@/lib/utils/simple-cache';
 import { updateFeaturedArtistCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
@@ -28,7 +28,10 @@ export const updateFeaturedArtistCoverArtAction = async (
   featuredArtistId: string,
   coverArt: string
 ): Promise<UpdateFeaturedArtistCoverArtResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
 
   const parsed = updateFeaturedArtistCoverArtSchema.safeParse({ featuredArtistId, coverArt });
   if (!parsed.success) {

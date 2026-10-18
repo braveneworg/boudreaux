@@ -4,12 +4,12 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VenueService } from '@/lib/services/tours/venue-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { createVenueAction, updateVenueAction } from './venue-actions';
 
@@ -19,7 +19,9 @@ vi.mock('../services/tours/venue-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 describe('Venue Actions', () => {
   const mockSession = {
@@ -32,7 +34,7 @@ describe('Venue Actions', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -69,12 +71,13 @@ describe('Venue Actions', () => {
       } as never);
     });
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without creating the venue', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(createVenueAction(initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
+      const result = await createVenueAction(initialFormState, mockFormData);
+
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(VenueService.create).not.toHaveBeenCalled();
     });
 
     it('should validate input and create venue', async () => {
@@ -227,20 +230,13 @@ describe('Venue Actions', () => {
       } as never);
     });
 
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without updating the venue', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(updateVenueAction(venueId, initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
+      const result = await updateVenueAction(venueId, initialFormState, mockFormData);
 
-    it('should throw when session is missing a user id', async () => {
-      vi.mocked(requireRole).mockResolvedValue({ user: { id: null } } as never);
-
-      await expect(updateVenueAction(venueId, initialFormState, mockFormData)).rejects.toThrow(
-        'Invalid admin session: missing user id for audit logging.'
-      );
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(VenueService.update).not.toHaveBeenCalled();
     });
 
     it('should reject invalid venue ID format', async () => {

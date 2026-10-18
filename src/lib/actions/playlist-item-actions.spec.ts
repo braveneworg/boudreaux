@@ -4,7 +4,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { PlaylistService } from '@/lib/services/playlist-service';
 import { DataError } from '@/lib/types/domain/errors';
 import type { PlaylistItemPayload } from '@/lib/types/domain/playlist';
@@ -17,7 +17,7 @@ import {
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
@@ -76,8 +76,14 @@ const validReorderInput = {
   orderedItemIds: [ITEM_ID, OTHER_ITEM_ID],
 };
 
-const signIn = (user: { id?: string; banned?: boolean | null } = { id: USER_ID }): void => {
-  vi.mocked(auth).mockResolvedValue({ user } as never);
+const REFUSAL = {
+  success: false as const,
+  error: 'Unauthorized',
+  code: 'UNAUTHENTICATED' as const,
+};
+
+const signIn = (user: { id: string } = { id: USER_ID }): void => {
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: { user } as never });
 };
 
 beforeEach(() => {
@@ -85,47 +91,30 @@ beforeEach(() => {
 });
 
 describe('playlist item actions authorization', () => {
-  it('rejects addPlaylistItemAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from addPlaylistItemAction without adding', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.addItem).not.toHaveBeenCalled();
   });
 
-  it('rejects addPlaylistItemAction when the user is banned', async () => {
-    signIn({ id: USER_ID, banned: true });
-
-    const result = await addPlaylistItemAction(validAddInput);
-
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-    expect(PlaylistService.addItem).not.toHaveBeenCalled();
-  });
-
-  it('rejects addPlaylistItemAction when the session user has no id', async () => {
-    signIn({ id: '' });
-
-    const result = await addPlaylistItemAction(validAddInput);
-
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
-  });
-
-  it('rejects removePlaylistItemAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from removePlaylistItemAction without removing', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await removePlaylistItemAction(validRemoveInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.removeItem).not.toHaveBeenCalled();
   });
 
-  it('rejects reorderPlaylistItemsAction when there is no session', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('returns the gate refusal from reorderPlaylistItemsAction without reordering', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await reorderPlaylistItemsAction(validReorderInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
     expect(PlaylistService.reorder).not.toHaveBeenCalled();
   });
 });

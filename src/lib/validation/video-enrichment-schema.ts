@@ -11,6 +11,8 @@ import {
 } from '@fakefour/job-contract';
 import { z } from 'zod';
 
+import type { ActionGateCode } from '@/lib/auth/action-gate';
+import type { DataErrorCode } from '@/lib/types/domain/errors';
 import { ASYNC_JOB_STATUSES, type AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { objectIdSchema } from './bio-generation-schema';
@@ -161,10 +163,20 @@ export const applyVideoSuggestionInputSchema = z.object({
 });
 export type ApplyVideoSuggestionInput = z.infer<typeof applyVideoSuggestionInputSchema>;
 
+/**
+ * A failed enrichment action. It carries a code like `AdminActionResult`'s
+ * (ADR-0001), because the enrichment mutation hooks read both actions as one.
+ */
+interface EnrichmentActionFailure {
+  success: false;
+  error: string;
+  code: DataErrorCode | ActionGateCode;
+}
+
 /** Result of triggering async enrichment (mirrors GenerateArtistBioActionResult). */
 export type RunVideoEnrichmentActionResult =
-  { success: true; status: EnrichmentStatus } | { success: false; error: string };
+  { success: true; status: EnrichmentStatus } | EnrichmentActionFailure;
 
 /** Result of applying/dismissing one suggestion. */
 export type ApplyVideoSuggestionActionResult =
-  { success: true; op: 'apply' | 'dismiss' } | { success: false; error: string };
+  { success: true; op: 'apply' | 'dismiss' } | EnrichmentActionFailure;

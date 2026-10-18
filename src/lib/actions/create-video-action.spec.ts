@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
@@ -11,7 +12,6 @@ import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { verifyS3ObjectExists } from '@/lib/utils/s3-client';
 
 import { createVideoAction } from './create-video-action';
@@ -22,7 +22,7 @@ vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
 vi.mock('@/lib/services/video-enrichment-service', () => ({
   VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
@@ -42,6 +42,8 @@ vi.mock('next/server', () => ({
     afterCallbacks.push(cb);
   },
 }));
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const videoId = '507f1f77bcf86cd799439011';
@@ -79,7 +81,7 @@ const mockParsedSuccess = (data: Record<string, unknown> = parsedData): void => 
 };
 
 beforeEach(() => {
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(verifyS3ObjectExists).mockResolvedValue(true);
   vi.mocked(VideoService.createVideo).mockResolvedValue({
@@ -95,19 +97,12 @@ beforeEach(() => {
 
 describe('createVideoAction', () => {
   describe('Authorization', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without creating the video', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(createVideoAction(initialFormState, buildFormData())).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
+      const result = await createVideoAction(initialFormState, buildFormData());
 
-    it('should not create a video when the admin check fails', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-      await createVideoAction(initialFormState, buildFormData()).catch(() => undefined);
-
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(VideoService.createVideo).not.toHaveBeenCalled();
     });
   });

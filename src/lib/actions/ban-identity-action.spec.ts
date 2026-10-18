@@ -5,14 +5,14 @@ export {};
 
 vi.mock('server-only', () => ({}));
 
-const requireRoleMock = vi.fn();
+const gateActionMock = vi.fn();
 const banMock = vi.fn();
 const headersMock = vi.fn().mockResolvedValue(new Headers());
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: headersMock }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: requireRoleMock }));
+vi.mock('@/lib/auth/action-gate', () => ({ gateAction: gateActionMock }));
 
 vi.mock('@/lib/services/chat-admin-service', () => ({
   ChatAdminService: { banIdentity: banMock },
@@ -26,18 +26,19 @@ const { banIdentityAction } = await import('./ban-identity-action');
 
 describe('banIdentityAction', () => {
   beforeEach(() => {
-    requireRoleMock.mockReset();
+    gateActionMock.mockReset();
     banMock.mockReset();
   });
 
-  it('returns unauthorized when requireRole throws', async () => {
-    requireRoleMock.mockRejectedValue(Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without banning', async () => {
+    gateActionMock.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
     const result = await banIdentityAction({ email: 'a@b.c' });
     expect(result).toEqual({ success: false, error: 'unauthorized' });
+    expect(banMock).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid email', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     const result = await banIdentityAction({ email: 'not-an-email' });
     expect(result.success).toBe(false);
     const error = !result.success ? result.error : null;
@@ -45,7 +46,7 @@ describe('banIdentityAction', () => {
   });
 
   it('persists the ban with the admin id captured', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     banMock.mockResolvedValue({ id: 'ban-1' });
 
     const result = await banIdentityAction({
@@ -67,7 +68,7 @@ describe('banIdentityAction', () => {
   });
 
   it('groups a top-level (pathless) issue under the _form key', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     // A non-object input fails the top-level object check, producing an
     // issue with an empty path → the `|| '_form'` fallback.
     const result = await banIdentityAction(
@@ -78,15 +79,8 @@ describe('banIdentityAction', () => {
     expect(fieldErrors).toHaveProperty('_form');
   });
 
-  it('returns unauthorized when the session lacks a user id', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: '' } });
-    const result = await banIdentityAction({ email: 'a@b.com' });
-    expect(result).toEqual({ success: false, error: 'unauthorized' });
-    expect(banMock).not.toHaveBeenCalled();
-  });
-
   it('defaults a missing fingerprint hash to null', async () => {
-    requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+    gateActionMock.mockResolvedValue({ success: true, session: { user: { id: 'admin-1' } } });
     banMock.mockResolvedValue({ id: 'ban-2' });
 
     const result = await banIdentityAction({ email: 'a@b.com' });

@@ -4,13 +4,13 @@
 // Mock server-only first to prevent errors from imported modules
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { CreditConfirmationService } from '@/lib/services/credit-confirmation-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
-import { requireRole } from '@/utils/auth/require-role';
 
 import { createReleaseAction } from './create-release-action';
 
@@ -24,7 +24,9 @@ vi.mock('../services/credit-confirmation-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('../utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 describe('createReleaseAction', () => {
   const mockSession = {
@@ -50,7 +52,7 @@ describe('createReleaseAction', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+    vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
   });
 
@@ -207,14 +209,15 @@ describe('createReleaseAction', () => {
   });
 
   describe('Authorization', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+    it('resolves (not rejects) the gate refusal as a form error without creating a release', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(createReleaseAction(initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
-
-      expect(requireRole).toHaveBeenCalledWith('admin');
+      await expect(createReleaseAction(initialFormState, mockFormData)).resolves.toEqual({
+        fields: {},
+        success: false,
+        errors: { general: ['Unauthorized'] },
+      });
+      expect(ReleaseService.createRelease).not.toHaveBeenCalled();
     });
 
     it('should allow admin users to create releases', async () => {
@@ -801,7 +804,7 @@ describe('createReleaseAction', () => {
       ];
 
       for (const errorMessage of errorMessages) {
-        vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+        vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
 
         vi.mocked(getActionState).mockReturnValue({
           formState: { fields: {}, success: false },

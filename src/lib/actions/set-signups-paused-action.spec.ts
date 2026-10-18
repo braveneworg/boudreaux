@@ -4,8 +4,8 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { SignupSettingsService } from '@/lib/services/signup-settings-service';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { setSignupsPausedAction } from './set-signups-paused-action';
 
@@ -13,7 +13,7 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 
 vi.mock('@/lib/services/signup-settings-service', () => ({
   SignupSettingsService: {
@@ -21,14 +21,14 @@ vi.mock('@/lib/services/signup-settings-service', () => ({
   },
 }));
 
-const mockRequireRole = vi.mocked(requireRole);
+const mockGateAction = vi.mocked(gateAction);
 const mockSetSignupsPaused = vi.mocked(SignupSettingsService.setSignupsPaused);
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('setSignupsPausedAction', () => {
-  it('rejects non-admins', async () => {
-    mockRequireRole.mockRejectedValue(new Error('Unauthorized'));
+  it('returns unauthorized for a gate refusal without changing the setting', async () => {
+    mockGateAction.mockResolvedValue({ success: false, error: 'Unauthorized', code: 'FORBIDDEN' });
 
     expect(await setSignupsPausedAction({ paused: true })).toEqual({
       success: false,
@@ -39,7 +39,7 @@ describe('setSignupsPausedAction', () => {
   });
 
   it('pauses signups for an admin', async () => {
-    mockRequireRole.mockResolvedValue({} as never);
+    mockGateAction.mockResolvedValue({ success: true, session: {} as never });
 
     const result = await setSignupsPausedAction({ paused: true });
 
@@ -49,7 +49,7 @@ describe('setSignupsPausedAction', () => {
   });
 
   it('resumes signups for an admin', async () => {
-    mockRequireRole.mockResolvedValue({} as never);
+    mockGateAction.mockResolvedValue({ success: true, session: {} as never });
 
     const result = await setSignupsPausedAction({ paused: false });
 
@@ -59,7 +59,7 @@ describe('setSignupsPausedAction', () => {
   });
 
   it('returns invalid for non-boolean paused input', async () => {
-    mockRequireRole.mockResolvedValue({} as never);
+    mockGateAction.mockResolvedValue({ success: true, session: {} as never });
 
     // Cast to bypass TypeScript — tests the runtime Zod guard
     const result = await setSignupsPausedAction({ paused: 'yes' as unknown as boolean });

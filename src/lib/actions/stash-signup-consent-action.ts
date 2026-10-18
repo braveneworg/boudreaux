@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use server';
+// action-gate: public: runs before sign-up, to pass the Turnstile challenge and stash consent
 
 import 'server-only';
 

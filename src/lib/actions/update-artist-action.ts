@@ -7,18 +7,20 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { normalizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
+
+import { refusedFormState } from './form-state-helpers';
 
 const PERMITTED_FIELD_NAMES = [
   'firstName',
@@ -112,10 +114,11 @@ export const updateArtistAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
-  if (!session?.user?.id) {
-    throw new Error('Invalid admin session: missing user id for audit logging.');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
   }
+  const { session } = gate;
 
   const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, createArtistSchema);
 

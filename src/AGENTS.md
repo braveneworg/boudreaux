@@ -14,8 +14,11 @@ Deeper rules: [`src/app/AGENTS.md`](app/AGENTS.md) (UI, forms, styling),
 - Mutations → Server Actions (`src/lib/actions/`). Queries → API routes
   (`src/app/api/`), REST conventions: plural nouns (`/api/releases`), correct
   verbs (GET read, POST create, PUT/PATCH update, DELETE remove).
-- Gate routes/actions with `withAuth` / `withAdmin`
-  (`src/lib/decorators/with-auth.ts`); rate-limit with `withRateLimit`.
+- Gate routes with `withAuth` / `withAdmin`
+  (`src/lib/decorators/with-auth.ts`) and Server Actions with `gateAction`
+  (`src/lib/auth/action-gate.ts`), or mark the action module public;
+  `scripts/check-server-action-gates.spec.ts` enforces it. Rate-limit with
+  `withRateLimit`.
 - Validate all external input (user input, API responses, Server Action args)
   with Zod (`src/lib/validation/`) before use.
 - Every API route and Server Action handles errors with `try`/`catch` and

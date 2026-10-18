@@ -7,6 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateReleaseData } from '@/lib/types/domain/release';
 import type { FormState } from '@/lib/types/form-state';
@@ -14,13 +15,14 @@ import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
+
+import { refusedFormState } from './form-state-helpers';
 
 const PERMITTED_FIELD_NAMES = [
   'title',
@@ -208,7 +210,11 @@ export const updateReleaseAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(releaseId)) {
     return {

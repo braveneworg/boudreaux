@@ -6,7 +6,7 @@ import { changeUsernameAction } from '@/lib/actions/change-username-action';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGateAction = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockUpdateUsername = vi.hoisted(() => vi.fn());
@@ -17,9 +17,11 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/action-gate', () => ({
+  gateAction: mockGateAction,
 }));
+
+const UNAUTHENTICATED = { success: false, error: 'Unauthorized', code: 'UNAUTHENTICATED' };
 
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: {
@@ -77,8 +79,11 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateUsername).mockResolvedValue({
@@ -112,8 +117,11 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateUsername).mockResolvedValue({
@@ -264,7 +272,7 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
@@ -273,7 +281,7 @@ describe('changeUsernameAction', () => {
       expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
 
-    it('should return error when session has no user id', async () => {
+    it('returns the suspension copy for a banned account without changing the username', async () => {
       const mockFormState: FormState = {
         fields: { username: 'newusername', confirmUsername: 'newusername' },
         success: false,
@@ -291,14 +299,16 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: false,
+        error: 'Account suspended',
+        code: 'BANNED',
       });
 
       const result = await changeUsernameAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['You must be logged in to change your username']);
+      expect(result.errors?.general).toEqual(['Account suspended']);
       expect(mockUpdateUsername).not.toHaveBeenCalled();
     });
   });
@@ -322,8 +332,11 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
     });
 
@@ -529,8 +542,11 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
 
       // Make the updateUser succeed but formState.success stays false
@@ -597,8 +613,11 @@ describe('changeUsernameAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
 
       const duplicateError = new DataError('DUPLICATE', 'Unique constraint failed');

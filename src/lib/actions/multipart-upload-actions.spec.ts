@@ -2,13 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import {
   VIDEO_MAX_FILE_SIZE,
   VIDEO_MAX_PARTS,
   VIDEO_PART_SIZE,
 } from '@/lib/constants/video-uploads';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 
 import {
@@ -24,8 +23,7 @@ import {
 } from './multipart-upload-actions';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/auth');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/logger', () => ({
   loggers: {
     s3: {
@@ -78,6 +76,8 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 
 const VALID_VIDEO_ID = 'a'.repeat(24);
 const VALID_KEY = `media/videos/${VALID_VIDEO_ID}/clip-123-abc.mp4`;
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
+
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 
 /** Read the constructor params of the nth command handed to `s3Client.send`. */
@@ -85,8 +85,7 @@ const sentCommand = (index: number): CommandParams =>
   mockSend.mock.calls.at(index)?.[0] as CommandParams;
 
 beforeEach(() => {
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
-  vi.mocked(auth).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   mockSend.mockResolvedValue({ UploadId: 'test-upload-id', ContentLength: 12345 });
   mockGetSignedUrl.mockResolvedValue('https://s3.amazonaws.com/signed-part-url?sig=abc');
 });
@@ -99,28 +98,13 @@ describe('initiateVideoUploadAction', () => {
     fileSize: 2 * VIDEO_PART_SIZE,
   };
 
-  it('returns an error when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns the gate refusal without calling S3', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await initiateVideoUploadAction(validInput);
 
-    expect(result.success).toBe(false);
-  });
-
-  it('makes no S3 call when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-    await initiateVideoUploadAction(validInput);
-
+    expect(result).toEqual(REFUSAL);
     expect(mockSend).not.toHaveBeenCalled();
-  });
-
-  it('returns an authentication error when the session is missing', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
-
-    const result = await initiateVideoUploadAction(validInput);
-
-    expect(result.error).toBe('Authentication required');
   });
 
   it('rejects an invalid ObjectId without calling S3', async () => {
@@ -262,28 +246,13 @@ describe('initiateVideoUploadAction', () => {
 describe('presignVideoPartsAction', () => {
   const validInput = { s3Key: VALID_KEY, uploadId: 'upload-123', partNumbers: [1, 2, 3] };
 
-  it('returns an error when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns the gate refusal without calling S3', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await presignVideoPartsAction(validInput);
 
-    expect(result.success).toBe(false);
-  });
-
-  it('makes no signing call when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-    await presignVideoPartsAction(validInput);
-
+    expect(result).toEqual(REFUSAL);
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
-  });
-
-  it('returns an authentication error when the session is missing', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
-
-    const result = await presignVideoPartsAction(validInput);
-
-    expect(result.error).toBe('Authentication required');
   });
 
   it('rejects a key outside the media/videos prefix', async () => {
@@ -409,28 +378,13 @@ describe('completeVideoUploadAction', () => {
     ],
   };
 
-  it('returns an error when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns the gate refusal without calling S3', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await completeVideoUploadAction(validInput);
 
-    expect(result.success).toBe(false);
-  });
-
-  it('makes no S3 call when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-    await completeVideoUploadAction(validInput);
-
+    expect(result).toEqual(REFUSAL);
     expect(mockSend).not.toHaveBeenCalled();
-  });
-
-  it('returns an authentication error when the session is missing', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
-
-    const result = await completeVideoUploadAction(validInput);
-
-    expect(result.error).toBe('Authentication required');
   });
 
   it('rejects a malformed completion payload', async () => {
@@ -519,28 +473,25 @@ describe('completeVideoUploadAction', () => {
 describe('abortVideoUploadAction', () => {
   const validInput = { s3Key: VALID_KEY, uploadId: 'upload-123' };
 
-  it('returns an error when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+  it('returns the gate refusal without calling S3', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await abortVideoUploadAction(validInput);
 
-    expect(result.success).toBe(false);
-  });
-
-  it('makes no S3 call when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-    await abortVideoUploadAction(validInput);
-
+    expect(result).toEqual(REFUSAL);
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('returns an authentication error when the session is missing', async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+  it('reports a failure when reading the session throws', async () => {
+    vi.mocked(gateAction).mockRejectedValueOnce(new Error('Database unavailable'));
 
     const result = await abortVideoUploadAction(validInput);
 
-    expect(result.error).toBe('Authentication required');
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to abort video upload: Database unavailable',
+    });
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed abort payload', async () => {
@@ -653,14 +604,6 @@ describe('multipart actions — local mode', () => {
     const result = await initiateVideoUploadAction(initiateInput);
 
     expect(result.data?.partSize).toBe(VIDEO_PART_SIZE);
-  });
-
-  it('still enforces the admin gate', async () => {
-    vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
-
-    const result = await initiateVideoUploadAction(initiateInput);
-
-    expect(result.success).toBe(false);
   });
 
   it('still rejects a video/quicktime upload', async () => {

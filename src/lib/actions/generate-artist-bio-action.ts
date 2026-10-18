@@ -7,8 +7,8 @@ import 'server-only';
 
 import { after } from 'next/server';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistRepository } from '@/lib/repositories/artist-repository';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateArtistBioInputSchema,
@@ -38,7 +38,11 @@ const logger = loggers.media;
 export const generateArtistBioAction = async (
   input: unknown
 ): Promise<GenerateArtistBioActionResult> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
 
   const parsed = generateArtistBioInputSchema.safeParse(input);
   if (!parsed.success) {

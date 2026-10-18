@@ -10,7 +10,10 @@ Read with [`src/AGENTS.md`](../AGENTS.md).
   query or seed work.
 - `services/` — business logic; components stay presentation-focused.
 - `decorators/` — `withAuth`, `withAdmin`, `withRateLimit`; gate every
-  protected route and action through them.
+  protected route through them. Server Actions cross the action gate,
+  `gateAction` (`auth/action-gate.ts`), or say they are public with
+  `// action-gate: public: <reason>` on the line after `'use server'`;
+  `scripts/check-server-action-gates.spec.ts` enforces it.
 - `validation/` — Zod schemas for all external input.
 - Mark server-only modules with `'server-only'` (specs mock it:
   `vi.mock('server-only', () => ({}))`).

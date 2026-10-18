@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { gateAction } from '@/lib/auth/action-gate';
+
 import { generateArtistBioAction } from './generate-artist-bio-action';
 
 vi.mock('server-only', () => ({}));
@@ -20,10 +22,7 @@ vi.mock('next/server', () => ({
 const logSecurityEventMock = vi.fn();
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: (e: unknown) => logSecurityEventMock(e) }));
 
-const requireRoleMock = vi.fn();
-vi.mock('@/lib/utils/auth/require-role', () => ({
-  requireRole: (role: string) => requireRoleMock(role),
-}));
+vi.mock('@/lib/auth/action-gate');
 
 const getBioGenerationStateMock = vi.fn();
 const setBioStatusMock = vi.fn();
@@ -54,10 +53,14 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 const VALID_ID = 'a'.repeat(24);
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 beforeEach(() => {
   afterCallback = null;
-  requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+  vi.mocked(gateAction).mockResolvedValue({
+    success: true,
+    session: { user: { id: 'admin-1' } } as never,
+  });
   // Default: artist exists, never generated.
   getBioGenerationStateMock.mockResolvedValue({ bioStatus: null, bioStartedAt: null });
   setBioStatusMock.mockResolvedValue(undefined);
@@ -65,10 +68,13 @@ beforeEach(() => {
 });
 
 describe('generateArtistBioAction', () => {
-  it('rejects when the caller is not an admin', async () => {
-    requireRoleMock.mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without touching the repository', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(generateArtistBioAction({ artistId: VALID_ID })).rejects.toThrow('Unauthorized');
+    const result = await generateArtistBioAction({ artistId: VALID_ID });
+
+    expect(result).toEqual(REFUSAL);
+    expect(getBioGenerationStateMock).not.toHaveBeenCalled();
   });
 
   it('returns an error for invalid input without touching the service', async () => {

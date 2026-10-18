@@ -3,11 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 import { runVideoEnrichmentAction } from './run-video-enrichment-action';
@@ -16,7 +16,7 @@ const afterMock = vi.hoisted(() => vi.fn());
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({ after: (cb: () => Promise<void>) => afterMock(cb) }));
-vi.mock('@/lib/utils/auth/require-role', () => ({ requireRole: vi.fn() }));
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: vi.fn() }));
 vi.mock('@/lib/repositories/video-repository', () => ({
   VideoRepository: { getEnrichmentState: vi.fn(), setEnrichmentStatus: vi.fn() },
@@ -35,6 +35,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 const VIDEO_ID = 'f'.repeat(24);
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const baseState = (overrides: Partial<VideoEnrichmentState> = {}): VideoEnrichmentState => ({
   id: VIDEO_ID,
@@ -55,9 +56,10 @@ const baseState = (overrides: Partial<VideoEnrichmentState> = {}): VideoEnrichme
 
 beforeEach(() => {
   afterMock.mockReset();
-  vi.mocked(requireRole).mockResolvedValue({
-    user: { id: 'admin-1', role: 'admin' },
-  } as never);
+  vi.mocked(gateAction).mockResolvedValue({
+    success: true,
+    session: { user: { id: 'admin-1', role: 'admin' } } as never,
+  });
   vi.mocked(VideoRepository.getEnrichmentState).mockResolvedValue(baseState());
   vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
@@ -65,16 +67,19 @@ beforeEach(() => {
 });
 
 describe('runVideoEnrichmentAction', () => {
-  it('rejects when the caller is not an admin', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without reading the video', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(runVideoEnrichmentAction(VIDEO_ID)).rejects.toThrow('Unauthorized');
+    const result = await runVideoEnrichmentAction(VIDEO_ID);
+
+    expect(result).toEqual(REFUSAL);
+    expect(VideoRepository.getEnrichmentState).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed video id', async () => {
     const result = await runVideoEnrichmentAction('not-an-object-id');
 
-    expect(result).toEqual({ success: false, error: 'Invalid video id.' });
+    expect(result).toEqual({ success: false, error: 'Invalid video id.', code: 'INVALID_INPUT' });
   });
 
   it('returns an error when the video does not exist', async () => {
@@ -82,7 +87,7 @@ describe('runVideoEnrichmentAction', () => {
 
     const result = await runVideoEnrichmentAction(VIDEO_ID);
 
-    expect(result).toEqual({ success: false, error: 'Video not found.' });
+    expect(result).toEqual({ success: false, error: 'Video not found.', code: 'NOT_FOUND' });
   });
 
   it('refuses to run when the persisted artist is blank', async () => {
@@ -93,6 +98,7 @@ describe('runVideoEnrichmentAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'Add an artist or creator and save before running enrichment.',
+      code: 'VALIDATION',
     });
     expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
     expect(afterMock).not.toHaveBeenCalled();
@@ -181,6 +187,7 @@ describe('runVideoEnrichmentAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'Video enrichment failed to start. Please try again.',
+      code: 'UNKNOWN',
     });
   });
 });

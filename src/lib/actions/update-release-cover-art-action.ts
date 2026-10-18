@@ -7,8 +7,8 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { updateReleaseCoverArtSchema } from '@/lib/validation/admin-asset-schemas';
 
 export interface UpdateReleaseCoverArtResult {
@@ -30,7 +30,10 @@ export const updateReleaseCoverArtAction = async (
   releaseId: string,
   coverArt: string
 ): Promise<UpdateReleaseCoverArtResult> => {
-  await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
 
   const parsed = updateReleaseCoverArtSchema.safeParse({ releaseId, coverArt });
   if (!parsed.success) {
