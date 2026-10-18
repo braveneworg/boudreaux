@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoRepository } from '@/lib/repositories/video-repository';
 import {
   planVideoPostSave,
@@ -17,7 +18,6 @@ import {
 import { VideoService } from '@/lib/services/video-service';
 import type { CreateVideoData, VideoPosterCandidate } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { videoDraftSchema, type VideoDraftInput } from '@/lib/validation/video-draft-schema';
 import { parseVideoFilename } from '@/utils/parse-video-filename';
@@ -139,6 +139,30 @@ const markEnrichmentPending = async (videoId: string): Promise<void> => {
 };
 
 /**
+ * Mark enrichment `pending` when it will dispatch, and schedule the draft's
+ * {@link planVideoPostSave} pipeline in `after()` when it has work.
+ */
+const scheduleDraftPostSave = async (videoId: string, data: VideoDraftInput): Promise<void> => {
+  const artist = data.artist ?? '';
+  const plan = planVideoPostSave({
+    intent: 'draft',
+    next: { artist, s3Key: data.s3Key },
+  });
+
+  if (plan.dispatchEnrichment) await markEnrichmentPending(videoId);
+  if (videoPostSaveHasWork(plan)) {
+    after(() =>
+      runVideoPostSave({
+        videoId,
+        artist,
+        artistDetails: data.artistDetails,
+        plan,
+      })
+    );
+  }
+};
+
+/**
  * Server Action: create the video row as an unpublished draft the moment the
  * S3 multipart upload completes, so enrichment can run while the admin is
  * still filling the form. The draft carries no release date unless the form
@@ -153,7 +177,11 @@ const markEnrichmentPending = async (videoId: string): Promise<void> => {
  * the upload — the form falls back to create-on-submit.
  */
 export const createVideoDraftAction = async (input: unknown): Promise<CreateVideoDraftResult> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
+  }
+  const { session } = gate;
   const parsed = videoDraftSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: 'Invalid draft request.' };
   const data = parsed.data;
@@ -181,23 +209,7 @@ export const createVideoDraftAction = async (input: unknown): Promise<CreateVide
 
     revalidatePath('/admin/videos');
 
-    const artist = data.artist ?? '';
-    const plan = planVideoPostSave({
-      intent: 'draft',
-      next: { artist, s3Key: data.s3Key },
-    });
-
-    if (plan.dispatchEnrichment) await markEnrichmentPending(response.data.id);
-    if (videoPostSaveHasWork(plan)) {
-      after(() =>
-        runVideoPostSave({
-          videoId: response.data.id,
-          artist,
-          artistDetails: data.artistDetails,
-          plan,
-        })
-      );
-    }
+    await scheduleDraftPostSave(response.data.id, data);
     return { success: true, videoId: response.data.id };
   } catch (error) {
     logger.error('video_draft_create_error', {

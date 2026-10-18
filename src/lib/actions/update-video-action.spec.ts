@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
 import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
@@ -12,7 +13,6 @@ import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 
@@ -24,7 +24,7 @@ vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
 vi.mock('@/lib/utils/s3-key-utils');
 vi.mock('@/lib/services/video-enrichment-service', () => ({
@@ -49,6 +49,8 @@ vi.mock('next/server', () => ({
     afterCallbacks.push(cb);
   },
 }));
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const videoId = '507f1f77bcf86cd799439011';
@@ -104,7 +106,7 @@ const mockParsedSuccess = (data: Record<string, unknown> = parsedData): void => 
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(verifyS3ObjectExists).mockResolvedValue(true);
   vi.mocked(deleteS3Object).mockResolvedValue(true);
@@ -144,12 +146,14 @@ beforeEach(() => {
 
 describe('updateVideoAction', () => {
   describe('Authorization', () => {
-    it('should require admin role', async () => {
-      vi.mocked(requireRole).mockRejectedValue(Error('Unauthorized'));
+    it('resolves the gate refusal as a form error without updating the video', async () => {
+      vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      await expect(updateVideoAction(videoId, initialFormState, mockFormData)).rejects.toThrow(
-        'Unauthorized'
-      );
+      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
+      expect(VideoService.getVideoById).not.toHaveBeenCalled();
+      expect(VideoService.updateVideo).not.toHaveBeenCalled();
     });
 
     it('should reject an invalid video id', async () => {

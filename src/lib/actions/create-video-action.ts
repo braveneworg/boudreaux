@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import {
   planVideoPostSave,
@@ -21,11 +22,11 @@ import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
+import { refusedFormState } from './form-state-helpers';
 import {
   buildVideoCreateInput,
   confirmVideoUpload,
@@ -147,7 +148,11 @@ export const createVideoAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   // Read the pre-generated ObjectId before getActionState, which strips
   // non-permitted fields.

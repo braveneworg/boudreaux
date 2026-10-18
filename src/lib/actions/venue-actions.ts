@@ -7,14 +7,16 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { VenueService } from '@/lib/services/tours/venue-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { venueCreateSchema, venueUpdateSchema } from '@/lib/validation/tours/venue-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
+
+import { refusedFormState } from './form-state-helpers';
 
 /**
  * Server action to create a new venue
@@ -23,7 +25,11 @@ export const createVenueAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   const permittedFieldNames = [
     'name',
@@ -95,10 +101,11 @@ export const updateVenueAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
-  if (!session?.user?.id) {
-    throw new Error('Invalid admin session: missing user id for audit logging.');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
   }
+  const { session } = gate;
 
   if (!OBJECT_ID_REGEX.test(venueId)) {
     return {
