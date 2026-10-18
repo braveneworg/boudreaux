@@ -33,3 +33,10 @@ export const refusedFormState = ({ error }: ActionGateRefusal): FormState => ({
   success: false,
   errors: { general: [error] },
 });
+
+/**
+ * The copy for a gate refusal on a self-service form: the form's own sign-in
+ * prompt when there is no session, otherwise the gate's copy.
+ */
+export const refusalCopy = ({ code, error }: ActionGateRefusal, signInPrompt: string): string =>
+  code === 'UNAUTHENTICATED' ? signInPrompt : error;

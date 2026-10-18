@@ -3,9 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { headers } from 'next/headers';
-
-import { auth as betterAuth } from '@/lib/auth';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import type { ServerSession } from '@/lib/auth/get-server-session';
 
@@ -20,13 +17,3 @@ import type { ServerSession } from '@/lib/auth/get-server-session';
  * {@link getServerSession}, which re-hydrates the user from the database.
  */
 export const auth = async (): Promise<ServerSession | null> => getServerSession();
-
-/**
- * Server-side sign-out façade. Mirrors the old Auth.js `signOut` signature
- * (an optional `{ redirect }` flag, ignored here — server actions handle their
- * own redirect) and revokes the better-auth session for the current request.
- */
-export const signOut = async (_options?: { redirect?: boolean }): Promise<void> => {
-  const requestHeaders = await headers();
-  await betterAuth.api.signOut({ headers: requestHeaders });
-};

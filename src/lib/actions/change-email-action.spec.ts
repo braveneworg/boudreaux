@@ -6,8 +6,9 @@ import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGateAction = vi.hoisted(() => vi.fn());
 const mockSignOut = vi.hoisted(() => vi.fn());
+const mockHeaders = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
@@ -19,10 +20,20 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  auth: mockAuth,
-  signOut: mockSignOut,
+vi.mock('@/lib/auth/action-gate', () => ({
+  gateAction: mockGateAction,
 }));
+
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { signOut: mockSignOut } },
+}));
+
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
+const UNAUTHENTICATED = { success: false, error: 'Unauthorized', code: 'UNAUTHENTICATED' };
+const requestHeaders = new Headers({ cookie: 'session=1' });
 
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: {
@@ -63,6 +74,7 @@ describe('changeEmailAction', () => {
   beforeEach(() => {
     // Reset all mocks to clear implementations from previous tests
     vi.resetAllMocks();
+    mockHeaders.mockResolvedValue(requestHeaders);
     mockFormData.set('email', 'newemail@example.com');
     mockFormData.set('confirmEmail', 'newemail@example.com');
     mockFormData.set('previousEmail', 'oldemail@example.com');
@@ -95,8 +107,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -122,7 +137,7 @@ describe('changeEmailAction', () => {
         undefined
       );
 
-      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+      expect(mockSignOut).toHaveBeenCalledWith({ headers: requestHeaders });
       expect(mockRedirect).toHaveBeenCalledWith(
         '/success/change-email?email=newemail%40example.com'
       );
@@ -141,8 +156,11 @@ describe('changeEmailAction', () => {
           },
         },
       });
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
       vi.mocked(mockUpdateEmail).mockResolvedValue({ id: 'user-123' });
       mockRedirect.mockImplementation(() => {
@@ -185,8 +203,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'session@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'session@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -235,8 +256,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -287,8 +311,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -337,8 +364,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -391,8 +421,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'session@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'session@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -445,8 +478,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -501,8 +537,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({
@@ -549,8 +588,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       const duplicateEmailError = new DataError('DUPLICATE', 'Unique constraint failed');
@@ -587,7 +629,7 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -668,7 +710,7 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -678,7 +720,7 @@ describe('changeEmailAction', () => {
       expect(mockSignOut).not.toHaveBeenCalled();
     });
 
-    it('should return error when session has no user id', async () => {
+    it('returns the suspension copy for a banned account without changing the email', async () => {
       const mockFormState: FormState = {
         fields: { email: 'newemail@example.com', confirmEmail: 'newemail@example.com' },
         success: false,
@@ -696,14 +738,16 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: false,
+        error: 'Account suspended',
+        code: 'BANNED',
       });
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['You must be logged in to change your email']);
+      expect(result.errors?.general).toEqual(['Account suspended']);
       expect(mockUpdateEmail).not.toHaveBeenCalled();
       expect(mockSignOut).not.toHaveBeenCalled();
     });
@@ -725,7 +769,7 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await changeEmailAction(mockInitialState, mockFormData);
 
@@ -764,8 +808,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
     });
 
@@ -960,8 +1007,11 @@ describe('changeEmailAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'oldemail@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'oldemail@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateEmail).mockResolvedValue({

@@ -6,7 +6,7 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
@@ -15,6 +15,8 @@ import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { isTimeoutDataError } from '@/lib/utils/data-error-helpers';
 import { loggers } from '@/lib/utils/logger';
 import { changeUsernameSchema } from '@/lib/validation/change-username-schema';
+
+import { refusalCopy, setGeneralFormError } from './form-state-helpers';
 
 const logger = loggers.auth;
 
@@ -58,12 +60,6 @@ const applyUsernameError = (error: unknown, formState: FormState): void => {
     formState.errors.general = ['Connection timed out. Please try again.'];
   } else if (error instanceof DataError) {
     applyDataErrorMessage(error, formState.errors);
-  } else if (
-    error instanceof Error &&
-    error.message === 'You must be logged in to change your username'
-  ) {
-    // Specific error message for authentication issues
-    formState.errors.general = [error.message];
   } else if (error instanceof Error) {
     // Handle general JavaScript errors
     logger.error('[changeUsernameAction] JavaScript error', error);
@@ -115,12 +111,15 @@ export const changeUsernameAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id) {
-        throw Error('You must be logged in to change your username');
+      const gate = await gateAction('signed-in');
+      if (!gate.success) {
+        formState.success = false;
+        setGeneralFormError(formState, [
+          refusalCopy(gate, 'You must be logged in to change your username'),
+        ]);
+        return formState;
       }
+      const { session } = gate;
 
       formState.hasTimeout = false;
 

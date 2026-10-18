@@ -6,7 +6,7 @@ import { updateProfileAction } from '@/lib/actions/update-profile-action';
 import { DataError } from '@/lib/types/domain/errors';
 import type { FormState } from '@/lib/types/form-state';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGateAction = vi.hoisted(() => vi.fn());
 const mockGetActionState = vi.hoisted(() => vi.fn());
 const mockSetUnknownError = vi.hoisted(() => vi.fn());
 const mockUpdateProfile = vi.hoisted(() => vi.fn());
@@ -18,9 +18,11 @@ vi.mock('server-only', () => ({}));
 
 // Mock dependencies
 // Use relative module path consistent with action source import to ensure CI resolution
-vi.mock('@/auth', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/action-gate', () => ({
+  gateAction: mockGateAction,
 }));
+
+const UNAUTHENTICATED = { success: false, error: 'Unauthorized', code: 'UNAUTHENTICATED' };
 
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: {
@@ -111,8 +113,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123', email: 'test@example.com' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123', email: 'test@example.com' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({
@@ -151,7 +156,10 @@ describe('updateProfileAction', () => {
           data: { firstName: 'John', lastName: 'Doe', allowEmailNotifications: true },
         },
       });
-      vi.mocked(mockAuth).mockResolvedValue({ user: { id: 'user-123' } });
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: { user: { id: 'user-123' } },
+      });
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
 
       await updateProfileAction(mockInitialState, mockFormData);
@@ -193,8 +201,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -240,8 +251,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -287,8 +301,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -331,8 +348,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -371,8 +391,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -424,7 +447,7 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
@@ -434,7 +457,7 @@ describe('updateProfileAction', () => {
       expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
-    it('should return error when session exists but user ID is missing', async () => {
+    it('returns the suspension copy for a banned account without writing the profile', async () => {
       const mockFormState: FormState = {
         fields: {},
         success: false,
@@ -462,14 +485,16 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: undefined },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: false,
+        error: 'Account suspended',
+        code: 'BANNED',
       });
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
+      expect(result.errors?.general).toEqual(['Account suspended']);
       expect(mockUpdateProfile).not.toHaveBeenCalled();
     });
 
@@ -501,50 +526,12 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue(null);
+      vi.mocked(mockGateAction).mockResolvedValue(UNAUTHENTICATED);
 
       const result = await updateProfileAction(mockInitialState, mockFormData);
 
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
-      expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
-    });
-
-    it('should return error when session exists but user is undefined', async () => {
-      const mockFormState: FormState = {
-        fields: {},
-        success: false,
-        errors: {},
-      };
-
-      const mockParsed = {
-        success: true,
-        data: {
-          firstName: 'John',
-          lastName: 'Doe',
-          phone: '',
-          addressLine1: '',
-          addressLine2: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: '',
-          allowSmsNotifications: false,
-        },
-      };
-
-      vi.mocked(mockGetActionState).mockReturnValue({
-        formState: mockFormState,
-        parsed: mockParsed,
-      });
-
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: undefined,
-      });
-
-      const result = await updateProfileAction(mockInitialState, mockFormData);
-
-      expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['You must be logged in to update your profile']);
     });
   });
@@ -580,7 +567,7 @@ describe('updateProfileAction', () => {
 
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
-      expect(mockAuth).not.toHaveBeenCalled();
+      expect(mockGateAction).not.toHaveBeenCalled();
       expect(mockUpdateProfile).not.toHaveBeenCalled();
     });
 
@@ -638,8 +625,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       const dataError = new DataError('NOT_FOUND', 'Database error');
@@ -681,8 +671,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockRejectedValue(Error('Database connection failed'));
@@ -721,8 +714,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockRejectedValue(Error('Update failed'));
@@ -762,8 +758,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -808,8 +807,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -852,8 +854,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -901,8 +906,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-123' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-123' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});
@@ -961,8 +969,11 @@ describe('updateProfileAction', () => {
         parsed: mockParsed,
       });
 
-      vi.mocked(mockAuth).mockResolvedValue({
-        user: { id: 'user-456' },
+      vi.mocked(mockGateAction).mockResolvedValue({
+        success: true,
+        session: {
+          user: { id: 'user-456' },
+        },
       });
 
       vi.mocked(mockUpdateProfile).mockResolvedValue({});

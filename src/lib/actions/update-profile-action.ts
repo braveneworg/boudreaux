@@ -7,7 +7,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/auth';
+import { gateAction } from '@/lib/auth/action-gate';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -15,7 +15,7 @@ import { setUnknownError } from '@/lib/utils/auth/auth-utils';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { profileActionSchema } from '@/lib/validation/profile-schema';
 
-import { setGeneralFormError } from './form-state-helpers';
+import { refusalCopy, setGeneralFormError } from './form-state-helpers';
 
 export const updateProfileAction = async (
   _initialState: FormState,
@@ -39,14 +39,15 @@ export const updateProfileAction = async (
 
   if (parsed.success) {
     try {
-      // Get current user session
-      const session = await auth();
-
-      if (!session?.user?.id) {
+      const gate = await gateAction('signed-in');
+      if (!gate.success) {
         formState.success = false;
-        setGeneralFormError(formState, ['You must be logged in to update your profile']);
+        setGeneralFormError(formState, [
+          refusalCopy(gate, 'You must be logged in to update your profile'),
+        ]);
         return formState;
       }
+      const { session } = gate;
 
       const {
         firstName,

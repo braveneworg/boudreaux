@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { z } from 'zod';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import { PlaylistService, SOURCE_NOT_FOUND_MESSAGE } from '@/lib/services/playlist-service';
 import { DataError } from '@/lib/types/domain/errors';
@@ -24,13 +25,7 @@ import {
 } from '@/lib/validation/playlist-schema';
 import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
 
-import {
-  failureFromError,
-  getAuthorizedUserId,
-  invalidInputFailure,
-  PLAYLISTS_PATH,
-  unauthorizedFailure,
-} from './playlist-action-helpers';
+import { failureFromError, invalidInputFailure, PLAYLISTS_PATH } from './playlist-action-helpers';
 
 /** Signal for the 200-item cap (service `LIMIT_EXCEEDED`). */
 const PLAYLIST_FULL_ERROR = 'PLAYLIST_FULL';
@@ -76,8 +71,9 @@ const addItemFailure = (error: unknown): PlaylistActionResult<never> => {
 export const addPlaylistItemAction = async (
   input: unknown
 ): Promise<PlaylistActionResult<{ item: PlaylistItemPayload }>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = addPlaylistItemInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
@@ -99,8 +95,9 @@ export const removePlaylistItemAction = async (input: {
   playlistId: string;
   itemId: string;
 }): Promise<PlaylistActionResult<{ removed: true }>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = removePlaylistItemInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
@@ -120,8 +117,9 @@ export const removePlaylistItemAction = async (input: {
 export const reorderPlaylistItemsAction = async (
   input: unknown
 ): Promise<PlaylistActionResult<{ reordered: true }>> => {
-  const userId = await getAuthorizedUserId();
-  if (!userId) return unauthorizedFailure();
+  const gate = await gateAction('signed-in');
+  if (!gate.success) return gate;
+  const userId = gate.session.user.id;
   const parsed = reorderPlaylistItemsInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
   try {
