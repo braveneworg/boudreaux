@@ -4,6 +4,7 @@
 import { verifyJobSignature } from '@fakefour/job-contract/signing';
 
 import { bioGenerationJob } from '@/lib/services/bio-generation-service';
+import { imageLinksJob } from '@/lib/services/image-links-service';
 
 import { jobInvoker, lambdaJobInvoker, localJobInvoker } from './job-invoker';
 
@@ -333,6 +334,21 @@ describe('one local adapter for every kind', () => {
 
     expect(postedUrls()).toEqual([PROGRESS_URL, CALLBACK_URL]);
     expect(postIsSignedWith(PROGRESS_URL, SIGNING_KEY)).toBe(true);
+    expect(postIsSignedWith(CALLBACK_URL, SIGNING_KEY)).toBe(true);
+  });
+
+  it('images-from-links: a signed callback alone, with no checkpoint', async () => {
+    await localJobInvoker.invoke(imageLinksJob, {
+      task: 'images-from-links',
+      artistId: 'a'.repeat(24),
+      displayName: 'Ceschi',
+      links: ['https://press.test/kit'],
+      callbackUrl: CALLBACK_URL,
+      jobToken: 'tok-123',
+      signingKey: SIGNING_KEY,
+    });
+
+    expect(postedUrls()).toEqual([CALLBACK_URL]);
     expect(postIsSignedWith(CALLBACK_URL, SIGNING_KEY)).toBe(true);
   });
 });

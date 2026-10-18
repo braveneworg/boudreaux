@@ -3,27 +3,26 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
-
-import { InvokeCommand } from '@aws-sdk/client-lambda';
 import { IMAGE_LINKS_TASK, MAX_IMAGE_LINKS, type ImageLinksInput } from '@fakefour/job-contract';
-import { JOB_SIGNATURE_HEADER, signJobBody } from '@fakefour/job-contract/signing';
 
 import { ArtistBioImageRepository } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
-import { ArtistRepository } from '@/lib/repositories/artist-repository';
+import {
+  ArtistRepository,
+  type ImageLinksJobStateRecord,
+} from '@/lib/repositories/artist-repository';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
+import type { JobAdapter, JobDispatch, JobTypes } from '@/lib/services/job-runner/types';
 import type { ArtistBioLinkRecord, CreateArtistBioImageData } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
 import { deriveBioLinkLabel } from '@/lib/utils/derive-bio-link-label';
-import { resolveEnrichmentBaseUrl } from '@/lib/utils/enrichment-base-url';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import type {
-  ImageLinksResult,
+  ImageLinksData,
   ImageLinksStatusResponse,
   ImageSourceLink,
 } from '@/lib/validation/image-links-schema';
-import { resolveStaleJobView, toAsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import {
   buildReferenceImageUrls,
@@ -32,90 +31,6 @@ import {
   type RehostedImage,
 } from './bio-generation-service';
 import { BioImageService } from './bio-image-service';
-import {
-  getLambdaClient,
-  resolveFakeDelayMs,
-  signingKeyForJob,
-  sleep,
-  tokensMatch,
-  verifyJobCallback,
-  type CallbackProof,
-} from './lambda-dispatch';
-
-/** Outcome of {@link ImageLinksService.runJob}: dispatched across the seam, or failed early. */
-export type RunImageLinksJobResult =
-  { status: 'dispatched' } | { status: 'skipped' } | { status: 'failed'; error: string };
-
-type InvokeAck = { ok: true } | { ok: false; error: string };
-
-/** Fake-path dwell when `BIO_GENERATOR_FAKE_DELAY_MS` is unset: none. */
-const DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS = 0;
-
-/**
- * Local stand-in for the Lambda under `BIO_GENERATOR_FAKE=true` (dev, E2E): it
- * POSTs an empty ok result to the same callback route the Lambda would, so the
- * token round-trip, the single-use claim and `completeCallback` all execute.
- */
-const dispatchImageLinksLocally = async (input: ImageLinksInput): Promise<InvokeAck> => {
-  try {
-    await sleep(resolveFakeDelayMs(DEFAULT_FAKE_IMAGE_LINKS_DELAY_MS));
-    const rawBody = JSON.stringify({
-      jobToken: input.jobToken,
-      result: { ok: true, data: { images: [] } },
-    });
-    const response = await fetch(input.callbackUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Signed exactly as the Lambda signs (ADR-0014).
-        ...(input.signingKey && {
-          [JOB_SIGNATURE_HEADER]: signJobBody(input.signingKey, rawBody, Date.now() / 1000),
-        }),
-      },
-      body: rawBody,
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      loggers.media.error('Local image-links dispatch callback rejected', undefined, {
-        url: input.callbackUrl,
-        status: response.status,
-      });
-    }
-    return { ok: true };
-  } catch (error) {
-    loggers.media.error('Local image-links dispatch failed', error);
-    return { ok: false, error: 'Local image-links dispatch failed' };
-  }
-};
-
-/** Fires the `Event` invoke (or the local fake). Never throws across the boundary. */
-const invoke = async (input: ImageLinksInput): Promise<InvokeAck> => {
-  if (process.env.BIO_GENERATOR_FAKE === 'true') {
-    return dispatchImageLinksLocally(input);
-  }
-
-  const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
-  if (!functionName) {
-    return {
-      ok: false,
-      error: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
-    };
-  }
-
-  try {
-    await getLambdaClient().send(
-      new InvokeCommand({
-        FunctionName: functionName,
-        InvocationType: 'Event',
-        Payload: Buffer.from(JSON.stringify(input)),
-      })
-    );
-    return { ok: true };
-  } catch (error) {
-    loggers.media.error('Image-links invoke failed', error);
-    return { ok: false, error: 'Failed to reach the bio generator' };
-  }
-};
 
 /** Projects a re-hosted, sanitized image onto a `linked` pool row. */
 const toLinkedRow = (artistId: string, image: RehostedImage): CreateArtistBioImageData => ({
@@ -165,27 +80,6 @@ const upsertImageSourceRow = async (
 };
 
 /**
- * Writes a terminal job status. A failed write is logged, never thrown, so
- * the `after()`-scheduled paths keep their never-throws contract; the stale
- * sweep then coerces the stuck `processing` row on the next read.
- */
-const writeTerminalStatus = async (
-  artistId: string,
-  status: 'failed' | 'succeeded',
-  opts: { error: string | null; addedCount?: number }
-): Promise<void> => {
-  try {
-    await ArtistRepository.setImageLinksStatus(artistId, status, opts);
-  } catch (error) {
-    loggers.media.error('image_links_status_write_failed', {
-      artistId,
-      status,
-      error: String(error),
-    });
-  }
-};
-
-/**
  * Re-hosts the callback's images that are not already in the pool and inserts
  * the survivors as `linked` rows. Returns how many rows were added. Pool URLs
  * are compared case-insensitively, matching the Lambda's own dedupe; the
@@ -194,7 +88,7 @@ const writeTerminalStatus = async (
  */
 const persistLinkedImages = async (
   artistId: string,
-  images: Extract<ImageLinksResult, { ok: true }>['data']['images']
+  images: ImageLinksData['images']
 ): Promise<number> => {
   const existing = new Set(
     Array.from(await ArtistBioImageRepository.findExistingUrls(artistId), (url) =>
@@ -215,6 +109,109 @@ const persistLinkedImages = async (
     return result ? [toLinkedRow(artistId, buildRehostedRecord(result, image))] : [];
   });
   return ArtistBioImageRepository.createMany(rows);
+};
+
+/** The invoke payload without the runner's dispatch fields. */
+type ImageLinksRequest = Omit<ImageLinksInput, keyof JobDispatch>;
+
+/**
+ * Reads the artist and its stored image-source links and assembles the Lambda
+ * request. Returns a typed error when the artist is missing, has no name to
+ * match faces against, or has no image-source links.
+ */
+const prepareImageLinks = async (
+  artistId: string
+): Promise<{ ok: true; request: ImageLinksRequest } | { ok: false; error: string }> => {
+  const artist = await ArtistRepository.findById(artistId);
+  if (!artist) return { ok: false, error: 'Artist not found.' };
+
+  const displayName = deriveDisplayName(artist);
+  if (!displayName) return { ok: false, error: 'Artist has no name to match faces against.' };
+
+  // `addSourceLink` enforces the cap; the slice only bounds rows that
+  // predate it so the payload always satisfies the Lambda's schema.
+  const sources = await ArtistBioLinkRepository.findImageSources(artistId);
+  const links = sources.slice(0, MAX_IMAGE_LINKS).map((link) => link.url);
+  if (links.length === 0) return { ok: false, error: 'Add at least one link first.' };
+
+  // Custom (human-chosen) pool images are the face references; a lookup
+  // failure degrades to no references.
+  const customUrls = await ArtistBioImageRepository.findCustomUrls(artistId).catch((error) => {
+    loggers.media.warn('image_links_reference_images_failed', {
+      artistId,
+      error: String(error),
+    });
+    return [] as string[];
+  });
+  const referenceImageUrls = buildReferenceImageUrls(customUrls);
+
+  return {
+    ok: true,
+    request: {
+      task: IMAGE_LINKS_TASK,
+      artistId,
+      displayName,
+      links,
+      referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
+    },
+  };
+};
+
+/** The images-from-links job's types (see the job runner). */
+interface ImageLinksJobTypes extends JobTypes {
+  record: ImageLinksJobStateRecord;
+  /** A run takes nothing from its trigger: it reads the stored sources. */
+  input: undefined;
+  request: ImageLinksRequest;
+  data: ImageLinksData;
+  claim: { slug: string };
+  persisted: number;
+  checkpoint: never;
+  progress: never;
+}
+
+/**
+ * The images-from-links job, as the job runner sees it: the artist's
+ * `imageLinks*` lifecycle columns (independent of the bio job's, so both can
+ * run at once), its callback route, the Lambda request, and the persistence
+ * that adds the found photos to the pool. It has no progress channel.
+ */
+export const imageLinksJob: JobAdapter<ImageLinksJobTypes> = {
+  kind: 'image-links',
+  copy: {
+    notFound: 'Artist not found.',
+    noCallbackUrl: 'Bio generator callback URL is not configured',
+    notConfigured: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+    unreachable: 'Failed to reach the bio generator',
+    runFailed: 'Image generation failed unexpectedly.',
+    persistFailed: 'Image persistence failed.',
+  },
+  callbackPath: (artistId) => `/api/artists/${artistId}/image-links/callback`,
+  // The local adapter answers at once with nothing found.
+  fake: { delayMs: 0, result: () => ({ ok: true, data: { images: [] } }) },
+
+  read: (artistId) => ArtistRepository.getImageLinksJobState(artistId),
+  state: ({ imageLinksStatus, imageLinksStartedAt, imageLinksError, imageLinksJobToken }) => ({
+    status: imageLinksStatus,
+    startedAt: imageLinksStartedAt,
+    error: imageLinksError ?? null,
+    jobToken: imageLinksJobToken,
+    progress: null,
+  }),
+  claimContext: ({ slug }) => ({ slug }),
+
+  markPending: (artistId, startedAt) =>
+    ArtistRepository.setImageLinksStatus(artistId, 'pending', { error: null, startedAt }),
+  begin: (artistId, now) => ArtistRepository.beginImageLinksRun(artistId, now),
+  setToken: (artistId, token) => ArtistRepository.setImageLinksJobToken(artistId, token),
+  claimToken: (artistId, token) => ArtistRepository.claimImageLinksJobToken(artistId, token),
+  recordFailed: (artistId, error) =>
+    ArtistRepository.setImageLinksStatus(artistId, 'failed', { error }),
+  recordSucceeded: (artistId, addedCount) =>
+    ArtistRepository.setImageLinksStatus(artistId, 'succeeded', { error: null, addedCount }),
+
+  prepare: (artistId) => prepareImageLinks(artistId),
+  persist: (artistId, { images }) => persistLinkedImages(artistId, images),
 };
 
 /**
@@ -248,80 +245,6 @@ export class ImageLinksService {
   }
 
   /**
-   * Runs an images-from-links job for the artist's stored image-source links:
-   * flips to `processing`, mints the per-job token, and fires the `Event`
-   * invoke. Leaves the artist `processing` for the callback to complete. Never
-   * throws — it is scheduled via Next.js `after()`.
-   *
-   * @param artistId - The artist whose image-source links to read.
-   */
-  static async runJob(artistId: string): Promise<RunImageLinksJobResult> {
-    try {
-      // One conditional write begins the run; a racing second runner loses
-      // here instead of invoking the Lambda twice.
-      if (!(await ArtistRepository.beginImageLinksRun(artistId, new Date()))) {
-        return { status: 'skipped' };
-      }
-      const fail = async (error: string): Promise<RunImageLinksJobResult> => {
-        await ArtistRepository.setImageLinksStatus(artistId, 'failed', { error });
-        return { status: 'failed', error };
-      };
-
-      const artist = await ArtistRepository.findById(artistId);
-      if (!artist) return fail('Artist not found.');
-
-      const displayName = deriveDisplayName(artist);
-      if (!displayName) return fail('Artist has no name to match faces against.');
-
-      // `addSourceLink` enforces the cap; the slice only bounds rows that
-      // predate it so the payload always satisfies the Lambda's schema.
-      const sources = await ArtistBioLinkRepository.findImageSources(artistId);
-      const links = sources.slice(0, MAX_IMAGE_LINKS).map((link) => link.url);
-      if (links.length === 0) return fail('Add at least one link first.');
-
-      const base = resolveEnrichmentBaseUrl();
-      if (!base) return fail('Bio generator callback URL is not configured');
-
-      // Custom (human-chosen) pool images are the face references; a lookup
-      // failure degrades to no references.
-      const customUrls = await ArtistBioImageRepository.findCustomUrls(artistId).catch((error) => {
-        loggers.media.warn('image_links_reference_images_failed', {
-          artistId,
-          error: String(error),
-        });
-        return [] as string[];
-      });
-      const referenceImageUrls = buildReferenceImageUrls(customUrls);
-
-      const jobToken = randomUUID();
-      // Derived before the token is stored, so a missing secret records
-      // `failed` (via the catch below) without leaving a claimable token.
-      const signingKey = signingKeyForJob({ kind: 'image-links', entityId: artistId, jobToken });
-      await ArtistRepository.setImageLinksJobToken(artistId, jobToken);
-      const ack = await invoke({
-        task: IMAGE_LINKS_TASK,
-        artistId,
-        displayName,
-        links,
-        referenceImageUrls: referenceImageUrls.length ? referenceImageUrls : undefined,
-        callbackUrl: `${base}/api/artists/${artistId}/image-links/callback`,
-        jobToken,
-        signingKey,
-      });
-      if (!ack.ok) {
-        await ArtistRepository.setImageLinksJobToken(artistId, null);
-        return fail(ack.error);
-      }
-      return { status: 'dispatched' };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Image generation failed unexpectedly.';
-      await writeTerminalStatus(artistId, 'failed', { error: message });
-      return { status: 'failed', error: message };
-    }
-  }
-
-  /**
    * Reads the job's lifecycle view (stale-coerced like the bio job) plus the
    * artist's image-source links. Returns `null` when the artist is missing.
    */
@@ -329,11 +252,7 @@ export class ImageLinksService {
     const state = await ArtistRepository.getImageLinksJobState(artistId);
     if (!state) return null;
 
-    const { status, error } = resolveStaleJobView({
-      status: toAsyncJobStatus(state.imageLinksStatus),
-      startedAt: state.imageLinksStartedAt,
-      error: state.imageLinksError ?? null,
-    });
+    const { status, error } = jobRunner.view(imageLinksJob, state);
     const sources = await ArtistBioLinkRepository.findImageSources(artistId);
 
     return {
@@ -342,56 +261,5 @@ export class ImageLinksService {
       addedCount: state.imageLinksAddedCount,
       links: sources.map(({ id, label, url }) => ({ id, label, url })),
     };
-  }
-
-  /**
-   * Verifies a completion callback and atomically claims the job so it can only
-   * complete once. Returns the artist slug (for revalidation) only when the job
-   * is `processing`, the body's signature verifies under the key derived from
-   * the STORED token (ADR-0014), the token constant-time-matches, AND this
-   * caller wins the claim; an unsigned, mis-signed, or mismatched callback
-   * never attempts the claim.
-   */
-  static async verifyAndClaimCallback(
-    artistId: string,
-    jobToken: string,
-    proof: CallbackProof
-  ): Promise<{ slug: string } | null> {
-    const state = await ArtistRepository.getImageLinksJobState(artistId);
-    if (!state || state.imageLinksStatus !== 'processing' || !state.imageLinksJobToken) {
-      return null;
-    }
-    const identity = {
-      kind: 'image-links',
-      entityId: artistId,
-      jobToken: state.imageLinksJobToken,
-    } as const;
-    if (!verifyJobCallback(identity, proof)) {
-      return null;
-    }
-    if (!tokensMatch(state.imageLinksJobToken, jobToken)) {
-      return null;
-    }
-    const claimed = await ArtistRepository.claimImageLinksJobToken(artistId, jobToken);
-    return claimed ? { slug: state.slug } : null;
-  }
-
-  /**
-   * Completes a claimed job: a non-ok result records `failed`; an ok result
-   * re-hosts the new images into the pool as `linked` rows and records
-   * `succeeded` with the number added. Never throws — it runs via `after()`.
-   */
-  static async completeCallback(artistId: string, result: ImageLinksResult): Promise<void> {
-    if (!result.ok) {
-      await writeTerminalStatus(artistId, 'failed', { error: result.error });
-      return;
-    }
-    try {
-      const addedCount = await persistLinkedImages(artistId, result.data.images);
-      await writeTerminalStatus(artistId, 'succeeded', { error: null, addedCount });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Image persistence failed.';
-      await writeTerminalStatus(artistId, 'failed', { error: message });
-    }
   }
 }

@@ -2,28 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import {
-  deriveJobSigningKey,
-  signJobBody,
-  verifyJobSignature,
-} from '@fakefour/job-contract/signing';
-
 import { DataError } from '@/lib/types/domain/errors';
-import { MAX_IMAGE_LINKS } from '@/lib/validation/image-links-schema';
-import { STALE_JOB_MS, STALE_JOB_TIMEOUT_MESSAGE } from '@/utils/async-job-lifecycle';
+import { imageLinksCallbackSchema, MAX_IMAGE_LINKS } from '@/lib/validation/image-links-schema';
 
-import { ImageLinksService } from './image-links-service';
+import { imageLinksJob, ImageLinksService } from './image-links-service';
 
 vi.mock('server-only', () => ({}));
 
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
-const sendMock = vi.hoisted(() => vi.fn());
 const findByIdMock = vi.hoisted(() => vi.fn());
 const setImageLinksStatusMock = vi.hoisted(() => vi.fn());
-const beginImageLinksRunMock = vi.hoisted(() =>
-  vi.fn((_id: string, _now: Date) => Promise.resolve(true))
-);
+const beginImageLinksRunMock = vi.hoisted(() => vi.fn());
 const setImageLinksJobTokenMock = vi.hoisted(() => vi.fn());
 const claimImageLinksJobTokenMock = vi.hoisted(() => vi.fn());
 const getImageLinksJobStateMock = vi.hoisted(() => vi.fn());
@@ -36,15 +26,6 @@ const findExistingUrlsMock = vi.hoisted(() => vi.fn());
 const findFingerprintsMock = vi.hoisted(() => vi.fn());
 const createManyMock = vi.hoisted(() => vi.fn());
 const rehostImagesMock = vi.hoisted(() => vi.fn());
-
-vi.mock('@aws-sdk/client-lambda', () => ({
-  LambdaClient: class {
-    send = sendMock;
-  },
-  InvokeCommand: class {
-    constructor(public input: unknown) {}
-  },
-}));
 
 vi.mock('@/lib/utils/logger', () => ({
   loggers: { media: { warn: mockLoggerWarn, error: mockLoggerError, info: vi.fn() } },
@@ -92,15 +73,6 @@ vi.mock('./bio-image-service', () => ({
   },
 }));
 
-type SentCommand = {
-  input: { InvocationType?: string; FunctionName?: string; Payload?: Uint8Array };
-};
-
-const lastCommand = (): SentCommand => sendMock.mock.calls.at(-1)?.[0] as SentCommand;
-
-const decodePayload = (command: SentCommand): Record<string, unknown> =>
-  JSON.parse(Buffer.from(command.input.Payload as Uint8Array).toString('utf-8'));
-
 const artist = {
   id: 'a1',
   displayName: 'Ceschi',
@@ -116,46 +88,14 @@ const sourceLinks = [
   { id: 'l2', url: 'https://photos.test/a.jpg', label: 'photos.test' },
 ];
 
-const fetchMock = vi.fn(async (): Promise<{ ok: boolean; status: number }> => ({
-  ok: true,
-  status: 202,
-}));
-
-const APP_SECRET = 'app-callback-secret-'.padEnd(40, 'x');
-const CALLBACK_BODY = '{"jobToken":"tok","result":{"ok":true,"data":{"images":[]}}}';
-
-/** The signing key the app derives for artist `a1` and `jobToken` (ADR-0014). */
-const keyFor = (jobToken: string): string =>
-  deriveJobSigningKey(APP_SECRET, { kind: 'image-links', entityId: 'a1', jobToken });
-
-/** A callback proof signed the way the Lambda signs it, under the key for `storedToken`. */
-const proofFor = (storedToken: string, rawBody = CALLBACK_BODY) => ({
-  signature: signJobBody(keyFor(storedToken), rawBody, Date.now() / 1000),
-  rawBody,
-});
-
 beforeEach(() => {
-  vi.stubEnv('JOB_CALLBACK_SECRET', APP_SECRET);
-  vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://app.test');
-  vi.stubEnv('BIO_GENERATOR_LAMBDA_NAME', 'fakefour-bio-generator');
-  vi.stubEnv('BIO_GENERATOR_FAKE', 'false');
-  vi.stubEnv('BIO_GENERATOR_FAKE_DELAY_MS', '0');
   findByIdMock.mockResolvedValue(artist);
   findImageSourcesMock.mockResolvedValue(sourceLinks);
   findCustomUrlsMock.mockResolvedValue(['https://cdn/custom-1.jpg']);
   findExistingUrlsMock.mockResolvedValue(new Set<string>());
   findFingerprintsMock.mockResolvedValue([]);
   createManyMock.mockResolvedValue(0);
-  sendMock.mockResolvedValue({});
   rehostImagesMock.mockResolvedValue({ results: [], duplicateAliases: new Map() });
-  vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
-  fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ ok: true, status: 202 });
 });
 
 describe('ImageLinksService.addSourceLink / removeSourceLink', () => {
@@ -246,98 +186,51 @@ describe('ImageLinksService.addSourceLink / removeSourceLink', () => {
   });
 });
 
-describe('ImageLinksService.runJob', () => {
-  it('skips without invoking the Lambda when another runner already began the job', async () => {
-    beginImageLinksRunMock.mockResolvedValueOnce(false);
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'skipped' });
-    expect(setImageLinksJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('flips to processing, mints a token and fires an Event invoke with the task payload', async () => {
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'dispatched' });
-    expect(beginImageLinksRunMock).toHaveBeenCalledWith('a1', expect.any(Date));
-    const token = setImageLinksJobTokenMock.mock.calls[0][1] as string;
-    expect(token).toMatch(/^[0-9a-f-]{36}$/);
-    const command = lastCommand();
-    expect(command.input.InvocationType).toBe('Event');
-    expect(command.input.FunctionName).toBe('fakefour-bio-generator');
-    expect(decodePayload(command)).toEqual({
-      task: 'images-from-links',
-      artistId: 'a1',
-      displayName: 'Ceschi',
-      links: ['https://press.test/kit', 'https://photos.test/a.jpg'],
-      referenceImageUrls: ['https://cdn/custom-1.jpg'],
-      callbackUrl: 'https://app.test/api/artists/a1/image-links/callback',
-      jobToken: token,
-      signingKey: keyFor(token),
+describe('imageLinksJob.prepare', () => {
+  it('builds the images-from-links request from the artist and its sources', async () => {
+    expect(await imageLinksJob.prepare('a1', undefined)).toEqual({
+      ok: true,
+      request: {
+        task: 'images-from-links',
+        artistId: 'a1',
+        displayName: 'Ceschi',
+        links: ['https://press.test/kit', 'https://photos.test/a.jpg'],
+        referenceImageUrls: ['https://cdn/custom-1.jpg'],
+      },
     });
-  });
-
-  it('records failed without storing a token or invoking when JOB_CALLBACK_SECRET is unset', async () => {
-    vi.stubEnv('JOB_CALLBACK_SECRET', undefined);
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toMatchObject({
-      status: 'failed',
-      error: expect.stringContaining('JOB_CALLBACK_SECRET'),
-    });
-    expect(setImageLinksJobTokenMock).not.toHaveBeenCalled();
-    expect(sendMock).not.toHaveBeenCalled();
-  });
-
-  it('fails without invoking when the artist has no image-source links', async () => {
-    findImageSourcesMock.mockResolvedValueOnce([]);
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'failed', error: 'Add at least one link first.' });
-    expect(sendMock).not.toHaveBeenCalled();
-    expect(setImageLinksStatusMock.mock.calls.at(-1)).toEqual([
-      'a1',
-      'failed',
-      { error: 'Add at least one link first.' },
-    ]);
   });
 
   it('fails when the artist is missing', async () => {
     findByIdMock.mockResolvedValueOnce(null);
 
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'failed', error: 'Artist not found.' });
-    expect(sendMock).not.toHaveBeenCalled();
-  });
-
-  it('fails when the callback base URL is unconfigured', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_URL', '');
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({
-      status: 'failed',
-      error: 'Bio generator callback URL is not configured',
+    expect(await imageLinksJob.prepare('a1', undefined)).toEqual({
+      ok: false,
+      error: 'Artist not found.',
     });
-    expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('records a failed status and clears the token when the invoke cannot be reached', async () => {
-    sendMock.mockRejectedValueOnce(new Error('network'));
+  it('fails when the artist has no name to match faces against', async () => {
+    findByIdMock.mockResolvedValueOnce({
+      ...artist,
+      displayName: null,
+      firstName: '',
+      surname: '',
+      akaNames: null,
+    });
 
-    const result = await ImageLinksService.runJob('a1');
+    expect(await imageLinksJob.prepare('a1', undefined)).toEqual({
+      ok: false,
+      error: 'Artist has no name to match faces against.',
+    });
+  });
 
-    expect(result).toEqual({ status: 'failed', error: 'Failed to reach the bio generator' });
-    expect(setImageLinksJobTokenMock.mock.calls.at(-1)).toEqual(['a1', null]);
-    expect(setImageLinksStatusMock.mock.calls.at(-1)).toEqual([
-      'a1',
-      'failed',
-      { error: 'Failed to reach the bio generator' },
-    ]);
+  it('fails when the artist has no image-source links', async () => {
+    findImageSourcesMock.mockResolvedValueOnce([]);
+
+    expect(await imageLinksJob.prepare('a1', undefined)).toEqual({
+      ok: false,
+      error: 'Add at least one link first.',
+    });
   });
 
   it('caps the links sent to the Lambda at MAX_IMAGE_LINKS', async () => {
@@ -349,78 +242,135 @@ describe('ImageLinksService.runJob', () => {
       }))
     );
 
-    await ImageLinksService.runJob('a1');
+    const prepared = await imageLinksJob.prepare('a1', undefined);
 
-    expect((decodePayload(lastCommand()).links as string[]).length).toBe(20);
+    expect(prepared.ok && prepared.request.links).toHaveLength(MAX_IMAGE_LINKS);
   });
 
-  it('omits reference images when the custom-image lookup fails', async () => {
+  it('omits reference images and warns when the custom-image lookup fails', async () => {
     findCustomUrlsMock.mockRejectedValueOnce(new Error('db'));
 
-    await ImageLinksService.runJob('a1');
+    const prepared = await imageLinksJob.prepare('a1', undefined);
 
-    expect(decodePayload(lastCommand()).referenceImageUrls).toBeUndefined();
-    expect(mockLoggerWarn).toHaveBeenCalled();
-  });
-
-  it('under BIO_GENERATOR_FAKE posts an empty ok callback to the callback URL instead of invoking', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'dispatched' });
-    expect(sendMock).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string }];
-    expect(url).toBe('https://app.test/api/artists/a1/image-links/callback');
-    expect(JSON.parse(init.body)).toEqual({
-      jobToken: setImageLinksJobTokenMock.mock.calls[0][1],
-      result: { ok: true, data: { images: [] } },
-    });
-  });
-
-  it('under BIO_GENERATOR_FAKE signs the callback with the per-job key, like the Lambda does', async () => {
-    vi.stubEnv('BIO_GENERATOR_FAKE', 'true');
-
-    await ImageLinksService.runJob('a1');
-
-    const token = setImageLinksJobTokenMock.mock.calls[0][1] as string;
-    const [, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      { body: string; headers: Record<string, string> },
-    ];
-    expect(
-      verifyJobSignature({
-        header: init.headers['x-job-signature'],
-        rawBody: init.body,
-        signingKey: keyFor(token),
-        nowSeconds: Date.now() / 1000,
-      })
-    ).toEqual({ ok: true });
-  });
-
-  it('never throws: an unexpected repository error records failed', async () => {
-    findImageSourcesMock.mockRejectedValueOnce(new Error('boom'));
-
-    const result = await ImageLinksService.runJob('a1');
-
-    expect(result).toEqual({ status: 'failed', error: 'boom' });
-  });
-
-  it('never throws even when recording the failure itself fails', async () => {
-    findImageSourcesMock.mockRejectedValueOnce(new Error('boom'));
-    // The run begins through the conditional write, so the first status
-    // write is the `failed` one — and it is the one that breaks.
-    setImageLinksStatusMock.mockRejectedValueOnce(new Error('mongo down'));
-
-    await expect(ImageLinksService.runJob('a1')).resolves.toEqual({
-      status: 'failed',
-      error: 'boom',
-    });
-    expect(mockLoggerError).toHaveBeenCalledWith(
-      'image_links_status_write_failed',
-      expect.objectContaining({ artistId: 'a1', status: 'failed' })
+    expect(prepared).toMatchObject({ ok: true, request: { referenceImageUrls: undefined } });
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      'image_links_reference_images_failed',
+      expect.objectContaining({ artistId: 'a1' })
     );
+  });
+});
+
+describe('imageLinksJob — the artist images-from-links columns', () => {
+  const ID = 'a1';
+  const START = new Date('2026-10-18T12:00:00.000Z');
+  const record = {
+    slug: 'ceschi',
+    imageLinksStatus: 'processing',
+    imageLinksError: 'earlier',
+    imageLinksStartedAt: START,
+    imageLinksJobToken: 'tok',
+    imageLinksAddedCount: null,
+  };
+
+  it('reads the images-from-links state', async () => {
+    getImageLinksJobStateMock.mockResolvedValueOnce(record);
+
+    expect(await imageLinksJob.read(ID)).toBe(record);
+    expect(getImageLinksJobStateMock).toHaveBeenCalledWith(ID);
+  });
+
+  it('maps its lifecycle columns onto the job state, with no progress', () => {
+    expect(imageLinksJob.state(record)).toEqual({
+      status: 'processing',
+      startedAt: START,
+      error: 'earlier',
+      jobToken: 'tok',
+      progress: null,
+    });
+  });
+
+  it('hands a won claim the artist slug', () => {
+    expect(imageLinksJob.claimContext(record)).toEqual({ slug: 'ceschi' });
+  });
+
+  it('answers on the images-from-links callback route and has no progress channel', () => {
+    expect(imageLinksJob.callbackPath(ID)).toBe('/api/artists/a1/image-links/callback');
+    expect(imageLinksJob.progress).toBeUndefined();
+  });
+
+  it.each([
+    [
+      'marks pending with a cleared error and its start',
+      () => imageLinksJob.markPending(ID, START),
+      setImageLinksStatusMock,
+      [ID, 'pending', { error: null, startedAt: START }],
+    ],
+    [
+      'begins with the conditional write',
+      () => imageLinksJob.begin(ID, START),
+      beginImageLinksRunMock,
+      [ID, START],
+    ],
+    [
+      'stores the token',
+      () => imageLinksJob.setToken(ID, 'tok'),
+      setImageLinksJobTokenMock,
+      [ID, 'tok'],
+    ],
+    [
+      'claims the token',
+      () => imageLinksJob.claimToken(ID, 'tok'),
+      claimImageLinksJobTokenMock,
+      [ID, 'tok'],
+    ],
+    [
+      'records failed with its error',
+      () => imageLinksJob.recordFailed(ID, 'Jina down'),
+      setImageLinksStatusMock,
+      [ID, 'failed', { error: 'Jina down' }],
+    ],
+    [
+      'records succeeded with the added count',
+      () => imageLinksJob.recordSucceeded(ID, 3),
+      setImageLinksStatusMock,
+      [ID, 'succeeded', { error: null, addedCount: 3 }],
+    ],
+  ])('%s', async (_name, write, repositoryMethod, args) => {
+    await write();
+
+    expect(repositoryMethod.mock.calls).toEqual([args]);
+  });
+
+  it('keeps its copy byte-identical', () => {
+    expect(imageLinksJob.copy).toEqual({
+      notFound: 'Artist not found.',
+      noCallbackUrl: 'Bio generator callback URL is not configured',
+      notConfigured: 'Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)',
+      unreachable: 'Failed to reach the bio generator',
+      runFailed: 'Image generation failed unexpectedly.',
+      persistFailed: 'Image persistence failed.',
+    });
+  });
+});
+
+describe('imageLinksJob.fake', () => {
+  const payload = {
+    task: 'images-from-links' as const,
+    artistId: 'a1',
+    displayName: 'Ceschi',
+    links: ['https://press.test/kit'],
+    callbackUrl: 'https://app.test/api/artists/a1/image-links/callback',
+    jobToken: 'tok',
+    signingKey: 'k'.repeat(64),
+  };
+
+  it('answers at once with an empty ok result, as a valid callback, and no checkpoint', () => {
+    const result = imageLinksJob.fake.result(payload);
+
+    expect(result).toEqual({ ok: true, data: { images: [] } });
+    expect(imageLinksCallbackSchema.safeParse({ jobToken: 'tok', result }).success).toBe(true);
+    expect(imageLinksJob.fake.checkpoint).toBeUndefined();
+    expect(imageLinksJob.fake.delayMs).toBe(0);
   });
 });
 
@@ -453,92 +403,10 @@ describe('ImageLinksService.getStatus', () => {
       ],
     });
   });
-
-  it('coerces a processing job older than STALE_JOB_MS to failed with the timeout copy', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce({
-      slug: 'ceschi',
-      imageLinksStatus: 'processing',
-      imageLinksError: null,
-      imageLinksStartedAt: new Date(Date.now() - (STALE_JOB_MS + 60_000)),
-      imageLinksJobToken: 'tok',
-      imageLinksAddedCount: null,
-    });
-
-    const status = await ImageLinksService.getStatus('a1');
-
-    expect(status?.status).toBe('failed');
-    expect(status?.error).toBe(STALE_JOB_TIMEOUT_MESSAGE);
-  });
 });
 
-describe('ImageLinksService.verifyAndClaimCallback', () => {
-  const processing = {
-    slug: 'ceschi',
-    imageLinksStatus: 'processing',
-    imageLinksError: null,
-    imageLinksStartedAt: new Date(),
-    imageLinksJobToken: 'tok',
-    imageLinksAddedCount: null,
-  };
-
-  it('claims a processing job whose token matches and returns the slug', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
-    claimImageLinksJobTokenMock.mockResolvedValueOnce(true);
-
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toEqual({
-      slug: 'ceschi',
-    });
-    expect(claimImageLinksJobTokenMock.mock.calls).toEqual([['a1', 'tok']]);
-  });
-
-  it('never attempts the claim on a mismatched token', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
-
-    expect(
-      await ImageLinksService.verifyAndClaimCallback('a1', 'nope', proofFor('tok'))
-    ).toBeNull();
-    expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('returns null when the job is not processing', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce({
-      ...processing,
-      imageLinksStatus: 'succeeded',
-    });
-
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toBeNull();
-  });
-
-  it('returns null when a concurrent callback already won the claim', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
-    claimImageLinksJobTokenMock.mockResolvedValueOnce(false);
-
-    expect(await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('tok'))).toBeNull();
-  });
-
-  it('never attempts the claim on an unsigned callback, even with the right token', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
-
-    const result = await ImageLinksService.verifyAndClaimCallback('a1', 'tok', {
-      signature: null,
-      rawBody: CALLBACK_BODY,
-    });
-
-    expect(result).toBeNull();
-    expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
-  });
-
-  it('never attempts the claim when the signature was made under another token’s key', async () => {
-    getImageLinksJobStateMock.mockResolvedValueOnce(processing);
-
-    const result = await ImageLinksService.verifyAndClaimCallback('a1', 'tok', proofFor('guess'));
-
-    expect(result).toBeNull();
-    expect(claimImageLinksJobTokenMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('ImageLinksService.completeCallback', () => {
+describe('imageLinksJob.persist', () => {
+  const claim = { slug: 'ceschi' };
   const image = (url: string, faceScore: number | null = null) => ({
     url,
     attribution: 'press.test',
@@ -551,14 +419,7 @@ describe('ImageLinksService.completeCallback', () => {
     alt: null,
   });
 
-  it('records failed with the Lambda error for a non-ok result', async () => {
-    await ImageLinksService.completeCallback('a1', { ok: false, error: 'Jina down' });
-
-    expect(setImageLinksStatusMock.mock.calls).toEqual([['a1', 'failed', { error: 'Jina down' }]]);
-    expect(rehostImagesMock).not.toHaveBeenCalled();
-  });
-
-  it('skips images already in the pool, re-hosts the rest as linked rows and records the count', async () => {
+  it('skips images already in the pool, re-hosts the rest as linked rows and returns the count', async () => {
     findExistingUrlsMock.mockResolvedValueOnce(new Set(['https://press.test/old.jpg']));
     rehostImagesMock.mockResolvedValueOnce({
       results: [
@@ -569,16 +430,17 @@ describe('ImageLinksService.completeCallback', () => {
     });
     createManyMock.mockResolvedValueOnce(1);
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: {
+    const added = await imageLinksJob.persist(
+      'a1',
+      {
         images: [
           image('https://press.test/old.jpg'),
           image('https://press.test/new-1.jpg', 88),
           image('https://press.test/new-2.jpg'),
         ],
       },
-    });
+      claim
+    );
 
     expect(rehostImagesMock.mock.calls).toEqual([
       [
@@ -611,9 +473,7 @@ describe('ImageLinksService.completeCallback', () => {
         ],
       ],
     ]);
-    expect(setImageLinksStatusMock.mock.calls).toEqual([
-      ['a1', 'succeeded', { error: null, addedCount: 1 }],
-    ]);
+    expect(added).toBe(1);
   });
 
   it("seeds the re-host dedupe with every pool image's hashes, whatever its origin", async () => {
@@ -623,10 +483,11 @@ describe('ImageLinksService.completeCallback', () => {
     ];
     findFingerprintsMock.mockResolvedValueOnce(fingerprints);
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://band.test/same-photo.jpg')] },
-    });
+    await imageLinksJob.persist(
+      'a1',
+      { images: [image('https://band.test/same-photo.jpg')] },
+      claim
+    );
 
     expect(findFingerprintsMock.mock.calls).toEqual([['a1', undefined]]);
     expect(rehostImagesMock.mock.calls).toEqual([
@@ -640,15 +501,14 @@ describe('ImageLinksService.completeCallback', () => {
       duplicateAliases: new Map([[0, 'https://cdn/commons.webp']]),
     });
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://band.test/same-photo.jpg')] },
-    });
+    const added = await imageLinksJob.persist(
+      'a1',
+      { images: [image('https://band.test/same-photo.jpg')] },
+      claim
+    );
 
     expect(createManyMock.mock.calls).toEqual([[[]]]);
-    expect(setImageLinksStatusMock.mock.calls).toEqual([
-      ['a1', 'succeeded', { error: null, addedCount: 0 }],
-    ]);
+    expect(added).toBe(0);
   });
 
   it("stores each new linked row's content and perceptual hashes", async () => {
@@ -666,10 +526,7 @@ describe('ImageLinksService.completeCallback', () => {
     });
     createManyMock.mockResolvedValueOnce(1);
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://press.test/new-1.jpg')] },
-    });
+    await imageLinksJob.persist('a1', { images: [image('https://press.test/new-1.jpg')] }, claim);
 
     expect(createManyMock.mock.calls).toEqual([
       [
@@ -687,52 +544,35 @@ describe('ImageLinksService.completeCallback', () => {
   it('treats pool URLs as case-insensitive when skipping images', async () => {
     findExistingUrlsMock.mockResolvedValueOnce(new Set(['https://press.test/OLD.jpg']));
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://press.test/old.jpg')] },
-    });
+    const added = await imageLinksJob.persist(
+      'a1',
+      { images: [image('https://press.test/old.jpg')] },
+      claim
+    );
 
     expect(rehostImagesMock).not.toHaveBeenCalled();
-    expect(setImageLinksStatusMock.mock.calls).toEqual([
-      ['a1', 'succeeded', { error: null, addedCount: 0 }],
-    ]);
+    expect(added).toBe(0);
   });
 
-  it('succeeds with a zero count when every image was already in the pool', async () => {
+  it('adds none when every image was already in the pool', async () => {
     findExistingUrlsMock.mockResolvedValueOnce(new Set(['https://press.test/old.jpg']));
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://press.test/old.jpg')] },
-    });
+    const added = await imageLinksJob.persist(
+      'a1',
+      { images: [image('https://press.test/old.jpg')] },
+      claim
+    );
 
     expect(rehostImagesMock).not.toHaveBeenCalled();
     expect(createManyMock).not.toHaveBeenCalled();
-    expect(setImageLinksStatusMock.mock.calls).toEqual([
-      ['a1', 'succeeded', { error: null, addedCount: 0 }],
-    ]);
+    expect(added).toBe(0);
   });
 
-  it('records failed when persistence throws', async () => {
+  it('lets a persistence error reach the job runner', async () => {
     rehostImagesMock.mockRejectedValueOnce(new Error('S3 down'));
 
-    await ImageLinksService.completeCallback('a1', {
-      ok: true,
-      data: { images: [image('https://press.test/x.jpg')] },
-    });
-
-    expect(setImageLinksStatusMock.mock.calls).toEqual([['a1', 'failed', { error: 'S3 down' }]]);
-  });
-
-  it('never throws when recording a Lambda failure itself fails', async () => {
-    setImageLinksStatusMock.mockRejectedValueOnce(new Error('mongo down'));
-
     await expect(
-      ImageLinksService.completeCallback('a1', { ok: false, error: 'Jina down' })
-    ).resolves.toBeUndefined();
-    expect(mockLoggerError).toHaveBeenCalledWith(
-      'image_links_status_write_failed',
-      expect.objectContaining({ artistId: 'a1', status: 'failed' })
-    );
+      imageLinksJob.persist('a1', { images: [image('https://press.test/x.jpg')] }, claim)
+    ).rejects.toThrow('S3 down');
   });
 });

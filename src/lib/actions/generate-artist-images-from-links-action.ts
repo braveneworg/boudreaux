@@ -8,14 +8,13 @@ import 'server-only';
 import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { ArtistRepository } from '@/lib/repositories/artist-repository';
-import { ImageLinksService } from '@/lib/services/image-links-service';
+import { imageLinksJob } from '@/lib/services/image-links-service';
+import { jobRunner } from '@/lib/services/job-runner/job-runner';
 import { loggers } from '@/lib/utils/logger';
 import {
   generateImagesFromLinksInputSchema,
   type GenerateImagesFromLinksActionResult,
 } from '@/lib/validation/image-links-schema';
-import { blocksNewTrigger, toAsyncJobStatus } from '@/utils/async-job-lifecycle';
 import { logSecurityEvent } from '@/utils/audit-log';
 
 /**
@@ -44,24 +43,19 @@ export const generateArtistImagesFromLinksAction = async (
   const { artistId } = parsed.data;
 
   try {
-    const state = await ArtistRepository.getImageLinksJobState(artistId);
-    if (!state) {
-      return { success: false, error: 'Artist not found.' };
+    // The job runner refuses a missing artist and echoes a run genuinely in
+    // flight instead of starting a second one.
+    const triggered = await jobRunner.trigger(imageLinksJob, artistId);
+    if (!triggered.success) {
+      return { success: false, error: triggered.error };
+    }
+    if (!triggered.data.started) {
+      return { success: true, status: triggered.data.status };
     }
 
-    const status = toAsyncJobStatus(state.imageLinksStatus);
-    if (blocksNewTrigger(status, state.imageLinksStartedAt)) {
-      return { success: true, status: status === 'processing' ? 'processing' : 'pending' };
-    }
-
-    await ArtistRepository.setImageLinksStatus(artistId, 'pending', {
-      error: null,
-      startedAt: new Date(),
-    });
-
-    // `runJob` records its own failed/dispatched status and never throws; the
-    // callback route finishes the job and revalidates the artist pages.
-    after(() => ImageLinksService.runJob(artistId));
+    // The run records its own failed status and never throws; the callback
+    // route finishes the job and revalidates the artist pages.
+    after(() => jobRunner.run(imageLinksJob, artistId, undefined));
 
     logSecurityEvent({
       event: 'media.artist.updated',
