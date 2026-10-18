@@ -10,7 +10,6 @@ import { loggers } from '@/lib/utils/logger';
 import {
   getS3Client,
   getS3BucketName,
-  generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
   generatePresignedProbeUrl,
   verifyS3ObjectExists,
@@ -21,7 +20,6 @@ vi.mock('server-only', () => ({}));
 
 const mockSend = vi.fn();
 const s3ClientCalls: Record<string, unknown>[] = [];
-const putCommandCalls: Record<string, unknown>[] = [];
 const getCommandCalls: Record<string, unknown>[] = [];
 
 vi.mock('@aws-sdk/client-s3', () => {
@@ -32,11 +30,7 @@ vi.mock('@aws-sdk/client-s3', () => {
         s3ClientCalls.push(config);
       }
     },
-    PutObjectCommand: class MockPutObjectCommand {
-      constructor(params: Record<string, unknown>) {
-        putCommandCalls.push(params);
-      }
-    },
+
     GetObjectCommand: class MockGetObjectCommand {
       constructor(params: Record<string, unknown>) {
         getCommandCalls.push(params);
@@ -63,7 +57,6 @@ vi.mock('@/lib/utils/cloudfront-signed-url', () => ({
 describe('s3-client', () => {
   beforeEach(() => {
     s3ClientCalls.length = 0;
-    putCommandCalls.length = 0;
     getCommandCalls.length = 0;
     vi.stubEnv('AWS_ACCESS_KEY_ID', 'test-key-id');
     vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'test-secret-key');
@@ -137,48 +130,6 @@ describe('s3-client', () => {
       delete process.env.S3_BUCKET;
 
       expect(() => getS3BucketName()).toThrow('S3 bucket not configured');
-    });
-  });
-
-  describe('generatePresignedUploadUrl', () => {
-    it('should generate presigned upload URL with correct params', async () => {
-      vi.mocked(getSignedUrl).mockResolvedValue('https://s3.example.com/upload?signed=true');
-
-      const result = await generatePresignedUploadUrl(
-        'releases/123/digital-formats/MP3_320KBPS/file.mp3',
-        'MP3_320KBPS',
-        'audio/mpeg'
-      );
-
-      expect(result.uploadUrl).toBe('https://s3.example.com/upload?signed=true');
-      expect(result.s3Key).toBe('releases/123/digital-formats/MP3_320KBPS/file.mp3');
-      expect(result.contentType).toBe('audio/mpeg');
-      expect(putCommandCalls).toHaveLength(1);
-      expect(putCommandCalls[0]).toEqual(
-        expect.objectContaining({
-          Bucket: 'test-bucket',
-          Key: 'releases/123/digital-formats/MP3_320KBPS/file.mp3',
-          ContentType: 'audio/mpeg',
-        })
-      );
-      expect(getSignedUrl).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ expiresIn: 900 })
-      );
-    });
-
-    it('should use default MIME type when empty mimeType is provided', async () => {
-      vi.mocked(getSignedUrl).mockResolvedValue('https://s3.example.com/upload');
-
-      const result = await generatePresignedUploadUrl(
-        'releases/123/digital-formats/MP3_320KBPS/file.mp3',
-        'MP3_320KBPS',
-        ''
-      );
-
-      // When mimeType is empty string (falsy), it falls back to getDefaultMimeType
-      expect(result.contentType).toBe('audio/mpeg');
     });
   });
 

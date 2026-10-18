@@ -212,29 +212,6 @@ export class ReleaseDigitalFormatRepository {
   }
 
   /**
-   * Upsert a parent format grouping record
-   * Creates if not exists, restores if soft-deleted
-   */
-  async upsertParent(
-    releaseId: string,
-    formatType: DigitalFormatType
-  ): Promise<ReleaseDigitalFormat> {
-    return await prisma.releaseDigitalFormat.upsert({
-      where: {
-        releaseId_formatType: { releaseId, formatType },
-      },
-      create: {
-        release: { connect: { id: releaseId } },
-        formatType,
-        trackCount: 0,
-      },
-      update: {
-        deletedAt: null, // Restore if soft-deleted
-      },
-    });
-  }
-
-  /**
    * Replace a format's track files in one transaction: upsert the parent (or
    * restore it when soft-deleted), delete its old tracks, create the new ones
    * and recount. A failure part-way leaves the previous tracks and counts.

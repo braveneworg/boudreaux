@@ -4,7 +4,6 @@
 
 import {
   FREE_FORMAT_TYPES,
-  generateS3Key,
   getDefaultMimeType,
   getFileExtensionForFormat,
   isFreeFormatType,
@@ -13,20 +12,6 @@ import {
 } from '@/lib/constants/digital-formats';
 
 describe('digital-formats constants', () => {
-  describe('generateS3Key', () => {
-    it('should return the correct S3 key pattern', () => {
-      const result = generateS3Key('release-123', 'FLAC', 'file-abc', 'flac');
-
-      expect(result).toBe('releases/release-123/digital-formats/FLAC/file-abc.flac');
-    });
-
-    it('should handle different format types', () => {
-      const result = generateS3Key('r1', 'MP3_320KBPS', 'f1', 'mp3');
-
-      expect(result).toBe('releases/r1/digital-formats/MP3_320KBPS/f1.mp3');
-    });
-  });
-
   describe('getFileExtensionForFormat', () => {
     it.each([
       ['MP3_V0', 'mp3'],

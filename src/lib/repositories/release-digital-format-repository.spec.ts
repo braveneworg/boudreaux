@@ -24,7 +24,6 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
-      upsert: vi.fn(),
     },
     releaseDigitalFormatFile: {
       aggregate: vi.fn(),
@@ -339,39 +338,6 @@ describe('ReleaseDigitalFormatRepository', () => {
         },
       });
       expect(result).toHaveLength(2);
-    });
-  });
-
-  describe('upsertParent', () => {
-    it('should create a new parent format record if it does not exist', async () => {
-      const newFormat = createMockFormat({ trackCount: 0 });
-      vi.mocked(prisma.releaseDigitalFormat.upsert).mockResolvedValue(newFormat);
-
-      const result = await repository.upsertParent(mockReleaseId, 'MP3_320KBPS');
-
-      expect(prisma.releaseDigitalFormat.upsert).toHaveBeenCalledWith({
-        where: {
-          releaseId_formatType: { releaseId: mockReleaseId, formatType: 'MP3_320KBPS' },
-        },
-        create: {
-          release: { connect: { id: mockReleaseId } },
-          formatType: 'MP3_320KBPS',
-          trackCount: 0,
-        },
-        update: {
-          deletedAt: null,
-        },
-      });
-      expect(result).toEqual(newFormat);
-    });
-
-    it('should restore soft-deleted format on upsert', async () => {
-      const restoredFormat = createMockFormat({ deletedAt: null });
-      vi.mocked(prisma.releaseDigitalFormat.upsert).mockResolvedValue(restoredFormat);
-
-      const result = await repository.upsertParent(mockReleaseId, 'FLAC');
-
-      expect(result.deletedAt).toBeNull();
     });
   });
 
