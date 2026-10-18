@@ -175,7 +175,11 @@ page concept is this), featured release (the home page row is a
 row. Every opener of a playable Release opens it in place — a cover, the
 **latest release** line, a search pick, a collection row, a bio link —
 from the click's gesture, and a **release deep link** opens it on arrival,
-paused. A Release is never a page of its own.
+paused. A Release is never a page of its own. Every opener gets it from one
+module, which starts the track inside the click, claims the **playback
+session**, and sets the accent and the share row; the opener names the
+Release, its layout, footer and where focus returns.
+_Defined in_ `src/hooks/use-listening-modal.tsx`.
 See [ADR-0023](docs/adr/0023-a-release-is-a-listening-modal-not-a-page.md).
 _Avoid_: release page, player page.
 
@@ -442,10 +446,13 @@ intermediate **progress stages**.
 **playback session** — the app-wide guarantee that at most one player is
 audible. Any player — a Release, Artist, featured or playlist audio player, or a
 Video — **claims** the session when it starts and **releases** it when it goes
-away; claiming pauses whoever held it. The session knows only `{ id, pause }`,
-which is what lets it span audio and video without either side knowing the other
-exists. Distinct from **player preferences** (volume and mute), which are shared
-by every player but are settings, not playback state.
+away; claiming pauses whoever held it. A media element primed inside a play
+gesture claims it at the click, before its player has loaded, and gives up that
+claim when the player adopts the element, so the player's own claim never pauses
+it. The session knows only `{ id, pause }`, which is what lets it span audio and
+video without either side knowing the other exists. Distinct from **player
+preferences** (volume and mute), which are shared by every player but are
+settings, not playback state.
 
 ## Shipping vocabulary
 
