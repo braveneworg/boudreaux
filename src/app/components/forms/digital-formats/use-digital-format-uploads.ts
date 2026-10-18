@@ -185,7 +185,8 @@ const newReleaseTitle = (metadata: ExtractedAudioMetadata): string =>
 
 /**
  * Create mode: why the album title is refused, asked before any file is sent,
- * or null when the title is free (or the upload creates no Release).
+ * or null when the title is free (or the upload creates no Release). A check
+ * that cannot be made refuses too, so the format never hangs in `uploading`.
  */
 const takenTitleRefusal = async (
   ctx: UploadContext,
@@ -194,11 +195,16 @@ const takenTitleRefusal = async (
 ): Promise<string | null> => {
   if (!createsRelease(ctx, formatType) || !ctx.releaseId) return null;
 
-  const check = await checkNewReleaseTitleAction({
-    releaseId: ctx.releaseId,
-    title: newReleaseTitle(metadata),
-  });
-  return check.success ? null : (check.error ?? 'Failed to create release');
+  try {
+    const check = await checkNewReleaseTitleAction({
+      releaseId: ctx.releaseId,
+      title: newReleaseTitle(metadata),
+    });
+    return check.success ? null : (check.error ?? 'Failed to create release');
+  } catch (error) {
+    console.error(`[upload] ${formatType}: title check failed`, error);
+    return 'Failed to create release';
+  }
 };
 
 /** Show a release that could not be created: the format's error plus a toast. */

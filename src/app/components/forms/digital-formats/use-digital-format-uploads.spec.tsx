@@ -499,6 +499,27 @@ describe('useDigitalFormatUploads', () => {
         message: 'Failed to create release',
       });
     });
+
+    it('shows a failed title check that throws, instead of hanging in uploading', async () => {
+      vi.mocked(checkNewReleaseTitleAction).mockRejectedValueOnce(new Error('Failed to fetch'));
+      const { result } = renderUploads({ onReleaseAutoCreated: vi.fn() });
+      const file = new File(['x'], 'a.mp3', { type: 'audio/mpeg' });
+
+      await act(async () => {
+        await result.current.handleFileInputChange('MP3_320KBPS', {
+          target: { files: [file] },
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
+      });
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(result.current.getUploadState('MP3_320KBPS')).toEqual({
+        status: 'error',
+        message: 'Failed to create release',
+      });
+      expect(toast.error).toHaveBeenCalledWith('Failed to create release', {
+        description: 'Failed to create release',
+      });
+    });
   });
 
   describe('handleBatchUpload — edit mode', () => {
