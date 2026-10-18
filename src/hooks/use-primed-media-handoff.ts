@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
+
+import { claimPlayback, releasePlayback } from '@/app/components/ui/playback-session';
 
 import { usePlayerPrefs } from './use-player-prefs';
 
@@ -19,20 +21,23 @@ export interface PrimedMediaHandoff<MediaEl extends HTMLMediaElement> {
    * gestured play() with a real source is allowed by every autoplay policy,
    * so no later deferred play() (which strict profiles and extensions can
    * reject) is ever needed. The element carries the user's saved volume
-   * prefs and hands off already playing.
+   * prefs and hands off already playing. It is audible from the click, so it
+   * claims the playback session then: whoever held it is paused at once, and
+   * a player that claims it before the handoff pauses this element.
    *
    * Without `src` (legacy video path), the element is primed for a later
    * deferred play: `load()` blesses WebKit, a gestured `play()` blesses
    * Firefox, and an immediate `pause()` (which the blessings survive) re-arms
-   * the play event for video.js.
+   * the play event for video.js. A paused element claims nothing.
    */
   primeMediaEl: (src?: string) => void;
   /**
    * One-shot supplier of the primed element for the player; returns null once
    * taken (or before any priming), and a player that gets null creates its
-   * own element. The video surface keeps the player it built on the taken
-   * element across React StrictMode's effect replay, so one take is enough on
-   * the dev server too.
+   * own element. Taking gives up the element's session claim, so the player's
+   * own claim never pauses the element it adopted. The video surface keeps the
+   * player it built on the taken element across React StrictMode's effect
+   * replay, so one take is enough on the dev server too.
    */
   takeMediaEl: () => MediaEl | null;
   /**
@@ -72,6 +77,8 @@ const createMediaEl = <Kind extends PrimedMediaKind>(kind: Kind): HTMLElementTag
 export const usePrimedMediaHandoff = <Kind extends PrimedMediaKind>(
   kind: Kind
 ): PrimedMediaHandoff<HTMLElementTagNameMap[Kind]> => {
+  // The primed element's claim on the playback session, until it is taken.
+  const claimId = useId();
   const primedElRef = useRef<HTMLElementTagNameMap[Kind] | null>(null);
 
   // An owner that unmounts between the gesture and the player's mount (a
@@ -83,16 +90,23 @@ export const usePrimedMediaHandoff = <Kind extends PrimedMediaKind>(
       if (primedElRef.current) {
         stopMediaEl(primedElRef.current);
         primedElRef.current = null;
+        releasePlayback(claimId);
       }
     },
-    []
+    [claimId]
   );
 
-  const primeMediaEl = (src?: string): void => {
-    // Never leak a previous untaken element — with a source it is playing.
+  const discardMediaEl = (): void => {
     if (primedElRef.current) {
       stopMediaEl(primedElRef.current);
     }
+    primedElRef.current = null;
+    releasePlayback(claimId);
+  };
+
+  const primeMediaEl = (src?: string): void => {
+    // Never leak a previous untaken element — with a source it is playing.
+    discardMediaEl();
 
     const el = createMediaEl(kind);
     if (src) {
@@ -100,6 +114,7 @@ export const usePrimedMediaHandoff = <Kind extends PrimedMediaKind>(
       el.volume = volume;
       el.muted = muted;
       el.src = src;
+      claimPlayback(claimId, () => el.pause());
       el.play().catch(() => {});
       // No pause: the player adopts the element mid-playback and syncs the
       // video.js UI state itself (it never sees this element's play event).
@@ -119,14 +134,8 @@ export const usePrimedMediaHandoff = <Kind extends PrimedMediaKind>(
   const takeMediaEl = (): HTMLElementTagNameMap[Kind] | null => {
     const el = primedElRef.current;
     primedElRef.current = null;
+    releasePlayback(claimId);
     return el;
-  };
-
-  const discardMediaEl = (): void => {
-    if (primedElRef.current) {
-      stopMediaEl(primedElRef.current);
-    }
-    primedElRef.current = null;
   };
 
   return { primeMediaEl, takeMediaEl, discardMediaEl };

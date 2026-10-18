@@ -3,16 +3,24 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { renderHook } from '@testing-library/react';
 
+import { claimPlayback, releasePlayback } from '@/app/components/ui/playback-session';
+
 import { usePlayerPrefs } from './use-player-prefs';
 import { usePrimedMediaHandoff } from './use-primed-media-handoff';
 
 const TRACK_URL = 'https://cdn.example.com/releases/r1/tracks/01.mp3';
 const CLIP_URL = 'https://cdn.example.com/clip.mp4?sig=abc';
 
+/** Other players' claims on the app-wide playback session. */
+const PREVIOUS_PLAYER = 'previous-player';
+const ADOPTING_PLAYER = 'adopting-player';
+const NEXT_PLAYER = 'next-player';
+
 describe('usePrimedMediaHandoff', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     usePlayerPrefs.setState({ volume: 1, muted: false });
+    [PREVIOUS_PLAYER, ADOPTING_PLAYER, NEXT_PLAYER].forEach(releasePlayback);
   });
 
   // A release's track primes an <audio>, a video an inline <video>; past the
@@ -120,6 +128,65 @@ describe('usePrimedMediaHandoff', () => {
 
       expect(() => result.current.primeMediaEl(src)).not.toThrow();
     });
+
+    // The playback session: at most one player is audible. A source prime is
+    // audible from the click, so it claims the session then, not once the
+    // player that adopts it is ready.
+    describe('and the playback session', () => {
+      it('pauses whoever held the session when priming with a source', () => {
+        const pausePrevious = vi.fn();
+        claimPlayback(PREVIOUS_PLAYER, pausePrevious);
+        const { result } = renderHook(() => usePrimedMediaHandoff(kind));
+
+        result.current.primeMediaEl(src);
+
+        expect(pausePrevious).toHaveBeenCalledTimes(1);
+      });
+
+      it('is paused by a player that claims the session before the handoff', () => {
+        const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+        const { result } = renderHook(() => usePrimedMediaHandoff(kind));
+
+        result.current.primeMediaEl(src);
+        claimPlayback(NEXT_PLAYER, vi.fn());
+
+        expect(pauseSpy).toHaveBeenCalledTimes(1);
+        expect(result.current.takeMediaEl()).toBe(pauseSpy.mock.instances[0]);
+      });
+
+      it('gives up its claim on the handoff, so the adopting player never pauses it', () => {
+        const { result } = renderHook(() => usePrimedMediaHandoff(kind));
+
+        result.current.primeMediaEl(src);
+        const primed = result.current.takeMediaEl();
+        const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+        claimPlayback(ADOPTING_PLAYER, () => primed?.pause());
+
+        expect(pauseSpy).not.toHaveBeenCalled();
+      });
+
+      it('gives up its claim when discarded', () => {
+        const { result } = renderHook(() => usePrimedMediaHandoff(kind));
+
+        result.current.primeMediaEl(src);
+        result.current.discardMediaEl();
+        const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+        claimPlayback(NEXT_PLAYER, vi.fn());
+
+        expect(pauseSpy).not.toHaveBeenCalled();
+      });
+
+      it('gives up its claim when the owner unmounts', () => {
+        const { result, unmount } = renderHook(() => usePrimedMediaHandoff(kind));
+
+        result.current.primeMediaEl(src);
+        unmount();
+        const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause');
+        claimPlayback(NEXT_PLAYER, vi.fn());
+
+        expect(pauseSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it('gives a source-primed video inline playback', () => {
@@ -162,6 +229,16 @@ describe('usePrimedMediaHandoff', () => {
 
       expect(primed).toBeInstanceOf(HTMLVideoElement);
       expect(primed?.getAttribute('playsinline')).toBe('');
+    });
+
+    it('claims nothing: a paused element is not audible', () => {
+      const pausePrevious = vi.fn();
+      claimPlayback(PREVIOUS_PLAYER, pausePrevious);
+      const { result } = renderHook(() => usePrimedMediaHandoff('video'));
+
+      result.current.primeMediaEl();
+
+      expect(pausePrevious).not.toHaveBeenCalled();
     });
 
     it('replaces a previously primed element on a fresh prime', () => {
