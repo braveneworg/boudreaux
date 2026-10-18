@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { gateAction } from '@/lib/auth/action-gate';
 import { STALE_JOB_MS } from '@/utils/async-job-lifecycle';
 
 import { generateArtistImagesFromLinksAction } from './generate-artist-images-from-links-action';
@@ -17,10 +18,7 @@ vi.mock('next/server', () => ({
 const logSecurityEventMock = vi.fn();
 vi.mock('@/utils/audit-log', () => ({ logSecurityEvent: (e: unknown) => logSecurityEventMock(e) }));
 
-const requireRoleMock = vi.fn();
-vi.mock('@/lib/utils/auth/require-role', () => ({
-  requireRole: (role: string) => requireRoleMock(role),
-}));
+vi.mock('@/lib/auth/action-gate');
 
 const getImageLinksJobStateMock = vi.fn();
 const setImageLinksStatusMock = vi.fn();
@@ -42,10 +40,14 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 const VALID_ID = 'a'.repeat(24);
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 beforeEach(() => {
   afterCallback = null;
-  requireRoleMock.mockResolvedValue({ user: { id: 'admin-1' } });
+  vi.mocked(gateAction).mockResolvedValue({
+    success: true,
+    session: { user: { id: 'admin-1' } } as never,
+  });
   getImageLinksJobStateMock.mockResolvedValue({
     imageLinksStatus: null,
     imageLinksStartedAt: null,
@@ -55,12 +57,13 @@ beforeEach(() => {
 });
 
 describe('generateArtistImagesFromLinksAction', () => {
-  it('rejects when the caller is not an admin', async () => {
-    requireRoleMock.mockRejectedValueOnce(new Error('Unauthorized'));
+  it('returns the gate refusal without touching the repository', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    await expect(generateArtistImagesFromLinksAction({ artistId: VALID_ID })).rejects.toThrow(
-      'Unauthorized'
-    );
+    const result = await generateArtistImagesFromLinksAction({ artistId: VALID_ID });
+
+    expect(result).toEqual(REFUSAL);
+    expect(getImageLinksJobStateMock).not.toHaveBeenCalled();
   });
 
   it('returns an error for invalid input without touching the repository', async () => {

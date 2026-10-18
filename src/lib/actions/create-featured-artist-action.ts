@@ -9,15 +9,17 @@ import { revalidatePath } from 'next/cache';
 
 import { z } from 'zod';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
 import { cache } from '@/lib/utils/simple-cache';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
+
+import { refusedFormState } from './form-state-helpers';
 
 const PERMITTED_FIELD_NAMES = [
   'displayName',
@@ -68,11 +70,11 @@ export const createFeaturedArtistAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
-
-  if (!session?.user?.id) {
-    throw new Error('Session user id is required for audit logging.');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
   }
+  const { session } = gate;
 
   const artistIds = payload.getAll('artistIds') as string[];
   payload.delete('artistIds');

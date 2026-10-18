@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { createArtistBioLinkAction } from './create-artist-bio-link-action';
 
@@ -13,10 +13,12 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/artist-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/logger', () => ({ loggers: { media: { error: vi.fn() } } }));
 vi.mock('@/lib/utils/sanitize-bio-html', () => ({ sanitizeBioText: (s: string) => `clean:${s}` }));
 vi.mock('@/lib/utils/sanitization', () => ({ sanitizeUrl: (s: string) => `safe:${s}` }));
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const artistId = '507f1f77bcf86cd799439011';
@@ -25,19 +27,20 @@ const createdRow = { id: 'link-1', artistId, label: 'Official', url: 'https://ex
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(ArtistService.existsById).mockResolvedValue(true);
   vi.mocked(ArtistService.createBioLink).mockResolvedValue(createdRow as never);
 });
 
 describe('createArtistBioLinkAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await createArtistBioLinkAction(validInput);
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(ArtistService.createBioLink).not.toHaveBeenCalled();
   });
 
   it('rejects invalid input (javascript: url)', async () => {

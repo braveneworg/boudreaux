@@ -3,9 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ImageLinksService } from '@/lib/services/image-links-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 
 import { removeArtistImageSourceLinkAction } from './remove-artist-image-source-link-action';
 
@@ -13,8 +13,10 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/image-links-service');
 vi.mock('@/lib/utils/audit-log');
-vi.mock('@/lib/utils/auth/require-role');
+vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/logger', () => ({ loggers: { media: { error: vi.fn() } } }));
+
+const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 const artistId = '507f1f77bcf86cd799439011';
@@ -22,18 +24,19 @@ const linkId = '507f1f77bcf86cd799439022';
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(requireRole).mockResolvedValue(mockSession as never);
+  vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(ImageLinksService.removeSourceLink).mockResolvedValue(true);
 });
 
 describe('removeArtistImageSourceLinkAction', () => {
-  it('returns Unauthorized when the admin role check fails', async () => {
-    vi.mocked(requireRole).mockRejectedValue(new Error('Unauthorized'));
+  it('returns the gate refusal without calling the service', async () => {
+    vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
     const result = await removeArtistImageSourceLinkAction({ artistId, linkId });
 
-    expect(result).toEqual({ success: false, error: 'Unauthorized' });
+    expect(result).toEqual(REFUSAL);
+    expect(ImageLinksService.removeSourceLink).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed link id', async () => {

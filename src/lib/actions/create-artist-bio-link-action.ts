@@ -7,10 +7,10 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ArtistBioLinkRecord } from '@/lib/types/domain/artist';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeUrl } from '@/lib/utils/sanitization';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
@@ -34,12 +34,11 @@ export interface CreateBioLinkActionResult {
 export const createArtistBioLinkAction = async (
   input: CreateBioLinkInput
 ): Promise<CreateBioLinkActionResult> => {
-  let session;
-  try {
-    session = await requireRole('admin');
-  } catch {
-    return { success: false, error: 'Unauthorized' };
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return gate;
   }
+  const { session } = gate;
 
   const parsed = createBioLinkInputSchema.safeParse(input);
   if (!parsed.success) {

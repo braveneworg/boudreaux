@@ -7,21 +7,26 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
+import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { requireRole } from '@/lib/utils/auth/require-role';
 import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
 import { applyCreateArtistFailure } from './create-artist-action-helpers';
+import { refusedFormState } from './form-state-helpers';
 
 export const createArtistAction = async (
   _initialState: FormState,
   payload: FormData
 ): Promise<FormState> => {
-  const session = await requireRole('admin');
+  const gate = await gateAction('admin');
+  if (!gate.success) {
+    return refusedFormState(gate);
+  }
+  const { session } = gate;
 
   // No `publishedOn`: an artist is created unpublished and published from
   // the edit form once it has a chosen display image (ADR-0019).
