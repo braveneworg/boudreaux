@@ -138,13 +138,18 @@ test.describe('Release deep link — the old release URL', () => {
     expect(response.headers()['location']).toBe(releaseDeepLink(albumOneId));
   });
 
-  test('is a 404 for an id no release has', async ({ page }) => {
-    const response = await page.request.get('/releases/000000000000000000000000', {
-      maxRedirects: 0,
-    });
+  for (const releaseId of ['000000000000000000000000', 'not-an-id']) {
+    test(`is a themed 404 for an id with no deep link (${releaseId})`, async ({ page }) => {
+      const response = await page.goto(`/releases/${releaseId}`);
 
-    expect(response.status()).toBe(404);
-  });
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole('img', { name: 'release not found' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Back to Releases' })).toHaveAttribute(
+        'href',
+        '/releases'
+      );
+    });
+  }
 });
 
 test.describe('Release deep link — downloads', () => {

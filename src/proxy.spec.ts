@@ -6,6 +6,8 @@ import type { NextRequest } from 'next/server';
 
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
+import type * as LegacyReleaseUrl from '@/lib/legacy-release-url';
+
 import middleware, { config } from './proxy';
 
 vi.mock('next/server', () => ({
@@ -24,6 +26,16 @@ vi.mock('better-auth/cookies', () => ({
   getSessionCookie: vi.fn(),
   getCookieCache: vi.fn(),
 }));
+
+const legacyReleaseResponse = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/legacy-release-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof LegacyReleaseUrl>()),
+  legacyReleaseResponse: (request: NextRequest, releaseId: string) =>
+    legacyReleaseResponse(request, releaseId),
+}));
+
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/services/release-service', () => ({ ReleaseService: {} }));
 
 interface MockNextUrl {
   pathname: string;
@@ -454,6 +466,29 @@ describe('proxy middleware', () => {
     });
   });
 
+  describe('legacy release URL', () => {
+    it('answers /releases/<id> from the legacy release URL, before any auth gate', async () => {
+      signedOut();
+      legacyReleaseResponse.mockResolvedValueOnce({ type: 'legacy-release' });
+      const request = createMockRequest('/releases/0123456789abcdef01234567');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(legacyReleaseResponse.mock.calls).toEqual([[request, '0123456789abcdef01234567']]);
+      expect(result).toEqual({ type: 'legacy-release' });
+      expect(NextResponse.redirect).not.toHaveBeenCalled();
+    });
+
+    it('leaves other paths to the auth gates', async () => {
+      signedOut();
+      const request = createMockRequest('/releases/0123456789abcdef01234567/more');
+
+      await middleware(request as unknown as NextRequest);
+
+      expect(legacyReleaseResponse).not.toHaveBeenCalled();
+    });
+  });
+
   describe('session cookie presence', () => {
     it('reads the better-auth session cookie with the boudreaux prefix', async () => {
       signedOut();
@@ -491,6 +526,11 @@ describe('proxy config', () => {
     expect(config.matcher).toContain('/admin');
     expect(config.matcher).toContain('/admin/:path*');
     expect(config.matcher).toContain('/api/admin/:path*');
+  });
+
+  it('matches the legacy release URL, but not the public /releases listing', () => {
+    expect(config.matcher).toContain('/releases/:releaseId');
+    expect(config.matcher).not.toContain('/releases');
   });
 
   it('excludes the public videos routes so the proxy never gates them', () => {
