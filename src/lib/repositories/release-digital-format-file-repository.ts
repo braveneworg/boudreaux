@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma';
 
 import { orderedCredits } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
-import { releaseWhere } from './_internal/release-where';
+import { listedRelease } from './_internal/visibility';
 
 import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
 
@@ -199,7 +199,7 @@ export class ReleaseDigitalFormatFileRepository {
           is: {
             formatType: 'MP3_320KBPS',
             ...digitalFormatWhere.active,
-            release: { is: releaseWhere.listed },
+            release: { is: listedRelease.where },
           },
         },
       },
@@ -226,7 +226,7 @@ export class ReleaseDigitalFormatFileRepository {
             formatType,
             releaseId: { in: releaseIds },
             ...digitalFormatWhere.active,
-            release: { is: releaseWhere.listed },
+            release: { is: listedRelease.where },
           },
         },
       },

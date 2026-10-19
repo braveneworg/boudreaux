@@ -9,13 +9,13 @@ import type { TourScalars, TourWithRelations } from '@/lib/types/tours';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
 import { artistCreditSelect } from '../_internal/artist-public-select';
-import { publicArtistWhere } from '../_internal/artist-where';
 import { runQuery } from '../_internal/map-prisma-error';
 import {
   publicHeadlinerWhere,
   visibleTourDateWhere,
   visibleTourWhere,
 } from '../_internal/tour-where';
+import { publicArtist } from '../_internal/visibility';
 
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -181,7 +181,7 @@ const buildPublicSearchWhere = (search: string): Prisma.TourWhereInput => {
                         artist: {
                           is: {
                             AND: [
-                              publicArtistWhere,
+                              publicArtist.where,
                               {
                                 OR: [
                                   { firstName: contains },

@@ -227,6 +227,15 @@ and
 _Avoid_: visible artist, published artist (as a synonym), current artist,
 alumni, roster (whether an Artist is still on the label decides nothing).
 
+**visibility rule** — a rule for whether the public may see a record,
+declared once as the state each field it reads must be in (set, or unset:
+null or absent) and read two ways: as a null-safe `where` fragment a query
+composes, and as a predicate over a row already loaded. A query with clauses
+of its own puts the fragment in as an `AND` member. There are two: the
+**public artist** rule (`publicArtist`) and the listed Release rule
+(`listedRelease`: published and not deleted).
+_Defined in_ `src/lib/repositories/_internal/visibility.ts`
+
 **hidden artist** — any Artist that is not a **public artist**. Hiding an
 Artist never hides the work that credits it: a Release stays public without
 that byline.

@@ -9,13 +9,13 @@ import {
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
 
-import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { artistPublishedFilter, artistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { creditOrderBy } from './_internal/credit-order';
 import { playableFormatWhere } from './_internal/playable-formats';
-import { releaseWhere } from './_internal/release-where';
 import { publicVideoWhere } from './_internal/video-where';
+import { listedRelease, publicArtist } from './_internal/visibility';
 import { isUnsetOr } from './_internal/where-kit';
 import { ArtistRepository } from './artist-repository';
 
@@ -76,7 +76,7 @@ const adminInclude = {
 const nameSelect = { id: true, displayName: true, firstName: true, surname: true };
 
 /** The public artist gate every public slug read applies (#786, ADR-0016). */
-const PUBLIC_ARTIST_WHERE = publicArtistWhere;
+const PUBLIC_ARTIST_WHERE = publicArtist.where;
 
 describe('ArtistRepository', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -202,7 +202,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findMany({ deleted: true, published: true });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({ AND: [{ publishedOn: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [artistPublishedFilter(true)] });
     });
 
     it('filters to unpublished artists when published=false', async () => {
@@ -280,7 +280,17 @@ describe('ArtistRepository', () => {
       await ArtistRepository.count({ published: true });
 
       expect(prisma.artist.count).toHaveBeenCalledWith({
-        where: { AND: [artistWhere.notDeleted, { publishedOn: { not: null } }] },
+        where: { AND: [artistWhere.notDeleted, artistPublishedFilter(true)] },
+      });
+    });
+
+    it('counts only unpublished artists when published=false', async () => {
+      vi.mocked(prisma.artist.count).mockResolvedValue(4 as never);
+
+      await ArtistRepository.count({ published: false });
+
+      expect(prisma.artist.count).toHaveBeenCalledWith({
+        where: { AND: [artistWhere.notDeleted, artistPublishedFilter(false)] },
       });
     });
   });
@@ -541,8 +551,8 @@ describe('ArtistRepository', () => {
       expect(result).toEqual([{ id: 'a' }]);
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).toEqual({
-        ...publicArtistWhere,
-        releases: { some: { release: releaseWhere.listed } },
+        releases: { some: { release: listedRelease.where } },
+        AND: [publicArtist.where],
       });
       expect(arg?.select?.bioImages).toEqual({
         where: { OR: [{ displayOrder: { gte: 0 } }, { isPrimary: true }] },
@@ -655,7 +665,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.searchPublished({ search: 'foo' });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where?.publishedOn).toEqual({ not: null });
+      expect(arg?.where?.AND).toContainEqual(publicArtist.where);
     });
 
     it('adds a title/name search AND clause when a search term is given', async () => {
@@ -664,14 +674,14 @@ describe('ArtistRepository', () => {
       await ArtistRepository.searchPublished({ search: 'foo' });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where?.AND).toBeDefined();
+      expect(arg?.where?.AND).toHaveLength(2);
     });
   });
 
   describe('searchForHomeNav', () => {
     const NOW = new Date('2026-10-16T12:00:00.000Z');
     const playableListedRelease = {
-      ...releaseWhere.listed,
+      ...listedRelease.where,
       digitalFormats: { some: { ...playableFormatWhere, files: { some: {} } } },
     };
     const hasCredit = {
@@ -697,7 +707,7 @@ describe('ArtistRepository', () => {
 
       await ArtistRepository.searchForHomeNav({});
 
-      expect(findManyArg()?.where).toEqual({ ...publicArtistWhere, AND: [hasCredit] });
+      expect(findManyArg()?.where).toEqual({ AND: [publicArtist.where, hasCredit] });
     });
 
     // The credit joins `releases` deepest, so it is the last member to read it
@@ -709,8 +719,8 @@ describe('ArtistRepository', () => {
 
       const contains = { contains: 'ash', mode: 'insensitive' };
       expect(findManyArg()?.where).toEqual({
-        ...publicArtistWhere,
         AND: [
+          publicArtist.where,
           {
             OR: [
               { firstName: contains },
@@ -722,7 +732,7 @@ describe('ArtistRepository', () => {
               { slug: contains },
               { akaNames: contains },
               { genres: contains },
-              { releases: { some: { release: { title: contains, ...releaseWhere.listed } } } },
+              { releases: { some: { release: { title: contains, ...listedRelease.where } } } },
               {
                 videoArtists: {
                   some: { video: { is: { title: contains, ...publicVideoWhere(NOW) } } },
@@ -740,7 +750,7 @@ describe('ArtistRepository', () => {
 
       await ArtistRepository.searchForHomeNav({ search: 'marguerite ash' });
 
-      expect(findManyArg()?.where?.AND).toHaveLength(3);
+      expect(findManyArg()?.where?.AND).toHaveLength(4);
     });
 
     it('loads only playable listed releases, with the first file of the playable format', async () => {
@@ -868,7 +878,7 @@ describe('ArtistRepository', () => {
   });
 
   describe('listListed band names (ADR-0015)', () => {
-    const PUBLIC_ARTIST = publicArtistWhere;
+    const PUBLIC_ARTIST = publicArtist.where;
 
     const readSelect = async (): Promise<{
       members: { where: unknown };
@@ -896,7 +906,7 @@ describe('ArtistRepository', () => {
     const NOW = new Date('2026-10-17T12:00:00.000Z');
     const hasReleaseOrVideo = {
       OR: [
-        { releases: { some: { release: releaseWhere.listed } } },
+        { releases: { some: { release: listedRelease.where } } },
         { videoArtists: { some: { video: { is: publicVideoWhere(NOW) } } } },
       ],
     };
@@ -911,7 +921,7 @@ describe('ArtistRepository', () => {
     });
 
     const searchOr = (arg: { where?: { AND?: Array<{ OR?: unknown[] }> } } | undefined) =>
-      arg?.where?.AND?.[0]?.OR ?? [];
+      arg?.where?.AND?.[1]?.OR ?? [];
 
     /**
      * A listing record whose only listed release carries the given date, with
@@ -950,7 +960,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({ ...publicArtistWhere, AND: [hasReleaseOrVideo] });
+      expect(arg?.where).toEqual({ AND: [publicArtist.where, hasReleaseOrVideo] });
     });
 
     // Same-relation filters share one join on MongoDB, so the credit `OR`
@@ -962,7 +972,7 @@ describe('ArtistRepository', () => {
 
       const and = (vi.mocked(prisma.artist.findMany).mock.calls[0][0]?.where?.AND ??
         []) as unknown[];
-      expect(and).toHaveLength(2);
+      expect(and).toHaveLength(3);
       expect(and.at(-1)).toEqual(hasReleaseOrVideo);
     });
 
@@ -988,7 +998,7 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
-      expect(and.slice(0, -1).map(({ OR }) => OR[0])).toEqual([
+      expect(and.slice(1, -1).map(({ OR }) => OR[0])).toEqual([
         { firstName: { contains: 'foo', mode: 'insensitive' } },
         { firstName: { contains: 'bar', mode: 'insensitive' } },
       ]);
@@ -1094,7 +1104,7 @@ describe('ArtistRepository', () => {
         {
           releases: {
             some: {
-              release: { title: contains, ...releaseWhere.listed },
+              release: { title: contains, ...listedRelease.where },
             },
           },
         },
@@ -1118,7 +1128,7 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       const and = (arg?.where?.AND ?? []) as Array<{ OR: Array<{ firstName?: unknown }> }>;
-      expect(and.slice(0, -1).map(({ OR }) => OR[0].firstName)).toEqual(
+      expect(and.slice(1, -1).map(({ OR }) => OR[0].firstName)).toEqual(
         ['Dr', 'Quillon', 'M', 'Tokensmith', 'Jr'].map((token) => ({
           contains: token,
           mode: 'insensitive',
@@ -1137,7 +1147,7 @@ describe('ArtistRepository', () => {
       });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where?.AND).toEqual([hasReleaseOrVideo]);
+      expect(arg?.where?.AND).toEqual([publicArtist.where, hasReleaseOrVideo]);
     });
 
     it('omits the search clause when no term is given', async () => {
@@ -1146,7 +1156,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.listListed({ sort: 'alpha', skip: 0, take: 24 });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where?.AND).toEqual([hasReleaseOrVideo]);
+      expect(arg?.where?.AND).toEqual([publicArtist.where, hasReleaseOrVideo]);
     });
 
     it('fetches every listed artist for the A–Z order instead of paging in the database', async () => {

@@ -37,13 +37,18 @@ const slugOf = (label: string): string => `${prefix}${label}`;
 
 type FormatSpec = { formatType: string; withdrawn?: boolean; files: number };
 
-const createArtist = async (label: string, publishedOn?: Date): Promise<string> => {
+const createArtist = async (
+  label: string,
+  publishedOn?: Date,
+  deletedOn?: Date
+): Promise<string> => {
   const { id } = await prisma.artist.create({
     data: {
       firstName: label,
       surname: TOKEN,
       slug: slugOf(label),
       ...(publishedOn && { publishedOn }),
+      ...(deletedOn && { deletedOn }),
     },
     select: { id: true },
   });
@@ -128,6 +133,39 @@ const ours = (matches: Array<{ slug: string }>): string[] =>
     .map((slug) => slug.slice(prefix.length))
     .sort();
 
+/** Large enough that no read pages away a row of this file, with or without a search term. */
+const EVERY_MATCH = Number.MAX_SAFE_INTEGER;
+
+/**
+ * The three public artist reads, each with every artist of this file it finds,
+ * once with a search term and once without. Every seeded artist carries
+ * `TOKEN` in its name, so the term changes nothing about which of them a read
+ * finds.
+ */
+const PUBLIC_ARTIST_READS = [
+  {
+    name: 'home search',
+    read: (search: string | undefined) =>
+      ArtistRepository.searchForHomeNav({ search, take: EVERY_MATCH }),
+    finds: ['both', 'playable', 'video-only'],
+  },
+  {
+    name: 'playlist search',
+    read: (search: string | undefined) =>
+      ArtistRepository.searchPublished({ search, take: EVERY_MATCH }),
+    finds: ['both', 'flac-only', 'mp3-no-files', 'playable', 'withdrawn-mp3'],
+  },
+  {
+    name: 'artists index',
+    read: (search: string | undefined) =>
+      ArtistRepository.listListed({ search, sort: 'alpha', skip: 0, take: EVERY_MATCH }),
+    finds: ['both', 'flac-only', 'mp3-no-files', 'playable', 'video-only', 'withdrawn-mp3'],
+  },
+].flatMap((reads) => [
+  { ...reads, searching: 'a search term', search: TOKEN },
+  { ...reads, searching: 'no search term', search: undefined },
+]);
+
 const homeSearch = async (search: string): Promise<ArtistHomeSearchMatch[]> =>
   (await ArtistRepository.searchForHomeNav({ search, take: 100 })).filter(({ slug }) =>
     slug.startsWith(prefix)
@@ -190,6 +228,15 @@ beforeAll(async () => {
 
   const hidden = await createArtist('hidden-with-video');
   await createVideo(`${prefix}hidden ${VIDEO_TITLE_TOKEN}`, hidden, {
+    publishedAt: PAST,
+    releasedOn: PAST,
+  });
+
+  // Published, then soft-deleted: not a public artist, though every credit it
+  // holds would list it.
+  const publishedDeleted = await createArtist('published-deleted', PAST, PAST);
+  await createRelease('published-deleted', publishedDeleted, [MP3()]);
+  await createVideo(`${prefix}published-deleted`, publishedDeleted, {
     publishedAt: PAST,
     releasedOn: PAST,
   });
@@ -361,4 +408,14 @@ describe('home search (Docker Mongo contract)', () => {
 
     expect(ours(listed)).toEqual([]);
   });
+
+  // The published-deleted artist holds a playable listed release and a live
+  // video, and its name carries the token: only the not-deleted half of the
+  // public artist rule keeps it out of each list.
+  it.each(PUBLIC_ARTIST_READS)(
+    'leaves a published, soft-deleted artist out of the $name, with $searching',
+    async ({ read, search, finds }) => {
+      expect(ours(await read(search))).toEqual(finds);
+    }
+  );
 });

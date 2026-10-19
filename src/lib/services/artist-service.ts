@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { publicArtist as publicArtistRule } from '@/lib/repositories/_internal/visibility';
 import {
   ArtistBioImageRepository,
   type BioImageEligibilityRow,
@@ -56,7 +57,6 @@ import {
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
-import { isPublicArtist } from '@/lib/utils/is-public-artist';
 import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
 import { getFirstTrackStreamSource } from '@/lib/utils/release-helpers';
@@ -864,7 +864,7 @@ export class ArtistService {
       const { memberOf, members, ...publicArtist } = artist;
       const credited = collectArtistReleases({
         ...artist,
-        memberOf: memberOf.filter(({ artist: band }) => isPublicArtist(band)),
+        memberOf: memberOf.filter(({ artist: band }) => publicArtistRule.matches(band)),
       });
       const filteredArtist: ArtistWithPublishedReleases = {
         ...publicArtist,
@@ -873,7 +873,7 @@ export class ArtistService {
         // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
         // descriptions, listing cards) strip it with sanitizeBioText instead.
         shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        members: members.filter(({ member }) => isPublicArtist(member)),
+        members: members.filter(({ member }) => publicArtistRule.matches(member)),
         releases: credited.map(withPublicCredits),
         // The page leads with the newest release the artist holds a direct
         // credit on — own or featured, never a band's — summarised as the

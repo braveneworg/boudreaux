@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { ARTIST_OWN_PAGE_FIELDS, ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
 
 import { TourRepository } from './tour-repository';
+import { publicArtist } from '../_internal/visibility';
 
 vi.mock('server-only', () => ({}));
 
@@ -94,10 +95,7 @@ describe('TourRepository', () => {
   });
 
   describe('public reads (ADR-0015)', () => {
-    const PUBLIC_ARTIST = {
-      publishedOn: { not: null },
-      OR: [{ deletedOn: null }, { deletedOn: { isSet: false } }],
-    };
+    const PUBLIC_ARTIST = publicArtist.where;
     const PUBLIC_HEADLINER = { artist: { is: PUBLIC_ARTIST } };
     const VISIBLE_DATE = {
       OR: [

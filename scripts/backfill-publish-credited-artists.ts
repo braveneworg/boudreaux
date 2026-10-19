@@ -48,8 +48,7 @@ import {
   creditThatStaysHiddenWhere,
   hiddenCreditSelect,
 } from '../src/lib/repositories/_internal/artist-where';
-import { releaseWhere } from '../src/lib/repositories/_internal/release-where';
-import { isListable } from '../src/lib/utils/artist-release-credits';
+import { listedRelease } from '../src/lib/repositories/_internal/visibility';
 import {
   toCreditAwaitingConfirmation,
   toCreditThatStaysHidden,
@@ -66,7 +65,7 @@ const TAG = '[backfill-publish-credited-artists]';
 const DEFAULT_OUT_PATH = join(tmpdir(), 'backfill-publish-credited-artists.tsv');
 
 /** Credits on any listed release, the scope of the whole backfill. */
-const ON_ANY_LISTED_RELEASE = { release: releaseWhere.listed };
+const ON_ANY_LISTED_RELEASE = { release: listedRelease.where };
 
 /** A credit awaiting confirmation plus the listed releases that credit it. */
 export interface BackfillCandidate extends CreditAwaitingConfirmation {
@@ -92,7 +91,7 @@ interface CreditedReleaseRow {
   release: { title: string; publishedAt: Date | null; deletedOn: Date | null };
 }
 
-const isListed = ({ release }: CreditedReleaseRow): boolean => isListable(release);
+const isListed = ({ release }: CreditedReleaseRow): boolean => listedRelease.matches(release);
 
 const byName = (a: { name: string }, b: { name: string }): number =>
   a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });

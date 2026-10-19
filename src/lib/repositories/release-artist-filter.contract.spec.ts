@@ -10,8 +10,8 @@ import { ReleaseRepository } from './release-repository';
 // Contract: on a real MongoDB, the public listing filtered by an artist slug
 // holds every listed release the artist holds a release credit on (ADR-0006):
 // their own, their featured appearances, and the releases of every public
-// band they belong to. A hidden band's releases and a hidden artist's slug
-// match nothing. Runs only under `pnpm run test:db`.
+// band they belong to. A hidden band's releases, a soft-deleted release and a
+// hidden artist's slug match nothing. Runs only under `pnpm run test:db`.
 
 const prefix = `__contract:${randomUUID()}:`;
 const PUBLISHED = new Date('2026-01-01T00:00:00.000Z');
@@ -26,6 +26,7 @@ const release = {
   unrelated: '',
   draftBand: '',
   hiddenMemberBand: '',
+  publishedDeleted: '',
 };
 let memberSlugFound: string[] = [];
 let hiddenSlugFound: string[] = [];
@@ -94,6 +95,11 @@ beforeAll(async () => {
   release.unrelated = await createRelease('unrelated', [other], listed);
   release.draftBand = await createRelease('draft-band', [band], {});
   release.hiddenMemberBand = await createRelease('hidden-member-band', [other, band], listed);
+  // Published, then soft-deleted: not a listed release, though the member holds its credit.
+  release.publishedDeleted = await createRelease('published-deleted', [member], {
+    ...listed,
+    deletedOn: PUBLISHED,
+  });
 
   memberSlugFound = await findIds(slugOf('member'));
   hiddenSlugFound = await findIds(slugOf('hidden-member'));
@@ -132,6 +138,14 @@ describe('published releases filtered by artist (Docker Mongo contract)', () => 
 
   it('leaves out a draft band release', () => {
     expect(memberSlugFound).not.toContain(release.draftBand);
+  });
+
+  it('leaves out a published release that is soft-deleted', () => {
+    expect(memberSlugFound).not.toContain(release.publishedDeleted);
+  });
+
+  it('never deep-links a published release that is soft-deleted', () => {
+    expect(deepLinkFound).not.toContain(release.publishedDeleted);
   });
 
   it('matches nothing for a hidden artist, band releases included', () => {

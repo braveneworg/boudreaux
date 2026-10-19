@@ -24,6 +24,11 @@ archived).**
   tokens, because `publicArtistWhere` owns the only top-level `OR` and two
   filters on one relation share one join on MongoDB
   (`docs/lessons/prisma-mongo/same-relation-filters-share-one-join.md`).
+  - Amended 2026-10-19 (#905): the public artist fragment is now
+    `publicArtist.where` (`src/lib/repositories/_internal/visibility.ts`)
+    and holds no top-level `OR`; it goes in as one more `AND` member. The
+    credit `OR` still comes after the search tokens, because two filters on
+    one relation share one join on MongoDB and the deepest must be last.
 - The index search also matches the titles of the artist's live videos, so a
   video-only artist can be found by what they made.
 - One `now` decides which videos are live for the whole read.

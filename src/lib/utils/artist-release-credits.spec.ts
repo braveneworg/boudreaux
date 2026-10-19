@@ -5,7 +5,6 @@ import {
   collectArtistReleases,
   compareByCreditThenNewest,
   deriveOwnReleaseCredit,
-  isListable,
   publicCredits,
   summarizeListedReleases,
 } from './artist-release-credits';
@@ -213,26 +212,6 @@ describe('collectArtistReleases', () => {
     });
 
     expect(result).toEqual([]);
-  });
-});
-
-describe('isListable', () => {
-  it('lists a published, non-deleted release', () => {
-    expect(isListable({ publishedAt: new Date('2024-01-01'), deletedOn: null })).toBe(true);
-  });
-
-  it('hides an unpublished release', () => {
-    expect(isListable({ publishedAt: null, deletedOn: null })).toBe(false);
-  });
-
-  it('hides a deleted release even when published', () => {
-    expect(
-      isListable({ publishedAt: new Date('2024-01-01'), deletedOn: new Date('2024-02-01') })
-    ).toBe(false);
-  });
-
-  it('treats a missing publishedAt field (legacy Mongo document) as unpublished', () => {
-    expect(isListable({ deletedOn: null })).toBe(false);
   });
 });
 
