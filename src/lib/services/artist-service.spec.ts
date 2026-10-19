@@ -48,7 +48,6 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     create: vi.fn(),
     createWithSelect: vi.fn(),
     findById: vi.fn(),
-    findBySlug: vi.fn(),
     findUniqueBySlug: vi.fn(),
     findFirstByDisplayName: vi.fn(),
     findFirstByName: vi.fn(),
@@ -357,42 +356,6 @@ describe('ArtistService', () => {
       vi.mocked(ArtistRepository.findById).mockRejectedValue(Error('Unknown error'));
 
       const result = await ArtistService.getArtistById('artist-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
-    });
-  });
-
-  describe('getArtistBySlug', () => {
-    it('should retrieve an artist by slug', async () => {
-      vi.mocked(ArtistRepository.findBySlug).mockResolvedValue(mockArtist);
-
-      const result = await ArtistService.getArtistBySlug('john-doe');
-
-      expect(result).toMatchObject({ success: true, data: mockArtist });
-      expect(ArtistRepository.findBySlug).toHaveBeenCalledWith('john-doe');
-    });
-
-    it('should return error when artist not found', async () => {
-      vi.mocked(ArtistRepository.findBySlug).mockResolvedValue(null);
-
-      const result = await ArtistService.getArtistBySlug('non-existent');
-
-      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
-    });
-
-    it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ArtistRepository.findBySlug).mockRejectedValue(initError);
-
-      const result = await ArtistService.getArtistBySlug('john-doe');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should handle unknown errors', async () => {
-      vi.mocked(ArtistRepository.findBySlug).mockRejectedValue(Error('Unknown error'));
-
-      const result = await ArtistService.getArtistBySlug('john-doe');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
     });

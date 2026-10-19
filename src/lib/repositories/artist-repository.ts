@@ -14,7 +14,6 @@ import type {
   ArtistListingFilters,
   ArtistListingRecord,
   ArtistNameRecord,
-  ArtistPublicScalars,
   ArtistScalars,
   ArtistSearchMatch,
   ArtistVocabularyField,
@@ -782,18 +781,6 @@ export class ArtistRepository {
    */
   static async findById(id: string): Promise<ArtistDetail | null> {
     return prisma.artist.findUnique({ where: { id } });
-  }
-
-  /**
-   * Find a published, non-deleted artist by slug (no relations), projected to
-   * the public scalars — this backs the public `GET /api/artists/slug/[slug]`.
-   * A draft or deleted artist reads as absent (#786).
-   */
-  static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
-    return prisma.artist.findFirst({
-      where: { slug, ...publicArtist.where },
-      select: artistPublicSelect,
-    });
   }
 
   /**

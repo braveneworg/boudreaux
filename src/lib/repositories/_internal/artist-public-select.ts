@@ -9,14 +9,14 @@ import type { Prisma } from '@prisma/client';
 
 /**
  * Public artist scalars — the select a public surface reads a GATED artist
- * through (#765): the artist-detail page artist and
- * `GET /api/artists/slug/[slug]`, both behind the publication gate. An artist
- * reached through another record reads through {@link artistCreditSelect}. An allow-list, so a column added to the schema stays off
- * every public payload until someone classifies it here; the drift guard below
- * fails `pnpm run typecheck` until {@link ArtistPublicScalars} agrees. Never
- * selects contact PII, notes, audit actors, or the async-job internals —
- * above all `bioJobToken` / `imageLinksJobToken`, the public job callbacks'
- * only credential.
+ * through (#765): the artist page's own artist, behind the publication gate.
+ * An artist reached through another record reads through
+ * {@link artistCreditSelect}. An allow-list, so a column added to the schema
+ * stays off every public payload until someone classifies it here; the drift
+ * guard below fails `pnpm run typecheck` until {@link ArtistPublicScalars}
+ * agrees. Never selects contact PII, notes, audit actors, or the async-job
+ * internals — above all `bioJobToken` / `imageLinksJobToken`, the public job
+ * callbacks' only credential.
  */
 export const artistPublicSelect = {
   id: true,

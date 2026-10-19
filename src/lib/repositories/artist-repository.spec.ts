@@ -124,28 +124,6 @@ describe('ArtistRepository', () => {
     });
   });
 
-  describe('findBySlug', () => {
-    it('finds a published, non-deleted artist by slug with a select projection', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
-
-      const result = await ArtistRepository.findBySlug('john-doe');
-
-      expect(result).toEqual({ id: 'a' });
-      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      expect(arg?.where).toEqual({ slug: 'john-doe', ...PUBLIC_ARTIST_WHERE });
-      expect(arg?.select).toEqual(expect.objectContaining({ id: true, slug: true, bio: true }));
-    });
-
-    it.each(ARTIST_PRIVATE_FIELDS)('never selects the private field %s', async (field) => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
-
-      await ArtistRepository.findBySlug('john-doe');
-
-      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      expect(arg?.select).not.toHaveProperty(field);
-    });
-  });
-
   describe('findMany', () => {
     it('uses the full admin include and default pagination', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);

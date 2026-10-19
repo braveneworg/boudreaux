@@ -28,7 +28,6 @@ import type {
   ArtistListingRecord,
   ArtistListingRow,
   ArtistNameRecord,
-  ArtistPublicScalars,
   ArtistPublishedReleaseRow,
   ArtistReleaseGraphRow,
   ArtistScalars,
@@ -552,24 +551,6 @@ export class ArtistService {
   static async getArtistById(id: string): Promise<ServiceResponse<ArtistDetail>> {
     try {
       const artist = await ArtistRepository.findById(id);
-
-      if (!artist) {
-        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
-      }
-
-      return { success: true, data: artist };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
-    }
-  }
-
-  /**
-   * Get an artist by slug, projected to the public scalars (no contact PII,
-   * notes, audit actors, or job internals) — it backs a public route.
-   */
-  static async getArtistBySlug(slug: string): Promise<ServiceResponse<ArtistPublicScalars>> {
-    try {
-      const artist = await ArtistRepository.findBySlug(slug);
 
       if (!artist) {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
