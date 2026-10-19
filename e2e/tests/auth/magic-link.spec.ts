@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../fixtures/base.fixture';
 
 // better-auth issues magic links with a 5-minute lifetime (MAGIC_LINK_EXPIRES_IN
 // in src/lib/auth.ts). Tokens are single-use and stored server-side, so the

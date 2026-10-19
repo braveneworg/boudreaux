@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { resolve } from 'node:path';
 
-import { test as baseTest } from '@playwright/test';
-
 import { expect, test } from '../fixtures/auth.fixture';
 
 /**
@@ -34,22 +32,21 @@ import { expect, test } from '../fixtures/auth.fixture';
  *     11+ rapid sends will not produce a 429.
  */
 
-baseTest.describe('Chat drawer — anonymous', () => {
-  baseTest(
-    'renders the trigger and shows the sign-in CTA when the drawer is opened',
-    async ({ page }) => {
-      await page.goto('/');
+test.describe('Chat drawer — anonymous', () => {
+  test('renders the trigger and shows the sign-in CTA when the drawer is opened', async ({
+    page,
+  }) => {
+    await page.goto('/');
 
-      const trigger = page.getByRole('button', { name: /open chat/i });
-      await expect(trigger).toBeVisible();
+    const trigger = page.getByRole('button', { name: /open chat/i });
+    await expect(trigger).toBeVisible();
 
-      await trigger.click();
+    await trigger.click();
 
-      await expect(page.getByText('Sign in to chat')).toBeVisible();
-      const signInLink = page.getByRole('link', { name: /sign in/i });
-      await expect(signInLink).toHaveAttribute('href', /\/signin\?callbackUrl=/);
-    }
-  );
+    await expect(page.getByText('Sign in to chat')).toBeVisible();
+    const signInLink = page.getByRole('link', { name: /sign in/i });
+    await expect(signInLink).toHaveAttribute('href', /\/signin\?callbackUrl=/);
+  });
 });
 
 test.describe('Chat drawer — authenticated', () => {
