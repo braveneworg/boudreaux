@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './bio-media-where';
-import { isUnsetOr } from './where-kit';
+import { isPresent, isUnsetOr } from './where-kit';
 
 describe('bioImageWhere', () => {
   it('chosen matches a numeric display position only (null and absent fail gte)', () => {
@@ -12,6 +12,12 @@ describe('bioImageWhere', () => {
   it('displayCandidate is the chosen fragment or the suggested flag', () => {
     expect(bioImageWhere.displayCandidate).toEqual({
       OR: [bioImageWhere.chosen, { isPrimary: true }],
+    });
+  });
+
+  it('pageCandidate is the chosen fragment or a set alt', () => {
+    expect(bioImageWhere.pageCandidate).toEqual({
+      OR: [bioImageWhere.chosen, isPresent('alt')],
     });
   });
 });

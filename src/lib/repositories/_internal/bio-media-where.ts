@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { isUnsetOr } from './where-kit';
+import { isPresent, isUnsetOr } from './where-kit';
 
 import type { Prisma } from '@prisma/client';
 
@@ -36,12 +36,19 @@ export const bioImageWhere = {
   /** The human's chosen rows — what the publish gate counts (ADR-0019). */
   chosen,
   /**
-   * The rows display-image resolution can pick from: a human's chosen row or
-   * the job's suggested row. No DB-level take belongs beside it: Mongo sorts
-   * nulls first, so a cap would return unchosen rows; the service resolves
-   * after the read (`resolveDisplayImages`).
+   * The rows an index card's display image can come from: a human's chosen
+   * row or the job's suggested row. No DB-level take belongs beside it: Mongo
+   * sorts nulls first, so a cap would return unchosen rows; the artist page
+   * model resolves after the read (`cardDisplayImages`).
    */
   displayCandidate: { OR: [chosen, { isPrimary: true }] },
+  /**
+   * The rows the artist page's display images can come from, every tier
+   * included: a human's chosen row, or a row whose alt is set (the fallback
+   * tiers take nothing else). The same rule on takes holds; the artist page
+   * model resolves after the read.
+   */
+  pageCandidate: { OR: [chosen, isPresent('alt')] },
 } as const satisfies Record<string, Prisma.ArtistBioImageWhereInput>;
 
 /**
