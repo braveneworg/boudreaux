@@ -91,6 +91,12 @@ export default defineConfig({
       NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY: '1x00000000000000000000AA',
       CLOUDFLARE_SECRET: CONSTANTS.TURNSTILE.TEST_SECRET,
       SKIP_ENV_VALIDATION: 'true',
+      // CI sets no CloudFront keys, so videos play from the local E2E file.
+      // Blank them with '' and never leave them out: Playwright passes the
+      // parent env through and Next.js fills any undefined key from `.env*`.
+      CLOUDFRONT_KEY_PAIR_ID: '',
+      CLOUDFRONT_PRIVATE_KEY_BASE64: '',
+      CLOUDFRONT_DISTRIBUTION_ID: '',
       // The carousel rotation speed is NOT env-driven — it comes from the
       // SiteSettings row seeded in e2e/helpers/seed-test-db.ts (pinned to
       // the 3s service minimum for fast, non-flaky rotation tests).
