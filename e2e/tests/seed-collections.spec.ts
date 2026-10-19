@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 
+import { expect, test } from '../fixtures/base.fixture';
 import { listCollectionNames, modelCollectionNames } from '../helpers/e2e-collections';
 
 const E2E_DATABASE_URL =

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { test as base } from '@playwright/test';
 
+import { routeCdn } from '../helpers/cdn-mock';
 import { createDisposableSignoutState } from '../helpers/seed-test-db';
 
 import type { Page } from '@playwright/test';
@@ -31,12 +32,21 @@ interface AuthFixtures {
  * - `adminPage`: A Page pre-loaded with an admin user session cookie.
  * - `bannedPage`: A Page for the dedicated banned user (chat-disabled +
  *   admin-plugin `banned`). Never reuse the shared users for ban tests.
+ *
+ * Every context, the built-in one included, answers the production CDN
+ * locally (`routeCdn`), so no spec waits on the live CDN.
  */
 const test = base.extend<AuthFixtures>({
+  context: async ({ context }, provide) => {
+    await routeCdn(context);
+    await provide(context);
+  },
+
   userPage: async ({ browser }, provide) => {
     const context = await browser.newContext({
       storageState: USER_STORAGE_STATE,
     });
+    await routeCdn(context);
     const page = await context.newPage();
     await provide(page);
     await context.close();
@@ -46,6 +56,7 @@ const test = base.extend<AuthFixtures>({
     const context = await browser.newContext({
       storageState: ADMIN_STORAGE_STATE,
     });
+    await routeCdn(context);
     const page = await context.newPage();
     await provide(page);
     await context.close();
@@ -55,6 +66,7 @@ const test = base.extend<AuthFixtures>({
     const context = await browser.newContext({
       storageState: BANNED_STORAGE_STATE,
     });
+    await routeCdn(context);
     const page = await context.newPage();
     await provide(page);
     await context.close();
@@ -69,6 +81,7 @@ const test = base.extend<AuthFixtures>({
   signOutPage: async ({ browser }, provide) => {
     const storageState = await createDisposableSignoutState();
     const context = await browser.newContext({ storageState });
+    await routeCdn(context);
     const page = await context.newPage();
     await provide(page);
     await context.close();

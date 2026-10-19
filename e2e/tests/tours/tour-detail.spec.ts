@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { expect, test } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
+
+import { expect, test } from '../../fixtures/base.fixture';
 
 /**
  * Public tour detail page (`/tours/[tourId]`). Only tour *search* is covered

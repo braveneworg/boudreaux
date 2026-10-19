@@ -36,5 +36,10 @@ these rules are what keep E2E runs on the container.
   cut duplication; keep tests deterministic and parallel-safe.
 - Commands: `pnpm run e2e:docker:up` / `e2e:docker:down` for the isolated
   Mongo (localhost:27018); `pnpm run test:e2e` for the suite.
+- Import `test` and `expect` from `e2e/fixtures/base.fixture`, never from
+  `@playwright/test`. The fixture routes `cdn.fakefourrecords.com` to a local
+  image, so no spec waits on the live CDN. Any context a spec creates with
+  `browser.newContext` must call `routeCdn(context)` (`e2e/helpers/cdn-mock.ts`)
+  before it is used.
 - Keep the suite passing during refactors; add specs for new flows and edge
   cases uncovered along the way.

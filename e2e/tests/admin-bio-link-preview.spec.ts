@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
+import { routeCdn } from '../helpers/cdn-mock';
 import { BIO_PALETTE_ARTIST_ID } from '../helpers/seed-test-db';
 
 import type { Page } from '@playwright/test';
@@ -86,6 +87,7 @@ test.describe('Admin bio link OG-unfurl preview', () => {
     // the project baseURL (like the auth-fixture contexts), so the relative URL
     // resolves. withAdmin rejects before the handler runs — no network work.
     const context = await browser.newContext();
+    await routeCdn(context);
     try {
       const response = await context.request.get(
         `/api/link-preview?url=${encodeURIComponent('https://example.com/')}`

@@ -4,9 +4,10 @@
 
 import http from 'node:http';
 
-import { devices, expect, test } from '@playwright/test';
+import { devices } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 
+import { expect, test } from '../fixtures/base.fixture';
 import { openReleaseDeepLink } from '../helpers/release-deep-link';
 
 /**
