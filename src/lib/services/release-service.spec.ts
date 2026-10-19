@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { CreditDecisionError, DataError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData, UpdateReleaseData } from '@/lib/types/domain/release';
@@ -28,12 +27,7 @@ vi.mock('@/lib/repositories/release-repository', () => ({
     updateData: vi.fn(),
     softDelete: vi.fn(),
     restore: vi.fn(),
-    findForDeletion: vi.fn(),
     delete: vi.fn(),
-    deleteReleaseUrls: vi.fn().mockResolvedValue(undefined),
-    deleteImages: vi.fn().mockResolvedValue(undefined),
-    deleteArtistReleases: vi.fn().mockResolvedValue(undefined),
-    clearFeaturedArtistReferences: vi.fn().mockResolvedValue(undefined),
     findPublished: vi.fn(),
     findPublishedWithTracks: vi.fn(),
     findPublishedCredits: vi.fn(),
@@ -41,31 +35,6 @@ vi.mock('@/lib/repositories/release-repository', () => ({
     findPublishedTitleById: vi.fn(),
     findTitleById: vi.fn(),
     existsById: vi.fn(),
-  },
-}));
-
-vi.mock('@/lib/repositories/release-digital-format-repository', () => ({
-  ReleaseDigitalFormatRepository: class {
-    deleteAllByReleaseId = vi.fn().mockResolvedValue(0);
-  },
-}));
-
-vi.mock('@/lib/repositories/release-digital-format-file-repository', () => ({
-  ReleaseDigitalFormatFileRepository: class {
-    deleteAllByFormatId = vi.fn().mockResolvedValue(0);
-  },
-}));
-
-vi.mock('@/lib/repositories/purchase-repository', () => ({
-  PurchaseRepository: {
-    deleteAllByReleaseId: vi.fn().mockResolvedValue(0),
-    deleteAllDownloadsByReleaseId: vi.fn().mockResolvedValue(0),
-  },
-}));
-
-vi.mock('@/lib/repositories/download-event-repository', () => ({
-  DownloadEventRepository: class {
-    deleteAllByReleaseId = vi.fn().mockResolvedValue(0);
   },
 }));
 
@@ -562,9 +531,10 @@ describe('ReleaseService', () => {
   });
 
   describe('deleteRelease', () => {
-    const existingRelease = {
-      id: 'release-123',
-      coverArt: null,
+    // The S3-cleanup view the repository's delete returns.
+    const deletedRelease = {
+      ...mockRelease,
+      coverArt: 'https://cdn.example.com/covers/album.jpg',
       digitalFormats: [
         {
           id: 'format-1',
@@ -574,48 +544,61 @@ describe('ReleaseService', () => {
           ],
         },
       ],
-      images: [{ id: 'img-1', src: 'https://cdn.example.com/cover.jpg' }],
+      images: [{ id: 'img-1', src: 'https://cdn.example.com/releases/cover.jpg' }],
     };
 
-    it('should delete a release successfully with cascade', async () => {
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
+    beforeEach(() => {
+      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
+    });
+
+    it('deletes the release with one repository call and returns it', async () => {
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce(deletedRelease as never);
 
       const result = await ReleaseService.deleteRelease('release-123');
 
-      expect(result).toMatchObject({ success: true, data: mockRelease });
-      // Verify cascade delete order
-      expect(ReleaseRepository.findForDeletion).toHaveBeenCalledWith('release-123');
-      expect(PurchaseRepository.deleteAllByReleaseId).toHaveBeenCalledWith('release-123');
-      expect(PurchaseRepository.deleteAllDownloadsByReleaseId).toHaveBeenCalledWith('release-123');
-      expect(ReleaseRepository.deleteReleaseUrls).toHaveBeenCalledWith('release-123');
-      expect(ReleaseRepository.deleteImages).toHaveBeenCalledWith('release-123');
-      expect(ReleaseRepository.deleteArtistReleases).toHaveBeenCalledWith('release-123');
-      expect(ReleaseRepository.clearFeaturedArtistReferences).toHaveBeenCalledWith('release-123');
-      expect(ReleaseRepository.delete).toHaveBeenCalledWith('release-123');
+      expect({ result, calls: vi.mocked(ReleaseRepository.delete).mock.calls }).toEqual({
+        result: { success: true, data: deletedRelease },
+        calls: [['release-123']],
+      });
     });
 
-    it('should return error when release not found', async () => {
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(null);
+    it("removes the release's S3 objects once the delete has gone through", async () => {
+      const { deleteS3Object } = await import('../utils/s3-client');
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce(deletedRelease as never);
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(vi.mocked(deleteS3Object).mock.calls).toEqual([
+        ['releases/release-123/mp3/track1.mp3'],
+        ['releases/release-123/mp3/track2.mp3'],
+        ['releases/cover.jpg'],
+        ['covers/album.jpg'],
+      ]);
+    });
+
+    it('removes no S3 object when the delete fails', async () => {
+      const { deleteS3Object } = await import('../utils/s3-client');
+      vi.mocked(ReleaseRepository.delete).mockRejectedValueOnce(Error('write conflict'));
+
+      await ReleaseService.deleteRelease('release-123');
+
+      expect(vi.mocked(deleteS3Object).mock.calls).toEqual([]);
+    });
+
+    it('returns NOT_FOUND when no release has the id', async () => {
+      vi.mocked(ReleaseRepository.delete).mockRejectedValueOnce(
+        new DataError('NOT_FOUND', 'Release not found')
+      );
 
       const result = await ReleaseService.deleteRelease('non-existent');
 
-      expect(result).toMatchObject({ success: false, error: 'Release not found' });
-    });
-
-    it('should return error when release not found during delete step', async () => {
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
-      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
-      vi.mocked(ReleaseRepository.delete).mockRejectedValue(notFoundError);
-
-      const result = await ReleaseService.deleteRelease('release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Release not found' });
+      expect(result).toEqual({ success: false, error: 'Release not found', code: 'NOT_FOUND' });
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ReleaseRepository.findForDeletion).mockRejectedValue(initError);
+      vi.mocked(ReleaseRepository.delete).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
 
       const result = await ReleaseService.deleteRelease('release-123');
 
@@ -623,87 +606,42 @@ describe('ReleaseService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(existingRelease as never);
-      vi.mocked(ReleaseRepository.delete).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ReleaseRepository.delete).mockRejectedValueOnce(Error('Unknown error'));
 
       const result = await ReleaseService.deleteRelease('release-123');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to delete release' });
     });
 
-    it('should extract S3 key from CDN domain image URLs', async () => {
-      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
-      const { deleteS3Object } = await import('../utils/s3-client');
-
-      const releaseWithCdnImages = {
-        ...existingRelease,
-        coverArt: null,
-        images: [{ id: 'img-1', src: 'https://cdn.example.com/releases/cover.jpg' }],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithCdnImages as never);
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
-
-      await ReleaseService.deleteRelease('release-123');
-
-      expect(deleteS3Object).toHaveBeenCalledWith('releases/cover.jpg');
-      vi.unstubAllEnvs();
-    });
-
     it('should extract S3 key from S3-style image URLs', async () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', '');
       const { deleteS3Object } = await import('../utils/s3-client');
-
-      const releaseWithS3Images = {
-        ...existingRelease,
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce({
+        ...deletedRelease,
         coverArt: null,
+        digitalFormats: [],
         images: [
           {
             id: 'img-1',
             src: 'https://bucket-name.s3.us-east-1.amazonaws.com/releases/cover.jpg',
           },
         ],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithS3Images as never);
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
+      } as never);
 
       await ReleaseService.deleteRelease('release-123');
 
-      expect(deleteS3Object).toHaveBeenCalledWith('releases/cover.jpg');
-    });
-
-    it('should extract S3 key from coverArt URL during delete', async () => {
-      vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
-      const { deleteS3Object } = await import('../utils/s3-client');
-
-      const releaseWithCoverArt = {
-        ...existingRelease,
-        coverArt: 'https://cdn.example.com/covers/album.jpg',
-        images: [],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithCoverArt as never);
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
-
-      await ReleaseService.deleteRelease('release-123');
-
-      expect(deleteS3Object).toHaveBeenCalledWith('covers/album.jpg');
-      vi.unstubAllEnvs();
+      expect(vi.mocked(deleteS3Object).mock.calls).toEqual([['releases/cover.jpg']]);
     });
 
     it('should not extract S3 key when URL has no S3 pattern and no CDN domain', async () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', '');
       const { deleteS3Object } = await import('../utils/s3-client');
-      vi.mocked(deleteS3Object).mockClear();
-
-      const releaseWithExternalImages = {
-        ...existingRelease,
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce({
+        ...deletedRelease,
         coverArt: null,
         images: [{ id: 'img-1', src: 'https://external.example.com/image.jpg' }],
         digitalFormats: [],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(
-        releaseWithExternalImages as never
-      );
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
+      } as never);
 
       await ReleaseService.deleteRelease('release-123');
 
@@ -711,12 +649,9 @@ describe('ReleaseService', () => {
     });
 
     it('should skip files without an s3Key when collecting deletion targets', async () => {
-      delete process.env.CDN_DOMAIN;
       const { deleteS3Object } = await import('../utils/s3-client');
-      vi.mocked(deleteS3Object).mockClear();
-
-      const releaseWithEmptyKey = {
-        ...existingRelease,
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce({
+        ...deletedRelease,
         coverArt: null,
         images: [],
         digitalFormats: [
@@ -728,31 +663,24 @@ describe('ReleaseService', () => {
             ],
           },
         ],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(releaseWithEmptyKey as never);
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
+      } as never);
 
       await ReleaseService.deleteRelease('release-123');
 
-      expect(deleteS3Object).toHaveBeenCalledTimes(1);
-      expect(deleteS3Object).toHaveBeenCalledWith('releases/release-123/mp3/track1.mp3');
+      expect(vi.mocked(deleteS3Object).mock.calls).toEqual([
+        ['releases/release-123/mp3/track1.mp3'],
+      ]);
     });
 
     it('should not extract an S3 key when ".s3." appears but the path tail is empty', async () => {
-      delete process.env.CDN_DOMAIN;
+      vi.stubEnv('CDN_DOMAIN', '');
       const { deleteS3Object } = await import('../utils/s3-client');
-      vi.mocked(deleteS3Object).mockClear();
-
-      const releaseWithMalformedS3Url = {
-        ...existingRelease,
+      vi.mocked(ReleaseRepository.delete).mockResolvedValueOnce({
+        ...deletedRelease,
         coverArt: null,
         images: [{ id: 'img-1', src: 'https://bucket.s3.' }],
         digitalFormats: [],
-      };
-      vi.mocked(ReleaseRepository.findForDeletion).mockResolvedValue(
-        releaseWithMalformedS3Url as never
-      );
-      vi.mocked(ReleaseRepository.delete).mockResolvedValue(mockRelease as never);
+      } as never);
 
       await ReleaseService.deleteRelease('release-123');
 

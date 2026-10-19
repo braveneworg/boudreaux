@@ -272,9 +272,9 @@ export interface ReleaseCoverSource {
 }
 
 /**
- * S3-cleanup view of a release loaded before a hard delete — just the
- * digital-format files and images needed to enumerate S3 keys. Mirrors the
- * `findForDeletion` include in release-repository.
+ * S3-cleanup view of a release — just the digital-format files and images
+ * needed to enumerate S3 keys. `ReleaseRepository.delete` reads it inside its
+ * transaction and returns it once the release is gone.
  */
 export type ReleaseForDeletion = ReleaseScalars & {
   images: ImageRecord[];

@@ -22,13 +22,11 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
-      deleteMany: vi.fn(),
     },
     releaseDownload: {
       findUnique: vi.fn(),
       update: vi.fn(),
       upsert: vi.fn(),
-      deleteMany: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -392,32 +390,6 @@ describe('PurchaseRepository', () => {
       const result = await PurchaseRepository.markRefunded('pi_test_123');
 
       expect(result).toBe(false);
-    });
-  });
-
-  describe('deleteAllByReleaseId', () => {
-    it('should delete all purchases for a release and return the count', async () => {
-      vi.mocked(prisma.releasePurchase.deleteMany).mockResolvedValue({ count: 2 } as never);
-
-      const result = await PurchaseRepository.deleteAllByReleaseId('release-abc');
-
-      expect(result).toBe(2);
-      expect(prisma.releasePurchase.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-abc' },
-      });
-    });
-  });
-
-  describe('deleteAllDownloadsByReleaseId', () => {
-    it('should delete all download records for a release and return the count', async () => {
-      vi.mocked(prisma.releaseDownload.deleteMany).mockResolvedValue({ count: 4 } as never);
-
-      const result = await PurchaseRepository.deleteAllDownloadsByReleaseId('release-abc');
-
-      expect(result).toBe(4);
-      expect(prisma.releaseDownload.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-abc' },
-      });
     });
   });
 });

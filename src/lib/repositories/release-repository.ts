@@ -4,6 +4,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 import type {
   CreateReleaseData,
   PublishedReleaseDetailRow,
@@ -413,7 +414,7 @@ export interface ReleaseCreditsWrite {
 
 /**
  * Data-access layer for the Release model and its directly-owned relations
- * (ReleaseUrl, ArtistRelease, and FeaturedArtist cleanup on release delete).
+ * (ReleaseUrl, ArtistRelease), and for the release delete cascade.
  *
  * The only layer that touches Prisma for releases: it owns the query shapes
  * (includes/selects/where DSL), translates domain input to Prisma input, and
@@ -578,58 +579,39 @@ export class ReleaseRepository {
   }
 
   /**
-   * Load the S3-cleanup view of a release (digital-format files + images)
-   * used to enumerate S3 keys before a hard delete. Returns `null` when the
-   * release does not exist.
+   * Hard-delete a release by id and every row keyed to it, in one transaction,
+   * children first: its formats' files, its formats, purchases, downloads,
+   * download events, release URLs, images and credits. Featured artists that
+   * pointed at it are kept, without the release. Artist rows are never
+   * deleted. A failure at any step keeps every row as it was. Returns the
+   * S3-cleanup view read inside the transaction (digital-format files and
+   * images), so it names exactly what was removed. Throws a `NOT_FOUND`
+   * `DataError` when no release has the id.
    */
-  static async findForDeletion(id: string): Promise<ReleaseForDeletion | null> {
-    return prisma.release.findUnique({
-      where: { id },
-      include: releaseForDeletionInclude,
-    }) as Promise<ReleaseForDeletion | null>;
-  }
-
-  /**
-   * Hard delete a release by id (the final step of the delete cascade, after
-   * all related records have been removed). Returns the deleted scalars —
-   * its relations were removed by the cascade and are not claimed.
-   */
-  static async delete(id: string): Promise<ReleaseScalars> {
-    return prisma.release.delete({ where: { id } });
-  }
-
-  /**
-   * Delete all ReleaseUrl junction records for a release.
-   */
-  static async deleteReleaseUrls(releaseId: string): Promise<void> {
-    await prisma.releaseUrl.deleteMany({ where: { releaseId } });
-  }
-
-  /**
-   * Delete all images linked to a release (shared Image model — scoped to this
-   * release only). Part of the release delete cascade.
-   */
-  static async deleteImages(releaseId: string): Promise<void> {
-    await prisma.image.deleteMany({ where: { releaseId } });
-  }
-
-  /**
-   * Delete all ArtistRelease junction records for a release (does NOT delete
-   * the Artist records themselves).
-   */
-  static async deleteArtistReleases(releaseId: string): Promise<void> {
-    await prisma.artistRelease.deleteMany({ where: { releaseId } });
-  }
-
-  /**
-   * Disconnect FeaturedArtist references to a release (set `releaseId` to null)
-   * without deleting the FeaturedArtist records.
-   */
-  static async clearFeaturedArtistReferences(releaseId: string): Promise<void> {
-    await prisma.featuredArtist.updateMany({
-      where: { releaseId },
-      data: { releaseId: null },
-    });
+  static async delete(id: string): Promise<ReleaseForDeletion> {
+    return runQuery(() =>
+      prisma.$transaction(async (tx) => {
+        const release = await tx.release.findUnique({
+          where: { id },
+          include: releaseForDeletionInclude,
+        });
+        if (!release) {
+          throw new DataError('NOT_FOUND', 'Release not found');
+        }
+        const formatIds = release.digitalFormats.map((format) => format.id);
+        await tx.releaseDigitalFormatFile.deleteMany({ where: { formatId: { in: formatIds } } });
+        await tx.releaseDigitalFormat.deleteMany({ where: { releaseId: id } });
+        await tx.releasePurchase.deleteMany({ where: { releaseId: id } });
+        await tx.releaseDownload.deleteMany({ where: { releaseId: id } });
+        await tx.downloadEvent.deleteMany({ where: { releaseId: id } });
+        await tx.releaseUrl.deleteMany({ where: { releaseId: id } });
+        await tx.image.deleteMany({ where: { releaseId: id } });
+        await tx.artistRelease.deleteMany({ where: { releaseId: id } });
+        await tx.featuredArtist.updateMany({ where: { releaseId: id }, data: { releaseId: null } });
+        await tx.release.delete({ where: { id } });
+        return release;
+      })
+    );
   }
 
   /**

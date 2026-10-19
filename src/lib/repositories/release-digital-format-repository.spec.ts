@@ -23,7 +23,6 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      deleteMany: vi.fn(),
     },
     releaseDigitalFormatFile: {
       aggregate: vi.fn(),
@@ -582,19 +581,6 @@ describe('ReleaseDigitalFormatRepository', () => {
 
       expect(result).toEqual([]);
       expect(prisma.releaseDigitalFormat.findMany).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('deleteAllByReleaseId', () => {
-    it('deletes all formats for a release and returns the count', async () => {
-      vi.mocked(prisma.releaseDigitalFormat.deleteMany).mockResolvedValue({ count: 3 } as never);
-
-      const result = await repository.deleteAllByReleaseId(mockReleaseId);
-
-      expect(result).toBe(3);
-      expect(prisma.releaseDigitalFormat.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: mockReleaseId },
-      });
     });
   });
 });

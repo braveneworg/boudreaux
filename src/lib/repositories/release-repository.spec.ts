@@ -43,14 +43,7 @@ vi.mock('@/lib/prisma', () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
       count: vi.fn(),
-    },
-    releaseUrl: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    image: {
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     artist: {
       findMany: vi.fn(),
@@ -60,9 +53,6 @@ vi.mock('@/lib/prisma', () => ({
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn(),
       upsert: vi.fn(),
-    },
-    featuredArtist: {
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   },
 }));
@@ -597,67 +587,90 @@ describe('ReleaseRepository', () => {
     });
   });
 
-  describe('findForDeletion', () => {
-    it('loads digital-format files and images for S3 cleanup', async () => {
-      const existing = { id: 'release-123', digitalFormats: [], images: [] };
-      vi.mocked(prisma.release.findUnique).mockResolvedValue(existing as never);
-
-      const result = await ReleaseRepository.findForDeletion('release-123');
-
-      expect(result).toEqual(existing);
-      expect(prisma.release.findUnique).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        include: {
-          digitalFormats: { include: { files: true } },
-          images: true,
-        },
-      });
-    });
-  });
-
   describe('delete', () => {
-    it('hard-deletes the release by id', async () => {
-      vi.mocked(prisma.release.delete).mockResolvedValue(mockRelease as never);
+    const view = {
+      id: 'release-123',
+      coverArt: 'https://cdn.example.com/cover.jpg',
+      digitalFormats: [
+        { id: 'format-1', files: [{ id: 'file-1', s3Key: 'releases/release-123/track1.mp3' }] },
+        { id: 'format-2', files: [] },
+      ],
+      images: [{ id: 'img-1', src: 'https://cdn.example.com/img.jpg' }],
+    };
+
+    // The cascade's own transaction client: every step is a call on it.
+    const buildDeleteTx = () => ({
+      release: {
+        findUnique: vi.fn().mockResolvedValue(view),
+        delete: vi.fn().mockResolvedValue({ id: 'release-123' }),
+      },
+      releaseDigitalFormatFile: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      releaseDigitalFormat: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      releasePurchase: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      releaseDownload: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      downloadEvent: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      releaseUrl: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      image: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      artistRelease: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      featuredArtist: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    });
+
+    const runIn = (deleteTx: ReturnType<typeof buildDeleteTx>): void => {
+      vi.mocked(prisma.$transaction).mockImplementationOnce(async (run) => run(deleteTx as never));
+    };
+
+    it('returns the S3-cleanup view it read inside the transaction', async () => {
+      const deleteTx = buildDeleteTx();
+      runIn(deleteTx);
 
       const result = await ReleaseRepository.delete('release-123');
 
-      expect(result).toEqual(mockRelease);
-      expect(prisma.release.delete).toHaveBeenCalledWith({ where: { id: 'release-123' } });
-    });
-  });
-
-  describe('cascade helpers', () => {
-    it('deleteReleaseUrls deletes by releaseId', async () => {
-      await ReleaseRepository.deleteReleaseUrls('release-123');
-
-      expect(prisma.releaseUrl.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
+      expect({ result, read: deleteTx.release.findUnique.mock.calls }).toEqual({
+        result: view,
+        read: [
+          [
+            {
+              where: { id: 'release-123' },
+              include: { digitalFormats: { include: { files: true } }, images: true },
+            },
+          ],
+        ],
       });
     });
 
-    it('deleteImages deletes by releaseId', async () => {
-      await ReleaseRepository.deleteImages('release-123');
+    it('rejects NOT_FOUND and deletes nothing when no release has the id', async () => {
+      const deleteTx = buildDeleteTx();
+      deleteTx.release.findUnique.mockResolvedValueOnce(null);
+      runIn(deleteTx);
 
-      expect(prisma.image.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
+      await expect(ReleaseRepository.delete('missing')).rejects.toEqual(
+        expect.objectContaining({ name: 'DataError', code: 'NOT_FOUND' })
+      );
+      expect(deleteTx.release.delete.mock.calls).toEqual([]);
     });
 
-    it('deleteArtistReleases deletes by releaseId', async () => {
-      await ReleaseRepository.deleteArtistReleases('release-123');
+    it('deletes the release row after every child step', async () => {
+      const deleteTx = buildDeleteTx();
+      runIn(deleteTx);
 
-      expect(prisma.artistRelease.deleteMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-      });
-    });
+      await ReleaseRepository.delete('release-123');
 
-    it('clearFeaturedArtistReferences nulls releaseId', async () => {
-      await ReleaseRepository.clearFeaturedArtistReferences('release-123');
-
-      expect(prisma.featuredArtist.updateMany).toHaveBeenCalledWith({
-        where: { releaseId: 'release-123' },
-        data: { releaseId: null },
-      });
+      const [releaseOrder] = deleteTx.release.delete.mock.invocationCallOrder;
+      const stepOrders = [
+        deleteTx.release.findUnique,
+        deleteTx.releaseDigitalFormatFile.deleteMany,
+        deleteTx.releaseDigitalFormat.deleteMany,
+        deleteTx.releasePurchase.deleteMany,
+        deleteTx.releaseDownload.deleteMany,
+        deleteTx.downloadEvent.deleteMany,
+        deleteTx.releaseUrl.deleteMany,
+        deleteTx.image.deleteMany,
+        deleteTx.artistRelease.deleteMany,
+        deleteTx.featuredArtist.updateMany,
+      ].map((step) => step.mock.invocationCallOrder);
+      expect(stepOrders.map((orders) => orders.length === 1 && orders[0] < releaseOrder)).toEqual(
+        Array.from({ length: 10 }, () => true)
+      );
     });
   });
 

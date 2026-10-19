@@ -3,10 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
-import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { ReleaseRepository, type CreditPublication } from '@/lib/repositories/release-repository';
 import { CreditDecisionError } from '@/lib/types/domain/errors';
 import type {
@@ -18,7 +14,6 @@ import type {
   ReleaseForDeletion,
   ReleaseListQuery,
   ReleaseListItem,
-  ReleaseScalars,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 import { publicCredits, withPublicByline } from '@/lib/utils/artist-release-credits';
@@ -81,10 +76,6 @@ const failFromReleaseWrite = (
   error instanceof CreditDecisionError
     ? { success: false, code: error.code, error: error.message }
     : failFromError(error, overrides);
-
-const digitalFormatRepository = new ReleaseDigitalFormatRepository();
-const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
-const downloadEventRepository = new DownloadEventRepository();
 
 /**
  * Collect every S3 key that should be removed when a release is hard-deleted:
@@ -216,50 +207,19 @@ export class ReleaseService {
   }
 
   /**
-   * Delete a release by ID (hard delete).
-   * Cascades to delete all related data EXCEPT Artist records.
-   * Deletes S3 objects for digital format files and images. Returns the
-   * deleted release's scalars; its relations are gone with it.
+   * Delete a release by ID (hard delete). The repository removes it and every
+   * row keyed to it in one transaction, keeping Artist records, so a failed
+   * delete changes nothing. Only once it has gone through are the S3 objects
+   * of its digital-format files and images removed, best-effort. Returns the
+   * deleted release with the files and images it had.
    */
-  static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseScalars>> {
+  static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseForDeletion>> {
     try {
-      // Verify release exists and fetch related data for S3 cleanup
-      const existing = await ReleaseRepository.findForDeletion(id);
-
-      if (!existing) {
-        return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
-      }
-
-      // Collect S3 keys (digital-format files + image/coverArt URLs) for cleanup.
-      const s3KeysToDelete = collectReleaseS3Keys(existing);
-
-      // Delete related records in dependency order (children first).
-      // 1. Digital format files (children of ReleaseDigitalFormat) — one delete
-      //    per format, run together since they target disjoint format ids.
-      await Promise.all(
-        existing.digitalFormats.map((format) =>
-          digitalFormatFileRepository.deleteAllByFormatId(format.id)
-        )
-      );
-
-      // 2. Everything else keyed off the release id touches a different
-      //    collection, so the remaining cascade deletes run concurrently.
-      await Promise.all([
-        digitalFormatRepository.deleteAllByReleaseId(id),
-        PurchaseRepository.deleteAllByReleaseId(id),
-        PurchaseRepository.deleteAllDownloadsByReleaseId(id),
-        downloadEventRepository.deleteAllByReleaseId(id),
-        ReleaseRepository.deleteReleaseUrls(id),
-        ReleaseRepository.deleteImages(id),
-        ReleaseRepository.deleteArtistReleases(id),
-        ReleaseRepository.clearFeaturedArtistReferences(id),
-      ]);
-
-      // 3. Delete the release itself, after all of its references are gone.
       const release = await ReleaseRepository.delete(id);
+      const s3Keys = collectReleaseS3Keys(release);
 
-      // 10. Best-effort S3 cleanup (async, fire-and-forget)
-      Promise.allSettled(s3KeysToDelete.map((key) => deleteS3Object(key))).catch(() => {
+      // Best-effort S3 cleanup once the delete has committed (fire-and-forget)
+      Promise.allSettled(s3Keys.map((key) => deleteS3Object(key))).catch(() => {
         // Silently ignore — S3 objects will be cleaned up by lifecycle rules
       });
 
