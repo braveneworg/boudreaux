@@ -164,6 +164,21 @@ describe('VideoService.schedulePostSave', () => {
       });
     });
 
+    it('(c) logs a pending write that rejects with a non-Error value', async () => {
+      const warnSpy = vi.spyOn(loggers.media, 'warn').mockImplementation(() => loggers.media);
+      vi.mocked(videoEnrichmentJob.markPending).mockRejectedValueOnce('timeout');
+
+      await VideoService.schedulePostSave({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY },
+      });
+
+      expect(warnSpy.mock.calls).toEqual([
+        ['video_draft_enrichment_pending_failed', { videoId, error: 'timeout' }],
+      ]);
+    });
+
     it('forwards the reviewed artist details to the artist sync', async () => {
       const artistDetails = [{ sourceName: 'Alpha Beta', displayName: 'A. Beta' }];
 
@@ -323,6 +338,21 @@ describe('VideoService.schedulePostSave', () => {
         enrichment: [[videoId]],
         producers: [],
       });
+    });
+
+    it('a details-only save filling a name part the stored artist lacks counts as a change', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: {
+          artist: 'Alpha Beta',
+          s3Key: S3_KEY,
+          artistDetails: [{ sourceName: 'Alpha Beta', middleName: 'Q' }],
+        },
+        previous,
+      });
+
+      expect(stageCalls().syncArtists).toHaveLength(1);
     });
 
     it('a details-only save naming an unlinked artist counts as a change', async () => {
