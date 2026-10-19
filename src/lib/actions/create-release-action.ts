@@ -215,10 +215,9 @@ export const createReleaseAction = async (
       // Revalidate the create release page to clear data
       revalidatePath('/admin/releases/new');
 
-      // A newly created release may already be published; clear the cached
-      // public listing and revalidate the public surfaces that show it.
+      // A newly created release may already be published; revalidate the
+      // public surfaces that show it.
       if (response.success) {
-        ReleaseService.invalidateCache();
         revalidatePath('/releases');
         revalidatePath('/artists/[slug]', 'page');
       }

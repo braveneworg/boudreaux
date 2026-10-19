@@ -9,7 +9,6 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import { ReleaseService } from '@/lib/services/release-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
@@ -163,7 +162,6 @@ export const updateArtistAction = async (
     // The artist's display name renders on release cards/listings, so refresh
     // the public release surfaces too.
     if (response.success) {
-      ReleaseService.invalidateCache();
       revalidatePath('/releases');
     }
   } catch {

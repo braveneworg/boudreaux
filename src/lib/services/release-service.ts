@@ -105,6 +105,15 @@ const collectReleaseS3Keys = (release: ReleaseForDeletion): string[] => {
   return s3Keys;
 };
 
+/**
+ * Clear the cached public published-releases listing pages
+ * ({@link ReleaseService.getPublishedReleases}) after a write that can change
+ * which releases are listed or how they render.
+ */
+const invalidatePublishedReleases = (): void => {
+  cache.deleteByPrefix(PUBLISHED_RELEASES_CACHE_PREFIX);
+};
+
 export class ReleaseService {
   /**
    * Create a new release with its credits, in order, in one write. A release
@@ -179,7 +188,8 @@ export class ReleaseService {
    * Update a release by ID. The credits the write names are stored, and, when
    * the write publishes, the admin's decisions are checked against them and
    * the confirmed artists published — all in the release's own transaction
-   * (ADR-0015), so a refused check or a failed write keeps none of it.
+   * (ADR-0015), so a refused check or a failed write keeps none of it. A
+   * write that goes through clears the cached published-releases listing.
    */
   static async updateRelease(
     id: string,
@@ -192,6 +202,7 @@ export class ReleaseService {
         artistIds: confirmation.creditArtistIds,
         publish: publishes ? publicationOf(confirmation, new Date()) : undefined,
       });
+      invalidatePublishedReleases();
       if (publishes) {
         // A published release's credits name its bylines.
         invalidatePublicNameCaches();
@@ -209,14 +220,16 @@ export class ReleaseService {
   /**
    * Delete a release by ID (hard delete). The repository removes it and every
    * row keyed to it in one transaction, keeping Artist records, so a failed
-   * delete changes nothing. Only once it has gone through are the S3 objects
-   * of its digital-format files and images removed, best-effort. Returns the
-   * deleted release with the files and images it had.
+   * delete changes nothing. Only once it has gone through is the cached
+   * published-releases listing cleared and are the S3 objects of its
+   * digital-format files and images removed, best-effort. Returns the deleted
+   * release with the files and images it had.
    */
   static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseForDeletion>> {
     try {
       const release = await ReleaseRepository.delete(id);
       const s3Keys = collectReleaseS3Keys(release);
+      invalidatePublishedReleases();
 
       // Best-effort S3 cleanup once the delete has committed (fire-and-forget)
       Promise.allSettled(s3Keys.map((key) => deleteS3Object(key))).catch(() => {
@@ -306,7 +319,9 @@ export class ReleaseService {
    * `artist` slug (only releases crediting that public artist). Only the
    * default, unsearched and unfiltered first page is cached (10 min in
    * production) — searched, artist-filtered and offset pages vary too much to
-   * share a cache entry.
+   * share a cache entry. This service clears the cache itself when a release
+   * write goes through (update, publish, delete); artist writes clear it with
+   * `invalidatePublicNameCaches`.
    */
   static async getPublishedReleases(
     params?: PublishedReleaseFilters
@@ -340,18 +355,6 @@ export class ReleaseService {
     }
 
     return withCache(`${PUBLISHED_RELEASES_CACHE_PREFIX}${take}`, fetchReleases, 600);
-  }
-
-  /**
-   * Clear the cached public published-releases listing pages.
-   *
-   * The default first page is cached for 10 minutes by
-   * {@link ReleaseService.getPublishedReleases}; call this after any mutation
-   * that changes which releases are published — or how they render — so the
-   * public `/releases` listing reflects the change before the TTL expires.
-   */
-  static invalidateCache(): void {
-    cache.deleteByPrefix(PUBLISHED_RELEASES_CACHE_PREFIX);
   }
 
   /**

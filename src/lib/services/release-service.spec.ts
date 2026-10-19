@@ -6,7 +6,6 @@ import { CreditDecisionError, DataError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData, UpdateReleaseData } from '@/lib/types/domain/release';
 import type { Format } from '@/lib/types/media-models';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
-import { cache } from '@/lib/utils/simple-cache';
 
 import { ReleaseService } from './release-service';
 
@@ -1229,14 +1228,6 @@ describe('ReleaseService', () => {
       const result = await ReleaseService.existsById('missing-id');
 
       expect(result).toBe(false);
-    });
-  });
-
-  describe('invalidateCache', () => {
-    it('clears the cached published-releases listing pages by prefix', () => {
-      ReleaseService.invalidateCache();
-
-      expect(cache.deleteByPrefix).toHaveBeenCalledWith('published-releases:');
     });
   });
 });

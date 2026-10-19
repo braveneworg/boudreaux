@@ -998,7 +998,7 @@ describe('updateReleaseAction', () => {
       expect(revalidatePath).toHaveBeenCalledWith(`/admin/releases/${mockReleaseId}`);
     });
 
-    it('should clear the cached listing and revalidate public surfaces on success', async () => {
+    it('should revalidate public surfaces on success', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -1019,13 +1019,12 @@ describe('updateReleaseAction', () => {
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(ReleaseService.invalidateCache).toHaveBeenCalled();
       expect(revalidatePath).toHaveBeenCalledWith('/releases');
       expect(revalidatePath).not.toHaveBeenCalledWith(`/releases/${mockReleaseId}`);
       expect(revalidatePath).toHaveBeenCalledWith('/artists/[slug]', 'page');
     });
 
-    it('should not clear the cache or revalidate public surfaces on failure', async () => {
+    it('should not revalidate public surfaces on failure', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -1046,7 +1045,6 @@ describe('updateReleaseAction', () => {
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(ReleaseService.invalidateCache).not.toHaveBeenCalled();
       expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
     });
   });
