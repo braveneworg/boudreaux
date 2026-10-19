@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.455.0] - 2026-10-19
+
+### Changed
+
+- One listening-modal opener: dialog, priming, share widget and accent behind one hook (#915)
+
 ## [4.454.0] - 2026-10-19
 
 ### Changed
