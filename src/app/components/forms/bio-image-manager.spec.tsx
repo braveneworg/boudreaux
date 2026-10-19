@@ -5,6 +5,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { chosenDisplayImageIds, resolveDisplayImageSet } from '@/lib/utils/display-images';
 import { BIO_IMAGE_DRAG_MIME } from '@/lib/validation/bio-dnd-schema';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
@@ -74,10 +75,18 @@ const POOL = [
   image('bare', { alt: null }),
 ];
 
+/**
+ * Render the manager as the artist pool feeds it: unless a case overrides
+ * them, the chosen ids and the page's view are the pool's, resolved from the
+ * images through the shared display-image rules.
+ */
 const renderManager = (overrides: Partial<BioImageManagerProps> = {}) => {
+  const images = overrides.images ?? POOL;
   const props: BioImageManagerProps = {
     artistId: 'artist-1',
-    images: POOL,
+    images,
+    chosenIds: chosenDisplayImageIds(images),
+    shown: resolveDisplayImageSet(images),
     isPublished: false,
     onDelete: vi.fn(),
     onInsert: vi.fn(),
@@ -266,6 +275,28 @@ describe('BioImageManager', () => {
       [],
       [],
       [],
+    ]);
+  });
+
+  // The pool resolves what the page shows; the manager renders its answer
+  // rather than resolving the images again.
+  it('marks the tiles the pool says the page shows, with its tier', () => {
+    renderManager({
+      images: [image('rest'), image('suggested', { isPrimary: true })],
+      shown: { tier: 'pool', images: [image('rest')] },
+    });
+
+    expect(['rest', 'suggested'].map(shownBadgesOn)).toEqual([['Shown (first in pool)'], []]);
+  });
+
+  it('lays out the strip from the chosen ids the pool passes', () => {
+    renderManager({ chosenIds: ['second'] });
+
+    const items = within(screen.getByRole('list', { name: 'Display images' })).getAllByRole(
+      'listitem'
+    );
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
+      'second, display image 1 of 1',
     ]);
   });
 
