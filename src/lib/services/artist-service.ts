@@ -11,10 +11,7 @@ import {
 } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
 import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
-import {
-  ArtistRepository,
-  type EnrichedArtistFieldUpdate,
-} from '@/lib/repositories/artist-repository';
+import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import type {
   Artist,
   ArtistBioImageRecord,
@@ -259,46 +256,6 @@ const removeBioMediaObjects = async (
   }
 };
 
-/** Pre-computed lookup keys for the find-or-create-by-name search order. */
-interface ArtistNameLookup {
-  trimmed: string;
-  slug: string;
-  firstName: string;
-  lastName: string;
-}
-
-/**
- * Run the find-or-create-by-name search order and return the first matching
- * artist, or `null` when none match:
- *   1. Slug match (unique index, most reliable)
- *   2. Case-insensitive displayName match
- *   3. Case-insensitive firstName + surname match
- */
-const findArtistByName = async (lookup: ArtistNameLookup): Promise<ArtistNameRecord | null> => {
-  const { trimmed, slug, firstName, lastName } = lookup;
-
-  if (slug) {
-    const bySlug = await ArtistRepository.findUniqueBySlug(slug);
-    if (bySlug) {
-      return bySlug;
-    }
-  }
-
-  const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed);
-  if (byDisplayName) {
-    return byDisplayName;
-  }
-
-  if (firstName) {
-    const byName = await ArtistRepository.findFirstByName(firstName, lastName);
-    if (byName) {
-      return byName;
-    }
-  }
-
-  return null;
-};
-
 /** How many numbered slugs (`name-2`, `name-3`, …) a create tries before giving up. */
 const NUMBERED_SLUG_ATTEMPTS = 5;
 
@@ -338,7 +295,7 @@ const createUnderNumberedSlug = async (
 const recoverArtistFromDuplicate = async (
   createData: CreateArtistData
 ): Promise<ServiceResponse<ArtistNameRecord>> => {
-  const existing = await ArtistRepository.findUniqueBySlug(createData.slug);
+  const existing = await ArtistRepository.findByNameKeys({ slug: createData.slug });
   if (existing) {
     return { success: true, data: existing };
   }
@@ -348,6 +305,9 @@ const recoverArtistFromDuplicate = async (
 /** The artist fields a video-enrichment suggestion may apply. */
 export type ArtistEnrichedField =
   'firstName' | 'middleName' | 'surname' | 'akaNames' | 'displayName' | 'bornOn';
+
+/** The one-field updates the enrichment Apply flow may write. */
+type EnrichedArtistFieldUpdate = Pick<UpdateArtistData, ArtistEnrichedField>;
 
 /**
  * Explicit whitelist switch mapping a suggestion field onto a typed one-field
@@ -673,11 +633,12 @@ export class ArtistService {
   }
 
   /**
-   * Soft delete an artist (archive)
+   * Soft delete an artist (archive) by stamping `deletedOn` with the current
+   * time.
    */
-  static async archiveArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
+  static async archiveArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = await ArtistRepository.archive(id);
+      const artist = await ArtistRepository.update(id, { deletedOn: new Date() });
       invalidatePublicNameCaches();
       // The vocabulary counts read only non-deleted artists.
       ArtistVocabularyService.invalidate();
@@ -911,10 +872,14 @@ export class ArtistService {
     const trimmed = artistName.trim();
     if (!trimmed) return null;
 
-    const slug = generateSlug(trimmed);
     const { firstName, lastName } = splitFullName(trimmed);
 
-    return findArtistByName({ trimmed, slug, firstName, lastName });
+    return ArtistRepository.findByNameKeys({
+      slug: generateSlug(trimmed),
+      displayName: trimmed,
+      firstName,
+      surname: lastName,
+    });
   }
 
   /**
@@ -956,7 +921,12 @@ export class ArtistService {
     try {
       // 1–3. Try slug, then displayName, then firstName + surname matches.
       // Soft-deleted artists never match.
-      const found = await findArtistByName({ trimmed, slug, firstName, lastName });
+      const found = await ArtistRepository.findByNameKeys({
+        slug,
+        displayName: trimmed,
+        firstName,
+        surname: lastName,
+      });
       if (found) {
         return { success: true, data: found };
       }
@@ -1145,8 +1115,7 @@ export class ArtistService {
    * artistId before performing a follow-up write.
    */
   static async existsById(artistId: string): Promise<boolean> {
-    const found = await ArtistRepository.existsById(artistId);
-    return Boolean(found);
+    return ArtistRepository.existsById(artistId);
   }
 
   /**
@@ -1160,8 +1129,8 @@ export class ArtistService {
 
   /**
    * Applies one admin-approved enrichment suggestion to the artist record
-   * through the field whitelist. Throws on a repository failure — the calling
-   * action maps that to a typed error.
+   * through the field whitelist, stamping `updatedBy` for audit. Throws on a
+   * repository failure — the calling action maps that to a typed error.
    */
   static async applyEnrichedField(
     artistId: string,
@@ -1169,10 +1138,9 @@ export class ArtistService {
     value: string,
     updatedBy: string
   ): Promise<void> {
-    await ArtistRepository.updateEnrichedField(
-      artistId,
-      buildEnrichedFieldUpdate(field, value),
-      updatedBy
-    );
+    await ArtistRepository.update(artistId, {
+      ...buildEnrichedFieldUpdate(field, value),
+      updatedBy,
+    });
   }
 }

@@ -58,17 +58,16 @@ export interface ArtistCountFilters {
 }
 
 /**
- * The one-field update shapes the enrichment Apply flow may write. A
- * suggestion's `field` maps onto this through an explicit whitelist switch in
- * `ArtistService.applyEnrichedField` — never a dynamic Prisma key.
+ * The keys a typed artist name is looked up by (see
+ * {@link ArtistRepository.findByNameKeys}). An empty or absent slug, display
+ * name or first name skips its step.
  */
-export interface EnrichedArtistFieldUpdate {
-  firstName?: string;
-  middleName?: string;
-  surname?: string;
-  akaNames?: string;
+export interface ArtistNameKeys {
+  slug?: string;
   displayName?: string;
-  bornOn?: Date;
+  firstName?: string;
+  /** Compared with `firstName`; absent reads as the empty surname of a one-word name. */
+  surname?: string;
 }
 
 /**
@@ -463,6 +462,34 @@ const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => {
 
 /** Case-insensitive substring filter for one search token. */
 const containsToken = (token: string) => ({ contains: token, mode: 'insensitive' as const });
+
+/** Case-insensitive equality filter for one name field. */
+const equalsIgnoringCase = (value: string) => ({ equals: value, mode: 'insensitive' as const });
+
+/**
+ * The name lookup's `where`s, in the order they are tried: the slug (unique,
+ * most reliable), then the display name, then first name + surname, the last
+ * two case-insensitive. A step whose key is empty is left out.
+ */
+const nameKeyWheres = ({
+  slug,
+  displayName,
+  firstName,
+  surname = '',
+}: ArtistNameKeys): Prisma.ArtistWhereInput[] => [
+  ...(slug ? [{ slug }] : []),
+  ...(displayName ? [{ displayName: equalsIgnoringCase(displayName) }] : []),
+  ...(firstName
+    ? [
+        {
+          AND: [
+            { firstName: equalsIgnoringCase(firstName) },
+            { surname: equalsIgnoringCase(surname) },
+          ],
+        },
+      ]
+    : []),
+];
 
 /**
  * The clauses one search token may match among an artist's name fields — every
@@ -908,17 +935,10 @@ export class ArtistRepository {
     ) as Promise<ArtistScalars>;
   }
 
-  /** Soft-delete (archive) an artist by setting deletedOn to now. */
-  static async archive(id: string): Promise<ArtistScalars> {
-    return prisma.artist.update({
-      where: { id },
-      data: { deletedOn: new Date() },
-    }) as Promise<ArtistScalars>;
-  }
-
-  /** Lightweight existence check returning only the id (or null). */
-  static async existsById(artistId: string): Promise<{ id: string } | null> {
-    return prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } });
+  /** Whether an artist has the id, read through its id alone. */
+  static async existsById(artistId: string): Promise<boolean> {
+    const found = await prisma.artist.findUnique({ where: { id: artistId }, select: { id: true } });
+    return found !== null;
   }
 
   /** Find an artist by id returning only the name projection (or null). */
@@ -997,43 +1017,24 @@ export class ArtistRepository {
   }
 
   /**
-   * Find the non-deleted artist that owns a slug, returning the name
-   * projection (find-or-create flow). A soft-deleted owner is not a match: a
-   * name lookup must never hand back an artist that stays hidden (ADR-0015).
+   * Find the artist a typed name refers to (the find-or-create flow and the
+   * admin name lookup), trying its keys in order — the slug, then the display
+   * name, then first name + surname ({@link nameKeyWheres}) — and returning
+   * the first match's name projection, or `null`. Only non-deleted artists
+   * match on any key: a name lookup must never hand back an artist that stays
+   * hidden (ADR-0015).
    */
-  static async findUniqueBySlug(slug: string): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findFirst({
-      where: { slug, ...artistWhere.notDeleted },
-      select: nameSelect,
-    }) as Promise<ArtistNameRecord | null>;
-  }
-
-  /** Case-insensitive displayName lookup over non-deleted artists (name projection). */
-  static async findFirstByDisplayName(displayName: string): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findFirst({
-      where: {
-        displayName: { equals: displayName, mode: 'insensitive' },
-        ...artistWhere.notDeleted,
-      },
-      select: nameSelect,
-    }) as Promise<ArtistNameRecord | null>;
-  }
-
-  /** Case-insensitive firstName + surname lookup over non-deleted artists (name projection). */
-  static async findFirstByName(
-    firstName: string,
-    surname: string
-  ): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findFirst({
-      where: {
-        AND: [
-          { firstName: { equals: firstName, mode: 'insensitive' } },
-          { surname: { equals: surname, mode: 'insensitive' } },
-        ],
-        ...artistWhere.notDeleted,
-      },
-      select: nameSelect,
-    }) as Promise<ArtistNameRecord | null>;
+  static async findByNameKeys(keys: ArtistNameKeys): Promise<ArtistNameRecord | null> {
+    for (const where of nameKeyWheres(keys)) {
+      const match = await prisma.artist.findFirst({
+        where: { ...where, ...artistWhere.notDeleted },
+        select: nameSelect,
+      });
+      if (match) {
+        return match;
+      }
+    }
+    return null;
   }
 
   /** Create an artist returning only the name projection (find-or-create flow). */
@@ -1331,15 +1332,6 @@ export class ArtistRepository {
         },
       },
     });
-  }
-
-  /** Applies one whitelisted enriched field, stamping `updatedBy` for audit. */
-  static async updateEnrichedField(
-    artistId: string,
-    data: EnrichedArtistFieldUpdate,
-    updatedBy: string
-  ): Promise<void> {
-    await prisma.artist.update({ where: { id: artistId }, data: { ...data, updatedBy } });
   }
 }
 

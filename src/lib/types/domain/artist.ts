@@ -647,6 +647,8 @@ export interface ArtistWritableData {
   publishedOn?: Date;
   publishedBy?: string | null;
   createdBy?: string | null;
+  /** The admin who applied an enrichment suggestion to the artist. */
+  updatedBy?: string | null;
   deletedOn?: Date | null;
   /** The curated links, written whole; `null` clears them (ADR-0020). */
   links?: ArtistLinks | null;
