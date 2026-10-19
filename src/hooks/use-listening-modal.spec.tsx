@@ -27,6 +27,8 @@ const player = vi.hoisted(() => ({
   /** The session id the stand-in claims with, as the real player claims with its own. */
   id: 'release-player',
   adopted: [] as Array<HTMLAudioElement | null>,
+  /** Every `autoPlay` the stand-in rendered with, closing renders included. */
+  autoPlays: [] as boolean[],
 }));
 vi.mock('@/app/components/release-player', async () => {
   const { useEffect, useState: useStandInState } = await import('react');
@@ -44,6 +46,7 @@ vi.mock('@/app/components/release-player', async () => {
       initialTrackNumber?: number;
     }) => {
       const [adopted] = useStandInState(() => takeMediaEl?.() ?? null);
+      player.autoPlays.push(autoPlay);
       useEffect(() => {
         player.adopted.push(adopted);
         session.claimPlayback(player.id, () => adopted?.pause());
@@ -140,6 +143,7 @@ describe('useListeningModal', () => {
       data: { id: RELEASE.id, title: RELEASE.title },
     });
     player.adopted = [];
+    player.autoPlays = [];
     latest.current = null;
   });
 
@@ -227,6 +231,16 @@ describe('useListeningModal', () => {
       expect(screen.getByTestId('release-player')).toHaveAttribute('data-autoplay', 'false');
       expect(playSpy()).not.toHaveBeenCalled();
       expect(player.adopted).toEqual([null]);
+    });
+
+    // The dialog keeps its content, and so the player, mounted for the exit
+    // animation: a close must not hand that player an autoPlay to act on.
+    it('stays paused while it closes', () => {
+      render(<Opener openOnArrival />);
+
+      act(() => latest.current?.close());
+
+      expect(player.autoPlays).not.toContain(true);
     });
   });
 

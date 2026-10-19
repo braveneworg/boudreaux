@@ -81,7 +81,8 @@ export interface ListeningModal {
    * Call inside the opening gesture: starts the release's first track there,
    * when it has one, claiming the playback session, then opens the modal.
    * Pass `pick` when the release was chosen inside this gesture (a search
-   * pick), since `release` names it only from the next render on.
+   * pick), since `release` names it only from the next render on. Wrap it in
+   * an event handler (`() => open()`), or the event is taken for the pick.
    */
   open: (pick?: ListeningModalRelease) => void;
   /** Close from caller code, e.g. a footer link before it navigates. */
@@ -91,9 +92,6 @@ export interface ListeningModal {
   /** The listening modal to render, or `null` without a release. */
   modal: ReactElement | null;
 }
-
-/** How the modal was opened: one opened on arrival has no gesture to play from. */
-type OpenedBy = 'gesture' | 'arrival';
 
 /** The share row's URL: the release deep link when asked for and nameable. */
 const shareUrlFor = (
@@ -130,7 +128,10 @@ export const useListeningModal = ({
   onClose,
   ...presentation
 }: ListeningModalOptions): ListeningModal => {
-  const [openedBy, setOpenedBy] = useState<OpenedBy | null>(openOnArrival ? 'arrival' : null);
+  const [isOpen, setIsOpen] = useState(Boolean(openOnArrival));
+  // Apart from the open state: the player stays mounted through the close
+  // animation, and an autoPlay that turned on at the close would start it.
+  const [autoPlay, setAutoPlay] = useState(!openOnArrival);
   const [warmed, setWarmed] = useState(false);
   const [drawnAccent, setDrawnAccent] = useState<ZineAccent>();
   const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff('audio');
@@ -139,14 +140,15 @@ export const useListeningModal = ({
     const playSrc = (pick ?? release)?.playSrc;
     if (playSrc) primeMediaEl(playSrc);
     if (accent === 'random') setDrawnAccent(pickLoudZineAccent());
-    setOpenedBy('gesture');
+    setAutoPlay(true);
+    setIsOpen(true);
   };
 
   const close = (): void => {
     // Closed before the player took the element — stop it, or the
     // gesture-started audio keeps playing with no UI attached.
     discardMediaEl();
-    setOpenedBy(null);
+    setIsOpen(false);
     onClose?.();
   };
 
@@ -160,10 +162,10 @@ export const useListeningModal = ({
       releaseId={release.id}
       title={release.title}
       artistName={release.artistName}
-      open={openedBy !== null}
+      open={isOpen}
       onOpenChange={handleOpenChange}
       takeMediaEl={takeMediaEl}
-      autoPlay={openedBy !== 'arrival'}
+      autoPlay={autoPlay}
       prefetch={warmed}
       accent={accentFor(release, accent, drawnAccent)}
       shareWidget={

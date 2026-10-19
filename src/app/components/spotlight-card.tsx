@@ -37,7 +37,8 @@ interface SpotlightCardProps {
   caption?: SpotlightCaption;
   /**
    * The page's accent, for the listening modal (see `useListeningModal`), or
-   * `'random'` for a new loud accent on each open (home).
+   * `'random'` for a new loud accent on each open (home). Without one, the
+   * modal takes the release's own accent.
    */
   accent?: ZineAccent | 'random';
   /**
