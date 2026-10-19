@@ -398,6 +398,88 @@ export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
   albumArtist: ArtistCreditScalars | null;
 };
 
+/**
+ * One display image as a public surface renders and credits it: the collage
+ * on the artist page and its lightbox. None of the pool's internals — no
+ * original URL, face signal, hashes or display position.
+ */
+export interface ArtistDisplayImage {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  alt: string | null;
+  title: string | null;
+  attribution: string | null;
+  license: string | null;
+  sourceUrl: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * A bio image as the artist-detail read selects it: what the page shows, plus
+ * the two fields display-image resolution reads.
+ */
+export interface ArtistPageBioImageRecord extends ArtistDisplayImage {
+  isPrimary: boolean;
+  displayOrder: number | null;
+}
+
+/**
+ * An Artist's latest release as the artist page and the artists index card
+ * lead with it: the newest listed release they hold a direct credit on, what
+ * its listening modal plays, and who it is "by".
+ */
+export interface LatestRelease {
+  id: string;
+  title: string;
+  releasedOn: Date;
+  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
+  playSrc: string | null;
+  /**
+   * The album artist's name when this artist is only featured on it and that
+   * artist is public; `null` otherwise (ADR-0015).
+   */
+  byName: string | null;
+  /** The album artist's slug, on the same terms as `byName`: the deep link's artist. */
+  albumArtistSlug: string | null;
+}
+
+/**
+ * The artist scalars the artist page model carries: the name fields, the
+ * slug, the genres, the curated links, and the two bios the page and its
+ * metadata read. Keyed as a `true` mask like {@link ARTIST_PRIVATE_FIELD_MASK}.
+ */
+export const ARTIST_PAGE_SCALAR_MASK = {
+  displayName: true,
+  firstName: true,
+  middleName: true,
+  surname: true,
+  title: true,
+  suffix: true,
+  slug: true,
+  genres: true,
+  links: true,
+  bio: true,
+  shortBio: true,
+} as const satisfies Partial<Record<keyof ArtistPublicScalars, true>>;
+
+/** The scalars of {@link ARTIST_PAGE_SCALAR_MASK}. */
+export type ArtistPageScalars = Pick<ArtistPublicScalars, keyof typeof ARTIST_PAGE_SCALAR_MASK>;
+
+/**
+ * What a public surface shows of an Artist, built once from the detail read:
+ * the page scalars with both bios sanitized, every display image, the latest
+ * release with its byline, and whether any listed release exists, band
+ * releases included. No pool internals, no release list, no band graph.
+ */
+export interface ArtistPageModel extends ArtistPageScalars {
+  displayImages: ArtistDisplayImage[];
+  latestRelease: LatestRelease | null;
+  /** Whether the artist holds any listed release, a public band's included. */
+  hasListedRelease: boolean;
+}
+
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';
 
