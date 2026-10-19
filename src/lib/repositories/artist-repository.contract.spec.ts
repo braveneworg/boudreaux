@@ -64,8 +64,8 @@ beforeAll(async () => {
     {},
     { artistIds: [movedToFrontId, firstInsertedId] }
   );
-  await ArtistCreditRepository.creditOnRelease(releaseId, appendedId);
-  await ArtistCreditRepository.creditOnRelease(releaseId, appendedId);
+  await ArtistCreditRepository.creditOnRelease({ artistId: appendedId, releaseId });
+  await ArtistCreditRepository.creditOnRelease({ artistId: appendedId, releaseId });
 });
 
 afterAll(async () => {

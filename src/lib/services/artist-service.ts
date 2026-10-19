@@ -40,7 +40,7 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
-import type { ReleaseCredit } from '@/lib/types/domain/release';
+import type { ArtistReleaseScalars, ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import {
   collectArtistReleases,
@@ -978,12 +978,16 @@ export class ArtistService {
    * Credit an artist on a release, after the credits it already has; a
    * repeat is a no-op. Goes through the credit module so the stored credit
    * order stays dense (ADR-0015).
-   *
-   * @param artistId - The Artist ID
-   * @param releaseId - The Release ID
    */
-  static async creditOnRelease(artistId: string, releaseId: string): Promise<void> {
-    await ArtistCreditRepository.creditOnRelease(releaseId, artistId);
+  static async creditOnRelease(
+    credit: Pick<ArtistReleaseScalars, 'artistId' | 'releaseId'>
+  ): Promise<ServiceResponse<void>> {
+    try {
+      await ArtistCreditRepository.creditOnRelease(credit);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to credit the artist on the release' });
+    }
   }
 
   /** Removes a bio link from the reference list (admin palette X). A row that

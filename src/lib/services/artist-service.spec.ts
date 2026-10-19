@@ -2320,11 +2320,32 @@ describe('ArtistService', () => {
     it('credits through the credit module so the stored order stays dense', async () => {
       vi.mocked(ArtistCreditRepository.creditOnRelease).mockResolvedValueOnce(undefined);
 
-      await ArtistService.creditOnRelease('artist-1', 'release-1');
+      const result = await ArtistService.creditOnRelease({
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      });
 
+      expect(result).toEqual({ success: true, data: undefined });
       expect(vi.mocked(ArtistCreditRepository.creditOnRelease).mock.calls).toEqual([
-        ['release-1', 'artist-1'],
+        [{ artistId: 'artist-1', releaseId: 'release-1' }],
       ]);
+    });
+
+    it('answers a failed credit write with its data error code', async () => {
+      vi.mocked(ArtistCreditRepository.creditOnRelease).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
+
+      const result = await ArtistService.creditOnRelease({
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
     });
   });
 
