@@ -4,9 +4,6 @@
 import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { VideoRepository } from '@/lib/repositories/video-repository';
-import { runVideoPostSave } from '@/lib/services/video-post-save-service';
-import type * as VideoPostSaveService from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { loggers } from '@/lib/utils/logger';
@@ -18,31 +15,14 @@ import type * as VideoActionHelpers from './video-action-helpers';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
-vi.mock('@/lib/repositories/video-repository', () => ({
-  VideoRepository: { setEnrichmentStatus: vi.fn() },
-}));
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/auth/action-gate');
-// Mock only the executor; the planner stays real so these tests exercise the
-// actual gate that decides both the `pending` write and the dispatch.
-vi.mock('@/lib/services/video-post-save-service', async (importOriginal) => {
-  const actual = await importOriginal<typeof VideoPostSaveService>();
-  return { ...actual, runVideoPostSave: vi.fn() };
-});
 // Mock only the integration helper; keep the coercers real via importActual.
 vi.mock('./video-action-helpers', async (importOriginal) => {
   const actual = await importOriginal<typeof VideoActionHelpers>();
   return { ...actual, confirmVideoUpload: vi.fn() };
 });
-
-// Capture after() callbacks so tests can inspect / run them on demand.
-const afterCallbacks: Array<() => Promise<void>> = [];
-vi.mock('next/server', () => ({
-  after: (cb: () => Promise<void>) => {
-    afterCallbacks.push(cb);
-  },
-}));
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
@@ -57,15 +37,13 @@ const validInput = {
 };
 
 beforeEach(() => {
-  afterCallbacks.length = 0;
   // areCandidatesForVideo (kept real above) resolves candidate URLs against
   // this CDN host to derive the S3 key it namespace-checks.
   vi.stubEnv('CDN_DOMAIN', 'https://cdn.example.com');
-  vi.mocked(VideoRepository.setEnrichmentStatus).mockResolvedValue(undefined);
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
   vi.mocked(confirmVideoUpload).mockResolvedValue(null);
-  vi.mocked(runVideoPostSave).mockResolvedValue(undefined);
+  vi.mocked(VideoService.schedulePostSave).mockResolvedValue(undefined);
   vi.mocked(VideoService.getVideoById).mockResolvedValue({ success: false } as never);
   vi.mocked(VideoService.createVideo).mockResolvedValue({
     success: true,
@@ -143,18 +121,24 @@ describe('createVideoDraftAction', () => {
     expect(input.releasedOn).not.toEqual(new Date('2026-09-14T00:00:00.000Z'));
   });
 
-  it('kicks the post-save pipeline with a probing plan', async () => {
+  it('schedules the draft post-save work for the created row', async () => {
     await createVideoDraftAction(validInput);
 
-    await afterCallbacks[0]?.();
+    expect(vi.mocked(VideoService.schedulePostSave).mock.calls).toEqual([
+      [{ intent: 'draft', videoId: ID, next: { artist: 'Alpha', s3Key: validInput.s3Key } }],
+    ]);
+  });
 
-    expect(runVideoPostSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        videoId: ID,
-        artist: 'Alpha',
-        plan: expect.objectContaining({ probe: true }),
-      })
-    );
+  it('hands the reviewed artist details to the post-save work', async () => {
+    const artistDetails = [{ sourceName: 'Alpha', displayName: 'Alpha (official)' }];
+
+    await createVideoDraftAction({ ...validInput, artistDetails });
+
+    expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual({
+      artist: 'Alpha',
+      s3Key: validInput.s3Key,
+      artistDetails,
+    });
   });
 
   it('prefers the provided title over the filename stem', async () => {
@@ -179,18 +163,14 @@ describe('createVideoDraftAction', () => {
     expect(input.artist).toBe('');
   });
 
-  it('kicks the pipeline with a blank artist snapshot', async () => {
+  it('schedules the post-save work with a blank artist snapshot', async () => {
     const { artist: _artist, ...noArtist } = validInput;
     await createVideoDraftAction(noArtist);
-    await afterCallbacks[0]?.();
 
-    expect(runVideoPostSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        videoId: ID,
-        artist: '',
-        plan: expect.objectContaining({ probe: true, syncArtists: false }),
-      })
-    );
+    expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual({
+      artist: '',
+      s3Key: validInput.s3Key,
+    });
   });
 
   it('revalidates the admin videos path on success', async () => {
@@ -260,7 +240,7 @@ describe('createVideoDraftAction', () => {
     expect(result).toEqual({ success: false, error: 'Could not create the draft.' });
   });
 
-  it('does not kick the pipeline when creation fails', async () => {
+  it('does not schedule post-save work when creation fails', async () => {
     vi.mocked(VideoService.createVideo).mockResolvedValue({
       success: false,
       error: 'Duplicate title',
@@ -268,7 +248,32 @@ describe('createVideoDraftAction', () => {
 
     await createVideoDraftAction(validInput);
 
-    expect(afterCallbacks).toHaveLength(0);
+    expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule post-save work when the row already exists', async () => {
+    vi.mocked(VideoService.getVideoById).mockResolvedValue({
+      success: true,
+      data: { id: ID },
+    } as never);
+
+    await createVideoDraftAction(validInput);
+
+    expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule post-save work when S3 confirmation fails', async () => {
+    vi.mocked(confirmVideoUpload).mockResolvedValue('File not found in S3 storage.');
+
+    await createVideoDraftAction(validInput);
+
+    expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule post-save work on invalid input', async () => {
+    await createVideoDraftAction({ nope: true });
+
+    expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
   });
 
   it('fails softly on an unexpected service error', async () => {
@@ -295,51 +300,6 @@ describe('createVideoDraftAction', () => {
   it('exposes the coercers used by the draft builder', () => {
     expect(parseDurationSeconds('212')).toBe(212);
     expect(parseFileSize('1024')).toBe(BigInt(1024));
-  });
-
-  // The edit page's status poll only re-arms while a job is in flight, so the
-  // `pending` handoff must land BEFORE the response (the dispatch itself runs
-  // post-response in after()) — otherwise the panel's first fetch can see a
-  // null status and never poll again.
-  it('marks enrichment pending before the response for a MUSIC draft with an artist', async () => {
-    await createVideoDraftAction(validInput);
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(ID, 'pending');
-  });
-
-  it('marks pending without waiting on the after() pipeline', async () => {
-    await createVideoDraftAction(validInput);
-
-    expect(afterCallbacks).toHaveLength(1);
-  });
-
-  it('does not mark pending when the artist snapshot is blank', async () => {
-    const { artist: _artist, ...noArtist } = validInput;
-    await createVideoDraftAction(noArtist);
-
-    expect(VideoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
-  });
-
-  it('marks pending for an INFORMATIONAL draft that names a creator', async () => {
-    await createVideoDraftAction({ ...validInput, category: 'INFORMATIONAL' });
-
-    expect(VideoRepository.setEnrichmentStatus).toHaveBeenCalledWith(ID, 'pending');
-  });
-
-  it('still succeeds when the pending write fails', async () => {
-    vi.mocked(VideoRepository.setEnrichmentStatus).mockRejectedValue(Error('db down'));
-
-    const result = await createVideoDraftAction(validInput);
-
-    expect(result).toEqual({ success: true, videoId: ID });
-  });
-
-  it('still schedules the kick when the pending write fails', async () => {
-    vi.mocked(VideoRepository.setEnrichmentStatus).mockRejectedValue(Error('db down'));
-
-    await createVideoDraftAction(validInput);
-
-    expect(afterCallbacks).toHaveLength(1);
   });
 
   const candidate = (n: number) => ({

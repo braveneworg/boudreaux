@@ -17,6 +17,7 @@ import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 
 import { failFromError } from './_internal/map-data-error';
 import { decidePublish, decideReleaseDate, type EditorialRefusal } from './video-editorial-rules';
+import { scheduleVideoPostSave, type VideoPostSave } from './video-post-save-service';
 
 import type { ServiceResponse } from './service.types';
 
@@ -62,6 +63,15 @@ export class VideoService {
         UNKNOWN: 'Failed to create video',
       });
     }
+  }
+
+  /**
+   * Schedule the post-save work for a save that has already succeeded: artist
+   * sync, probe, enrichment dispatch and producer sync after the response, and
+   * a draft's `pending` mark before it. Never fails the save.
+   */
+  static async schedulePostSave(save: VideoPostSave): Promise<void> {
+    await scheduleVideoPostSave(save);
   }
 
   /** Get a video by id. Returns a NOT_FOUND failure when the video is missing. */
