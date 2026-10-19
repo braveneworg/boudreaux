@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.updateBioImageAlt).mockResolvedValue(undefined as never);
+  vi.mocked(ArtistService.updateBioImageAlt).mockResolvedValue({ success: true, data: undefined });
 });
 
 describe('updateArtistBioImageAltAction', () => {
@@ -82,6 +82,19 @@ describe('updateArtistBioImageAltAction', () => {
     await updateArtistBioImageAltAction({ imageId, alt: 'Alt' });
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
+  });
+
+  it("returns the service's failure with its code", async () => {
+    vi.mocked(ArtistService.updateBioImageAlt).mockResolvedValueOnce({
+      success: false,
+      error: 'Bio image not found',
+      code: 'NOT_FOUND',
+    });
+
+    const result = await updateArtistBioImageAltAction({ imageId, alt: 'Alt' });
+
+    expect(result).toEqual({ success: false, error: 'Bio image not found', code: 'NOT_FOUND' });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
   });
 
   it('returns the failure copy when the service throws', async () => {

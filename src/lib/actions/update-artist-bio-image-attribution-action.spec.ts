@@ -24,7 +24,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.updateBioImageAttribution).mockResolvedValue(undefined as never);
+  vi.mocked(ArtistService.updateBioImageAttribution).mockResolvedValue({
+    success: true,
+    data: undefined,
+  });
 });
 
 describe('updateArtistBioImageAttributionAction', () => {
@@ -94,5 +97,18 @@ describe('updateArtistBioImageAttributionAction', () => {
     await updateArtistBioImageAttributionAction({ imageId, attribution: 'Credit' });
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
+  });
+
+  it("returns the service's failure with its code", async () => {
+    vi.mocked(ArtistService.updateBioImageAttribution).mockResolvedValueOnce({
+      success: false,
+      error: 'Database unavailable',
+      code: 'UNAVAILABLE',
+    });
+
+    const result = await updateArtistBioImageAttributionAction({ imageId, attribution: 'Credit' });
+
+    expect(result).toEqual({ success: false, error: 'Database unavailable', code: 'UNAVAILABLE' });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
   });
 });

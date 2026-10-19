@@ -65,7 +65,7 @@ describe('GET /api/artists/name-lookup', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     limiterCheckMock.mockResolvedValue(undefined);
-    findByNameMock.mockResolvedValue(null);
+    findByNameMock.mockResolvedValue({ success: true, data: null });
   });
 
   afterEach(() => {
@@ -86,7 +86,9 @@ describe('GET /api/artists/name-lookup', () => {
 
   it('returns 200 with mixed matched/null results, order preserved, and Cache-Control header', async () => {
     const match = { id: 'a1', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' };
-    findByNameMock.mockResolvedValueOnce(match).mockResolvedValueOnce(null);
+    findByNameMock
+      .mockResolvedValueOnce({ success: true, data: match })
+      .mockResolvedValueOnce({ success: true, data: null });
 
     const response = await GET(createRequest(['Ceschi', 'Unknown Artist']), dummyContext);
     const data = await response.json();
@@ -124,6 +126,21 @@ describe('GET /api/artists/name-lookup', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toMatch(/name/i);
+  });
+
+  it.each([
+    ['UNKNOWN', 'Failed to look up artist', 500],
+    ['UNAVAILABLE', 'Database unavailable', 503],
+  ])('answers a %s lookup failure with its copy and status', async (code, error, status) => {
+    findByNameMock
+      .mockResolvedValueOnce({ success: true, data: null })
+      .mockResolvedValueOnce({ success: false, error, code });
+
+    const response = await GET(createRequest(['Ceschi', 'Sole']), dummyContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(status);
+    expect(data).toEqual({ error });
   });
 
   it('returns 500 when ArtistService.findByName throws', async () => {

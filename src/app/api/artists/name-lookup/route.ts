@@ -7,6 +7,8 @@ import { ARTIST_NAME_LOOKUP_LIMIT, artistNameLookupLimiter } from '@/lib/config/
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
 import { ArtistService } from '@/lib/services/artist-service';
+import type { ArtistNameRecord } from '@/lib/types/domain/artist';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -42,12 +44,21 @@ export const GET = withRateLimit(
     }
 
     try {
-      const results = await Promise.all(
-        names.map(async (name) => ({
-          name,
-          match: await ArtistService.findByName(name),
-        }))
+      const lookups = await Promise.all(
+        names.map(async (name) => ({ name, lookup: await ArtistService.findByName(name) }))
       );
+
+      const results: Array<{ name: string; match: ArtistNameRecord | null }> = [];
+      for (const { name, lookup } of lookups) {
+        // One failed lookup fails the request, with the code's status.
+        if (!lookup.success) {
+          return NextResponse.json(
+            { error: lookup.error },
+            { status: httpStatusForCode(lookup.code) }
+          );
+        }
+        results.push({ name, match: lookup.data });
+      }
 
       return NextResponse.json({ results }, { headers: { 'Cache-Control': 'private, no-store' } });
     } catch (error) {

@@ -27,7 +27,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.deleteBioLink).mockResolvedValue(undefined as never);
+  vi.mocked(ArtistService.deleteBioLink).mockResolvedValue({ success: true, data: undefined });
 });
 
 describe('deleteArtistBioLinkAction', () => {
@@ -76,6 +76,19 @@ describe('deleteArtistBioLinkAction', () => {
     await deleteArtistBioLinkAction(linkId);
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
+  });
+
+  it("returns the service's failure with its code", async () => {
+    vi.mocked(ArtistService.deleteBioLink).mockResolvedValueOnce({
+      success: false,
+      error: 'Bio link not found',
+      code: 'NOT_FOUND',
+    });
+
+    const result = await deleteArtistBioLinkAction(linkId);
+
+    expect(result).toEqual({ success: false, error: 'Bio link not found', code: 'NOT_FOUND' });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
   });
 
   it('handles an unexpected service error', async () => {

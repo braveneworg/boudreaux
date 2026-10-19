@@ -16,6 +16,8 @@ import { ArtistService } from './artist-service';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
+import type { ServiceResponse } from './service.types';
+
 // Type honesty (#661): getArtistById surfaces ArtistRepository.findById, which
 // fetches only scalars. A server-side caller must never be able to
 // trust phantom `labels`/`urls`/`releases`, so the success `data` must be exactly
@@ -35,6 +37,22 @@ type _UpdateNeverUnpublishes = AssertExact<UpdateArtistData['publishedOn'], Date
 const _updateNeverUnpublishes: _UpdateNeverUnpublishes = true;
 type _CreateNeverUnpublishes = AssertExact<CreateArtistData['publishedOn'], Date | undefined>;
 const _createNeverUnpublishes: _CreateNeverUnpublishes = true;
+
+// ADR-0001: a service call answers a ServiceResponse, so every failure
+// carries its code. The one exception is applyEnrichedField, which throws to
+// the one action that calls it. A method that goes back to returning a raw
+// value, or to throwing its failures, fails `pnpm run typecheck` here.
+type NonServiceResponseMethod = {
+  [K in keyof typeof ArtistService]: (typeof ArtistService)[K] extends (
+    ...args: never
+  ) => Promise<infer Result>
+    ? [Result] extends [ServiceResponse<unknown>]
+      ? never
+      : K
+    : never;
+}[keyof typeof ArtistService];
+type _OnlyApplyEnrichedFieldIsRaw = AssertExact<NonServiceResponseMethod, 'applyEnrichedField'>;
+const _onlyApplyEnrichedFieldIsRaw: _OnlyApplyEnrichedFieldIsRaw = true;
 
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
@@ -2160,43 +2178,6 @@ describe('ArtistService', () => {
     });
   });
 
-  describe('existsById', () => {
-    it('should return true when the artist exists', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(true);
-
-      const result = await ArtistService.existsById('artist-1');
-
-      expect(result).toBe(true);
-      expect(ArtistRepository.existsById).toHaveBeenCalledWith('artist-1');
-    });
-
-    it('should return false when the artist does not exist', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(false);
-
-      const result = await ArtistService.existsById('missing-id');
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('findNameById', () => {
-    it('returns the name projection from the repository', async () => {
-      const row = { id: 'artist-1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
-      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(row);
-
-      const result = await ArtistService.findNameById('artist-1');
-
-      expect(result).toEqual(row);
-      expect(ArtistRepository.findNameById).toHaveBeenCalledWith('artist-1');
-    });
-
-    it('returns null when the artist does not exist', async () => {
-      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(null);
-
-      await expect(ArtistService.findNameById('missing-id')).resolves.toBeNull();
-    });
-  });
-
   describe('updateArtist shortBio sanitization', () => {
     it('sanitizes a string shortBio before persisting', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(mockArtist);
@@ -2567,11 +2548,26 @@ describe('ArtistService', () => {
 
   describe('deleteBioLink', () => {
     it('drops only the reference role so a shared image-source row survives', async () => {
-      vi.mocked(ArtistBioLinkRepository.removeReference).mockResolvedValue(undefined as never);
+      vi.mocked(ArtistBioLinkRepository.removeReference).mockResolvedValueOnce(undefined);
 
-      await ArtistService.deleteBioLink('link-1');
+      const result = await ArtistService.deleteBioLink('link-1');
 
-      expect(ArtistBioLinkRepository.removeReference).toHaveBeenCalledWith('link-1');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioLinkRepository.removeReference).mock.calls).toEqual([['link-1']]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio link not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to delete bio link'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioLinkRepository.removeReference).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.deleteBioLink('link-1');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
@@ -2700,42 +2696,141 @@ describe('ArtistService', () => {
   });
 
   describe('createBioImage', () => {
-    it('delegates to the repository and returns the created row', async () => {
-      const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
-      vi.mocked(ArtistBioImageRepository.create).mockResolvedValue(row as never);
+    const artistName = { id: 'a1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+    const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findNameById).mockReset();
+      vi.mocked(ArtistBioImageRepository.create).mockReset();
+    });
+
+    it('creates the row for the artist and returns it', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
 
       const result = await ArtistService.createBioImage({
         artistId: 'a1',
         url: 'https://cdn/x.webp',
+        alt: 'Ceschi on stage',
       });
 
-      expect(ArtistBioImageRepository.create).toHaveBeenCalledWith({
-        artistId: 'a1',
-        url: 'https://cdn/x.webp',
+      expect(result).toEqual({ success: true, data: row });
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls).toEqual([
+        [{ artistId: 'a1', url: 'https://cdn/x.webp', alt: 'Ceschi on stage' }],
+      ]);
+    });
+
+    it('returns NOT_FOUND for an unknown artist and creates nothing', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(null);
+
+      const result = await ArtistService.createBioImage({ artistId: 'missing', url: 'https://x' });
+
+      expect(result).toEqual({ success: false, error: 'Artist not found', code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['omitted', {}],
+      ['null', { alt: null }],
+      ['blank', { alt: '   ' }],
+    ])("stores the artist's display name when alt is %s", async (_label, altInput) => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x', ...altInput });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe('Ceschi');
+    });
+
+    it('derives the name from first and surname when displayName is blank', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce({
+        ...artistName,
+        displayName: null,
       });
-      expect(result).toBe(row);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe('David Ramos');
+    });
+
+    it('leaves alt null when the artist has no name to fall back on', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce({
+        id: 'a1',
+        displayName: null,
+        firstName: '',
+        surname: '',
+      });
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBeNull();
+    });
+
+    it('stores the alt as plain text', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({
+        artistId: 'a1',
+        url: 'https://x',
+        alt: '<b>Ceschi</b> on stage',
+      });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe(
+        'Ceschi on stage'
+      );
+    });
+
+    it.each([
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to add bio image'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
   describe('createBioLink', () => {
-    it('creates a new row when no existing link has that URL', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
-      vi.mocked(ArtistBioLinkRepository.create).mockResolvedValue(row as never);
+    const input = { artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Site',
-        url: 'https://cdn/x',
-      });
+    beforeEach(() => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue(true);
+    });
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.existsById).mockReset();
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockReset();
+      vi.mocked(ArtistBioLinkRepository.create).mockReset();
+    });
+
+    it('creates a new row when no existing link has that URL', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(null);
+      const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
+      vi.mocked(ArtistBioLinkRepository.create).mockResolvedValueOnce(row as never);
+
+      const result = await ArtistService.createBioLink(input);
 
       expect(ArtistBioLinkRepository.findByUrl).toHaveBeenCalledWith('a1', 'https://cdn/x');
-      expect(ArtistBioLinkRepository.create).toHaveBeenCalledWith({
-        artistId: 'a1',
-        label: 'Site',
-        url: 'https://cdn/x',
-      });
-      expect(result).toBe(row);
+      expect(vi.mocked(ArtistBioLinkRepository.create).mock.calls).toEqual([[input]]);
+      expect(result).toEqual({ success: true, data: row });
+    });
+
+    it('returns NOT_FOUND for an unknown artist and writes nothing', async () => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(false);
+
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({ success: false, error: 'Artist not found', code: 'NOT_FOUND' });
+      expect(ArtistBioLinkRepository.findByUrl).not.toHaveBeenCalled();
+      expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
 
     it('returns the existing row and does not create a duplicate URL', async () => {
@@ -2750,15 +2845,11 @@ describe('ArtistService', () => {
         reference: true,
         imageSource: false,
       };
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(existing);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(existing);
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Duplicate attempt',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Duplicate attempt' });
 
-      expect(result).toBe(existing);
+      expect(result).toEqual({ success: true, data: existing });
       expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
       expect(ArtistBioLinkRepository.restoreReference).not.toHaveBeenCalled();
     });
@@ -2776,16 +2867,12 @@ describe('ArtistService', () => {
         imageSource: true,
       };
       const restored = { ...imageOnly, reference: true };
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(imageOnly);
-      vi.mocked(ArtistBioLinkRepository.restoreReference).mockResolvedValue(restored);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(imageOnly);
+      vi.mocked(ArtistBioLinkRepository.restoreReference).mockResolvedValueOnce(restored);
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Press kit',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Press kit' });
 
-      expect(result).toBe(restored);
+      expect(result).toEqual({ success: true, data: restored });
       expect(ArtistBioLinkRepository.restoreReference).toHaveBeenCalledWith('link-img');
       expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
@@ -2805,59 +2892,103 @@ describe('ArtistService', () => {
       vi.mocked(ArtistBioLinkRepository.findByUrl)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(raced);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Loser',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Loser' });
 
-      expect(result).toBe(raced);
+      expect(result).toEqual({ success: true, data: raced });
     });
 
-    it('rethrows a non-duplicate data error from the create', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+    it('answers a non-duplicate data error from the create with its code', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('UNAVAILABLE', 'Connection failed')
       );
 
-      await expect(
-        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
-      ).rejects.toThrow('Connection failed');
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
     });
 
-    it('rethrows the duplicate error when the post-conflict re-read finds nothing', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+    it('answers DUPLICATE when the post-conflict re-read finds nothing', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
-      await expect(
-        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
-      ).rejects.toThrow('Unique constraint failed');
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toMatchObject({ success: false, code: 'DUPLICATE' });
+    });
+
+    it('answers an unexpected failure with the add copy', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockRejectedValueOnce(new Error('boom'));
+
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({ success: false, error: 'Failed to add bio link', code: 'UNKNOWN' });
     });
   });
 
   describe('updateBioImageAttribution', () => {
-    it('delegates the attribution update to the repository', async () => {
-      vi.mocked(ArtistBioImageRepository.updateAttribution).mockResolvedValue(undefined as never);
+    it('updates the attribution through the repository', async () => {
+      vi.mocked(ArtistBioImageRepository.updateAttribution).mockResolvedValueOnce(undefined);
 
-      await ArtistService.updateBioImageAttribution('img-1', 'Credit');
+      const result = await ArtistService.updateBioImageAttribution('img-1', 'Credit');
 
-      expect(ArtistBioImageRepository.updateAttribution).toHaveBeenCalledWith('img-1', 'Credit');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioImageRepository.updateAttribution).mock.calls).toEqual([
+        ['img-1', 'Credit'],
+      ]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio image not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to update bio image attribution'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioImageRepository.updateAttribution).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.updateBioImageAttribution('img-1', 'Credit');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
   describe('updateBioImageAlt', () => {
-    it('delegates the alt update to the repository', async () => {
-      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValue(undefined as never);
+    it('updates the alt text through the repository', async () => {
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValueOnce(undefined);
 
-      await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
+      const result = await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
 
-      expect(ArtistBioImageRepository.updateAlt).toHaveBeenCalledWith('img-1', 'Ceschi on stage');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioImageRepository.updateAlt).mock.calls).toEqual([
+        ['img-1', 'Ceschi on stage'],
+      ]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio image not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to update bio image alt text'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
@@ -3108,7 +3239,7 @@ describe('ArtistService', () => {
 
       const result = await ArtistService.findByName('Ceschi');
 
-      expect(result).toEqual(matchedArtist);
+      expect(result).toEqual({ success: true, data: matchedArtist });
     });
 
     it('looks the name up with the same keys findOrCreateByName uses', async () => {
@@ -3128,19 +3259,32 @@ describe('ArtistService', () => {
       ]);
     });
 
-    it('returns null when no key matches', async () => {
+    it('answers null data when no key matches', async () => {
       vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
 
       const result = await ArtistService.findByName('Unknown Artist');
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ success: true, data: null });
     });
 
-    it('returns null for a blank name without a lookup', async () => {
+    it('answers null data for a blank name without a lookup', async () => {
       const result = await ArtistService.findByName('   ');
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ success: true, data: null });
       expect(ArtistRepository.findByNameKeys).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to look up artist'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockRejectedValueOnce(
+        new DataError(code, 'read failed')
+      );
+
+      const result = await ArtistService.findByName('Ceschi');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 

@@ -32,8 +32,7 @@ export const updateArtistBioImageAttributionAction = async (
       }
       const attribution =
         parsed.data.attribution === null ? null : sanitizeBioText(parsed.data.attribution);
-      await ArtistService.updateBioImageAttribution(id, attribution);
-      return { success: true };
+      return ArtistService.updateBioImageAttribution(id, attribution);
     },
     event: 'media.artist_bio_image.updated',
     metadataKey: 'artistBioImageId',
