@@ -4,7 +4,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { DisplayImageGallery, type GalleryImage } from './display-image-gallery';
+import type { ArtistDisplayImage } from '@/lib/types/domain/artist';
+
+import { DisplayImageGallery } from './display-image-gallery';
 
 vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -12,7 +14,7 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-const image = (n: number, extra: Partial<GalleryImage> = {}): GalleryImage => ({
+const image = (n: number, extra: Partial<ArtistDisplayImage> = {}): ArtistDisplayImage => ({
   id: `img-${n}`,
   url: `https://cdn.example/${n}.jpg`,
   thumbnailUrl: null,

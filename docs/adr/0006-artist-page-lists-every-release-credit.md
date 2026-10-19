@@ -61,6 +61,14 @@ The `credit` field is part of the artist-detail wire contract (Zod-validated
 on the client) and the picker's ordering and labels depend on it. Removing it
 means removing the ordering and labels with it.
 
+Note (2026-10-19, #906): the artist-detail payload no longer carries the
+credit-tagged release list. It is now the artist page model
+(`src/lib/services/artist-page-model.ts`), which carries the latest release
+and whether any listed release exists, band releases included. The credits
+are still derived from the full credit order, to decide which releases
+count: a direct credit (`primary` or `featured`) can lead the page, and a
+band's release counts without leading it.
+
 ## Trade-offs accepted
 
 - ~~Credit order depends on `ArtistRelease` insertion order. `syncArtistReleases`

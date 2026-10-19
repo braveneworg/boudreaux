@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
@@ -205,6 +205,27 @@ describe('BioMediaPalettes', () => {
     renderPalettes();
     expect(screen.getByRole('region', { name: 'Bio images' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Image pool' })).toBeInTheDocument();
+  });
+
+  // The manager badges what the pool resolved the page to show: here the
+  // job's suggestion, since nothing is chosen, and then the chosen image.
+  it("badges the pool's view of what the page shows", () => {
+    renderPalettes();
+    const pool = screen.getByRole('group', { name: 'Image pool' });
+    expect(within(pool).getByText('Shown (suggested)')).toBeInTheDocument();
+  });
+
+  it("strips the pool's chosen images in order", () => {
+    mockStatus({
+      status: 'succeeded',
+      error: null,
+      content: contentWith([], [{ ...IMAGE_ROW, displayOrder: 0 }]),
+    });
+    renderPalettes();
+
+    expect(
+      within(screen.getByRole('list', { name: 'Display images' })).getAllByRole('listitem')
+    ).toHaveLength(1);
   });
 
   // Uploading is the manager's job, so it mounts even before anything exists.

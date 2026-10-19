@@ -383,6 +383,7 @@ describe('Artist API Routes', () => {
         title: 'LP',
         releasedOn: new Date('2024-01-01'),
         playSrc: null,
+        byName: null,
         albumArtistSlug: null,
       },
     };

@@ -179,6 +179,18 @@ _Avoid_: newest release (the summary field is named `newestRelease`, but the
 page concept is this), featured release (the home page row is a
 **spotlight**).
 
+**artist page model** — what a public surface shows of an Artist, built in
+one place from the artist's detail read: the name fields, the slug, the
+genres, the **artist links** and both bios (sanitized); every **display
+image**, each with only what the collage renders and credits; the **latest
+release** with its "by"; and whether the Artist holds any listed Release,
+band releases included. The artist page reads all of it; the artists index
+card reads its first display image and its latest release; a **spotlight**
+and the home search read its first display image. It never carries the
+pool's internals (original URL, face signal, hashes, display position), and
+no release list or band graph.
+_Defined in_ `src/lib/services/artist-page-model.ts`.
+
 **listening modal** — the in-place player dialog for a Release
 (`ReleasePlayDialog`): its cover, track list, controls, download and share
 row. Every opener of a playable Release opens it in place — a cover, the

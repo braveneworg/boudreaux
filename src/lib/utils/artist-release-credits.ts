@@ -9,17 +9,6 @@ import {
 } from '@/lib/repositories/_internal/visibility';
 import type { ReleaseCredit } from '@/lib/types/domain/release';
 
-/**
- * Every credit the artist page can assign to a release, in display order:
- * the artist's own releases, then releases they are featured on, then releases
- * by a band they belong to.
- */
-export const RELEASE_CREDITS = [
-  'primary',
-  'featured',
-  'member',
-] as const satisfies readonly ReleaseCredit[];
-
 const CREDIT_RANK: Record<ReleaseCredit, number> = { primary: 0, featured: 1, member: 2 };
 
 /** The release fields the credit derivation and listing filter read. */

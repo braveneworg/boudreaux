@@ -109,17 +109,22 @@ test.describe('Admin form round trips', () => {
     await expect(adminPage.locator('[name="displayName"]')).toHaveValue('');
     const row = await prisma.artist.findUniqueOrThrow({
       where: { id },
-      select: { suffix: true, displayName: true },
+      select: { suffix: true, displayName: true, slug: true },
     });
     expect({ suffix: row.suffix ?? '', displayName: row.displayName ?? '' }).toEqual({
       suffix: '',
       displayName: '',
     });
 
-    const response = await adminPage.request.get(`/api/artists/slug/e2e-clear-${STAMP}`);
-    const body = await response.text();
+    // The public page names the artist by first name and surname now. The
+    // form derives the slug from the name fields, so the save moved it off
+    // the seeded `e2e-clear-` slug: read the page at the stored one.
+    await adminPage.goto(`/artists/${row.slug}`);
+    await expect(adminPage.getByRole('heading', { level: 1 })).toHaveText(`ZZ Clear ${STAMP}`, {
+      timeout: 15_000,
+    });
+    const body = await (await adminPage.request.get(`/artists/${row.slug}`)).text();
     expect(body).not.toContain(`ZZ Shown ${STAMP}`);
-    expect(body).not.toContain('Jr.');
   });
 
   test('stores an emptied catalog number on a release', async ({ adminPage }) => {

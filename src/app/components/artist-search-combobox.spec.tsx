@@ -43,6 +43,7 @@ const makeArtist = (overrides: Partial<ArtistListingRow>): ArtistListingRow => (
     title: 'Debut LP',
     releasedOn: new Date(2024, 0, 1),
     playSrc: null,
+    byName: null,
     albumArtistSlug: null,
   },
   ...overrides,
@@ -71,6 +72,7 @@ const alpha = makeArtist({
     title: 'Alpha Sessions',
     releasedOn: new Date(2025, 0, 1),
     playSrc: null,
+    byName: null,
     albumArtistSlug: null,
   },
 });

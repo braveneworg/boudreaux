@@ -13,14 +13,12 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
 import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
 
 import { getPublicArtist } from './get-public-artist';
-import { toLatestRelease } from './latest-release';
 
 import type { Metadata } from 'next';
 
@@ -45,10 +43,10 @@ export async function generateMetadata({ params }: ArtistDetailPageProps): Promi
  * The artist page, design A ("contact sheet"): the proof-sheet collage of
  * the display images, the genres and the curated link sections in the left
  * third; the name, the latest release and the biography on the right. A
- * Server Component: the graph is read once per request (shared with the
- * metadata) and parsed to the public wire shape; the collage and the
- * latest-release line are the only client islands. On a phone the order is
- * name, filmstrip, genres and links, then the biography.
+ * Server Component that renders the artist page model, read once per request
+ * (shared with the metadata) and parsed through its schema; the collage and
+ * the latest-release line are the only client islands. On a phone the order
+ * is name, filmstrip, genres and links, then the biography.
  */
 export default async function ArtistDetailPage({ params }: ArtistDetailPageProps) {
   const { slug } = await params;
@@ -57,11 +55,9 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
   const displayName = getArtistDisplayName(artist);
   const genres = splitList(artist.genres);
-  // The chosen display images in order; a grandfathered artist with none
-  // chosen keeps the ADR-0008 fallback tiers (decision 5).
-  const images = resolveDisplayImages(artist.bioImages);
-  const latest = toLatestRelease(artist);
-  const { links } = artist;
+  // The display images arrive resolved: the chosen ones in order, or a
+  // grandfathered artist's ADR-0008 fallback tiers (decision 5).
+  const { displayImages, latestRelease, links } = artist;
 
   return (
     <PageContainer>
@@ -87,15 +83,15 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
               <ZineHeading level={1} className="mb-2">
                 {displayName}
               </ZineHeading>
-              {latest ? (
+              {latestRelease ? (
                 <LatestReleasePlayLink
-                  release={latest}
+                  release={latestRelease}
                   artistName={displayName}
                   slug={slug}
                   variant="page"
                   className="text-lg"
                 />
-              ) : artist.releases.length > 0 ? (
+              ) : artist.hasListedRelease ? (
                 // Only band releases: no latest release to lead with, but
                 // the full list still holds them (ADR-0006).
                 <div className="space-y-2">
@@ -112,7 +108,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
             {/* `lg:pt-4` sets the sheet's top edge on the cap line of the name
               (the heading's top padding, margin and line-box lead). */}
             <aside className="space-y-8 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:pt-4">
-              <DisplayImageCollage images={images} displayName={displayName} />
+              <DisplayImageCollage images={displayImages} displayName={displayName} />
               {genres.length > 0 && (
                 <ul aria-label="Genres" className="flex flex-wrap gap-2">
                   {genres.map((genre) => (

@@ -10,7 +10,6 @@ import { Badge } from '@/app/components/ui/badge';
 import { Card, CardContent } from '@/app/components/ui/card';
 import type { ArtistListingRow } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
-import { CARD_DISPLAY_IMAGE_COUNT } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { splitList } from '@/lib/utils/split-list';
 import { formatVocabularyTerm } from '@/utils/vocabulary-term';
@@ -24,14 +23,6 @@ interface ArtistListCardProps {
 
 /** How many genre badges a card shows before the rest are left to the detail page. */
 const MAX_GENRES = 3;
-
-/**
- * The listing row already arrives resolved — the human's chosen rows, else
- * the job's suggestions, else pool order — and sliced to the card count by
- * the service, so the first row is the one worth showing; the rest belong to
- * the artist page's collage.
- */
-const MAX_CARD_IMAGES = CARD_DISPLAY_IMAGE_COUNT;
 
 /**
  * The photo frame at each breakpoint, as one class string so the photo, the
@@ -79,9 +70,10 @@ interface ArtistThumbnailsProps {
  * photo enlarges it in place (see `ArtistCardPhoto`) and the name carries the
  * navigation. With no photo the slot holds an inert placeholder — there is
  * nothing to enlarge, so it is neither a link nor a button — wearing the same
- * black frame as a photo so an empty slot keeps the paste-up edge. Takes a
- * list rather than a single row so the caller owns how many it shows (see
- * `MAX_CARD_IMAGES`).
+ * black frame as a photo so an empty slot keeps the paste-up edge. Takes the
+ * listing row's display images as they arrive: the artist page model has
+ * already resolved them (the human's chosen rows, else the job's
+ * suggestions) and cut them to the card count.
  */
 const ArtistThumbnails = ({ slug, displayName, images }: ArtistThumbnailsProps) => (
   <div data-slot="artist-thumbnails" className="flex shrink-0 gap-2">
@@ -141,19 +133,18 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
   const displayName = getArtistDisplayName(artist);
   const akaNames = otherNames(artist.akaNames, displayName);
   const genres = splitList(artist.genres).slice(0, MAX_GENRES);
-  const images = artist.bioImages.slice(0, MAX_CARD_IMAGES);
   const meta = formatMetaLine(artist);
   const newestRelease = artist.releaseCount > 0 ? artist.newestRelease : null;
   // The artist page renders for any artist, so gate the link on there being a
   // biography worth jumping to. The listing row carries no `bio`/`bioLinks`,
   // but the generator always writes a short bio alongside a long one, so these
   // two stand in for it.
-  const hasBioPage = Boolean(artist.shortBio) || images.length > 0;
+  const hasBioPage = Boolean(artist.shortBio) || artist.bioImages.length > 0;
 
   return (
     <Card className="shadow-zine-sm mb-0 overflow-hidden bg-white p-0">
       <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:gap-6 sm:p-6">
-        <ArtistThumbnails slug={artist.slug} displayName={displayName} images={images} />
+        <ArtistThumbnails slug={artist.slug} displayName={displayName} images={artist.bioImages} />
 
         <div data-slot="artist-details" className="flex min-w-0 flex-1 flex-col gap-2">
           {/* The cutout face is a single-weight display font, so no
@@ -199,7 +190,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           {newestRelease && (
             <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
               <LatestReleasePlayLink
-                release={{ ...newestRelease, byName: null }}
+                release={newestRelease}
                 artistName={displayName}
                 slug={artist.slug}
                 variant="card"

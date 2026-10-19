@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { publicArtist as publicArtistRule } from '@/lib/repositories/_internal/visibility';
 import {
   ArtistBioImageRepository,
   type BioImageEligibilityRow,
@@ -25,38 +24,25 @@ import type {
   ArtistListingRecord,
   ArtistListingRow,
   ArtistNameRecord,
-  ArtistPublicScalars,
-  ArtistPublishedReleaseRow,
-  ArtistReleaseGraphRow,
+  ArtistPageModel,
   ArtistScalars,
   ArtistSearchMatch,
-  ArtistWithPublishedReleases,
   CreateArtistBioImageData,
   CreateArtistBioLinkData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
-import type { ArtistReleaseScalars, ReleaseCredit } from '@/lib/types/domain/release';
+import type { ArtistReleaseScalars } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
-import {
-  collectArtistReleases,
-  publicCredits,
-  summarizeListedReleases,
-} from '@/lib/utils/artist-release-credits';
+import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
-import {
-  CARD_DISPLAY_IMAGE_COUNT,
-  isDisplayEligible,
-  orderBioImagesForPicker,
-  resolveDisplayImages,
-} from '@/lib/utils/display-images';
+import { isDisplayEligible, orderBioImagesForPicker } from '@/lib/utils/display-images';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
-import { getFirstTrackStreamSource } from '@/lib/utils/release-helpers';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import { sanitizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
@@ -70,6 +56,7 @@ import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
+import { buildArtistPageModel, buildLatestRelease, cardDisplayImages } from './artist-page-model';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
@@ -349,19 +336,6 @@ interface ArtistCreateInput {
   details?: VideoArtistDetail;
 }
 
-type CreditedReleaseRow = ArtistReleaseGraphRow & { credit: ReleaseCredit };
-
-/**
- * Drop the hidden artists from a release's credits, once its credit has been
- * derived. The album artist is read from the full credit order first, so a
- * hidden album artist leaves `albumArtist` null rather than handing the
- * attribution to the next credit.
- */
-const withPublicCredits = (row: CreditedReleaseRow): ArtistPublishedReleaseRow => {
-  const { albumArtist, credits } = publicCredits(row.release.artistReleases);
-  return { ...row, albumArtist, release: { ...row.release, artistReleases: credits } };
-};
-
 /** Optional middleName spread: only include the field when a non-blank value is present. */
 const middleNameSpread = (value: string | undefined): { middleName?: string } =>
   value ? { middleName: value } : {};
@@ -537,24 +511,6 @@ export class ArtistService {
   static async getArtistById(id: string): Promise<ServiceResponse<ArtistDetail>> {
     try {
       const artist = await ArtistRepository.findById(id);
-
-      if (!artist) {
-        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
-      }
-
-      return { success: true, data: artist };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
-    }
-  }
-
-  /**
-   * Get an artist by slug, projected to the public scalars (no contact PII,
-   * notes, audit actors, or job internals) — it backs a public route.
-   */
-  static async getArtistBySlug(slug: string): Promise<ServiceResponse<ArtistPublicScalars>> {
-    try {
-      const artist = await ArtistRepository.findBySlug(slug);
 
       if (!artist) {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
@@ -755,10 +711,11 @@ export class ArtistService {
   /**
    * Project one repository listing record onto the public listing row: the band
    * joins flattened to name projections, the direct release joins summarised
-   * into `releaseCount` + `newestRelease` (listed releases only) and dropped,
-   * the video joins (read only by the repository's "newest" order) dropped,
-   * the bio image candidates resolved to the artist's display images, and the
-   * short bio reduced to plain text for the card teaser.
+   * into `releaseCount` (listed releases only) and `newestRelease`, the latest
+   * release with its byline, and dropped, the video joins (read only by the
+   * repository's "newest" order) dropped, the bio image candidates resolved to
+   * the card's display image, and the short bio reduced to plain text for the
+   * card teaser.
    */
   private static toArtistListingRow({
     members,
@@ -770,35 +727,12 @@ export class ArtistService {
     return {
       ...artist,
       // A card shows the first display image only; the page shows them all.
-      bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
+      bioImages: cardDisplayImages(artist.bioImages),
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
-      ...ArtistService.summarizeListingReleases(releases),
-    };
-  }
-
-  /**
-   * The listing row's release summary: the count and the newest listed
-   * release, the newest with its first track's stream URL (the card's
-   * listening modal) and its album artist's slug (the release deep link),
-   * `null` when that artist is hidden (ADR-0015).
-   */
-  private static summarizeListingReleases(
-    releases: ArtistListingRecord['releases']
-  ): Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'> {
-    const { releaseCount, newestRelease } = summarizeListedReleases(releases);
-    const newest = releases.find(({ release }) => release.id === newestRelease?.id)?.release;
-    return {
-      releaseCount,
-      newestRelease:
-        newestRelease && newest
-          ? {
-              ...newestRelease,
-              playSrc: getFirstTrackStreamSource(newest),
-              albumArtistSlug: publicCredits(newest.artistReleases).albumArtist?.slug ?? null,
-            }
-          : null,
+      releaseCount: summarizeListedReleases(releases).releaseCount,
+      newestRelease: buildLatestRelease(artist.id, releases),
     };
   }
 
@@ -820,14 +754,14 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and digital format data: every
-   * published, non-deleted release the artist is credited on (their own
-   * releases and featured appearances) plus the published releases of every
-   * band they belong to, each tagged with its credit and listed own-first.
+   * Get the artist page model for a slug: what the public artist page shows of
+   * a public artist, built once from the detail read (`buildArtistPageModel`)
+   * — the page scalars with sanitized bios, every display image, the latest
+   * release with its byline, and whether any listed release exists.
    */
   static async getArtistBySlugWithReleases(
     slug: string
-  ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
+  ): Promise<ServiceResponse<ArtistPageModel>> {
     try {
       const artist = await ArtistRepository.findPublishedBySlugWithReleases(slug);
 
@@ -835,35 +769,7 @@ export class ArtistService {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
-      // The band graph is folded into `releases` and not exposed. Hidden
-      // artists are dropped here rather than in the query because each
-      // release's credit is derived from its full credit order first: the
-      // first credit is the album artist even when that artist is hidden
-      // (ADR-0015). Bio prose is sanitized on read so
-      // redisplay is safe regardless of how it was authored (generated bios
-      // are also sanitized at write time).
-      const { memberOf, members, ...publicArtist } = artist;
-      const credited = collectArtistReleases({
-        ...artist,
-        memberOf: memberOf.filter(({ artist: band }) => publicArtistRule.matches(band)),
-      });
-      const filteredArtist: ArtistWithPublishedReleases = {
-        ...publicArtist,
-        bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
-        // Short bio is rich-text too (Tiptap); kept as sanitized HTML for
-        // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
-        // descriptions, listing cards) strip it with sanitizeBioText instead.
-        shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        members: members.filter(({ member }) => publicArtistRule.matches(member)),
-        releases: credited.map(withPublicCredits),
-        // The page leads with the newest release the artist holds a direct
-        // credit on — own or featured, never a band's — summarised as the
-        // artists index does (ADR-0006).
-        newestRelease: summarizeListedReleases(credited.filter(({ credit }) => credit !== 'member'))
-          .newestRelease,
-      };
-
-      return { success: true, data: filteredArtist };
+      return { success: true, data: buildArtistPageModel(artist) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }

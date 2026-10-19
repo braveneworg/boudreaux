@@ -101,6 +101,8 @@ export const BioMediaPalettes = ({
       <BioImageManager
         artistId={artistId}
         images={pool.images}
+        chosenIds={pool.chosenIds}
+        shown={pool.shown}
         isLoading={pool.isPending}
         loadError={pool.loadError}
         onRetry={pool.retry}

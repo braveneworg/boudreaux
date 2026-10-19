@@ -52,7 +52,8 @@ const wireRow = {
     title: 'E2E Album Three',
     releasedOn: '2024-09-01T00:00:00.000Z',
     playSrc: 'https://cdn.example/r-3/track-1.mp3',
-    albumArtistSlug: 'e2e-artist',
+    byName: 'Ceschi',
+    albumArtistSlug: 'ceschi',
   },
 };
 
@@ -62,6 +63,13 @@ describe('artistListingRowSchema', () => {
 
     expect(parsed.bornOn).toEqual(new Date('1975-01-01T00:00:00.000Z'));
     expect(parsed.newestRelease?.releasedOn).toEqual(new Date('2024-09-01T00:00:00.000Z'));
+  });
+
+  // The card's listening modal is headed by the album artist it names.
+  it("keeps the album artist's name on the newest release", () => {
+    const parsed = artistListingRowSchema.parse(wireRow);
+
+    expect(parsed.newestRelease?.byName).toBe('Ceschi');
   });
 
   it('accepts a row with no newest release', () => {

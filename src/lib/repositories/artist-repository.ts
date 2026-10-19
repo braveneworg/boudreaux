@@ -16,7 +16,6 @@ import type {
   ArtistListingFilters,
   ArtistListingRecord,
   ArtistNameRecord,
-  ArtistPublicScalars,
   ArtistScalars,
   ArtistSearchMatch,
   ArtistVocabularyField,
@@ -168,6 +167,20 @@ const artistListingNameSelect = {
 } as const satisfies Prisma.ArtistSelect;
 
 /**
+ * A credited artist on a listing-row release: the name the card's listening
+ * modal is headed by, the slug the deep link names, and the public gate fields.
+ */
+const listingCreditArtistSelect = {
+  id: true,
+  firstName: true,
+  surname: true,
+  displayName: true,
+  slug: true,
+  publishedOn: true,
+  deletedOn: true,
+} as const satisfies Prisma.ArtistSelect;
+
+/**
  * Public artists-index select — the identifying scalars only (this payload
  * leaves the server, so contact fields are never selected), the display-image
  * candidates, the band graph as name projections, and the artist's
@@ -233,9 +246,10 @@ const artistListingSelect = (now: Date) =>
                 files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
               },
             } as const),
-            // The album artist's slug names the release deep link (ADR-0015).
+            // Who leads the release: a featured credit's album artist heads the
+            // card's listening modal and names the deep link (ADR-0015).
             artistReleases: orderedCredits({
-              select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+              select: { artistId: true, artist: { select: listingCreditArtistSelect } },
             } as const),
           },
         },
@@ -426,21 +440,38 @@ const artistReleaseRowsInclude = {
 } as const satisfies Prisma.Artist$releasesArgs;
 
 /**
- * Public artist-detail select — the public scalars plus the full nested
- * release + bio graph, and the same release graph for every band the artist is
- * a member of so the page can list band releases beside the artist's own. A
- * `select` (not an `include`) so no artist on the graph — the artist, members,
- * bands, or release credits — carries a private scalar. Only the page artist,
- * which the slug read gates on publication, carries its bio; members and bands
- * read through {@link artistCreditSelect}.
+ * Public artist-detail select — the public scalars, the bio images the page
+ * can show, and the full nested release graph, with the same release graph
+ * for every band the artist is a member of: the artist page model reads the
+ * latest release from the artist's own releases and counts the bands' too. A
+ * `select` (not an `include`) so no artist on the graph — the artist, bands,
+ * or release credits — carries a private scalar. Only the page artist, which
+ * the slug read gates on publication, carries its bio; bands and credits read
+ * through {@link artistCreditSelect}.
  */
 const artistWithReleaseGraphSelect = {
   ...artistPublicSelect,
-  labels: true,
-  urls: true,
-  bioImages: { orderBy: { sortOrder: 'asc' } },
-  bioLinks: { where: bioLinkWhere.reference, orderBy: { sortOrder: 'asc' } },
-  members: { include: { member: { select: artistCreditSelect } } },
+  // The rows display-image resolution can return, in pool order, with the
+  // fields the page renders and resolution reads. No take: Mongo sorts nulls
+  // first, so a cap would return unchosen rows (ADR-0008).
+  bioImages: {
+    where: bioImageWhere.pageCandidate,
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      id: true,
+      url: true,
+      thumbnailUrl: true,
+      alt: true,
+      title: true,
+      attribution: true,
+      license: true,
+      sourceUrl: true,
+      width: true,
+      height: true,
+      isPrimary: true,
+      displayOrder: true,
+    },
+  },
   releases: artistReleaseRowsInclude,
   memberOf: {
     include: { artist: { select: { ...artistCreditSelect, releases: artistReleaseRowsInclude } } },
@@ -868,18 +899,6 @@ export class ArtistRepository {
   }
 
   /**
-   * Find a published, non-deleted artist by slug (no relations), projected to
-   * the public scalars — this backs the public `GET /api/artists/slug/[slug]`.
-   * A draft or deleted artist reads as absent (#786).
-   */
-  static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
-    return prisma.artist.findFirst({
-      where: { slug, ...publicArtist.where },
-      select: artistPublicSelect,
-    });
-  }
-
-  /**
    * List one page of listed artists for the public `/artists` index —
    * published, non-deleted, and directly credited on a listed release or
    * credited on a live video ({@link buildListedWhere}, ADR-0022) — with the
@@ -1068,12 +1087,11 @@ export class ArtistRepository {
 
   /**
    * Find a single published, non-deleted artist by slug with the public
-   * scalars and the full nested release + bio graph used on the public detail
-   * page (every artist on it projected public), including the releases of
+   * scalars, the bio images the page can show, and the full nested release
+   * graph (every artist on it projected public), including the releases of
    * every band the artist belongs to. A draft or deleted artist reads as
-   * absent (#786). The service folds the band
-   * releases in and post-filters members, bands, and releases to published,
-   * non-deleted.
+   * absent (#786). The artist page model is built from it: it derives each
+   * release's credit, then drops hidden bands and unlisted releases.
    */
   static async findPublishedBySlugWithReleases(
     slug: string

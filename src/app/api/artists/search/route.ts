@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 
 import { SEARCH_LIMIT, searchLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
+import { cardDisplayImages } from '@/lib/services/artist-page-model';
 import { ArtistService } from '@/lib/services/artist-service';
 import type {
   ArtistHomeSearchMatch,
@@ -14,7 +15,6 @@ import type {
   ArtistHomeSearchVideoRecord,
   ArtistSearchBioImage,
 } from '@/lib/types/domain/artist';
-import { resolveDisplayImages } from '@/lib/utils/display-images';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
@@ -62,7 +62,7 @@ const CACHE_HEADER = 'public, s-maxage=60, stale-while-revalidate=300';
 
 /** The thumbnail (or, lacking one, the full image) of the artist's first display image. */
 const firstDisplayImageSrc = (bioImages: ArtistSearchBioImage[]): string | null => {
-  const [first] = resolveDisplayImages(bioImages);
+  const [first] = cardDisplayImages(bioImages);
   return first ? (first.thumbnailUrl ?? first.url) : null;
 };
 
