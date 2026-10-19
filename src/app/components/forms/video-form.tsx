@@ -18,6 +18,7 @@ import {
   useUnpublishVideoMutation,
   useUpdateVideoMutation,
 } from '@/hooks/mutations/use-video-mutations';
+import type { FormState } from '@/lib/types/form-state';
 import { composeArtistString, splitFeaturedArtists } from '@/lib/utils/artist-name-split';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { releaseDayFromForm } from '@/lib/utils/validation/iso-date';
@@ -26,6 +27,7 @@ import type { VideoLevelSuggestionField } from '@/lib/validation/video-enrichmen
 import type { VideoRow } from '@/lib/validation/video-schema';
 import { ZinePanel } from '@/ui/zine-panel';
 
+import { type SubmitMode, useEntitySubmit } from './_hooks/use-entity-submit';
 import { useVideoProbePrefillQuery } from './_hooks/use-video-probe-prefill-query';
 import { useVideoProducersQuery } from './_hooks/use-video-producers-query';
 import { useVideoQuery } from './_hooks/use-video-query';
@@ -69,16 +71,6 @@ export interface VideoFormProps {
   onDraftCreated?: (videoId: string) => void;
 }
 
-interface SubmitVideoDeps {
-  isPersisted: boolean;
-  effectiveVideoId: string | undefined;
-  preGeneratedId: string;
-  form: UseFormReturn<VideoFormData>;
-  router: ReturnType<typeof useRouter>;
-  createVideoAsync: ReturnType<typeof useCreateVideoMutation>['createVideoAsync'];
-  updateVideoAsync: ReturnType<typeof useUpdateVideoMutation>['updateVideoAsync'];
-}
-
 /**
  * Merge reviewed artist details into the form payload when present.
  * Keeps `onValidSubmit` under the complexity cap by extracting the conditional.
@@ -118,27 +110,65 @@ const resolveSubmitPosterUrl = async ({
   return uploaded ? { ok: true, posterUrl: uploaded } : { ok: false, posterUrl: '' };
 };
 
-/** Dispatch to the create/update mutation, then map errors or navigate on success. */
-const submitVideo = async (data: VideoFormData, deps: SubmitVideoDeps): Promise<void> => {
-  const { isPersisted, effectiveVideoId, preGeneratedId, form, router } = deps;
-  const result =
-    isPersisted && effectiveVideoId
-      ? await deps.updateVideoAsync({ id: effectiveVideoId, values: data })
-      : await deps.createVideoAsync({ ...data, preGeneratedId });
+interface UseVideoSubmitArgs {
+  form: UseFormReturn<VideoFormData>;
+  preGeneratedId: string;
+}
 
-  if (!result.success) {
-    applyServerFieldErrors(form.setError, result.errors);
-    toast.error(
-      result.errors?.general?.[0] ?? `Failed to ${isPersisted ? 'update' : 'create'} the video.`
-    );
-    return;
-  }
+interface VideoSubmit {
+  /** The shared protocol's submit: `(formEl, persisted row id or null, values)`. */
+  submit: ReturnType<typeof useEntitySubmit<VideoFormData, FormState>>;
+  isSubmitting: boolean;
+}
 
-  toast.success(`Video ${isPersisted ? 'saved' : 'created'} successfully.`);
-  // Create lands on the new video's edit page so the admin can watch the
-  // probe + auto-kicked enrichment complete; a persisted (edit/draft) save
-  // returns to the list.
-  router.push(isPersisted ? '/admin/videos' : `/admin/videos/${preGeneratedId}`);
+/**
+ * The video form on the shared submit protocol. A persisted row (edit, or the
+ * draft created at upload) updates; anything else creates under the
+ * pre-generated id. A failure maps the server's field errors inline and toasts
+ * its general message. Extracted to keep `VideoForm` within the ESLint size
+ * caps.
+ */
+const useVideoSubmit = ({ form, preGeneratedId }: UseVideoSubmitArgs): VideoSubmit => {
+  const router = useRouter();
+  const { createVideoAsync, isCreatingVideo } = useCreateVideoMutation();
+  const { updateVideoAsync, isUpdatingVideo } = useUpdateVideoMutation();
+
+  const create = useCallback(
+    (values: VideoFormData): Promise<FormState> => createVideoAsync({ ...values, preGeneratedId }),
+    [createVideoAsync, preGeneratedId]
+  );
+  const update = useCallback(
+    (id: string, values: VideoFormData): Promise<FormState> => updateVideoAsync({ id, values }),
+    [updateVideoAsync]
+  );
+  const onSuccess = useCallback(
+    (_result: FormState, _values: VideoFormData, mode: SubmitMode): void => {
+      const isPersisted = mode === 'update';
+      toast.success(`Video ${isPersisted ? 'saved' : 'created'} successfully.`);
+      // Create lands on the new video's edit page so the admin can watch the
+      // probe + auto-kicked enrichment complete; a persisted (edit/draft) save
+      // returns to the list.
+      router.push(isPersisted ? '/admin/videos' : `/admin/videos/${preGeneratedId}`);
+    },
+    [router, preGeneratedId]
+  );
+  const onFailure = useCallback(
+    (result: FormState, _values: VideoFormData, mode: SubmitMode): void => {
+      applyServerFieldErrors(form.setError, result.errors);
+      toast.error(result.errors?.general?.[0] ?? `Failed to ${mode} the video.`);
+    },
+    [form]
+  );
+
+  const submit = useEntitySubmit<VideoFormData, FormState>({
+    entity: 'video',
+    reset: form.reset,
+    create,
+    update,
+    onSuccess,
+    onFailure,
+  });
+  return { submit, isSubmitting: isCreatingVideo || isUpdatingVideo };
 };
 
 interface EnrichmentPanelMountProps {
@@ -370,8 +400,8 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
    */
   const getPosterDraftFieldsRef = useRef<() => Promise<DraftPosterFields>>(async () => ({}));
 
-  const { createVideoAsync, isCreatingVideo } = useCreateVideoMutation();
-  const { updateVideoAsync, isUpdatingVideo } = useUpdateVideoMutation();
+  const formRef = useRef<HTMLFormElement>(null);
+
   const { unpublishVideoAsync } = useUnpublishVideoMutation();
   const { data: video, isPending } = useVideoQuery(videoId ?? '', { enabled: isEditMode });
 
@@ -380,6 +410,7 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
     defaultValues: buildVideoDefaults(),
   });
   const { control, setValue } = form;
+  const { submit, isSubmitting } = useVideoSubmit({ form, preGeneratedId });
 
   useVideoFormReset({ isEditMode, video, form });
   useVideoProducersPrefill({ videoId, isEditMode, video, form });
@@ -387,7 +418,6 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
   const s3Key = useWatch({ control, name: 's3Key' });
   const artistValue = useWatch({ control, name: 'artist', defaultValue: '' });
   const categoryValue = useWatch({ control, name: 'category' });
-  const isSubmitting = isCreatingVideo || isUpdatingVideo;
 
   const { entries, updateDraft, buildArtistDetails, primarySplitParts } =
     useVideoArtistReview(artistValue);
@@ -539,28 +569,17 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
         return;
       }
       const shaped = shapePublish(mergeArtistDetails(data, buildArtistDetails()), intent, isDraft);
-      return submitVideo(
-        {
-          ...shaped,
-          // Same precedence as the preview: this session's manual poster, then
-          // the fresh capture's picked frame (on a file replace the poster must
-          // follow the new file, not stay on a frame of the old one), then the
-          // resolved form value / Save-time commit.
-          posterUrl: sessionManualPoster ?? posterFields.posterUrl ?? resolvedPoster.posterUrl,
-          ...(posterFields.posterCandidates
-            ? { posterCandidates: posterFields.posterCandidates }
-            : {}),
-        },
-        {
-          isPersisted,
-          effectiveVideoId,
-          preGeneratedId,
-          form,
-          router,
-          createVideoAsync,
-          updateVideoAsync,
-        }
-      );
+      return submit(formRef.current, isPersisted && effectiveVideoId ? effectiveVideoId : null, {
+        ...shaped,
+        // Same precedence as the preview: this session's manual poster, then
+        // the fresh capture's picked frame (on a file replace the poster must
+        // follow the new file, not stay on a frame of the old one), then the
+        // resolved form value / Save-time commit.
+        posterUrl: sessionManualPoster ?? posterFields.posterUrl ?? resolvedPoster.posterUrl,
+        ...(posterFields.posterCandidates
+          ? { posterCandidates: posterFields.posterCandidates }
+          : {}),
+      });
     },
     [
       posterStrip,
@@ -569,11 +588,8 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
       isDraft,
       isPersisted,
       effectiveVideoId,
-      preGeneratedId,
       form,
-      router,
-      createVideoAsync,
-      updateVideoAsync,
+      submit,
       buildArtistDetails,
     ]
   );
@@ -607,7 +623,12 @@ export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.Re
           <CardTitle>{formTitle}</CardTitle>
         </CardHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onValidSubmit)} noValidate className="space-y-8">
+          <form
+            ref={formRef}
+            onSubmit={form.handleSubmit(onValidSubmit)}
+            noValidate
+            className="space-y-8"
+          >
             <VideoFileSection control={control} upload={upload} />
             {isEditMode && video ? <VideoTechnicalMetadataCard video={video} /> : null}
             <VideoMetadataSection
