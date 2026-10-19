@@ -4,21 +4,24 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import type {
-  ArtistListingName,
-  ArtistListingNewestRelease,
-  ArtistListingRow,
-} from '@/lib/types/domain/artist';
+import type { ArtistListingName, ArtistListingRow, LatestRelease } from '@/lib/types/domain/artist';
 
 import { ArtistListCard } from './artist-list-card';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 // The listening modal itself is covered by latest-release-play-link.spec;
-// here it only shows whether it opened.
+// here it only shows whether it opened, and whose name heads it.
 vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: ({ open, title }: { open: boolean; title: string }) =>
-    open ? <div role="dialog" aria-label={title} /> : null,
+  ReleasePlayDialog: ({
+    open,
+    title,
+    artistName,
+  }: {
+    open: boolean;
+    title: string;
+    artistName: string | null;
+  }) => (open ? <div role="dialog" aria-label={title} data-artist-name={artistName} /> : null),
 }));
 
 const name = (id: string, displayName: string): ArtistListingName => ({
@@ -49,12 +52,13 @@ const bioImage = (id: string, overrides: Partial<BioImage> = {}): BioImage => ({
   ...overrides,
 });
 
-const NEWEST: ArtistListingNewestRelease = {
+const NEWEST: LatestRelease = {
   id: 'r3',
   title: 'Third Album',
   releasedOn: new Date('2024-09-01T00:00:00Z'),
   playSrc: 'https://cdn.example/r3/track-1.mp3',
-  albumArtistSlug: 'test-artist',
+  byName: null,
+  albumArtistSlug: null,
 };
 
 const baseArtist: ArtistListingRow = {
@@ -276,7 +280,8 @@ describe('ArtistListCard', () => {
             title: 'Only One',
             releasedOn: new Date('2020-05-05T00:00:00Z'),
             playSrc: 'https://cdn.example/r1/track-1.mp3',
-            albumArtistSlug: 'test-artist',
+            byName: null,
+            albumArtistSlug: null,
           },
         }}
       />
@@ -317,6 +322,37 @@ describe('ArtistListCard', () => {
     await user.click(screen.getByRole('link', { name: 'Third Album' }));
 
     expect(screen.getByRole('dialog', { name: 'Third Album' })).toBeInTheDocument();
+  });
+
+  it('heads the listening modal with the album artist when the artist is only featured', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <ArtistListCard
+        artist={{
+          ...baseArtist,
+          newestRelease: { ...NEWEST, byName: 'Ceschi', albumArtistSlug: 'ceschi' },
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('link', { name: 'Third Album' }));
+
+    expect(screen.getByRole('dialog', { name: 'Third Album' })).toHaveAttribute(
+      'data-artist-name',
+      'Ceschi'
+    );
+  });
+
+  it('heads the listening modal with the artist on a release of their own', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ArtistListCard artist={baseArtist} />);
+
+    await user.click(screen.getByRole('link', { name: 'Third Album' }));
+
+    expect(screen.getByRole('dialog', { name: 'Third Album' })).toHaveAttribute(
+      'data-artist-name',
+      'Test Artist'
+    );
   });
 
   it('shows the latest release as plain text when nothing is playable', () => {

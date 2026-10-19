@@ -190,7 +190,7 @@ export const ArtistListCard = ({ artist }: ArtistListCardProps) => {
           {newestRelease && (
             <p data-slot="artist-credits" className="text-sm font-medium text-zinc-950">
               <LatestReleasePlayLink
-                release={{ ...newestRelease, byName: null }}
+                release={newestRelease}
                 artistName={displayName}
                 slug={artist.slug}
                 variant="card"

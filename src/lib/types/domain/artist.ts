@@ -531,9 +531,18 @@ export interface ArtistListingReleaseRecord {
   deletedOn: Date | null;
   /** The playable format with its first track only. */
   digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
-  /** The full credit order, each artist with its slug and public gate fields. */
+  /** The full credit order, each artist with its name, slug and public gate fields. */
   artistReleases: Array<{
-    artist: { slug: string; publishedOn: Date | null; deletedOn: Date | null };
+    artistId: string;
+    artist: {
+      id: string;
+      firstName: string;
+      surname: string;
+      displayName: string | null;
+      slug: string;
+      publishedOn: Date | null;
+      deletedOn: Date | null;
+    };
   }>;
 }
 
@@ -575,17 +584,6 @@ export interface NewestListedRelease {
 }
 
 /**
- * The newest listed release credited to an artist, as shown on the listing
- * row: what its listening modal plays and the deep link names.
- */
-export interface ArtistListingNewestRelease extends NewestListedRelease {
-  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
-  playSrc: string | null;
-  /** The album artist's slug, or `null` when that artist is hidden (ADR-0015). */
-  albumArtistSlug: string | null;
-}
-
-/**
  * Public artists-index row (the wire shape of `/api/artists?listing=published`
  * and the SSR prefetch): {@link ArtistListingRecord} with the release joins
  * summarised into a count plus the newest listed release, and the band joins
@@ -599,7 +597,8 @@ export interface ArtistListingRow extends Omit<
   memberOf: ArtistListingName[];
   /** Published, non-deleted releases the artist holds a direct credit on. */
   releaseCount: number;
-  newestRelease: ArtistListingNewestRelease | null;
+  /** The artist's latest release, with its byline, from the artist page model. */
+  newestRelease: LatestRelease | null;
 }
 
 /**

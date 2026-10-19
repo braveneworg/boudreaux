@@ -168,6 +168,20 @@ const artistListingNameSelect = {
 } as const satisfies Prisma.ArtistSelect;
 
 /**
+ * A credited artist on a listing-row release: the name the card's listening
+ * modal is headed by, the slug the deep link names, and the public gate fields.
+ */
+const listingCreditArtistSelect = {
+  id: true,
+  firstName: true,
+  surname: true,
+  displayName: true,
+  slug: true,
+  publishedOn: true,
+  deletedOn: true,
+} as const satisfies Prisma.ArtistSelect;
+
+/**
  * Public artists-index select — the identifying scalars only (this payload
  * leaves the server, so contact fields are never selected), the display-image
  * candidates, the band graph as name projections, and the artist's
@@ -233,9 +247,10 @@ const artistListingSelect = (now: Date) =>
                 files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
               },
             } as const),
-            // The album artist's slug names the release deep link (ADR-0015).
+            // Who leads the release: a featured credit's album artist heads the
+            // card's listening modal and names the deep link (ADR-0015).
             artistReleases: orderedCredits({
-              select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+              select: { artistId: true, artist: { select: listingCreditArtistSelect } },
             } as const),
           },
         },

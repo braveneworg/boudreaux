@@ -11,25 +11,13 @@ import { useRouter } from 'next/navigation';
 
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useListeningModal, type ListeningModalRelease } from '@/hooks/use-listening-modal';
+import type { LatestRelease } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { isPlainLeftClick } from '@/lib/utils/is-plain-left-click';
 import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
 
 import { AllReleasesLink } from './all-releases-link';
-
-/** An artist's newest release, as the artist page and the artists index card lead with it. */
-export interface LatestRelease {
-  id: string;
-  title: string;
-  releasedOn: Date;
-  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
-  playSrc: string | null;
-  /** The album artist's name when this artist is only featured on it (ADR-0015). */
-  byName: string | null;
-  /** The album artist's slug, or `null` when that artist is hidden (ADR-0015). */
-  albumArtistSlug: string | null;
-}
 
 interface LatestReleasePlayLinkProps {
   release: LatestRelease;

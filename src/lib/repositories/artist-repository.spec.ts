@@ -1068,10 +1068,24 @@ describe('ArtistRepository', () => {
                   files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
                 },
               },
-              // The album artist's slug names the release deep link (ADR-0015).
+              // Who leads the release: the credit order, each artist's name, slug
+              // and public gate fields (ADR-0015).
               artistReleases: {
                 orderBy: creditOrderBy,
-                select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+                select: {
+                  artistId: true,
+                  artist: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      surname: true,
+                      displayName: true,
+                      slug: true,
+                      publishedOn: true,
+                      deletedOn: true,
+                    },
+                  },
+                },
               },
             },
           },

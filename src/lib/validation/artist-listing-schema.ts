@@ -7,6 +7,7 @@ import type {
   ArtistListingBioImage,
   ArtistListingName,
   ArtistListingRow,
+  LatestRelease,
 } from '@/lib/types/domain/artist';
 import { date, nullableDate, nullableString } from '@/lib/validation/media/shared-schema';
 import { paginatedResponseSchema } from '@/lib/validation/pagination-schema';
@@ -56,16 +57,18 @@ const newestListedReleaseFields = { id: z.string(), title: z.string(), releasedO
 export const newestListedReleaseSchema = z.object(newestListedReleaseFields).nullable();
 
 /**
- * The newest listed release credited to the artist, as a listing row carries
- * it: with its first track's stream URL and the album artist's slug, or `null`.
+ * An artist's latest release, as a listing row and the artist page model
+ * carry it: with its first track's stream URL and, for a featured release
+ * whose album artist is public, that artist's name and slug; or `null`.
  */
-export const artistListingNewestReleaseSchema = z
+export const latestReleaseSchema = z
   .object({
     ...newestListedReleaseFields,
     playSrc: z.string().nullable(),
+    byName: z.string().nullable(),
     albumArtistSlug: z.string().nullable(),
   })
-  .nullable();
+  .nullable() satisfies z.ZodType<LatestRelease | null>;
 
 /** One validated `/api/artists?listing=published` row. */
 export const artistListingRowSchema = z.object({
@@ -88,7 +91,7 @@ export const artistListingRowSchema = z.object({
   members: z.array(artistListingNameSchema),
   memberOf: z.array(artistListingNameSchema),
   releaseCount: z.number().int().min(0),
-  newestRelease: artistListingNewestReleaseSchema,
+  newestRelease: latestReleaseSchema,
 }) satisfies z.ZodType<ArtistListingRow>;
 
 /** Strict schema for one `/api/artists?listing=published` page (`{ rows, nextSkip }`). */

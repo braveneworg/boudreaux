@@ -2339,9 +2339,29 @@ describe('ArtistService', () => {
       suffix: null,
     });
 
-    const albumCredit = (slug: string, publishedOn: Date | null = new Date('2024-01-01')) => ({
-      artist: { slug, publishedOn, deletedOn: null },
+    /** A credit row: the credited artist's id, name, slug and public gate fields. */
+    const albumCredit = (
+      id: string,
+      displayName: string,
+      {
+        slug = id,
+        publishedOn = new Date('2024-01-01'),
+      }: { slug?: string; publishedOn?: Date | null } = {}
+    ) => ({
+      artistId: id,
+      artist: {
+        id,
+        firstName: displayName,
+        surname: '',
+        displayName,
+        slug,
+        publishedOn,
+        deletedOn: null,
+      },
     });
+
+    /** The listed artist's own credit. */
+    const ownCredit = () => albumCredit('artist-1', 'E2E Artist', { slug: 'e2e-artist' });
 
     const listedRelease = (id: string, title: string, releasedOn: string) => ({
       release: {
@@ -2351,7 +2371,7 @@ describe('ArtistService', () => {
         publishedAt: new Date('2024-01-01'),
         deletedOn: null,
         digitalFormats: [{ files: [{ s3Key: `releases/${id}/track-1.mp3` }] }],
-        artistReleases: [albumCredit('e2e-artist')],
+        artistReleases: [ownCredit()],
       },
     });
 
@@ -2389,7 +2409,7 @@ describe('ArtistService', () => {
             publishedAt: null,
             deletedOn: null,
             digitalFormats: [],
-            artistReleases: [albumCredit('e2e-artist')],
+            artistReleases: [ownCredit()],
           },
         },
       ],
@@ -2447,7 +2467,8 @@ describe('ArtistService', () => {
         title: 'E2E Album Three',
         releasedOn: new Date('2024-09-01'),
         playSrc: expect.stringContaining('releases/r-3/track-1.mp3'),
-        albumArtistSlug: 'e2e-artist',
+        byName: null,
+        albumArtistSlug: null,
       });
     });
 
@@ -2475,18 +2496,35 @@ describe('ArtistService', () => {
       await expect(listWithNewest({ digitalFormats: [] })).resolves.toHaveProperty('playSrc', null);
     });
 
-    it("names the album artist's slug when the artist is only featured", async () => {
-      await expect(
-        listWithNewest({ artistReleases: [albumCredit('ceschi'), albumCredit('e2e-artist')] })
-      ).resolves.toHaveProperty('albumArtistSlug', 'ceschi');
+    // The card's listening modal is headed by the album artist of a featured
+    // latest release while that artist is public, as on the artist page.
+    it('names a public album artist and its slug when the artist is only featured', async () => {
+      const newest = await listWithNewest({
+        artistReleases: [albumCredit('ceschi', 'Ceschi'), ownCredit()],
+      });
+
+      expect({ byName: newest?.byName, albumArtistSlug: newest?.albumArtistSlug }).toEqual({
+        byName: 'Ceschi',
+        albumArtistSlug: 'ceschi',
+      });
     });
 
-    it('names no album artist slug when the album artist is hidden', async () => {
-      await expect(
-        listWithNewest({
-          artistReleases: [albumCredit('hidden', null), albumCredit('e2e-artist')],
-        })
-      ).resolves.toHaveProperty('albumArtistSlug', null);
+    it('names neither the album artist nor its slug when that artist is hidden', async () => {
+      const newest = await listWithNewest({
+        artistReleases: [albumCredit('hidden', 'Hidden', { publishedOn: null }), ownCredit()],
+      });
+
+      expect({ byName: newest?.byName, albumArtistSlug: newest?.albumArtistSlug }).toEqual({
+        byName: null,
+        albumArtistSlug: null,
+      });
+    });
+
+    it('names no album artist on a release of their own', async () => {
+      await expect(listWithNewest({ artistReleases: [ownCredit()] })).resolves.toHaveProperty(
+        'byName',
+        null
+      );
     });
 
     it('does not expose the raw release joins on the row', async () => {

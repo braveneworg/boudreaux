@@ -54,7 +54,6 @@ import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
 import { loggers } from '@/lib/utils/logger';
 import { invalidatePublicNameCaches } from '@/lib/utils/public-name-caches';
-import { getFirstTrackStreamSource } from '@/lib/utils/release-helpers';
 import { deleteS3Object } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
 import { sanitizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
@@ -68,7 +67,7 @@ import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
-import { cardDisplayImages } from './artist-page-model';
+import { buildLatestRelease, cardDisplayImages } from './artist-page-model';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
@@ -770,10 +769,11 @@ export class ArtistService {
   /**
    * Project one repository listing record onto the public listing row: the band
    * joins flattened to name projections, the direct release joins summarised
-   * into `releaseCount` + `newestRelease` (listed releases only) and dropped,
-   * the video joins (read only by the repository's "newest" order) dropped,
-   * the bio image candidates resolved to the artist's display images, and the
-   * short bio reduced to plain text for the card teaser.
+   * into `releaseCount` (listed releases only) and `newestRelease`, the latest
+   * release with its byline, and dropped, the video joins (read only by the
+   * repository's "newest" order) dropped, the bio image candidates resolved to
+   * the card's display image, and the short bio reduced to plain text for the
+   * card teaser.
    */
   private static toArtistListingRow({
     members,
@@ -789,31 +789,8 @@ export class ArtistService {
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
-      ...ArtistService.summarizeListingReleases(releases),
-    };
-  }
-
-  /**
-   * The listing row's release summary: the count and the newest listed
-   * release, the newest with its first track's stream URL (the card's
-   * listening modal) and its album artist's slug (the release deep link),
-   * `null` when that artist is hidden (ADR-0015).
-   */
-  private static summarizeListingReleases(
-    releases: ArtistListingRecord['releases']
-  ): Pick<ArtistListingRow, 'releaseCount' | 'newestRelease'> {
-    const { releaseCount, newestRelease } = summarizeListedReleases(releases);
-    const newest = releases.find(({ release }) => release.id === newestRelease?.id)?.release;
-    return {
-      releaseCount,
-      newestRelease:
-        newestRelease && newest
-          ? {
-              ...newestRelease,
-              playSrc: getFirstTrackStreamSource(newest),
-              albumArtistSlug: publicCredits(newest.artistReleases).albumArtist?.slug ?? null,
-            }
-          : null,
+      releaseCount: summarizeListedReleases(releases).releaseCount,
+      newestRelease: buildLatestRelease(artist.id, releases),
     };
   }
 
