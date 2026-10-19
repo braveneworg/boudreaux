@@ -43,6 +43,12 @@ export const videoFormSchema = z.object({
     .max(2000, { message: 'Description must be less than 2000 characters' })
     .optional()
     .or(z.literal('')),
+  /**
+   * Required on every full-form Save: ADR-0004's "Save and Publish still
+   * require a date". The column itself is nullable — a draft created at upload
+   * may have none — and published ⇒ dated, which also covers writes made
+   * without the form, lives in `src/lib/services/video-editorial-rules.ts`.
+   */
   releasedOn: z.string().min(1, { message: 'Release date is required' }),
   durationSeconds: z.union([z.string(), z.number()]).optional().refine(isOptionalPositiveInteger, {
     message: 'Duration must be a positive whole number of seconds',

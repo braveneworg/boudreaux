@@ -53,8 +53,15 @@ asked by every writer rather than enforced where a form happens to be open:
 - A suggestion equal to today's UTC day is **never filled by itself**. It stays
   a pending suggestion for the admin to confirm — the enrichment counterpart of
   the lookup's "today is a miss".
+- "Today is a miss" is one decision, `isTodayMiss`, in
+  `video-editorial-rules.ts` (amended 2026-10-19). It takes the day and today
+  and reads no clock. Three callers ask it: `ReleaseDateLookupService.lookup`
+  on the server, the client lookup policy (`classifyLookupResult`, the
+  double-guard), and enrichment auto-apply (`decideEnrichmentAutoApply`).
 - published ⇒ dated is asked of the same module by `publishVideo` and
-  `updateVideoReleaseDate`.
+  `updateVideoReleaseDate`, and lives nowhere else. The required `releasedOn`
+  in `createVideoSchema` is the separate "Save and Publish still require a
+  date" rule for the full form.
 - A release day is a `ReleaseDay` (`src/lib/utils/validation/iso-date.ts`),
   built by `releaseDayFromForm` (a form string names its local day) or
   `releaseDayFromStored` (a stored `Date` names its UTC day). The two differ

@@ -421,6 +421,16 @@ with its confidence and sources. Applying it overwrites the description; a
 blank description takes it without review, and it is never dismissed. See
 [ADR-0005](docs/adr/0005-description-is-edited-only-in-the-enrichment-panel.md).
 
+**post-save work** — what a successful Video save schedules once the row is
+written: the **video credit** sync from the artist string, the **probe** of a new
+or replaced file, the enrichment dispatch, and the producer sync. A **draft**
+also marks its enrichment `pending` before the response, so the edit page's
+status poll engages. Everything else runs after the response and never fails
+the save. A details-only update re-checks the stored credits first and does
+nothing when they already match.
+_Defined in_ `src/lib/services/video-post-save-service.ts`.
+_Avoid_: kick, after-save hook.
+
 **autosave** — persistence of a single field the moment it changes, without
 Save. Today only a persisted Video's release date autosaves, whether a human
 picked it or the release-date lookup filled it; Save and Publish still carry
