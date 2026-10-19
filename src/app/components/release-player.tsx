@@ -36,7 +36,7 @@ interface ReleasePlayerProps {
   releaseTitle?: string;
   /**
    * One-shot supplier of an audio element primed (and usually already playing)
-   * during the opening play gesture — see `usePrimedAudioHandoff`. Forwarded
+   * during the opening play gesture — see `usePrimedMediaHandoff`. Forwarded
    * to the audio controls so they adopt it in place and the gesture's
    * autoplay blessing survives (release play modal).
    */

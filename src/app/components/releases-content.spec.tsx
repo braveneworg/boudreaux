@@ -68,19 +68,8 @@ vi.mock('./spotlight-card', async (importOriginal) => {
   };
 });
 
-// The real card's listening modal and its priming hook, kept closed and inert.
+// The real card's listening modal, kept closed and inert.
 vi.mock('./release-play-dialog', () => ({ ReleasePlayDialog: () => null }));
-
-vi.mock('@/hooks/use-release-play-dialog', () => ({
-  useReleasePlayDialog: () => ({
-    playerOpen: false,
-    prefetchPlayer: false,
-    openPlayer: vi.fn(),
-    handlePlayerOpenChange: vi.fn(),
-    warmPlayer: vi.fn(),
-    takeMediaEl: () => null,
-  }),
-}));
 
 vi.mock('./deep-link-play-dialog', () => ({
   DeepLinkPlayDialog: ({

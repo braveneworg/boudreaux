@@ -3,14 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { ReactElement } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { useHydrated } from '@/hooks/use-hydrated';
-import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
+import { useListeningModal, type ListeningModalOptions } from '@/hooks/use-listening-modal';
 import { cn } from '@/lib/utils';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
@@ -20,9 +20,8 @@ import {
 } from '@/lib/utils/spotlight-card';
 
 import { PlaySharpIcon } from './icons/play-sharp-icon';
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
-import { pickLoudZineAccent, type ZineAccent } from './ui/zine-panel';
+
+import type { ZineAccent } from './ui/zine-panel';
 
 /**
  * What the caption under a cover names. `'artist-and-title'` (home): the
@@ -37,8 +36,9 @@ interface SpotlightCardProps {
   /** The caption under the cover; `'artist-and-title'` (as on home) by default. */
   caption?: SpotlightCaption;
   /**
-   * The page's accent, for the listening modal (see `ReleasePlayDialog`), or
-   * `'random'` for a new loud accent on each open (home).
+   * The page's accent, for the listening modal (see `useListeningModal`), or
+   * `'random'` for a new loud accent on each open (home). Without one, the
+   * modal takes the release's own accent.
    */
   accent?: ZineAccent | 'random';
   /**
@@ -53,12 +53,8 @@ interface SpotlightCardCaptionProps {
   caption: SpotlightCaption;
 }
 
-/** The props a linked modal heading passes to `ReleasePlayDialog`. */
-interface LinkedHeadingProps {
-  artistHref?: string;
-  year?: number;
-  footer?: ReactElement;
-}
+/** What a linked modal heading adds to the listening modal. */
+type LinkedHeadingProps = Pick<ListeningModalOptions, 'artistHref' | 'year' | 'footer'>;
 
 /**
  * What a linked modal heading adds: the artist's page, the year, and the link
@@ -88,22 +84,6 @@ const linkedHeadingProps = (
         ),
       }
     : { year };
-};
-
-/**
- * The modal's accent: the given one, or with `'random'` a new loud accent
- * drawn by `drawAccent` inside each opening click.
- */
-const useOpenAccent = (
-  accent: ZineAccent | 'random' | undefined
-): { dialogAccent: ZineAccent | undefined; drawAccent: () => void } => {
-  const [drawn, setDrawn] = useState<ZineAccent | undefined>(undefined);
-  return {
-    dialogAccent: accent === 'random' ? drawn : accent,
-    drawAccent: () => {
-      if (accent === 'random') setDrawn(pickLoudZineAccent());
-    },
-  };
 };
 
 /**
@@ -159,29 +139,25 @@ export const SpotlightCard = ({
   linkedHeading,
 }: SpotlightCardProps): ReactElement => {
   const { releaseId, title, artistName, artistSlug, coverArt, playSrc } = card;
-  const {
-    playerOpen,
-    prefetchPlayer,
-    openPlayer,
-    handlePlayerOpenChange,
-    warmPlayer,
-    takeMediaEl,
-  } = useReleasePlayDialog(playSrc);
   const coverButtonRef = useRef<HTMLButtonElement>(null);
   const hydrated = useHydrated();
   const playable = playSrc !== null;
-  const { dialogAccent, drawAccent } = useOpenAccent(accent);
-
-  const handleCoverClick = (): void => {
-    drawAccent();
-    openPlayer();
-  };
 
   /** Closing the modal puts focus back on the cover that opened it. */
   const returnFocusToCover = (event: Event): void => {
     event.preventDefault();
     coverButtonRef.current?.focus();
   };
+
+  const listening = useListeningModal({
+    release: playable ? { id: releaseId, title, artistName, artistSlug, playSrc } : null,
+    accent,
+    share: 'artist-page',
+    layout: 'sheet',
+    initialTrackNumber: card.initialTrackNumber ?? undefined,
+    onCloseAutoFocus: returnFocusToCover,
+    ...linkedHeadingProps(card, linkedHeading),
+  });
 
   return (
     <div className="mx-auto flex w-full flex-col gap-3 sm:max-w-52">
@@ -194,9 +170,9 @@ export const SpotlightCard = ({
         data-hydrated={hydrated}
         aria-label={artistName ? `Play ${title} by ${artistName}` : `Play ${title}`}
         disabled={!playable}
-        onClick={handleCoverClick}
-        onPointerEnter={playable ? warmPlayer : undefined}
-        onFocus={playable ? warmPlayer : undefined}
+        onClick={() => listening.open()}
+        onPointerEnter={playable ? listening.warm : undefined}
+        onFocus={playable ? listening.warm : undefined}
         className={cn(
           'group shadow-zine-sm relative block aspect-square w-full cursor-pointer border-2 border-black bg-zinc-200',
           'transition-transform duration-200 hover:scale-[1.03] motion-reduce:transition-none',
@@ -236,31 +212,7 @@ export const SpotlightCard = ({
 
       <SpotlightCardCaption card={card} caption={caption} />
 
-      {playable ? (
-        <ReleasePlayDialog
-          releaseId={releaseId}
-          title={title}
-          artistName={artistName}
-          open={playerOpen}
-          onOpenChange={handlePlayerOpenChange}
-          takeMediaEl={takeMediaEl}
-          prefetch={prefetchPlayer}
-          onCloseAutoFocus={returnFocusToCover}
-          headingOrder="artist-first"
-          centered
-          sheetOnPhone
-          accent={dialogAccent}
-          {...linkedHeadingProps(card, linkedHeading)}
-          initialTrackNumber={card.initialTrackNumber ?? undefined}
-          shareWidget={
-            <ReleaseShareWidget
-              artistSlug={artistSlug}
-              artistName={artistName}
-              releaseTitle={title}
-            />
-          }
-        />
-      ) : null}
+      {listening.modal}
     </div>
   );
 };

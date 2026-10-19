@@ -242,7 +242,7 @@ describe('VideoPlayerSurface', () => {
         primed: HTMLVideoElement | undefined;
         unmount: () => void;
       }> => {
-        const { result } = renderHook(() => usePrimedMediaHandoff());
+        const { result } = renderHook(() => usePrimedMediaHandoff('video'));
         result.current.primeMediaEl(SRC);
         const taken: HTMLVideoElement[] = [];
         const takeMediaEl = (): HTMLVideoElement | null => {

@@ -37,15 +37,8 @@ vi.mock('@/components/ui/video/lazy-video-surface', async () => {
   };
 });
 
-vi.mock('@/hooks/use-primed-media-handoff', () => ({
-  usePrimedMediaHandoff: () => ({
-    primeMediaEl: vi.fn(),
-    takeMediaEl: () => null,
-    discardMediaEl: vi.fn(),
-  }),
-}));
-
-vi.mock('./release-play-dialog', () => ({ ReleasePlayDialog: () => null }));
+// The listening modal's player, never opened here.
+vi.mock('./release-player', () => ({ ReleasePlayer: () => null }));
 vi.mock('./playlists/add-to-playlist-menu', () => ({ AddToPlaylistMenu: () => null }));
 
 const VIDEO: ArtistNavSearchVideo = {
@@ -82,6 +75,13 @@ const openVideo = () => {
 
 beforeEach(() => {
   surface.unmounts = 0;
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('HomeSearchPlayDialog in picture-in-picture', () => {

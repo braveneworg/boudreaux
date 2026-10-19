@@ -3,7 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createRef, type ReactNode } from 'react';
 
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import type {
   ArtistNavSearchRelease,
@@ -13,22 +14,20 @@ import type {
 import { HomeSearchPlayDialog, type HomeSearchPlayDialogHandle } from './home-search-play-dialog';
 import { zineAccentForRelease } from './ui/zine-panel';
 
-const audio = vi.hoisted(() => ({
-  primeMediaEl: vi.fn(),
-  takeMediaEl: vi.fn(() => null),
-  discardMediaEl: vi.fn(),
-}));
-vi.mock('@/hooks/use-primed-audio-handoff', () => ({
-  usePrimedAudioHandoff: () => audio,
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
+vi.mock('@/hooks/queries/use-release-query', () => ({
+  useReleaseQuery: () => ({ isPending: true, isError: false, data: undefined }),
 }));
 
-const media = vi.hoisted(() => ({
-  primeMediaEl: vi.fn(),
-  takeMediaEl: vi.fn(() => null),
-  discardMediaEl: vi.fn(),
+vi.mock('./release-player', () => ({
+  ReleasePlayer: () => <div data-testid="release-player" />,
 }));
-vi.mock('@/hooks/use-primed-media-handoff', () => ({
-  usePrimedMediaHandoff: () => media,
+
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
+  ),
 }));
 
 interface DialogProps {
@@ -43,48 +42,12 @@ interface DialogProps {
   artistHref?: string;
   year?: number;
   footer?: ReactNode;
-  shareWidget?: ReactNode;
   action?: ReactNode;
   [key: string]: unknown;
 }
 
-// Sentinel dialogs: record the props the home search wires in, without
-// pulling in Radix, the release query or video.js.
-const releaseDialog = vi.hoisted((): { props?: DialogProps } => ({}));
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: (props: DialogProps) => {
-    releaseDialog.props = props;
-    // Mounted while there is a pick, open or closing; shown only while open.
-    return (
-      <div data-testid="release-dialog" data-open={String(props.open)}>
-        {props.open ? (
-          <>
-            {props.title}
-            {props.shareWidget}
-            {props.footer}
-          </>
-        ) : null}
-      </div>
-    );
-  },
-}));
-
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({
-    shareUrl,
-    artistSlug,
-  }: {
-    shareUrl?: string;
-    artistSlug: string | null;
-  }) => (
-    <div
-      data-testid="share-widget"
-      data-share-url={shareUrl ?? ''}
-      data-artist-slug={artistSlug ?? ''}
-    />
-  ),
-}));
-
+// A sentinel video dialog: records the props the home search wires in,
+// without pulling in Radix or video.js.
 const videoDialog = vi.hoisted((): { props?: DialogProps } => ({}));
 vi.mock('@/components/ui/video/video-play-dialog', () => ({
   VideoPlayDialog: (props: DialogProps) => {
@@ -144,40 +107,53 @@ const renderDialog = (pickAccent = vi.fn(() => 'orchid' as const)) => {
   return { handle, trigger, pickAccent };
 };
 
+const play = () => vi.mocked(HTMLMediaElement.prototype.play);
+const pause = () => vi.mocked(HTMLMediaElement.prototype.pause);
+const dialog = (): HTMLElement => screen.getByRole('dialog');
+
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
-  releaseDialog.props = undefined;
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   videoDialog.props = undefined;
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('HomeSearchPlayDialog', () => {
   it('renders no dialog until a pick opens one', () => {
     renderDialog();
 
-    expect(screen.queryByTestId('release-dialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByTestId('video-dialog')).toBeNull();
   });
 
   describe('a release pick', () => {
-    it('primes the first track inside the gesture and opens the release dialog', () => {
+    it('plays the first track inside the gesture', () => {
       const { handle } = renderDialog();
 
       act(() => handle.current?.openRelease(ARTIST, RELEASE));
 
-      expect(audio.primeMediaEl.mock.calls).toEqual([['https://cdn.example.com/r-1/01.mp3']]);
-      expect(screen.getByTestId('release-dialog')).toHaveTextContent('Paper Moons');
-      expect(releaseDialog.props).toMatchObject({
-        open: true,
-        releaseId: 'r-1',
-        title: 'Paper Moons',
-        artistName: 'Marguerite Ash',
-        takeMediaEl: audio.takeMediaEl,
-        headingOrder: 'artist-first',
-        centered: true,
-        sheetOnPhone: true,
-        artistHref: '/artists/marguerite-ash',
-        year: 2024,
-      });
+      expect(play()).toHaveBeenCalledTimes(1);
+      expect(play().mock.instances[0]).toBeInstanceOf(HTMLAudioElement);
+      expect(play().mock.instances[0]).toHaveAttribute('src', 'https://cdn.example.com/r-1/01.mp3');
+    });
+
+    it('opens the listening modal as a sheet, bylined and linked to the artist', () => {
+      const { handle } = renderDialog();
+
+      act(() => handle.current?.openRelease(ARTIST, RELEASE));
+
+      expect(dialog()).toHaveAccessibleName('Marguerite Ash');
+      expect(dialog()).toHaveAccessibleDescription('Paper Moons (2024)');
+      expect(dialog()).toHaveClass('max-sm:bottom-0');
+      expect(within(dialog()).getByRole('link', { name: 'Marguerite Ash' })).toHaveAttribute(
+        'href',
+        '/artists/marguerite-ash'
+      );
     });
 
     it('links "View all releases" to the artist’s releases', () => {
@@ -185,19 +161,19 @@ describe('HomeSearchPlayDialog', () => {
 
       act(() => handle.current?.openRelease(ARTIST, RELEASE));
 
-      expect(screen.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
+      expect(within(dialog()).getByRole('link', { name: 'View all releases' })).toHaveAttribute(
         'href',
         '/releases?artist=marguerite-ash'
       );
     });
 
-    it('shares the release deep link from the release dialog', () => {
+    it('shares the release deep link from the release dialog', async () => {
       const { handle } = renderDialog();
 
       act(() => handle.current?.openRelease(ARTIST, RELEASE));
 
-      expect(screen.getByTestId('share-widget')).toHaveAttribute(
-        'data-share-url',
+      expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+        'data-url',
         'https://fakefour.test/releases?artist=marguerite-ash&release=r-1'
       );
     });
@@ -207,28 +183,43 @@ describe('HomeSearchPlayDialog', () => {
 
       act(() => handle.current?.openRelease(ARTIST, RELEASE));
 
-      expect(releaseDialog.props?.accent).toBe(zineAccentForRelease('r-1'));
+      expect(dialog()).toHaveClass(`zine-accent-${zineAccentForRelease('r-1')}`);
       expect(pickAccent).not.toHaveBeenCalled();
     });
 
-    it('opens a release with no public album artist without byline links or a deep link', () => {
+    it('opens a release with no public album artist without byline links or a deep link', async () => {
       const { handle } = renderDialog();
 
       act(() => handle.current?.openRelease({ artistName: null, artistSlug: null }, RELEASE));
 
-      expect(releaseDialog.props).toMatchObject({ open: true, artistName: null });
-      expect(releaseDialog.props?.artistHref).toBeUndefined();
-      expect(screen.queryByRole('link', { name: 'View all releases' })).toBeNull();
-      expect(screen.getByTestId('share-widget')).toHaveAttribute('data-share-url', '');
+      expect(dialog()).toHaveAccessibleName('Paper Moons (2024)');
+      expect(within(dialog()).queryByRole('link')).toBeNull();
+      expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+        'data-url',
+        'https://fakefour.test'
+      );
     });
 
-    it('primes nothing for a release without a playable track', () => {
+    it('opens unprimed for a release without a playable track', () => {
       const { handle } = renderDialog();
 
       act(() => handle.current?.openRelease(ARTIST, { ...RELEASE, playSrc: null }));
 
-      expect(audio.primeMediaEl).not.toHaveBeenCalled();
-      expect(screen.getByTestId('release-dialog')).toBeInTheDocument();
+      expect(play()).not.toHaveBeenCalled();
+      expect(dialog()).toBeInTheDocument();
+    });
+
+    it('stops the track, forgets the pick and returns focus to the search trigger once closed', async () => {
+      const user = userEvent.setup({ delay: null });
+      const { handle, trigger } = renderDialog();
+      act(() => handle.current?.openRelease(ARTIST, RELEASE));
+      const primed = play().mock.instances[0];
+
+      await user.click(within(dialog()).getByRole('button', { name: 'Close' }));
+
+      await waitFor(() => expect(trigger.current).toHaveFocus());
+      expect(pause().mock.instances).toEqual([primed]);
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
   });
 
@@ -238,19 +229,21 @@ describe('HomeSearchPlayDialog', () => {
 
       act(() => handle.current?.openVideo(ARTIST, VIDEO));
 
-      expect(media.primeMediaEl.mock.calls).toEqual([['https://cdn.example.com/v-1.mp4?signed']]);
+      const primed = play().mock.instances[0];
+      expect(primed).toBeInstanceOf(HTMLVideoElement);
+      expect(primed).toHaveAttribute('src', 'https://cdn.example.com/v-1.mp4?signed');
       expect(screen.getByTestId('video-dialog')).toHaveTextContent('Live at the Basement');
       expect(videoDialog.props).toMatchObject({
         open: true,
         title: 'Live at the Basement',
         artist: 'Marguerite Ash',
         src: 'https://cdn.example.com/v-1.mp4?signed',
-        takeMediaEl: media.takeMediaEl,
         headingOrder: 'artist-first',
         centered: true,
         artistHref: '/artists/marguerite-ash',
         year: 2025,
       });
+      expect(videoDialog.props?.takeMediaEl()).toBe(primed);
     });
 
     it('links "View all videos" to the artist’s videos', () => {
@@ -279,7 +272,7 @@ describe('HomeSearchPlayDialog', () => {
 
       act(() => handle.current?.openVideo(ARTIST, { ...VIDEO, streamUrl: null }));
 
-      expect(media.primeMediaEl).not.toHaveBeenCalled();
+      expect(play()).not.toHaveBeenCalled();
       expect(videoDialog.props?.src).toBeNull();
     });
   });
@@ -296,27 +289,27 @@ describe('HomeSearchPlayDialog', () => {
     expect(pickAccent).toHaveBeenCalledTimes(2);
   });
 
-  it('closing stops an unclaimed primed element and closes the dialog', () => {
+  it('closing the video dialog stops an element the player never took', () => {
     const { handle } = renderDialog();
 
     act(() => handle.current?.openVideo(ARTIST, VIDEO));
+    const primed = play().mock.instances[0];
     act(() => videoDialog.props?.onOpenChange(false));
 
-    expect(media.discardMediaEl).toHaveBeenCalledTimes(1);
+    expect(pause().mock.instances).toEqual([primed]);
     expect(screen.getByTestId('video-dialog')).toHaveAttribute('data-open', 'false');
   });
 
-  it('discards the pick and returns focus to the search trigger once closed', () => {
+  it('discards a closed video pick and returns focus to the search trigger', () => {
     const { handle, trigger } = renderDialog();
 
-    act(() => handle.current?.openRelease(ARTIST, RELEASE));
-    act(() => releaseDialog.props?.onOpenChange(false));
+    act(() => handle.current?.openVideo(ARTIST, VIDEO));
+    act(() => videoDialog.props?.onOpenChange(false));
     const event = new Event('focusout', { cancelable: true });
-    act(() => releaseDialog.props?.onCloseAutoFocus?.(event));
+    act(() => videoDialog.props?.onCloseAutoFocus?.(event));
 
     expect(event.defaultPrevented).toBe(true);
     expect(trigger.current).toHaveFocus();
-    expect(audio.discardMediaEl).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('release-dialog')).toBeNull();
+    expect(screen.queryByTestId('video-dialog')).toBeNull();
   });
 });

@@ -1,14 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
-
 import { BioReleaseLink } from './bio-release-link';
-
-import type { ReleasePlayDialogProps } from './release-play-dialog';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -28,39 +24,22 @@ vi.mock('next/link', () => ({
 const hydrated = vi.hoisted(() => ({ value: true }));
 vi.mock('@/hooks/use-hydrated', () => ({ useHydrated: () => hydrated.value }));
 
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
 const query = vi.hoisted(() => ({
   useReleaseQuery: vi.fn(),
 }));
 vi.mock('@/hooks/queries/use-release-query', () => ({
-  useReleaseQuery: (...args: unknown[]) => query.useReleaseQuery(...args),
+  useReleaseQuery: (...args: unknown[]): unknown => query.useReleaseQuery(...args),
 }));
 
-const dialog = vi.hoisted(() => ({
-  playerOpen: false,
-  openPlayer: vi.fn(),
-  handlePlayerOpenChange: vi.fn(),
-  warmPlayer: vi.fn(),
-  takeMediaEl: vi.fn(() => null),
-  useReleasePlayDialog: vi.fn(),
-}));
-vi.mock('@/hooks/use-release-play-dialog', () => ({
-  useReleasePlayDialog: (playSrc: string | null) => {
-    dialog.useReleasePlayDialog(playSrc);
-    return { ...dialog, prefetchPlayer: false };
-  },
+vi.mock('./release-player', () => ({
+  ReleasePlayer: () => <div data-testid="release-player" />,
 }));
 
-const dialogProps = vi.hoisted(() => ({ current: null as ReleasePlayDialogProps | null }));
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: (props: ReleasePlayDialogProps) => {
-    dialogProps.current = props;
-    return props.open ? <div role="dialog">{props.shareWidget}</div> : null;
-  },
-}));
-
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({ shareUrl }: { shareUrl?: string }) => (
-    <div data-testid="share-widget" data-share-url={shareUrl} />
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
   ),
 }));
 
@@ -76,108 +55,114 @@ const renderLink = () => {
   return userEvent.setup({ delay: null });
 };
 
-/** The `enabled` the link last asked the release query for. */
-const lastQueryEnabled = (): unknown => query.useReleaseQuery.mock.calls.at(-1)?.[1]?.enabled;
+const link = (): HTMLElement => screen.getByRole('link', { name: 'E2E Album One', hidden: true });
+
+/** Whether anything on the page asks the release query to fetch. */
+const fetching = (): boolean =>
+  query.useReleaseQuery.mock.calls.some(
+    ([, options]) => (options as { enabled?: boolean } | undefined)?.enabled === true
+  );
 
 describe('BioReleaseLink', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
     hydrated.value = true;
-    dialog.playerOpen = false;
-    dialogProps.current = null;
-    query.useReleaseQuery.mockReturnValue({ data: undefined });
+    query.useReleaseQuery.mockReturnValue({ isPending: true, isError: false, data: undefined });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders the stored deep link as the href', () => {
     renderLink();
 
-    expect(screen.getByRole('link', { name: 'E2E Album One' })).toHaveAttribute('href', HREF);
+    expect(link()).toHaveAttribute('href', HREF);
   });
 
-  it('owns an unprimed play dialog: a bio link knows no stream before the release loads', () => {
-    renderLink();
-
-    expect(dialog.useReleasePlayDialog).toHaveBeenCalledWith(null);
-  });
-
-  it('opens the listening modal unprimed on a plain left click', async () => {
+  it('opens the listening modal unprimed on a plain left click: a bio link knows no stream', async () => {
     const user = renderLink();
 
-    await user.click(screen.getByRole('link', { name: 'E2E Album One' }));
+    await user.click(link());
 
-    expect(dialog.handlePlayerOpenChange.mock.calls).toEqual([[true]]);
-    expect(dialog.openPlayer).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
   it('leaves a modified click to the browser', () => {
     renderLink();
 
-    const notCanceled = fireEvent.click(screen.getByRole('link', { name: 'E2E Album One' }), {
-      ctrlKey: true,
-    });
+    const notCanceled = fireEvent.click(link(), { ctrlKey: true });
 
     expect(notCanceled).toBe(true);
-    expect(dialog.handlePlayerOpenChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('fetches the release only once hovered, focused or open', async () => {
+  it('fetches the release only once hovered', async () => {
     const user = renderLink();
-    expect(lastQueryEnabled()).toBe(false);
+    expect(fetching()).toBe(false);
 
-    await user.hover(screen.getByRole('link', { name: 'E2E Album One' }));
+    await user.hover(link());
 
-    expect(query.useReleaseQuery).toHaveBeenLastCalledWith(RELEASE_ID, { enabled: true });
+    expect(fetching()).toBe(true);
+  });
+
+  it('fetches the release once focused', () => {
+    renderLink();
+
+    act(() => link().focus());
+
+    expect(fetching()).toBe(true);
   });
 
   it('fetches the release while the modal is open', () => {
-    dialog.playerOpen = true;
     renderLink();
 
-    expect(lastQueryEnabled()).toBe(true);
+    fireEvent.click(link());
+
+    expect(fetching()).toBe(true);
   });
 
   it('announces the dialog once hydrated', () => {
     renderLink();
 
-    expect(screen.getByRole('link', { name: 'E2E Album One' })).toHaveAttribute(
-      'aria-haspopup',
-      'dialog'
-    );
+    expect(link()).toHaveAttribute('aria-haspopup', 'dialog');
   });
 
   it('is a plain link before hydration, so the server markup matches', () => {
     hydrated.value = false;
     renderLink();
 
-    expect(screen.getByRole('link', { name: 'E2E Album One' })).not.toHaveAttribute(
-      'aria-haspopup'
-    );
+    expect(link()).not.toHaveAttribute('aria-haspopup');
   });
 
-  it("titles the modal from the loaded release, in the release's own accent", () => {
+  it('titles the modal from the loaded release, described by its album artist', async () => {
     query.useReleaseQuery.mockReturnValue({
+      isPending: false,
+      isError: false,
       data: {
         title: 'E2E Album One',
         albumArtist: { firstName: 'E2E', surname: 'Artist', displayName: 'E2E Artist' },
       },
     });
-    renderLink();
+    const user = renderLink();
 
-    expect(dialogProps.current).toMatchObject({
-      releaseId: RELEASE_ID,
-      title: 'E2E Album One',
-      artistName: 'E2E Artist',
-      accent: zineAccentForRelease(RELEASE_ID),
-      takeMediaEl: dialog.takeMediaEl,
-    });
+    await user.click(link());
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('E2E Album One');
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('E2E Artist');
   });
 
-  it('shares the same deep link as an absolute URL', () => {
-    dialog.playerOpen = true;
-    renderLink();
+  it('shares the same deep link as an absolute URL', async () => {
+    const user = renderLink();
 
-    expect(screen.getByTestId('share-widget')).toHaveAttribute(
-      'data-share-url',
+    await user.click(link());
+
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
       `https://fakefour.test${HREF}`
     );
   });

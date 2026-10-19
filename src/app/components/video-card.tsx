@@ -39,7 +39,7 @@ interface VideoCardProps {
  */
 export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
   const [playerOpen, setPlayerOpen] = useState(false);
-  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff();
+  const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff('video');
   const src = resolveStreamUrl(video);
   const mediaItem = videoMediaItem({
     videoId: video.id,

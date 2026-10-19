@@ -1,14 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
-
 import { LatestReleasePlayLink, type LatestRelease } from './latest-release-play-link';
-
-import type { ReleasePlayDialogProps } from './release-play-dialog';
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -33,36 +29,20 @@ vi.mock('next/link', () => ({
 const hydrated = vi.hoisted(() => ({ value: true }));
 vi.mock('@/hooks/use-hydrated', () => ({ useHydrated: () => hydrated.value }));
 
-const dialog = vi.hoisted(() => ({
-  playerOpen: false,
-  openPlayer: vi.fn(),
-  handlePlayerOpenChange: vi.fn(),
-  warmPlayer: vi.fn(),
-  takeMediaEl: vi.fn(() => null),
-}));
-vi.mock('@/hooks/use-release-play-dialog', () => ({
-  useReleasePlayDialog: () => ({ ...dialog, prefetchPlayer: false }),
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
+const query = vi.hoisted(() => ({ useReleaseQuery: vi.fn() }));
+vi.mock('@/hooks/queries/use-release-query', () => ({
+  useReleaseQuery: (...args: unknown[]): unknown => query.useReleaseQuery(...args),
 }));
 
-const dialogProps = vi.hoisted(() => ({ current: null as ReleasePlayDialogProps | null }));
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: (props: ReleasePlayDialogProps) => {
-    dialogProps.current = props;
-    return props.open ? (
-      <div role="dialog" aria-label="player">
-        {props.shareWidget}
-        {props.footer}
-        <button type="button" onClick={() => props.onCloseAutoFocus?.(new Event('focus'))}>
-          close-focus
-        </button>
-      </div>
-    ) : null;
-  },
+vi.mock('./release-player', () => ({
+  ReleasePlayer: () => <div data-testid="release-player" />,
 }));
 
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({ shareUrl, artistSlug }: { shareUrl?: string; artistSlug: string }) => (
-    <div data-testid="share-widget" data-share-url={shareUrl} data-artist-slug={artistSlug} />
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
   ),
 }));
 
@@ -92,17 +72,31 @@ const renderLink = (release: Partial<LatestRelease> = {}, variant: 'page' | 'car
   return userEvent.setup({ delay: null });
 };
 
-const props = (): ReleasePlayDialogProps => {
-  if (!dialogProps.current) throw new Error('ReleasePlayDialog was not rendered');
-  return dialogProps.current;
+const titleLink = (): HTMLElement =>
+  screen.getByRole('link', { name: 'Night Shift', hidden: true });
+
+/** Open the modal with a plain left click on the title. */
+const openModal = async (release: Partial<LatestRelease> = {}) => {
+  const user = renderLink(release);
+  await user.click(titleLink());
+  return user;
 };
+
+/** The `enabled` the listening modal last asked the release query for. */
+const lastQueryEnabled = (): unknown => query.useReleaseQuery.mock.calls.at(-1)?.[1]?.enabled;
 
 describe('LatestReleasePlayLink', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    query.useReleaseQuery.mockReturnValue({ isPending: true, isError: false, data: undefined });
     hydrated.value = true;
-    dialog.playerOpen = false;
-    dialogProps.current = null;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('page variant', () => {
@@ -151,7 +145,7 @@ describe('LatestReleasePlayLink', () => {
       expect(screen.getByText('Latest Release:').parentElement).toHaveTextContent(
         'Latest Release: Night Shift (2024)'
       );
-      expect(dialogProps.current).toBeNull();
+      expect(query.useReleaseQuery).not.toHaveBeenCalled();
     });
   });
 
@@ -243,12 +237,12 @@ describe('LatestReleasePlayLink', () => {
       );
     });
 
-    it('opens the player on a plain left click', async () => {
+    it('opens the modal on a plain left click', async () => {
       const user = renderLink();
 
       await user.click(screen.getByRole('button', { name: 'Night Shift' }));
 
-      expect(dialog.openPlayer).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('dialog', { name: 'Night Shift' })).toBeInTheDocument();
     });
 
     it('shows the title as plain text when nothing is playable', () => {
@@ -259,86 +253,87 @@ describe('LatestReleasePlayLink', () => {
     });
   });
 
-  it('opens the player on a plain left click instead of navigating', async () => {
-    const user = renderLink();
+  it("opens the modal in place on a plain left click, playing the release's track", async () => {
+    await openModal();
 
-    await user.click(screen.getByRole('link', { name: 'Night Shift' }));
-
-    expect(dialog.openPlayer).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Night Shift' })).toBeInTheDocument();
+    expect(vi.mocked(HTMLMediaElement.prototype.play).mock.instances[0]).toHaveAttribute(
+      'src',
+      'https://cdn.example/track-1.mp3'
+    );
   });
 
-  it('leaves a modified click to the browser', async () => {
-    const user = renderLink();
-
-    await user.keyboard('{Meta>}');
-    await user.click(screen.getByRole('link', { name: 'Night Shift' }));
-    await user.keyboard('{/Meta}');
-
-    expect(dialog.openPlayer).not.toHaveBeenCalled();
-  });
-
-  it('warms the player when the link is hovered or focused', async () => {
-    const user = renderLink();
-
-    await user.hover(screen.getByRole('link', { name: 'Night Shift' }));
-    screen.getByRole('link', { name: 'Night Shift' }).focus();
-
-    expect(dialog.warmPlayer).toHaveBeenCalled();
-  });
-
-  it("frames the modal in the release's own accent, naming the album artist", () => {
-    renderLink({ byName: 'Ceschi', albumArtistSlug: 'ceschi' });
-
-    expect(props()).toMatchObject({
-      releaseId: RELEASE_ID,
-      title: 'Night Shift',
-      artistName: 'Ceschi',
-      accent: zineAccentForRelease(RELEASE_ID),
-    });
-  });
-
-  it('shares the release deep link from the modal', () => {
-    dialog.playerOpen = true;
+  it('leaves a modified click to the browser', () => {
     renderLink();
 
-    expect(screen.getByTestId('share-widget')).toHaveAttribute(
-      'data-share-url',
-      `https://fakefour.test${DEEP_LINK}`
+    const notCanceled = fireEvent.click(titleLink(), { metaKey: true });
+
+    expect(notCanceled).toBe(true);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('warms the modal when the link is hovered', async () => {
+    const user = renderLink();
+    expect(lastQueryEnabled()).toBe(false);
+
+    await user.hover(titleLink());
+
+    expect(lastQueryEnabled()).toBe(true);
+  });
+
+  it('warms the modal when the link is focused', () => {
+    renderLink();
+
+    act(() => titleLink().focus());
+
+    expect(lastQueryEnabled()).toBe(true);
+  });
+
+  it('titles the modal with the release, described by the album artist when featured', async () => {
+    await openModal({ byName: 'Ceschi', albumArtistSlug: 'ceschi' });
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Night Shift');
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Ceschi');
+  });
+
+  it("shares the album artist's release deep link from the modal", async () => {
+    await openModal({ byName: 'Ceschi', albumArtistSlug: 'ceschi' });
+
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
+      `https://fakefour.test/releases?artist=ceschi&release=${RELEASE_ID}`
     );
   });
 
-  it('closes the player before "View all releases" navigates', async () => {
-    dialog.playerOpen = true;
-    const user = renderLink();
+  it('closes the modal before "View all releases" navigates', async () => {
+    const user = await openModal();
 
     await user.click(
       within(screen.getByRole('dialog')).getByRole('link', { name: 'View all releases' })
     );
 
-    expect(dialog.handlePlayerOpenChange).toHaveBeenCalledWith(false);
-    expect(push).toHaveBeenCalledWith('/releases?artist=marguerite-ash');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(push.mock.calls).toEqual([['/releases?artist=marguerite-ash']]);
   });
 
-  it('leaves a modified click on "View all releases" to the browser, keeping the player open', async () => {
-    dialog.playerOpen = true;
-    const user = renderLink();
+  it('leaves a modified click on "View all releases" to the browser, keeping the modal open', async () => {
+    await openModal();
 
-    await user.keyboard('{Meta>}');
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('link', { name: 'View all releases' })
+    const notCanceled = fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('link', { name: 'View all releases' }),
+      { metaKey: true }
     );
-    await user.keyboard('{/Meta}');
 
-    expect(dialog.handlePlayerOpenChange).not.toHaveBeenCalled();
+    expect(notCanceled).toBe(true);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('returns focus to the title link when the player closes', async () => {
-    dialog.playerOpen = true;
-    const user = renderLink();
+  it('returns focus to the title link when the modal closes', async () => {
+    const user = await openModal();
 
-    await user.click(screen.getByRole('button', { name: 'close-focus' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
 
-    expect(screen.getByRole('link', { name: 'Night Shift' })).toHaveFocus();
+    await waitFor(() => expect(titleLink()).toHaveFocus());
   });
 });

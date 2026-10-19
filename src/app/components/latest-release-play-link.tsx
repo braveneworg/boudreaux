@@ -9,17 +9,14 @@ import type { JSX, MouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
 import { useHydrated } from '@/hooks/use-hydrated';
-import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
+import { useListeningModal, type ListeningModalRelease } from '@/hooks/use-listening-modal';
 import { cn } from '@/lib/utils';
 import { artistReleasesHref } from '@/lib/utils/artist-releases-href';
 import { isPlainLeftClick } from '@/lib/utils/is-plain-left-click';
-import { releaseDeepLinkHref, releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
+import { releaseDeepLinkHref } from '@/lib/utils/release-deep-link';
 
 import { AllReleasesLink } from './all-releases-link';
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
 
 /** An artist's newest release, as the artist page and the artists index card lead with it. */
 export interface LatestRelease {
@@ -53,6 +50,20 @@ const PAGE_LINK_CLASS = 'underline underline-offset-4 hover:no-underline';
 const CARD_LINK_CLASS = 'underline underline-offset-2 hover:no-underline';
 
 /**
+ * The release as its listening modal opens it: bylined by the album artist
+ * when this artist is only featured, its deep link on `deepLinkSlug`. `null`
+ * when nothing is playable.
+ */
+const toListeningRelease = (
+  { id, title, playSrc, byName }: LatestRelease,
+  artistName: string,
+  deepLinkSlug: string
+): ListeningModalRelease | null =>
+  playSrc === null
+    ? null
+    : { id, title, artistName: byName ?? artistName, artistSlug: deepLinkSlug, playSrc };
+
+/**
  * An artist's latest release, the title opening its listening modal in place
  * (the `/releases` Play flow): a plain left click primes track 1 inside the
  * gesture and opens the modal; modified clicks and the keyboard's
@@ -77,36 +88,38 @@ export const LatestReleasePlayLink = ({
   const router = useRouter();
   const hydrated = useHydrated();
   const linkRef = useRef<HTMLAnchorElement>(null);
-  const {
-    playerOpen,
-    prefetchPlayer,
-    openPlayer,
-    handlePlayerOpenChange,
-    warmPlayer,
-    takeMediaEl,
-  } = useReleasePlayDialog(release.playSrc);
   const allReleasesHref = artistReleasesHref(slug);
   const deepLinkSlug = release.albumArtistSlug ?? slug;
   const year = release.releasedOn.getUTCFullYear();
-
-  const handleClick = (event: MouseEvent<HTMLElement>): void => {
-    if (!isPlainLeftClick(event)) return;
-    event.preventDefault();
-    openPlayer();
-  };
 
   // A plain click closes the modal first, then navigates; a modified click
   // (a new tab) is the browser's and leaves the music playing here.
   const viewAllReleases = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (!isPlainLeftClick(event)) return;
     event.preventDefault();
-    handlePlayerOpenChange(false);
+    listening.close();
     router.push(allReleasesHref);
   };
 
   const returnFocusToLink = (event: Event): void => {
     event.preventDefault();
     linkRef.current?.focus();
+  };
+
+  const listening = useListeningModal({
+    release: toListeningRelease(release, artistName, deepLinkSlug),
+    onCloseAutoFocus: returnFocusToLink,
+    footer: (
+      <Link href={allReleasesHref} onClick={viewAllReleases} className={PAGE_LINK_CLASS}>
+        View all releases
+      </Link>
+    ),
+  });
+
+  const handleClick = (event: MouseEvent<HTMLElement>): void => {
+    if (!isPlainLeftClick(event)) return;
+    event.preventDefault();
+    listening.open();
   };
 
   const linkClass = variant === 'card' ? CARD_LINK_CLASS : PAGE_LINK_CLASS;
@@ -122,8 +135,8 @@ export const LatestReleasePlayLink = ({
             href={releaseDeepLinkHref(deepLinkSlug, release.id)}
             prefetch={false}
             onClick={handleClick}
-            onPointerEnter={warmPlayer}
-            onFocus={warmPlayer}
+            onPointerEnter={listening.warm}
+            onFocus={listening.warm}
             aria-haspopup="dialog"
             className={linkClass}
           >
@@ -139,30 +152,7 @@ export const LatestReleasePlayLink = ({
             <span className={cn('cursor-pointer', linkClass)}>{release.title}</span>
           </button>
         )}
-        <ReleasePlayDialog
-          releaseId={release.id}
-          title={release.title}
-          artistName={release.byName ?? artistName}
-          open={playerOpen}
-          onOpenChange={handlePlayerOpenChange}
-          takeMediaEl={takeMediaEl}
-          prefetch={prefetchPlayer}
-          onCloseAutoFocus={returnFocusToLink}
-          accent={zineAccentForRelease(release.id)}
-          shareWidget={
-            <ReleaseShareWidget
-              artistSlug={deepLinkSlug}
-              artistName={release.byName ?? artistName}
-              releaseTitle={release.title}
-              shareUrl={releaseDeepLinkUrl(deepLinkSlug, release.id)}
-            />
-          }
-          footer={
-            <Link href={allReleasesHref} onClick={viewAllReleases} className={PAGE_LINK_CLASS}>
-              View all releases
-            </Link>
-          }
-        />
+        {listening.modal}
       </>
     );
 

@@ -86,6 +86,7 @@ playing while it waits.
   [`videojs-dispose-removes-data-vjs-player-parent.md`](videojs-dispose-removes-data-vjs-player-parent.md).
 - A playback bug seen only on the dev server is still a bug: it hides
   regressions in local testing and keeps the case out of the E2E suite.
-- The audio handoff (`use-primed-audio-handoff.ts`,
-  `create-player-initializer.tsx`) takes its element the same one-shot way.
+- The audio handoff (`usePrimedMediaHandoff('audio')` in
+  `use-primed-media-handoff.ts`, `create-player-initializer.tsx`) takes its
+  element the same one-shot way.
   Whether it misbehaves on the dev server was not checked.

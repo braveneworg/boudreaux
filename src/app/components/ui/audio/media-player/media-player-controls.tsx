@@ -46,7 +46,7 @@ interface MediaControlsProps {
   controlsRef?: (controls: MediaPlayerControls | null) => void;
   /**
    * One-shot supplier of an audio element primed (and usually already
-   * playing) during the user's play gesture — see `usePrimedAudioHandoff`.
+   * playing) during the user's play gesture — see `usePrimedMediaHandoff`.
    * The initializer adopts it in place so the gesture's autoplay blessing
    * survives; returns null once taken, and a fresh element is created.
    */

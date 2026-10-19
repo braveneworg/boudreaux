@@ -3,21 +3,15 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
 import type { JSX, MouseEvent, ReactNode } from 'react';
 
 import Link from 'next/link';
 
-import { zineAccentForRelease } from '@/app/components/ui/zine-panel';
 import { useReleaseQuery } from '@/hooks/queries/use-release-query';
 import { useHydrated } from '@/hooks/use-hydrated';
-import { useReleasePlayDialog } from '@/hooks/use-release-play-dialog';
+import { useListeningModal } from '@/hooks/use-listening-modal';
 import { isPlainLeftClick } from '@/lib/utils/is-plain-left-click';
-import { releaseDeepLinkUrl } from '@/lib/utils/release-deep-link';
 import { getArtistDisplayNameForRelease } from '@/lib/utils/release-helpers';
-
-import { ReleasePlayDialog } from './release-play-dialog';
-import { ReleaseShareWidget } from './release-share-widget';
 
 interface BioReleaseLinkProps {
   /** The stored release deep link, as the bio HTML carries it. */
@@ -43,21 +37,21 @@ export const BioReleaseLink = ({
   children,
 }: BioReleaseLinkProps): JSX.Element => {
   const hydrated = useHydrated();
-  const [hovered, setHovered] = useState(false);
-  const { playerOpen, handlePlayerOpenChange, takeMediaEl } = useReleasePlayDialog(null);
-  const { data: release } = useReleaseQuery(releaseId, { enabled: hovered || playerOpen });
+  // The modal fetches the release once warmed or opened; the heading reads
+  // the same cached result.
+  const { data: release } = useReleaseQuery(releaseId, { enabled: false });
   const artistName = release?.albumArtist
     ? getArtistDisplayNameForRelease(release.albumArtist)
     : null;
-  const title = release?.title ?? '';
+  const listening = useListeningModal({
+    release: { id: releaseId, title: release?.title ?? '', artistName, artistSlug, playSrc: null },
+  });
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (!isPlainLeftClick(event)) return;
     event.preventDefault();
-    handlePlayerOpenChange(true);
+    listening.open();
   };
-
-  const warm = (): void => setHovered(true);
 
   return (
     <>
@@ -65,29 +59,13 @@ export const BioReleaseLink = ({
         href={href}
         prefetch={false}
         onClick={handleClick}
-        onPointerEnter={warm}
-        onFocus={warm}
+        onPointerEnter={listening.warm}
+        onFocus={listening.warm}
         aria-haspopup={hydrated ? 'dialog' : undefined}
       >
         {children}
       </Link>
-      <ReleasePlayDialog
-        releaseId={releaseId}
-        title={title}
-        artistName={artistName}
-        open={playerOpen}
-        onOpenChange={handlePlayerOpenChange}
-        takeMediaEl={takeMediaEl}
-        accent={zineAccentForRelease(releaseId)}
-        shareWidget={
-          <ReleaseShareWidget
-            artistSlug={artistSlug}
-            artistName={artistName}
-            releaseTitle={title}
-            shareUrl={releaseDeepLinkUrl(artistSlug, releaseId)}
-          />
-        }
-      />
+      {listening.modal}
     </>
   );
 };

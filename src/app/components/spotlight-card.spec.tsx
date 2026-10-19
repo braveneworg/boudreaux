@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createElement } from 'react';
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -55,116 +55,22 @@ vi.mock('next/image', () => ({
     }),
 }));
 
-const dialog = vi.hoisted(() => ({
-  openPlayer: vi.fn(),
-  warmPlayer: vi.fn(),
-  playSrcs: [] as Array<string | null>,
+// The listening modal is real; only its external edges are stood in for: the
+// release detail fetch, the video.js player and the lazily-loaded social links.
+const query = vi.hoisted(() => ({ useReleaseQuery: vi.fn() }));
+vi.mock('@/hooks/queries/use-release-query', () => ({
+  useReleaseQuery: (...args: unknown[]): unknown => query.useReleaseQuery(...args),
 }));
 
-// The real hook primes an audio element; this stand-in keeps its contract
-// (openPlayer opens, onOpenChange closes) and records what it was given.
-vi.mock('@/hooks/use-release-play-dialog', async () => {
-  const { useState } = await import('react');
-  return {
-    useReleasePlayDialog: (playSrc: string | null) => {
-      const [playerOpen, setPlayerOpen] = useState(false);
-      dialog.playSrcs.push(playSrc);
-      return {
-        playerOpen,
-        prefetchPlayer: false,
-        openPlayer: () => {
-          dialog.openPlayer();
-          setPlayerOpen(true);
-        },
-        handlePlayerOpenChange: setPlayerOpen,
-        warmPlayer: dialog.warmPlayer,
-        takeMediaEl: () => null,
-      };
-    },
-  };
-});
-
-vi.mock('./release-play-dialog', () => ({
-  ReleasePlayDialog: ({
-    open,
-    releaseId,
-    title,
-    artistName,
-    headingOrder,
-    centered,
-    sheetOnPhone,
-    initialTrackNumber,
-    shareWidget,
-    footer,
-    onOpenChange,
-    onCloseAutoFocus,
-    accent,
-    artistHref,
-    year,
-  }: {
-    open: boolean;
-    releaseId: string;
-    title: string;
-    artistName: string | null;
-    headingOrder?: string;
-    centered?: boolean;
-    sheetOnPhone?: boolean;
-    initialTrackNumber?: number;
-    shareWidget?: React.ReactNode;
-    footer?: React.ReactNode;
-    onOpenChange: (open: boolean) => void;
-    onCloseAutoFocus?: (event: Event) => void;
-    accent?: string;
-    artistHref?: string;
-    year?: number;
-  }) =>
-    open ? (
-      <div
-        role="dialog"
-        aria-label="player"
-        data-release-id={releaseId}
-        data-title={title}
-        data-artist-name={artistName ?? ''}
-        data-heading-order={headingOrder}
-        data-centered={String(centered)}
-        data-sheet-on-phone={String(sheetOnPhone)}
-        data-initial-track-number={initialTrackNumber?.toString() ?? ''}
-        data-has-footer={String(footer !== undefined)}
-        data-accent={accent ?? ''}
-        data-artist-href={artistHref ?? ''}
-        data-year={year?.toString() ?? ''}
-      >
-        {shareWidget}
-        {footer}
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange(false);
-            onCloseAutoFocus?.(new Event('focus'));
-          }}
-        >
-          close
-        </button>
-      </div>
-    ) : null,
+vi.mock('./release-player', () => ({
+  ReleasePlayer: ({ initialTrackNumber }: { initialTrackNumber?: number }) => (
+    <div data-testid="release-player" data-initial-track-number={initialTrackNumber ?? ''} />
+  ),
 }));
 
-vi.mock('./release-share-widget', () => ({
-  ReleaseShareWidget: ({
-    artistSlug,
-    artistName,
-    releaseTitle,
-  }: {
-    artistSlug: string | null;
-    artistName: string | null;
-    releaseTitle: string;
-  }) => (
-    <div
-      data-testid="share-widget"
-      data-artist-slug={artistSlug ?? ''}
-      data-artist-name={artistName ?? ''}
-      data-release-title={releaseTitle}
-    />
+vi.mock('./social-share-widget', () => ({
+  SocialShareWidget: ({ url }: { url: string }) => (
+    <div data-testid="social-share-widget" data-url={url} />
   ),
 }));
 
@@ -191,11 +97,28 @@ const renderCard = (overrides: Partial<SpotlightCardData> = {}, options: CardOpt
 };
 
 const playButton = (): HTMLElement =>
-  screen.getByRole('button', { name: 'Play Spot Album by Spot Artist' });
+  screen.getByRole('button', { name: 'Play Spot Album by Spot Artist', hidden: true });
+
+const dialog = (): HTMLElement => screen.getByRole('dialog');
+
+/** The `enabled` the listening modal last asked the release query for. */
+const lastQueryEnabled = (): unknown => query.useReleaseQuery.mock.calls.at(-1)?.[1]?.enabled;
 
 describe('SpotlightCard', () => {
   beforeEach(() => {
-    dialog.playSrcs = [];
+    vi.stubEnv('NEXT_PUBLIC_HOST_NAME', 'https://fakefour.test');
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    query.useReleaseQuery.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { id: 'rel-1', title: 'Spot Album' },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('labels the cover button with the release and artist, and says it opens a dialog', () => {
@@ -298,67 +221,46 @@ describe('SpotlightCard', () => {
     expect(playButton()).toBeInTheDocument();
   });
 
-  it('opens the dialog in the given accent', async () => {
+  it('frames the modal in the page accent it is given', async () => {
     const user = renderCard({}, { accent: 'cyan' });
 
     await user.click(playButton());
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'cyan');
+    expect(dialog()).toHaveClass('zine-accent-cyan');
   });
 
-  it('leaves the dialog accent to the dialog by default', async () => {
-    const user = renderCard();
-
-    await user.click(playButton());
-
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', '');
-  });
-
-  it('frames each open in a new loud accent when the accent is random', async () => {
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.95);
-    const user = renderCard({}, { accent: 'random' });
-
-    await user.click(playButton());
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'cyan');
-    await user.click(screen.getByRole('button', { name: 'close' }));
-    await user.click(playButton());
-
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-accent', 'orchid');
-  });
-
-  it('links the dialog heading and adds the year and a "View all releases" footer', async () => {
+  it('links the modal heading and adds the year and a "View all releases" footer', async () => {
     const user = renderCard({}, { linkedHeading: true });
 
     await user.click(playButton());
 
-    const opened = screen.getByRole('dialog');
-    expect(opened).toHaveAttribute('data-artist-href', '/artists/spot-artist');
-    expect(opened).toHaveAttribute('data-year', '2024');
-    const viewAll = screen.getByRole('link', { name: 'View all releases' });
+    expect(dialog()).toHaveAccessibleDescription('Spot Album (2024)');
+    expect(within(dialog()).getByRole('link', { name: 'Spot Artist' })).toHaveAttribute(
+      'href',
+      '/artists/spot-artist'
+    );
+    const viewAll = within(dialog()).getByRole('link', { name: 'View all releases' });
     expect(viewAll).toHaveAttribute('href', '/releases?artist=spot-artist');
     // Smaller on a phone, where the sheet's cover is already at its floor.
     expect(viewAll.parentElement).toHaveClass('text-center', 'max-sm:text-xs');
   });
 
-  it('links nothing in the dialog for a linked heading without an artist page', async () => {
+  it('links nothing in the modal for a linked heading without an artist page', async () => {
     const user = renderCard({ artistSlug: null }, { linkedHeading: true });
 
     await user.click(playButton());
 
-    const opened = screen.getByRole('dialog');
-    expect(opened).toHaveAttribute('data-artist-href', '');
-    expect(opened).toHaveAttribute('data-year', '2024');
-    expect(opened).toHaveAttribute('data-has-footer', 'false');
+    expect(dialog()).toHaveAccessibleDescription('Spot Album (2024)');
+    expect(within(dialog()).queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('keeps the plain dialog heading by default', async () => {
+  it('keeps the plain modal heading by default', async () => {
     const user = renderCard();
 
     await user.click(playButton());
 
-    const opened = screen.getByRole('dialog');
-    expect(opened).toHaveAttribute('data-artist-href', '');
-    expect(opened).toHaveAttribute('data-year', '');
+    expect(dialog()).toHaveAccessibleDescription('Spot Album');
+    expect(within(dialog()).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('leaves the artist as text when there is no artist page', () => {
@@ -369,40 +271,34 @@ describe('SpotlightCard', () => {
     expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
   });
 
-  it('primes the card track and opens the artist-first dialog on click', async () => {
+  it("plays the card's track from the cover click", async () => {
     const user = renderCard();
 
     await user.click(playButton());
 
-    expect(dialog.openPlayer).toHaveBeenCalledTimes(1);
-    expect(dialog.playSrcs.at(-1)).toBe('https://cdn.example/1.mp3');
-    const opened = screen.getByRole('dialog');
-    expect(opened).toHaveAttribute('data-release-id', 'rel-1');
-    expect(opened).toHaveAttribute('data-title', 'Spot Album');
-    expect(opened).toHaveAttribute('data-artist-name', 'Spot Artist');
-    expect(opened).toHaveAttribute('data-heading-order', 'artist-first');
-    expect(opened).toHaveAttribute('data-centered', 'true');
-    expect(opened).toHaveAttribute('data-initial-track-number', '2');
-    expect(opened).toHaveAttribute('data-has-footer', 'false');
+    const play = vi.mocked(HTMLMediaElement.prototype.play);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(play.mock.instances[0]).toHaveAttribute('src', 'https://cdn.example/1.mp3');
   });
 
-  it('opens the dialog as a sheet sized to the screen on a phone', async () => {
+  it('opens the modal as a sheet, the artist leading the heading', async () => {
     const user = renderCard();
 
     await user.click(playButton());
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-sheet-on-phone', 'true');
+    expect(dialog()).toHaveAccessibleName('Spot Artist');
+    expect(screen.getByText('Spot Artist', { selector: '[data-slot="dialog-title"]' })).toHaveClass(
+      'text-center'
+    );
+    expect(dialog()).toHaveClass('max-sm:bottom-0');
   });
 
-  it('puts the share widget for the artist page in the dialog', async () => {
+  it("starts the player on the card's track", async () => {
     const user = renderCard();
 
     await user.click(playButton());
 
-    const share = screen.getByTestId('share-widget');
-    expect(share).toHaveAttribute('data-artist-slug', 'spot-artist');
-    expect(share).toHaveAttribute('data-artist-name', 'Spot Artist');
-    expect(share).toHaveAttribute('data-release-title', 'Spot Album');
+    expect(screen.getByTestId('release-player')).toHaveAttribute('data-initial-track-number', '2');
   });
 
   it('starts the fallback card on the first track', async () => {
@@ -410,32 +306,51 @@ describe('SpotlightCard', () => {
 
     await user.click(playButton());
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-initial-track-number', '');
+    expect(screen.getByTestId('release-player')).toHaveAttribute('data-initial-track-number', '');
   });
 
-  it('warms the dialog on pointer enter and on focus', () => {
-    renderCard();
-
-    fireEvent.pointerEnter(playButton());
-    act(() => playButton().focus());
-
-    expect(dialog.warmPlayer).toHaveBeenCalledTimes(2);
-  });
-
-  it('returns focus to the cover button when the dialog closes', async () => {
+  it("shares the artist's page from the modal", async () => {
     const user = renderCard();
 
     await user.click(playButton());
-    await user.click(screen.getByRole('button', { name: 'close' }));
 
-    expect(playButton()).toHaveFocus();
+    expect(await screen.findByTestId('social-share-widget')).toHaveAttribute(
+      'data-url',
+      'https://fakefour.test/artists/spot-artist'
+    );
   });
 
-  it('disables the cover and mounts no dialog when nothing is playable', () => {
+  it('warms the modal on pointer enter', () => {
+    renderCard();
+    expect(lastQueryEnabled()).toBe(false);
+
+    fireEvent.pointerEnter(playButton());
+
+    expect(lastQueryEnabled()).toBe(true);
+  });
+
+  it('warms the modal on focus', () => {
+    renderCard();
+
+    act(() => playButton().focus());
+
+    expect(lastQueryEnabled()).toBe(true);
+  });
+
+  it('returns focus to the cover button when the modal closes', async () => {
+    const user = renderCard();
+
+    await user.click(playButton());
+    await user.click(within(dialog()).getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(playButton()).toHaveFocus());
+  });
+
+  it('disables the cover and mounts no modal when nothing is playable', () => {
     renderCard({ playSrc: null });
 
     expect(playButton()).toBeDisabled();
-    expect(dialog.playSrcs.at(-1)).toBeNull();
+    expect(query.useReleaseQuery).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Spot Artist' })).toHaveAttribute(
       'href',
       '/artists/spot-artist'
