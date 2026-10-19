@@ -24,6 +24,9 @@ these rules are what keep E2E runs on the container.
   `PATH`, `HOME`, `NODE_ENV=test`, `E2E_DATABASE_URL`,
   `DATABASE_URL=mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0`,
   `AUTH_SECRET=<test-only>`, `AUTH_URL=http://localhost:3000`.
+  `playwright.config.ts` starts the web server with the `CLOUDFRONT_*`
+  variables blanked to `''`, so videos play from `/e2e/video/e2e-video.mp4`
+  as in CI instead of a signed URL on the live CDN.
 - Before running, confirm the web server's effective `DATABASE_URL` points to
   `localhost:27018`; if not, refuse to run. The `E2E_SEED_ALLOW_NONLOCAL`
   escape hatch is forbidden.
