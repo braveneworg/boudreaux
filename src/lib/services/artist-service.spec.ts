@@ -2011,6 +2011,20 @@ describe('ArtistService', () => {
         ).toEqual(['ceschi', 'ceschi-2', 'ceschi-3']);
       });
 
+      it('answers a failure other than DUPLICATE on a numbered slug with its code', async () => {
+        vi.mocked(ArtistRepository.createWithSelect)
+          .mockRejectedValueOnce(duplicate)
+          .mockRejectedValueOnce(new DataError('UNAVAILABLE', 'Connection failed'));
+
+        const result = await ArtistService.findOrCreateByName('Ceschi');
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Database unavailable',
+          code: 'UNAVAILABLE',
+        });
+      });
+
       it('fails with DUPLICATE once the numbered slugs run out', async () => {
         vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(duplicate);
 
@@ -3289,15 +3303,18 @@ describe('ArtistService', () => {
   });
 
   describe('applyEnrichedField', () => {
-    it('writes the whitelisted field and the auditing updatedBy through the update', async () => {
-      vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
+    it.each(['firstName', 'middleName', 'surname', 'akaNames', 'displayName'] as const)(
+      'writes %s and the auditing updatedBy through the update',
+      async (field) => {
+        vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
 
-      await ArtistService.applyEnrichedField('a'.repeat(24), 'surname', 'Ramos', 'admin-1');
+        await ArtistService.applyEnrichedField('a'.repeat(24), field, 'Ramos', 'admin-1');
 
-      expect(vi.mocked(ArtistRepository.update).mock.calls).toEqual([
-        ['a'.repeat(24), { surname: 'Ramos', updatedBy: 'admin-1' }],
-      ]);
-    });
+        expect(vi.mocked(ArtistRepository.update).mock.calls).toEqual([
+          ['a'.repeat(24), { [field]: 'Ramos', updatedBy: 'admin-1' }],
+        ]);
+      }
+    );
 
     it('parses bornOn into a Date', async () => {
       vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
