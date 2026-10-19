@@ -7,6 +7,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type {
   Artist,
+  ArtistBioImageRecord,
+  ArtistBioLinkRecord,
   ArtistDetail,
   ArtistHomeSearchMatch,
   ArtistListFilters,
@@ -22,7 +24,6 @@ import type {
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
-import type { Json } from '@/lib/types/domain/shared';
 import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { getArtistDisplayName, type ArtistNameFields } from '@/lib/utils/get-artist-display-name';
 import { tokenizeSearchQuery } from '@/lib/utils/tokenize-search-query';
@@ -43,14 +44,6 @@ import { isUnsetOr } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
-
-/** The narrowed projection used by the find-or-create-by-name flow. */
-type ArtistNameSelect = {
-  id: true;
-  displayName: true;
-  firstName: true;
-  surname: true;
-};
 
 /** Count filters for the admin dashboard (Prisma-free at the boundary). */
 export interface ArtistCountFilters {
@@ -75,57 +68,57 @@ export interface ArtistNameKeys {
  * async lifecycle fields (incl. the latest `bioProgress` checkpoint) plus the
  * persisted bio content the admin form populates from.
  */
-export interface BioGenerationStateRecord {
-  bioStatus: string | null;
-  bioError: string | null;
-  bioStartedAt: Date | null;
-  bioJobToken: string | null;
-  bioProgress: Json | null;
-  bioGeneratedAt: Date | null;
-  slug: string;
-  shortBio: string | null;
-  bio: string | null;
-  altBio: string | null;
-  genres: string | null;
-  bioModel: string | null;
-  bioImages: Array<{
-    id: string;
-    url: string;
-    thumbnailUrl: string | null;
-    title: string | null;
-    attribution: string | null;
-    license: string | null;
-    licenseUrl: string | null;
-    sourceUrl: string | null;
-    originalUrl: string | null;
-    width: number | null;
-    height: number | null;
-    isPrimary: boolean;
-    kind: string | null;
-    alt: string | null;
-    hasFace: boolean | null;
-    faceScore: number | null;
-    origin: string | null;
-    displayOrder: number | null;
-  }>;
-  bioLinks: Array<{
-    id: string;
-    label: string;
-    url: string;
-    kind: string | null;
-    origin: string | null;
-  }>;
-}
+export type BioGenerationStateRecord = Pick<
+  ArtistScalars,
+  | 'bioStatus'
+  | 'bioError'
+  | 'bioStartedAt'
+  | 'bioJobToken'
+  | 'bioProgress'
+  | 'bioGeneratedAt'
+  | 'slug'
+  | 'shortBio'
+  | 'bio'
+  | 'altBio'
+  | 'genres'
+  | 'bioModel'
+> & {
+  bioImages: Array<
+    Pick<
+      ArtistBioImageRecord,
+      | 'id'
+      | 'url'
+      | 'thumbnailUrl'
+      | 'title'
+      | 'attribution'
+      | 'license'
+      | 'licenseUrl'
+      | 'sourceUrl'
+      | 'originalUrl'
+      | 'width'
+      | 'height'
+      | 'isPrimary'
+      | 'kind'
+      | 'alt'
+      | 'hasFace'
+      | 'faceScore'
+      | 'origin'
+      | 'displayOrder'
+    >
+  >;
+  bioLinks: Array<Pick<ArtistBioLinkRecord, 'id' | 'label' | 'url' | 'kind' | 'origin'>>;
+};
 
 /** Projection returned by {@link ArtistRepository.getImageLinksJobState}. */
-export interface ImageLinksJobStateRecord {
-  slug: string;
-  imageLinksStatus: string | null;
-  imageLinksError: string | null;
-  imageLinksStartedAt: Date | null;
-  imageLinksJobToken: string | null;
-  imageLinksAddedCount: number | null;
-}
+export type ImageLinksJobStateRecord = Pick<
+  ArtistScalars,
+  | 'slug'
+  | 'imageLinksStatus'
+  | 'imageLinksError'
+  | 'imageLinksStartedAt'
+  | 'imageLinksJobToken'
+  | 'imageLinksAddedCount'
+>;
 
 // =============================================================================
 // Query shapes (single source of truth for both the query and the drift check)
@@ -154,6 +147,14 @@ const toArtistListItem = ({ bioImages, ...artist }: ArtistListRow): ArtistListIt
   ...artist,
   hasDisplayImage: bioImages.length > 0,
 });
+
+/** The name projection the find-or-create-by-name flow reads and creates. */
+const artistNameSelect = {
+  id: true,
+  displayName: true,
+  firstName: true,
+  surname: true,
+} as const satisfies Prisma.ArtistSelect;
 
 /** Name projection of a related artist (band member / band) on a listing row. */
 const artistListingNameSelect = {
@@ -289,21 +290,15 @@ const playableListedReleaseWhere = {
 } as const satisfies Prisma.ReleaseWhereInput;
 
 /**
- * Home-search select: the public-search name fields, slug and display-image
- * candidates, the artist's playable listed releases with what a release row
- * shows and the first file its play pick primes, and the artist's video
- * credits on videos live at `now` with what a video row shows and the key its
- * stream URL is signed from.
+ * Home-search select: the {@link artistSearchSelect} name fields, slug and
+ * display-image candidates, with the artist's playable listed releases in
+ * place of its search releases — what a release row shows and the first file
+ * its play pick primes — and the artist's video credits on videos live at
+ * `now` with what a video row shows and the key its stream URL is signed from.
  */
 const artistHomeSearchSelect = (now: Date) =>
   ({
-    ...artistListingNameSelect,
-    slug: true,
-    bioImages: {
-      where: bioImageWhere.displayCandidate,
-      orderBy: { sortOrder: 'asc' },
-      select: { url: true, thumbnailUrl: true, alt: true, isPrimary: true, displayOrder: true },
-    },
+    ...artistSearchSelect,
     releases: {
       where: { release: playableListedReleaseWhere },
       select: {
@@ -343,6 +338,67 @@ const artistHomeSearchSelect = (now: Date) =>
       },
     },
   }) as const satisfies Prisma.ArtistSelect;
+
+/**
+ * The bio-generation state select ({@link ArtistRepository.getBioGenerationState}):
+ * the async lifecycle fields, the persisted bio content, the bio images in
+ * pool order, and the reference links in order.
+ */
+const bioGenerationStateSelect = {
+  bioStatus: true,
+  bioError: true,
+  bioStartedAt: true,
+  bioJobToken: true,
+  bioProgress: true,
+  bioGeneratedAt: true,
+  slug: true,
+  shortBio: true,
+  bio: true,
+  altBio: true,
+  genres: true,
+  bioModel: true,
+  bioImages: {
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      id: true,
+      url: true,
+      thumbnailUrl: true,
+      title: true,
+      attribution: true,
+      license: true,
+      licenseUrl: true,
+      sourceUrl: true,
+      originalUrl: true,
+      width: true,
+      height: true,
+      isPrimary: true,
+      kind: true,
+      alt: true,
+      hasFace: true,
+      faceScore: true,
+      origin: true,
+      displayOrder: true,
+    },
+  },
+  bioLinks: {
+    where: bioLinkWhere.reference,
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, label: true, url: true, kind: true, origin: true },
+  },
+} as const satisfies Prisma.ArtistSelect;
+
+/**
+ * The images-from-links job state select ({@link ArtistRepository.getImageLinksJobState}):
+ * the job columns plus the slug, for revalidation.
+ */
+const imageLinksJobStateSelect = {
+  slug: true,
+  imageLinksStatus: true,
+  imageLinksError: true,
+  imageLinksStartedAt: true,
+  imageLinksJobToken: true,
+  imageLinksAddedCount: true,
+} as const satisfies Prisma.ArtistSelect;
 
 /**
  * The media `Release` graph loaded behind every artist-detail release join,
@@ -420,6 +476,21 @@ const _artistSearchMatchDrift: _ArtistSearchMatchDrift = true;
 const _artistHomeSearchMatchDrift: _ArtistHomeSearchMatchDrift = true;
 const _artistListingRecordDrift: _ArtistListingRecordDrift = true;
 const _artistWithReleaseGraphDrift: _ArtistWithReleaseGraphDrift = true;
+type _ArtistNameDrift = AssertExact<
+  ArtistNameRecord,
+  Prisma.ArtistGetPayload<{ select: typeof artistNameSelect }>
+>;
+type _BioGenerationStateDrift = AssertExact<
+  BioGenerationStateRecord,
+  Prisma.ArtistGetPayload<{ select: typeof bioGenerationStateSelect }>
+>;
+type _ImageLinksJobStateDrift = AssertExact<
+  ImageLinksJobStateRecord,
+  Prisma.ArtistGetPayload<{ select: typeof imageLinksJobStateSelect }>
+>;
+const _artistNameDrift: _ArtistNameDrift = true;
+const _bioGenerationStateDrift: _BioGenerationStateDrift = true;
+const _imageLinksJobStateDrift: _ImageLinksJobStateDrift = true;
 
 // =============================================================================
 // Translators (domain input -> Prisma input; the return type is the drift guard)
@@ -943,10 +1014,7 @@ export class ArtistRepository {
 
   /** Find an artist by id returning only the name projection (or null). */
   static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
-    return prisma.artist.findUnique({
-      where: { id: artistId },
-      select: nameSelect,
-    }) as Promise<ArtistNameRecord | null>;
+    return prisma.artist.findUnique({ where: { id: artistId }, select: artistNameSelect });
   }
 
   /**
@@ -1028,7 +1096,7 @@ export class ArtistRepository {
     for (const where of nameKeyWheres(keys)) {
       const match = await prisma.artist.findFirst({
         where: { ...where, ...artistWhere.notDeleted },
-        select: nameSelect,
+        select: artistNameSelect,
       });
       if (match) {
         return match;
@@ -1039,10 +1107,7 @@ export class ArtistRepository {
 
   /** Create an artist returning only the name projection (find-or-create flow). */
   static async createWithSelect(data: CreateArtistData): Promise<ArtistNameRecord> {
-    return prisma.artist.create({
-      data: toPrismaCreate(data),
-      select: nameSelect,
-    }) as Promise<ArtistNameRecord>;
+    return prisma.artist.create({ data: toPrismaCreate(data), select: artistNameSelect });
   }
 
   /**
@@ -1268,17 +1333,7 @@ export class ArtistRepository {
   /** Reads the images-from-links job columns (plus slug, for revalidation).
    *  Returns `null` when the artist does not exist. */
   static async getImageLinksJobState(artistId: string): Promise<ImageLinksJobStateRecord | null> {
-    return prisma.artist.findUnique({
-      where: { id: artistId },
-      select: {
-        slug: true,
-        imageLinksStatus: true,
-        imageLinksError: true,
-        imageLinksStartedAt: true,
-        imageLinksJobToken: true,
-        imageLinksAddedCount: true,
-      },
-    });
+    return prisma.artist.findUnique({ where: { id: artistId }, select: imageLinksJobStateSelect });
   }
 
   /**
@@ -1287,58 +1342,6 @@ export class ArtistRepository {
    * admin form to populate. Returns `null` when the artist does not exist.
    */
   static async getBioGenerationState(artistId: string): Promise<BioGenerationStateRecord | null> {
-    return prisma.artist.findUnique({
-      where: { id: artistId },
-      select: {
-        bioStatus: true,
-        bioError: true,
-        bioStartedAt: true,
-        bioJobToken: true,
-        bioProgress: true,
-        bioGeneratedAt: true,
-        slug: true,
-        shortBio: true,
-        bio: true,
-        altBio: true,
-        genres: true,
-        bioModel: true,
-        bioImages: {
-          orderBy: { sortOrder: 'asc' },
-          select: {
-            id: true,
-            url: true,
-            thumbnailUrl: true,
-            title: true,
-            attribution: true,
-            license: true,
-            licenseUrl: true,
-            sourceUrl: true,
-            originalUrl: true,
-            width: true,
-            height: true,
-            isPrimary: true,
-            kind: true,
-            alt: true,
-            hasFace: true,
-            faceScore: true,
-            origin: true,
-            displayOrder: true,
-          },
-        },
-        bioLinks: {
-          where: bioLinkWhere.reference,
-          orderBy: { sortOrder: 'asc' },
-          select: { id: true, label: true, url: true, kind: true, origin: true },
-        },
-      },
-    });
+    return prisma.artist.findUnique({ where: { id: artistId }, select: bioGenerationStateSelect });
   }
 }
-
-/** The narrow name projection select reused by the find-or-create flow. */
-const nameSelect: ArtistNameSelect = {
-  id: true,
-  displayName: true,
-  firstName: true,
-  surname: true,
-};

@@ -411,34 +411,30 @@ export interface ArtistListingFilters {
 }
 
 /** The name projection of a related artist (band member or band) on a listing row. */
-export interface ArtistListingName {
-  id: string;
-  displayName: string | null;
-  firstName: string;
-  middleName: string | null;
-  surname: string;
-  title: string | null;
-  suffix: string | null;
-}
+export type ArtistListingName = Pick<
+  ArtistScalars,
+  'id' | 'displayName' | 'firstName' | 'middleName' | 'surname' | 'title' | 'suffix'
+>;
 
 /**
  * The bio-image projection the listing card and search dropdown render. Carries
  * the suggestion flag and the human-chosen position so the service can resolve
  * the artist's display images.
  */
-export interface ArtistListingBioImage {
-  id: string;
-  url: string;
-  thumbnailUrl: string | null;
-  title: string | null;
-  attribution: string | null;
-  license: string | null;
-  licenseUrl: string | null;
-  sourceUrl: string | null;
-  alt: string | null;
-  isPrimary: boolean;
-  displayOrder: number | null;
-}
+export type ArtistListingBioImage = Pick<
+  ArtistBioImageRecord,
+  | 'id'
+  | 'url'
+  | 'thumbnailUrl'
+  | 'title'
+  | 'attribution'
+  | 'license'
+  | 'licenseUrl'
+  | 'sourceUrl'
+  | 'alt'
+  | 'isPrimary'
+  | 'displayOrder'
+>;
 
 /** Narrow release projection loaded behind every listing-row release join. */
 export interface ArtistListingReleaseRecord {
@@ -589,24 +585,17 @@ export interface ArtistHomeSearchVideoRecord {
 /**
  * Home search match: a public artist the home page search can find, with a
  * direct credit on a playable listed release or a video credit on a live
- * video. Carries the same name fields, slug and display-image candidates as
- * {@link ArtistSearchMatch}, its playable listed releases, and its video
- * credits on live videos.
+ * video. An {@link ArtistSearchMatch} — the same name fields, slug and
+ * display-image candidates — whose releases are its playable listed releases,
+ * plus its video credits on live videos.
  */
-export interface ArtistHomeSearchMatch extends ArtistListingName {
-  slug: string;
-  bioImages: ArtistSearchBioImage[];
+export interface ArtistHomeSearchMatch extends Omit<ArtistSearchMatch, 'releases'> {
   releases: Array<{ release: ArtistHomeSearchReleaseRecord }>;
   videoArtists: Array<{ video: ArtistHomeSearchVideoRecord }>;
 }
 
 /** Narrow name projection used by the find-or-create-by-name flow. */
-export interface ArtistNameRecord {
-  id: string;
-  displayName: string | null;
-  firstName: string;
-  surname: string;
-}
+export type ArtistNameRecord = Pick<ArtistScalars, 'id' | 'displayName' | 'firstName' | 'surname'>;
 
 // =============================================================================
 // Input types
