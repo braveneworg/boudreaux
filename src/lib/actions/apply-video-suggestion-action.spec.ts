@@ -292,7 +292,7 @@ describe('applyVideoSuggestionAction', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'A description suggestion is never dismissed.',
+      error: 'A description suggestion is never dismissed',
       code: 'VALIDATION',
     });
     expect(VideoEnrichmentSuggestionRepository.markDismissed).not.toHaveBeenCalled();

@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { isRealCalendarDate, isTodayUtc } from '@/lib/utils/validation/iso-date';
+import { isTodayMiss } from '@/lib/services/video-editorial-rules';
+import { isRealCalendarDate, todayUtcIsoDate } from '@/lib/utils/validation/iso-date';
 
 import type { VideoUploadStatus } from './use-video-upload';
 
@@ -100,6 +101,8 @@ export const classifyLookupResult = (
 ): LookupOutcome => {
   if (!result) return { kind: 'miss' };
   const { releasedOn } = result;
-  if (!isRealCalendarDate(releasedOn) || isTodayUtc(releasedOn, now)) return { kind: 'miss' };
+  if (!isRealCalendarDate(releasedOn) || isTodayMiss(releasedOn, todayUtcIsoDate(now))) {
+    return { kind: 'miss' };
+  }
   return { kind: 'found', releasedOn };
 };

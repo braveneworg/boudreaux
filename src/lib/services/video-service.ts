@@ -16,7 +16,7 @@ import { deleteS3Object } from '@/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/utils/s3-key-utils';
 
 import { failFromError } from './_internal/map-data-error';
-import { decidePublish, decideReleaseDate, type EditorialRefusal } from './video-editorial-rules';
+import { decidePublish, decideReleaseDate, EDITORIAL_REFUSALS } from './video-editorial-rules';
 import { scheduleVideoPostSave, type VideoPostSave } from './video-post-save-service';
 
 import type { ServiceResponse } from './service.types';
@@ -42,13 +42,6 @@ const collectVideoS3Keys = ({ s3Key, posterUrl, posterCandidates }: Video): stri
   });
 
   return [...keys];
-};
-
-/** The admin-facing message for each editorial refusal this service can return. */
-const EDITORIAL_REFUSALS: Record<EditorialRefusal, string> = {
-  RELEASE_DATE_REQUIRED: 'Set a release date before publishing',
-  PUBLISHED_KEEPS_DATE: 'A published video must keep a release date',
-  DESCRIPTION_NEVER_DISMISSED: 'A description suggestion is never dismissed',
 };
 
 export class VideoService {

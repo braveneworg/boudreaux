@@ -8,9 +8,10 @@ import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { z } from 'zod';
 
 import { loggers } from '@/lib/utils/logger';
-import { isTodayUtc } from '@/lib/utils/validation/iso-date';
+import { todayUtcIsoDate } from '@/lib/utils/validation/iso-date';
 
 import { fakeReleaseDay } from './fake-release-day';
+import { isTodayMiss } from './video-editorial-rules';
 
 const logger = loggers.media;
 const INVOKE_REQUEST_TIMEOUT_MS = 25_000;
@@ -55,16 +56,16 @@ export class ReleaseDateLookupService {
    *
    * Domain rule (ADR-0004): a result equal to today's UTC day is a miss. A
    * release date is never inferred, and a lookup landing on today means the
-   * web had nothing and the model guessed. Enforced here — the single choke
-   * point over both Lambda tiers and the fake path — and double-guarded on the
-   * client.
+   * web had nothing and the model guessed. Asked of the editorial rules here —
+   * the single choke point over both Lambda tiers and the fake path — and
+   * double-guarded on the client.
    *
    * Fake path (`BIO_GENERATOR_FAKE=true`): returns a deterministic fixture
    * without invoking the Lambda, for use in E2E and local dev.
    */
   static async lookup(title: string, artist?: string): Promise<ReleaseDateLookup | null> {
     const result = await ReleaseDateLookupService.fetchLookup(title, artist);
-    if (result && isTodayUtc(result.releasedOn)) {
+    if (result && isTodayMiss(result.releasedOn, todayUtcIsoDate())) {
       logger.info('release_date_lookup_today_discarded', { title, artist });
       return null;
     }
