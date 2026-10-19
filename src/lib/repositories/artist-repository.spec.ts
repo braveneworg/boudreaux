@@ -1411,10 +1411,8 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
 
       const bioImages = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select?.bioImages;
-      expect(bioImages).toMatchObject({
-        where: bioImageWhere.pageCandidate,
-        orderBy: { sortOrder: 'asc' },
-      });
+      expect((bioImages as { where: unknown }).where).toEqual(bioImageWhere.pageCandidate);
+      expect(bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
       expect(bioImages).not.toHaveProperty('take');
     });
 
