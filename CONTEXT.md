@@ -39,6 +39,15 @@ _Defined in_ `src/lib/services/service.types.d.ts`.
 query construction, compare-and-swap claims, and race guards.
 _In_ `src/lib/repositories/`.
 
+**read model** — the named, Prisma-free shape a **Repository** read returns
+(`ArtistNameRecord`, `ArtistSearchMatch`, …). Each is declared once: a
+narrower read model is a `Pick` or `Omit` of its base record, never a re-typed
+copy. An `AssertExact` drift guard binds it to the `select` that loads it, so a
+schema or select change it does not follow fails `pnpm run typecheck`. Callers
+name it and never re-spell its fields.
+_In_ `src/lib/types/domain/`; drift guards from
+`src/lib/repositories/_internal/drift.ts`.
+
 **Service** — business rules and policy over one or more repositories. Returns
 `ServiceResponse`. **All business logic lives here**, and callers always go
 through a service — never past it to a repository — even when the service
