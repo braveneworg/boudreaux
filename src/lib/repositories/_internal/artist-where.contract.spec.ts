@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { isPublicArtist } from '@/lib/utils/is-public-artist';
 
 import {
+  artistPublishedFilter,
   artistWhere,
   creditAwaitingConfirmationWhere,
   creditThatStaysHiddenWhere,
@@ -163,6 +164,30 @@ describe('artistWhere (Docker Mongo contract)', () => {
       .sort();
 
     expect(await findKeys(publicArtistWhere)).toEqual(byPredicate);
+  });
+
+  describe('artistPublishedFilter', () => {
+    it('true matches every published artist, deleted or not', async () => {
+      expect(await findKeys(artistPublishedFilter(true))).toEqual(
+        expectKeys(({ publishedOn }) => publishedOn === 'set')
+      );
+    });
+
+    it('false matches every never-published artist', async () => {
+      expect(await findKeys(artistPublishedFilter(false))).toEqual(
+        expectKeys(({ publishedOn }) => publishedOn !== 'set')
+          .concat('draft-only')
+          .sort()
+      );
+    });
+
+    it('undefined matches everything', async () => {
+      expect(await findKeys(artistPublishedFilter(undefined))).toEqual(
+        expectKeys(() => true)
+          .concat('draft-only')
+          .sort()
+      );
+    });
   });
 });
 

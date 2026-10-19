@@ -9,7 +9,7 @@ import {
   type ArtistDetail,
 } from '@/lib/types/domain/artist';
 
-import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { artistPublishedFilter, artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { creditOrderBy } from './_internal/credit-order';
@@ -202,7 +202,7 @@ describe('ArtistRepository', () => {
       await ArtistRepository.findMany({ deleted: true, published: true });
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
-      expect(arg?.where).toEqual({ AND: [{ publishedOn: { not: null } }] });
+      expect(arg?.where).toEqual({ AND: [artistPublishedFilter(true)] });
     });
 
     it('filters to unpublished artists when published=false', async () => {
@@ -280,7 +280,17 @@ describe('ArtistRepository', () => {
       await ArtistRepository.count({ published: true });
 
       expect(prisma.artist.count).toHaveBeenCalledWith({
-        where: { AND: [artistWhere.notDeleted, { publishedOn: { not: null } }] },
+        where: { AND: [artistWhere.notDeleted, artistPublishedFilter(true)] },
+      });
+    });
+
+    it('counts only unpublished artists when published=false', async () => {
+      vi.mocked(prisma.artist.count).mockResolvedValue(4 as never);
+
+      await ArtistRepository.count({ published: false });
+
+      expect(prisma.artist.count).toHaveBeenCalledWith({
+        where: { AND: [artistWhere.notDeleted, artistPublishedFilter(false)] },
       });
     });
   });

@@ -30,7 +30,7 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
-import { artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { artistPublishedFilter, artistWhere, publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { orderedCredits } from './_internal/credit-order';
@@ -499,10 +499,8 @@ const buildListWhere = (filters: ArtistListFilters): Prisma.ArtistWhereInput => 
   if (!deleted) {
     and.push(artistWhere.notDeleted);
   }
-  if (published === true) {
-    and.push({ publishedOn: { not: null } });
-  } else if (published === false) {
-    and.push(artistWhere.unpublished);
+  if (published !== undefined) {
+    and.push(artistPublishedFilter(published));
   }
   if (search) {
     and.push(...buildTokenSearch(search, nameFieldClauses));
@@ -839,17 +837,12 @@ export class ArtistRepository {
   }
 
   /**
-   * Count artists matching an optional published filter (admin dashboard).
-   * Soft-deleted artists never count — the trash view has its own list.
+   * Count artists matching an optional published filter (admin dashboard),
+   * through the admin listing's {@link buildListWhere}. Soft-deleted artists
+   * never count — the trash view has its own list.
    */
-  static async count(filters: ArtistCountFilters = {}): Promise<number> {
-    const and: Prisma.ArtistWhereInput[] = [artistWhere.notDeleted];
-    if (filters.published === true) {
-      and.push({ publishedOn: { not: null } });
-    } else if (filters.published === false) {
-      and.push(artistWhere.unpublished);
-    }
-    return prisma.artist.count({ where: { AND: and } });
+  static async count({ published }: ArtistCountFilters = {}): Promise<number> {
+    return prisma.artist.count({ where: buildListWhere({ published }) });
   }
 
   /**

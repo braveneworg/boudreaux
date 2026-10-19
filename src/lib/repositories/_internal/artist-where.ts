@@ -29,6 +29,18 @@ export const artistWhere = {
 } as const satisfies Record<string, Prisma.ArtistWhereInput>;
 
 /**
+ * Admin "published?" tri-state: `true` → published (deleted rows included —
+ * admin lists filter deletion separately), `false` → never published,
+ * `undefined` → no clause.
+ */
+export const artistPublishedFilter = (published: boolean | undefined): Prisma.ArtistWhereInput =>
+  published === true
+    ? isPresent('publishedOn')
+    : published === false
+      ? artistWhere.unpublished
+      : {};
+
+/**
  * A public artist (ADR-0015, ADR-0016): published and not soft-deleted.
  * Whether the artist is still on the label plays no part. Every public read
  * applies it: to the artist a page is about, and, nested as
