@@ -3,12 +3,17 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { after } from 'next/server';
+
 import {
   VideoArtistRepository,
   type VideoArtistWithArtist,
 } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
+import {
+  VideoEnrichmentService,
+  videoEnrichmentJob,
+} from '@/lib/services/video-enrichment-service';
 import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { loggers } from '@/lib/utils/logger';
@@ -51,13 +56,19 @@ export type VideoPostSaveInput =
   | { intent: 'draft' | 'create'; next: SavedVideoValues }
   | { intent: 'update'; next: SavedVideoValues; previous: PreviousVideoValues };
 
+/** One successful save: what was saved, to which row, and by whom. */
+export type VideoPostSave = VideoPostSaveInput & {
+  videoId: string;
+  /** Stamped on any Producer the producer sync creates. */
+  createdBy?: string;
+};
+
 /**
  * Everything the post-save pipeline should do for one save. Each flag is
- * decided once, here, so the callers that schedule the work and the caller that
- * pre-marks the enrichment job read the same decision instead of each
- * re-deriving it.
+ * decided once, here, so the scheduling and the draft's pending mark read the
+ * same decision instead of each re-deriving it.
  */
-export interface VideoPostSavePlan {
+interface VideoPostSavePlan {
   /** Sync the `VideoArtist` links from the artist string. */
   syncArtists: boolean;
   /** Probe (or re-probe) the uploaded file. */
@@ -139,21 +150,18 @@ const planUpdatedVideo = (
   };
 };
 
-/**
- * Decide what post-save work one save needs. Pure — the callers schedule the
- * result; this only chooses it.
- */
-export const planVideoPostSave = (input: VideoPostSaveInput): VideoPostSavePlan =>
+/** Decide what post-save work one save needs. Pure — this only chooses it. */
+const planVideoPostSave = (input: VideoPostSaveInput): VideoPostSavePlan =>
   input.intent === 'update'
     ? planUpdatedVideo(input.next, input.previous)
     : planNewVideo(input.next, input.intent);
 
 /**
- * True when {@link runVideoPostSave} would do anything, so a caller can skip
- * scheduling an empty `after()`. Producer sync is excluded deliberately: it runs
- * in its own `after()` and is gated on {@link VideoPostSavePlan.syncProducers}.
+ * True when {@link runVideoPostSave} would do anything, so an empty `after()`
+ * is never scheduled. Producer sync is excluded deliberately: it runs in its
+ * own `after()` and is gated on {@link VideoPostSavePlan.syncProducers}.
  */
-export const videoPostSaveHasWork = (plan: VideoPostSavePlan): boolean =>
+const videoPostSaveHasWork = (plan: VideoPostSavePlan): boolean =>
   plan.syncArtists || plan.probe || plan.dispatchEnrichment || plan.confirmArtistDetailsChanged;
 
 /** The linked artist's matchable display name (lowercased for comparison). */
@@ -168,7 +176,7 @@ const detailPartDiffers = (stored: string | null, provided: string | undefined):
  * True when any admin-reviewed artist detail actually differs from the linked
  * artists' stored name parts (an unmatched sourceName counts as a change).
  */
-export const artistDetailsDiffer = (
+const artistDetailsDiffer = (
   details: VideoArtistDetail[],
   rows: VideoArtistWithArtist[]
 ): boolean =>
@@ -203,7 +211,7 @@ const attemptStage = async (
 };
 
 /** What {@link runVideoPostSave} needs beyond the plan itself. */
-export interface RunVideoPostSaveInput {
+interface RunVideoPostSaveInput {
   videoId: string;
   /** The admin-entered display artist string — the source of the artist sync. */
   artist: string;
@@ -219,7 +227,7 @@ export interface RunVideoPostSaveInput {
  * When the plan defers to a stored-detail comparison, that read happens first
  * and a no-op save stops here without touching the enrichment services.
  */
-export const runVideoPostSave = async ({
+const runVideoPostSave = async ({
   videoId,
   artist,
   artistDetails,
@@ -250,7 +258,7 @@ export const runVideoPostSave = async ({
 };
 
 /** Best-effort producer-join sync (runs in `after()`, never fails the save). */
-export const syncVideoProducersAfterSave = async ({
+const syncVideoProducersAfterSave = async ({
   videoId,
   producers,
   createdBy,
@@ -262,4 +270,55 @@ export const syncVideoProducersAfterSave = async ({
   await attemptStage('Post-save video producer sync failed', videoId, () =>
     ProducerService.syncVideoProducers(videoId, producers, createdBy)
   );
+};
+
+/**
+ * Pre-response `pending` handoff for a draft's auto-kicked enrichment. The edit
+ * page's status poll only re-arms while a job is in flight, so the status must
+ * be in-flight BEFORE the client's first fetch — the dispatch itself runs
+ * post-response in `after()`. Best-effort: a failure never blocks the draft;
+ * the run's own `processing` write self-heals the status.
+ */
+const markEnrichmentPending = async (videoId: string): Promise<void> => {
+  try {
+    await videoEnrichmentJob.markPending(videoId, new Date());
+  } catch (error) {
+    logger.warn('video_draft_enrichment_pending_failed', {
+      videoId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Schedule the **post-save work** for one successful save. Plans it once, then:
+ *
+ * - on a draft whose plan dispatches enrichment, marks the job `pending`
+ *   before resolving, so the marker and the dispatch can never disagree;
+ * - schedules the stage pipeline (artist sync → probe → enrichment, behind the
+ *   details-only stored-link check) in one `after()` when it has work;
+ * - schedules the producer sync in its own `after()` when the plan asks.
+ *
+ * Everything runs after the response and never fails the save.
+ */
+export const scheduleVideoPostSave = async (save: VideoPostSave): Promise<void> => {
+  const { videoId, next, createdBy } = save;
+  const plan = planVideoPostSave(save);
+
+  if (save.intent === 'draft' && plan.dispatchEnrichment) await markEnrichmentPending(videoId);
+  if (videoPostSaveHasWork(plan)) {
+    after(() =>
+      runVideoPostSave({
+        videoId,
+        artist: next.artist,
+        artistDetails: next.artistDetails,
+        plan,
+      })
+    );
+  }
+  if (plan.syncProducers) {
+    after(() =>
+      syncVideoProducersAfterSave({ videoId, producers: next.producers ?? [], createdBy })
+    );
+  }
 };

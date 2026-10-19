@@ -70,11 +70,3 @@ export const releaseDayFromStored = (value: Date | null | undefined): ReleaseDay
 /** Today's UTC calendar day as `YYYY-MM-DD` (`now` injectable for tests). */
 export const todayUtcIsoDate = (now: Date = new Date()): ReleaseDay =>
   now.toISOString().slice(0, 10) as ReleaseDay;
-
-/**
- * Whether a `YYYY-MM-DD` day is today's UTC day. A release-date lookup that
- * lands on today is treated as "not found": a release date is never inferred,
- * and today only ever appears because a human typed it (ADR-0004).
- */
-export const isTodayUtc = (day: string, now: Date = new Date()): boolean =>
-  day === todayUtcIsoDate(now);

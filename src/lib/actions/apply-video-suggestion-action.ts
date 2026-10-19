@@ -12,7 +12,7 @@ import { VideoArtistRepository } from '@/lib/repositories/video-artist-repositor
 import type { VideoArtistWithArtist } from '@/lib/repositories/video-artist-repository';
 import { VideoEnrichmentSuggestionRepository } from '@/lib/repositories/video-enrichment-suggestion-repository';
 import { ArtistService, type ArtistEnrichedField } from '@/lib/services/artist-service';
-import { decideSuggestionDismiss } from '@/lib/services/video-editorial-rules';
+import { decideSuggestionDismiss, EDITORIAL_REFUSALS } from '@/lib/services/video-editorial-rules';
 import type { VideoEnrichmentSuggestionRecord } from '@/lib/types/domain/video-enrichment';
 import { loggers } from '@/lib/utils/logger';
 import { isRealCalendarDate } from '@/lib/utils/validation/iso-date';
@@ -124,7 +124,7 @@ const dismissSuggestion = async (
   if (!decision.ok) {
     return {
       success: false,
-      error: 'A description suggestion is never dismissed.',
+      error: EDITORIAL_REFUSALS[decision.reason],
       code: 'VALIDATION',
     };
   }

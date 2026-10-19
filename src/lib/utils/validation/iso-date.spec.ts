@@ -5,7 +5,6 @@ import {
   ISO_DATE_PATTERN,
   isRealCalendarDate,
   isReleaseDay,
-  isTodayUtc,
   releaseDayFromForm,
   releaseDayFromStored,
   todayUtcIsoDate,
@@ -129,25 +128,5 @@ describe('todayUtcIsoDate', () => {
 
   it('uses the UTC day, not the local one, right after UTC midnight', () => {
     expect(todayUtcIsoDate(new Date('2026-09-15T00:00:00.000Z'))).toBe('2026-09-15');
-  });
-});
-
-describe('isTodayUtc', () => {
-  it('is true for the UTC day of the injected instant', () => {
-    expect(isTodayUtc('2026-09-14', new Date('2026-09-14T00:00:00.000Z'))).toBe(true);
-  });
-
-  it('is false for yesterday', () => {
-    expect(isTodayUtc('2026-09-13', new Date('2026-09-14T00:00:00.000Z'))).toBe(false);
-  });
-
-  it('is false one millisecond before UTC midnight flips the day', () => {
-    expect(isTodayUtc('2026-09-14', new Date('2026-09-13T23:59:59.999Z'))).toBe(false);
-  });
-
-  it('is false for a value that is not a YYYY-MM-DD day', () => {
-    expect(isTodayUtc('2026-09-14T00:00:00.000Z', new Date('2026-09-14T12:00:00.000Z'))).toBe(
-      false
-    );
   });
 });

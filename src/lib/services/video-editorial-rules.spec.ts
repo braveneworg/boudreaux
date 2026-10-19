@@ -8,6 +8,8 @@ import {
   decidePublish,
   decideReleaseDate,
   decideSuggestionDismiss,
+  EDITORIAL_REFUSALS,
+  isTodayMiss,
 } from './video-editorial-rules';
 
 const day = (value: string): ReleaseDay => value as ReleaseDay;
@@ -142,6 +144,34 @@ describe('decideSuggestionDismiss — a description suggestion is never dismisse
   it('allows dismissing an artist-level suggestion whatever its field', () => {
     expect(decideSuggestionDismiss({ artistId: 'artist-1', field: 'description' })).toEqual({
       ok: true,
+    });
+  });
+});
+
+describe('isTodayMiss — today is never a found release date (ADR-0004)', () => {
+  it('treats today as a miss', () => {
+    expect(isTodayMiss('2026-10-01', TODAY)).toBe(true);
+  });
+
+  it('does not treat yesterday as a miss', () => {
+    expect(isTodayMiss('2026-09-30', TODAY)).toBe(false);
+  });
+
+  it('follows the injected today rather than a clock', () => {
+    expect(isTodayMiss('2026-09-30', day('2026-09-30'))).toBe(true);
+  });
+
+  it('compares whole days, so a datetime on today is not a miss', () => {
+    expect(isTodayMiss('2026-10-01T00:00:00.000Z', TODAY)).toBe(false);
+  });
+});
+
+describe('EDITORIAL_REFUSALS', () => {
+  it('names each refusal for the admin', () => {
+    expect(EDITORIAL_REFUSALS).toEqual({
+      RELEASE_DATE_REQUIRED: 'Set a release date before publishing',
+      PUBLISHED_KEEPS_DATE: 'A published video must keep a release date',
+      DESCRIPTION_NEVER_DISMISSED: 'A description suggestion is never dismissed',
     });
   });
 });

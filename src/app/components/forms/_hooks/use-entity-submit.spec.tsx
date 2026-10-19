@@ -109,6 +109,51 @@ describe('useEntitySubmit', () => {
     );
   });
 
+  /**
+   * A form with field-level server errors handles its own failure; the hook
+   * hands it the result instead of showing the one-sentence default.
+   */
+  it('hands the failed result, the values and the mode to onFailure', async () => {
+    const failed = { success: false };
+    const onFailure = vi.fn();
+    const { submit } = setup({ update: vi.fn().mockResolvedValue(failed), onFailure });
+
+    await submit(formEl, 'a1', values);
+
+    expect(onFailure.mock.calls).toEqual([[failed, values, 'update']]);
+  });
+
+  it('shows no default failure toast when onFailure is given', async () => {
+    const { submit } = setup({
+      create: vi.fn().mockResolvedValue({ success: false }),
+      onFailure: vi.fn(),
+    });
+
+    await submit(formEl, null, values);
+
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('does not reset the form when onFailure handles the failure', async () => {
+    const { submit, reset } = setup({
+      create: vi.fn().mockResolvedValue({ success: false }),
+      onFailure: vi.fn(),
+    });
+
+    await submit(formEl, null, values);
+
+    expect(reset).not.toHaveBeenCalled();
+  });
+
+  it('does not run onFailure when the mutation succeeds', async () => {
+    const onFailure = vi.fn();
+    const { submit } = setup({ onFailure });
+
+    await submit(formEl, null, values);
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
   it('does not run onSuccess when the mutation fails', async () => {
     const onSuccess = vi.fn();
     const { submit } = setup({

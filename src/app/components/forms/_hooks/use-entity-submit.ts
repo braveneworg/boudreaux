@@ -25,13 +25,19 @@ interface UseEntitySubmitOptions<TValues, TResult extends { success: boolean }> 
    * Runs before the form is reset.
    */
   onSuccess?: (result: TResult, values: TValues, mode: SubmitMode) => void | Promise<void>;
+  /**
+   * Handle a failed write in place of the default toast — for a form that maps
+   * the server's field errors and message itself. The form is not reset.
+   */
+  onFailure?: (result: TResult, values: TValues, mode: SubmitMode) => void;
 }
 
 /**
  * The submit protocol shared by every entity form: guard the form ref, dispatch
  * create-or-update on the presence of an id, stop on failure with a message
  * naming the entity, then hand off to the entity's own success handling and
- * reset the form.
+ * reset the form. A form whose server returns field-level errors passes
+ * `onFailure`, which replaces the default failure toast.
  *
  * Deliberately owns only what every form does identically. Entity-specific
  * work stays in `onSuccess` rather than being threaded in as a bag of
@@ -48,6 +54,7 @@ export const useEntitySubmit = <TValues, TResult extends { success: boolean }>({
   create,
   update,
   onSuccess,
+  onFailure,
 }: UseEntitySubmitOptions<TValues, TResult>) =>
   useCallback(
     async (formEl: HTMLFormElement | null, id: string | null, values: TValues): Promise<void> => {
@@ -61,12 +68,16 @@ export const useEntitySubmit = <TValues, TResult extends { success: boolean }>({
       const result = id ? await update(id, values) : await create(values);
 
       if (!result.success) {
-        toast.error(`Failed to ${mode} ${entity}. Please check the form for errors.`);
+        if (onFailure) {
+          onFailure(result, values, mode);
+        } else {
+          toast.error(`Failed to ${mode} ${entity}. Please check the form for errors.`);
+        }
         return;
       }
 
       await onSuccess?.(result, values, mode);
       reset(values);
     },
-    [entity, reset, create, update, onSuccess]
+    [entity, reset, create, update, onSuccess, onFailure]
   );

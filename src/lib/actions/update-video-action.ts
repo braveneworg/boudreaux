@@ -6,16 +6,9 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import type { ServiceResponse } from '@/lib/services/service.types';
-import {
-  planVideoPostSave,
-  runVideoPostSave,
-  syncVideoProducersAfterSave,
-  videoPostSaveHasWork,
-} from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { Video } from '@/lib/types/domain/video';
 import type { FormState } from '@/lib/types/form-state';
@@ -117,26 +110,13 @@ const runVideoUpdate = async (
     revalidatePath('/admin/videos');
     revalidatePath('/videos');
 
-    const plan = planVideoPostSave({ intent: 'update', next: data, previous: current });
-    if (plan.syncProducers) {
-      after(() =>
-        syncVideoProducersAfterSave({
-          videoId,
-          producers: data.producers ?? [],
-          createdBy: userId,
-        })
-      );
-    }
-    if (videoPostSaveHasWork(plan)) {
-      after(() =>
-        runVideoPostSave({
-          videoId,
-          artist: data.artist,
-          artistDetails: data.artistDetails,
-          plan,
-        })
-      );
-    }
+    await VideoService.schedulePostSave({
+      intent: 'update',
+      videoId,
+      next: data,
+      previous: { artist: current.artist, s3Key: current.s3Key },
+      createdBy: userId,
+    });
   }
 };
 

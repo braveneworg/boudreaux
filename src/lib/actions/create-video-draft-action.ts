@@ -6,15 +6,8 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { VideoRepository } from '@/lib/repositories/video-repository';
-import {
-  planVideoPostSave,
-  runVideoPostSave,
-  videoPostSaveHasWork,
-} from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { CreateVideoData, VideoPosterCandidate } from '@/lib/types/domain/video';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -119,50 +112,6 @@ const DRAFT_FAILED: CreateVideoDraftResult = {
 };
 
 /**
- * Pre-response `pending` handoff for the auto-kicked enrichment. The edit
- * page's status poll only re-arms while a job is in flight, so the status must
- * be in-flight BEFORE the client's first fetch — the dispatch itself runs
- * post-response in `after()` (mirrors runVideoEnrichmentAction). The caller
- * gates this on the plan's own `dispatchEnrichment`, so the marker and the
- * dispatch can never disagree. Best-effort: a failure never blocks the draft;
- * the run's own `processing` write self-heals the status.
- */
-const markEnrichmentPending = async (videoId: string): Promise<void> => {
-  try {
-    await VideoRepository.setEnrichmentStatus(videoId, 'pending');
-  } catch (error) {
-    logger.warn('video_draft_enrichment_pending_failed', {
-      videoId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-};
-
-/**
- * Mark enrichment `pending` when it will dispatch, and schedule the draft's
- * {@link planVideoPostSave} pipeline in `after()` when it has work.
- */
-const scheduleDraftPostSave = async (videoId: string, data: VideoDraftInput): Promise<void> => {
-  const artist = data.artist ?? '';
-  const plan = planVideoPostSave({
-    intent: 'draft',
-    next: { artist, s3Key: data.s3Key },
-  });
-
-  if (plan.dispatchEnrichment) await markEnrichmentPending(videoId);
-  if (videoPostSaveHasWork(plan)) {
-    after(() =>
-      runVideoPostSave({
-        videoId,
-        artist,
-        artistDetails: data.artistDetails,
-        plan,
-      })
-    );
-  }
-};
-
-/**
  * Server Action: create the video row as an unpublished draft the moment the
  * S3 multipart upload completes, so enrichment can run while the admin is
  * still filling the form. The draft carries no release date unless the form
@@ -171,10 +120,10 @@ const scheduleDraftPostSave = async (videoId: string, data: VideoDraftInput): Pr
  * networks). When enrichment will dispatch (a non-blank artist, any category)
  * the job is marked `pending` before the response so the edit page's status poll
  * engages. In `after()` the
- * post-save pipeline runs the {@link planVideoPostSave} plan: the probe
- * always, artist sync when the artist snapshot is non-blank, and enrichment
- * only when the video is enrichment-eligible. A failure here NEVER blocks
- * the upload — the form falls back to create-on-submit.
+ * post-save work runs: the probe always, artist sync when the artist snapshot
+ * is non-blank, and enrichment only when the video is enrichment-eligible. A
+ * failure here NEVER blocks the upload — the form falls back to
+ * create-on-submit.
  */
 export const createVideoDraftAction = async (input: unknown): Promise<CreateVideoDraftResult> => {
   const gate = await gateAction('admin');
@@ -209,7 +158,11 @@ export const createVideoDraftAction = async (input: unknown): Promise<CreateVide
 
     revalidatePath('/admin/videos');
 
-    await scheduleDraftPostSave(response.data.id, data);
+    await VideoService.schedulePostSave({
+      intent: 'draft',
+      videoId: response.data.id,
+      next: { artist: data.artist ?? '', s3Key: data.s3Key, artistDetails: data.artistDetails },
+    });
     return { success: true, videoId: response.data.id };
   } catch (error) {
     logger.error('video_draft_create_error', {

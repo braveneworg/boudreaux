@@ -1,29 +1,28 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 import {
   VideoArtistRepository,
   type VideoArtistWithArtist,
 } from '@/lib/repositories/video-artist-repository';
 import { ProducerService } from '@/lib/services/producer-service';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
-import { VideoProbeService } from '@/lib/services/video-probe-service';
-import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
-import type { VideoProducerInput } from '@/lib/validation/video-producer-schema';
-
 import {
-  artistDetailsDiffer,
-  planVideoPostSave,
-  runVideoPostSave,
-  syncVideoProducersAfterSave,
-  videoPostSaveHasWork,
-  type VideoPostSavePlan,
-} from './video-post-save-service';
+  VideoEnrichmentService,
+  videoEnrichmentJob,
+} from '@/lib/services/video-enrichment-service';
+import { VideoProbeService } from '@/lib/services/video-probe-service';
+import { loggers } from '@/lib/utils/logger';
+
+import { VideoService } from './video-service';
+
+import type { VideoPostSave } from './video-post-save-service';
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/repositories/video-repository', () => ({ VideoRepository: {} }));
+vi.mock('@/lib/utils/s3-client', () => ({ deleteS3Object: vi.fn() }));
 vi.mock('@/lib/services/video-enrichment-service', () => ({
   VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
+  videoEnrichmentJob: { markPending: vi.fn() },
 }));
 vi.mock('@/lib/services/video-probe-service', () => ({
   VideoProbeService: { probeAndPersist: vi.fn() },
@@ -35,429 +34,485 @@ vi.mock('@/lib/repositories/video-artist-repository', () => ({
   VideoArtistRepository: { findByVideoId: vi.fn() },
 }));
 
-const S3_KEY = 'media/videos/v1/clip.mp4';
+// Capture after() callbacks so each case can run them on demand, in order.
+const afterCallbacks: Array<() => Promise<void>> = [];
+vi.mock('next/server', () => ({
+  after: (cb: () => Promise<void>) => {
+    afterCallbacks.push(cb);
+  },
+}));
 
-/**
- * Saved values for a create/draft, overridable per case. The planner reads no
- * category: enrichment eligibility is decided on the artist alone.
- */
-const nextValues = (overrides: {
-  artist?: string;
-  s3Key?: string;
-  producers?: VideoProducerInput[];
-  artistDetails?: VideoArtistDetail[];
-}) => ({
-  artist: 'Band',
-  s3Key: S3_KEY,
-  ...overrides,
+const videoId = '507f1f77bcf86cd799439011';
+const S3_KEY = `media/videos/${videoId}/clip.mp4`;
+const REPLACED_S3_KEY = `media/videos/${videoId}/replaced.mp4`;
+const previous = { artist: 'Alpha Beta', s3Key: S3_KEY };
+
+/** The linked artist row the details-only cases compare against. */
+const storedRow = {
+  artistId: 'a1',
+  role: 'PRIMARY',
+  artist: {
+    firstName: 'Alpha',
+    middleName: null,
+    surname: 'Beta',
+    displayName: 'Alpha Beta',
+    akaNames: null,
+    bornOn: null,
+  },
+} as VideoArtistWithArtist;
+
+/** Schedule one save, then run every captured after() callback in order. */
+const scheduleAndRun = async (save: VideoPostSave): Promise<void> => {
+  await VideoService.schedulePostSave(save);
+  for (const callback of afterCallbacks) await callback();
+};
+
+/** The stage services each case can observe, in pipeline order. */
+const stageCalls = () => ({
+  syncArtists: vi.mocked(VideoEnrichmentService.syncVideoArtists).mock.calls,
+  probe: vi.mocked(VideoProbeService.probeAndPersist).mock.calls,
+  enrichment: vi.mocked(VideoEnrichmentService.runEnrichmentJob).mock.calls,
+  producers: vi.mocked(ProducerService.syncVideoProducers).mock.calls,
 });
 
-describe('planVideoPostSave', () => {
-  describe('a newly uploaded file (draft and create)', () => {
-    it('always probes the file, because it has never been probed', () => {
-      const plan = planVideoPostSave({ intent: 'create', next: nextValues({}) });
+beforeEach(() => {
+  afterCallbacks.length = 0;
+  vi.mocked(videoEnrichmentJob.markPending).mockResolvedValue(undefined);
+  vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
+  vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
+  vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
+  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
+  vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([storedRow]);
+});
 
-      expect(plan.probe).toBe(true);
-    });
-
-    it('syncs the artist links when the admin supplied an artist', () => {
-      const plan = planVideoPostSave({ intent: 'create', next: nextValues({}) });
-
-      expect(plan.syncArtists).toBe(true);
-    });
-
-    it('skips the artist sync when the artist is blank, minting no shell', () => {
-      const plan = planVideoPostSave({ intent: 'draft', next: nextValues({ artist: '   ' }) });
-
-      expect(plan.syncArtists).toBe(false);
-    });
-
-    it('still probes a blank-artist draft', () => {
-      const plan = planVideoPostSave({ intent: 'draft', next: nextValues({ artist: '' }) });
-
-      expect(plan.probe).toBe(true);
-    });
-
-    it('never syncs producers for a draft, which carries none', () => {
-      const plan = planVideoPostSave({
+describe('VideoService.schedulePostSave', () => {
+  describe('a draft', () => {
+    it('(a) marks enrichment pending before resolving, then runs sync, probe and enrichment in one after()', async () => {
+      await VideoService.schedulePostSave({
         intent: 'draft',
-        next: nextValues({ producers: [{ name: 'Pro' } as VideoProducerInput] }),
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY },
       });
+      const pendingBeforeAfterRan = vi.mocked(videoEnrichmentJob.markPending).mock.calls.length;
+      for (const callback of afterCallbacks) await callback();
 
-      expect(plan.syncProducers).toBe(false);
+      expect({
+        pendingBeforeAfterRan,
+        afterCount: afterCallbacks.length,
+        ...stageCalls(),
+      }).toEqual({
+        pendingBeforeAfterRan: 1,
+        afterCount: 1,
+        syncArtists: [[videoId, 'Alpha Beta', undefined]],
+        probe: [[videoId]],
+        enrichment: [[videoId]],
+        producers: [],
+      });
     });
 
-    it('syncs producers on create when the form supplied some', () => {
-      const plan = planVideoPostSave({
-        intent: 'create',
-        next: nextValues({ producers: [{ name: 'Pro' } as VideoProducerInput] }),
+    it('(a) marks the draft video itself pending', async () => {
+      await VideoService.schedulePostSave({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY },
       });
 
-      expect(plan.syncProducers).toBe(true);
+      expect(vi.mocked(videoEnrichmentJob.markPending).mock.calls[0]?.[0]).toBe(videoId);
     });
 
-    it('skips the producer sync on create when the list is empty, having nothing to clear', () => {
-      const plan = planVideoPostSave({ intent: 'create', next: nextValues({ producers: [] }) });
+    it('(b) with a blank artist marks nothing pending and only probes', async () => {
+      await scheduleAndRun({ intent: 'draft', videoId, next: { artist: '  ', s3Key: S3_KEY } });
 
-      expect(plan.syncProducers).toBe(false);
+      expect({
+        pending: vi.mocked(videoEnrichmentJob.markPending).mock.calls,
+        ...stageCalls(),
+      }).toEqual({
+        pending: [],
+        syncArtists: [],
+        probe: [[videoId]],
+        enrichment: [],
+        producers: [],
+      });
+    });
+
+    it('(c) resolves when the pending write rejects', async () => {
+      vi.spyOn(loggers.media, 'warn').mockImplementation(() => loggers.media);
+      vi.mocked(videoEnrichmentJob.markPending).mockRejectedValueOnce(Error('db down'));
+
+      await expect(
+        VideoService.schedulePostSave({
+          intent: 'draft',
+          videoId,
+          next: { artist: 'Alpha Beta', s3Key: S3_KEY },
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('(c) logs the failed pending write and still schedules the pipeline', async () => {
+      const warnSpy = vi.spyOn(loggers.media, 'warn').mockImplementation(() => loggers.media);
+      vi.mocked(videoEnrichmentJob.markPending).mockRejectedValueOnce(Error('db down'));
+
+      await VideoService.schedulePostSave({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY },
+      });
+
+      expect({ warn: warnSpy.mock.calls, afterCount: afterCallbacks.length }).toEqual({
+        warn: [['video_draft_enrichment_pending_failed', { videoId, error: 'db down' }]],
+        afterCount: 1,
+      });
+    });
+
+    it('(c) logs a pending write that rejects with a non-Error value', async () => {
+      const warnSpy = vi.spyOn(loggers.media, 'warn').mockImplementation(() => loggers.media);
+      vi.mocked(videoEnrichmentJob.markPending).mockRejectedValueOnce('timeout');
+
+      await VideoService.schedulePostSave({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY },
+      });
+
+      expect(warnSpy.mock.calls).toEqual([
+        ['video_draft_enrichment_pending_failed', { videoId, error: 'timeout' }],
+      ]);
+    });
+
+    it('forwards the reviewed artist details to the artist sync', async () => {
+      const artistDetails = [{ sourceName: 'Alpha Beta', displayName: 'A. Beta' }];
+
+      await scheduleAndRun({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, artistDetails },
+      });
+
+      expect(stageCalls().syncArtists).toEqual([[videoId, 'Alpha Beta', artistDetails]]);
+    });
+
+    it('never syncs producers for a draft', async () => {
+      await scheduleAndRun({
+        intent: 'draft',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers: [{ name: 'Pro' }] },
+      });
+
+      expect(stageCalls().producers).toEqual([]);
     });
   });
 
-  describe('the enrichment dispatch gate', () => {
-    it('dispatches for a video that has an artist', () => {
-      const plan = planVideoPostSave({ intent: 'create', next: nextValues({}) });
+  describe('a create', () => {
+    it('(d) with producers syncs them in their own after(), after the stage pipeline', async () => {
+      const producers = [{ name: 'Studio Pro' }];
+      await VideoService.schedulePostSave({
+        intent: 'create',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers },
+        createdBy: 'user-123',
+      });
+      await afterCallbacks[1]?.();
 
-      expect(plan.dispatchEnrichment).toBe(true);
+      expect({ afterCount: afterCallbacks.length, ...stageCalls() }).toEqual({
+        afterCount: 2,
+        syncArtists: [],
+        probe: [],
+        enrichment: [],
+        producers: [[videoId, producers, 'user-123']],
+      });
     });
 
-    it('does not dispatch when the artist is blank', () => {
-      const plan = planVideoPostSave({ intent: 'create', next: nextValues({ artist: '  ' }) });
+    it('(e) with an empty producer list schedules no producer sync', async () => {
+      await scheduleAndRun({
+        intent: 'create',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers: [] },
+        createdBy: 'user-123',
+      });
 
-      expect(plan.dispatchEnrichment).toBe(false);
+      expect({ afterCount: afterCallbacks.length, producers: stageCalls().producers }).toEqual({
+        afterCount: 1,
+        producers: [],
+      });
+    });
+
+    it('runs artist sync, probe and enrichment for a new file with an artist', async () => {
+      await scheduleAndRun({ intent: 'create', videoId, next: { artist: 'Alpha', s3Key: S3_KEY } });
+
+      expect(stageCalls()).toEqual({
+        syncArtists: [[videoId, 'Alpha', undefined]],
+        probe: [[videoId]],
+        enrichment: [[videoId]],
+        producers: [],
+      });
+    });
+
+    it('never marks enrichment pending', async () => {
+      await scheduleAndRun({ intent: 'create', videoId, next: { artist: 'Alpha', s3Key: S3_KEY } });
+
+      expect(videoEnrichmentJob.markPending).not.toHaveBeenCalled();
+    });
+
+    it('runs the artist sync before the probe and the probe before enrichment', async () => {
+      await scheduleAndRun({ intent: 'create', videoId, next: { artist: 'Alpha', s3Key: S3_KEY } });
+
+      const [sync] = vi.mocked(VideoEnrichmentService.syncVideoArtists).mock.invocationCallOrder;
+      const [probe] = vi.mocked(VideoProbeService.probeAndPersist).mock.invocationCallOrder;
+      const [job] = vi.mocked(VideoEnrichmentService.runEnrichmentJob).mock.invocationCallOrder;
+      expect([sync < probe, probe < job]).toEqual([true, true]);
     });
   });
 
   describe('an update', () => {
-    const previous = { artist: 'Band', s3Key: S3_KEY };
-
-    it('kicks the artist sync when the artist string changed', () => {
-      const plan = planVideoPostSave({
+    it('(f) with a changed artist syncs and dispatches enrichment without probing', async () => {
+      await scheduleAndRun({
         intent: 'update',
+        videoId,
+        next: { artist: 'New Band', s3Key: S3_KEY },
         previous,
-        next: nextValues({ artist: 'New Band' }),
+        createdBy: 'user-123',
       });
 
-      expect(plan.syncArtists).toBe(true);
-    });
-
-    it('does not re-probe when only the artist changed', () => {
-      const plan = planVideoPostSave({
-        intent: 'update',
-        previous,
-        next: nextValues({ artist: 'New Band' }),
+      expect(stageCalls()).toEqual({
+        syncArtists: [[videoId, 'New Band', undefined]],
+        probe: [],
+        enrichment: [[videoId]],
+        producers: [],
       });
-
-      expect(plan.probe).toBe(false);
     });
 
-    it('re-probes when the file was replaced', () => {
-      const plan = planVideoPostSave({
+    it('(f) kicks a changed artist without reading the stored links', async () => {
+      await scheduleAndRun({
         intent: 'update',
-        previous,
-        next: nextValues({ s3Key: 'media/videos/v1/replaced.mp4' }),
-      });
-
-      expect(plan.probe).toBe(true);
-    });
-
-    it('plans no enrichment work when nothing relevant changed', () => {
-      const plan = planVideoPostSave({ intent: 'update', previous, next: nextValues({}) });
-
-      expect(videoPostSaveHasWork(plan)).toBe(false);
-    });
-
-    it('defers to a stored-detail comparison on a details-only save', () => {
-      const plan = planVideoPostSave({
-        intent: 'update',
-        previous,
-        next: nextValues({ artistDetails: [{ sourceName: 'Band' } as VideoArtistDetail] }),
-      });
-
-      expect(plan.confirmArtistDetailsChanged).toBe(true);
-    });
-
-    it('kicks immediately rather than deferring when the artist also changed', () => {
-      const plan = planVideoPostSave({
-        intent: 'update',
-        previous,
-        next: nextValues({
+        videoId,
+        next: {
           artist: 'New Band',
-          artistDetails: [{ sourceName: 'New Band' } as VideoArtistDetail],
-        }),
-      });
-
-      expect(plan.confirmArtistDetailsChanged).toBe(false);
-    });
-
-    it('skips the producer sync when the payload omitted producers entirely', () => {
-      const plan = planVideoPostSave({ intent: 'update', previous, next: nextValues({}) });
-
-      expect(plan.syncProducers).toBe(false);
-    });
-
-    it('syncs producers when the payload cleared them to an empty list', () => {
-      const plan = planVideoPostSave({
-        intent: 'update',
+          s3Key: S3_KEY,
+          artistDetails: [{ sourceName: 'New Band' }],
+        },
         previous,
-        next: nextValues({ producers: [] }),
       });
 
-      expect(plan.syncProducers).toBe(true);
-    });
-  });
-});
-
-describe('videoPostSaveHasWork', () => {
-  it('reports work for a plan that only needs the deferred detail check', () => {
-    const plan = planVideoPostSave({
-      intent: 'update',
-      previous: { artist: 'Band', s3Key: S3_KEY },
-      next: nextValues({ artistDetails: [{ sourceName: 'Band' } as VideoArtistDetail] }),
+      expect(VideoArtistRepository.findByVideoId).not.toHaveBeenCalled();
     });
 
-    expect(videoPostSaveHasWork(plan)).toBe(true);
-  });
-
-  it('reports work for a blank-artist draft, which still probes', () => {
-    const plan = planVideoPostSave({ intent: 'draft', next: nextValues({ artist: '' }) });
-
-    expect(videoPostSaveHasWork(plan)).toBe(true);
-  });
-});
-
-const videoId = '507f1f77bcf86cd799439011';
-
-/** A plan with every enrichment stage on, overridable per case. */
-const fullPlan = (over: Partial<VideoPostSavePlan> = {}): VideoPostSavePlan => ({
-  syncArtists: true,
-  probe: true,
-  dispatchEnrichment: true,
-  confirmArtistDetailsChanged: false,
-  syncProducers: false,
-  ...over,
-});
-
-describe('runVideoPostSave', () => {
-  const artist = 'Ceschi feat. Sage Francis';
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
-    vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
-    vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
-    vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
-  });
-
-  it('syncs video artists from the artist string', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-      videoId,
-      artist,
-      undefined
-    );
-  });
-
-  it('forwards artistDetails as the third arg to syncVideoArtists', async () => {
-    const artistDetails = [{ sourceName: 'Ceschi', displayName: 'Ceschi Ramos' }];
-
-    await runVideoPostSave({ videoId, artist, artistDetails, plan: fullPlan() });
-
-    expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-      videoId,
-      artist,
-      artistDetails
-    );
-  });
-
-  it('probes when the plan says to', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
-  });
-
-  it('skips the probe when the plan says not to', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan({ probe: false }) });
-
-    expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
-  });
-
-  it('dispatches the enrichment job when the plan says to', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-  });
-
-  it('skips the dispatch when the plan says not to', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan({ dispatchEnrichment: false }) });
-
-    expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
-  });
-
-  it('skips the artist sync when the plan says not to', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan({ syncArtists: false }) });
-
-    expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
-  });
-
-  it('runs the sync before the probe and the probe before the job', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    const syncOrder = vi.mocked(VideoEnrichmentService.syncVideoArtists).mock
-      .invocationCallOrder[0];
-    const probeOrder = vi.mocked(VideoProbeService.probeAndPersist).mock.invocationCallOrder[0];
-    const jobOrder = vi.mocked(VideoEnrichmentService.runEnrichmentJob).mock.invocationCallOrder[0];
-    expect([syncOrder < probeOrder, probeOrder < jobOrder]).toEqual([true, true]);
-  });
-
-  it('still probes when the artist sync fails', async () => {
-    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('sync down'));
-
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
-  });
-
-  it('still dispatches the job when the probe fails', async () => {
-    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValue(Error('probe down'));
-
-    await runVideoPostSave({ videoId, artist, plan: fullPlan() });
-
-    expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-  });
-
-  it('never throws even when every stage fails', async () => {
-    vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('a'));
-    vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValue(Error('b'));
-    vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockRejectedValue(Error('c'));
-
-    await expect(runVideoPostSave({ videoId, artist, plan: fullPlan() })).resolves.toBeUndefined();
-  });
-
-  it('never syncs producers, which are scheduled independently', async () => {
-    await runVideoPostSave({ videoId, artist, plan: fullPlan({ syncProducers: true }) });
-
-    expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
-  });
-
-  describe('when the plan defers to a stored-detail comparison', () => {
-    const deferred = fullPlan({ confirmArtistDetailsChanged: true, probe: false });
-    const storedRow = {
-      artistId: 'a1',
-      role: 'PRIMARY',
-      artist: {
-        firstName: 'Alpha',
-        middleName: null,
-        surname: 'Beta',
-        displayName: 'Alpha Beta',
-        akaNames: null,
-        bornOn: null,
-      },
-    } as VideoArtistWithArtist;
-
-    it('runs the stages when the details actually differ', async () => {
-      vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([storedRow]);
-
-      await runVideoPostSave({
+    it('(g) with a replaced file probes it', async () => {
+      await scheduleAndRun({
+        intent: 'update',
         videoId,
-        artist,
-        artistDetails: [{ sourceName: 'Alpha Beta', firstName: 'Changed' }],
-        plan: deferred,
+        next: { artist: 'Alpha Beta', s3Key: REPLACED_S3_KEY },
+        previous,
       });
 
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalled();
+      expect(stageCalls().probe).toEqual([[videoId]]);
     });
 
-    it('stops without touching the enrichment services when nothing changed', async () => {
-      vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([storedRow]);
-
-      await runVideoPostSave({
+    it('(h) a details-only save matching the stored links calls no stage service', async () => {
+      await scheduleAndRun({
+        intent: 'update',
         videoId,
-        artist,
-        artistDetails: [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }],
-        plan: deferred,
+        next: {
+          artist: 'Alpha Beta',
+          s3Key: S3_KEY,
+          artistDetails: [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }],
+        },
+        previous,
       });
 
-      expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
+      expect(stageCalls()).toEqual({ syncArtists: [], probe: [], enrichment: [], producers: [] });
     });
 
-    it('does not dispatch the job on a no-op details save', async () => {
-      vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([storedRow]);
+    it('a details-only save that changes a name part syncs and dispatches without probing', async () => {
+      const artistDetails = [{ sourceName: 'Alpha Beta', firstName: 'Changed' }];
 
-      await runVideoPostSave({
+      await scheduleAndRun({
+        intent: 'update',
         videoId,
-        artist,
-        artistDetails: [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }],
-        plan: deferred,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, artistDetails },
+        previous,
       });
 
-      expect(VideoEnrichmentService.runEnrichmentJob).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe('artistDetailsDiffer', () => {
-  const row = (over: Partial<VideoArtistWithArtist['artist']> = {}): VideoArtistWithArtist =>
-    ({
-      artistId: 'a1',
-      role: 'PRIMARY',
-      artist: {
-        firstName: 'Alpha',
-        middleName: null,
-        surname: 'Beta',
-        displayName: 'Alpha Beta',
-        akaNames: null,
-        bornOn: null,
-        ...over,
-      },
-    }) as VideoArtistWithArtist;
-
-  it('is false when every detail matches the linked artist', () => {
-    const details = [{ sourceName: 'Alpha Beta', firstName: 'Alpha', surname: 'Beta' }];
-    expect(artistDetailsDiffer(details, [row()])).toBe(false);
-  });
-
-  it('is true when a provided part differs', () => {
-    const details = [{ sourceName: 'Alpha Beta', firstName: 'Changed' }];
-    expect(artistDetailsDiffer(details, [row()])).toBe(true);
-  });
-
-  it('is true when the source name matches no linked artist', () => {
-    expect(artistDetailsDiffer([{ sourceName: 'Nobody' }], [row()])).toBe(true);
-  });
-});
-
-describe('syncVideoProducersAfterSave', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
-  });
-
-  it('syncs producers when provided', async () => {
-    await syncVideoProducersAfterSave({ videoId, producers: [{ name: 'New Producer' }] });
-
-    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
-      videoId,
-      [{ name: 'New Producer' }],
-      undefined
-    );
-  });
-
-  it('syncs an empty producers array (clear-to-zero)', async () => {
-    await syncVideoProducersAfterSave({ videoId, producers: [] });
-
-    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(videoId, [], undefined);
-  });
-
-  it('forwards createdBy to syncVideoProducers', async () => {
-    await syncVideoProducersAfterSave({
-      videoId,
-      producers: [{ id: 'p1', name: 'Rick' }],
-      createdBy: 'user-abc',
+      expect(stageCalls()).toEqual({
+        syncArtists: [[videoId, 'Alpha Beta', artistDetails]],
+        probe: [],
+        enrichment: [[videoId]],
+        producers: [],
+      });
     });
 
-    expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
-      videoId,
-      [{ id: 'p1', name: 'Rick' }],
-      'user-abc'
-    );
+    it('a details-only save filling a name part the stored artist lacks counts as a change', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: {
+          artist: 'Alpha Beta',
+          s3Key: S3_KEY,
+          artistDetails: [{ sourceName: 'Alpha Beta', middleName: 'Q' }],
+        },
+        previous,
+      });
+
+      expect(stageCalls().syncArtists).toHaveLength(1);
+    });
+
+    it('a details-only save naming an unlinked artist counts as a change', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, artistDetails: [{ sourceName: 'Nobody' }] },
+        previous,
+      });
+
+      expect(stageCalls().syncArtists).toHaveLength(1);
+    });
+
+    it('a details-only save reads the stored links of this video', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: {
+          artist: 'Alpha Beta',
+          s3Key: S3_KEY,
+          artistDetails: [{ sourceName: 'Alpha Beta', firstName: 'Changed' }],
+        },
+        previous,
+      });
+
+      expect(vi.mocked(VideoArtistRepository.findByVideoId).mock.calls).toEqual([[videoId]]);
+    });
+
+    it('an empty details list on an unchanged save schedules nothing', async () => {
+      await VideoService.schedulePostSave({
+        intent: 'update',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, artistDetails: [] },
+        previous,
+      });
+
+      expect(afterCallbacks).toHaveLength(0);
+    });
+
+    it('(i) with nothing relevant changed and producers present only syncs producers', async () => {
+      const producers = [{ name: 'Studio Pro' }, { id: 'p2', name: 'Rick' }];
+
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers },
+        previous,
+        createdBy: 'user-123',
+      });
+
+      expect({ afterCount: afterCallbacks.length, ...stageCalls() }).toEqual({
+        afterCount: 1,
+        syncArtists: [],
+        probe: [],
+        enrichment: [],
+        producers: [[videoId, producers, 'user-123']],
+      });
+    });
+
+    it('(i) clears producers when the save sends an empty list', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers: [] },
+        previous,
+        createdBy: 'user-123',
+      });
+
+      expect(stageCalls().producers).toEqual([[videoId, [], 'user-123']]);
+    });
+
+    it('(j) with producers omitted schedules no producer sync', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'New Band', s3Key: S3_KEY },
+        previous,
+      });
+
+      expect({ afterCount: afterCallbacks.length, producers: stageCalls().producers }).toEqual({
+        afterCount: 1,
+        producers: [],
+      });
+    });
+
+    it('never marks enrichment pending', async () => {
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'New Band', s3Key: S3_KEY },
+        previous,
+      });
+
+      expect(videoEnrichmentJob.markPending).not.toHaveBeenCalled();
+    });
   });
 
-  it('swallows a sync failure (best-effort)', async () => {
-    vi.mocked(ProducerService.syncVideoProducers).mockRejectedValue(Error('producer sync down'));
+  describe('a failing stage', () => {
+    beforeEach(() => {
+      vi.spyOn(loggers.media, 'warn').mockImplementation(() => loggers.media);
+    });
 
-    await expect(
-      syncVideoProducersAfterSave({ videoId, producers: [{ name: 'Bad' }] })
-    ).resolves.toBeUndefined();
+    it('(k) logs a failed artist sync and still runs the probe and enrichment', async () => {
+      vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValueOnce(Error('sync down'));
+
+      await scheduleAndRun({ intent: 'create', videoId, next: { artist: 'Alpha', s3Key: S3_KEY } });
+
+      expect({
+        warn: vi.mocked(loggers.media.warn).mock.calls,
+        probe: stageCalls().probe,
+        enrichment: stageCalls().enrichment,
+      }).toEqual({
+        warn: [['Post-save video artist sync failed', { videoId, error: 'sync down' }]],
+        probe: [[videoId]],
+        enrichment: [[videoId]],
+      });
+    });
+
+    it('(k) logs a failed probe and still dispatches enrichment', async () => {
+      vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValueOnce(Error('probe down'));
+
+      await scheduleAndRun({ intent: 'create', videoId, next: { artist: 'Alpha', s3Key: S3_KEY } });
+
+      expect({
+        warn: vi.mocked(loggers.media.warn).mock.calls,
+        enrichment: stageCalls().enrichment,
+      }).toEqual({
+        warn: [['Post-save video probe failed', { videoId, error: 'probe down' }]],
+        enrichment: [[videoId]],
+      });
+    });
+
+    it('(k) never rejects when every stage fails', async () => {
+      vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValueOnce(Error('a'));
+      vi.mocked(VideoProbeService.probeAndPersist).mockRejectedValueOnce(Error('b'));
+      vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockRejectedValueOnce('c');
+      vi.mocked(ProducerService.syncVideoProducers).mockRejectedValueOnce(Error('d'));
+
+      await expect(
+        scheduleAndRun({
+          intent: 'create',
+          videoId,
+          next: { artist: 'Alpha', s3Key: S3_KEY, producers: [{ name: 'Pro' }] },
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('(k) logs a failed producer sync', async () => {
+      vi.mocked(ProducerService.syncVideoProducers).mockRejectedValueOnce(Error('producers down'));
+
+      await scheduleAndRun({
+        intent: 'update',
+        videoId,
+        next: { artist: 'Alpha Beta', s3Key: S3_KEY, producers: [{ name: 'Bad' }] },
+        previous,
+      });
+
+      expect(vi.mocked(loggers.media.warn).mock.calls).toEqual([
+        ['Post-save video producer sync failed', { videoId, error: 'producers down' }],
+      ]);
+    });
   });
 });

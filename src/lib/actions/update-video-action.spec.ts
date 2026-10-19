@@ -4,10 +4,6 @@
 import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { VideoArtistRepository } from '@/lib/repositories/video-artist-repository';
-import { ProducerService } from '@/lib/services/producer-service';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
-import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -27,28 +23,6 @@ vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
 vi.mock('@/lib/utils/s3-key-utils');
-vi.mock('@/lib/services/video-enrichment-service', () => ({
-  VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
-}));
-vi.mock('@/lib/services/video-probe-service', () => ({
-  VideoProbeService: { probeAndPersist: vi.fn() },
-}));
-vi.mock('@/lib/services/producer-service', () => ({
-  ProducerService: { syncVideoProducers: vi.fn() },
-}));
-vi.mock('@/lib/repositories/video-artist-repository', () => ({
-  VideoArtistRepository: { findByVideoId: vi.fn() },
-}));
-
-// Capture after() callbacks so tests can inspect / run them on demand.
-// Index 0 = producer-sync (always scheduled when producers field present)
-// Index 1 = enrichment kick (scheduled only when enrichment-relevant fields changed)
-const afterCallbacks: Array<() => Promise<void>> = [];
-vi.mock('next/server', () => ({
-  after: (cb: () => Promise<void>) => {
-    afterCallbacks.push(cb);
-  },
-}));
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
@@ -119,29 +93,7 @@ beforeEach(() => {
     success: true,
     data: { id: videoId },
   } as never);
-  afterCallbacks.length = 0;
-  vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
-  vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
-  vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
-  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
-  // Default: the linked artist row matches the current 'The Band' artist string
-  // exactly, so a details-only save whose sourceName is 'The Band' is a no-op
-  // unless a test overrides this to return a differing row.
-  vi.mocked(VideoArtistRepository.findByVideoId).mockResolvedValue([
-    {
-      artistId: 'a1',
-      role: 'PRIMARY',
-      sortOrder: 0,
-      artist: {
-        displayName: 'The Band',
-        firstName: 'The',
-        middleName: null,
-        surname: 'Band',
-        akaNames: null,
-        bornOn: null,
-      },
-    },
-  ]);
+  vi.mocked(VideoService.schedulePostSave).mockResolvedValue(undefined);
 });
 
 describe('updateVideoAction', () => {
@@ -422,87 +374,39 @@ describe('updateVideoAction', () => {
     });
   });
 
-  describe('Post-update enrichment kick', () => {
-    /** Helper: returns the enrichment-kick callback (not the producer-sync one). */
-    const getEnrichmentCallback = (): (() => Promise<void>) | undefined =>
-      afterCallbacks.find(
-        (cb) =>
-          // The enrichment kick callback is the one that calls syncVideoArtists;
-          // we identify it by running it and checking mock call counts.
-          // Simpler approach: the action schedules producer-sync first, kick second.
-          // Producer sync is always index 0 when producers present; kick is last.
-          // When only kick scheduled (no producers), it's index 0.
-          cb === afterCallbacks[afterCallbacks.length - 1]
-      );
-
-    it('does not schedule a kick when nothing enrichment-relevant changed', async () => {
+  describe('Post-save work', () => {
+    it('schedules the post-save work against the row as it was before the update', async () => {
       mockParsedSuccess();
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      // No producers field → no producer sync. No enrichment-relevant change → no kick.
-      expect(afterCallbacks).toHaveLength(0);
+      expect(vi.mocked(VideoService.schedulePostSave).mock.calls).toEqual([
+        [
+          {
+            intent: 'update',
+            videoId,
+            next: parsedData,
+            previous: { artist: 'The Band', s3Key: currentS3Key },
+            createdBy: 'user-123',
+          },
+        ],
+      ]);
     });
 
-    it('schedules a kick when the artist string changed', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+    it('hands a replaced file, the reviewed artist details and producers to the post-save work', async () => {
+      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
+      const producers = [{ name: 'Studio Pro' }];
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, artistDetails, producers });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallbacks).toHaveLength(1);
-    });
-
-    it('re-syncs artists with the new artist string', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        'New Band',
-        undefined
+      expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual(
+        expect.objectContaining({ s3Key: replacementS3Key, artistDetails, producers })
       );
     });
 
-    it('does not re-probe on an artist-only change', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
-    });
-
-    it('re-probes when the video file was replaced', async () => {
-      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
-    });
-
-    it('re-dispatches enrichment for a MUSIC video on file replacement', async () => {
-      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-    });
-
-    it('dispatches enrichment for an INFORMATIONAL video on an artist change', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band', category: 'INFORMATIONAL' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-    });
-
-    it('does not schedule a kick when the update fails', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
+    it('does not schedule post-save work when the update fails', async () => {
+      mockParsedSuccess({ ...parsedData, artist: 'New Band', producers: [{ name: 'Someone' }] });
       vi.mocked(VideoService.updateVideo).mockResolvedValue({
         success: false,
         error: 'nope',
@@ -510,16 +414,48 @@ describe('updateVideoAction', () => {
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallbacks).toHaveLength(0);
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
-    it('schedules a kick when artistDetails is non-empty (new trigger)', async () => {
-      const artistDetails = [{ sourceName: 'The Band' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
+    it('does not schedule post-save work when the current video cannot be loaded', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.getVideoById).mockResolvedValue({
+        success: false,
+        error: 'Video not found',
+      } as never);
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(afterCallbacks).toHaveLength(1);
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule post-save work when the replacement key fails confirmation', async () => {
+      mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
+      vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule post-save work when validation fails', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: { success: false, error: { issues: [] } },
+      } as never);
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule post-save work when the update throws', async () => {
+      mockParsedSuccess();
+      vi.mocked(VideoService.updateVideo).mockRejectedValue(Error('boom'));
+
+      await updateVideoAction(videoId, initialFormState, mockFormData);
+
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
     it('does not include artistDetails in the repository update payload', async () => {
@@ -532,140 +468,6 @@ describe('updateVideoAction', () => {
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'artistDetails')).toBe(false);
     });
 
-    it('does not schedule a kick when artistDetails is empty (regression pin)', async () => {
-      mockParsedSuccess({ ...parsedData, artistDetails: [] });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      expect(afterCallbacks).toHaveLength(0);
-    });
-
-    it('does not schedule a kick when artist unchanged, no file replaced, and no artistDetails', async () => {
-      mockParsedSuccess();
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      expect(afterCallbacks).toHaveLength(0);
-    });
-
-    it('forwards artistDetails to syncVideoArtists when present', async () => {
-      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band (official)' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        parsedData.artist,
-        artistDetails
-      );
-    });
-
-    // --- No-op change detection (details-only saves in the draft flow) ---
-
-    it('does not kick when details-only save matches the linked artist rows', async () => {
-      // sourceName + parts equal the default linked row → an ACTUAL no-op save.
-      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      // The details path still schedules an after() (the change check runs there).
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.syncVideoArtists).not.toHaveBeenCalled();
-    });
-
-    it('kicks with reProbe false when a details-only save changes a name part', async () => {
-      // The provided surname differs from the linked row's stored surname.
-      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        parsedData.artist,
-        artistDetails
-      );
-    });
-
-    it('reads the linked rows before deciding on a details-only save', async () => {
-      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoArtistRepository.findByVideoId).toHaveBeenCalledWith(videoId);
-    });
-
-    it('does not re-probe on a details-only change', async () => {
-      const artistDetails = [{ sourceName: 'The Band', surname: 'Bandit' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoProbeService.probeAndPersist).not.toHaveBeenCalled();
-    });
-
-    it('kicks immediately without reading the linked rows when the artist changed', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      await getEnrichmentCallback()?.();
-
-      expect(VideoArtistRepository.findByVideoId).not.toHaveBeenCalled();
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        'New Band',
-        undefined
-      );
-    });
-
-    // --- Producer sync is now DECOUPLED from the enrichment kick ---
-
-    it('syncs producers independently when producers is non-empty', async () => {
-      const producers = [{ name: 'Studio Pro' }, { id: 'p2', name: 'Rick' }];
-      mockParsedSuccess({ ...parsedData, producers });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      // Only producer sync scheduled — no enrichment-relevant change
-      expect(afterCallbacks).toHaveLength(1);
-      await afterCallbacks[0]();
-
-      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
-        videoId,
-        producers,
-        'user-123'
-      );
-    });
-
-    it('clears producers when producers is empty [] (the fix: clear-to-zero persists)', async () => {
-      mockParsedSuccess({ ...parsedData, producers: [] });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      // Producer sync scheduled even when empty — no enrichment kick since nothing relevant changed
-      expect(afterCallbacks).toHaveLength(1);
-      await afterCallbacks[0]();
-
-      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(videoId, [], 'user-123');
-    });
-
-    it('does not schedule producer sync when producers is absent (undefined)', async () => {
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      // Run all scheduled callbacks
-      for (const cb of afterCallbacks) await cb();
-
-      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
-    });
-
     it('does not include producers in the repository update payload', async () => {
       const producers = [{ name: 'Studio Pro' }];
       mockParsedSuccess({ ...parsedData, producers });
@@ -674,37 +476,6 @@ describe('updateVideoAction', () => {
 
       const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'producers')).toBe(false);
-    });
-
-    it('does not schedule any after() when update fails and producers present', async () => {
-      mockParsedSuccess({ ...parsedData, producers: [{ name: 'Someone' }] });
-      vi.mocked(VideoService.updateVideo).mockResolvedValue({
-        success: false,
-        error: 'nope',
-      } as never);
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      expect(afterCallbacks).toHaveLength(0);
-    });
-
-    it('schedules both producer sync and enrichment kick independently when both conditions met', async () => {
-      const producers = [{ name: 'Producer' }];
-      mockParsedSuccess({ ...parsedData, artist: 'New Band', producers });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      expect(afterCallbacks).toHaveLength(2);
-    });
-
-    it('enrichment kick does not call syncVideoProducers', async () => {
-      // Enrichment-relevant change (artist) but no producers field
-      mockParsedSuccess({ ...parsedData, artist: 'New Band' });
-
-      await updateVideoAction(videoId, initialFormState, mockFormData);
-      for (const cb of afterCallbacks) await cb();
-
-      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
     });
   });
 

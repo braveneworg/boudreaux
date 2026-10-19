@@ -4,9 +4,6 @@
 import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { ProducerService } from '@/lib/services/producer-service';
-import { VideoEnrichmentService } from '@/lib/services/video-enrichment-service';
-import { VideoProbeService } from '@/lib/services/video-probe-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
@@ -24,24 +21,6 @@ vi.mock('@/lib/utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
 vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
-vi.mock('@/lib/services/video-enrichment-service', () => ({
-  VideoEnrichmentService: { syncVideoArtists: vi.fn(), runEnrichmentJob: vi.fn() },
-}));
-vi.mock('@/lib/services/video-probe-service', () => ({
-  VideoProbeService: { probeAndPersist: vi.fn() },
-}));
-vi.mock('@/lib/services/producer-service', () => ({
-  ProducerService: { syncVideoProducers: vi.fn() },
-}));
-
-// Capture after() callbacks so tests can inspect / run them on demand.
-// Index 0 = enrichment kick; Index 1 = producer sync (when producers present)
-const afterCallbacks: Array<() => Promise<void>> = [];
-vi.mock('next/server', () => ({
-  after: (cb: () => Promise<void>) => {
-    afterCallbacks.push(cb);
-  },
-}));
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 
@@ -88,11 +67,7 @@ beforeEach(() => {
     success: true,
     data: { id: videoId },
   } as never);
-  afterCallbacks.length = 0;
-  vi.mocked(VideoEnrichmentService.syncVideoArtists).mockResolvedValue(undefined);
-  vi.mocked(VideoEnrichmentService.runEnrichmentJob).mockResolvedValue(undefined);
-  vi.mocked(VideoProbeService.probeAndPersist).mockResolvedValue(undefined);
-  vi.mocked(ProducerService.syncVideoProducers).mockResolvedValue(undefined);
+  vi.mocked(VideoService.schedulePostSave).mockResolvedValue(undefined);
 });
 
 describe('createVideoAction', () => {
@@ -431,17 +406,30 @@ describe('createVideoAction', () => {
     });
   });
 
-  describe('Post-save enrichment kick', () => {
-    it('schedules the kick via after() on success', async () => {
+  describe('Post-save work', () => {
+    it('schedules the post-save work for the created video', async () => {
       mockParsedSuccess();
 
       await createVideoAction(initialFormState, buildFormData());
 
-      // Kick is always the first after() call
-      expect(afterCallbacks[0]).toBeTypeOf('function');
+      expect(vi.mocked(VideoService.schedulePostSave).mock.calls).toEqual([
+        [{ intent: 'create', videoId, next: parsedData, createdBy: 'user-123' }],
+      ]);
     });
 
-    it('does not schedule the kick when creation fails', async () => {
+    it('hands the reviewed artist details and producers to the post-save work', async () => {
+      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band (official)' }];
+      const producers = [{ name: 'New Producer' }];
+      mockParsedSuccess({ ...parsedData, artistDetails, producers });
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual(
+        expect.objectContaining({ artistDetails, producers })
+      );
+    });
+
+    it('does not schedule post-save work when creation fails', async () => {
       mockParsedSuccess();
       vi.mocked(VideoService.createVideo).mockResolvedValue({
         success: false,
@@ -450,80 +438,36 @@ describe('createVideoAction', () => {
 
       await createVideoAction(initialFormState, buildFormData());
 
-      expect(afterCallbacks).toHaveLength(0);
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
-    it('does not schedule the kick when S3 confirmation fails', async () => {
+    it('does not schedule post-save work when S3 confirmation fails', async () => {
       mockParsedSuccess();
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
       await createVideoAction(initialFormState, buildFormData());
 
-      expect(afterCallbacks).toHaveLength(0);
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
-    it('syncs video artists from the submitted artist string', async () => {
+    it('does not schedule post-save work when the body is invalid', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false, errors: { title: ['Title is required'] } },
+        parsed: { success: false, error: {} },
+      } as never);
+
+      await createVideoAction(initialFormState, buildFormData());
+
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
+    });
+
+    it('does not schedule post-save work when the create throws', async () => {
       mockParsedSuccess();
+      vi.mocked(VideoService.createVideo).mockRejectedValue(Error('boom'));
 
       await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
 
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        'The Band',
-        undefined
-      );
-    });
-
-    it('probes the new upload', async () => {
-      mockParsedSuccess();
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
-    });
-
-    it('dispatches web enrichment for a MUSIC video', async () => {
-      mockParsedSuccess();
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-    });
-
-    it('dispatches web enrichment for an INFORMATIONAL video too', async () => {
-      mockParsedSuccess({ ...parsedData, category: 'INFORMATIONAL' });
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(VideoEnrichmentService.runEnrichmentJob).toHaveBeenCalledWith(videoId);
-    });
-
-    it('still probes when the artist sync fails', async () => {
-      mockParsedSuccess();
-      vi.mocked(VideoEnrichmentService.syncVideoArtists).mockRejectedValue(Error('sync down'));
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(VideoProbeService.probeAndPersist).toHaveBeenCalledWith(videoId);
-    });
-
-    it('forwards artistDetails to syncVideoArtists when present', async () => {
-      const artistDetails = [{ sourceName: 'The Band', displayName: 'The Band (official)' }];
-      mockParsedSuccess({ ...parsedData, artistDetails });
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(VideoEnrichmentService.syncVideoArtists).toHaveBeenCalledWith(
-        videoId,
-        'The Band',
-        artistDetails
-      );
+      expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
     it('does not include artistDetails in the repository create payload', async () => {
@@ -543,43 +487,6 @@ describe('createVideoAction', () => {
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
-    });
-
-    // --- Producer sync is now DECOUPLED from the enrichment kick ---
-
-    it('syncs producers in a separate after() when producers is non-empty', async () => {
-      const producers = [{ name: 'New Producer' }];
-      mockParsedSuccess({ ...parsedData, producers });
-
-      await createVideoAction(initialFormState, buildFormData());
-
-      // kick = afterCallbacks[0], producer sync = afterCallbacks[1]
-      expect(afterCallbacks).toHaveLength(2);
-      await afterCallbacks[1]();
-
-      expect(ProducerService.syncVideoProducers).toHaveBeenCalledWith(
-        videoId,
-        producers,
-        'user-123'
-      );
-    });
-
-    it('does not schedule a producer sync when producers is absent', async () => {
-      mockParsedSuccess();
-
-      await createVideoAction(initialFormState, buildFormData());
-      for (const cb of afterCallbacks) await cb();
-
-      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
-    });
-
-    it('enrichment kick does not call syncVideoProducers', async () => {
-      mockParsedSuccess();
-
-      await createVideoAction(initialFormState, buildFormData());
-      await afterCallbacks[0]?.();
-
-      expect(ProducerService.syncVideoProducers).not.toHaveBeenCalled();
     });
 
     it('does not include producers in the repository create payload', async () => {

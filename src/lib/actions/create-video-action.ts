@@ -6,16 +6,9 @@
 import 'server-only';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import type { ServiceResponse } from '@/lib/services/service.types';
-import {
-  planVideoPostSave,
-  runVideoPostSave,
-  syncVideoProducersAfterSave,
-  videoPostSaveHasWork,
-} from '@/lib/services/video-post-save-service';
 import { VideoService } from '@/lib/services/video-service';
 import type { CreateVideoData, Video } from '@/lib/types/domain/video';
 import type { FormState } from '@/lib/types/form-state';
@@ -108,29 +101,12 @@ const runVideoCreate = async (
     revalidatePath('/admin/videos');
     if (response.success) {
       revalidatePath('/videos');
-      // Both stages run after the response so the admin's save returns
-      // immediately, and in separate after() calls so producer sync is
-      // independent of the enrichment stages.
-      const plan = planVideoPostSave({ intent: 'create', next: data });
-      if (videoPostSaveHasWork(plan)) {
-        after(() =>
-          runVideoPostSave({
-            videoId: response.data.id,
-            artist: data.artist,
-            artistDetails: data.artistDetails,
-            plan,
-          })
-        );
-      }
-      if (plan.syncProducers) {
-        after(() =>
-          syncVideoProducersAfterSave({
-            videoId: response.data.id,
-            producers: data.producers ?? [],
-            createdBy: userId,
-          })
-        );
-      }
+      await VideoService.schedulePostSave({
+        intent: 'create',
+        videoId: response.data.id,
+        next: data,
+        createdBy: userId,
+      });
     }
   } catch {
     formState.success = false;

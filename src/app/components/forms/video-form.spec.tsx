@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { VideoForm, useVideoProducersPrefill } from '@/app/components/forms/video-form';
 import type * as videoDescriptionEditor from '@/app/components/forms/videos/enrichment/video-description-editor';
 import { RELEASE_DATE_LOOKUP_DEBOUNCE_MS } from '@/app/components/forms/videos/use-release-date-auto-lookup';
+import { RELEASE_DATE_AUTOSAVE_DEBOUNCE_MS } from '@/app/components/forms/videos/use-release-date-autosave';
 import type { DraftPosterFields } from '@/app/components/forms/videos/use-video-draft';
 import type * as videoPosterStrip from '@/app/components/forms/videos/use-video-poster-strip';
 import type * as videoMetadata from '@/app/components/forms/videos/video-metadata';
@@ -927,6 +928,144 @@ describe('VideoForm — draft-mode submit', () => {
       )
     );
     expect(mocks.push).toHaveBeenCalledWith('/admin/videos');
+  });
+});
+
+describe('VideoForm — submit outcome', () => {
+  const asEditMode = (publishedAt: Date | null = null) =>
+    mocks.useVideoQuery.mockReturnValue({
+      data: { ...editVideo, publishedAt },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+  /** Open the edit form, dirty the title, and press Save. */
+  const saveEdit = async (user: ReturnType<typeof setup>): Promise<void> => {
+    render(<VideoForm videoId="v1" />);
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Existing Title'));
+    await user.type(screen.getByLabelText('Title'), '!');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+  };
+
+  /** Upload a file on the new-video form, fill it, and press Save. */
+  const saveCreate = async (user: ReturnType<typeof setup>): Promise<void> => {
+    render(<VideoForm />);
+    await uploadVideoFile(user);
+    await screen.findByText('clip.mp4');
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+  };
+
+  it('toasts the default update failure when the server sends no general message', async () => {
+    mocks.updateVideoAsync.mockResolvedValueOnce({ success: false, fields: {}, errors: {} });
+    asEditMode();
+
+    await saveEdit(setup());
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error).mock.calls).toEqual([['Failed to update the video.']])
+    );
+  });
+
+  it('toasts the default create failure when the server sends no general message', async () => {
+    mocks.createVideoAsync.mockResolvedValueOnce({ success: false, fields: {} });
+
+    await saveCreate(setup());
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error).mock.calls).toEqual([['Failed to create the video.']])
+    );
+  });
+
+  it('renders a server title error inline under Title when an update fails', async () => {
+    mocks.updateVideoAsync.mockResolvedValueOnce({
+      success: false,
+      fields: {},
+      errors: { title: ['This title is already in use. Please choose a different one.'] },
+    });
+    asEditMode();
+
+    await saveEdit(setup());
+
+    expect(
+      await screen.findByText('This title is already in use. Please choose a different one.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not navigate when a save fails', async () => {
+    mocks.updateVideoAsync.mockResolvedValueOnce({
+      success: false,
+      fields: {},
+      errors: { general: ['Video not found'] },
+    });
+    asEditMode();
+
+    await saveEdit(setup());
+
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Video not found'));
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('toasts the saved message and returns to the list after a persisted save', async () => {
+    asEditMode();
+
+    await saveEdit(setup());
+
+    await waitFor(() => expect(mocks.push.mock.calls).toEqual([['/admin/videos']]));
+    expect(vi.mocked(toast.success).mock.calls).toEqual([['Video saved successfully.']]);
+  });
+
+  it('toasts the created message and opens the new video after a create', async () => {
+    await saveCreate(setup());
+
+    await waitFor(() =>
+      expect(mocks.push.mock.calls).toEqual([[`/admin/videos/${'a'.repeat(24)}`]])
+    );
+    expect(vi.mocked(toast.success).mock.calls).toEqual([['Video created successfully.']]);
+  });
+
+  /** The form resets to what it saved, so nothing is left unsaved behind it. */
+  it('leaves the form clean after a successful save', async () => {
+    asEditMode(new Date('2023-04-04T00:00:00.000Z'));
+    const user = setup();
+
+    await saveEdit(user);
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/videos'));
+    await user.click(screen.getByRole('button', { name: 'Unpublish' }));
+
+    expect(screen.queryByText('Unpublish video?')).not.toBeInTheDocument();
+  });
+
+  it('makes no mutation beyond the one update after a successful save', async () => {
+    asEditMode();
+
+    await saveEdit(setup());
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/videos'));
+    await act(
+      () => new Promise((resolve) => setTimeout(resolve, RELEASE_DATE_AUTOSAVE_DEBOUNCE_MS + 100))
+    );
+
+    expect({
+      update: mocks.updateVideoAsync.mock.calls.length,
+      create: mocks.createVideoAsync.mock.calls.length,
+      releaseDate: mocks.updateVideoReleaseDateAsync.mock.calls.length,
+    }).toEqual({ update: 1, create: 0, releaseDate: 0 });
+  });
+
+  it('makes no mutation beyond the one create after a successful create', async () => {
+    await saveCreate(setup());
+    await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+    await act(
+      () => new Promise((resolve) => setTimeout(resolve, RELEASE_DATE_AUTOSAVE_DEBOUNCE_MS + 100))
+    );
+
+    expect({
+      update: mocks.updateVideoAsync.mock.calls.length,
+      create: mocks.createVideoAsync.mock.calls.length,
+      releaseDate: mocks.updateVideoReleaseDateAsync.mock.calls.length,
+    }).toEqual({ update: 0, create: 1, releaseDate: 0 });
   });
 });
 

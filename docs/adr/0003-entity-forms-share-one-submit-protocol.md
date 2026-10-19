@@ -136,3 +136,33 @@ successful write; a create navigates to the new artist's edit page (or the
 `returnTo` page), so the create path's `reset` is the meaningless work the
 scope section describes. Moving `artist-form` off the protocol for creates
 is not worth a second submit path; the row now says what happens.
+
+## Amendment (2026-10-19): `video-form` joins the protocol through `onFailure`
+
+`video-form` now submits through `useEntitySubmit`. The protocol gained one
+optional member, `onFailure(result, values, mode)`, which runs in place of
+the default failure toast. That reverses the alternative rejected above as
+"Add an `onFailure` callback so `video-form` and `featured-artist-form` fit".
+
+What changed is the cost of staying out. Kept off the protocol, `video-form`
+grew its own `SubmitVideoDeps` bag and a free `submitVideo(data, deps)` — the
+`*Deps` pattern this ADR exists to delete — and that was the shape the
+2026-10-18 architecture review flagged. The deletion test also comes out
+differently now: `video-form` has a form ref, and the hook still owns the
+null-ref guard, the create-or-update dispatch, the mode, and the
+success-then-reset order. `video-form` keeps field-level errors by passing
+`applyServerFieldErrors` and its server-message toast as `onFailure`; its
+success toast and navigation are its `onSuccess`. Without `onFailure` the
+hook behaves exactly as before, so `artist-form` and `release-form` did not
+change.
+
+`video-form` navigates away after a successful save, so its `reset` returns
+the form to the values it just saved. That changes no field the autosave or
+the draft watches.
+
+`featured-artist-form` and `tour-form` are still off the protocol.
+`featured-artist-form` still lacks an `update(id, values)` mutation (see the
+scope section); `tour-form` was not looked at here.
+
+The protocol now has six members: `entity`, `reset`, `create`, `update`,
+`onSuccess` and `onFailure`.

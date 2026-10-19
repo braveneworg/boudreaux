@@ -25,6 +25,13 @@ export type EditorialRefusal =
 
 export type EditorialDecision = { ok: true } | { ok: false; reason: EditorialRefusal };
 
+/** The admin-facing message for each editorial refusal. */
+export const EDITORIAL_REFUSALS: Record<EditorialRefusal, string> = {
+  RELEASE_DATE_REQUIRED: 'Set a release date before publishing',
+  PUBLISHED_KEEPS_DATE: 'A published video must keep a release date',
+  DESCRIPTION_NEVER_DISMISSED: 'A description suggestion is never dismissed',
+};
+
 const allow: EditorialDecision = { ok: true };
 const refuse = (reason: EditorialRefusal): EditorialDecision => ({ ok: false, reason });
 
@@ -38,6 +45,13 @@ export const decideReleaseDate = (
   incoming: ReleaseDay | Date | null
 ): EditorialDecision =>
   incoming === null && publishedAt !== null ? refuse('PUBLISHED_KEEPS_DATE') : allow;
+
+/**
+ * Is a found release day a miss because it is today? A lookup or enrichment run
+ * that lands on today's UTC day means the web had nothing and a model guessed,
+ * so the find is discarded. The caller passes today; nothing here reads a clock.
+ */
+export const isTodayMiss = (day: string, today: ReleaseDay): boolean => day === today;
 
 /** What the stored Video says about the two fields enrichment may fill. */
 export interface EditorialState {
@@ -73,7 +87,9 @@ export const decideEnrichmentAutoApply = ({
   today: ReleaseDay;
 }): EnrichmentAutoApply => ({
   releasedOn:
-    state.releasedOn === null && offered.releasedOn !== null && offered.releasedOn !== today
+    state.releasedOn === null &&
+    offered.releasedOn !== null &&
+    !isTodayMiss(offered.releasedOn, today)
       ? offered.releasedOn
       : null,
   description: !state.description?.trim() && offered.description ? offered.description : null,
