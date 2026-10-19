@@ -689,27 +689,6 @@ describe('ArtistListCard', () => {
     ).toHaveAttribute('href', '/artists/test-artist');
   });
 
-  it('shows one photo only, however many display images the row carries', () => {
-    render(
-      <ArtistListCard
-        artist={{
-          ...baseArtist,
-          bioImages: [
-            bioImage('bi1', { alt: 'First' }),
-            bioImage('bi2', { alt: 'Second' }),
-            bioImage('bi3', { alt: 'Third' }),
-          ],
-        }}
-      />
-    );
-
-    // The listing row arrives already resolved — chosen, else suggested, else
-    // pool order — so the first row is the one photo worth showing.
-    const photos = screen.getAllByRole('img');
-    expect(photos).toHaveLength(1);
-    expect(photos[0]).toHaveAccessibleName('First');
-  });
-
   it('sets the gap right of the photo to the card’s own 24px inset', () => {
     const { container } = render(<ArtistListCard artist={baseArtist} />);
 

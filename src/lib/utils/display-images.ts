@@ -14,9 +14,10 @@
  * rendered as a display image unless a human chose it (ADR-0008 and its
  * addenda).
  *
- * Pure and client-safe: the public page, the listing service, the admin media
- * manager, and the cover-art picker all resolve through here so every surface
- * agrees on which images are the display images.
+ * Pure and client-safe: the artist page model resolves every public surface
+ * through here, and the admin artist pool and the cover-art picker resolve
+ * the admin's, so every surface agrees on which images are the display
+ * images.
  */
 
 /**

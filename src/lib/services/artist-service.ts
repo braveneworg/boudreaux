@@ -48,12 +48,7 @@ import {
   summarizeListedReleases,
 } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
-import {
-  CARD_DISPLAY_IMAGE_COUNT,
-  isDisplayEligible,
-  orderBioImagesForPicker,
-  resolveDisplayImages,
-} from '@/lib/utils/display-images';
+import { isDisplayEligible, orderBioImagesForPicker } from '@/lib/utils/display-images';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { getArtistDisplayName } from '@/lib/utils/get-artist-display-name';
 import { isPubliclyRoutableUrl } from '@/lib/utils/ip-guard';
@@ -73,6 +68,7 @@ import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
+import { cardDisplayImages } from './artist-page-model';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
@@ -789,7 +785,7 @@ export class ArtistService {
     return {
       ...artist,
       // A card shows the first display image only; the page shows them all.
-      bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
+      bioImages: cardDisplayImages(artist.bioImages),
       shortBio: artist.shortBio ? sanitizeBioText(artist.shortBio) : artist.shortBio,
       members: members.map(({ member }) => member).sort(ArtistService.compareListingNames),
       memberOf: memberOf.map(({ artist: band }) => band).sort(ArtistService.compareListingNames),
