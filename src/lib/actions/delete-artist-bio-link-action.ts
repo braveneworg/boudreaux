@@ -18,10 +18,7 @@ export const deleteArtistBioLinkAction = async (linkId: string): Promise<AdminAc
   runAdminEntityAction({
     id: linkId,
     entityLabel: 'artist bio link',
-    perform: async (id) => {
-      await ArtistService.deleteBioLink(id);
-      return { success: true };
-    },
+    perform: (id) => ArtistService.deleteBioLink(id),
     event: 'media.artist_bio_link.deleted',
     metadataKey: 'artistBioLinkId',
     revalidate: ['/admin/artists'],

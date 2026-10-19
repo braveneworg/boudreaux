@@ -359,7 +359,10 @@ describe('ArtistCreditRepository', () => {
       vi.mocked(prisma.artistRelease.count).mockResolvedValueOnce(2);
       vi.mocked(prisma.artistRelease.create).mockResolvedValueOnce({} as never);
 
-      await ArtistCreditRepository.creditOnRelease('release-1', 'artist-c');
+      await ArtistCreditRepository.creditOnRelease({
+        artistId: 'artist-c',
+        releaseId: 'release-1',
+      });
 
       expect(vi.mocked(prisma.artistRelease.create).mock.calls).toEqual([
         [{ data: { artistId: 'artist-c', releaseId: 'release-1', position: 2 } }],
@@ -369,7 +372,10 @@ describe('ArtistCreditRepository', () => {
     it('is a no-op when the artist is already credited', async () => {
       vi.mocked(prisma.artistRelease.findUnique).mockResolvedValueOnce({ id: 'ar-1' } as never);
 
-      await ArtistCreditRepository.creditOnRelease('release-1', 'artist-a');
+      await ArtistCreditRepository.creditOnRelease({
+        artistId: 'artist-a',
+        releaseId: 'release-1',
+      });
 
       expect(prisma.artistRelease.count).not.toHaveBeenCalled();
       expect(prisma.artistRelease.create).not.toHaveBeenCalled();

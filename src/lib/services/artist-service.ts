@@ -10,10 +10,7 @@ import {
 } from '@/lib/repositories/artist-bio-image-repository';
 import { ArtistBioLinkRepository } from '@/lib/repositories/artist-bio-link-repository';
 import { ArtistCreditRepository } from '@/lib/repositories/artist-credit-repository';
-import {
-  ArtistRepository,
-  type EnrichedArtistFieldUpdate,
-} from '@/lib/repositories/artist-repository';
+import { ArtistRepository } from '@/lib/repositories/artist-repository';
 import type {
   Artist,
   ArtistBioImageRecord,
@@ -36,6 +33,7 @@ import type {
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
+import type { ArtistReleaseScalars } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
@@ -245,46 +243,6 @@ const removeBioMediaObjects = async (
   }
 };
 
-/** Pre-computed lookup keys for the find-or-create-by-name search order. */
-interface ArtistNameLookup {
-  trimmed: string;
-  slug: string;
-  firstName: string;
-  lastName: string;
-}
-
-/**
- * Run the find-or-create-by-name search order and return the first matching
- * artist, or `null` when none match:
- *   1. Slug match (unique index, most reliable)
- *   2. Case-insensitive displayName match
- *   3. Case-insensitive firstName + surname match
- */
-const findArtistByName = async (lookup: ArtistNameLookup): Promise<ArtistNameRecord | null> => {
-  const { trimmed, slug, firstName, lastName } = lookup;
-
-  if (slug) {
-    const bySlug = await ArtistRepository.findUniqueBySlug(slug);
-    if (bySlug) {
-      return bySlug;
-    }
-  }
-
-  const byDisplayName = await ArtistRepository.findFirstByDisplayName(trimmed);
-  if (byDisplayName) {
-    return byDisplayName;
-  }
-
-  if (firstName) {
-    const byName = await ArtistRepository.findFirstByName(firstName, lastName);
-    if (byName) {
-      return byName;
-    }
-  }
-
-  return null;
-};
-
 /** How many numbered slugs (`name-2`, `name-3`, …) a create tries before giving up. */
 const NUMBERED_SLUG_ATTEMPTS = 5;
 
@@ -324,7 +282,7 @@ const createUnderNumberedSlug = async (
 const recoverArtistFromDuplicate = async (
   createData: CreateArtistData
 ): Promise<ServiceResponse<ArtistNameRecord>> => {
-  const existing = await ArtistRepository.findUniqueBySlug(createData.slug);
+  const existing = await ArtistRepository.findByNameKeys({ slug: createData.slug });
   if (existing) {
     return { success: true, data: existing };
   }
@@ -334,6 +292,9 @@ const recoverArtistFromDuplicate = async (
 /** The artist fields a video-enrichment suggestion may apply. */
 export type ArtistEnrichedField =
   'firstName' | 'middleName' | 'surname' | 'akaNames' | 'displayName' | 'bornOn';
+
+/** The one-field updates the enrichment Apply flow may write. */
+type EnrichedArtistFieldUpdate = Pick<UpdateArtistData, ArtistEnrichedField>;
 
 /**
  * Explicit whitelist switch mapping a suggestion field onto a typed one-field
@@ -404,6 +365,26 @@ const buildArtistCreateData = ({
  *  the bio payload again. Rows already carrying the role are returned as-is. */
 const adoptAsReference = async (row: ArtistBioLinkRecord): Promise<ArtistBioLinkRecord> =>
   row.reference === false ? ArtistBioLinkRepository.restoreReference(row.id) : row;
+
+/** Creates a bio link. A concurrent add can slip between the URL check and
+ *  the insert; the DB's `@@unique([artistId, url])` index then rejects the
+ *  loser, so a `DUPLICATE` is recovered by re-reading and adopting the row the
+ *  winner persisted. Any other failure, or a winner that is gone, rethrows. */
+const createOrAdoptRacedLink = async (
+  input: CreateArtistBioLinkData
+): Promise<ArtistBioLinkRecord> => {
+  try {
+    return await ArtistBioLinkRepository.create(input);
+  } catch (error) {
+    if (error instanceof DataError && error.code === 'DUPLICATE') {
+      const raced = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
+      if (raced) {
+        return adoptAsReference(raced);
+      }
+    }
+    throw error;
+  }
+};
 
 type ServiceFailure = Extract<ServiceResponse<never>, { success: false }>;
 
@@ -628,11 +609,12 @@ export class ArtistService {
   }
 
   /**
-   * Soft delete an artist (archive)
+   * Soft delete an artist (archive) by stamping `deletedOn` with the current
+   * time.
    */
-  static async archiveArtist(id: string): Promise<ServiceResponse<ArtistScalars>> {
+  static async archiveArtist(id: string): Promise<ServiceResponse<Artist>> {
     try {
-      const artist = await ArtistRepository.archive(id);
+      const artist = await ArtistRepository.update(id, { deletedOn: new Date() });
       invalidatePublicNameCaches();
       // The vocabulary counts read only non-deleted artists.
       ArtistVocabularyService.invalidate();
@@ -800,26 +782,30 @@ export class ArtistService {
    *   2. Case-insensitive displayName match
    *   3. Case-insensitive firstName + surname match
    *
-   * Returns the matched record (`id`, `displayName`, `firstName`, `surname`) or
-   * `null` when none of the three lookups succeeds. This method exists so the
-   * admin artist-lookup route and `findOrCreateByName` share the same code path
-   * and can never silently drift.
+   * Answers the matched record's name projection, or `null` data when the name
+   * is blank or none of the three lookups succeeds. The admin artist-lookup
+   * route and `findOrCreateByName` share one lookup
+   * (`ArtistRepository.findByNameKeys`), so the two can never silently drift.
    *
    * @param artistName - Full artist name to look up (trimmed internally)
    */
-  static async findByName(artistName: string): Promise<{
-    id: string;
-    displayName: string | null;
-    firstName: string;
-    surname: string;
-  } | null> {
+  static async findByName(artistName: string): Promise<ServiceResponse<ArtistNameRecord | null>> {
     const trimmed = artistName.trim();
-    if (!trimmed) return null;
+    if (!trimmed) return { success: true, data: null };
 
-    const slug = generateSlug(trimmed);
     const { firstName, lastName } = splitFullName(trimmed);
 
-    return findArtistByName({ trimmed, slug, firstName, lastName });
+    try {
+      const match = await ArtistRepository.findByNameKeys({
+        slug: generateSlug(trimmed),
+        displayName: trimmed,
+        firstName,
+        surname: lastName,
+      });
+      return { success: true, data: match };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to look up artist' });
+    }
   }
 
   /**
@@ -845,9 +831,7 @@ export class ArtistService {
   static async findOrCreateByName(
     artistName: string,
     details?: VideoArtistDetail
-  ): Promise<
-    ServiceResponse<{ id: string; displayName: string | null; firstName: string; surname: string }>
-  > {
+  ): Promise<ServiceResponse<ArtistNameRecord>> {
     const trimmed = artistName.trim();
     if (!trimmed) {
       return { success: false, error: 'Artist name is empty', code: 'INVALID_INPUT' };
@@ -861,7 +845,12 @@ export class ArtistService {
     try {
       // 1–3. Try slug, then displayName, then firstName + surname matches.
       // Soft-deleted artists never match.
-      const found = await findArtistByName({ trimmed, slug, firstName, lastName });
+      const found = await ArtistRepository.findByNameKeys({
+        slug,
+        displayName: trimmed,
+        firstName,
+        surname: lastName,
+      });
       if (found) {
         return { success: true, data: found };
       }
@@ -883,18 +872,30 @@ export class ArtistService {
    * Credit an artist on a release, after the credits it already has; a
    * repeat is a no-op. Goes through the credit module so the stored credit
    * order stays dense (ADR-0015).
-   *
-   * @param artistId - The Artist ID
-   * @param releaseId - The Release ID
    */
-  static async creditOnRelease(artistId: string, releaseId: string): Promise<void> {
-    await ArtistCreditRepository.creditOnRelease(releaseId, artistId);
+  static async creditOnRelease(
+    credit: Pick<ArtistReleaseScalars, 'artistId' | 'releaseId'>
+  ): Promise<ServiceResponse<void>> {
+    try {
+      await ArtistCreditRepository.creditOnRelease(credit);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to credit the artist on the release' });
+    }
   }
 
   /** Removes a bio link from the reference list (admin palette X). A row that
    *  also serves as an image source keeps that role; otherwise it is deleted. */
-  static async deleteBioLink(linkId: string): Promise<void> {
-    await ArtistBioLinkRepository.removeReference(linkId);
+  static async deleteBioLink(linkId: string): Promise<ServiceResponse<void>> {
+    try {
+      await ArtistBioLinkRepository.removeReference(linkId);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Bio link not found',
+        UNKNOWN: 'Failed to delete bio link',
+      });
+    }
   }
 
   /**
@@ -926,14 +927,47 @@ export class ArtistService {
     }
   }
 
-  /** Persists one manually-added bio image and returns the created row. */
-  static async createBioImage(input: CreateArtistBioImageData): Promise<ArtistBioImageRecord> {
-    return ArtistBioImageRepository.create(input);
+  /**
+   * Persists one manually-added bio image for an existing artist and returns
+   * the created row. A blank alt falls back to the artist's display name, so
+   * every upload is eligible as a display image from the moment it lands; an
+   * artist with no name at all (blank displayName, first name and surname)
+   * leaves it null. The alt is stored as plain text.
+   */
+  static async createBioImage({
+    alt,
+    ...input
+  }: CreateArtistBioImageData): Promise<ServiceResponse<ArtistBioImageRecord>> {
+    try {
+      const artist = await ArtistRepository.findNameById(input.artistId);
+      if (!artist) {
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
+      }
+      const resolvedAlt = alt?.trim() || deriveArtistDisplayName(artist) || null;
+      const created = await ArtistBioImageRepository.create({
+        ...input,
+        alt: resolvedAlt === null ? null : sanitizeBioText(resolvedAlt),
+      });
+      return { success: true, data: created };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to add bio image' });
+    }
   }
 
   /** Updates one bio image's alt text (admin edit). */
-  static async updateBioImageAlt(imageId: string, alt: string | null): Promise<void> {
-    await ArtistBioImageRepository.updateAlt(imageId, alt);
+  static async updateBioImageAlt(
+    imageId: string,
+    alt: string | null
+  ): Promise<ServiceResponse<void>> {
+    try {
+      await ArtistBioImageRepository.updateAlt(imageId, alt);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Bio image not found',
+        UNKNOWN: 'Failed to update bio image alt text',
+      });
+    }
   }
 
   /**
@@ -1007,29 +1041,27 @@ export class ArtistService {
     }
   }
 
-  /** Persists one admin-authored bio link and returns the created row.
-   *  Dedupes by URL: if the artist already has a link with this URL (custom or
-   *  generated), returns that existing row instead of creating a duplicate, so
-   *  the reference-links input and the Add-link editor stay idempotent — an
-   *  existing row that was image-source only regains the reference role. A
-   *  concurrent add can slip between the check and the insert; the DB's
-   *  `@@unique([artistId, url])` index then rejects the loser, so a `DUPLICATE`
-   *  is recovered by re-reading and returning the row the winner persisted. */
-  static async createBioLink(input: CreateArtistBioLinkData): Promise<ArtistBioLinkRecord> {
-    const existing = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
-    if (existing) {
-      return adoptAsReference(existing);
-    }
+  /** Persists one admin-authored bio link for an existing artist and returns
+   *  the created row. Dedupes by URL: if the artist already has a link with
+   *  this URL (custom or generated), returns that existing row instead of
+   *  creating a duplicate, so the reference-links input and the Add-link
+   *  editor stay idempotent — an existing row that was image-source only
+   *  regains the reference role. A concurrent add is recovered by
+   *  {@link createOrAdoptRacedLink}. */
+  static async createBioLink(
+    input: CreateArtistBioLinkData
+  ): Promise<ServiceResponse<ArtistBioLinkRecord>> {
     try {
-      return await ArtistBioLinkRepository.create(input);
-    } catch (error) {
-      if (error instanceof DataError && error.code === 'DUPLICATE') {
-        const raced = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
-        if (raced) {
-          return adoptAsReference(raced);
-        }
+      if (!(await ArtistRepository.existsById(input.artistId))) {
+        return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
-      throw error;
+      const existing = await ArtistBioLinkRepository.findByUrl(input.artistId, input.url);
+      const link = existing
+        ? await adoptAsReference(existing)
+        : await createOrAdoptRacedLink(input);
+      return { success: true, data: link };
+    } catch (error) {
+      return failFromError(error, { UNKNOWN: 'Failed to add bio link' });
     }
   }
 
@@ -1037,32 +1069,22 @@ export class ArtistService {
   static async updateBioImageAttribution(
     imageId: string,
     attribution: string | null
-  ): Promise<void> {
-    await ArtistBioImageRepository.updateAttribution(imageId, attribution);
-  }
-
-  /**
-   * Lightweight existence check used by callers that only need to validate an
-   * artistId before performing a follow-up write.
-   */
-  static async existsById(artistId: string): Promise<boolean> {
-    const found = await ArtistRepository.existsById(artistId);
-    return Boolean(found);
-  }
-
-  /**
-   * The artist's name projection (id + the parts a display name derives
-   * from), or null when no artist has the id. For callers that must both
-   * validate an artistId and name the artist before a follow-up write.
-   */
-  static async findNameById(artistId: string): Promise<ArtistNameRecord | null> {
-    return ArtistRepository.findNameById(artistId);
+  ): Promise<ServiceResponse<void>> {
+    try {
+      await ArtistBioImageRepository.updateAttribution(imageId, attribution);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return failFromError(error, {
+        NOT_FOUND: 'Bio image not found',
+        UNKNOWN: 'Failed to update bio image attribution',
+      });
+    }
   }
 
   /**
    * Applies one admin-approved enrichment suggestion to the artist record
-   * through the field whitelist. Throws on a repository failure — the calling
-   * action maps that to a typed error.
+   * through the field whitelist, stamping `updatedBy` for audit. Throws on a
+   * repository failure — the calling action maps that to a typed error.
    */
   static async applyEnrichedField(
     artistId: string,
@@ -1070,10 +1092,9 @@ export class ArtistService {
     value: string,
     updatedBy: string
   ): Promise<void> {
-    await ArtistRepository.updateEnrichedField(
-      artistId,
-      buildEnrichedFieldUpdate(field, value),
-      updatedBy
-    );
+    await ArtistRepository.update(artistId, {
+      ...buildEnrichedFieldUpdate(field, value),
+      updatedBy,
+    });
   }
 }

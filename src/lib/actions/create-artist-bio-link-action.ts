@@ -46,10 +46,6 @@ export const createArtistBioLinkAction = async (
   }
 
   try {
-    if (!(await ArtistService.existsById(parsed.data.artistId))) {
-      return { success: false, error: 'Artist not found' };
-    }
-
     const { label, url } = parsed.data;
     const created = await ArtistService.createBioLink({
       ...parsed.data,
@@ -58,16 +54,19 @@ export const createArtistBioLinkAction = async (
       label: sanitizeBioText(label),
       url: sanitizeUrl(url),
     });
+    if (!created.success) {
+      return { success: false, error: created.error };
+    }
 
     logSecurityEvent({
       event: 'media.artist_bio_link.created',
       userId: session.user.id,
-      metadata: { artistId: parsed.data.artistId, artistBioLinkId: created.id },
+      metadata: { artistId: parsed.data.artistId, artistBioLinkId: created.data.id },
     });
 
     revalidatePath('/admin/artists');
 
-    return { success: true, data: created };
+    return { success: true, data: created.data };
   } catch (error) {
     loggers.media.error('Create artist bio link action error', error);
     return { success: false, error: 'Failed to add bio link' };

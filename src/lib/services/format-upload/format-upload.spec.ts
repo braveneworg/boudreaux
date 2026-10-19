@@ -148,7 +148,7 @@ beforeEach(async () => {
     success: true,
     data: { id: 'artist-1', displayName: null, firstName: 'Some', surname: 'Artist' },
   });
-  vi.mocked(ArtistService.creditOnRelease).mockResolvedValue(undefined);
+  vi.mocked(ArtistService.creditOnRelease).mockResolvedValue({ success: true, data: undefined });
 });
 
 afterEach(async () => {
@@ -728,7 +728,33 @@ describe('FormatUpload.confirm', () => {
         ],
       ]);
       expect(ArtistService.findOrCreateByName).toHaveBeenCalledWith('Album Artist');
-      expect(ArtistService.creditOnRelease).toHaveBeenCalledWith('artist-1', RELEASE_ID);
+      expect(vi.mocked(ArtistService.creditOnRelease).mock.calls).toEqual([
+        [{ artistId: 'artist-1', releaseId: RELEASE_ID }],
+      ]);
+    });
+
+    it('logs a failed credit and is still created', async () => {
+      const s3Key = keyFor('one.flac');
+      await seed(s3Key);
+      vi.mocked(ReleaseService.findTitleById).mockResolvedValueOnce(null);
+      vi.mocked(ArtistService.creditOnRelease).mockResolvedValueOnce({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
+      const warn = vi.spyOn(loggers.media, 'warn').mockImplementation(() => {});
+
+      const result = await upload.confirm(
+        confirmInput([fileOf(s3Key)], { newRelease: { album: 'Credited', artist: 'A' } })
+      );
+
+      expect(result.success && result.data.created).toBe(true);
+      expect(warn.mock.calls).toEqual([
+        [
+          '[format-upload] Could not credit the album artist from metadata',
+          { error: 'Database unavailable' },
+        ],
+      ]);
     });
 
     it('is dated today without a usable year, and keeps its cover art', async () => {

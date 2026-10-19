@@ -23,14 +23,15 @@ const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@examp
 const artistId = '507f1f77bcf86cd799439011';
 const validInput = { artistId, url: 'https://cdn.example/x.webp', attribution: 'Uploaded' };
 const createdRow = { id: 'img-1', artistId, url: 'https://cdn.example/x.webp' };
-const artistName = { id: artistId, displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.findNameById).mockResolvedValue(artistName);
-  vi.mocked(ArtistService.createBioImage).mockResolvedValue(createdRow as never);
+  vi.mocked(ArtistService.createBioImage).mockResolvedValue({
+    success: true,
+    data: createdRow as never,
+  });
 });
 
 describe('createArtistBioImageAction', () => {
@@ -52,77 +53,30 @@ describe('createArtistBioImageAction', () => {
     expect(result.success).toBe(false);
   });
 
-  it('returns Artist not found when the artist does not exist', async () => {
-    vi.mocked(ArtistService.findNameById).mockResolvedValue(null);
+  it("returns the service's failure", async () => {
+    vi.mocked(ArtistService.createBioImage).mockResolvedValueOnce({
+      success: false,
+      error: 'Artist not found',
+      code: 'NOT_FOUND',
+    });
 
     const result = await createArtistBioImageAction(validInput);
 
     expect(result).toEqual({ success: false, error: 'Artist not found' });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it('creates the bio image via the service and returns it', async () => {
     const result = await createArtistBioImageAction(validInput);
 
-    expect(ArtistService.createBioImage).toHaveBeenCalledWith({
-      ...validInput,
-      origin: 'custom',
-      attribution: 'clean:Uploaded',
-      alt: 'clean:Ceschi',
-    });
+    expect(vi.mocked(ArtistService.createBioImage).mock.calls).toEqual([
+      [{ ...validInput, origin: 'custom', attribution: 'clean:Uploaded' }],
+    ]);
     expect(result).toEqual({ success: true, data: createdRow });
   });
 
-  describe('alt text default', () => {
-    it.each([
-      ['omitted', {}],
-      ['null', { alt: null }],
-      ['blank', { alt: '   ' }],
-    ])("stores the artist's display name when alt is %s", async (_label, altInput) => {
-      await createArtistBioImageAction({ ...validInput, ...altInput });
-
-      expect(ArtistService.createBioImage).toHaveBeenCalledWith(
-        expect.objectContaining({ alt: 'clean:Ceschi' })
-      );
-    });
-
-    it('derives the name from first and surname when displayName is blank', async () => {
-      vi.mocked(ArtistService.findNameById).mockResolvedValue({
-        ...artistName,
-        displayName: null,
-      });
-
-      await createArtistBioImageAction(validInput);
-
-      expect(ArtistService.createBioImage).toHaveBeenCalledWith(
-        expect.objectContaining({ alt: 'clean:David Ramos' })
-      );
-    });
-
-    it('keeps the alt the admin typed', async () => {
-      await createArtistBioImageAction({ ...validInput, alt: 'Ceschi on stage' });
-
-      expect(ArtistService.createBioImage).toHaveBeenCalledWith(
-        expect.objectContaining({ alt: 'clean:Ceschi on stage' })
-      );
-    });
-
-    it('leaves alt null when the artist has no name to fall back on', async () => {
-      vi.mocked(ArtistService.findNameById).mockResolvedValue({
-        id: artistId,
-        displayName: null,
-        firstName: '',
-        surname: '',
-      });
-
-      await createArtistBioImageAction(validInput);
-
-      expect(ArtistService.createBioImage).toHaveBeenCalledWith(
-        expect.objectContaining({ alt: null })
-      );
-    });
-  });
-
-  it('sanitizes attribution, title, and alt before creating', async () => {
+  it('sanitizes attribution and title, and leaves alt to the service', async () => {
     const htmlInput = {
       artistId,
       url: 'https://cdn.example/x.webp',
@@ -130,7 +84,6 @@ describe('createArtistBioImageAction', () => {
       title: 'Title <script>evil</script>',
       alt: 'Alt <i>text</i>',
     };
-    vi.mocked(ArtistService.createBioImage).mockResolvedValue({ ...createdRow } as never);
 
     await createArtistBioImageAction(htmlInput);
 
@@ -138,7 +91,7 @@ describe('createArtistBioImageAction', () => {
       expect.objectContaining({
         attribution: 'clean:Photo <b>x</b>',
         title: 'clean:Title <script>evil</script>',
-        alt: 'clean:Alt <i>text</i>',
+        alt: 'Alt <i>text</i>',
       })
     );
   });

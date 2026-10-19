@@ -16,6 +16,8 @@ import { ArtistService } from './artist-service';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
+import type { ServiceResponse } from './service.types';
+
 // Type honesty (#661): getArtistById surfaces ArtistRepository.findById, which
 // fetches only scalars. A server-side caller must never be able to
 // trust phantom `labels`/`urls`/`releases`, so the success `data` must be exactly
@@ -36,6 +38,22 @@ const _updateNeverUnpublishes: _UpdateNeverUnpublishes = true;
 type _CreateNeverUnpublishes = AssertExact<CreateArtistData['publishedOn'], Date | undefined>;
 const _createNeverUnpublishes: _CreateNeverUnpublishes = true;
 
+// ADR-0001: a service call answers a ServiceResponse, so every failure
+// carries its code. The one exception is applyEnrichedField, which throws to
+// the one action that calls it. A method that goes back to returning a raw
+// value, or to throwing its failures, fails `pnpm run typecheck` here.
+type NonServiceResponseMethod = {
+  [K in keyof typeof ArtistService]: (typeof ArtistService)[K] extends (
+    ...args: never
+  ) => Promise<infer Result>
+    ? [Result] extends [ServiceResponse<unknown>]
+      ? never
+      : K
+    : never;
+}[keyof typeof ArtistService];
+type _OnlyApplyEnrichedFieldIsRaw = AssertExact<NonServiceResponseMethod, 'applyEnrichedField'>;
+const _onlyApplyEnrichedFieldIsRaw: _OnlyApplyEnrichedFieldIsRaw = true;
+
 // Mock server-only to prevent client component error in tests
 vi.mock('server-only', () => ({}));
 
@@ -48,9 +66,7 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     create: vi.fn(),
     createWithSelect: vi.fn(),
     findById: vi.fn(),
-    findUniqueBySlug: vi.fn(),
-    findFirstByDisplayName: vi.fn(),
-    findFirstByName: vi.fn(),
+    findByNameKeys: vi.fn(),
     findMany: vi.fn(),
     searchPublished: vi.fn(),
     searchForHomeNav: vi.fn(),
@@ -58,10 +74,8 @@ vi.mock('@/lib/repositories/artist-repository', () => ({
     findPublishedBySlugWithReleases: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    archive: vi.fn(),
     existsById: vi.fn(),
     findNameById: vi.fn(),
-    updateEnrichedField: vi.fn(),
   },
 }));
 
@@ -119,13 +133,11 @@ describe('ArtistService', () => {
 
     beforeEach(() => {
       vi.mocked(ArtistRepository.update).mockResolvedValue(artist as never);
-      vi.mocked(ArtistRepository.archive).mockResolvedValue(artist as never);
       vi.mocked(ArtistRepository.delete).mockResolvedValue(artist as never);
     });
 
     afterEach(() => {
       vi.mocked(ArtistRepository.update).mockReset();
-      vi.mocked(ArtistRepository.archive).mockReset();
       vi.mocked(ArtistRepository.delete).mockReset();
     });
 
@@ -1033,19 +1045,21 @@ describe('ArtistService', () => {
   });
 
   describe('archiveArtist', () => {
-    it('should archive an artist successfully', async () => {
+    it('archives the artist by stamping deletedOn through the update', async () => {
       const archivedArtist = { ...mockArtist, deletedOn: new Date('2024-12-13') };
-      vi.mocked(ArtistRepository.archive).mockResolvedValue(archivedArtist);
+      vi.mocked(ArtistRepository.update).mockResolvedValueOnce(archivedArtist as never);
 
       const result = await ArtistService.archiveArtist('artist-123');
 
-      expect(result).toMatchObject({ success: true, data: archivedArtist });
-      expect(ArtistRepository.archive).toHaveBeenCalledWith('artist-123');
+      expect(result).toEqual({ success: true, data: archivedArtist });
+      expect(vi.mocked(ArtistRepository.update).mock.calls).toEqual([
+        ['artist-123', { deletedOn: expect.any(Date) }],
+      ]);
     });
 
     // The vocabulary counts read only non-deleted artists.
     it('drops the archived artist’s terms from the vocabulary counts', async () => {
-      vi.mocked(ArtistRepository.archive).mockResolvedValue(mockArtist);
+      vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
 
       await ArtistService.archiveArtist('artist-123');
 
@@ -1053,9 +1067,9 @@ describe('ArtistService', () => {
     });
 
     it('should return error when artist not found', async () => {
-      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
-      vi.mocked(ArtistRepository.archive).mockReset();
-      vi.mocked(ArtistRepository.archive).mockRejectedValue(notFoundError);
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(
+        new DataError('NOT_FOUND', 'Record not found')
+      );
 
       const result = await ArtistService.archiveArtist('non-existent');
 
@@ -1063,9 +1077,9 @@ describe('ArtistService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ArtistRepository.archive).mockReset();
-      vi.mocked(ArtistRepository.archive).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
 
       const result = await ArtistService.archiveArtist('artist-123');
 
@@ -1073,8 +1087,7 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(ArtistRepository.archive).mockReset();
-      vi.mocked(ArtistRepository.archive).mockRejectedValue(Error('Unknown error'));
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(Error('Unknown error'));
 
       const result = await ArtistService.archiveArtist('artist-123');
 
@@ -1412,34 +1425,35 @@ describe('ArtistService', () => {
       surname: '',
     };
 
-    it('should return artist found by slug', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(existingArtist as never);
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockReset();
+      vi.mocked(ArtistRepository.createWithSelect).mockReset();
+    });
+
+    it('returns the artist its name keys find', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(existingArtist);
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
       expect(result).toEqual({ success: true, data: existingArtist });
-      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+      expect(ArtistRepository.createWithSelect).not.toHaveBeenCalled();
     });
 
-    it('should fall back to displayName match when slug not found', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(existingArtist as never);
+    it('looks the name up by its slug, display name, and first name + surname', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(existingArtist);
 
-      const result = await ArtistService.findOrCreateByName('Ceschi');
+      await ArtistService.findOrCreateByName('  Ceschi Ramos ');
 
-      expect(result).toEqual({ success: true, data: existingArtist });
-      expect(ArtistRepository.findFirstByDisplayName).toHaveBeenCalledWith('Ceschi');
-    });
-
-    it('should fall back to firstName + surname match', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(existingArtist as never);
-
-      const result = await ArtistService.findOrCreateByName('Ceschi Ramos');
-
-      expect(result).toEqual({ success: true, data: existingArtist });
-      expect(ArtistRepository.findFirstByName).toHaveBeenCalledWith('Ceschi', 'Ramos');
+      expect(vi.mocked(ArtistRepository.findByNameKeys).mock.calls).toEqual([
+        [
+          {
+            slug: 'ceschi-ramos',
+            displayName: 'Ceschi Ramos',
+            firstName: 'Ceschi',
+            surname: 'Ramos',
+          },
+        ],
+      ]);
     });
 
     it('should create a new artist when no match found', async () => {
@@ -1449,10 +1463,8 @@ describe('ArtistService', () => {
         firstName: 'Jane',
         surname: 'Smith',
       };
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue(newArtist as never);
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValueOnce(newArtist);
 
       const result = await ArtistService.findOrCreateByName('Jane Smith');
 
@@ -1466,15 +1478,13 @@ describe('ArtistService', () => {
     });
 
     it('should handle single-word artist name', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValueOnce({
         id: 'artist-new',
         displayName: 'Ceschi',
         firstName: 'Ceschi',
         surname: '',
-      } as never);
+      });
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1509,18 +1519,20 @@ describe('ArtistService', () => {
       });
     });
 
-    it('should handle P2002 slug collision by finding existing artist', async () => {
-      const p2002Error = new DataError('DUPLICATE', 'Unique constraint failed');
-
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // slug lookup
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(p2002Error);
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(existingArtist as never); // retry
+    it('returns the slug owner that won a concurrent create', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingArtist);
+      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValueOnce(
+        new DataError('DUPLICATE', 'Unique constraint failed')
+      );
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
-      expect(result.success).toBe(true);
+      expect(result).toEqual({ success: true, data: existingArtist });
+      expect(vi.mocked(ArtistRepository.findByNameKeys).mock.calls[1]).toEqual([
+        { slug: 'ceschi' },
+      ]);
     });
 
     describe('when a soft-deleted artist owns the slug', () => {
@@ -1528,20 +1540,14 @@ describe('ArtistService', () => {
       const created = { id: 'artist-new', displayName: 'Ceschi', firstName: 'Ceschi', surname: '' };
 
       beforeEach(() => {
-        // The finders skip soft-deleted rows, so every lookup misses.
-        vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-        vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-        vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      });
-
-      afterEach(() => {
-        vi.mocked(ArtistRepository.createWithSelect).mockReset();
+        // The name lookup skips soft-deleted rows, so every lookup misses.
+        vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValue(null);
       });
 
       it('creates a new artist under the next free slug', async () => {
         vi.mocked(ArtistRepository.createWithSelect)
           .mockRejectedValueOnce(duplicate)
-          .mockResolvedValueOnce(created as never);
+          .mockResolvedValueOnce(created);
 
         const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1552,13 +1558,27 @@ describe('ArtistService', () => {
         vi.mocked(ArtistRepository.createWithSelect)
           .mockRejectedValueOnce(duplicate)
           .mockRejectedValueOnce(duplicate)
-          .mockResolvedValueOnce(created as never);
+          .mockResolvedValueOnce(created);
 
         await ArtistService.findOrCreateByName('Ceschi');
 
         expect(
           vi.mocked(ArtistRepository.createWithSelect).mock.calls.map(([{ slug }]) => slug)
         ).toEqual(['ceschi', 'ceschi-2', 'ceschi-3']);
+      });
+
+      it('answers a failure other than DUPLICATE on a numbered slug with its code', async () => {
+        vi.mocked(ArtistRepository.createWithSelect)
+          .mockRejectedValueOnce(duplicate)
+          .mockRejectedValueOnce(new DataError('UNAVAILABLE', 'Connection failed'));
+
+        const result = await ArtistService.findOrCreateByName('Ceschi');
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Database unavailable',
+          code: 'UNAVAILABLE',
+        });
       });
 
       it('fails with DUPLICATE once the numbered slugs run out', async () => {
@@ -1575,9 +1595,9 @@ describe('ArtistService', () => {
     });
 
     it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection refused');
-
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findByNameKeys).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection refused')
+      );
 
       const result = await ArtistService.findOrCreateByName('Ceschi');
 
@@ -1588,25 +1608,23 @@ describe('ArtistService', () => {
       });
     });
 
-    it('should skip the slug lookup and fall back to slugifying firstName when generateSlug yields an empty string', async () => {
-      // Names composed of only special characters slugify to '' — exercising the
-      // `if (slug)` false branch and the `slug || generateSlug(firstName ?? 'artist')`
-      // right-hand branch when persisting the new artist.
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
+    it('falls back to slugifying the first name when the name yields no slug', async () => {
+      // A name of only special characters slugifies to '', which the name
+      // lookup skips; the new artist takes a slug derived from its first name.
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValueOnce({
         id: 'artist-special',
         displayName: '...',
         firstName: '...',
         surname: '',
-      } as never);
+      });
 
       const result = await ArtistService.findOrCreateByName('...');
 
       expect(result.success).toBe(true);
-      // Slug lookup must be skipped entirely — only the displayName fallback path is consulted.
-      expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
+      expect(vi.mocked(ArtistRepository.findByNameKeys).mock.calls).toEqual([
+        [{ slug: '', displayName: '...', firstName: '...', surname: '' }],
+      ]);
       expect(ArtistRepository.createWithSelect).toHaveBeenCalledWith(
         expect.objectContaining({ displayName: '...' })
       );
@@ -1615,9 +1633,7 @@ describe('ArtistService', () => {
 
   describe('findOrCreateByName with details', () => {
     const noMatch = (): void => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
     };
 
     it('create branch with full details uses trimmed admin names including middleName', async () => {
@@ -1698,7 +1714,7 @@ describe('ArtistService', () => {
         firstName: 'Zora',
         surname: '',
       };
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(existingArtist as never);
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(existingArtist);
 
       const result = await ArtistService.findOrCreateByName('Zora', {
         sourceName: 'Zora',
@@ -1713,29 +1729,14 @@ describe('ArtistService', () => {
   });
 
   describe('findOrCreateByName - additional branch coverage', () => {
-    it('should return error when P2002 collision occurs and existing artist is not found', async () => {
-      const p2002Error = new DataError('DUPLICATE', 'Unique constraint failed');
-
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // slug lookup
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(p2002Error);
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValueOnce(null as never); // retry also fails
-
-      const result = await ArtistService.findOrCreateByName('Ceschi');
-
-      expect(result).toEqual({
-        success: false,
-        error: 'Artist with this slug already exists',
-        code: 'DUPLICATE',
-      });
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockReset();
+      vi.mocked(ArtistRepository.createWithSelect).mockReset();
     });
 
     it('should handle unexpected error in findOrCreateByName', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValue(new Error('Unexpected'));
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
+      vi.mocked(ArtistRepository.createWithSelect).mockRejectedValueOnce(new Error('Unexpected'));
 
       const result = await ArtistService.findOrCreateByName('New Artist');
 
@@ -1744,69 +1745,6 @@ describe('ArtistService', () => {
         error: 'Failed to find or create artist',
         code: 'UNKNOWN',
       });
-    });
-
-    it('should skip firstName+surname search when firstName is empty', async () => {
-      // This requires splitFullName to return empty firstName.
-      // With a name like " " it would be trimmed to empty and caught earlier.
-      // So let's test with a name that generates slug but yields empty firstName from splitFullName.
-      // Actually, a single-word name returns firstName=word, so we need special mock behavior.
-      // The important branch is when slug lookup returns null, displayName returns null,
-      // but firstName is truthy (which is always the case for non-empty names).
-      // The actual uncovered branch is: byName not found -> falls through to create.
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never); // slug miss
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never); // displayName miss
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never); // firstName+surname miss
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
-        id: 'new-id',
-        displayName: 'Test Name',
-        firstName: 'Test',
-        surname: 'Name',
-      } as never);
-
-      const result = await ArtistService.findOrCreateByName('Test Name');
-
-      expect(result.success).toBe(true);
-      // Verify the displayName and firstName+surname search paths were attempted.
-      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('test-name');
-      expect(ArtistRepository.findFirstByName).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('existsById', () => {
-    it('should return true when the artist exists', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValue({ id: 'artist-1' } as never);
-
-      const result = await ArtistService.existsById('artist-1');
-
-      expect(result).toBe(true);
-      expect(ArtistRepository.existsById).toHaveBeenCalledWith('artist-1');
-    });
-
-    it('should return false when the artist does not exist', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValue(null);
-
-      const result = await ArtistService.existsById('missing-id');
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('findNameById', () => {
-    it('returns the name projection from the repository', async () => {
-      const row = { id: 'artist-1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
-      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(row);
-
-      const result = await ArtistService.findNameById('artist-1');
-
-      expect(result).toEqual(row);
-      expect(ArtistRepository.findNameById).toHaveBeenCalledWith('artist-1');
-    });
-
-    it('returns null when the artist does not exist', async () => {
-      vi.mocked(ArtistRepository.findNameById).mockResolvedValue(null);
-
-      await expect(ArtistService.findNameById('missing-id')).resolves.toBeNull();
     });
   });
 
@@ -1876,11 +1814,32 @@ describe('ArtistService', () => {
     it('credits through the credit module so the stored order stays dense', async () => {
       vi.mocked(ArtistCreditRepository.creditOnRelease).mockResolvedValueOnce(undefined);
 
-      await ArtistService.creditOnRelease('artist-1', 'release-1');
+      const result = await ArtistService.creditOnRelease({
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      });
 
+      expect(result).toEqual({ success: true, data: undefined });
       expect(vi.mocked(ArtistCreditRepository.creditOnRelease).mock.calls).toEqual([
-        ['release-1', 'artist-1'],
+        [{ artistId: 'artist-1', releaseId: 'release-1' }],
       ]);
+    });
+
+    it('answers a failed credit write with its data error code', async () => {
+      vi.mocked(ArtistCreditRepository.creditOnRelease).mockRejectedValueOnce(
+        new DataError('UNAVAILABLE', 'Connection failed')
+      );
+
+      const result = await ArtistService.creditOnRelease({
+        artistId: 'artist-1',
+        releaseId: 'release-1',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
     });
   });
 
@@ -2163,11 +2122,26 @@ describe('ArtistService', () => {
 
   describe('deleteBioLink', () => {
     it('drops only the reference role so a shared image-source row survives', async () => {
-      vi.mocked(ArtistBioLinkRepository.removeReference).mockResolvedValue(undefined as never);
+      vi.mocked(ArtistBioLinkRepository.removeReference).mockResolvedValueOnce(undefined);
 
-      await ArtistService.deleteBioLink('link-1');
+      const result = await ArtistService.deleteBioLink('link-1');
 
-      expect(ArtistBioLinkRepository.removeReference).toHaveBeenCalledWith('link-1');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioLinkRepository.removeReference).mock.calls).toEqual([['link-1']]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio link not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to delete bio link'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioLinkRepository.removeReference).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.deleteBioLink('link-1');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
@@ -2296,42 +2270,141 @@ describe('ArtistService', () => {
   });
 
   describe('createBioImage', () => {
-    it('delegates to the repository and returns the created row', async () => {
-      const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
-      vi.mocked(ArtistBioImageRepository.create).mockResolvedValue(row as never);
+    const artistName = { id: 'a1', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+    const row = { id: 'img-1', artistId: 'a1', url: 'https://cdn/x.webp' };
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findNameById).mockReset();
+      vi.mocked(ArtistBioImageRepository.create).mockReset();
+    });
+
+    it('creates the row for the artist and returns it', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
 
       const result = await ArtistService.createBioImage({
         artistId: 'a1',
         url: 'https://cdn/x.webp',
+        alt: 'Ceschi on stage',
       });
 
-      expect(ArtistBioImageRepository.create).toHaveBeenCalledWith({
-        artistId: 'a1',
-        url: 'https://cdn/x.webp',
+      expect(result).toEqual({ success: true, data: row });
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls).toEqual([
+        [{ artistId: 'a1', url: 'https://cdn/x.webp', alt: 'Ceschi on stage' }],
+      ]);
+    });
+
+    it('returns NOT_FOUND for an unknown artist and creates nothing', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(null);
+
+      const result = await ArtistService.createBioImage({ artistId: 'missing', url: 'https://x' });
+
+      expect(result).toEqual({ success: false, error: 'Artist not found', code: 'NOT_FOUND' });
+      expect(ArtistBioImageRepository.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['omitted', {}],
+      ['null', { alt: null }],
+      ['blank', { alt: '   ' }],
+    ])("stores the artist's display name when alt is %s", async (_label, altInput) => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x', ...altInput });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe('Ceschi');
+    });
+
+    it('derives the name from first and surname when displayName is blank', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce({
+        ...artistName,
+        displayName: null,
       });
-      expect(result).toBe(row);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe('David Ramos');
+    });
+
+    it('leaves alt null when the artist has no name to fall back on', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce({
+        id: 'a1',
+        displayName: null,
+        firstName: '',
+        surname: '',
+      });
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBeNull();
+    });
+
+    it('stores the alt as plain text', async () => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockResolvedValueOnce(row as never);
+
+      await ArtistService.createBioImage({
+        artistId: 'a1',
+        url: 'https://x',
+        alt: '<b>Ceschi</b> on stage',
+      });
+
+      expect(vi.mocked(ArtistBioImageRepository.create).mock.calls[0]?.[0].alt).toBe(
+        'Ceschi on stage'
+      );
+    });
+
+    it.each([
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to add bio image'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistRepository.findNameById).mockResolvedValueOnce(artistName);
+      vi.mocked(ArtistBioImageRepository.create).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.createBioImage({ artistId: 'a1', url: 'https://x' });
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
   describe('createBioLink', () => {
-    it('creates a new row when no existing link has that URL', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
-      vi.mocked(ArtistBioLinkRepository.create).mockResolvedValue(row as never);
+    const input = { artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Site',
-        url: 'https://cdn/x',
-      });
+    beforeEach(() => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValue(true);
+    });
+
+    afterEach(() => {
+      vi.mocked(ArtistRepository.existsById).mockReset();
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockReset();
+      vi.mocked(ArtistBioLinkRepository.create).mockReset();
+    });
+
+    it('creates a new row when no existing link has that URL', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(null);
+      const row = { id: 'link-1', artistId: 'a1', label: 'Site', url: 'https://cdn/x' };
+      vi.mocked(ArtistBioLinkRepository.create).mockResolvedValueOnce(row as never);
+
+      const result = await ArtistService.createBioLink(input);
 
       expect(ArtistBioLinkRepository.findByUrl).toHaveBeenCalledWith('a1', 'https://cdn/x');
-      expect(ArtistBioLinkRepository.create).toHaveBeenCalledWith({
-        artistId: 'a1',
-        label: 'Site',
-        url: 'https://cdn/x',
-      });
-      expect(result).toBe(row);
+      expect(vi.mocked(ArtistBioLinkRepository.create).mock.calls).toEqual([[input]]);
+      expect(result).toEqual({ success: true, data: row });
+    });
+
+    it('returns NOT_FOUND for an unknown artist and writes nothing', async () => {
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(false);
+
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({ success: false, error: 'Artist not found', code: 'NOT_FOUND' });
+      expect(ArtistBioLinkRepository.findByUrl).not.toHaveBeenCalled();
+      expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
 
     it('returns the existing row and does not create a duplicate URL', async () => {
@@ -2346,15 +2419,11 @@ describe('ArtistService', () => {
         reference: true,
         imageSource: false,
       };
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(existing);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(existing);
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Duplicate attempt',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Duplicate attempt' });
 
-      expect(result).toBe(existing);
+      expect(result).toEqual({ success: true, data: existing });
       expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
       expect(ArtistBioLinkRepository.restoreReference).not.toHaveBeenCalled();
     });
@@ -2372,16 +2441,12 @@ describe('ArtistService', () => {
         imageSource: true,
       };
       const restored = { ...imageOnly, reference: true };
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(imageOnly);
-      vi.mocked(ArtistBioLinkRepository.restoreReference).mockResolvedValue(restored);
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(imageOnly);
+      vi.mocked(ArtistBioLinkRepository.restoreReference).mockResolvedValueOnce(restored);
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Press kit',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Press kit' });
 
-      expect(result).toBe(restored);
+      expect(result).toEqual({ success: true, data: restored });
       expect(ArtistBioLinkRepository.restoreReference).toHaveBeenCalledWith('link-img');
       expect(ArtistBioLinkRepository.create).not.toHaveBeenCalled();
     });
@@ -2401,59 +2466,103 @@ describe('ArtistService', () => {
       vi.mocked(ArtistBioLinkRepository.findByUrl)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(raced);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
-      const result = await ArtistService.createBioLink({
-        artistId: 'a1',
-        label: 'Loser',
-        url: 'https://cdn/x',
-      });
+      const result = await ArtistService.createBioLink({ ...input, label: 'Loser' });
 
-      expect(result).toBe(raced);
+      expect(result).toEqual({ success: true, data: raced });
     });
 
-    it('rethrows a non-duplicate data error from the create', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+    it('answers a non-duplicate data error from the create with its code', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValueOnce(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('UNAVAILABLE', 'Connection failed')
       );
 
-      await expect(
-        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
-      ).rejects.toThrow('Connection failed');
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
     });
 
-    it('rethrows the duplicate error when the post-conflict re-read finds nothing', async () => {
-      vi.mocked(ArtistBioLinkRepository.findByUrl).mockResolvedValue(null);
-      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValue(
+    it('answers DUPLICATE when the post-conflict re-read finds nothing', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      vi.mocked(ArtistBioLinkRepository.create).mockRejectedValueOnce(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
-      await expect(
-        ArtistService.createBioLink({ artistId: 'a1', label: 'Site', url: 'https://cdn/x' })
-      ).rejects.toThrow('Unique constraint failed');
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toMatchObject({ success: false, code: 'DUPLICATE' });
+    });
+
+    it('answers an unexpected failure with the add copy', async () => {
+      vi.mocked(ArtistBioLinkRepository.findByUrl).mockRejectedValueOnce(new Error('boom'));
+
+      const result = await ArtistService.createBioLink(input);
+
+      expect(result).toEqual({ success: false, error: 'Failed to add bio link', code: 'UNKNOWN' });
     });
   });
 
   describe('updateBioImageAttribution', () => {
-    it('delegates the attribution update to the repository', async () => {
-      vi.mocked(ArtistBioImageRepository.updateAttribution).mockResolvedValue(undefined as never);
+    it('updates the attribution through the repository', async () => {
+      vi.mocked(ArtistBioImageRepository.updateAttribution).mockResolvedValueOnce(undefined);
 
-      await ArtistService.updateBioImageAttribution('img-1', 'Credit');
+      const result = await ArtistService.updateBioImageAttribution('img-1', 'Credit');
 
-      expect(ArtistBioImageRepository.updateAttribution).toHaveBeenCalledWith('img-1', 'Credit');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioImageRepository.updateAttribution).mock.calls).toEqual([
+        ['img-1', 'Credit'],
+      ]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio image not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to update bio image attribution'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioImageRepository.updateAttribution).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.updateBioImageAttribution('img-1', 'Credit');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
   describe('updateBioImageAlt', () => {
-    it('delegates the alt update to the repository', async () => {
-      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValue(undefined as never);
+    it('updates the alt text through the repository', async () => {
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockResolvedValueOnce(undefined);
 
-      await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
+      const result = await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
 
-      expect(ArtistBioImageRepository.updateAlt).toHaveBeenCalledWith('img-1', 'Ceschi on stage');
+      expect(result).toEqual({ success: true, data: undefined });
+      expect(vi.mocked(ArtistBioImageRepository.updateAlt).mock.calls).toEqual([
+        ['img-1', 'Ceschi on stage'],
+      ]);
+    });
+
+    it.each([
+      ['NOT_FOUND', 'Bio image not found'],
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to update bio image alt text'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistBioImageRepository.updateAlt).mockRejectedValueOnce(
+        new DataError(code, 'write failed')
+      );
+
+      const result = await ArtistService.updateBioImageAlt('img-1', 'Ceschi on stage');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
@@ -2650,7 +2759,7 @@ describe('ArtistService', () => {
     });
 
     it('returns the pool in picker order: chosen, suggested, then the rest', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce({ id: 'a1' });
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(true);
       vi.mocked(ArtistBioImageRepository.findManyByArtist).mockResolvedValueOnce([
         poolRow('rest'),
         poolRow('suggested', { isPrimary: true }),
@@ -2667,7 +2776,7 @@ describe('ArtistService', () => {
     });
 
     it('returns NOT_FOUND for an unknown artist', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(null);
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(false);
 
       const result = await ArtistService.listBioImages('missing');
 
@@ -2676,7 +2785,7 @@ describe('ArtistService', () => {
     });
 
     it('maps a repository failure through the data error code', async () => {
-      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce({ id: 'a1' });
+      vi.mocked(ArtistRepository.existsById).mockResolvedValueOnce(true);
       vi.mocked(ArtistBioImageRepository.findManyByArtist).mockRejectedValueOnce(
         new DataError('UNAVAILABLE', 'db down')
       );
@@ -2684,42 +2793,6 @@ describe('ArtistService', () => {
       const result = await ArtistService.listBioImages('a1');
 
       expect(result).toMatchObject({ success: false, code: 'UNAVAILABLE' });
-    });
-  });
-
-  describe('findOrCreateByName branch coverage', () => {
-    it('creates a new artist when no slug, displayName, or name match exists', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
-        id: 'new-1',
-        displayName: 'Brand New',
-        firstName: 'Brand',
-        surname: 'New',
-      } as never);
-
-      const result = await ArtistService.findOrCreateByName('Brand New');
-
-      expect(result).toMatchObject({ success: true, data: { id: 'new-1' } });
-    });
-
-    it('falls back to a name-derived slug when the name yields no slug', async () => {
-      // Punctuation-only name trims non-empty but slugifies to '' → the slug
-      // lookup is skipped and createWithSelect uses the firstName-derived slug.
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null);
-      vi.mocked(ArtistRepository.createWithSelect).mockResolvedValue({
-        id: 'new-2',
-        displayName: '!!!',
-        firstName: '!!!',
-        surname: '',
-      } as never);
-
-      const result = await ArtistService.findOrCreateByName('!!!');
-
-      expect(result).toMatchObject({ success: true, data: { id: 'new-2' } });
-      expect(ArtistRepository.findUniqueBySlug).not.toHaveBeenCalled();
     });
   });
 
@@ -2731,58 +2804,96 @@ describe('ArtistService', () => {
       surname: '',
     };
 
-    it('returns the match when found by slug and calls the same repository lookups in order', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+    afterEach(() => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockReset();
+    });
+
+    it('returns the match its name keys find', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(matchedArtist);
 
       const result = await ArtistService.findByName('Ceschi');
 
-      expect(result).toEqual(matchedArtist);
-      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+      expect(result).toEqual({ success: true, data: matchedArtist });
     });
 
-    it('returns null when no match is found across all three lookups', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByDisplayName).mockResolvedValue(null as never);
-      vi.mocked(ArtistRepository.findFirstByName).mockResolvedValue(null as never);
+    it('looks the name up with the same keys findOrCreateByName uses', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(matchedArtist);
+
+      await ArtistService.findByName(' Ceschi Ramos ');
+
+      expect(vi.mocked(ArtistRepository.findByNameKeys).mock.calls).toEqual([
+        [
+          {
+            slug: 'ceschi-ramos',
+            displayName: 'Ceschi Ramos',
+            firstName: 'Ceschi',
+            surname: 'Ramos',
+          },
+        ],
+      ]);
+    });
+
+    it('answers null data when no key matches', async () => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockResolvedValueOnce(null);
 
       const result = await ArtistService.findByName('Unknown Artist');
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ success: true, data: null });
     });
 
-    it('findOrCreateByName behavior is unchanged by the refactor — slug match still returns existing artist', async () => {
-      vi.mocked(ArtistRepository.findUniqueBySlug).mockResolvedValue(matchedArtist as never);
+    it('answers null data for a blank name without a lookup', async () => {
+      const result = await ArtistService.findByName('   ');
 
-      const result = await ArtistService.findOrCreateByName('Ceschi');
+      expect(result).toEqual({ success: true, data: null });
+      expect(ArtistRepository.findByNameKeys).not.toHaveBeenCalled();
+    });
 
-      expect(result).toEqual({ success: true, data: matchedArtist });
-      expect(ArtistRepository.findUniqueBySlug).toHaveBeenCalledWith('ceschi');
+    it.each([
+      ['UNAVAILABLE', 'Database unavailable'],
+      ['UNKNOWN', 'Failed to look up artist'],
+    ] as const)('answers a %s failure with its code and copy', async (code, error) => {
+      vi.mocked(ArtistRepository.findByNameKeys).mockRejectedValueOnce(
+        new DataError(code, 'read failed')
+      );
+
+      const result = await ArtistService.findByName('Ceschi');
+
+      expect(result).toEqual({ success: false, error, code });
     });
   });
 
   describe('applyEnrichedField', () => {
-    it('maps a text field through the whitelist switch', async () => {
-      vi.mocked(ArtistRepository.updateEnrichedField).mockResolvedValue(undefined);
+    it.each(['firstName', 'middleName', 'surname', 'akaNames', 'displayName'] as const)(
+      'writes %s and the auditing updatedBy through the update',
+      async (field) => {
+        vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
 
-      await ArtistService.applyEnrichedField('a'.repeat(24), 'surname', 'Ramos', 'admin-1');
+        await ArtistService.applyEnrichedField('a'.repeat(24), field, 'Ramos', 'admin-1');
 
-      expect(ArtistRepository.updateEnrichedField).toHaveBeenCalledWith(
-        'a'.repeat(24),
-        { surname: 'Ramos' },
-        'admin-1'
-      );
-    });
+        expect(vi.mocked(ArtistRepository.update).mock.calls).toEqual([
+          ['a'.repeat(24), { [field]: 'Ramos', updatedBy: 'admin-1' }],
+        ]);
+      }
+    );
 
     it('parses bornOn into a Date', async () => {
-      vi.mocked(ArtistRepository.updateEnrichedField).mockResolvedValue(undefined);
+      vi.mocked(ArtistRepository.update).mockResolvedValueOnce(mockArtist as never);
 
       await ArtistService.applyEnrichedField('a'.repeat(24), 'bornOn', '1985-03-15', 'admin-1');
 
-      expect(ArtistRepository.updateEnrichedField).toHaveBeenCalledWith(
-        'a'.repeat(24),
-        { bornOn: new Date('1985-03-15') },
-        'admin-1'
+      expect(vi.mocked(ArtistRepository.update).mock.calls).toEqual([
+        ['a'.repeat(24), { bornOn: new Date('1985-03-15'), updatedBy: 'admin-1' }],
+      ]);
+    });
+
+    it('throws a failed write to the calling action', async () => {
+      vi.mocked(ArtistRepository.update).mockRejectedValueOnce(
+        new DataError('NOT_FOUND', 'Record not found')
       );
+
+      await expect(
+        ArtistService.applyEnrichedField('a'.repeat(24), 'surname', 'Ramos', 'admin-1')
+      ).rejects.toThrow('Record not found');
     });
   });
 });

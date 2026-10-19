@@ -45,6 +45,9 @@ export const checkTitleFree = async (
 const releaseDateFrom = (year: number | undefined): Date =>
   year && year > 1900 && year < 2100 ? new Date(year, 0, 1) : new Date();
 
+/** What the upload logs when the album artist cannot be credited. */
+const CREDIT_FAILED_MESSAGE = '[format-upload] Could not credit the album artist from metadata';
+
 /**
  * Credit the album artist the metadata names (`albumArtist`, else the track
  * `artist`) on the new Release. Best-effort: a failure never fails the upload.
@@ -60,13 +63,15 @@ const creditAlbumArtist = async (
 
   try {
     const artist = await ArtistService.findOrCreateByName(artistName);
-    if (artist.success) {
-      await ArtistService.creditOnRelease(artist.data.id, releaseId);
+    if (!artist.success) {
+      return;
+    }
+    const credited = await ArtistService.creditOnRelease({ artistId: artist.data.id, releaseId });
+    if (!credited.success) {
+      loggers.media.warn(CREDIT_FAILED_MESSAGE, { error: credited.error });
     }
   } catch (error) {
-    loggers.media.warn('[format-upload] Could not credit the album artist from metadata', {
-      error: String(error),
-    });
+    loggers.media.warn(CREDIT_FAILED_MESSAGE, { error: String(error) });
   }
 };
 

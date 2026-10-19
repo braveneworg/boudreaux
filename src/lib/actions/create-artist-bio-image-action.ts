@@ -10,7 +10,6 @@ import { revalidatePath } from 'next/cache';
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { ArtistBioImageRecord } from '@/lib/types/domain/artist';
-import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { loggers } from '@/lib/utils/logger';
 import { sanitizeBioText } from '@/lib/utils/sanitize-bio-html';
@@ -31,9 +30,9 @@ export interface CreateBioImageActionResult {
  * it appears in the discovered-images palette. Variant generation is triggered
  * separately by the upload orchestration (PR 1b).
  *
- * Alt text defaults to the artist's display name when the admin leaves it
- * blank, so every upload is eligible as a display image from the moment it
- * lands; the admin can still refine it from the palette afterwards.
+ * The alt text goes to the service as typed: it defaults to the artist's
+ * display name when the admin leaves it blank (`ArtistService.createBioImage`),
+ * and the admin can still refine it from the palette afterwards.
  */
 export const createArtistBioImageAction = async (
   input: CreateBioImageInput
@@ -50,33 +49,27 @@ export const createArtistBioImageAction = async (
   }
 
   try {
-    const artist = await ArtistService.findNameById(parsed.data.artistId);
-    if (!artist) {
-      return { success: false, error: 'Artist not found' };
-    }
-
-    const { attribution, title, alt } = parsed.data;
-    // A blank alt falls back to the artist's name; an artist with no name at
-    // all (blank displayName, first name and surname) leaves it null.
-    const resolvedAlt = alt?.trim() || deriveArtistDisplayName(artist) || null;
+    const { attribution, title } = parsed.data;
     const created = await ArtistService.createBioImage({
       ...parsed.data,
       // Manually-uploaded media is custom, so regeneration preserves it.
       origin: 'custom',
       attribution: sanitizeBioText(attribution),
       title: title == null ? title : sanitizeBioText(title),
-      alt: resolvedAlt == null ? resolvedAlt : sanitizeBioText(resolvedAlt),
     });
+    if (!created.success) {
+      return { success: false, error: created.error };
+    }
 
     logSecurityEvent({
       event: 'media.artist_bio_image.created',
       userId: session.user.id,
-      metadata: { artistId: parsed.data.artistId, artistBioImageId: created.id },
+      metadata: { artistId: parsed.data.artistId, artistBioImageId: created.data.id },
     });
 
     revalidatePath('/admin/artists');
 
-    return { success: true, data: created };
+    return { success: true, data: created.data };
   } catch (error) {
     loggers.s3.error('Create artist bio image action error', error);
     return { success: false, error: 'Failed to add bio image' };

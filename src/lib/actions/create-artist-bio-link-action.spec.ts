@@ -29,8 +29,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
   vi.mocked(revalidatePath).mockImplementation(() => {});
-  vi.mocked(ArtistService.existsById).mockResolvedValue(true);
-  vi.mocked(ArtistService.createBioLink).mockResolvedValue(createdRow as never);
+  vi.mocked(ArtistService.createBioLink).mockResolvedValue({
+    success: true,
+    data: createdRow as never,
+  });
 });
 
 describe('createArtistBioLinkAction', () => {
@@ -53,12 +55,18 @@ describe('createArtistBioLinkAction', () => {
     expect(result.success).toBe(false);
   });
 
-  it('returns Artist not found when the artist does not exist', async () => {
-    vi.mocked(ArtistService.existsById).mockResolvedValue(false);
+  it("returns the service's failure", async () => {
+    vi.mocked(ArtistService.createBioLink).mockResolvedValueOnce({
+      success: false,
+      error: 'Artist not found',
+      code: 'NOT_FOUND',
+    });
 
     const result = await createArtistBioLinkAction(validInput);
 
     expect(result).toEqual({ success: false, error: 'Artist not found' });
+    expect(logSecurityEvent).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it('creates the bio link via the service with sanitized fields and origin custom', async () => {

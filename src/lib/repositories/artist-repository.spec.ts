@@ -472,30 +472,23 @@ describe('ArtistRepository', () => {
     });
   });
 
-  describe('archive', () => {
-    it('soft-deletes an artist by setting deletedOn', async () => {
-      vi.mocked(prisma.artist.update).mockResolvedValue({ id: 'a' } as never);
-
-      await ArtistRepository.archive('a');
-
-      expect(prisma.artist.update).toHaveBeenCalledWith({
-        where: { id: 'a' },
-        data: { deletedOn: expect.any(Date) },
-      });
-    });
-  });
-
   describe('existsById', () => {
-    it('selects only the id for an existence check', async () => {
-      vi.mocked(prisma.artist.findUnique).mockResolvedValue({ id: 'a' } as never);
+    it('is true when an artist has the id', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce({ id: 'a' } as never);
 
       const result = await ArtistRepository.existsById('a');
 
-      expect(result).toEqual({ id: 'a' });
+      expect(result).toBe(true);
       expect(prisma.artist.findUnique).toHaveBeenCalledWith({
         where: { id: 'a' },
         select: { id: true },
       });
+    });
+
+    it('is false when no artist has the id', async () => {
+      vi.mocked(prisma.artist.findUnique).mockResolvedValueOnce(null);
+
+      await expect(ArtistRepository.existsById('missing')).resolves.toBe(false);
     });
   });
 
@@ -1556,53 +1549,119 @@ describe('ArtistRepository', () => {
     });
   });
 
-  describe('findUniqueBySlug', () => {
-    it('finds a non-deleted artist by slug with the name projection', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce({ id: 'a' } as never);
+  describe('findByNameKeys', () => {
+    const match = { id: 'a', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+    const keys = { slug: 'ceschi', displayName: 'Ceschi', firstName: 'David', surname: 'Ramos' };
+    const bySlug = { where: { slug: 'ceschi', ...artistWhere.notDeleted }, select: nameSelect };
+    const byDisplayName = {
+      where: { displayName: { equals: 'Ceschi', mode: 'insensitive' }, ...artistWhere.notDeleted },
+      select: nameSelect,
+    };
+    const byName = {
+      where: {
+        AND: [
+          { firstName: { equals: 'David', mode: 'insensitive' } },
+          { surname: { equals: 'Ramos', mode: 'insensitive' } },
+        ],
+        ...artistWhere.notDeleted,
+      },
+      select: nameSelect,
+    };
 
-      const result = await ArtistRepository.findUniqueBySlug('ceschi');
+    it('returns the slug match without reading the other keys', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(match as never);
 
-      expect(result).toEqual({ id: 'a' });
+      const result = await ArtistRepository.findByNameKeys(keys);
+
+      expect(result).toEqual(match);
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([[bySlug]]);
+    });
+
+    it('falls back to a case-insensitive display name match', async () => {
+      vi.mocked(prisma.artist.findFirst)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(match as never);
+
+      const result = await ArtistRepository.findByNameKeys(keys);
+
+      expect(result).toEqual(match);
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([[bySlug], [byDisplayName]]);
+    });
+
+    it('falls back to a case-insensitive first name and surname match', async () => {
+      vi.mocked(prisma.artist.findFirst)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(match as never);
+
+      const result = await ArtistRepository.findByNameKeys(keys);
+
+      expect(result).toEqual(match);
       expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([
-        [{ where: { slug: 'ceschi', ...artistWhere.notDeleted }, select: nameSelect }],
+        [bySlug],
+        [byDisplayName],
+        [byName],
       ]);
     });
-  });
 
-  describe('findFirstByDisplayName', () => {
-    it('does a case-insensitive displayName lookup with the name projection', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
+    it('returns null when no key matches', async () => {
+      vi.mocked(prisma.artist.findFirst)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
 
-      const result = await ArtistRepository.findFirstByDisplayName('Ceschi');
-
-      expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: {
-          displayName: { equals: 'Ceschi', mode: 'insensitive' },
-          ...artistWhere.notDeleted,
-        },
-        select: nameSelect,
-      });
+      await expect(ArtistRepository.findByNameKeys(keys)).resolves.toBeNull();
     });
-  });
 
-  describe('findFirstByName', () => {
-    it('does a case-insensitive firstName+surname lookup with the name projection', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
+    it('skips an empty slug and an empty display name', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(match as never);
 
-      const result = await ArtistRepository.findFirstByName('Ceschi', 'Ramos');
+      const result = await ArtistRepository.findByNameKeys({ ...keys, slug: '', displayName: '' });
 
-      expect(result).toEqual({ id: 'a' });
-      expect(prisma.artist.findFirst).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
-            { surname: { equals: 'Ramos', mode: 'insensitive' } },
-          ],
-          ...artistWhere.notDeleted,
-        },
-        select: nameSelect,
-      });
+      expect(result).toEqual(match);
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([[byName]]);
+    });
+
+    it('skips the name pair when the first name is empty', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+      const result = await ArtistRepository.findByNameKeys({ ...keys, firstName: '' });
+
+      expect(result).toBeNull();
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([[bySlug], [byDisplayName]]);
+    });
+
+    it.each([
+      ['an empty surname', { firstName: 'Ceschi', surname: '' }],
+      ['an absent surname', { firstName: 'Ceschi' }],
+    ])('compares %s as the empty surname of a one-word name', async (_label, nameKeys) => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(match as never);
+
+      await ArtistRepository.findByNameKeys(nameKeys);
+
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([
+        [
+          {
+            where: {
+              AND: [
+                { firstName: { equals: 'Ceschi', mode: 'insensitive' } },
+                { surname: { equals: '', mode: 'insensitive' } },
+              ],
+              ...artistWhere.notDeleted,
+            },
+            select: nameSelect,
+          },
+        ],
+      ]);
+    });
+
+    it('reads only the slug when only a slug is given', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValueOnce(null);
+
+      const result = await ArtistRepository.findByNameKeys({ slug: 'ceschi' });
+
+      expect(result).toBeNull();
+      expect(vi.mocked(prisma.artist.findFirst).mock.calls).toEqual([[bySlug]]);
     });
   });
 
@@ -2197,23 +2256,6 @@ describe('ArtistRepository', () => {
 
       const arg = vi.mocked(prisma.artist.findMany).mock.calls[0][0];
       expect(arg?.where).not.toHaveProperty('publishedOn');
-    });
-  });
-
-  describe('updateEnrichedField', () => {
-    it('writes the single typed field plus the auditing updatedBy', async () => {
-      vi.mocked(prisma.artist.update).mockResolvedValue({} as never);
-
-      await ArtistRepository.updateEnrichedField(
-        'a'.repeat(24),
-        { bornOn: new Date('1985-03-15T00:00:00.000Z') },
-        'admin-1'
-      );
-
-      expect(prisma.artist.update).toHaveBeenCalledWith({
-        where: { id: 'a'.repeat(24) },
-        data: { bornOn: new Date('1985-03-15T00:00:00.000Z'), updatedBy: 'admin-1' },
-      });
     });
   });
 

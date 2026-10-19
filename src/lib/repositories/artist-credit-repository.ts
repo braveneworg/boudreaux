@@ -5,6 +5,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
+import type { ArtistReleaseScalars } from '@/lib/types/domain/release';
 import {
   toCreditThatStaysHidden,
   type CreditAwaitingConfirmation,
@@ -105,7 +106,10 @@ export class ArtistCreditRepository {
    * path credits one artist at a time this way — through here, not through
    * an upsert of its own, so no writer stores a credit without a position.
    */
-  static async creditOnRelease(releaseId: string, artistId: string): Promise<void> {
+  static async creditOnRelease({
+    artistId,
+    releaseId,
+  }: Pick<ArtistReleaseScalars, 'artistId' | 'releaseId'>): Promise<void> {
     const existing = await prisma.artistRelease.findUnique({
       where: { artistId_releaseId: { artistId, releaseId } },
       select: { id: true },
