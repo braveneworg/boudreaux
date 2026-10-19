@@ -23,9 +23,6 @@ vi.mock('@/lib/repositories/release-repository', () => ({
     findMany: vi.fn(),
     findIdsWithoutByline: vi.fn(),
     updateWithCredits: vi.fn(),
-    updateData: vi.fn(),
-    softDelete: vi.fn(),
-    restore: vi.fn(),
     delete: vi.fn(),
     findPublished: vi.fn(),
     findPublishedWithTracks: vi.fn(),
@@ -687,88 +684,6 @@ describe('ReleaseService', () => {
     });
   });
 
-  describe('softDeleteRelease', () => {
-    it('should soft delete a release successfully', async () => {
-      const softDeletedRelease = { ...mockRelease, deletedOn: new Date() };
-      vi.mocked(ReleaseRepository.softDelete).mockResolvedValue(softDeletedRelease as never);
-
-      const result = await ReleaseService.softDeleteRelease('release-123');
-
-      expect(result.success).toBe(true);
-      expect(
-        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
-      ).not.toBeNull();
-      expect(ReleaseRepository.softDelete).toHaveBeenCalledWith('release-123');
-    });
-
-    it('should return error when release not found', async () => {
-      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
-      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(notFoundError);
-
-      const result = await ReleaseService.softDeleteRelease('non-existent');
-
-      expect(result).toMatchObject({ success: false, error: 'Release not found' });
-    });
-
-    it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(initError);
-
-      const result = await ReleaseService.softDeleteRelease('release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should handle unknown errors', async () => {
-      vi.mocked(ReleaseRepository.softDelete).mockRejectedValue(Error('Unknown error'));
-
-      const result = await ReleaseService.softDeleteRelease('release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Failed to soft delete release' });
-    });
-  });
-
-  describe('restoreRelease', () => {
-    it('should restore a soft-deleted release successfully', async () => {
-      const restoredRelease = { ...mockRelease, deletedOn: null };
-      vi.mocked(ReleaseRepository.restore).mockResolvedValue(restoredRelease as never);
-
-      const result = await ReleaseService.restoreRelease('release-123');
-
-      expect(result.success).toBe(true);
-      expect(
-        (result as { success: true; data: { deletedOn: Date | null } }).data.deletedOn
-      ).toBeNull();
-      expect(ReleaseRepository.restore).toHaveBeenCalledWith('release-123');
-    });
-
-    it('should return error when release not found', async () => {
-      const notFoundError = new DataError('NOT_FOUND', 'Record not found');
-      vi.mocked(ReleaseRepository.restore).mockRejectedValue(notFoundError);
-
-      const result = await ReleaseService.restoreRelease('non-existent');
-
-      expect(result).toMatchObject({ success: false, error: 'Release not found' });
-    });
-
-    it('should return error when database is unavailable', async () => {
-      const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ReleaseRepository.restore).mockRejectedValue(initError);
-
-      const result = await ReleaseService.restoreRelease('release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Database unavailable' });
-    });
-
-    it('should handle unknown errors', async () => {
-      vi.mocked(ReleaseRepository.restore).mockRejectedValue(Error('Unknown error'));
-
-      const result = await ReleaseService.restoreRelease('release-123');
-
-      expect(result).toMatchObject({ success: false, error: 'Failed to restore release' });
-    });
-  });
-
   describe('publishRelease', () => {
     it('should publish a release by stamping publishedAt', async () => {
       const publishedRelease = { ...mockRelease, publishedAt: new Date('2024-12-13') };
@@ -1152,18 +1067,6 @@ describe('ReleaseService', () => {
       await expect(
         ReleaseService.getPublishedReleaseRedirectTarget('release-123')
       ).resolves.toBeNull();
-    });
-  });
-
-  describe('restoreFoundRelease', () => {
-    it('clears deletedOn', async () => {
-      vi.mocked(ReleaseRepository.updateData).mockResolvedValueOnce(mockRelease as never);
-
-      await ReleaseService.restoreFoundRelease('release-123');
-
-      expect(vi.mocked(ReleaseRepository.updateData).mock.calls).toEqual([
-        ['release-123', { deletedOn: null }],
-      ]);
     });
   });
 

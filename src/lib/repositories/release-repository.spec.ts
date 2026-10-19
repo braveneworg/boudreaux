@@ -62,7 +62,7 @@ describe('ReleaseRepository', () => {
 
   const mockRelease = { id: 'release-123', title: 'Test Album' };
 
-  // Detail include with unordered images (writes, softDelete, restore).
+  // Detail include with unordered images (create and update writes).
   const detailIncludeUnordered = {
     images: true,
     artistReleases: { orderBy: creditOrderBy, include: { artist: true } },
@@ -559,34 +559,6 @@ describe('ReleaseRepository', () => {
     });
   });
 
-  describe('softDelete', () => {
-    it('sets deletedOn to a Date with the unordered-images detail include', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
-
-      await ReleaseRepository.softDelete('release-123');
-
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { deletedOn: expect.any(Date) },
-        include: detailIncludeUnordered,
-      });
-    });
-  });
-
-  describe('restore', () => {
-    it('clears deletedOn with the unordered-images detail include', async () => {
-      vi.mocked(prisma.release.update).mockResolvedValue(mockRelease as never);
-
-      await ReleaseRepository.restore('release-123');
-
-      expect(prisma.release.update).toHaveBeenCalledWith({
-        where: { id: 'release-123' },
-        data: { deletedOn: null },
-        include: detailIncludeUnordered,
-      });
-    });
-  });
-
   describe('delete', () => {
     const view = {
       id: 'release-123',
@@ -840,37 +812,6 @@ describe('ReleaseRepository', () => {
             },
           },
         },
-      });
-    });
-  });
-
-  describe('findPublishedByArtist', () => {
-    it('returns id and title of published releases for the artist, newest first', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([
-        { id: 'r2', title: 'Second' },
-        { id: 'r1', title: 'First' },
-      ] as never);
-
-      const result = await ReleaseRepository.findPublishedByArtist('artist-1');
-
-      expect(result).toEqual([
-        { id: 'r2', title: 'Second' },
-        { id: 'r1', title: 'First' },
-      ]);
-    });
-
-    it('queries with the correct where/select/orderBy shape', async () => {
-      vi.mocked(prisma.release.findMany).mockResolvedValue([] as never);
-
-      await ReleaseRepository.findPublishedByArtist('artist-1');
-
-      expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: {
-          artistReleases: { some: { artistId: 'artist-1' } },
-          ...listedRelease.where,
-        },
-        orderBy: { releasedOn: 'desc' },
-        select: { id: true, title: true },
       });
     });
   });

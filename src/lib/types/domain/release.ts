@@ -251,18 +251,6 @@ export interface PublishedReleaseCredits {
   }>;
 }
 
-/**
- * Narrow projection for bio release-link injection — just the id and title.
- * Produced by `ReleaseRepository.findPublishedByArtist` and consumed by the
- * bio-generation service to append internal release deep links
- * (`/releases?artist=<slug>&release=<id>`) after generation (the lambda has
- * no DB access).
- */
-export interface ReleaseLinkSource {
-  id: string;
-  title: string;
-}
-
 /** Source row for injecting internal release links AND cover art after generation. */
 export interface ReleaseCoverSource {
   id: string;

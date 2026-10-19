@@ -18,7 +18,6 @@ import type {
   ReleaseForDeletion,
   ReleaseListFilters,
   ReleaseListItem,
-  ReleaseLinkSource,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 import { publicCredits } from '@/lib/utils/artist-release-credits';
@@ -73,8 +72,8 @@ const releaseDetailIncludeWithImages = {
 } as const satisfies Prisma.ReleaseInclude;
 
 /**
- * Detail include with unordered, unbounded images — used by create/softDelete/
- * restore to preserve the prior payload shape.
+ * Detail include with unordered, unbounded images — the payload the release
+ * writes (create, update) return.
  */
 const releaseDetailIncludeUnorderedImages = {
   images: true,
@@ -543,39 +542,14 @@ export class ReleaseRepository {
   }
 
   /**
-   * Apply a partial update (used by un-delete/publish and soft-delete flows)
-   * without re-hydrating relations. Returns the updated scalars — no
-   * relations are loaded, so none are claimed.
+   * Apply a partial update without re-hydrating relations. Returns the
+   * updated scalars — no relations are loaded, so none are claimed.
    */
   static async updateData(id: string, data: UpdateReleaseData): Promise<ReleaseScalars> {
     return prisma.release.update({
       where: { id },
       data: toPrismaUpdate(data),
     });
-  }
-
-  /**
-   * Set a release's `deletedOn` to now (soft delete), returning the release
-   * with the full detail include (files unordered, matching the prior shape).
-   */
-  static async softDelete(id: string): Promise<Release> {
-    return prisma.release.update({
-      where: { id },
-      data: { deletedOn: new Date() },
-      include: releaseDetailIncludeUnorderedImages,
-    }) as Promise<Release>;
-  }
-
-  /**
-   * Clear a release's `deletedOn` (restore), returning the release with the
-   * full detail include (files unordered, matching the prior shape).
-   */
-  static async restore(id: string): Promise<Release> {
-    return prisma.release.update({
-      where: { id },
-      data: { deletedOn: null },
-      include: releaseDetailIncludeUnorderedImages,
-    }) as Promise<Release>;
   }
 
   /**
@@ -660,23 +634,6 @@ export class ReleaseRepository {
       where: { id, ...listedRelease.where },
       select: publishedReleaseCreditsSelect,
     });
-  }
-
-  /**
-   * Fetch all published, non-deleted releases for an artist, returning only the
-   * `id` and `title` fields ordered newest first.
-   * Used by the bio-generation service to inject internal release links after
-   * generation (the lambda has no DB access).
-   */
-  static async findPublishedByArtist(artistId: string): Promise<ReleaseLinkSource[]> {
-    return prisma.release.findMany({
-      where: {
-        artistReleases: { some: { artistId } },
-        ...listedRelease.where,
-      },
-      orderBy: { releasedOn: 'desc' },
-      select: { id: true, title: true },
-    }) as Promise<ReleaseLinkSource[]>;
   }
 
   /**

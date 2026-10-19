@@ -246,38 +246,6 @@ export class ReleaseService {
   }
 
   /**
-   * Soft delete a release by ID (set deletedOn timestamp)
-   */
-  static async softDeleteRelease(id: string): Promise<ServiceResponse<Release>> {
-    try {
-      const release = await ReleaseRepository.softDelete(id);
-
-      return { success: true, data: release };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Release not found',
-        UNKNOWN: 'Failed to soft delete release',
-      });
-    }
-  }
-
-  /**
-   * Restore a soft-deleted release by ID (clear deletedOn timestamp)
-   */
-  static async restoreRelease(id: string): Promise<ServiceResponse<Release>> {
-    try {
-      const release = await ReleaseRepository.restore(id);
-
-      return { success: true, data: release };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Release not found',
-        UNKNOWN: 'Failed to restore release',
-      });
-    }
-  }
-
-  /**
    * Publish a release by stamping `publishedAt`, and publish the credited
    * artists the admin chose to publish, in one transaction. Every credit
    * awaiting confirmation needs a decision, or this fails with `VALIDATION`
@@ -406,11 +374,6 @@ export class ReleaseService {
     deletedOn: Date | null;
   } | null> {
     return ReleaseRepository.findByTitleInsensitive(title);
-  }
-
-  /** Restore a soft-deleted release that a find-or-create matched. */
-  static async restoreFoundRelease(id: string): Promise<void> {
-    await ReleaseRepository.updateData(id, { deletedOn: null });
   }
 
   /**
