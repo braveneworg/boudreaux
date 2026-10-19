@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * The `where` fragments that decide whether an artist may be public, shared by
- * the artist repositories and the backfill script so the rule has one
- * definition. Type-only Prisma import and no `server-only`, so a CLI script
- * can load it.
+ * Artist `where` fragments: the artist states, the admin published filter and
+ * the ADR-0015 credit gates, shared by the artist repositories and the backfill
+ * script. The public artist rule itself is `publicArtist` in `visibility.ts`.
+ * Type-only Prisma import and no `server-only`, so a CLI script can load it.
  */
 
 import { allOf, isPresent, isUnset } from './where-kit';
@@ -39,19 +39,6 @@ export const artistPublishedFilter = (published: boolean | undefined): Prisma.Ar
     : published === false
       ? artistWhere.unpublished
       : {};
-
-/**
- * A public artist (ADR-0015, ADR-0016): published and not soft-deleted.
- * Whether the artist is still on the label plays no part. Every public read
- * applies it: to the artist a page is about, and, nested as
- * `{ artist: { is: publicArtistWhere } }`, to the artists a release credits, a
- * band lists, a featured row names, or a tour date headlines. Its in-memory
- * twin is `isPublicArtist`.
- */
-export const publicArtistWhere = {
-  ...isPresent('publishedOn'),
-  ...artistWhere.notDeleted,
-} as const satisfies Prisma.ArtistWhereInput;
 
 /**
  * Hidden only for want of a `publishedOn`: never published, not deleted.

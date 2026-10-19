@@ -15,10 +15,10 @@ import type {
 } from '@/lib/types/domain/video';
 import type { VideoEnrichmentState } from '@/lib/types/domain/video-enrichment';
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
+import { publicArtist } from './_internal/visibility';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -69,7 +69,7 @@ const containsInsensitive = (value: string) => ({ contains: value, mode: 'insens
  * nothing. The `Video.artist` string is display copy and never matched.
  */
 const creditedToArtistWhere = (slug: string): Prisma.VideoWhereInput => ({
-  videoArtists: { some: { artist: { is: { slug, ...publicArtistWhere } } } },
+  videoArtists: { some: { artist: { is: { slug, ...publicArtist.where } } } },
 });
 
 /**

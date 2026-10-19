@@ -1,8 +1,13 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import {
+  listedRelease,
+  publicArtist,
+  type ListedReleaseFields,
+  type PublicArtistFields,
+} from '@/lib/repositories/_internal/visibility';
 import type { ReleaseCredit } from '@/lib/types/domain/release';
-import { isPublicArtist, type PublicArtistFields } from '@/lib/utils/is-public-artist';
 
 /**
  * Every credit the artist page can assign to a release, in display order:
@@ -18,11 +23,9 @@ export const RELEASE_CREDITS = [
 const CREDIT_RANK: Record<ReleaseCredit, number> = { primary: 0, featured: 1, member: 2 };
 
 /** The release fields the credit derivation and listing filter read. */
-export interface CreditableRelease {
+export interface CreditableRelease extends ListedReleaseFields {
   id: string;
   releasedOn: Date | string | null;
-  publishedAt?: Date | string | null;
-  deletedOn?: Date | string | null;
   /** Artist credits in album-artist-first order (the admin release form's `artistIds` order). */
   artistReleases: Array<{ artistId: string }>;
 }
@@ -78,8 +81,8 @@ export const publicCredits = <TRow extends PublicCreditRow>(
 ): PublicCredits<TRow> => {
   const first = credits.at(0)?.artist;
   return {
-    albumArtist: first && isPublicArtist(first) ? first : null,
-    credits: credits.filter(({ artist }) => isPublicArtist(artist)),
+    albumArtist: first && publicArtist.matches(first) ? first : null,
+    credits: credits.filter(({ artist }) => publicArtist.matches(artist)),
   };
 };
 
@@ -147,16 +150,6 @@ export const compareByCreditThenNewest = <
   CREDIT_RANK[a.credit] - CREDIT_RANK[b.credit] ||
   releasedOnTime(b.release.releasedOn) - releasedOnTime(a.release.releasedOn);
 
-/**
- * Public listing rule: only published, non-deleted releases. `publishedAt` may
- * be absent on legacy Mongo documents, which counts as unpublished.
- */
-export const isListable = ({
-  publishedAt,
-  deletedOn,
-}: Pick<CreditableRelease, 'publishedAt' | 'deletedOn'>): boolean =>
-  publishedAt != null && deletedOn == null;
-
 /** The release fields the artists-index summary reads from a direct release join. */
 export interface SummarizableReleaseRow {
   release: Pick<CreditableRelease, 'id' | 'releasedOn' | 'publishedAt' | 'deletedOn'> & {
@@ -178,7 +171,7 @@ export interface ListedReleaseSummary {
  * lists an artist nor inflates their count.
  */
 export const summarizeListedReleases = (rows: SummarizableReleaseRow[]): ListedReleaseSummary => {
-  const listed = rows.map(({ release }) => release).filter(isListable);
+  const listed = rows.map(({ release }) => release).filter(listedRelease.matches);
   const newest = listed.reduce<SummarizableReleaseRow['release'] | null>(
     (best, release) =>
       best === null || releasedOnTime(release.releasedOn) > releasedOnTime(best.releasedOn)
@@ -209,13 +202,13 @@ export const collectArtistReleases = <TRow extends CreditableReleaseRow>({
   memberOf,
 }: ArtistReleaseGraph<TRow>): Array<TRow & { credit: ReleaseCredit }> => {
   const own = releases
-    .filter(({ release }) => isListable(release))
+    .filter(({ release }) => listedRelease.matches(release))
     .map((row) => ({ ...row, credit: deriveOwnReleaseCredit(id, row.release) }));
 
   const listed = new Set(own.map(({ release }) => release.id));
   const viaBands = memberOf
     .flatMap(({ artist }) => artist.releases)
-    .filter(({ release }) => isListable(release))
+    .filter(({ release }) => listedRelease.matches(release))
     .filter(({ release }) => {
       // A direct credit wins over a band route, and two bands can share a
       // release — the first row seen keeps the slot.

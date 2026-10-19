@@ -10,6 +10,7 @@ import {
   PLAYLIST_SEARCH_GROUP_LIMIT,
   PLAYLISTS_PAGE_SIZE,
 } from '@/lib/constants/playlists';
+import { listedRelease, type PublicArtistFields } from '@/lib/repositories/_internal/visibility';
 import { PlaylistRepository } from '@/lib/repositories/playlist-repository';
 import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
 import type {
@@ -38,9 +39,8 @@ import type {
 } from '@/lib/types/domain/playlist';
 import type { PublishedReleaseDetail } from '@/lib/types/domain/release';
 import { computeNextSkip } from '@/lib/types/pagination';
-import { isListable, publicAlbumArtistName } from '@/lib/utils/artist-release-credits';
+import { publicAlbumArtistName } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
-import type { PublicArtistFields } from '@/lib/utils/is-public-artist';
 import { signStreamUrl } from '@/lib/utils/sign-stream-url';
 import { safeArchiveEntryName } from '@/lib/utils/zip-stream';
 import type { UpdatePlaylistInput } from '@/lib/validation/playlist-schema';
@@ -542,7 +542,7 @@ const collectArtistReleaseTargets = (artists: ArtistSearchMatch[]): ArtistReleas
     const artistName = deriveArtistName(artist);
     for (const { release } of artist.releases) {
       if (targets.length >= ARTIST_EXPANSION_LIMIT) return targets;
-      if (!isListable(release) || seen.has(release.id)) continue;
+      if (!listedRelease.matches(release) || seen.has(release.id)) continue;
       seen.add(release.id);
       targets.push({ releaseId: release.id, artistName });
     }

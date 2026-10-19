@@ -11,7 +11,7 @@ import {
   type BackfillDeps,
 } from './backfill-publish-credited-artists';
 import { artistWhere } from '../src/lib/repositories/_internal/artist-where';
-import { releaseWhere } from '../src/lib/repositories/_internal/release-where';
+import { listedRelease } from '../src/lib/repositories/_internal/visibility';
 
 import type { PrismaClient } from '@prisma/client';
 
@@ -22,7 +22,7 @@ const ID_UNKNOWN = 'cccccccccccccccccccccccc';
 const ADMIN_ID = 'dddddddddddddddddddddddd';
 
 const AWAITING_WHERE = {
-  releases: { some: { release: releaseWhere.listed } },
+  releases: { some: { release: listedRelease.where } },
   AND: [artistWhere.unpublished, artistWhere.notDeleted],
 };
 

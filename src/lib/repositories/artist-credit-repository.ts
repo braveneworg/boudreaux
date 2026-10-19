@@ -22,7 +22,7 @@ import {
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { byDisplayedName, readAwaitingConfirmation } from './_internal/release-credits';
-import { releaseWhere } from './_internal/release-where';
+import { listedRelease } from './_internal/visibility';
 
 import type { Prisma } from '@prisma/client';
 
@@ -126,7 +126,7 @@ export class ArtistCreditRepository {
   static async findPublishedWorkCreditedTo(artistId: string): Promise<PublishedWorkCreditedTo> {
     const [credits, headliners] = await Promise.all([
       prisma.artistRelease.findMany({
-        where: { artistId, release: releaseWhere.listed },
+        where: { artistId, release: listedRelease.where },
         select: {
           release: {
             select: {

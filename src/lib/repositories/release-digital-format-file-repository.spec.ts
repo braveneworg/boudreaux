@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 
 import { creditOrderBy } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
-import { releaseWhere } from './_internal/release-where';
+import { listedRelease } from './_internal/visibility';
 import {
   ReleaseDigitalFormatFileRepository,
   type TrackFileWithRelease,
@@ -281,7 +281,7 @@ describe('ReleaseDigitalFormatFileRepository', () => {
             is: {
               formatType: 'MP3_320KBPS',
               ...digitalFormatWhere.active,
-              release: { is: releaseWhere.listed },
+              release: { is: listedRelease.where },
             },
           },
         },
@@ -323,7 +323,7 @@ describe('ReleaseDigitalFormatFileRepository', () => {
               formatType: 'AAC',
               releaseId: { in: ['r1', 'r2'] },
               ...digitalFormatWhere.active,
-              release: { is: releaseWhere.listed },
+              release: { is: listedRelease.where },
             },
           },
         },

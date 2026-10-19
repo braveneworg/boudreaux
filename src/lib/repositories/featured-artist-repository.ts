@@ -12,9 +12,9 @@ import type {
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { bioImageWhere } from './_internal/bio-media-where';
 import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
+import { publicArtist } from './_internal/visibility';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -79,7 +79,7 @@ export const featuredArtistInclude = {
  */
 const publicFeaturedArtistInclude = {
   ...featuredArtistInclude,
-  artists: { ...featuredArtistInclude.artists, where: publicArtistWhere },
+  artists: { ...featuredArtistInclude.artists, where: publicArtist.where },
 } satisfies Prisma.FeaturedArtistInclude;
 
 /**
@@ -88,7 +88,7 @@ const publicFeaturedArtistInclude = {
  * public artist. A row whose artists are all hidden is dropped.
  */
 const hasNoHiddenOnlyArtists = {
-  OR: [{ artists: { none: {} } }, { artists: { some: publicArtistWhere } }],
+  OR: [{ artists: { none: {} } }, { artists: { some: publicArtist.where } }],
 } satisfies Prisma.FeaturedArtistWhereInput;
 
 // Compile-time drift guard: fail `pnpm run typecheck` if the hand-written

@@ -4,7 +4,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
-import { isListable } from '@/lib/utils/artist-release-credits';
 
 import { releasePublishedFilter, releaseWhere } from './release-where';
 
@@ -97,32 +96,6 @@ describe('releaseWhere (Docker Mongo contract)', () => {
   it('unpublished matches absent and null publishedAt, never a set one', async () => {
     expect(await findKeys(releaseWhere.unpublished)).toEqual(
       expectKeys(({ publishedAt }) => publishedAt !== 'set')
-    );
-  });
-
-  it('listed matches published rows that are not deleted, however "not deleted" is stored', async () => {
-    expect(await findKeys(releaseWhere.listed)).toEqual(
-      expectKeys(({ publishedAt, deletedOn }) => publishedAt === 'set' && deletedOn !== 'set')
-    );
-  });
-
-  it('listed and its in-memory twin isListable agree on every storage', async () => {
-    // The twin reads what Prisma hands back: an absent field comes back as
-    // null, so the predicate sees two storages where the database sees three.
-    const all = await prisma.release.findMany({
-      where: scope,
-      select: { title: true, publishedAt: true, deletedOn: true },
-    });
-    const byPredicate = keysOf(all.filter(isListable));
-
-    expect(await findKeys(releaseWhere.listed)).toEqual(byPredicate);
-  });
-
-  it('listed composes with a caller-supplied OR without the two colliding', async () => {
-    const withSearch = { ...releaseWhere.listed, OR: [{ title: { contains: 'publishedAt=set' } }] };
-
-    expect(await findKeys(withSearch)).toEqual(
-      expectKeys(({ publishedAt, deletedOn }) => publishedAt === 'set' && deletedOn !== 'set')
     );
   });
 

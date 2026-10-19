@@ -4,22 +4,21 @@
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
-import { isPublicArtist } from '@/lib/utils/is-public-artist';
 
 import {
   artistPublishedFilter,
   artistWhere,
   creditAwaitingConfirmationWhere,
   creditThatStaysHiddenWhere,
-  publicArtistWhere,
 } from './artist-where';
-import { releaseWhere } from './release-where';
+import { listedRelease } from './visibility';
 
 import type { Prisma } from '@prisma/client';
 
-// Contract: the artist state fragments and the ADR-0015 credit gates match
-// exactly the rows the rule says on a real MongoDB. This is the probe table
-// from `docs/lessons/prisma-mongo/gate-where-shapes-need-a-live-probe.md`,
+// Contract: the artist state fragments, the admin published filter and the
+// ADR-0015 credit gates match exactly the rows the rule says on a real
+// MongoDB. This is the probe table from
+// `docs/lessons/prisma-mongo/gate-where-shapes-need-a-live-probe.md`,
 // committed: every artist is credited on one listed release, and `publishedOn`
 // / `deletedOn` take each of their three storages. Runs only under
 // `pnpm run test:db`.
@@ -145,27 +144,6 @@ describe('artistWhere (Docker Mongo contract)', () => {
     );
   });
 
-  it('publicArtistWhere matches published artists that are not deleted', async () => {
-    expect(await findKeys(publicArtistWhere)).toEqual(
-      expectKeys(({ publishedOn, deletedOn }) => publishedOn === 'set' && deletedOn !== 'set')
-    );
-  });
-
-  it('publicArtistWhere and its in-memory twin isPublicArtist agree on every storage', async () => {
-    // The twin reads what Prisma hands back: an absent field comes back as
-    // null, so the predicate sees two storages where the database sees three.
-    const all = await prisma.artist.findMany({
-      where: scope,
-      select: { slug: true, publishedOn: true, deletedOn: true },
-    });
-    const byPredicate = all
-      .filter(isPublicArtist)
-      .map(({ slug }) => slug.slice(prefix.length))
-      .sort();
-
-    expect(await findKeys(publicArtistWhere)).toEqual(byPredicate);
-  });
-
   describe('artistPublishedFilter', () => {
     it('true matches every published artist, deleted or not', async () => {
       expect(await findKeys(artistPublishedFilter(true))).toEqual(
@@ -200,7 +178,7 @@ describe('ADR-0015 credit gates (Docker Mongo contract)', () => {
 
   it('awaiting confirmation on any listed release ignores a draft-only credit', async () => {
     expect(
-      await findKeys(creditAwaitingConfirmationWhere({ release: releaseWhere.listed }))
+      await findKeys(creditAwaitingConfirmationWhere({ release: listedRelease.where }))
     ).toEqual(
       expectKeys(({ publishedOn, deletedOn }) => publishedOn !== 'set' && deletedOn !== 'set')
     );

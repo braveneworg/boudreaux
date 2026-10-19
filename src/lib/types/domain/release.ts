@@ -149,8 +149,8 @@ export type ReleaseListItem = ReleaseScalars & {
 
 /**
  * Narrow artist name projection consumed by the public releases listing card,
- * plus the fields `isPublicArtist` reads so the service can apply the byline
- * rule to the full credit order.
+ * plus the fields `publicArtist.matches` reads so the service can apply the
+ * byline rule to the full credit order.
  */
 export type PublishedReleaseListingArtist = {
   id: string;
@@ -208,7 +208,7 @@ export type PublishedReleaseListing = PublishedReleaseListingRow & {
 
 /**
  * Narrow artist name-part projection for the listening modal's release
- * detail, plus the fields `isPublicArtist` reads.
+ * detail, plus the fields `publicArtist.matches` reads.
  */
 export type PublishedReleaseDetailArtist = {
   id: string;

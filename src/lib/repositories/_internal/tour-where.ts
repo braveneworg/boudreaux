@@ -11,7 +11,7 @@
  * dates: see `docs/lessons/prisma-mongo/`.
  */
 
-import { publicArtistWhere } from './artist-where';
+import { publicArtist } from './visibility';
 import { isUnset } from './where-kit';
 
 import type { Prisma } from '@prisma/client';
@@ -21,7 +21,7 @@ const namesNoArtist = isUnset('artistId') satisfies Prisma.TourDateHeadlinerWher
 
 /** A headliner the public may see: one whose artist is a public artist. */
 export const publicHeadlinerWhere = {
-  artist: { is: publicArtistWhere },
+  artist: { is: publicArtist.where },
 } as const satisfies Prisma.TourDateHeadlinerWhereInput;
 
 /**

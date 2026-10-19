@@ -30,15 +30,15 @@ import type { BioProgress, BioStatus } from '@/lib/validation/bio-generation-sch
 import type { AsyncJobStatus } from '@/utils/async-job-lifecycle';
 
 import { artistCreditSelect, artistPublicSelect } from './_internal/artist-public-select';
-import { artistPublishedFilter, artistWhere, publicArtistWhere } from './_internal/artist-where';
+import { artistPublishedFilter, artistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { bioImageWhere, bioLinkWhere, bioMediaWhere } from './_internal/bio-media-where';
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { playableFormats, playableFormatWhere } from './_internal/playable-formats';
 import { renumberCredits } from './_internal/release-credits';
-import { releaseWhere } from './_internal/release-where';
 import { publicVideoWhere } from './_internal/video-where';
+import { listedRelease, publicArtist } from './_internal/visibility';
 import { isUnsetOr } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
@@ -211,11 +211,11 @@ const artistListingSelect = (now: Date) =>
     },
     // A card names only the members and bands that are public artists (ADR-0015).
     members: {
-      where: { member: { is: publicArtistWhere } },
+      where: { member: { is: publicArtist.where } },
       select: { member: { select: artistListingNameSelect } },
     },
     memberOf: {
-      where: { artist: { is: publicArtistWhere } },
+      where: { artist: { is: publicArtist.where } },
       select: { artist: { select: artistListingNameSelect } },
     },
     releases: {
@@ -285,7 +285,7 @@ const artistSearchSelect = {
  * a pick there starts playback at once.
  */
 const playableListedReleaseWhere = {
-  ...releaseWhere.listed,
+  ...listedRelease.where,
   digitalFormats: { some: { ...playableFormatWhere, files: { some: {} } } },
 } as const satisfies Prisma.ReleaseWhereInput;
 
@@ -348,11 +348,11 @@ const artistHomeSearchSelect = (now: Date) =>
 /**
  * The media `Release` graph loaded behind every artist-detail release join,
  * with each credited artist read through {@link artistCreditSelect}: public
- * scalars (#765) without the bio, plus the fields `isPublicArtist` reads. The
- * credits are read whole, hidden artists included: the service derives each
- * release's credit from the full credit order and drops the hidden artists
- * afterwards (ADR-0015). The artist page is public, so each release carries
- * only the playable format (`playableFormats`).
+ * scalars (#765) without the bio, plus the fields `publicArtist.matches`
+ * reads. The credits are read whole, hidden artists included: the service
+ * derives each release's credit from the full credit order and drops the
+ * hidden artists afterwards (ADR-0015). The artist page is public, so each
+ * release carries only the playable format (`playableFormats`).
  */
 const releaseGraphInclude = {
   images: true,
@@ -541,13 +541,17 @@ const readVocabularyColumn = (
 };
 
 /**
- * A search word matching the title of one of the artist's listed releases —
- * the token clause the artists index, the playlist "By artist" search and the
- * home search share.
+ * The clauses one search token may match on a public artist — the name fields,
+ * aka names, genres, and the title of one of the artist's listed releases —
+ * shared by the playlist "By artist" search, the artists index and the home
+ * search.
  */
-const listedReleaseTitleClause = (token: string): Prisma.ArtistWhereInput => ({
-  releases: { some: { release: { title: containsToken(token), ...releaseWhere.listed } } },
-});
+const publicArtistTokenClauses = (token: string): Prisma.ArtistWhereInput[] => [
+  ...nameFieldClauses(token),
+  { akaNames: containsToken(token) },
+  { genres: containsToken(token) },
+  { releases: { some: { release: { title: containsToken(token), ...listedRelease.where } } } },
+];
 
 /**
  * Build the playlist "By artist" search `where`: a public artist holding a
@@ -557,22 +561,14 @@ const listedReleaseTitleClause = (token: string): Prisma.ArtistWhereInput => ({
  * titles of their listed releases. The search expands each match into its
  * release tracks, so an artist with only videos has nothing to offer it.
  *
- * It requires the artist to be published: a search that matched a hidden
- * artist would name it (ADR-0015).
+ * It requires a public artist: a search that matched a hidden artist would
+ * name it (ADR-0015).
  */
 const buildReleaseCreditedWhere = (search: string | undefined): Prisma.ArtistWhereInput => {
-  const tokenSearch = search
-    ? buildTokenSearch(search, (token) => [
-        ...nameFieldClauses(token),
-        { akaNames: containsToken(token) },
-        { genres: containsToken(token) },
-        listedReleaseTitleClause(token),
-      ])
-    : [];
+  const tokenSearch = search ? buildTokenSearch(search, publicArtistTokenClauses) : [];
   return {
-    ...publicArtistWhere,
-    releases: { some: { release: releaseWhere.listed } },
-    ...(tokenSearch.length > 0 && { AND: tokenSearch }),
+    releases: { some: { release: listedRelease.where } },
+    AND: [publicArtist.where, ...tokenSearch],
   };
 };
 
@@ -583,8 +579,8 @@ const buildReleaseCreditedWhere = (search: string | undefined): Prisma.ArtistWhe
  * names, genres, the title of a listed release, or the title of a live video.
  * Whether the artist is still on the label plays no part (ADR-0016).
  *
- * `publicArtistWhere` holds the only top-level `OR`, so the credit `OR` and
- * each token's `OR` sit in `AND` members. The credit comes last: Prisma on
+ * `publicArtist.where`, the credit `OR` and each token's `OR` sit in `AND`
+ * members, so no two of them meet on one key. The credit comes last: Prisma on
  * MongoDB joins a relation once per filter under one alias, and the last join
  * replaces the earlier ones, so the filter that joins deepest (the credit, down
  * to the format files for the home search) must be the last to read `releases`
@@ -598,18 +594,15 @@ const buildReleaseOrVideoWhere = (
   const liveVideo = publicVideoWhere(now);
   const tokenSearch = search
     ? buildTokenSearch(search, (token) => [
-        ...nameFieldClauses(token),
-        { akaNames: containsToken(token) },
-        { genres: containsToken(token) },
-        listedReleaseTitleClause(token),
+        ...publicArtistTokenClauses(token),
         {
           videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
         },
       ])
     : [];
   return {
-    ...publicArtistWhere,
     AND: [
+      publicArtist.where,
       ...tokenSearch,
       {
         OR: [
@@ -627,7 +620,7 @@ const buildReleaseOrVideoWhere = (
  * a live video. See {@link buildReleaseOrVideoWhere}.
  */
 const buildListedWhere = (search: string | undefined, now: Date): Prisma.ArtistWhereInput =>
-  buildReleaseOrVideoWhere(search, now, releaseWhere.listed);
+  buildReleaseOrVideoWhere(search, now, listedRelease.where);
 
 /**
  * Build the home search `where` (a **home search match**): like
@@ -783,7 +776,7 @@ export class ArtistRepository {
    */
   static async findBySlug(slug: string): Promise<ArtistPublicScalars | null> {
     return prisma.artist.findFirst({
-      where: { slug, ...publicArtistWhere },
+      where: { slug, ...publicArtist.where },
       select: artistPublicSelect,
     });
   }
@@ -998,7 +991,7 @@ export class ArtistRepository {
     slug: string
   ): Promise<ArtistWithReleaseGraph | null> {
     return prisma.artist.findFirst({
-      where: { slug, ...publicArtistWhere },
+      where: { slug, ...publicArtist.where },
       select: artistWithReleaseGraphSelect,
     });
   }

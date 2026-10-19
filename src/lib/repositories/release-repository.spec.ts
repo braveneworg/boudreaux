@@ -6,10 +6,10 @@ import { prisma } from '@/lib/prisma';
 import { CreditDecisionError } from '@/lib/types/domain/errors';
 import type { CreateReleaseData } from '@/lib/types/domain/release';
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { creditOrderBy } from './_internal/credit-order';
 import { playableFormatWhere } from './_internal/playable-formats';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
+import { listedRelease, publicArtist } from './_internal/visibility';
 import { ReleaseRepository } from './release-repository';
 
 vi.mock('server-only', () => ({}));
@@ -493,7 +493,7 @@ describe('ReleaseRepository', () => {
       expect(vi.mocked(prisma.release.findMany).mock.calls).toEqual([
         [
           {
-            where: releaseWhere.listed,
+            where: listedRelease.where,
             select: {
               id: true,
               artistReleases: {
@@ -670,11 +670,11 @@ describe('ReleaseRepository', () => {
           artist: {
             is: {
               OR: [
-                { slug: 'e2e-artist', ...publicArtistWhere },
+                { slug: 'e2e-artist', ...publicArtist.where },
                 {
-                  ...publicArtistWhere,
+                  ...publicArtist.where,
                   members: {
-                    some: { member: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
+                    some: { member: { is: { slug: 'e2e-artist', ...publicArtist.where } } },
                   },
                 },
               ],
@@ -690,7 +690,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findPublished({ skip: 24, take: 12 });
 
       expect(prisma.release.findMany).toHaveBeenCalledWith({
-        where: releaseWhere.listed,
+        where: { AND: [listedRelease.where] },
         orderBy: { releasedOn: 'desc' },
         skip: 24,
         take: 12,
@@ -706,9 +706,8 @@ describe('ReleaseRepository', () => {
       const contains = { contains: 'Doe', mode: 'insensitive' };
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
       expect(arg?.where).toEqual({
-        publishedAt: { not: null },
         AND: [
-          releaseWhere.notDeleted,
+          listedRelease.where,
           {
             OR: [
               { title: contains },
@@ -720,7 +719,7 @@ describe('ReleaseRepository', () => {
                     artist: {
                       is: {
                         AND: [
-                          publicArtistWhere,
+                          publicArtist.where,
                           {
                             OR: [
                               { firstName: contains },
@@ -745,10 +744,7 @@ describe('ReleaseRepository', () => {
       await ReleaseRepository.findPublished({ artist: 'e2e-artist' });
 
       const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
-      expect(arg?.where).toEqual({
-        publishedAt: { not: null },
-        AND: [releaseWhere.notDeleted, creditedToE2eArtist],
-      });
+      expect(arg?.where).toEqual({ AND: [listedRelease.where, creditedToE2eArtist] });
       expect(arg?.orderBy).toEqual({ releasedOn: 'desc' });
     });
 
@@ -775,7 +771,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'release-123',
-          ...releaseWhere.listed,
+          ...listedRelease.where,
         },
         include: detailSelect,
       });
@@ -789,17 +785,17 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'release-123',
-          ...releaseWhere.listed,
+          ...listedRelease.where,
           artistReleases: {
             some: {
               artist: {
                 is: {
                   OR: [
-                    { slug: 'e2e-artist', ...publicArtistWhere },
+                    { slug: 'e2e-artist', ...publicArtist.where },
                     {
-                      ...publicArtistWhere,
+                      ...publicArtist.where,
                       members: {
-                        some: { member: { is: { slug: 'e2e-artist', ...publicArtistWhere } } },
+                        some: { member: { is: { slug: 'e2e-artist', ...publicArtist.where } } },
                       },
                     },
                   ],
@@ -822,7 +818,7 @@ describe('ReleaseRepository', () => {
 
       expect(result).toBe(credits);
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
-        where: { id: 'release-123', ...releaseWhere.listed },
+        where: { id: 'release-123', ...listedRelease.where },
         select: {
           artistReleases: {
             orderBy: creditOrderBy,
@@ -858,7 +854,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
           artistReleases: { some: { artistId: 'artist-1' } },
-          ...releaseWhere.listed,
+          ...listedRelease.where,
         },
         orderBy: { releasedOn: 'desc' },
         select: { id: true, title: true },
@@ -919,7 +915,7 @@ describe('ReleaseRepository', () => {
       expect(prisma.release.findMany).toHaveBeenCalledWith({
         where: {
           artistReleases: { some: { artistId: 'artist-1' } },
-          ...releaseWhere.listed,
+          ...listedRelease.where,
         },
         orderBy: { releasedOn: 'desc' },
         select: {
@@ -959,7 +955,7 @@ describe('ReleaseRepository', () => {
 
       expect(result).toEqual({ id: 'r-1', title: 'T' });
       expect(prisma.release.findFirst).toHaveBeenCalledWith({
-        where: { id: 'r-1', ...releaseWhere.listed },
+        where: { id: 'r-1', ...listedRelease.where },
         select: { id: true, title: true },
       });
     });

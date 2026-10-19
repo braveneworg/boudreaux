@@ -4,7 +4,7 @@
 
 import { artistWhere } from './_internal/artist-where';
 import { creditOrderBy } from './_internal/credit-order';
-import { releaseWhere } from './_internal/release-where';
+import { listedRelease } from './_internal/visibility';
 import { ArtistCreditRepository } from './artist-credit-repository';
 
 vi.mock('server-only', () => ({}));
@@ -230,7 +230,7 @@ describe('ArtistCreditRepository', () => {
           {
             where: {
               artistId: 'artist-1',
-              release: releaseWhere.listed,
+              release: listedRelease.where,
             },
             select: {
               release: {

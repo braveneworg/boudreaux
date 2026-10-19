@@ -5,9 +5,9 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateVideoData, SaveProbeResultData } from '@/lib/types/domain/video';
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { mayBeginRunWhere } from './_internal/async-job-where';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
+import { publicArtist } from './_internal/visibility';
 import { VideoRepository, type VideoSummary } from './video-repository';
 
 vi.mock('server-only', () => ({}));
@@ -266,7 +266,7 @@ describe('VideoRepository', () => {
           videoLiveAt(expect.any(Date) as Date),
           {
             videoArtists: {
-              some: { artist: { is: { slug: 'marguerite-ash', ...publicArtistWhere } } },
+              some: { artist: { is: { slug: 'marguerite-ash', ...publicArtist.where } } },
             },
           },
         ],
@@ -314,7 +314,7 @@ describe('VideoRepository', () => {
                 videoLiveAt(expect.any(Date) as Date),
                 {
                   videoArtists: {
-                    some: { artist: { is: { slug: 'marguerite-ash', ...publicArtistWhere } } },
+                    some: { artist: { is: { slug: 'marguerite-ash', ...publicArtist.where } } },
                   },
                 },
               ],

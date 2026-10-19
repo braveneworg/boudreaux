@@ -22,7 +22,6 @@ import type {
 } from '@/lib/types/domain/release';
 import { publicCredits } from '@/lib/utils/artist-release-credits';
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { orderedCredits } from './_internal/credit-order';
 import { runQuery } from './_internal/map-prisma-error';
 import { playableFormats } from './_internal/playable-formats';
@@ -33,7 +32,7 @@ import {
   type CreditPublication,
 } from './_internal/release-credits';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
-import { isPresent } from './_internal/where-kit';
+import { listedRelease, publicArtist } from './_internal/visibility';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -330,15 +329,15 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
  * and neither does a hidden band's release.
  */
 const creditedToArtistWhere = (slug: string): Prisma.ReleaseWhereInput => {
-  const theArtist = { is: { slug, ...publicArtistWhere } };
+  const theArtist = { is: { slug, ...publicArtist.where } };
   return {
     artistReleases: {
       some: {
         artist: {
           is: {
             OR: [
-              { slug, ...publicArtistWhere },
-              { ...publicArtistWhere, members: { some: { member: theArtist } } },
+              { slug, ...publicArtist.where },
+              { ...publicArtist.where, members: { some: { member: theArtist } } },
             ],
           },
         },
@@ -349,9 +348,9 @@ const creditedToArtistWhere = (slug: string): Prisma.ReleaseWhereInput => {
 
 /**
  * Build the public-listing `where` from an optional search term and an
- * optional artist slug. The deletedOn OR and the search OR are combined under
- * `AND` so they don't collide on the same `OR` key; the artist filter is one
- * more `AND` member ({@link creditedToArtistWhere}).
+ * optional artist slug: a listed release, the search `OR` and the artist
+ * filter ({@link creditedToArtistWhere}) are each one `AND` member, so no two
+ * of them meet on one key.
  */
 const buildPublishedWhere = ({
   search,
@@ -359,9 +358,8 @@ const buildPublishedWhere = ({
 }: Pick<PublishedReleaseFilters, 'search' | 'artist'>): Prisma.ReleaseWhereInput => {
   const contains = containsInsensitive(search ?? '');
   return {
-    ...isPresent('publishedAt'),
     AND: [
-      releaseWhere.notDeleted,
+      listedRelease.where,
       ...(search
         ? [
             {
@@ -377,7 +375,7 @@ const buildPublishedWhere = ({
                       artist: {
                         is: {
                           AND: [
-                            publicArtistWhere,
+                            publicArtist.where,
                             {
                               OR: [
                                 { firstName: contains },
@@ -483,7 +481,7 @@ export class ReleaseRepository {
    */
   static async findIdsWithoutByline(): Promise<string[]> {
     const releases = await prisma.release.findMany({
-      where: releaseWhere.listed,
+      where: listedRelease.where,
       select: {
         id: true,
         artistReleases: orderedCredits({
@@ -665,7 +663,7 @@ export class ReleaseRepository {
     artist?: string
   ): Promise<PublishedReleaseDetailRow | null> {
     return prisma.release.findFirst({
-      where: { id, ...releaseWhere.listed, ...(artist && creditedToArtistWhere(artist)) },
+      where: { id, ...listedRelease.where, ...(artist && creditedToArtistWhere(artist)) },
       include: publishedReleaseDetailInclude,
     }) as Promise<PublishedReleaseDetailRow | null>;
   }
@@ -677,7 +675,7 @@ export class ReleaseRepository {
    */
   static async findPublishedCredits(id: string): Promise<PublishedReleaseCredits | null> {
     return prisma.release.findFirst({
-      where: { id, ...releaseWhere.listed },
+      where: { id, ...listedRelease.where },
       select: publishedReleaseCreditsSelect,
     });
   }
@@ -692,7 +690,7 @@ export class ReleaseRepository {
     return prisma.release.findMany({
       where: {
         artistReleases: { some: { artistId } },
-        ...releaseWhere.listed,
+        ...listedRelease.where,
       },
       orderBy: { releasedOn: 'desc' },
       select: { id: true, title: true },
@@ -711,7 +709,7 @@ export class ReleaseRepository {
     const releases = await prisma.release.findMany({
       where: {
         artistReleases: { some: { artistId } },
-        ...releaseWhere.listed,
+        ...listedRelease.where,
       },
       orderBy: { releasedOn: 'desc' },
       select: releaseCoverSourceSelect,
@@ -756,7 +754,7 @@ export class ReleaseRepository {
    */
   static async findPublishedTitleById(id: string): Promise<{ id: string; title: string } | null> {
     return prisma.release.findFirst({
-      where: { id, ...releaseWhere.listed },
+      where: { id, ...listedRelease.where },
       select: { id: true, title: true },
     });
   }

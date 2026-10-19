@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { publicArtistWhere } from './_internal/artist-where';
 import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
+import { publicArtist } from './_internal/visibility';
 import { FeaturedArtistRepository, featuredArtistInclude } from './featured-artist-repository';
 
 vi.mock('server-only', () => ({}));
@@ -49,7 +49,7 @@ describe('FeaturedArtistRepository', () => {
   });
 
   /** The public artist gate (ADR-0015, ADR-0016): published, not deleted. */
-  const PUBLIC_ARTIST = publicArtistWhere;
+  const PUBLIC_ARTIST = publicArtist.where;
 
   describe('findFeatured', () => {
     it('should query with date filter, include, ordering and limit', async () => {
