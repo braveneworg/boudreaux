@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { expect, test } from '../fixtures/base.fixture';
 import { E2E_AUTH_SECRET } from '../helpers/auth-constants';
 import { createStorageState } from '../helpers/auth-helpers';
+import { routeCdn } from '../helpers/cdn-mock';
 import { openReleaseDeepLink } from '../helpers/release-deep-link';
 
 import type { APIRequestContext, Browser, BrowserContext } from '@playwright/test';
@@ -66,9 +67,9 @@ const signInNewUser = async (
   await prisma.session.create({
     data: { token, userId, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
   });
-  const context = await browser.newContext({
-    storageState: await createStorageState(token, E2E_AUTH_SECRET),
-  });
+  const storageState = await createStorageState(token, E2E_AUTH_SECRET);
+  const context = await browser.newContext({ storageState });
+  await routeCdn(context);
   return { userId, context, request: context.request };
 };
 
