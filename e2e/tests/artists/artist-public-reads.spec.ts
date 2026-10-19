@@ -14,10 +14,11 @@ import { expect, test } from '../../fixtures/base.fixture';
  * so the privacy checks read its body, RSC payload included.
  *
  * The spec seeds its own rows, stamped per worker, so it changes no seeded
- * count another spec reads: an artist carrying every private field and a bio,
- * a band it belongs to, an artist it is a guest of, a draft, and a published
- * artist with no release. All are dated in 2000 so they never lead a
- * newest-first listing.
+ * count another spec reads: an artist carrying every private field, a bio and
+ * a chosen display image whose pool internals are sentinels, a band it
+ * belongs to, an artist it is a guest of, a draft, and a published artist
+ * with no release. All are dated in 2000 so they never lead a newest-first
+ * listing.
  *
  * Parallel safety: every test reads the rows one `beforeAll` seeded, so the
  * file runs in one worker (`mode: 'default'`). Rows are removed by id.
@@ -49,6 +50,17 @@ const PRIVATE_VALUES = [
   'e2e-job-token',
   'e2e-admin',
 ];
+
+/** The lead's chosen display image: what the page shows, and pool internals it never may. */
+const DISPLAY_IMAGE_URL = `https://picsum.photos/seed/e2e-api-${STAMP}/600/400`;
+const POOL_SENTINELS = {
+  originalUrl: `https://e2e-original-${STAMP}.example/source.jpg`,
+  contentHash: `e2e-content-hash-${STAMP}`,
+  perceptualHash: `e2e-perceptual-hash-${STAMP}`,
+  faceScore: 61.2345,
+};
+/** The bio-image fields that are the pool's alone. */
+const POOL_KEYS = ['faceScore', 'hasFace', 'contentHash', 'perceptualHash', 'originalUrl'];
 
 const artistIds: string[] = [];
 const releaseIds: string[] = [];
@@ -116,6 +128,18 @@ test.beforeAll(async () => {
     bornOn: new Date('1984-06-01T00:00:00.000Z'),
   });
   await prisma.artistMember.create({ data: { artistId: band, memberId: leadId } });
+  await prisma.artistBioImage.create({
+    data: {
+      artistId: leadId,
+      url: DISPLAY_IMAGE_URL,
+      alt: `E2E lead on stage ${STAMP}`,
+      isPrimary: false,
+      origin: 'custom',
+      displayOrder: 0,
+      hasFace: true,
+      ...POOL_SENTINELS,
+    },
+  });
 
   await createRelease('own', [leadId]);
   await createRelease('guest', [host, leadId]);
@@ -129,6 +153,7 @@ test.afterAll(async () => {
     await prisma.release.deleteMany({ where: { id: { in: releaseIds } } });
   }
   if (artistIds.length > 0) {
+    await prisma.artistBioImage.deleteMany({ where: { artistId: { in: artistIds } } });
     await prisma.artistMember.deleteMany({ where: { memberId: { in: artistIds } } });
     await prisma.artist.deleteMany({ where: { id: { in: artistIds } } });
   }
@@ -145,6 +170,18 @@ test.describe('Public artist reads', () => {
     expect(body).toContain(nameOf('lead'));
 
     expect(PRIVATE_VALUES.filter((value) => body.includes(value))).toEqual([]);
+  });
+
+  // The collage gets each display image with only what it renders: none of
+  // the pool's internals reaches the page's HTML or its RSC payload.
+  test('carry a display image without its pool internals', async ({ request }) => {
+    const body = await (await request.get(`/artists/${slugOf('lead')}`)).text();
+    expect(body).toContain(DISPLAY_IMAGE_URL);
+
+    const leaked = [...Object.values(POOL_SENTINELS).map(String), ...POOL_KEYS].filter((value) =>
+      body.includes(value)
+    );
+    expect(leaked).toEqual([]);
   });
 
   test('keep the by-id read for admins', async ({ request }) => {

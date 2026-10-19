@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
+import type { ArtistReleaseScalars, Release, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
 
@@ -349,56 +349,6 @@ export type PublicArtistRelease = Omit<Release, 'artistReleases'> & {
 export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArtistRelease };
 
 /**
- * Repository payload behind the public artist-detail page: public scalars plus
- * labels, urls, bio images/links, band members (with member credit scalars),
- * the artist's own release joins, and — via `memberOf` — the release joins of
- * every band the artist belongs to, all carrying the public media release
- * graph. No artist anywhere in it carries an {@link ArtistPrivateField}, and
- * no nested artist carries an {@link ArtistOwnPageField}.
- * The service flattens this into {@link ArtistWithPublishedReleases}.
- */
-export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
-  labels: ArtistLabelRecord[];
-  urls: UrlRecord[];
-  bioImages: ArtistBioImageRecord[];
-  bioLinks: ArtistBioLinkRecord[];
-  members: Array<ArtistMemberScalars & { member: ArtistCreditScalars }>;
-  releases: ArtistReleaseGraphRow[];
-  memberOf: Array<
-    ArtistMemberScalars & { artist: ArtistCreditScalars & { releases: ArtistReleaseGraphRow[] } }
-  >;
-}
-
-/**
- * Public artist-detail payload: {@link ArtistWithReleaseGraph} with the band
- * graph folded into `releases` — every published release the artist is on,
- * each tagged with its {@link ReleaseCredit} and listed own-releases-first.
- */
-export interface ArtistWithPublishedReleases extends Omit<
-  ArtistWithReleaseGraph,
-  'memberOf' | 'releases'
-> {
-  releases: ArtistPublishedReleaseRow[];
-  /**
-   * The newest listed release the artist holds a direct credit on (own or
-   * featured, never a band's), as the artists index summarises it; the page
-   * leads with it (ADR-0006). `null` when there is none.
-   */
-  newestRelease: NewestListedRelease | null;
-}
-
-/**
- * One release on the public artist page. Its credits name public artists only
- * (ADR-0015). `albumArtist` is the release's first credit, read before the
- * hidden artists were dropped: `null` when that artist is hidden, so the page
- * never attributes the release to whoever is credited next.
- */
-export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
-  credit: ReleaseCredit;
-  albumArtist: ArtistCreditScalars | null;
-};
-
-/**
  * One display image as a public surface renders and credits it: the collage
  * on the artist page and its lightbox. None of the pool's internals — no
  * original URL, face signal, hashes or display position.
@@ -423,6 +373,22 @@ export interface ArtistDisplayImage {
 export interface ArtistPageBioImageRecord extends ArtistDisplayImage {
   isPrimary: boolean;
   displayOrder: number | null;
+}
+
+/**
+ * Repository payload behind the public artist page: the public scalars, the
+ * bio images display-image resolution can return, the artist's own release
+ * joins, and — via `memberOf` — the release joins of every band the artist
+ * belongs to, all carrying the public media release graph. No artist anywhere
+ * in it carries an {@link ArtistPrivateField}, and no nested artist carries an
+ * {@link ArtistOwnPageField}. The artist page model is built from it.
+ */
+export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
+  bioImages: ArtistPageBioImageRecord[];
+  releases: ArtistReleaseGraphRow[];
+  memberOf: Array<
+    ArtistMemberScalars & { artist: ArtistCreditScalars & { releases: ArtistReleaseGraphRow[] } }
+  >;
 }
 
 /**
@@ -574,13 +540,6 @@ export interface ArtistListingRecord {
   releases: Array<{ release: ArtistListingReleaseRecord }>;
   /** The artist's live video credits, read only to rank the "newest" order. */
   videoArtists: Array<{ video: { releasedOn: Date | null } }>;
-}
-
-/** The newest listed release credited to an artist (the artist page leads with it). */
-export interface NewestListedRelease {
-  id: string;
-  title: string;
-  releasedOn: Date;
 }
 
 /**

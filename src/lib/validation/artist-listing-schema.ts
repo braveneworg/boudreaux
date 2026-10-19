@@ -51,11 +51,6 @@ const artistListingBioImageSchema = z.object({
   displayOrder: z.number().int().nullable(),
 }) satisfies z.ZodType<ArtistListingBioImage>;
 
-const newestListedReleaseFields = { id: z.string(), title: z.string(), releasedOn: date };
-
-/** The newest listed release credited to the artist (the artist page's), or `null`. */
-export const newestListedReleaseSchema = z.object(newestListedReleaseFields).nullable();
-
 /**
  * An artist's latest release, as a listing row and the artist page model
  * carry it: with its first track's stream URL and, for a featured release
@@ -63,7 +58,9 @@ export const newestListedReleaseSchema = z.object(newestListedReleaseFields).nul
  */
 export const latestReleaseSchema = z
   .object({
-    ...newestListedReleaseFields,
+    id: z.string(),
+    title: z.string(),
+    releasedOn: date,
     playSrc: z.string().nullable(),
     byName: z.string().nullable(),
     albumArtistSlug: z.string().nullable(),

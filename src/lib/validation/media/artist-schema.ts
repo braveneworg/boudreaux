@@ -3,79 +3,47 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { ArtistDetail, ArtistListItem } from '@/lib/types/domain/artist';
-import type { Artist, ArtistWithPublishedReleases } from '@/lib/types/media-models';
-import { RELEASE_CREDITS } from '@/lib/utils/artist-release-credits';
-import { newestListedReleaseSchema } from '@/lib/validation/artist-listing-schema';
-
-import { publicArtistReleaseSchema } from './release-schema';
 import {
-  artistCreditScalarSchema,
+  ARTIST_PAGE_SCALAR_MASK,
+  type ArtistDetail,
+  type ArtistDisplayImage,
+  type ArtistListItem,
+  type ArtistPageModel,
+} from '@/lib/types/domain/artist';
+import type { Artist } from '@/lib/types/media-models';
+import { latestReleaseSchema } from '@/lib/validation/artist-listing-schema';
+
+import {
   artistPublicScalarSchema,
   artistScalarSchema,
-  date,
   nullableString,
   releaseScalarSchema,
   urlSchema,
 } from './shared-schema';
 
-/** `ArtistBioImage` scalars (the shape produced by `bioImages: true`). */
-const artistBioImageSchema = z.object({
+/**
+ * A display image as the artist page renders and credits it. A plain object
+ * strips unknown keys, so no pool internal (original URL, face signal,
+ * hashes, display position) survives a parse.
+ */
+const artistDisplayImageSchema = z.object({
   id: z.string(),
-  artistId: z.string(),
   url: z.string(),
   thumbnailUrl: nullableString,
+  alt: nullableString,
   title: nullableString,
   attribution: nullableString,
   license: nullableString,
-  licenseUrl: nullableString,
   sourceUrl: nullableString,
-  originalUrl: nullableString,
   width: z.number().nullable(),
   height: z.number().nullable(),
-  isPrimary: z.boolean(),
-  kind: nullableString,
-  alt: nullableString,
-  hasFace: z.boolean().nullable(),
-  faceScore: z.number().nullable(),
-  // Absent from payloads serialized before the hashes existed — read as null.
-  contentHash: nullableString.default(null),
-  perceptualHash: nullableString.default(null),
-  origin: nullableString,
-  sortOrder: z.number(),
-  displayOrder: z.number().int().nullable(),
-  createdAt: date,
-});
-
-/** `ArtistBioLink` scalars (the shape produced by `bioLinks: true`). */
-const artistBioLinkSchema = z.object({
-  id: z.string(),
-  artistId: z.string(),
-  label: z.string(),
-  url: z.string(),
-  kind: nullableString,
-  origin: nullableString,
-  sortOrder: z.number(),
-  reference: z.boolean().nullable(),
-  imageSource: z.boolean().nullable(),
-});
+}) satisfies z.ZodType<ArtistDisplayImage>;
 
 /** `ArtistLabel` join-row scalars (the shape produced by `labels: true`). */
 const artistLabelSchema = z.object({
   id: z.string(),
   artistId: z.string(),
   labelId: z.string(),
-});
-
-/**
- * `ArtistMember` join row with its member artist, public scalars only
- * (`members: { include: { member: { select } } }`).
- */
-const artistMemberSchema = z.object({
-  id: z.string(),
-  artistId: z.string(),
-  memberId: z.string(),
-  member: artistCreditScalarSchema,
 });
 
 /** `Artist` with the relations selected by the `Artist` domain type. */
@@ -109,35 +77,16 @@ export const artistListItemSchema = artistSchema.extend({
 export const artistDetailSchema = artistScalarSchema satisfies z.ZodType<ArtistDetail>;
 
 /**
- * Artist with full published release data, for the public artist detail page.
- * Each release row carries the credit the service derived for it (own release,
- * featured appearance, or band release) so the page can order and label rows.
- *
- * Public by construction: the page artist is parsed through
- * {@link artistPublicScalarSchema}, and every nested artist — its band members
- * and each credited artist on a release — through
- * {@link artistCreditScalarSchema}, which also drops the bio (a bio is shown
- * only on its artist's own page). Zod strips unknown keys, so the server also
- * runs a payload through this as the response guard (#765): a private or
- * nested bio field a future query re-selects is dropped before it is
- * serialised.
+ * The artist page model, as the public artist page and the artist-filtered
+ * listings read it: the page scalars, the display images, the latest release
+ * and whether any listed release exists. Public by construction — the page
+ * scalars are picked from {@link artistPublicScalarSchema} — and Zod strips
+ * unknown keys, so the server runs the model through this as the response
+ * guard (#765): a private field or pool internal a future change lets through
+ * is dropped before the page renders it.
  */
-export const artistWithPublishedReleasesSchema = artistPublicScalarSchema.extend({
-  labels: z.array(artistLabelSchema),
-  urls: z.array(urlSchema),
-  bioImages: z.array(artistBioImageSchema),
-  bioLinks: z.array(artistBioLinkSchema),
-  members: z.array(artistMemberSchema),
-  newestRelease: newestListedReleaseSchema,
-  releases: z.array(
-    z.object({
-      id: z.string(),
-      artistId: z.string(),
-      releaseId: z.string(),
-      position: z.number().int(),
-      release: publicArtistReleaseSchema,
-      credit: z.enum(RELEASE_CREDITS),
-      albumArtist: artistCreditScalarSchema.nullable(),
-    })
-  ),
-}) satisfies z.ZodType<ArtistWithPublishedReleases>;
+export const artistPageModelSchema = artistPublicScalarSchema.pick(ARTIST_PAGE_SCALAR_MASK).extend({
+  displayImages: z.array(artistDisplayImageSchema),
+  latestRelease: latestReleaseSchema,
+  hasListedRelease: z.boolean(),
+}) satisfies z.ZodType<ArtistPageModel>;

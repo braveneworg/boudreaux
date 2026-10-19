@@ -1305,9 +1305,11 @@ describe('ArtistService', () => {
   });
 
   describe('getArtistBySlugWithReleases', () => {
-    const mockArtistWithReleases = {
+    /** The detail read of a public artist: one own listed release, nothing else. */
+    const detailRead = {
       ...mockArtist,
-      members: [],
+      bio: '<p>Hi</p><script>alert(1)</script>',
+      bioImages: [],
       memberOf: [],
       releases: [
         {
@@ -1321,420 +1323,70 @@ describe('ArtistService', () => {
             publishedAt: new Date('2024-01-01'),
             deletedOn: null,
             artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
-            digitalFormats: [
-              {
-                id: 'df-1',
-                format: 'MP3_320KBPS',
-                files: [{ id: 'f-1', trackNumber: 1, fileName: 'track1.mp3' }],
-              },
-            ],
-          },
-        },
-        {
-          id: 'ar-2',
-          artistId: mockArtist.id,
-          releaseId: 'release-2',
-          release: {
-            id: 'release-2',
-            title: 'Unpublished Album',
-            releasedOn: new Date('2024-02-01'),
-            publishedAt: null,
-            deletedOn: null,
-            artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
-            digitalFormats: [],
-          },
-        },
-        {
-          id: 'ar-3',
-          artistId: mockArtist.id,
-          releaseId: 'release-3',
-          release: {
-            id: 'release-3',
-            title: 'Deleted Album',
-            releasedOn: new Date('2024-03-01'),
-            publishedAt: new Date('2024-01-01'),
-            deletedOn: new Date('2024-06-01'),
-            artistReleases: [{ artistId: mockArtist.id, artist: { ...mockArtist } }],
             digitalFormats: [],
           },
         },
       ],
     };
 
-    /** A published release credited to `artistIds` in order, released on `releasedOn`. */
-    interface PublishedReleaseRow {
-      id: string;
-      title: string;
-      releasedOn: Date;
-      publishedAt: Date | null;
-      deletedOn: Date | null;
-      artistReleases: Array<{ artistId: string; artist: { id: string; publishedOn: Date | null } }>;
-      digitalFormats: never[];
-    }
+    it('reads the public artist by its slug', async () => {
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce(
+        detailRead as never
+      );
 
-    /** A credited artist as the credit select projects it: public unless overridden. */
-    const creditArtist = (id: string) => ({
-      id,
-      slug: id,
-      firstName: 'Artist',
-      surname: id,
-      displayName: id,
-      deactivatedAt: null,
-      publishedOn: new Date('2024-01-01'),
-      deletedOn: null,
-    });
+      await ArtistService.getArtistBySlugWithReleases('john-doe');
 
-    /** Ids whose credit the fixture builds as a hidden (unpublished) artist. */
-    const hiddenCreditIds = new Set(['artist-hidden']);
-
-    const publishedRelease = (
-      id: string,
-      artistIds: string[],
-      releasedOn: string
-    ): PublishedReleaseRow => ({
-      id,
-      title: id,
-      releasedOn: new Date(releasedOn),
-      publishedAt: new Date(releasedOn),
-      deletedOn: null,
-      artistReleases: artistIds.map((artistId) => ({
-        artistId,
-        artist: hiddenCreditIds.has(artistId)
-          ? { ...creditArtist(artistId), publishedOn: null }
-          : creditArtist(artistId),
-      })),
-      digitalFormats: [],
-    });
-
-    /** The visibility fields a joined-artist fixture may override (#786). */
-    interface JoinedArtistOverrides {
-      deactivatedAt?: Date | null;
-      publishedOn?: Date | null;
-      deletedOn?: Date | null;
-    }
-
-    /** A joined artist (band member or band) as the public select projects it. */
-    const joinedArtist = (id: string, overrides: JoinedArtistOverrides = {}) => ({
-      ...mockArtist,
-      id,
-      slug: id,
-      publishedOn: new Date('2024-01-01'),
-      deletedOn: null,
-      ...overrides,
-    });
-
-    const joinRow = (artistId: string, release: PublishedReleaseRow) => ({
-      id: `${artistId}-${release.id}`,
-      artistId,
-      releaseId: release.id,
-      release,
-    });
-
-    const readReleases = (
-      result: Awaited<ReturnType<typeof ArtistService.getArtistBySlugWithReleases>>
-    ) =>
-      (
-        result as {
-          success: true;
-          data: { releases: Array<{ releaseId: string; credit: string }> };
-        }
-      ).data.releases;
-
-    it('lists the artist’s own releases first, then featured appearances, then band releases', async () => {
-      const own = publishedRelease('own', [mockArtist.id], '2010-01-01');
-      const guest = publishedRelease('guest', ['artist-other', mockArtist.id], '2024-01-01');
-      const bandLp = publishedRelease('band-lp', ['band-1'], '2025-01-01');
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtist,
-        members: [],
-        releases: [joinRow(mockArtist.id, guest), joinRow(mockArtist.id, own)],
-        memberOf: [
-          {
-            id: 'am-1',
-            artistId: 'band-1',
-            memberId: mockArtist.id,
-            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', bandLp)] },
-          },
-        ],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(readReleases(result).map(({ releaseId, credit }) => ({ releaseId, credit }))).toEqual([
-        { releaseId: 'own', credit: 'primary' },
-        { releaseId: 'guest', credit: 'featured' },
-        { releaseId: 'band-lp', credit: 'member' },
+      expect(vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mock.calls).toEqual([
+        ['john-doe'],
       ]);
     });
 
-    // The page leads with the newest release the artist holds a direct credit
-    // on — own or featured, never a band's — summarised like the index does.
-    it('summarises the newest listed direct release, ignoring band releases', async () => {
-      const own = publishedRelease('own', [mockArtist.id], '2010-01-01');
-      const guest = publishedRelease('guest', ['artist-other', mockArtist.id], '2024-01-01');
-      const bandLp = publishedRelease('band-lp', ['band-1'], '2025-01-01');
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
-        ...mockArtist,
-        members: [],
-        releases: [joinRow(mockArtist.id, own), joinRow(mockArtist.id, guest)],
-        memberOf: [
-          {
-            id: 'am-1',
-            artistId: 'band-1',
-            memberId: mockArtist.id,
-            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', bandLp)] },
-          },
-        ],
-      } as never);
+    it('returns the artist page model built from the read', async () => {
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce(
+        detailRead as never
+      );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
-      expect(result.success && result.data.newestRelease).toEqual({
-        id: 'guest',
-        title: 'guest',
-        releasedOn: new Date('2024-01-01'),
-      });
-    });
-
-    it('has no newest release when every direct credit is unlisted', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
-        ...mockArtist,
-        members: [],
-        memberOf: [],
-        releases: [
-          joinRow(mockArtist.id, {
-            ...publishedRelease('draft', [mockArtist.id], '2024-01-01'),
-            publishedAt: null,
-          }),
-        ],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(result.success && result.data.newestRelease).toBeNull();
-    });
-
-    describe('hidden credited artists (ADR-0015)', () => {
-      interface CreditedRow {
-        releaseId: string;
-        albumArtist: { id: string } | null;
-        release: { artistReleases: Array<{ artistId: string }> };
-      }
-
-      const readRows = async (release: PublishedReleaseRow): Promise<CreditedRow[]> => {
-        vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
-          ...mockArtist,
-          members: [],
-          memberOf: [],
-          releases: [joinRow(mockArtist.id, release)],
-        } as never);
-        const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-        return (result as { success: true; data: { releases: CreditedRow[] } }).data.releases;
-      };
-
-      it('drops a hidden artist from a release’s credits', async () => {
-        const [row] = await readRows(
-          publishedRelease('lp', [mockArtist.id, 'artist-hidden', 'artist-other'], '2024-01-01')
-        );
-
-        expect(row.release.artistReleases.map(({ artistId }) => artistId)).toEqual([
-          mockArtist.id,
-          'artist-other',
-        ]);
-      });
-
-      it('names the album artist when it is public', async () => {
-        const [row] = await readRows(
-          publishedRelease('guest', ['artist-other', mockArtist.id], '2024-01-01')
-        );
-
-        expect(row.albumArtist?.id).toBe('artist-other');
-      });
-
-      it('names no album artist when it is hidden, rather than the next credit', async () => {
-        const [row] = await readRows(
-          publishedRelease('guest', ['artist-hidden', mockArtist.id], '2024-01-01')
-        );
-
-        expect(row.albumArtist).toBeNull();
-      });
-
-      it('still derives the credit from the full credit order', async () => {
-        vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce({
-          ...mockArtist,
-          members: [],
-          memberOf: [],
-          releases: [
-            joinRow(
-              mockArtist.id,
-              publishedRelease('guest', ['artist-hidden', mockArtist.id], '2024-01-01')
-            ),
-          ],
-        } as never);
-
-        const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-        expect(readReleases(result).map(({ credit }) => credit)).toEqual(['featured']);
-      });
-    });
-
-    it('excludes an unpublished band release', async () => {
-      const draft = { ...publishedRelease('draft', ['band-1'], '2025-01-01'), publishedAt: null };
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtist,
-        members: [],
-        releases: [],
-        memberOf: [
-          {
-            id: 'am-1',
-            artistId: 'band-1',
-            memberId: mockArtist.id,
-            artist: { ...joinedArtist('band-1'), releases: [joinRow('band-1', draft)] },
-          },
-        ],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(readReleases(result)).toEqual([]);
-    });
-
-    it('omits unpublished and deleted members, and keeps one that left the label (ADR-0016)', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtistWithReleases,
-        members: [
-          { id: 'm-1', artistId: mockArtist.id, memberId: 'pub', member: joinedArtist('pub') },
-          {
-            id: 'm-2',
-            artistId: mockArtist.id,
-            memberId: 'draft',
-            member: joinedArtist('draft', { publishedOn: null }),
-          },
-          {
-            id: 'm-3',
-            artistId: mockArtist.id,
-            memberId: 'inactive',
-            member: joinedArtist('inactive'),
-          },
-          {
-            id: 'm-4',
-            artistId: mockArtist.id,
-            memberId: 'gone',
-            member: joinedArtist('gone', { deletedOn: new Date('2024-06-01') }),
-          },
-          {
-            id: 'm-5',
-            artistId: mockArtist.id,
-            memberId: 'alumnus',
-            member: joinedArtist('alumnus', {
-              deactivatedAt: new Date('2025-03-01'),
-            }),
-          },
-        ],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      const data = (result as { success: true; data: { members: Array<{ memberId: string }> } })
-        .data;
-      expect(data.members.map(({ memberId }) => memberId)).toEqual(['pub', 'inactive', 'alumnus']);
-    });
-
-    it('drops the releases of an unpublished or deleted band, whatever its standing (ADR-0016)', async () => {
-      const bandRow = (id: string, overrides: JoinedArtistOverrides = {}) => ({
-        id: `am-${id}`,
-        artistId: id,
-        memberId: mockArtist.id,
-        artist: {
-          ...joinedArtist(id, overrides),
-          releases: [joinRow(id, publishedRelease(`${id}-lp`, [id], '2025-01-01'))],
+      expect(result).toMatchObject({
+        success: true,
+        data: {
+          slug: mockArtist.slug,
+          bio: '<p>Hi</p>',
+          displayImages: [],
+          latestRelease: { id: 'release-1', byName: null },
+          hasListedRelease: true,
         },
       });
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtist,
-        members: [],
-        releases: [],
-        memberOf: [
-          bandRow('pub-band'),
-          bandRow('draft-band', { publishedOn: null }),
-          bandRow('inactive-band'),
-          bandRow('gone-band', { deletedOn: new Date('2024-06-01') }),
-          bandRow('alumni-band', { deactivatedAt: new Date('2025-03-01') }),
-        ],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(
-        readReleases(result)
-          .map(({ releaseId }) => releaseId)
-          .sort()
-      ).toEqual(['alumni-band-lp', 'inactive-band-lp', 'pub-band-lp']);
     });
 
-    it('does not expose the band graph on the public payload', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(
-        mockArtistWithReleases as never
+    it('does not expose the release graph or the band graph', async () => {
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce(
+        detailRead as never
       );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result).toMatchObject({ success: true });
-      expect((result as { data: object }).data).not.toHaveProperty('memberOf');
-    });
-
-    it('should retrieve an artist with releases by slug', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(
-        mockArtistWithReleases as never
-      );
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(result.success).toBe(true);
-      // The full nested release/digital-format include AND the public artist
-      // where-clause (published + deletedOn null-safety) now live in (and are
-      // covered by) ArtistRepository.findPublishedBySlugWithReleases; the service
-      // only forwards the slug.
-      expect(ArtistRepository.findPublishedBySlugWithReleases).toHaveBeenCalledWith('john-doe');
-    });
-
-    it('keeps the short bio as sanitized HTML for rich rendering', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtistWithReleases,
-        shortBio: '<p><strong>Bold</strong></p><script>alert(1)</script>',
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      const data = (result as { success: true; data: { shortBio: string } }).data;
-      expect(data.shortBio).toBe('<p><strong>Bold</strong></p>');
-    });
-
-    it('should filter to only published, non-deleted releases', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(
-        mockArtistWithReleases as never
-      );
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(result.success).toBe(true);
-      const data = (result as unknown as { success: true; data: typeof mockArtistWithReleases })
-        .data;
-      expect(data.releases).toHaveLength(1);
-      expect(data.releases[0].release.title).toBe('Published Album');
+      const keys = result.success ? Object.keys(result.data) : [];
+      expect(keys.filter((key) => ['releases', 'memberOf', 'members'].includes(key))).toEqual([]);
     });
 
     it('should return error when artist not found', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(null);
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValueOnce(null);
 
       const result = await ArtistService.getArtistBySlugWithReleases('non-existent');
 
-      expect(result).toMatchObject({ success: false, error: 'Artist not found' });
+      expect(result).toMatchObject({
+        success: false,
+        error: 'Artist not found',
+        code: 'NOT_FOUND',
+      });
     });
 
     it('should return error when database is unavailable', async () => {
       const initError = new DataError('UNAVAILABLE', 'Connection failed');
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockRejectedValue(initError);
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockRejectedValueOnce(initError);
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
@@ -1742,72 +1394,13 @@ describe('ArtistService', () => {
     });
 
     it('should handle unknown errors', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockRejectedValue(
+      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockRejectedValueOnce(
         new Error('Unknown error')
       );
 
       const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artist' });
-    });
-
-    it('should return empty releases array when all releases are filtered out', async () => {
-      const artistWithOnlyUnpublished = {
-        ...mockArtist,
-        members: [],
-        memberOf: [],
-        releases: [
-          {
-            id: 'ar-2',
-            release: {
-              id: 'release-2',
-              title: 'Unpublished',
-              publishedAt: null,
-              deletedOn: null,
-            },
-          },
-        ],
-      };
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(
-        artistWithOnlyUnpublished as never
-      );
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(result.success).toBe(true);
-      const data = (result as unknown as { success: true; data: typeof artistWithOnlyUnpublished })
-        .data;
-      expect(data.releases).toHaveLength(0);
-    });
-
-    it('should filter out releases with undefined publishedAt (missing MongoDB field)', async () => {
-      const artistWithMissingPublishedAt = {
-        ...mockArtist,
-        members: [],
-        memberOf: [],
-        releases: [
-          {
-            id: 'ar-4',
-            release: {
-              id: 'release-4',
-              title: 'Missing publishedAt',
-              publishedAt: undefined,
-              deletedOn: null,
-            },
-          },
-        ],
-      };
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue(
-        artistWithMissingPublishedAt as never
-      );
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      expect(result.success).toBe(true);
-      const data = (
-        result as unknown as { success: true; data: typeof artistWithMissingPublishedAt }
-      ).data;
-      expect(data.releases).toHaveLength(0);
     });
   });
 
@@ -2565,40 +2158,6 @@ describe('ArtistService', () => {
       const result = await ArtistService.listPublishedArtists(filters);
 
       expect(result).toMatchObject({ success: false, error: 'Failed to retrieve artists' });
-    });
-  });
-
-  describe('getArtistBySlugWithReleases bio sanitization', () => {
-    it('leaves null bio/shortBio untouched (no sanitization)', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtist,
-        bio: null,
-        shortBio: null,
-        members: [],
-        releases: [],
-        memberOf: [],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      const bio = result.success ? result.data.bio : 'unexpected';
-      expect(bio).toBeNull();
-    });
-
-    it('sanitizes a non-null bio before returning it', async () => {
-      vi.mocked(ArtistRepository.findPublishedBySlugWithReleases).mockResolvedValue({
-        ...mockArtist,
-        bio: '<p>Hi</p><script>alert(1)</script>',
-        shortBio: '<p>Short</p><script>alert(2)</script>',
-        members: [],
-        releases: [],
-        memberOf: [],
-      } as never);
-
-      const result = await ArtistService.getArtistBySlugWithReleases('john-doe');
-
-      const bio = result.success ? result.data.bio : 'unexpected';
-      expect(bio).toBe('<p>Hi</p>');
     });
   });
 

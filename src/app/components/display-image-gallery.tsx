@@ -8,29 +8,17 @@ import type { JSX } from 'react';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import type { ArtistDisplayImage } from '@/lib/types/domain/artist';
+
 import { LightboxImage } from './responsive-lightbox';
 import { ThumbnailCaption } from './thumbnail-caption';
 
-/** What a display image needs to be shown and credited. */
-export interface GalleryImage {
-  id: string;
-  url: string;
-  thumbnailUrl: string | null;
-  alt: string | null;
-  title: string | null;
-  attribution: string | null;
-  license: string | null;
-  sourceUrl: string | null;
-  width: number | null;
-  height: number | null;
-}
-
 /** The alt text of a display image: its own, else its title, else the artist's name. */
-export const galleryImageAlt = (image: GalleryImage, displayName: string): string =>
+export const galleryImageAlt = (image: ArtistDisplayImage, displayName: string): string =>
   image.alt ?? image.title ?? `${displayName} image`;
 
 interface DisplayImageGalleryProps {
-  images: GalleryImage[];
+  images: ArtistDisplayImage[];
   /** The image shown, 0-based; the caller owns it so the collage can open at a tile. */
   index: number;
   onIndexChange: (index: number) => void;

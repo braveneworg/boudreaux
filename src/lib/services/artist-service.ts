@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { publicArtist as publicArtistRule } from '@/lib/repositories/_internal/visibility';
 import {
   ArtistBioImageRepository,
   type BioImageEligibilityRow,
@@ -28,24 +27,17 @@ import type {
   ArtistListingRecord,
   ArtistListingRow,
   ArtistNameRecord,
-  ArtistPublishedReleaseRow,
-  ArtistReleaseGraphRow,
+  ArtistPageModel,
   ArtistScalars,
   ArtistSearchMatch,
-  ArtistWithPublishedReleases,
   CreateArtistBioImageData,
   CreateArtistBioLinkData,
   CreateArtistData,
   UpdateArtistData,
 } from '@/lib/types/domain/artist';
 import { DataError } from '@/lib/types/domain/errors';
-import type { ReleaseCredit } from '@/lib/types/domain/release';
 import { deriveArtistDisplayName } from '@/lib/utils/artist-display-name';
-import {
-  collectArtistReleases,
-  publicCredits,
-  summarizeListedReleases,
-} from '@/lib/utils/artist-release-credits';
+import { summarizeListedReleases } from '@/lib/utils/artist-release-credits';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { isDisplayEligible, orderBioImagesForPicker } from '@/lib/utils/display-images';
 import { generateSlug } from '@/lib/utils/generate-slug';
@@ -66,7 +58,7 @@ import { normalizeVocabularyList } from '@/lib/utils/vocabulary-term';
 import type { VideoArtistDetail } from '@/lib/validation/video-artist-detail-schema';
 
 import { failFromError } from './_internal/map-data-error';
-import { buildLatestRelease, cardDisplayImages } from './artist-page-model';
+import { buildArtistPageModel, buildLatestRelease, cardDisplayImages } from './artist-page-model';
 import { ArtistVocabularyService } from './artist-vocabulary-service';
 import { BioImageService } from './bio-image-service';
 
@@ -382,19 +374,6 @@ interface ArtistCreateInput {
   slug: string;
   details?: VideoArtistDetail;
 }
-
-type CreditedReleaseRow = ArtistReleaseGraphRow & { credit: ReleaseCredit };
-
-/**
- * Drop the hidden artists from a release's credits, once its credit has been
- * derived. The album artist is read from the full credit order first, so a
- * hidden album artist leaves `albumArtist` null rather than handing the
- * attribution to the next credit.
- */
-const withPublicCredits = (row: CreditedReleaseRow): ArtistPublishedReleaseRow => {
-  const { albumArtist, credits } = publicCredits(row.release.artistReleases);
-  return { ...row, albumArtist, release: { ...row.release, artistReleases: credits } };
-};
 
 /** Optional middleName spread: only include the field when a non-blank value is present. */
 const middleNameSpread = (value: string | undefined): { middleName?: string } =>
@@ -793,14 +772,14 @@ export class ArtistService {
   }
 
   /**
-   * Get an artist by slug with full release and digital format data: every
-   * published, non-deleted release the artist is credited on (their own
-   * releases and featured appearances) plus the published releases of every
-   * band they belong to, each tagged with its credit and listed own-first.
+   * Get the artist page model for a slug: what the public artist page shows of
+   * a public artist, built once from the detail read (`buildArtistPageModel`)
+   * — the page scalars with sanitized bios, every display image, the latest
+   * release with its byline, and whether any listed release exists.
    */
   static async getArtistBySlugWithReleases(
     slug: string
-  ): Promise<ServiceResponse<ArtistWithPublishedReleases>> {
+  ): Promise<ServiceResponse<ArtistPageModel>> {
     try {
       const artist = await ArtistRepository.findPublishedBySlugWithReleases(slug);
 
@@ -808,35 +787,7 @@ export class ArtistService {
         return { success: false, error: 'Artist not found', code: 'NOT_FOUND' };
       }
 
-      // The band graph is folded into `releases` and not exposed. Hidden
-      // artists are dropped here rather than in the query because each
-      // release's credit is derived from its full credit order first: the
-      // first credit is the album artist even when that artist is hidden
-      // (ADR-0015). Bio prose is sanitized on read so
-      // redisplay is safe regardless of how it was authored (generated bios
-      // are also sanitized at write time).
-      const { memberOf, members, ...publicArtist } = artist;
-      const credited = collectArtistReleases({
-        ...artist,
-        memberOf: memberOf.filter(({ artist: band }) => publicArtistRule.matches(band)),
-      });
-      const filteredArtist: ArtistWithPublishedReleases = {
-        ...publicArtist,
-        bio: artist.bio ? sanitizeBioHtml(artist.bio) : artist.bio,
-        // Short bio is rich-text too (Tiptap); kept as sanitized HTML for
-        // BioHtml on the detail/bio pages. Plain-text surfaces (metadata
-        // descriptions, listing cards) strip it with sanitizeBioText instead.
-        shortBio: artist.shortBio ? sanitizeBioHtml(artist.shortBio) : artist.shortBio,
-        members: members.filter(({ member }) => publicArtistRule.matches(member)),
-        releases: credited.map(withPublicCredits),
-        // The page leads with the newest release the artist holds a direct
-        // credit on — own or featured, never a band's — summarised as the
-        // artists index does (ADR-0006).
-        newestRelease: summarizeListedReleases(credited.filter(({ credit }) => credit !== 'member'))
-          .newestRelease,
-      };
-
-      return { success: true, data: filteredArtist };
+      return { success: true, data: buildArtistPageModel(artist) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to retrieve artist' });
     }

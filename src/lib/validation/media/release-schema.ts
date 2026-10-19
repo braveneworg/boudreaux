@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { z } from 'zod';
 
-import type { PublicArtistRelease } from '@/lib/types/domain/artist';
 import type {
   PublishedReleaseDetail,
   PublishedReleaseListing,
@@ -13,7 +12,6 @@ import type {
 
 import { digitalFormatWithFilesSchema } from './digital-format-schema';
 import {
-  artistCreditScalarSchema,
   artistScalarSchema,
   date,
   formatSchema,
@@ -46,23 +44,6 @@ export const releaseSchema = releaseScalarSchema.extend({
     })
   ),
 }) satisfies z.ZodType<Release>;
-
-/**
- * {@link releaseSchema} as the public artist-detail page carries it: every
- * credited artist narrowed to its public scalars (#765) without its bio, since
- * a bio is shown only on its artist's own page.
- */
-export const publicArtistReleaseSchema = releaseSchema.extend({
-  artistReleases: z.array(
-    z.object({
-      id: z.string(),
-      artistId: z.string(),
-      releaseId: z.string(),
-      position: z.number().int(),
-      artist: artistCreditScalarSchema,
-    })
-  ),
-}) satisfies z.ZodType<PublicArtistRelease>;
 
 /**
  * Lightweight `Release` for the admin listing — scalars, images, and the
