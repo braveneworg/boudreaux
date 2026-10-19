@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { ReleaseDigitalFormatRepository } from './release-digital-format-repository';
@@ -14,6 +15,7 @@ vi.mock('server-only', () => ({}));
 // Mock Prisma client
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    $transaction: vi.fn(),
     releaseDigitalFormat: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -22,13 +24,24 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
-      upsert: vi.fn(),
     },
     releaseDigitalFormatFile: {
       aggregate: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
+
+/** The transaction client `replaceTracks` writes through. */
+const tx = {
+  releaseDigitalFormat: { upsert: vi.fn(), update: vi.fn() },
+  releaseDigitalFormatFile: {
+    findMany: vi.fn(),
+    deleteMany: vi.fn(),
+    createMany: vi.fn(),
+    aggregate: vi.fn(),
+  },
+};
 
 describe('ReleaseDigitalFormatRepository', () => {
   let repository: ReleaseDigitalFormatRepository;
@@ -328,39 +341,6 @@ describe('ReleaseDigitalFormatRepository', () => {
     });
   });
 
-  describe('upsertParent', () => {
-    it('should create a new parent format record if it does not exist', async () => {
-      const newFormat = createMockFormat({ trackCount: 0 });
-      vi.mocked(prisma.releaseDigitalFormat.upsert).mockResolvedValue(newFormat);
-
-      const result = await repository.upsertParent(mockReleaseId, 'MP3_320KBPS');
-
-      expect(prisma.releaseDigitalFormat.upsert).toHaveBeenCalledWith({
-        where: {
-          releaseId_formatType: { releaseId: mockReleaseId, formatType: 'MP3_320KBPS' },
-        },
-        create: {
-          release: { connect: { id: mockReleaseId } },
-          formatType: 'MP3_320KBPS',
-          trackCount: 0,
-        },
-        update: {
-          deletedAt: null,
-        },
-      });
-      expect(result).toEqual(newFormat);
-    });
-
-    it('should restore soft-deleted format on upsert', async () => {
-      const restoredFormat = createMockFormat({ deletedAt: null });
-      vi.mocked(prisma.releaseDigitalFormat.upsert).mockResolvedValue(restoredFormat);
-
-      const result = await repository.upsertParent(mockReleaseId, 'FLAC');
-
-      expect(result.deletedAt).toBeNull();
-    });
-  });
-
   describe('updateTrackCounts', () => {
     it('should recalculate trackCount and totalFileSize from child files', async () => {
       vi.mocked(prisma.releaseDigitalFormatFile.aggregate).mockResolvedValue({
@@ -436,6 +416,172 @@ describe('ReleaseDigitalFormatRepository', () => {
       const result = await repository.findActiveByReleaseAndFormat(mockReleaseId, 'MP3_320KBPS');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('replaceTracks', () => {
+    const tracks = [
+      {
+        trackNumber: 1,
+        s3Key: 'releases/r1/digital-formats/FLAC/1-one.flac',
+        fileName: 'one.flac',
+        fileSize: BigInt(100),
+        mimeType: 'audio/flac',
+        title: 'One',
+        duration: 61,
+      },
+      {
+        trackNumber: 2,
+        s3Key: 'releases/r1/digital-formats/FLAC/2-two.flac',
+        fileName: 'two.flac',
+        fileSize: BigInt(200),
+        mimeType: 'audio/flac',
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(prisma.$transaction).mockImplementation((async (
+        run: (client: typeof tx) => Promise<unknown>
+      ) => run(tx)) as never);
+      tx.releaseDigitalFormat.upsert.mockResolvedValue(createMockFormat({ id: 'format-1' }));
+      tx.releaseDigitalFormatFile.findMany.mockResolvedValue([
+        { s3Key: 'releases/r1/digital-formats/FLAC/old-1.flac' },
+        { s3Key: 'releases/r1/digital-formats/FLAC/old-2.flac' },
+      ]);
+      tx.releaseDigitalFormatFile.deleteMany.mockResolvedValue({ count: 2 });
+      tx.releaseDigitalFormatFile.createMany.mockResolvedValue({ count: 2 });
+      tx.releaseDigitalFormatFile.aggregate.mockResolvedValue({
+        _count: 2,
+        _sum: { fileSize: BigInt(300) },
+      });
+      tx.releaseDigitalFormat.update.mockResolvedValue(createMockFormat({ id: 'format-1' }));
+    });
+
+    it('returns the format id, the new file count and the keys it replaced', async () => {
+      const result = await repository.replaceTracks(mockReleaseId, 'FLAC', tracks);
+
+      expect(result).toEqual({
+        formatId: 'format-1',
+        fileCount: 2,
+        replacedKeys: [
+          'releases/r1/digital-formats/FLAC/old-1.flac',
+          'releases/r1/digital-formats/FLAC/old-2.flac',
+        ],
+      });
+    });
+
+    it('upserts or restores the parent, then writes the tracks and the counts in one transaction', async () => {
+      await repository.replaceTracks(mockReleaseId, 'FLAC', tracks);
+
+      expect(tx.releaseDigitalFormat.upsert.mock.calls).toEqual([
+        [
+          {
+            where: { releaseId_formatType: { releaseId: mockReleaseId, formatType: 'FLAC' } },
+            create: {
+              release: { connect: { id: mockReleaseId } },
+              formatType: 'FLAC',
+              trackCount: 0,
+            },
+            update: { deletedAt: null },
+          },
+        ],
+      ]);
+      expect(tx.releaseDigitalFormatFile.deleteMany).toHaveBeenCalledWith({
+        where: { formatId: 'format-1' },
+      });
+      expect(tx.releaseDigitalFormatFile.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            formatId: 'format-1',
+            trackNumber: 1,
+            s3Key: 'releases/r1/digital-formats/FLAC/1-one.flac',
+            fileName: 'one.flac',
+            fileSize: BigInt(100),
+            mimeType: 'audio/flac',
+            title: 'One',
+            duration: 61,
+          },
+          {
+            formatId: 'format-1',
+            trackNumber: 2,
+            s3Key: 'releases/r1/digital-formats/FLAC/2-two.flac',
+            fileName: 'two.flac',
+            fileSize: BigInt(200),
+            mimeType: 'audio/flac',
+          },
+        ],
+      });
+      expect(tx.releaseDigitalFormat.update).toHaveBeenCalledWith({
+        where: { id: 'format-1' },
+        data: { trackCount: 2, totalFileSize: BigInt(300) },
+      });
+    });
+
+    it('records a total size of 0 when the aggregate sums nothing', async () => {
+      tx.releaseDigitalFormatFile.aggregate.mockResolvedValueOnce({
+        _count: 0,
+        _sum: { fileSize: null },
+      });
+
+      await repository.replaceTracks(mockReleaseId, 'FLAC', []);
+
+      expect(tx.releaseDigitalFormat.update).toHaveBeenCalledWith({
+        where: { id: 'format-1' },
+        data: { trackCount: 0, totalFileSize: BigInt(0) },
+      });
+    });
+
+    it('surfaces a failed transaction as a DataError', async () => {
+      vi.mocked(prisma.$transaction).mockRejectedValueOnce(new Error('Transaction aborted'));
+
+      await expect(repository.replaceTracks(mockReleaseId, 'FLAC', tracks)).rejects.toBeInstanceOf(
+        DataError
+      );
+    });
+  });
+
+  describe('findReferencedS3Keys', () => {
+    it('returns the keys that a format row or a track row references, once each', async () => {
+      vi.mocked(prisma.releaseDigitalFormat.findMany).mockResolvedValueOnce([
+        { s3Key: 'k-legacy' },
+        { s3Key: 'k-both' },
+      ] as never);
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValueOnce([
+        { s3Key: 'k-track' },
+        { s3Key: 'k-both' },
+      ] as never);
+
+      const result = await repository.findReferencedS3Keys([
+        'k-legacy',
+        'k-track',
+        'k-both',
+        'k-free',
+      ]);
+
+      expect(result.sort()).toEqual(['k-both', 'k-legacy', 'k-track']);
+    });
+
+    it('reads both models for exactly the given keys, withdrawn formats included', async () => {
+      vi.mocked(prisma.releaseDigitalFormat.findMany).mockResolvedValueOnce([]);
+      vi.mocked(prisma.releaseDigitalFormatFile.findMany).mockResolvedValueOnce([]);
+
+      await repository.findReferencedS3Keys(['k1', 'k2']);
+
+      expect(prisma.releaseDigitalFormat.findMany).toHaveBeenCalledWith({
+        where: { s3Key: { in: ['k1', 'k2'] } },
+        select: { s3Key: true },
+      });
+      expect(prisma.releaseDigitalFormatFile.findMany).toHaveBeenCalledWith({
+        where: { s3Key: { in: ['k1', 'k2'] } },
+        select: { s3Key: true },
+      });
+    });
+
+    it('answers an empty list without a query', async () => {
+      const result = await repository.findReferencedS3Keys([]);
+
+      expect(result).toEqual([]);
+      expect(prisma.releaseDigitalFormat.findMany).not.toHaveBeenCalled();
     });
   });
 

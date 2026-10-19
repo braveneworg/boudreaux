@@ -26,26 +26,6 @@ export type UploadState =
   | { status: 'error'; message: string };
 
 /**
- * File information for upload validation
- */
-export interface FileInfo {
-  formatType: DigitalFormatType; // Digital format type (e.g., "MP3_320KBPS")
-  fileName: string; // Original filename (e.g., "album.mp3")
-  mimeType: string; // MIME type (e.g., "audio/mpeg")
-  fileSize: number; // File size in bytes
-}
-
-/**
- * Presigned upload URL response from Server Action
- */
-export interface PresignedUploadResponse {
-  uploadUrl: string; // S3 presigned PUT URL, valid for 15 minutes
-  s3Key: string; // S3 object key for tracking upload completion
-  expiresIn: number; // Expiration time in seconds (900 = 15 minutes)
-  contentType: string; // Resolved Content-Type used to sign the URL (must match PUT header)
-}
-
-/**
  * Download authorization response from API endpoint
  */
 export interface DownloadAuthorizationResponse {
@@ -132,35 +112,6 @@ export interface ActionResult<T> {
   success: boolean;
   data?: T;
   error?: string;
-}
-
-/**
- * Upload completion confirmation parameters
- */
-export interface UploadConfirmationParams {
-  releaseId: string;
-  formatType: DigitalFormatType;
-  s3Key: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  checksum?: string;
-  trackNumber?: number;
-}
-
-/**
- * Parameters for confirming a multi-track upload (all files for one format)
- */
-export interface MultiTrackUploadConfirmationParams {
-  releaseId: string;
-  formatType: DigitalFormatType;
-  files: Array<{
-    trackNumber: number;
-    s3Key: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-  }>;
 }
 
 /**

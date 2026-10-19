@@ -4,14 +4,10 @@
 
 import 'server-only';
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-import {
-  getDefaultMimeType,
-  PRESIGNED_URL_EXPIRATION,
-  type DigitalFormatType,
-} from '@/lib/constants/digital-formats';
+import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
 import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
 import { loggers } from '@/lib/utils/logger';
@@ -56,50 +52,6 @@ export const getS3BucketName = (): string => {
   }
 
   return bucketName;
-};
-
-/**
- * Generate presigned PUT URL for uploading digital audio files to S3
- *
- * @param s3Key - S3 object key (path within bucket)
- * @param formatType - Digital format type for MIME type inference
- * @param mimeType - MIME type of the audio file
- * @returns Presigned URL valid for 15 minutes
- *
- * @example
- * ```ts
- * const uploadUrl = await generatePresignedUploadUrl(
- *   'releases/65f8a3b2c4d5e6f7a8b9c0d1/digital-formats/MP3_320KBPS/abc-123.mp3',
- *   'MP3_320KBPS',
- *   'audio/mpeg',
- *   '65f8a3b2c4d5e6f7a8b9c0d1',
- *   'album.mp3'
- * );
- * ```
- */
-export const generatePresignedUploadUrl = async (
-  s3Key: string,
-  formatType: DigitalFormatType,
-  mimeType: string
-): Promise<{ uploadUrl: string; s3Key: string; contentType: string }> => {
-  const s3Client = getS3Client();
-  const bucketName = getS3BucketName();
-
-  const resolvedContentType = mimeType || getDefaultMimeType(formatType);
-
-  const putCommand = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: s3Key,
-    ContentType: resolvedContentType,
-    CacheControl: 'public, max-age=31536000, immutable',
-  });
-
-  // Generate presigned URL with 15-minute expiration
-  const uploadUrl = await getSignedUrl(s3Client, putCommand, {
-    expiresIn: PRESIGNED_URL_EXPIRATION.UPLOAD, // 900 seconds = 15 minutes
-  });
-
-  return { uploadUrl, s3Key, contentType: resolvedContentType };
 };
 
 /**

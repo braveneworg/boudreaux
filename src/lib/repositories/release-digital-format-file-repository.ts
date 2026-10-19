@@ -120,37 +120,6 @@ export class ReleaseDigitalFormatFileRepository {
   }
 
   /**
-   * Create multiple track file records in a batch
-   * @returns Count of records created
-   */
-  async createMany(
-    formatId: string,
-    files: Array<{
-      trackNumber: number;
-      s3Key: string;
-      fileName: string;
-      fileSize: bigint;
-      mimeType: string;
-      title?: string;
-      duration?: number;
-    }>
-  ): Promise<number> {
-    const result = await prisma.releaseDigitalFormatFile.createMany({
-      data: files.map((file) => ({
-        formatId,
-        trackNumber: file.trackNumber,
-        s3Key: file.s3Key,
-        fileName: file.fileName,
-        fileSize: file.fileSize,
-        mimeType: file.mimeType,
-        ...(file.title && { title: file.title }),
-        ...(file.duration && { duration: file.duration }),
-      })),
-    });
-    return result.count;
-  }
-
-  /**
    * Find all track files for a format, ordered by trackNumber
    */
   async findAllByFormatId(formatId: string): Promise<ReleaseDigitalFormatFile[]> {

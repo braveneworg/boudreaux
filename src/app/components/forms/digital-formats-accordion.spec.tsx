@@ -6,12 +6,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
-import {
-  confirmDigitalFormatUploadAction,
-  confirmMultiTrackUploadAction,
-} from '@/lib/actions/confirm-upload-action';
 import { deleteFormatFilesAction } from '@/lib/actions/delete-format-files-action';
-import { findOrCreateReleaseAction } from '@/lib/actions/find-or-create-release-action';
+import {
+  checkNewReleaseTitleAction,
+  confirmFormatUploadAction,
+} from '@/lib/actions/format-upload-actions';
 import { requireElement } from '@/test-utils';
 
 import { DigitalFormatsAccordion } from './digital-formats-accordion';
@@ -19,13 +18,10 @@ import { DigitalFormatsAccordion } from './digital-formats-accordion';
 const mockParseBlob = vi.hoisted(() => vi.fn());
 
 // Mock Server Actions
-vi.mock('@/lib/actions/confirm-upload-action', () => ({
-  confirmDigitalFormatUploadAction: vi.fn(),
-  confirmMultiTrackUploadAction: vi.fn(),
-}));
-
-vi.mock('@/lib/actions/find-or-create-release-action', () => ({
-  findOrCreateReleaseAction: vi.fn(),
+vi.mock('@/lib/actions/format-upload-actions', () => ({
+  checkNewReleaseTitleAction: vi.fn(),
+  confirmFormatUploadAction: vi.fn(),
+  discardFormatUploadAction: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/delete-format-files-action', () => ({
@@ -48,6 +44,21 @@ vi.mock('music-metadata', () => ({
 
 const mockReleaseId = '507f1f77bcf86cd799439011';
 
+const TAKEN_COPY =
+  'A release titled "E2E Album One" already exists. Open it from Releases to upload its formats.';
+
+/** A confirm that went through, for the release the accordion was given. */
+const confirmed = (releaseTitle = 'Test Album') => ({
+  success: true,
+  data: {
+    releaseId: mockReleaseId,
+    releaseTitle,
+    formatId: 'format123',
+    fileCount: 1,
+    created: true,
+  },
+});
+
 /** Returns a resolved fetch response with JSON body */
 const mockFetchSuccess = (s3Key = 'uploads/key') =>
   vi.fn().mockResolvedValue({
@@ -64,8 +75,10 @@ const mockFetchError = (message = 'Upload failed') =>
 
 describe('DigitalFormatsAccordion', () => {
   beforeEach(() => {
-    // Default: proxy route succeeds
+    // Default: proxy route succeeds, the title is free and the confirm goes through
     global.fetch = mockFetchSuccess();
+    vi.mocked(checkNewReleaseTitleAction).mockResolvedValue({ success: true, data: null });
+    vi.mocked(confirmFormatUploadAction).mockResolvedValue(confirmed());
     mockParseBlob.mockReset();
     mockParseBlob.mockRejectedValue(new Error('no metadata'));
   });
@@ -152,11 +165,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should extract matching file from a dropped folder', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -352,11 +360,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Checkmark indicator visibility', () => {
     it('should show checkmark when format is successfully uploaded', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -461,11 +464,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show success message after successful upload', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -487,11 +485,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Toast notifications', () => {
     it('should show success toast after upload', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -527,11 +520,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Remove file functionality', () => {
     it('should show remove button for uploaded formats', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -546,11 +534,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should clear format state when remove is clicked', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -598,17 +581,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should call onReleaseAutoCreated after MP3_320KBPS upload in create mode', async () => {
       const onReleaseAutoCreated = vi.fn();
 
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Test Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce(confirmed('Test Album'));
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
@@ -633,17 +606,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show success status after auto-creating release on MP3_320KBPS upload', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Test Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce(confirmed('Test Album'));
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
 
@@ -657,10 +620,10 @@ describe('DigitalFormatsAccordion', () => {
       });
     });
 
-    it('should show error when findOrCreateReleaseAction fails during MP3_320KBPS upload', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+    it('should show the refusal, and send no file, when the album title is taken', async () => {
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({
         success: false,
-        error: 'DB error',
+        error: TAKEN_COPY,
       });
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
@@ -672,15 +635,16 @@ describe('DigitalFormatsAccordion', () => {
       await user.upload(fileInput, file);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Failed to create release',
-          expect.objectContaining({ description: 'DB error' })
-        );
+        expect(toast.error).toHaveBeenCalledWith('Failed to create release', {
+          description: TAKEN_COPY,
+        });
       });
+      expect(screen.getByRole('alert')).toHaveTextContent(TAKEN_COPY);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('should use default message when create action fails without an error', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+    it('should use default message when the title check fails without an error', async () => {
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({
         success: false,
       });
 
@@ -792,7 +756,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should handle confirm action failure in edit mode', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'DB write failed',
       });
@@ -816,11 +780,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Single file drop', () => {
     it('should handle single file drop with valid MIME type', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -895,11 +854,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Batch upload via folder input', () => {
     it('should upload multiple matching files from folder input', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'format123', fileCount: 2 },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -912,7 +866,7 @@ describe('DigitalFormatsAccordion', () => {
       fireEvent.change(fileInput, { target: { files: [file1, file2] } });
 
       await waitFor(() => {
-        expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
+        expect(confirmFormatUploadAction).toHaveBeenCalled();
       });
     });
 
@@ -1016,11 +970,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should allow upload when file type matches the format', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -1054,11 +1003,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should have ARIA label on remove button', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -1076,11 +1020,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Metadata extraction (MP3_320KBPS)', () => {
     it('extracts full metadata including embedded cover art for MP3 uploads', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       mockParseBlob.mockResolvedValue({
         common: {
           album: 'Album Name',
@@ -1122,11 +1061,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should call onMetadataExtracted when MP3_320KBPS file has metadata', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       mockParseBlob.mockResolvedValue({
         common: {
           album: 'Test Album',
@@ -1150,18 +1084,13 @@ describe('DigitalFormatsAccordion', () => {
 
       // Upload still succeeds regardless of metadata extraction
       await waitFor(() => {
-        expect(confirmDigitalFormatUploadAction).toHaveBeenCalledWith(
+        expect(confirmFormatUploadAction).toHaveBeenCalledWith(
           expect.objectContaining({ formatType: 'MP3_320KBPS' })
         );
       });
     });
 
     it('should not extract metadata for non-MP3_320KBPS formats', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const onMetadataExtracted = vi.fn();
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
@@ -1178,7 +1107,7 @@ describe('DigitalFormatsAccordion', () => {
       await user.upload(fileInput, file);
 
       await waitFor(() => {
-        expect(confirmDigitalFormatUploadAction).toHaveBeenCalled();
+        expect(confirmFormatUploadAction).toHaveBeenCalled();
       });
 
       expect(onMetadataExtracted).not.toHaveBeenCalled();
@@ -1324,11 +1253,6 @@ describe('DigitalFormatsAccordion', () => {
         });
       });
 
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'format123', fileCount: 2 },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -1361,21 +1285,11 @@ describe('DigitalFormatsAccordion', () => {
       } as Response);
 
       await waitFor(() => {
-        expect(confirmMultiTrackUploadAction).toHaveBeenCalled();
+        expect(confirmFormatUploadAction).toHaveBeenCalled();
       });
     });
 
     it('should show warning toast when batch has partial failures', async () => {
-      // When only 1 file succeeds, the code uses confirmDigitalFormatUploadAction (single-file path)
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'format123', fileCount: 1 },
-      });
-
       let callCount = 0;
       global.fetch = vi.fn().mockImplementation(() => {
         callCount++;
@@ -1558,11 +1472,6 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Re-upload confirmation flow', () => {
     it('should show re-upload confirmation dialog when clicking re-upload on already-uploaded format', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -1586,10 +1495,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should delete existing files and open file picker on confirm re-upload', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
       vi.mocked(deleteFormatFilesAction).mockResolvedValue({
         success: true,
         data: { deletedCount: 1 },
@@ -1628,10 +1533,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show error when delete fails during re-upload', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
       vi.mocked(deleteFormatFilesAction).mockResolvedValue({
         success: false,
         error: 'S3 error',
@@ -1668,10 +1569,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show error when delete throws an exception', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
       vi.mocked(deleteFormatFilesAction).mockRejectedValue(new Error('Network error'));
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
@@ -1698,11 +1595,6 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should close re-upload dialog when dismissed', async () => {
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
 
@@ -1733,13 +1625,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Create mode confirm failure (single file)', () => {
     it('should show error when confirm action fails in create mode single file upload', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Test Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'DB confirm error',
       });
@@ -1760,13 +1646,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should use default confirm error message when create mode confirm fails without an error', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Test Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
       });
 
@@ -1790,17 +1670,7 @@ describe('DigitalFormatsAccordion', () => {
     it('should auto-create release and confirm batch upload in create mode', async () => {
       const onReleaseAutoCreated = vi.fn();
 
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Batch Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'format123', fileCount: 2 },
-      });
-
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce(confirmed('Batch Album'));
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(
         <DigitalFormatsAccordion
@@ -1826,10 +1696,10 @@ describe('DigitalFormatsAccordion', () => {
       });
     });
 
-    it('should show error when findOrCreateReleaseAction fails in batch create mode', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
+    it("should show the refusal, and send no file, when a batch's album title is taken", async () => {
+      vi.mocked(checkNewReleaseTitleAction).mockResolvedValueOnce({
         success: false,
-        error: 'Batch create error',
+        error: TAKEN_COPY,
       });
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
@@ -1843,44 +1713,15 @@ describe('DigitalFormatsAccordion', () => {
       fireEvent.change(fileInput, { target: { files: [file1, file2] } });
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Failed to create release',
-          expect.objectContaining({ description: 'Batch create error' })
-        );
+        expect(toast.error).toHaveBeenCalledWith('Failed to create release', {
+          description: TAKEN_COPY,
+        });
       });
-    });
-
-    it('should use default create error message when batch create fails without an error', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: false,
-      });
-
-      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-      render(<DigitalFormatsAccordion releaseId={mockReleaseId} onReleaseAutoCreated={vi.fn()} />);
-
-      await user.click(screen.getByText('MP3 320kbps'));
-      const fileInput = await screen.findByLabelText(/upload mp3/i);
-
-      const file1 = new File(['a'], '01-song.mp3', { type: 'audio/mpeg' });
-      const file2 = new File(['b'], '02-song.mp3', { type: 'audio/mpeg' });
-      fireEvent.change(fileInput, { target: { files: [file1, file2] } });
-
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          'Failed to create release',
-          expect.objectContaining({ description: 'Failed to create release' })
-        );
-      });
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('should show error when batch confirm fails in create mode', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Batch Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'Confirm fail',
       });
@@ -1904,13 +1745,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should use default confirm error message when create batch confirm fails without an error', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Batch Album',
-        created: true,
-      });
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
       });
 
@@ -1933,17 +1768,7 @@ describe('DigitalFormatsAccordion', () => {
     });
 
     it('should show warning toast for partial failures in create mode batch upload', async () => {
-      vi.mocked(findOrCreateReleaseAction).mockResolvedValue({
-        success: true,
-        releaseId: mockReleaseId,
-        releaseTitle: 'Partial Album',
-        created: true,
-      });
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce(confirmed('Partial Album'));
       let callCount = 0;
       global.fetch = vi.fn().mockImplementation(() => {
         callCount++;
@@ -1979,7 +1804,7 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('Batch confirm failure in edit mode', () => {
     it('should show error when batch confirm fails in edit mode', async () => {
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
+      vi.mocked(confirmFormatUploadAction).mockResolvedValueOnce({
         success: false,
         error: 'Edit batch confirm fail',
       });
@@ -2006,11 +1831,6 @@ describe('DigitalFormatsAccordion', () => {
   describe('Batch metadata extraction', () => {
     it('should extract metadata from first MP3_320KBPS file in batch upload', async () => {
       const onMetadataExtracted = vi.fn();
-
-      vi.mocked(confirmMultiTrackUploadAction).mockResolvedValue({
-        success: true,
-        data: { formatId: 'format123', fileCount: 2 },
-      });
 
       mockParseBlob.mockResolvedValue({
         common: {
@@ -2048,11 +1868,6 @@ describe('DigitalFormatsAccordion', () => {
   describe('formatFileSize edge case', () => {
     it('should show 0 Bytes for zero-size files in uploaded file list', async () => {
       // Mock confirm to succeed and produce a 0-byte uploaded file entry
-      vi.mocked(confirmDigitalFormatUploadAction).mockResolvedValue({
-        success: true,
-        data: { id: 'format123' },
-      });
-
       // Mock fetch to return success with s3Key
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -2105,9 +1920,9 @@ describe('DigitalFormatsAccordion', () => {
 
   describe('getStatusText intermediate upload states', () => {
     it('should display "Finalizing upload..." during the confirming state', async () => {
-      // Make confirmDigitalFormatUploadAction hang so the component stays in 'confirming'
+      // Make the confirm hang so the component stays in 'confirming'
 
-      vi.mocked(confirmDigitalFormatUploadAction).mockReturnValue(new Promise(() => {}));
+      vi.mocked(confirmFormatUploadAction).mockReturnValueOnce(new Promise(() => {}));
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       render(<DigitalFormatsAccordion releaseId={mockReleaseId} />);
@@ -2157,7 +1972,7 @@ describe('DigitalFormatsAccordion', () => {
         screen.queryByRole('button', { name: /cancel mp3 320kbps upload/i })
       ).not.toBeInTheDocument();
       expect(screen.queryByText(/uploading to cloud storage/i)).not.toBeInTheDocument();
-      expect(confirmDigitalFormatUploadAction).not.toHaveBeenCalled();
+      expect(confirmFormatUploadAction).not.toHaveBeenCalled();
       expect(toast.info).toHaveBeenCalledWith('MP3 320kbps upload cancelled');
     });
   });

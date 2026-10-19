@@ -17,7 +17,6 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     releaseDigitalFormatFile: {
       create: vi.fn(),
-      createMany: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
@@ -73,70 +72,6 @@ describe('ReleaseDigitalFormatFileRepository', () => {
           fileSize: BigInt(10000000),
           mimeType: 'audio/mpeg',
         },
-      });
-    });
-  });
-
-  describe('createMany', () => {
-    it('should create multiple track file records and return count', async () => {
-      vi.mocked(prisma.releaseDigitalFormatFile.createMany).mockResolvedValue({ count: 3 });
-
-      const files = [
-        {
-          trackNumber: 1,
-          s3Key: 'key-1',
-          fileName: 'song1.mp3',
-          fileSize: BigInt(10000000),
-          mimeType: 'audio/mpeg',
-        },
-        {
-          trackNumber: 2,
-          s3Key: 'key-2',
-          fileName: 'song2.mp3',
-          fileSize: BigInt(12000000),
-          mimeType: 'audio/mpeg',
-        },
-        {
-          trackNumber: 3,
-          s3Key: 'key-3',
-          fileName: 'song3.mp3',
-          fileSize: BigInt(8000000),
-          mimeType: 'audio/mpeg',
-        },
-      ];
-
-      const count = await repo.createMany('format-1', files);
-
-      expect(count).toBe(3);
-      expect(prisma.releaseDigitalFormatFile.createMany).toHaveBeenCalledWith({
-        data: files.map((f) => ({
-          formatId: 'format-1',
-          trackNumber: f.trackNumber,
-          s3Key: f.s3Key,
-          fileName: f.fileName,
-          fileSize: f.fileSize,
-          mimeType: f.mimeType,
-        })),
-      });
-    });
-
-    it('should pass through title and duration when provided', async () => {
-      vi.mocked(prisma.releaseDigitalFormatFile.createMany).mockResolvedValue({ count: 1 });
-
-      await repo.createMany('format-1', [
-        {
-          trackNumber: 1,
-          s3Key: 'k',
-          fileName: 'song.mp3',
-          fileSize: BigInt(1),
-          mimeType: 'audio/mpeg',
-          title: 'My Song',
-          duration: 215,
-        },
-      ]);
-
-      expect(prisma.releaseDigitalFormatFile.createMany).toHaveBeenCalledWith({
-        data: [expect.objectContaining({ title: 'My Song', duration: 215 })],
       });
     });
   });

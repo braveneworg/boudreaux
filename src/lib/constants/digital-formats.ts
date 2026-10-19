@@ -154,22 +154,6 @@ export const isFreeFormatType = (formatType: DigitalFormatType): formatType is F
   (FREE_FORMAT_TYPES as ReadonlyArray<DigitalFormatType>).includes(formatType);
 
 /**
- * S3 key pattern generator utility
- *
- * @param releaseId - MongoDB ObjectId of the release
- * @param formatType - Digital format type
- * @param fileId - Unique file identifier (UUID)
- * @param extension - File extension (mp3, flac, wav, aac)
- * @returns S3 object key in the format: releases/{releaseId}/digital-formats/{formatType}/{fileId}.{ext}
- */
-export const generateS3Key = (
-  releaseId: string,
-  formatType: DigitalFormatType,
-  fileId: string,
-  extension: string
-): string => `releases/${releaseId}/digital-formats/${formatType}/${fileId}.${extension}`;
-
-/**
  * Get file extension from format type
  */
 export const getFileExtensionForFormat = (formatType: DigitalFormatType): string => {

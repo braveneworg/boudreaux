@@ -56,14 +56,12 @@ vi.mock('@/lib/actions/release-image-actions', () => ({
   deleteReleaseImageAction: vi.fn(),
   reorderReleaseImagesAction: vi.fn(),
 }));
-vi.mock('@/lib/actions/confirm-upload-action', () => ({
-  confirmDigitalFormatUploadAction: vi.fn(),
-  confirmMultiTrackUploadAction: vi.fn(),
+vi.mock('@/lib/actions/format-upload-actions', () => ({
+  checkNewReleaseTitleAction: vi.fn(),
+  confirmFormatUploadAction: vi.fn(),
+  discardFormatUploadAction: vi.fn(),
 }));
 vi.mock('@/lib/actions/delete-format-files-action', () => ({ deleteFormatFilesAction: vi.fn() }));
-vi.mock('@/lib/actions/find-or-create-release-action', () => ({
-  findOrCreateReleaseAction: vi.fn(),
-}));
 vi.mock('@/lib/utils/direct-upload', () => ({ uploadFilesToS3: vi.fn() }));
 vi.mock('@/lib/utils/console-logger', () => ({ error: vi.fn() }));
 

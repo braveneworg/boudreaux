@@ -9,18 +9,3 @@
  */
 export const isInvalidS3Key = (s3Key: string, expectedPrefix: string): boolean =>
   !s3Key.startsWith(expectedPrefix) || s3Key.includes('..');
-
-/**
- * True when `error` is a Prisma unique-constraint violation (`P2002`), i.e. a
- * digital format of this type already exists for the release.
- */
-export const isUniqueConstraintError = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
-
-/**
- * Resolve the user-facing message for a thrown confirmation error. Mirrors the
- * prior catch block: a thrown `Error` surfaces its message; anything else
- * surfaces `fallbackMessage`.
- */
-export const confirmUploadErrorMessage = (error: unknown, fallbackMessage: string): string =>
-  error instanceof Error ? error.message : fallbackMessage;
