@@ -59,7 +59,8 @@ const artistRowResponse = {
     title: 'LP',
     releasedOn: '2024-09-01T00:00:00.000Z',
     playSrc: 'https://cdn.example/r-1/track-1.mp3',
-    albumArtistSlug: 'e2e-artist',
+    byName: null,
+    albumArtistSlug: null,
   },
 };
 

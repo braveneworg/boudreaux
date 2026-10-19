@@ -4,9 +4,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { DisplayImageCollage } from './display-image-collage';
+import type { ArtistDisplayImage } from '@/lib/types/domain/artist';
 
-import type { GalleryImage } from './display-image-gallery';
+import { DisplayImageCollage } from './display-image-collage';
 
 vi.mock('next/image', () => ({
   default: ({
@@ -32,7 +32,7 @@ vi.mock('next/image', () => ({
 
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 
-const image = (n: number): GalleryImage => ({
+const image = (n: number): ArtistDisplayImage => ({
   id: `img-${n}`,
   url: `https://cdn.example/${n}.jpg`,
   thumbnailUrl: `https://cdn.example/${n}-thumb.jpg`,
@@ -45,7 +45,7 @@ const image = (n: number): GalleryImage => ({
   height: null,
 });
 
-const images = (count: number): GalleryImage[] =>
+const images = (count: number): ArtistDisplayImage[] =>
   Array.from({ length: count }, (_, n) => image(n + 1));
 
 const renderCollage = (count = 9) => {

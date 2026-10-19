@@ -4,7 +4,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { LatestReleasePlayLink, type LatestRelease } from './latest-release-play-link';
+import type { LatestRelease } from '@/lib/types/domain/artist';
+
+import { LatestReleasePlayLink } from './latest-release-play-link';
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));

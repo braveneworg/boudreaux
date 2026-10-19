@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { ARTIST_PRIVATE_FIELDS } from '@/lib/types/domain/artist';
-import {
-  artistPrivateValues,
-  artistWithPublishedReleases,
-} from '@/lib/validation/media/schema-fixtures';
+import { artistPageModel, artistPrivateValues } from '@/lib/validation/media/schema-fixtures';
 
 import { getPublicArtist } from './get-public-artist';
 
@@ -19,19 +16,24 @@ vi.mock('@/lib/services/artist-service', () => ({
 }));
 
 describe('getPublicArtist', () => {
-  it('reads the artist graph through the service and parses it to the public wire shape', async () => {
-    getArtistBySlugWithReleases.mockResolvedValueOnce({
-      success: true,
-      data: { ...artistWithPublishedReleases, ...artistPrivateValues },
-    });
+  it('reads the artist page model through the service and parses it', async () => {
+    getArtistBySlugWithReleases.mockResolvedValueOnce({ success: true, data: artistPageModel });
 
     const artist = await getPublicArtist('marguerite-ash');
 
     expect(getArtistBySlugWithReleases).toHaveBeenCalledWith('marguerite-ash');
-    expect(artist?.slug).toBe(artistWithPublishedReleases.slug);
-    for (const field of ARTIST_PRIVATE_FIELDS) {
-      expect(artist).not.toHaveProperty(field);
-    }
+    expect(artist?.latestRelease?.releasedOn).toEqual(
+      new Date(artistPageModel.latestRelease.releasedOn)
+    );
+  });
+
+  it.each(ARTIST_PRIVATE_FIELDS)('strips the private field %s', async (field) => {
+    getArtistBySlugWithReleases.mockResolvedValueOnce({
+      success: true,
+      data: { ...artistPageModel, ...artistPrivateValues },
+    });
+
+    expect(await getPublicArtist(`private-${field}`)).not.toHaveProperty(field);
   });
 
   it('is null when the service finds no public artist', async () => {

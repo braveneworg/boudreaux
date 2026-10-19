@@ -10,12 +10,12 @@ import type {
   FeaturedArtistListFilters,
   UpdateFeaturedArtistData,
 } from '@/lib/types/domain/featured-artist';
-import { CARD_DISPLAY_IMAGE_COUNT, resolveDisplayImages } from '@/lib/utils/display-images';
 import { isPlayableFormat } from '@/lib/utils/playable-format';
 import { FEATURED_ARTISTS_CACHE_PREFIX } from '@/lib/utils/public-name-caches';
 import { withCache } from '@/lib/utils/simple-cache';
 
 import { failFromError } from './_internal/map-data-error';
+import { cardDisplayImages } from './artist-page-model';
 
 import type { ServiceResponse } from './service.types';
 
@@ -26,16 +26,17 @@ const withPlayableFormatOnly = (artist: FeaturedArtist): FeaturedArtist =>
     : artist;
 
 /**
- * A featured row's artists with their images resolved to the display images
- * (ADR-0008): the human's chosen rows by position, else the job's suggested
- * rows that have alt text — so the cover fallback (`bioImages[0]`) is the
- * image a human chose. Only the card count travels: the player reads one.
+ * A featured row's artists with their images resolved to the card's display
+ * image (ADR-0008): the human's chosen rows by position, else the job's
+ * suggested rows that have alt text — so the cover fallback (`bioImages[0]`)
+ * is the image a human chose. Only the card count travels: the player reads
+ * one.
  */
 const withDisplayImages = (featured: FeaturedArtist): FeaturedArtist => ({
   ...featured,
   artists: featured.artists.map((artist) => ({
     ...artist,
-    bioImages: resolveDisplayImages(artist.bioImages).slice(0, CARD_DISPLAY_IMAGE_COUNT),
+    bioImages: cardDisplayImages(artist.bioImages),
   })),
 });
 

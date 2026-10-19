@@ -124,28 +124,6 @@ describe('ArtistRepository', () => {
     });
   });
 
-  describe('findBySlug', () => {
-    it('finds a published, non-deleted artist by slug with a select projection', async () => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
-
-      const result = await ArtistRepository.findBySlug('john-doe');
-
-      expect(result).toEqual({ id: 'a' });
-      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      expect(arg?.where).toEqual({ slug: 'john-doe', ...PUBLIC_ARTIST_WHERE });
-      expect(arg?.select).toEqual(expect.objectContaining({ id: true, slug: true, bio: true }));
-    });
-
-    it.each(ARTIST_PRIVATE_FIELDS)('never selects the private field %s', async (field) => {
-      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
-
-      await ArtistRepository.findBySlug('john-doe');
-
-      const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
-      expect(arg?.select).not.toHaveProperty(field);
-    });
-  });
-
   describe('findMany', () => {
     it('uses the full admin include and default pagination', async () => {
       vi.mocked(prisma.artist.findMany).mockResolvedValue([] as never);
@@ -1068,10 +1046,24 @@ describe('ArtistRepository', () => {
                   files: { orderBy: { trackNumber: 'asc' }, take: 1, select: { s3Key: true } },
                 },
               },
-              // The album artist's slug names the release deep link (ADR-0015).
+              // Who leads the release: the credit order, each artist's name, slug
+              // and public gate fields (ADR-0015).
               artistReleases: {
                 orderBy: creditOrderBy,
-                select: { artist: { select: { slug: true, publishedOn: true, deletedOn: true } } },
+                select: {
+                  artistId: true,
+                  artist: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      surname: true,
+                      displayName: true,
+                      slug: true,
+                      publishedOn: true,
+                      deletedOn: true,
+                    },
+                  },
+                },
               },
             },
           },
@@ -1410,6 +1402,57 @@ describe('ArtistRepository', () => {
       expect(arg?.select?.bioImages).toBeDefined();
     });
 
+    // Only the rows display-image resolution can return, in pool order, with
+    // the fields the page model reads. No DB cap: Mongo sorts nulls first, so
+    // a take would return unchosen rows (ADR-0008).
+    it('reads the page-candidate bio images in sort order without a DB cap', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+
+      await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+
+      const bioImages = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select?.bioImages;
+      expect((bioImages as { where: unknown }).where).toEqual(bioImageWhere.pageCandidate);
+      expect(bioImages).toMatchObject({ orderBy: { sortOrder: 'asc' } });
+      expect(bioImages).not.toHaveProperty('take');
+    });
+
+    it('selects only the bio-image fields the page model reads', async () => {
+      vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+
+      await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+
+      const bioImages = vi.mocked(prisma.artist.findFirst).mock.calls[0][0]?.select?.bioImages;
+      expect(bioImages).toMatchObject({
+        select: {
+          id: true,
+          url: true,
+          thumbnailUrl: true,
+          alt: true,
+          title: true,
+          attribution: true,
+          license: true,
+          sourceUrl: true,
+          width: true,
+          height: true,
+          isPrimary: true,
+          displayOrder: true,
+        },
+      });
+      expect(Object.keys((bioImages as { select: object }).select)).toHaveLength(12);
+    });
+
+    it.each(['labels', 'urls', 'bioLinks', 'members'])(
+      'reads no %s, which the page never shows',
+      async (relation) => {
+        vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
+
+        await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
+
+        const arg = vi.mocked(prisma.artist.findFirst).mock.calls[0][0];
+        expect(arg?.select).not.toHaveProperty(relation);
+      }
+    );
+
     it('loads the releases of every band the artist is a member of with the same release graph', async () => {
       vi.mocked(prisma.artist.findFirst).mockResolvedValue({ id: 'a' } as never);
 
@@ -1424,8 +1467,8 @@ describe('ArtistRepository', () => {
     });
 
     describe('selects no private artist field anywhere in the graph', () => {
-      /** Every artist-level `select` in the query: the artist, its band members,
-       * its bands, and each credited artist on every loaded release. */
+      /** Every artist-level `select` in the query: the artist, its bands, and
+       * each credited artist on every loaded release. */
       const artistSelects = async (): Promise<Array<[string, Record<string, unknown>]>> => {
         vi.mocked(prisma.artist.findFirst).mockResolvedValue(null);
         await ArtistRepository.findPublishedBySlugWithReleases('john-doe');
@@ -1441,7 +1484,6 @@ describe('ArtistRepository', () => {
         };
         return [
           ['artist', select],
-          ['members.member', (select.members as { include: { member: never } }).include.member],
           ['memberOf.artist', memberOf.include.artist.select],
           ['releases.release.artistReleases.artist', releaseArtistSelect(select.releases)],
           [
@@ -1466,7 +1508,7 @@ describe('ArtistRepository', () => {
       it('projects every artist level through an explicit select', async () => {
         const selects = await artistSelects();
 
-        expect(selects.map(([, select]) => select.slug)).toEqual([true, true, true, true, true]);
+        expect(selects.map(([, select]) => select.slug)).toEqual([true, true, true, true]);
       });
 
       // Nothing gates a nested artist on publication, so a draft artist

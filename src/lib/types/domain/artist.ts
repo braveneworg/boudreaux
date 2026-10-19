@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ArtistReleaseScalars, Release, ReleaseCredit, ReleaseScalars } from './release';
+import type { ArtistReleaseScalars, Release, ReleaseScalars } from './release';
 import type { Json } from './shared';
 import type { UrlRecord } from './url';
 
@@ -349,20 +349,42 @@ export type PublicArtistRelease = Omit<Release, 'artistReleases'> & {
 export type ArtistReleaseGraphRow = ArtistReleaseScalars & { release: PublicArtistRelease };
 
 /**
- * Repository payload behind the public artist-detail page: public scalars plus
- * labels, urls, bio images/links, band members (with member credit scalars),
- * the artist's own release joins, and — via `memberOf` — the release joins of
- * every band the artist belongs to, all carrying the public media release
- * graph. No artist anywhere in it carries an {@link ArtistPrivateField}, and
- * no nested artist carries an {@link ArtistOwnPageField}.
- * The service flattens this into {@link ArtistWithPublishedReleases}.
+ * One display image as a public surface renders and credits it: the collage
+ * on the artist page and its lightbox. None of the pool's internals — no
+ * original URL, face signal, hashes or display position.
+ */
+export interface ArtistDisplayImage {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  alt: string | null;
+  title: string | null;
+  attribution: string | null;
+  license: string | null;
+  sourceUrl: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * A bio image as the artist-detail read selects it: what the page shows, plus
+ * the two fields display-image resolution reads.
+ */
+export interface ArtistPageBioImageRecord extends ArtistDisplayImage {
+  isPrimary: boolean;
+  displayOrder: number | null;
+}
+
+/**
+ * Repository payload behind the public artist page: the public scalars, the
+ * bio images display-image resolution can return, the artist's own release
+ * joins, and — via `memberOf` — the release joins of every band the artist
+ * belongs to, all carrying the public media release graph. No artist anywhere
+ * in it carries an {@link ArtistPrivateField}, and no nested artist carries an
+ * {@link ArtistOwnPageField}. The artist page model is built from it.
  */
 export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
-  labels: ArtistLabelRecord[];
-  urls: UrlRecord[];
-  bioImages: ArtistBioImageRecord[];
-  bioLinks: ArtistBioLinkRecord[];
-  members: Array<ArtistMemberScalars & { member: ArtistCreditScalars }>;
+  bioImages: ArtistPageBioImageRecord[];
   releases: ArtistReleaseGraphRow[];
   memberOf: Array<
     ArtistMemberScalars & { artist: ArtistCreditScalars & { releases: ArtistReleaseGraphRow[] } }
@@ -370,33 +392,59 @@ export interface ArtistWithReleaseGraph extends ArtistPublicScalars {
 }
 
 /**
- * Public artist-detail payload: {@link ArtistWithReleaseGraph} with the band
- * graph folded into `releases` — every published release the artist is on,
- * each tagged with its {@link ReleaseCredit} and listed own-releases-first.
+ * An Artist's latest release as the artist page and the artists index card
+ * lead with it: the newest listed release they hold a direct credit on, what
+ * its listening modal plays, and who it is "by".
  */
-export interface ArtistWithPublishedReleases extends Omit<
-  ArtistWithReleaseGraph,
-  'memberOf' | 'releases'
-> {
-  releases: ArtistPublishedReleaseRow[];
+export interface LatestRelease {
+  id: string;
+  title: string;
+  releasedOn: Date;
+  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
+  playSrc: string | null;
   /**
-   * The newest listed release the artist holds a direct credit on (own or
-   * featured, never a band's), as the artists index summarises it; the page
-   * leads with it (ADR-0006). `null` when there is none.
+   * The album artist's name when this artist is only featured on it and that
+   * artist is public; `null` otherwise (ADR-0015).
    */
-  newestRelease: NewestListedRelease | null;
+  byName: string | null;
+  /** The album artist's slug, on the same terms as `byName`: the deep link's artist. */
+  albumArtistSlug: string | null;
 }
 
 /**
- * One release on the public artist page. Its credits name public artists only
- * (ADR-0015). `albumArtist` is the release's first credit, read before the
- * hidden artists were dropped: `null` when that artist is hidden, so the page
- * never attributes the release to whoever is credited next.
+ * The artist scalars the artist page model carries: the name fields, the
+ * slug, the genres, the curated links, and the two bios the page and its
+ * metadata read. Keyed as a `true` mask like {@link ARTIST_PRIVATE_FIELD_MASK}.
  */
-export type ArtistPublishedReleaseRow = ArtistReleaseGraphRow & {
-  credit: ReleaseCredit;
-  albumArtist: ArtistCreditScalars | null;
-};
+export const ARTIST_PAGE_SCALAR_MASK = {
+  displayName: true,
+  firstName: true,
+  middleName: true,
+  surname: true,
+  title: true,
+  suffix: true,
+  slug: true,
+  genres: true,
+  links: true,
+  bio: true,
+  shortBio: true,
+} as const satisfies Partial<Record<keyof ArtistPublicScalars, true>>;
+
+/** The scalars of {@link ARTIST_PAGE_SCALAR_MASK}. */
+export type ArtistPageScalars = Pick<ArtistPublicScalars, keyof typeof ARTIST_PAGE_SCALAR_MASK>;
+
+/**
+ * What a public surface shows of an Artist, built once from the detail read:
+ * the page scalars with both bios sanitized, every display image, the latest
+ * release with its byline, and whether any listed release exists, band
+ * releases included. No pool internals, no release list, no band graph.
+ */
+export interface ArtistPageModel extends ArtistPageScalars {
+  displayImages: ArtistDisplayImage[];
+  latestRelease: LatestRelease | null;
+  /** Whether the artist holds any listed release, a public band's included. */
+  hasListedRelease: boolean;
+}
 
 /** Sort orders offered by the public artists index. */
 export type ArtistListingSort = 'alpha' | 'newest';
@@ -449,9 +497,18 @@ export interface ArtistListingReleaseRecord {
   deletedOn: Date | null;
   /** The playable format with its first track only. */
   digitalFormats: Array<{ files: Array<{ s3Key: string }> }>;
-  /** The full credit order, each artist with its slug and public gate fields. */
+  /** The full credit order, each artist with its name, slug and public gate fields. */
   artistReleases: Array<{
-    artist: { slug: string; publishedOn: Date | null; deletedOn: Date | null };
+    artistId: string;
+    artist: {
+      id: string;
+      firstName: string;
+      surname: string;
+      displayName: string | null;
+      slug: string;
+      publishedOn: Date | null;
+      deletedOn: Date | null;
+    };
   }>;
 }
 
@@ -485,24 +542,6 @@ export interface ArtistListingRecord {
   videoArtists: Array<{ video: { releasedOn: Date | null } }>;
 }
 
-/** The newest listed release credited to an artist (the artist page leads with it). */
-export interface NewestListedRelease {
-  id: string;
-  title: string;
-  releasedOn: Date;
-}
-
-/**
- * The newest listed release credited to an artist, as shown on the listing
- * row: what its listening modal plays and the deep link names.
- */
-export interface ArtistListingNewestRelease extends NewestListedRelease {
-  /** The first MP3 track's stream URL, or `null` when nothing is playable. */
-  playSrc: string | null;
-  /** The album artist's slug, or `null` when that artist is hidden (ADR-0015). */
-  albumArtistSlug: string | null;
-}
-
 /**
  * Public artists-index row (the wire shape of `/api/artists?listing=published`
  * and the SSR prefetch): {@link ArtistListingRecord} with the release joins
@@ -517,7 +556,8 @@ export interface ArtistListingRow extends Omit<
   memberOf: ArtistListingName[];
   /** Published, non-deleted releases the artist holds a direct credit on. */
   releaseCount: number;
-  newestRelease: ArtistListingNewestRelease | null;
+  /** The artist's latest release, with its byline, from the artist page model. */
+  newestRelease: LatestRelease | null;
 }
 
 /**

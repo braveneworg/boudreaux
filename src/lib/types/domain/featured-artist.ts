@@ -46,7 +46,8 @@ export type FeaturedArtistArtist = {
   slug: string;
   /**
    * The display-image candidates as read; the public featured read resolves
-   * them (`resolveDisplayImages`) so the first is the artist's display image.
+   * them to the card's display image (`cardDisplayImages`, the artist page
+   * model), so the first is the artist's display image.
    */
   bioImages: Array<{
     url: string;

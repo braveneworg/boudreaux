@@ -8,10 +8,11 @@ import type { JSX } from 'react';
 
 import Image from 'next/image';
 
+import type { ArtistDisplayImage } from '@/lib/types/domain/artist';
 import { cn } from '@/lib/utils';
 import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
 
-import { DisplayImageGallery, galleryImageAlt, type GalleryImage } from './display-image-gallery';
+import { DisplayImageGallery, galleryImageAlt } from './display-image-gallery';
 import { LIGHTBOX_ZOOM_CLASS, LightboxTrigger, ResponsiveLightbox } from './responsive-lightbox';
 
 /** How many tiles the collage shows; the last one carries "+N more" for the rest. */
@@ -33,7 +34,7 @@ const MORE_OVERLAY_CLASS =
 
 interface DisplayImageCollageProps {
   /** The chosen display images, in display order (uncapped). */
-  images: GalleryImage[];
+  images: ArtistDisplayImage[];
   displayName: string;
   className?: string;
 }

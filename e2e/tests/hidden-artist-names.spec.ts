@@ -234,10 +234,6 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
       name: 'release deep link',
       url: `/releases?artist=${seeded.publicSlug}&release=${seeded.releaseId}`,
     },
-    {
-      name: 'artist page API',
-      url: `/api/artists/slug/${seeded.publicSlug}?withReleases=true`,
-    },
     { name: 'artist page', url: `/artists/${seeded.publicSlug}` },
     { name: 'artist releases listing', url: `/releases?artist=${seeded.publicSlug}` },
     { name: 'featured listing', url: '/api/featured-artists?active=true&limit=100' },

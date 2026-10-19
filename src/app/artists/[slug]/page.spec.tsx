@@ -3,8 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen, within } from '@testing-library/react';
 
-import type { ArtistWithPublishedReleases } from '@/lib/types/media-models';
-import { artistWithPublishedReleases } from '@/lib/validation/media/schema-fixtures';
+import {
+  buildArtistPageModel,
+  type ArtistPageSource,
+  type LatestReleaseSourceRow,
+} from '@/lib/services/artist-page-model';
+import type { ArtistPageBioImageRecord } from '@/lib/types/domain/artist';
 
 import ArtistDetailPage, { generateMetadata } from './page';
 
@@ -83,30 +87,80 @@ vi.mock('@/app/components/latest-release-play-link', () => ({
 
 const params = Promise.resolve({ slug: 'marguerite-ash' });
 
-const image = (id: string, displayOrder: number | null) => ({
-  ...artistWithPublishedReleases.bioImages[0],
+const PUBLISHED = new Date('2024-01-01T00:00:00.000Z');
+
+const image = (
+  id: string,
+  displayOrder: number | null,
+  overrides: Partial<ArtistPageBioImageRecord> = {}
+): ArtistPageBioImageRecord => ({
   id,
   url: `https://cdn.example/${id}.jpg`,
+  thumbnailUrl: null,
   alt: `${id} described`,
+  title: null,
+  attribution: null,
+  license: null,
+  sourceUrl: null,
+  width: null,
+  height: null,
   isPrimary: false,
   displayOrder,
+  ...overrides,
 });
 
-const graph = (overrides: Partial<ArtistWithPublishedReleases> = {}): ArtistWithPublishedReleases =>
-  ({
-    ...artistWithPublishedReleases,
-    displayName: 'Marguerite Ash',
-    shortBio: '<p>A <b>genre-blurring</b> act.</p>',
-    bio: '<p>Born in a van.</p>',
-    genres: 'experimental,noise-rock',
-    bioImages: [image('pool', null), image('second', 1), image('first', 0)],
-    links: null,
-    newestRelease: null,
-    ...overrides,
-  }) as ArtistWithPublishedReleases;
+/** A credited artist, public unless its publication is cleared. */
+const credit = (id: string, displayName: string, publishedOn: Date | null = PUBLISHED) => ({
+  artistId: id,
+  artist: {
+    id,
+    firstName: displayName,
+    surname: '',
+    displayName,
+    slug: id,
+    publishedOn,
+    deletedOn: null,
+  },
+});
 
-const renderPage = async (overrides: Partial<ArtistWithPublishedReleases> = {}) => {
-  getPublicArtist.mockResolvedValueOnce(graph(overrides));
+const SELF = credit('marguerite', 'Marguerite Ash');
+
+/** A listed release join row with an MP3 track, its credits in stored order. */
+const releaseRow = (id: string, credits = [SELF]): LatestReleaseSourceRow => ({
+  release: {
+    id,
+    title: `Release ${id}`,
+    releasedOn: new Date('2024-01-01'),
+    publishedAt: PUBLISHED,
+    deletedOn: null,
+    digitalFormats: [{ files: [{ s3Key: `releases/${id}/tracks/01.mp3` }] }],
+    artistReleases: credits,
+  },
+});
+
+/** The detail read of a public artist with three images, one of them only pooled. */
+const source = (overrides: Partial<ArtistPageSource> = {}): ArtistPageSource => ({
+  id: 'marguerite',
+  displayName: 'Marguerite Ash',
+  firstName: 'Marguerite',
+  middleName: null,
+  surname: 'Ash',
+  title: null,
+  suffix: null,
+  slug: 'marguerite-ash',
+  genres: 'experimental,noise-rock',
+  links: null,
+  bio: '<p>Born in a van.</p>',
+  shortBio: '<p>A <b>genre-blurring</b> act.</p>',
+  bioImages: [image('pool', null), image('second', 1), image('first', 0)],
+  releases: [],
+  memberOf: [],
+  ...overrides,
+});
+
+/** Render the page over the artist page model the module builds from `overrides`. */
+const renderPage = async (overrides: Partial<ArtistPageSource> = {}) => {
+  getPublicArtist.mockResolvedValueOnce(buildArtistPageModel(source(overrides)));
   render(await ArtistDetailPage({ params }));
 };
 
@@ -155,18 +209,49 @@ describe('ArtistDetailPage', () => {
     expect(collage).toHaveAttribute('data-display-name', 'Marguerite Ash');
   });
 
-  it('leads with the latest release', async () => {
+  // A grandfathered artist with nothing chosen keeps the ADR-0008 fallback.
+  it('hands the collage the suggested images with alt text when nothing is chosen', async () => {
     await renderPage({
-      newestRelease: { id: 'r1', title: 'Release', releasedOn: new Date('2024-01-01') },
+      bioImages: [
+        image('pool', null),
+        image('bare', null, { isPrimary: true, alt: null }),
+        image('suggested', null, { isPrimary: true }),
+      ],
     });
+
+    expect(screen.getByTestId('collage')).toHaveAttribute('data-ids', 'suggested');
+  });
+
+  it('leads with the latest release', async () => {
+    await renderPage({ releases: [releaseRow('r1')] });
 
     const latest = screen.getByTestId('latest-release');
     expect(latest).toHaveAttribute('data-release-id', 'r1');
     expect(latest).toHaveAttribute('data-slug', 'marguerite-ash');
   });
 
+  it('names no album artist on a release of their own', async () => {
+    await renderPage({ releases: [releaseRow('r1')] });
+
+    expect(screen.getByTestId('latest-release')).toHaveAttribute('data-by-name', '');
+  });
+
+  it('says the latest release is by its album artist when the artist is only featured', async () => {
+    await renderPage({ releases: [releaseRow('guest', [credit('ceschi', 'Ceschi'), SELF])] });
+
+    expect(screen.getByTestId('latest-release')).toHaveAttribute('data-by-name', 'Ceschi');
+  });
+
+  it('names no album artist when that artist is hidden', async () => {
+    await renderPage({
+      releases: [releaseRow('guest', [credit('hidden', 'Hidden', null), SELF])],
+    });
+
+    expect(screen.getByTestId('latest-release')).toHaveAttribute('data-by-name', '');
+  });
+
   it('says when there is no release yet, with nothing to view', async () => {
-    await renderPage({ newestRelease: null, releases: [] });
+    await renderPage({ releases: [], memberOf: [] });
 
     expect(screen.getByText('No releases yet.')).toBeInTheDocument();
     expect(screen.queryByTestId('latest-release')).not.toBeInTheDocument();
@@ -174,10 +259,20 @@ describe('ArtistDetailPage', () => {
   });
 
   it('leads a member with only band releases to them', async () => {
-    const [ownRow] = graph().releases;
-    await renderPage({ newestRelease: null, releases: [{ ...ownRow, credit: 'member' }] });
+    await renderPage({
+      memberOf: [
+        {
+          artist: {
+            publishedOn: PUBLISHED,
+            deletedOn: null,
+            releases: [releaseRow('band-lp', [credit('band', 'The Band')])],
+          },
+        },
+      ],
+    });
 
     expect(screen.getByText('No releases of their own yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('latest-release')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View all releases' })).toHaveAttribute(
       'href',
       '/releases?artist=marguerite-ash'
@@ -248,7 +343,7 @@ describe('ArtistDetailPage', () => {
 
   describe('generateMetadata', () => {
     it('titles the page with the artist and describes it with the short bio as text', async () => {
-      getPublicArtist.mockResolvedValueOnce(graph());
+      getPublicArtist.mockResolvedValueOnce(buildArtistPageModel(source()));
 
       expect(await generateMetadata({ params })).toEqual({
         title: 'Marguerite Ash',
@@ -257,7 +352,7 @@ describe('ArtistDetailPage', () => {
     });
 
     it('falls back to a listening line without a short bio', async () => {
-      getPublicArtist.mockResolvedValueOnce(graph({ shortBio: null }));
+      getPublicArtist.mockResolvedValueOnce(buildArtistPageModel(source({ shortBio: null })));
 
       expect(await generateMetadata({ params })).toMatchObject({
         description: 'Listen to releases by Marguerite Ash.',

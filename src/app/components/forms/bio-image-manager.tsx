@@ -11,12 +11,7 @@ import { Plus } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import {
-  chosenDisplayImageIds,
-  type DisplayImageTier,
-  orderBioImagesForPicker,
-  resolveDisplayImageSet,
-} from '@/lib/utils/display-images';
+import { type DisplayImageTier, orderBioImagesForPicker } from '@/lib/utils/display-images';
 import type { BioStatusImage } from '@/lib/validation/bio-generation-schema';
 
 import { BioImageTile, resolveImageLabels } from './bio-image-tile';
@@ -30,6 +25,10 @@ export interface BioImageManagerProps {
   artistId: string;
   /** The artist's whole bio image pool (may be empty). */
   images: BioStatusImage[];
+  /** The chosen display-image ids, in order — the artist pool's. */
+  chosenIds: ArtistPool['chosenIds'];
+  /** What the public page shows right now, with its tier — the artist pool's. */
+  shown: ArtistPool['shown'];
   /** True while the pool is still loading; renders a placeholder instead of an empty pool. */
   isLoading?: boolean;
   /**
@@ -107,30 +106,24 @@ const PoolTileBadge = ({
   );
 };
 
-/** Everything the manager derives from the pool through the shared display-image rules. */
-const derivePoolView = (
-  images: BioStatusImage[],
-  filter: string
-): {
-  chosenIds: string[];
-  chosen: BioStatusImage[];
-  shownIds: Set<string>;
-  shownCopy: string | undefined;
-  pool: BioStatusImage[];
-} => {
-  const chosenIds = chosenDisplayImageIds(images);
-  // What the public page shows right now; the fallback tiers are marked on the
-  // tiles so the admin sees the same images the public does.
-  const { tier, images: shownImages } = resolveDisplayImageSet(images);
+/** The pool as the manager lists it: in picker order, narrowed by the filter. */
+const derivePoolView = (images: BioStatusImage[], filter: string): BioStatusImage[] => {
   const lower = filter.trim().toLowerCase();
-  return {
-    chosenIds,
-    chosen: chosenIds.flatMap((id) => images.filter((image) => image.id === id)),
-    shownIds: new Set(shownImages.map(({ id }) => id)),
-    shownCopy: tier === 'chosen' ? undefined : SHOWN_COPY.get(tier),
-    pool: orderBioImagesForPicker(images).filter((image) => !lower || matchesFilter(image, lower)),
-  };
+  return orderBioImagesForPicker(images).filter((image) => !lower || matchesFilter(image, lower));
 };
+
+/**
+ * The tiles the public page shows right now, and their badge copy while a
+ * fallback tier supplies them, so the admin sees the same images the public
+ * does.
+ */
+const shownView = ({
+  tier,
+  images,
+}: ArtistPool['shown']): { shownIds: Set<string>; shownCopy: string | undefined } => ({
+  shownIds: new Set(images.map(({ id }) => id)),
+  shownCopy: tier === 'chosen' ? undefined : SHOWN_COPY.get(tier),
+});
 
 const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
   (image.title ?? '').toLowerCase().includes(lower) ||
@@ -146,12 +139,13 @@ const matchesFilter = (image: BioStatusImage, lower: string): boolean =>
  * preview, delete, and edit attribution — plus alt editing and a "use as
  * display image" affordance whose disabled reason is spelled out.
  *
- * Mounts even with an empty pool, because uploading is its job too. Chosen
- * rows, the picker order, and the "Shown" badges on the images the page falls
- * back to while nothing is chosen are all derived from the pool through the
- * shared display-image rules, so this view never disagrees with the public
- * page. Every write — an upload included, and whether it joins the display
- * images — is the artist pool module's; this is a render of it.
+ * Mounts even with an empty pool, because uploading is its job too. The
+ * chosen ids and what the page shows (the "Shown" badges on the images the
+ * page falls back to while nothing is chosen) are the artist pool module's,
+ * resolved through the shared display-image rules, so this view never
+ * disagrees with the public page; it only orders the pool for the picker and
+ * filters it. Every write — an upload included, and whether it joins the
+ * display images — is the pool's too; this is a render of it.
  */
 /**
  * Why a pool tile cannot be deleted, or `null`: a published artist keeps its
@@ -167,6 +161,8 @@ const deleteDisabledReasonFor = (
 export const BioImageManager = ({
   artistId,
   images,
+  chosenIds,
+  shown,
   isLoading = false,
   loadError = null,
   onRetry,
@@ -184,7 +180,9 @@ export const BioImageManager = ({
   const hintIdBase = useId();
   const [filter, setFilter] = useState('');
 
-  const { chosenIds, chosen, shownIds, shownCopy, pool } = derivePoolView(images, filter);
+  const pool = derivePoolView(images, filter);
+  const chosen = chosenIds.flatMap((id) => images.filter((image) => image.id === id));
+  const { shownIds, shownCopy } = shownView(shown);
 
   const chooseImage = (image: BioStatusImage): void => {
     onSetDisplayImages([...chosenIds, image.id]);
