@@ -208,14 +208,14 @@ describe('publishedReleasesToSpotlightCards', () => {
 describe('SPOTLIGHT_COVER_SPAN_CLASS', () => {
   it('spans the outer cover edges of the one, two and four column grids', () => {
     // One column on phones: the cover fills the panel, so the span is the full
-    // width. From `sm`, 13rem covers centered in cells with a 1.5rem gap: the
-    // outer edges sit 100% - (cell - 13rem) apart, never more than the full
+    // width. From `sm`, 17.25rem covers centered in cells with a 1.5rem gap: the
+    // outer edges sit 100% - (cell - 17.25rem) apart, never more than the full
     // width.
     expect(SPOTLIGHT_COVER_SPAN_CLASS.split(' ')).toEqual([
       'mx-auto',
       'w-full',
-      'sm:w-[min(100%,calc(50%_+_13.75rem))]',
-      'lg:w-[min(100%,calc(75%_+_14.125rem))]',
+      'sm:w-[min(100%,calc(50%_+_18rem))]',
+      'lg:w-[min(100%,calc(75%_+_18.375rem))]',
     ]);
   });
 });

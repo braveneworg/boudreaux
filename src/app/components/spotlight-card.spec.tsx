@@ -412,8 +412,8 @@ describe('SpotlightCard', () => {
     renderCard();
 
     const card = playButton().parentElement;
-    expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-52');
-    expect(card).not.toHaveClass('max-w-52');
-    expect(SPOTLIGHT_COVER_SIZES).toBe('(min-width: 640px) 208px, 100vw');
+    expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
+    expect(card).not.toHaveClass('max-w-[17.25rem]');
+    expect(SPOTLIGHT_COVER_SIZES).toBe('(min-width: 640px) 276px, 100vw');
   });
 });

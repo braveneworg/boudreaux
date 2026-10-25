@@ -131,8 +131,8 @@ describe('HomeLoading', () => {
     render(<HomeLoading />);
 
     screen.getAllByTestId('spotlight-card-skeleton').forEach((card) => {
-      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-52');
-      expect(card).not.toHaveClass('max-w-52');
+      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
+      expect(card).not.toHaveClass('max-w-[17.25rem]');
     });
   });
 

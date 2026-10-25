@@ -55,7 +55,7 @@ export const ReleasesSkeleton = (): ReactElement => (
         <div
           key={index}
           data-testid="releases-card-skeleton"
-          className="mx-auto flex w-full flex-col gap-3 sm:max-w-52"
+          className="mx-auto flex w-full flex-col gap-3 sm:max-w-[17.25rem]"
         >
           <Skeleton className="my-0 aspect-square w-full" />
           <Skeleton className="mx-auto my-0 h-4 w-3/5" />
