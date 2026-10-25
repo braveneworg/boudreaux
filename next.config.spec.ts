@@ -55,6 +55,14 @@ describe('next.config CSS delivery', () => {
   });
 });
 
+describe('next.config agent upgrades', () => {
+  it('keeps the agent upgrade channel on security releases only', () => {
+    // Set when 16.4.0 → 16.4.3 landed for a published advisory: the channel
+    // scopes any future agent-driven upgrade to security patches.
+    expect(config.experimental?.agentUpgrade).toBe('security');
+  });
+});
+
 interface RedirectRule {
   source: string;
   destination: string;

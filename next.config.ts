@@ -240,6 +240,10 @@ const config = {
   // For local development, Next.js uses Node.js defaults which should handle larger files.
   serverExternalPackages: ['node-id3', 'winston'],
   experimental: {
+    // Agent-driven Next.js upgrades stay on the security channel: only
+    // patches for published advisories (16.4.0 → 16.4.3 was the first), never
+    // feature releases or experimental defaults.
+    agentUpgrade: 'security',
     // CSS stays an external `<link>` on purpose. `inlineCss` was tried to
     // remove the stylesheet round-trip, but Next writes the sheet into every
     // document three times — the head `<style>` plus two copies in the RSC
