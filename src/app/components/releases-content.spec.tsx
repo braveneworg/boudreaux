@@ -560,7 +560,7 @@ describe('ReleasesSkeleton', () => {
     const cards = screen.getAllByTestId('releases-card-skeleton');
     expect(cards.length).toBeGreaterThan(0);
     cards.forEach((card) => {
-      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-52');
+      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
       expect(card.children).toHaveLength(2);
       expect(card.firstElementChild).toHaveClass('aspect-square', 'w-full');
       expect(card.lastElementChild).toHaveClass('mx-auto', 'h-4');

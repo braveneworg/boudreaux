@@ -120,7 +120,7 @@ const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): Rea
 
 /**
  * One cover in a grid of release covers, on the home page and on `/releases`:
- * the cover, as wide as the panel on phones and at most 13rem from `sm`,
+ * the cover, as wide as the panel on phones and at most 17.25rem from `sm`,
  * centered in its grid cell, then a centered caption — by default the artist
  * (linked to the artist's page) and the title with its year, or with
  * `caption="releases"` the artist (linked to their releases on `/releases`)
@@ -160,7 +160,7 @@ export const SpotlightCard = ({
   });
 
   return (
-    <div className="mx-auto flex w-full flex-col gap-3 sm:max-w-52">
+    <div className="mx-auto flex w-full flex-col gap-3 sm:max-w-[17.25rem]">
       <button
         ref={coverButtonRef}
         type="button"
