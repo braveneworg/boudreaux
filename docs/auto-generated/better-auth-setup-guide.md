@@ -155,11 +155,14 @@ e.g. `https://fakefourrecords.com/api/auth/callback/google`. The path is fixed
 by better-auth and must match **byte-for-byte** (scheme, host, no trailing
 slash) or the provider returns a redirect-URI-mismatch error. Add the
 `http://localhost:3000/api/auth/callback/<provider>` variant too if you test
-OAuth locally.
+OAuth locally (X rejects `localhost`: register
+`http://127.0.0.1:3000/api/auth/callback/twitter`, run the dev server with
+`AUTH_URL=http://127.0.0.1:3000`, and browse to `127.0.0.1:3000`).
 
 **Account auto-linking** fires for `google`, `apple`, `facebook` (a verified
 email that matches an existing account links automatically). **Twitter/X is
-deliberately excluded** — X does not reliably return an email without elevated
+deliberately excluded** — X returns an email only when the app has "Request
+email from users" enabled and the user's X account has a confirmed email,
 permissions, so users link X manually from their profile.
 
 ### Registering each provider
@@ -223,20 +226,35 @@ permissions, so users link X manually from their profile.
    `<AUTH_URL>/api/auth/callback/facebook` (plus the localhost variant for dev).
    Keep **Client OAuth Login** and **Web OAuth Login** enabled and **Save
    changes**. Meta uses strict URI matching.
-5. Go to **App settings → Basic**; copy **App ID** → `FACEBOOK_CLIENT_ID` and
-   **App Secret** (click **Show**) → `FACEBOOK_CLIENT_SECRET`.
+5. Go to **App settings → Basic** and fill in what Meta requires before the
+   app can go Live: **App domains** (`fakefourrecords.com`), **Privacy policy
+   URL** (`<AUTH_URL>/legal/privacy-policy`), **Terms of service URL**
+   (`<AUTH_URL>/legal/terms-and-conditions`), **User data deletion** (choose
+   "Data deletion instructions URL" and point it at the privacy policy, which
+   documents account-deletion rights), a **Category** and an app icon. Then
+   copy **App ID** → `FACEBOOK_CLIENT_ID` and **App Secret** (click **Show**)
+   → `FACEBOOK_CLIENT_SECRET`.
 6. App Mode: a new app starts in **Development** mode — only app
-   admins/developers/testers (under **App roles**) can sign in. Toggle the app
-   to **Live** at the top of the dashboard to allow the public.
-7. `email` + `public_profile` work in Development mode. For `email` in **Live**
-   mode you must complete **business verification** (and possibly App Review for
-   advanced access), or sign-in returns no email for non-role users.
+   admins/developers/testers (under **App roles**) can sign in. Add yourself
+   as a tester, smoke the sign-in, then toggle the app to **Live** at the top
+   of the dashboard to allow the public.
+7. `email` + `public_profile` are granted automatically and need no App
+   Review (better-auth requests exactly these two scopes). Meta can still
+   omit the email for phone-only accounts or revoked consent; better-auth
+   then stores the account with `emailVerified: false`.
 
 #### Twitter / X
 
 **Console:** https://developer.x.com/en/portal/dashboard (formerly
 developer.twitter.com)
 **Provides:** `TWITTER_CLIENT_ID`, `TWITTER_CLIENT_SECRET` (OAuth 2.0)
+
+> **Cost:** X stopped offering a Free tier to new developer accounts in
+> February 2026; new accounts are pay-per-use. X states the OAuth login
+> endpoints are free, but the profile read better-auth performs during
+> sign-in (`GET /2/users/me`, twice) may be metered. Set a low spend cap on
+> the developer account before enabling the provider and watch the first
+> week of usage.
 
 1. Sign in at https://developer.x.com/en/portal/dashboard. Create a **Project**,
    then add an **App** inside it (a Project is required for OAuth 2.0 / API v2).
@@ -246,21 +264,29 @@ developer.twitter.com)
 4. Set **Type of App** to **Web App, Automated App or Bot** — the confidential
    client that yields a Client Secret.
 5. In **Callback URI / Redirect URL** enter exactly
-   `<AUTH_URL>/api/auth/callback/twitter` (plus the localhost variant for dev).
-6. Fill in the required **Website URL** (e.g. `<AUTH_URL>`), then **Save**.
-7. To get the user's email, enable **Request email from users** / the
-   `user.email` scope. This is **not** granted by default — X gates email behind
-   elevated/special permission you must apply for. Until then sign-in works but
-   X returns no email.
+   `<AUTH_URL>/api/auth/callback/twitter`. X refuses `localhost`, so the dev
+   variant is `http://127.0.0.1:3000/api/auth/callback/twitter` (see the
+   redirect-URI note above). Up to 10 URLs per app; exact match, trailing
+   slash included.
+6. Fill in the required **Website URL** (`<AUTH_URL>`) plus **Terms of
+   service** (`<AUTH_URL>/legal/terms-and-conditions`) and **Privacy policy**
+   (`<AUTH_URL>/legal/privacy-policy`) — both are required before the email
+   toggle below can be switched on — then **Save**.
+7. Turn **Request email from users** **ON**. Since April 2025 X returns the
+   user's confirmed email through the `users.email` scope, which better-auth
+   already requests by default (with `users.read`, `tweet.read` and
+   `offline.access`; `tweet.read` is required by X for `/2/users/me` even for
+   login-only apps). Without the toggle, or for an X account with no
+   confirmed email, sign-in still works but no email comes back.
 8. Open the App's **Keys and Tokens** tab → **OAuth 2.0 Client ID and Client
    Secret**: copy **Client ID** → `TWITTER_CLIENT_ID` and generate/copy **Client
    Secret** → `TWITTER_CLIENT_SECRET`. The secret is shown **once**; if lost you
    must regenerate (invalidating the old one).
 
-> Because of the email-scope gate above, X is intentionally **excluded** from
-> this app's trusted auto-linking providers — without a reliable verified email
-> the by-email account link can't match an existing user. Users who want their X
-> sign-in linked must obtain email access from X, or link manually while signed
+> Because an X email is optional per account, X is intentionally **excluded**
+> from this app's trusted auto-linking providers — without a reliable verified
+> email the by-email account link can't match an existing user. Users who want
+> their X sign-in linked can link it manually from their profile while signed
 > in.
 
 #### Apple

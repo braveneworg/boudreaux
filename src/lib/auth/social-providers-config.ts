@@ -124,12 +124,13 @@ export const buildSocialProvidersConfig = (): SocialProviders => {
  * Auto-linking fires when an OAuth provider returns a verified email that
  * matches an existing account **and** the provider is in `trustedProviders`.
  *
- * Twitter is deliberately excluded: X/Twitter does not reliably return an
- * email address without elevated app permissions (the `email` scope requires
- * explicit approval by Twitter/X). Including it in trustedProviders would
- * mean the auto-link path silently falls through on most Twitter sign-ins,
- * which is confusing. Users can manually link a Twitter account from their
- * profile (Task 7).
+ * Twitter is deliberately excluded: X only returns an email when the app has
+ * "Request email from users" enabled AND the user has a confirmed email on
+ * their X account (better-auth requests the `users.email` scope and reads
+ * `confirmed_email`; when absent it stores a placeholder email with
+ * `emailVerified: false`). Including it in trustedProviders would mean the
+ * auto-link path silently falls through on those sign-ins, which is
+ * confusing. Users can manually link an X account from their profile.
  */
 export const accountLinkingConfig: {
   enabled: boolean;

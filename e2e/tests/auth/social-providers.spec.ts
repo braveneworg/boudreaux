@@ -81,6 +81,22 @@ test.describe('Social provider sign-in initiation', () => {
     expect(request.postData() ?? '').toContain('facebook');
   });
 
+  test('clicking X (Twitter) initiates the social sign-in request', async ({ page }) => {
+    await page.goto('/signin');
+
+    const button = page.getByRole('button', { name: 'Continue with X (Twitter)' });
+    await expect(button).toBeVisible();
+
+    const [request] = await Promise.all([
+      page.waitForRequest(
+        (req) => req.url().includes('/api/auth/sign-in/social') && req.method() === 'POST'
+      ),
+      button.click(),
+    ]);
+
+    expect(request.postData() ?? '').toContain('twitter');
+  });
+
   test('a stubbed provider authorize URL is followed when present', async ({ page }) => {
     // Deterministically simulate a configured provider: intercept the social
     // sign-in call and return better-auth's redirect-branch shape
