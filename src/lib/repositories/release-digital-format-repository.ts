@@ -291,18 +291,6 @@ export class ReleaseDigitalFormatRepository {
   }
 
   /**
-   * Delete all digital-format records for a release (used by the release
-   * delete cascade, after their child files have been removed).
-   * @returns Count of deleted records
-   */
-  async deleteAllByReleaseId(releaseId: string): Promise<number> {
-    const result = await prisma.releaseDigitalFormat.deleteMany({
-      where: { releaseId },
-    });
-    return result.count;
-  }
-
-  /**
    * Recalculate trackCount and totalFileSize from child files
    */
   async updateTrackCounts(formatId: string): Promise<ReleaseDigitalFormat> {

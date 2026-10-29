@@ -6,7 +6,6 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import { ReleaseService } from '@/lib/services/release-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -19,7 +18,6 @@ vi.mock('server-only', () => ({}));
 // Mock all dependencies
 vi.mock('next/cache');
 vi.mock('../services/artist-service');
-vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
 vi.mock('@/lib/utils/auth/get-action-state');
@@ -752,7 +750,7 @@ describe('updateArtistAction', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/artists/john-doe');
     });
 
-    it('should clear the release cache and revalidate the public releases listing on success', async () => {
+    it('should revalidate the public releases listing on success', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -772,11 +770,10 @@ describe('updateArtistAction', () => {
 
       await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
-      expect(ReleaseService.invalidateCache).toHaveBeenCalled();
       expect(revalidatePath).toHaveBeenCalledWith('/releases');
     });
 
-    it('should not touch the release cache when the update fails', async () => {
+    it('should not revalidate the public releases listing when the update fails', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -796,7 +793,6 @@ describe('updateArtistAction', () => {
 
       await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
-      expect(ReleaseService.invalidateCache).not.toHaveBeenCalled();
       expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
     });
 

@@ -185,28 +185,6 @@ export class PurchaseRepository {
   }
 
   /**
-   * Delete all purchase records for a release (release delete cascade).
-   * @returns Count of deleted records
-   */
-  static async deleteAllByReleaseId(releaseId: string): Promise<number> {
-    const result = await prisma.releasePurchase.deleteMany({
-      where: { releaseId },
-    });
-    return result.count;
-  }
-
-  /**
-   * Delete all download tracking records for a release (release delete cascade).
-   * @returns Count of deleted records
-   */
-  static async deleteAllDownloadsByReleaseId(releaseId: string): Promise<number> {
-    const result = await prisma.releaseDownload.deleteMany({
-      where: { releaseId },
-    });
-    return result.count;
-  }
-
-  /**
    * Delete a purchase record by its ID. Admin-only operation for testing.
    */
   static async deleteById(purchaseId: string) {
