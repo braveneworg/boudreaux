@@ -140,7 +140,14 @@ const resolveLocation = (locations: LocationBlock[], path: string): LocationBloc
 
 const appLocations = parseLocations(readAppServerBlock(CONFIG));
 
-const OAUTH_CALLBACK_PATHS = ['/api/auth/callback/google', '/api/auth/callback/apple'] as const;
+// Every provider `social-providers-config.ts` can wire; a callback that lands
+// in a strict zone fails the OAuth round-trip (docs/lessons/nginx/).
+const OAUTH_CALLBACK_PATHS = [
+  '/api/auth/callback/google',
+  '/api/auth/callback/apple',
+  '/api/auth/callback/facebook',
+  '/api/auth/callback/twitter',
+] as const;
 
 const SESSION_PATH = '/api/auth/get-session';
 
