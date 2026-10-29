@@ -5,6 +5,7 @@
 
 import { toast } from 'sonner';
 
+import { type SocialProvider } from '@/app/components/auth/social-provider-buttons';
 import {
   AppleIcon,
   FacebookIcon,
@@ -34,8 +35,6 @@ import { Skeleton } from '@/ui/skeleton';
 import { ZinePanel } from '@/ui/zine-panel';
 
 import { useConnectedAccounts, type ConnectedAccount } from './_hooks/use-connected-accounts';
-
-type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
 
 interface ProviderConfig {
   provider: SocialProvider;
