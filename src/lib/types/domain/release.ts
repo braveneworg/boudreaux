@@ -251,18 +251,6 @@ export interface PublishedReleaseCredits {
   }>;
 }
 
-/**
- * Narrow projection for bio release-link injection — just the id and title.
- * Produced by `ReleaseRepository.findPublishedByArtist` and consumed by the
- * bio-generation service to append internal release deep links
- * (`/releases?artist=<slug>&release=<id>`) after generation (the lambda has
- * no DB access).
- */
-export interface ReleaseLinkSource {
-  id: string;
-  title: string;
-}
-
 /** Source row for injecting internal release links AND cover art after generation. */
 export interface ReleaseCoverSource {
   id: string;
@@ -272,9 +260,9 @@ export interface ReleaseCoverSource {
 }
 
 /**
- * S3-cleanup view of a release loaded before a hard delete — just the
- * digital-format files and images needed to enumerate S3 keys. Mirrors the
- * `findForDeletion` include in release-repository.
+ * S3-cleanup view of a release — just the digital-format files and images
+ * needed to enumerate S3 keys. `ReleaseRepository.delete` reads it inside its
+ * transaction and returns it once the release is gone.
  */
 export type ReleaseForDeletion = ReleaseScalars & {
   images: ImageRecord[];

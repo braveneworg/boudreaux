@@ -3,10 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { DownloadEventRepository } from '@/lib/repositories/download-event-repository';
-import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
-import { ReleaseDigitalFormatFileRepository } from '@/lib/repositories/release-digital-format-file-repository';
-import { ReleaseDigitalFormatRepository } from '@/lib/repositories/release-digital-format-repository';
 import { ReleaseRepository, type CreditPublication } from '@/lib/repositories/release-repository';
 import { CreditDecisionError } from '@/lib/types/domain/errors';
 import type {
@@ -18,7 +14,6 @@ import type {
   ReleaseForDeletion,
   ReleaseListQuery,
   ReleaseListItem,
-  ReleaseScalars,
   UpdateReleaseData,
 } from '@/lib/types/domain/release';
 import { publicCredits, withPublicByline } from '@/lib/utils/artist-release-credits';
@@ -82,10 +77,6 @@ const failFromReleaseWrite = (
     ? { success: false, code: error.code, error: error.message }
     : failFromError(error, overrides);
 
-const digitalFormatRepository = new ReleaseDigitalFormatRepository();
-const digitalFormatFileRepository = new ReleaseDigitalFormatFileRepository();
-const downloadEventRepository = new DownloadEventRepository();
-
 /**
  * Collect every S3 key that should be removed when a release is hard-deleted:
  * the stored `s3Key` of each digital-format file plus the keys derived from the
@@ -112,6 +103,15 @@ const collectReleaseS3Keys = (release: ReleaseForDeletion): string[] => {
   }
 
   return s3Keys;
+};
+
+/**
+ * Clear the cached public published-releases listing pages
+ * ({@link ReleaseService.getPublishedReleases}) after a write that can change
+ * which releases are listed or how they render.
+ */
+const invalidatePublishedReleases = (): void => {
+  cache.deleteByPrefix(PUBLISHED_RELEASES_CACHE_PREFIX);
 };
 
 export class ReleaseService {
@@ -188,7 +188,8 @@ export class ReleaseService {
    * Update a release by ID. The credits the write names are stored, and, when
    * the write publishes, the admin's decisions are checked against them and
    * the confirmed artists published — all in the release's own transaction
-   * (ADR-0015), so a refused check or a failed write keeps none of it.
+   * (ADR-0015), so a refused check or a failed write keeps none of it. A
+   * write that goes through clears the cached published-releases listing.
    */
   static async updateRelease(
     id: string,
@@ -201,6 +202,7 @@ export class ReleaseService {
         artistIds: confirmation.creditArtistIds,
         publish: publishes ? publicationOf(confirmation, new Date()) : undefined,
       });
+      invalidatePublishedReleases();
       if (publishes) {
         // A published release's credits name its bylines.
         invalidatePublicNameCaches();
@@ -216,50 +218,21 @@ export class ReleaseService {
   }
 
   /**
-   * Delete a release by ID (hard delete).
-   * Cascades to delete all related data EXCEPT Artist records.
-   * Deletes S3 objects for digital format files and images. Returns the
-   * deleted release's scalars; its relations are gone with it.
+   * Delete a release by ID (hard delete). The repository removes it and every
+   * row keyed to it in one transaction, keeping Artist records, so a failed
+   * delete changes nothing. Only once it has gone through is the cached
+   * published-releases listing cleared and are the S3 objects of its
+   * digital-format files and images removed, best-effort. Returns the deleted
+   * release with the files and images it had.
    */
-  static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseScalars>> {
+  static async deleteRelease(id: string): Promise<ServiceResponse<ReleaseForDeletion>> {
     try {
-      // Verify release exists and fetch related data for S3 cleanup
-      const existing = await ReleaseRepository.findForDeletion(id);
-
-      if (!existing) {
-        return { success: false, error: 'Release not found', code: 'NOT_FOUND' };
-      }
-
-      // Collect S3 keys (digital-format files + image/coverArt URLs) for cleanup.
-      const s3KeysToDelete = collectReleaseS3Keys(existing);
-
-      // Delete related records in dependency order (children first).
-      // 1. Digital format files (children of ReleaseDigitalFormat) — one delete
-      //    per format, run together since they target disjoint format ids.
-      await Promise.all(
-        existing.digitalFormats.map((format) =>
-          digitalFormatFileRepository.deleteAllByFormatId(format.id)
-        )
-      );
-
-      // 2. Everything else keyed off the release id touches a different
-      //    collection, so the remaining cascade deletes run concurrently.
-      await Promise.all([
-        digitalFormatRepository.deleteAllByReleaseId(id),
-        PurchaseRepository.deleteAllByReleaseId(id),
-        PurchaseRepository.deleteAllDownloadsByReleaseId(id),
-        downloadEventRepository.deleteAllByReleaseId(id),
-        ReleaseRepository.deleteReleaseUrls(id),
-        ReleaseRepository.deleteImages(id),
-        ReleaseRepository.deleteArtistReleases(id),
-        ReleaseRepository.clearFeaturedArtistReferences(id),
-      ]);
-
-      // 3. Delete the release itself, after all of its references are gone.
       const release = await ReleaseRepository.delete(id);
+      const s3Keys = collectReleaseS3Keys(release);
+      invalidatePublishedReleases();
 
-      // 10. Best-effort S3 cleanup (async, fire-and-forget)
-      Promise.allSettled(s3KeysToDelete.map((key) => deleteS3Object(key))).catch(() => {
+      // Best-effort S3 cleanup once the delete has committed (fire-and-forget)
+      Promise.allSettled(s3Keys.map((key) => deleteS3Object(key))).catch(() => {
         // Silently ignore — S3 objects will be cleaned up by lifecycle rules
       });
 
@@ -268,38 +241,6 @@ export class ReleaseService {
       return failFromError(error, {
         NOT_FOUND: 'Release not found',
         UNKNOWN: 'Failed to delete release',
-      });
-    }
-  }
-
-  /**
-   * Soft delete a release by ID (set deletedOn timestamp)
-   */
-  static async softDeleteRelease(id: string): Promise<ServiceResponse<Release>> {
-    try {
-      const release = await ReleaseRepository.softDelete(id);
-
-      return { success: true, data: release };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Release not found',
-        UNKNOWN: 'Failed to soft delete release',
-      });
-    }
-  }
-
-  /**
-   * Restore a soft-deleted release by ID (clear deletedOn timestamp)
-   */
-  static async restoreRelease(id: string): Promise<ServiceResponse<Release>> {
-    try {
-      const release = await ReleaseRepository.restore(id);
-
-      return { success: true, data: release };
-    } catch (error) {
-      return failFromError(error, {
-        NOT_FOUND: 'Release not found',
-        UNKNOWN: 'Failed to restore release',
       });
     }
   }
@@ -346,7 +287,9 @@ export class ReleaseService {
    * `artist` slug (only releases crediting that public artist). Only the
    * default, unsearched and unfiltered first page is cached (10 min in
    * production) — searched, artist-filtered and offset pages vary too much to
-   * share a cache entry.
+   * share a cache entry. This service clears the cache itself when a release
+   * write goes through (update, publish, delete); artist writes clear it with
+   * `invalidatePublicNameCaches`.
    */
   static async getPublishedReleases(
     params?: PublishedReleaseFilters
@@ -380,18 +323,6 @@ export class ReleaseService {
     }
 
     return withCache(`${PUBLISHED_RELEASES_CACHE_PREFIX}${take}`, fetchReleases, 600);
-  }
-
-  /**
-   * Clear the cached public published-releases listing pages.
-   *
-   * The default first page is cached for 10 minutes by
-   * {@link ReleaseService.getPublishedReleases}; call this after any mutation
-   * that changes which releases are published — or how they render — so the
-   * public `/releases` listing reflects the change before the TTL expires.
-   */
-  static invalidateCache(): void {
-    cache.deleteByPrefix(PUBLISHED_RELEASES_CACHE_PREFIX);
   }
 
   /**
@@ -443,11 +374,6 @@ export class ReleaseService {
     deletedOn: Date | null;
   } | null> {
     return ReleaseRepository.findByTitleInsensitive(title);
-  }
-
-  /** Restore a soft-deleted release that a find-or-create matched. */
-  static async restoreFoundRelease(id: string): Promise<void> {
-    await ReleaseRepository.updateData(id, { deletedOn: null });
   }
 
   /**
