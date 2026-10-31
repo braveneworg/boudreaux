@@ -186,7 +186,7 @@ test.describe('Releases — cover grid + listening modal', () => {
   for (const { width, columns } of [
     { width: 375, columns: 1 },
     { width: 768, columns: 2 },
-    { width: 1280, columns: 4 },
+    { width: 1280, columns: 3 },
   ]) {
     test(`puts the search above the wordmark and the covers ${columns} to a row at ${width}px`, async ({
       page,
