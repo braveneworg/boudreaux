@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 
 import {
+  SPOTLIGHT_CARD_CLASS,
   SPOTLIGHT_COVER_SIZES,
   type SpotlightCard as SpotlightCardData,
 } from '@/utils/spotlight-card';
@@ -162,18 +163,31 @@ describe('SpotlightCard', () => {
     expect(playButton()).toHaveTextContent('Spot Album');
   });
 
-  it('captions the cover with the linked artist in semibold, then the title and year as text', () => {
+  it('captions the cover with the linked artist in semibold, then the title, then the year', () => {
     renderCard();
 
     const artist = screen.getByRole('link', { name: 'Spot Artist' });
     expect(artist).toHaveAttribute('href', '/artists/spot-artist');
     expect(artist.parentElement).toHaveClass('font-semibold');
-    expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
+    const title = screen.getByText('Spot Album', { exact: true });
+    const year = screen.getByText('2024', { exact: true });
+    expect(title).not.toHaveClass('font-semibold');
+    expect(artist.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.compareDocumentPosition(year) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Spot Album (2024)')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Spot Album' })).not.toBeInTheDocument();
-    expect(artist.parentElement?.parentElement).toHaveClass('text-center');
+    expect(title.parentElement).toHaveClass('text-center');
   });
 
-  it('captions a /releases cover with the artist, linked to their releases, above the title alone', () => {
+  it('sets the year line off from the title in a quieter ink', () => {
+    renderCard();
+
+    const year = screen.getByText('2024', { exact: true });
+    expect(year).toHaveClass('text-zinc-700');
+    expect(screen.getByText('Spot Album', { exact: true })).not.toHaveClass('text-zinc-700');
+  });
+
+  it('captions a /releases cover with the artist, linked to their releases, above the title and year', () => {
     renderCard({}, { caption: 'releases' });
 
     const artist = screen.getByRole('link', { name: 'Spot Artist' });
@@ -181,8 +195,10 @@ describe('SpotlightCard', () => {
     expect(artist).toHaveClass('underline', 'underline-offset-4', 'hover:no-underline');
     expect(artist.parentElement).toHaveClass('font-semibold');
     const title = screen.getByText('Spot Album', { exact: true });
+    const year = screen.getByText('2024', { exact: true });
     expect(title).not.toHaveClass('font-semibold');
     expect(artist.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.compareDocumentPosition(year) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('Spot Album (2024)')).not.toBeInTheDocument();
     expect(title.parentElement).toHaveClass('text-center');
   });
@@ -268,7 +284,8 @@ describe('SpotlightCard', () => {
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('Spot Artist')).toBeInTheDocument();
-    expect(screen.getByText('Spot Album (2024)')).toBeInTheDocument();
+    expect(screen.getByText('Spot Album', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('2024', { exact: true })).toBeInTheDocument();
   });
 
   it("plays the card's track from the cover click", async () => {
@@ -408,12 +425,11 @@ describe('SpotlightCard', () => {
     expect(playButton().querySelector('[data-slot="spotlight-tape"]')).toBeNull();
   });
 
-  it('fills the phone width and caps the card at the cover width its sizes name from sm', () => {
+  it('lays the card out with the shared card class: phone-wide, the 21rem cover cap from sm', () => {
     renderCard();
 
     const card = playButton().parentElement;
-    expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
-    expect(card).not.toHaveClass('max-w-[17.25rem]');
-    expect(SPOTLIGHT_COVER_SIZES).toBe('(min-width: 640px) 276px, 100vw');
+    expect(card).toHaveAttribute('class', SPOTLIGHT_CARD_CLASS);
+    expect(card).not.toHaveClass('max-w-[21rem]');
   });
 });

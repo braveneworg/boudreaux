@@ -19,34 +19,46 @@ import {
  * The `sizes` of a spotlight card's cover. On a phone the one-column card
  * fills the panel, so the cover is as wide as the viewport less the panel's
  * padding; `100vw` is the safe ceiling. From `sm` the card is capped at
- * `sm:max-w-[17.25rem]` (276px, a third wider than the 13rem it grew from so
- * the artwork leads the page), and every grid cell is at least that wide, so the
- * cover renders at 276px. The home page's cover preload uses the same string
- * as its `imagesizes`, so the preload and the card pick the same variant.
+ * `sm:max-w-[21rem]` (336px, see {@link SPOTLIGHT_CARD_CLASS}); a cell
+ * narrower than that (two columns on a narrow tablet) renders a smaller cover,
+ * which the next-larger variant still covers. The home page's cover preload
+ * uses the same string as its `imagesizes`, so the preload and the card pick
+ * the same variant.
  */
-export const SPOTLIGHT_COVER_SIZES = '(min-width: 640px) 276px, 100vw';
+export const SPOTLIGHT_COVER_SIZES = '(min-width: 640px) 336px, 100vw';
+
+/**
+ * One card of the cover grid — the cover over its caption — on the home page,
+ * on `/releases`, and in both pages' loading skeletons: as wide as the panel
+ * on phones, centered in its cell and capped at the 21rem cover from `sm`.
+ * {@link SPOTLIGHT_COVER_SIZES} and {@link SPOTLIGHT_COVER_SPAN_CLASS} assume
+ * the cap, so change them together.
+ */
+export const SPOTLIGHT_CARD_CLASS = 'mx-auto flex w-full flex-col gap-3 sm:max-w-[21rem]';
 
 /**
  * Width, centered, from the left edge of the grid's first cover to the right
  * edge of its last column's cover, so a row above the grid (a page's search)
  * lines up with the covers. On a phone the single cover fills the panel, so
- * the span is the full width. From `sm` each 17.25rem cover is centered in a
- * cell, and cells sit 1.5rem apart (`gap-x-6`), so the outer edges lie
- * `100% - (cell - 17.25rem)` apart: `50% + 18rem` in two columns (`sm`),
- * `75% + 18.375rem` in four (`lg`). `min(100%, …)` covers cells narrower than
- * 17.25rem, where the covers fill them. Change it with the grid's gap, columns or
- * cover cap.
+ * the span is the full width. From `sm` each 21rem cover is centered in a
+ * cell, and cells sit 3rem apart (`gap-x-12`), so the outer edges lie
+ * `100% - (cell - 21rem)` apart: `50% + 1.5rem + 21rem` in two columns
+ * (`sm`), `200%/3 + 2rem + 21rem` in three (`lg`). `min(100%, …)` covers
+ * cells narrower than 21rem, where the covers fill them. Change it with the
+ * grid's gap, columns or cover cap.
  */
 export const SPOTLIGHT_COVER_SPAN_CLASS =
-  'mx-auto w-full sm:w-[min(100%,calc(50%_+_18rem))] lg:w-[min(100%,calc(75%_+_18.375rem))]';
+  'mx-auto w-full sm:w-[min(100%,calc(50%_+_22.5rem))] lg:w-[min(100%,calc(200%/3_+_23rem))]';
 
 /**
  * The cover grid of the home page and `/releases`: one column on phones, two
- * from `sm`, four from `lg`. {@link SPOTLIGHT_COVER_SPAN_CLASS} assumes these
- * columns and the `gap-x-6`, so change them together.
+ * from `sm`, three from `lg`, with room between the covers (3rem across, and
+ * 2.5rem, 3.5rem, then 4.5rem down as the columns grow) so the artwork
+ * breathes. {@link SPOTLIGHT_COVER_SPAN_CLASS} assumes these columns and the
+ * `gap-x-12`, so change them together.
  */
 export const SPOTLIGHT_GRID_CLASS =
-  'grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4';
+  'grid grid-cols-1 gap-x-12 gap-y-10 sm:grid-cols-2 sm:gap-y-14 lg:grid-cols-3 lg:gap-y-18';
 
 /** One cover in the home or `/releases` grid, from a spotlight or a published release. */
 export interface SpotlightCard {

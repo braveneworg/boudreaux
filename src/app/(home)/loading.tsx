@@ -8,16 +8,20 @@ import { ZinePanel } from '@/components/ui/zine-panel';
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
 import { cn } from '@/lib/utils';
 import { buildBannerPreloadUrl } from '@/lib/utils/cloudfront-loader';
-import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/lib/utils/spotlight-card';
+import {
+  SPOTLIGHT_CARD_CLASS,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  SPOTLIGHT_GRID_CLASS,
+} from '@/lib/utils/spotlight-card';
 import { PageContainer } from '@/ui/page-container';
 
-/** Cover skeletons in the grid fallback: one row of the four-up desktop grid. */
-const SKELETON_CARD_COUNT = 4;
+/** Cover skeletons in the grid fallback: one row of the three-up desktop grid. */
+const SKELETON_CARD_COUNT = 3;
 
 /**
  * Suspense fallback for `/`. It mirrors the hydrated landing layout at every
  * breakpoint — carousel below `md`, stitched BannerStrip frame at `md`+, and
- * the ZinePanel with the wordmark, the search and the 1/2/4-column spotlight
+ * the ZinePanel with the wordmark, the search and the 1/2/3-column spotlight
  * grid — so client-side navigations swap skeleton → page in place instead of
  * flashing a different layout for the duration of the dynamic render (~300ms
  * warm).
@@ -102,22 +106,17 @@ export default function HomeLoading() {
               />
             </div>
             {/* Spotlight grid skeleton — the SpotlightGrid columns, each card a
-                square cover (panel-wide on phones, 17.25rem from `sm`), centered
-                in its cell, over a centered two-line caption. */}
-            <div
-              data-testid="spotlight-grid-skeleton"
-              className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4"
-            >
+                square cover (panel-wide on phones, 21rem from `sm`), centered
+                in its cell, over a centered three-line caption: artist, title,
+                year. */}
+            <div data-testid="spotlight-grid-skeleton" className={SPOTLIGHT_GRID_CLASS}>
               {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
-                <div
-                  key={i}
-                  data-testid="spotlight-card-skeleton"
-                  className="mx-auto flex w-full flex-col gap-3 sm:max-w-[17.25rem]"
-                >
+                <div key={i} data-testid="spotlight-card-skeleton" className={SPOTLIGHT_CARD_CLASS}>
                   <div className="bg-muted aspect-square w-full animate-pulse border-2 border-black" />
                   <div className="flex flex-col items-center gap-1.5">
                     <div className="bg-muted h-4 w-2/5 animate-pulse" />
                     <div className="bg-muted h-4 w-3/5 animate-pulse" />
+                    <div className="bg-muted h-4 w-1/5 animate-pulse" />
                   </div>
                 </div>
               ))}

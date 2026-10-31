@@ -10,8 +10,8 @@ import type { Locator, Page } from '@playwright/test';
 /**
  * E2E coverage for the public releases listing:
  *  - Releases listing: laid out like the home page — the search, then the
- *    RELEASES wordmark, then a 1/2/4-column grid of covers captioned with the
- *    artist above the title. A cover opens the home page's listening modal on
+ *    RELEASES wordmark, then a 1/2/3-column grid of covers captioned with the
+ *    artist above the title and year. A cover opens the home page's listening modal on
  *    the release's first track, in the page's cyan accent.
  *  - Artist filter: a caption's artist link lists every release that artist
  *    holds a credit on, their band's included (`/releases?artist=<slug>`),
@@ -81,7 +81,7 @@ test.describe('Releases — cover grid + listening modal', () => {
     expect(html).toContain(`alt="${RELEASE_TITLE} cover art"`);
   });
 
-  test('captions the cover with the artist, linked to their releases, above the title', async ({
+  test('captions the cover with the artist, linked to their releases, above the title, above the year', async ({
     page,
   }) => {
     await page.goto('/releases');
@@ -90,12 +90,14 @@ test.describe('Releases — cover grid + listening modal', () => {
     const card = page.getByRole('listitem').filter({ has: cover });
     const artist = card.getByRole('link', { name: ARTIST_NAME, exact: true });
     const title = card.getByText(RELEASE_TITLE, { exact: true });
+    const year = card.getByText('2024', { exact: true });
     await expect(artist).toHaveAttribute('href', `/releases?artist=${ARTIST_SLUG}`);
-    await expect(card).toHaveText(`${ARTIST_NAME}${RELEASE_TITLE}`);
+    await expect(card).toHaveText(`${ARTIST_NAME}${RELEASE_TITLE}2024`);
     await expect(card.getByRole('link')).toHaveCount(1);
 
-    const [artistBox, titleBox] = await edgesOfAll([artist, title]);
+    const [artistBox, titleBox, yearBox] = await edgesOfAll([artist, title, year]);
     expect(artistBox.bottom).toBeLessThanOrEqual(titleBox.top);
+    expect(titleBox.bottom).toBeLessThanOrEqual(yearBox.top);
   });
 
   test('an artist link lists that artist’s releases, their band’s included, and the all-artists link lists every release again', async ({
@@ -184,7 +186,7 @@ test.describe('Releases — cover grid + listening modal', () => {
   for (const { width, columns } of [
     { width: 375, columns: 1 },
     { width: 768, columns: 2 },
-    { width: 1280, columns: 4 },
+    { width: 1280, columns: 3 },
   ]) {
     test(`puts the search above the wordmark and the covers ${columns} to a row at ${width}px`, async ({
       page,

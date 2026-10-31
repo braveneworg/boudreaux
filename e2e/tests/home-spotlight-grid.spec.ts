@@ -125,7 +125,8 @@ test.describe('home spotlight grid', () => {
     expect(html).toContain('alt="E2E Album One cover art"');
     expect(html).toContain(`aria-label="${COVER_NAME}"`);
     expect(html).toContain('>E2E Featured Artist</a>');
-    expect(html).toContain('>E2E Album One (2024)</p>');
+    expect(html).toContain('>E2E Album One</p>');
+    expect(html).toContain('>2024</p>');
   });
 
   test('captions the card with the linked artist, then the title and year', async ({ page }) => {
@@ -137,7 +138,8 @@ test.describe('home spotlight grid', () => {
     await expect(
       card.getByRole('link', { name: 'E2E Featured Artist', exact: true })
     ).toHaveAttribute('href', '/artists/e2e-artist', { timeout: 15_000 });
-    await expect(card.getByText('E2E Album One (2024)', { exact: true })).toBeVisible();
+    await expect(card.getByText('E2E Album One', { exact: true })).toBeVisible();
+    await expect(card.getByText('2024', { exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'E2E Album One', exact: true })).toHaveCount(0);
   });
 
