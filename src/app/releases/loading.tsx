@@ -9,7 +9,7 @@ import { ZinePanel } from '@/app/components/ui/zine-panel';
 /**
  * Suspense fallback for `/releases`: the page's cyan zine panel around the
  * skeleton the listing itself shows while its first page loads — the search
- * bar, the wordmark and the 1/2/4-column cover grid — so a navigation swaps
+ * bar, the wordmark and the 1/2/3-column cover grid — so a navigation swaps
  * skeleton → page in place.
  */
 export default function ReleasesLoading() {

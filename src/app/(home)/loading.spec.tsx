@@ -4,7 +4,11 @@
 import { render, screen } from '@testing-library/react';
 
 import { BANNER_ASPECT_PADDING, BANNER_SLOTS } from '@/lib/constants/banner-slots';
-import { SPOTLIGHT_COVER_SPAN_CLASS } from '@/lib/utils/spotlight-card';
+import {
+  SPOTLIGHT_CARD_CLASS,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  SPOTLIGHT_GRID_CLASS,
+} from '@/lib/utils/spotlight-card';
 
 import HomeLoading from './loading';
 
@@ -105,34 +109,37 @@ describe('HomeLoading', () => {
     expect(screen.getByTestId('search-skeleton')).toContainElement(hint);
   });
 
-  it('lays the cover skeletons out one, two, then four to a row', () => {
+  it('lays the cover skeletons out in the shared one, two, three column grid', () => {
     render(<HomeLoading />);
 
-    expect(screen.getByTestId('spotlight-grid-skeleton')).toHaveClass(
-      'grid',
-      'grid-cols-1',
-      'sm:grid-cols-2',
-      'lg:grid-cols-4'
+    expect(screen.getByTestId('spotlight-grid-skeleton')).toHaveAttribute(
+      'class',
+      SPOTLIGHT_GRID_CLASS
     );
   });
 
-  it('gives each card skeleton a square cover and caption bars', () => {
+  it('shows one row of the three-up desktop grid', () => {
+    render(<HomeLoading />);
+
+    expect(screen.getAllByTestId('spotlight-card-skeleton')).toHaveLength(3);
+  });
+
+  it('gives each card skeleton a square cover and three caption bars', () => {
     render(<HomeLoading />);
 
     const cards = screen.getAllByTestId('spotlight-card-skeleton');
     expect(cards.length).toBeGreaterThan(0);
     cards.forEach((card) => {
       expect(card.firstElementChild).toHaveClass('aspect-square');
-      expect(card.lastElementChild?.children).toHaveLength(2);
+      expect(card.lastElementChild?.children).toHaveLength(3);
     });
   });
 
-  it('keeps each card skeleton to the card width: full on phones, the cover cap from sm', () => {
+  it('keeps each card skeleton to the shared card class: full on phones, the cover cap from sm', () => {
     render(<HomeLoading />);
 
     screen.getAllByTestId('spotlight-card-skeleton').forEach((card) => {
-      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
-      expect(card).not.toHaveClass('max-w-[17.25rem]');
+      expect(card).toHaveAttribute('class', SPOTLIGHT_CARD_CLASS);
     });
   });
 

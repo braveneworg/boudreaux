@@ -17,6 +17,7 @@ import { useInfinitePublishedReleasesQuery } from '@/hooks/queries/use-infinite-
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import {
   publishedReleasesToSpotlightCards,
+  SPOTLIGHT_CARD_CLASS,
   SPOTLIGHT_COVER_SPAN_CLASS,
   SPOTLIGHT_GRID_CLASS,
 } from '@/lib/utils/spotlight-card';
@@ -25,14 +26,15 @@ import { DeepLinkPlayDialog, type DeepLinkRelease } from './deep-link-play-dialo
 import { ReleaseSearchCombobox } from './release-search-combobox';
 import { SpotlightCard } from './spotlight-card';
 
-/** Cover skeletons in the loading grid: two rows of the four-up desktop grid. */
-const SKELETON_CARD_COUNT = 8;
+/** Cover skeletons in the loading grid: two rows of the three-up desktop grid. */
+const SKELETON_CARD_COUNT = 6;
 
 /**
  * Loading skeleton mirroring the real layout — the search bar and the
- * RELEASES wordmark in the cover-span column, then the 1/2/4-column grid of
- * square covers over a one-line caption — so nothing jumps when the first
- * page lands. Also the `/releases` route's `loading.tsx` fallback.
+ * RELEASES wordmark in the cover-span column, then the 1/2/3-column grid of
+ * square covers over a three-line caption (artist, title, year) — so nothing
+ * jumps when the first page lands. Also the `/releases` route's `loading.tsx`
+ * fallback.
  */
 export const ReleasesSkeleton = (): ReactElement => (
   <div aria-busy="true">
@@ -52,13 +54,13 @@ export const ReleasesSkeleton = (): ReactElement => (
     </div>
     <div data-testid="releases-grid-skeleton" className={SPOTLIGHT_GRID_CLASS}>
       {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-        <div
-          key={index}
-          data-testid="releases-card-skeleton"
-          className="mx-auto flex w-full flex-col gap-3 sm:max-w-[17.25rem]"
-        >
+        <div key={index} data-testid="releases-card-skeleton" className={SPOTLIGHT_CARD_CLASS}>
           <Skeleton className="my-0 aspect-square w-full" />
-          <Skeleton className="mx-auto my-0 h-4 w-3/5" />
+          <div className="flex flex-col items-center gap-1.5">
+            <Skeleton className="my-0 h-4 w-2/5" />
+            <Skeleton className="my-0 h-4 w-3/5" />
+            <Skeleton className="my-0 h-4 w-1/5" />
+          </div>
         </div>
       ))}
     </div>

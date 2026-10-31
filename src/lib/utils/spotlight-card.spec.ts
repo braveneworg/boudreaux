@@ -9,6 +9,8 @@ import type {
 
 import {
   publishedReleasesToSpotlightCards,
+  SPOTLIGHT_CARD_CLASS,
+  SPOTLIGHT_COVER_SIZES,
   SPOTLIGHT_COVER_SPAN_CLASS,
   SPOTLIGHT_GRID_CLASS,
   toSpotlightCards,
@@ -206,29 +208,51 @@ describe('publishedReleasesToSpotlightCards', () => {
 });
 
 describe('SPOTLIGHT_COVER_SPAN_CLASS', () => {
-  it('spans the outer cover edges of the one, two and four column grids', () => {
+  it('spans the outer cover edges of the one, two and three column grids', () => {
     // One column on phones: the cover fills the panel, so the span is the full
-    // width. From `sm`, 17.25rem covers centered in cells with a 1.5rem gap: the
-    // outer edges sit 100% - (cell - 17.25rem) apart, never more than the full
-    // width.
+    // width. From `sm`, 21rem covers centered in cells with a 3rem gap: the
+    // outer edges sit 100% - (cell - 21rem) apart, never more than the full
+    // width — `50% + 1.5rem + 21rem` in two columns, `200%/3 + 2rem + 21rem`
+    // in three.
     expect(SPOTLIGHT_COVER_SPAN_CLASS.split(' ')).toEqual([
       'mx-auto',
       'w-full',
-      'sm:w-[min(100%,calc(50%_+_18rem))]',
-      'lg:w-[min(100%,calc(75%_+_18.375rem))]',
+      'sm:w-[min(100%,calc(50%_+_22.5rem))]',
+      'lg:w-[min(100%,calc(200%/3_+_23rem))]',
     ]);
   });
 });
 
 describe('SPOTLIGHT_GRID_CLASS', () => {
-  it('lays the covers out one, two, then four to a row, with the gaps the span assumes', () => {
+  it('lays the covers out one, two, then three to a row, with the gaps the span assumes', () => {
     expect(SPOTLIGHT_GRID_CLASS.split(' ')).toEqual([
       'grid',
       'grid-cols-1',
-      'gap-x-6',
-      'gap-y-8',
+      'gap-x-12',
+      'gap-y-10',
       'sm:grid-cols-2',
-      'lg:grid-cols-4',
+      'sm:gap-y-14',
+      'lg:grid-cols-3',
+      'lg:gap-y-18',
     ]);
+  });
+});
+
+describe('SPOTLIGHT_CARD_CLASS', () => {
+  it('fills the phone width and caps the card at the 21rem cover from sm', () => {
+    expect(SPOTLIGHT_CARD_CLASS.split(' ')).toEqual([
+      'mx-auto',
+      'flex',
+      'w-full',
+      'flex-col',
+      'gap-3',
+      'sm:max-w-[21rem]',
+    ]);
+  });
+});
+
+describe('SPOTLIGHT_COVER_SIZES', () => {
+  it('names the 21rem cover cap from sm and the viewport below it', () => {
+    expect(SPOTLIGHT_COVER_SIZES).toBe('(min-width: 640px) 336px, 100vw');
   });
 });

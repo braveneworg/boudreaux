@@ -10,7 +10,11 @@ import userEvent from '@testing-library/user-event';
 import { useInfinitePublishedReleasesQuery } from '@/hooks/queries/use-infinite-published-releases-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { PublishedReleaseListing } from '@/lib/types/media-models';
-import { SPOTLIGHT_COVER_SPAN_CLASS, SPOTLIGHT_GRID_CLASS } from '@/utils/spotlight-card';
+import {
+  SPOTLIGHT_CARD_CLASS,
+  SPOTLIGHT_COVER_SPAN_CLASS,
+  SPOTLIGHT_GRID_CLASS,
+} from '@/utils/spotlight-card';
 
 import { ReleasesContent, ReleasesSkeleton } from './releases-content';
 
@@ -554,16 +558,27 @@ describe('ReleasesSkeleton', () => {
     ).toBeTruthy();
   });
 
-  it('gives each card skeleton a square cover over one centered caption line', () => {
+  it('shows two rows of the three-up desktop grid', () => {
+    render(<ReleasesSkeleton />);
+
+    expect(screen.getAllByTestId('releases-card-skeleton')).toHaveLength(6);
+  });
+
+  it('gives each card skeleton a square cover over three centered caption bars', () => {
     render(<ReleasesSkeleton />);
 
     const cards = screen.getAllByTestId('releases-card-skeleton');
     expect(cards.length).toBeGreaterThan(0);
     cards.forEach((card) => {
-      expect(card).toHaveClass('mx-auto', 'w-full', 'sm:max-w-[17.25rem]');
+      expect(card).toHaveAttribute('class', SPOTLIGHT_CARD_CLASS);
       expect(card.children).toHaveLength(2);
       expect(card.firstElementChild).toHaveClass('aspect-square', 'w-full');
-      expect(card.lastElementChild).toHaveClass('mx-auto', 'h-4');
+      const caption = card.lastElementChild;
+      expect(caption).toHaveClass('items-center');
+      expect(caption?.children).toHaveLength(3);
+      Array.from(caption?.children ?? []).forEach((bar) => {
+        expect(bar).toHaveClass('h-4');
+      });
     });
   });
 });

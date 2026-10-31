@@ -50,14 +50,14 @@ describe('SpotlightGrid', () => {
     expect(items.map((item) => item.textContent)).toEqual(['Album 0', 'Album 1', 'Album 2']);
   });
 
-  it('lays the cards out one, two, then four to a row', () => {
+  it('lays the cards out one, two, then three to a row', () => {
     render(<SpotlightGrid cards={makeCards(1)} />);
 
     expect(screen.getByRole('list')).toHaveClass(
       'grid',
       'grid-cols-1',
       'sm:grid-cols-2',
-      'lg:grid-cols-4'
+      'lg:grid-cols-3'
     );
   });
 
