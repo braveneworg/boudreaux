@@ -111,6 +111,7 @@ vi.mock('./data-view', () => ({
           type="checkbox"
           role="switch"
           aria-label="Show deleted"
+          aria-checked={filters.showDeleted}
           checked={filters.showDeleted}
           onChange={(e) => filters.onShowDeletedChange(e.target.checked)}
         />

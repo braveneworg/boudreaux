@@ -260,19 +260,19 @@ fi
 echo "✅ TypeScript type-check passed"
 
 echo ""
-echo "🔎 Running ESLint before push..."
-stage="ESLint (pnpm run lint)"
+echo "🔎 Running oxlint before push..."
+stage="oxlint (pnpm run lint)"
 
 pnpm run lint
 
 if [ $? -ne 0 ]; then
   echo ""
-  echo "❌ ESLint found errors or warnings. Please fix them before pushing."
+  echo "❌ oxlint found errors or warnings. Please fix them before pushing."
   echo "   Run 'pnpm run lint' to see all issues."
   exit 1
 fi
 
-echo "✅ ESLint passed"
+echo "✅ oxlint passed"
 
 echo ""
 echo "🎨 Running Prettier format check before push..."

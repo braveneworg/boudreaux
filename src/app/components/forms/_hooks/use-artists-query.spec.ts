@@ -32,7 +32,7 @@ describe('useArtistsQuery', () => {
 
     renderHook(() => useArtistsQuery(['a', '']));
 
-    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { queries } = mockUseQueries.mock.calls[0][0] as { queries: MockQueryConfig[] };
 
     expect(queries[0]?.queryKey).toEqual(['artists', 'detail', 'a']);
     expect(queries[0]?.enabled).toBe(true);
@@ -45,7 +45,7 @@ describe('useArtistsQuery', () => {
 
     renderHook(() => useArtistsQuery(['a']));
 
-    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { queries } = mockUseQueries.mock.calls[0][0] as { queries: MockQueryConfig[] };
     const { signal } = new AbortController();
 
     await expect(queries[0]?.queryFn({ signal })).resolves.toBeNull();

@@ -70,6 +70,7 @@ vi.mock('@/app/components/ui/switch', () => ({
       data-testid="switch-input"
       type="checkbox"
       role="switch"
+      aria-checked={checked}
       checked={checked}
       id={id}
       onChange={(e) => onCheckedChange?.(e.target.checked)}

@@ -738,8 +738,9 @@ describe('ReleaseRepository', () => {
 
       await ReleaseRepository.findPublished({ search: 'Doe', artist: 'e2e-artist' });
 
-      const arg = vi.mocked(prisma.release.findMany).mock.calls[0]?.[0];
-      const clauses = (arg?.where as { AND: unknown[] }).AND;
+      const arg = vi.mocked(prisma.release.findMany).mock.calls[0][0];
+      const where = arg?.where as { AND: unknown[] };
+      const clauses = where.AND;
       expect(clauses).toHaveLength(3);
       expect(clauses[1]).toHaveProperty('OR');
       expect(clauses[2]).toEqual(creditedToE2eArtist);

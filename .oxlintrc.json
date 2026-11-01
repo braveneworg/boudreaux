@@ -1,0 +1,671 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Lint configuration. Native (Rust) plugins carry every rule oxlint
+  // implements; the ESLint plugins oxlint lacks run through `jsPlugins`
+  // (oxlint's ESLint-compatible bridge, alpha). Rule *scoping* lives in
+  // `overrides` below — never in inline disable comments (src/AGENTS.md).
+  // `unicorn` (an oxlint default) is left out: it was never part of the ESLint
+  // setup this config replaces. oxlint's `correctness` category stays on for
+  // the plugins listed; rules from it that the old setup did not run are
+  // switched off individually below, each with its reason.
+  "plugins": ["eslint", "typescript", "oxc", "react", "nextjs", "import", "jsx-a11y", "vitest"],
+  "jsPlugins": [
+    // `import` is reserved for oxlint's native plugin, so the JS one gets an alias.
+    // It is here only for `order`, which oxlint does not implement.
+    { "name": "importx", "specifier": "eslint-plugin-import-x" },
+    { "name": "unused-imports", "specifier": "eslint-plugin-unused-imports" },
+    { "name": "prefer-arrow-functions", "specifier": "eslint-plugin-prefer-arrow-functions" },
+    { "name": "security", "specifier": "eslint-plugin-security" },
+    { "name": "tanstack-query", "specifier": "@tanstack/eslint-plugin-query" },
+    { "name": "better-tailwindcss", "specifier": "eslint-plugin-better-tailwindcss" },
+    // Repo-local rules (lint/boudreaux-plugin.mjs, tested by its sibling spec).
+    { "name": "boudreaux", "specifier": "./lint/boudreaux-plugin.mjs" }
+  ],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/.turbo/**",
+    "**/coverage/**",
+    "**/.vitest/**",
+    // Playwright writes its HTML report and failure traces here; both are
+    // gitignored but otherwise lintable (docs/lessons/tooling/playwright-report-breaks-repo-wide-lint.md).
+    "**/e2e/playwright-report/**",
+    "**/e2e/test-results/**",
+    "**/blob-report/**",
+    "**/backups/**",
+    "next-env.d.ts",
+    "**/*.d.ts",
+    // Tool configs: long by nature, and ESLint never linted them either.
+    "vite.config.ts",
+    "vitest.config.ts",
+    "jest.config.ts",
+    "postcss.config.mjs",
+    "scripts/**/*.js",
+    "docs/**/*.mjs",
+    "**/.claude/**",
+    "public/**"
+  ],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true
+  },
+  "globals": {
+    "React": "readonly",
+    "NodeJS": "readonly",
+    "JSX": "readonly",
+    "FormDataEntryValue": "readonly",
+    "CanvasTextAlign": "readonly",
+    "CanvasTextBaseline": "readonly",
+    "FileSystemEntry": "readonly",
+    "FileSystemFileEntry": "readonly",
+    "FileSystemDirectoryEntry": "readonly",
+    "FileSystemDirectoryReader": "readonly"
+  },
+  "settings": {
+    "importx/resolver": {
+      "typescript": true,
+      "node": true
+    }
+  },
+  "rules": {
+    // ── Next.js ──────────────────────────────────────────────────────────────
+    "nextjs/no-html-link-for-pages": "error",
+    "nextjs/no-img-element": "warn",
+    "nextjs/no-head-import-in-document": "error",
+    "nextjs/no-sync-scripts": "error",
+    "nextjs/no-script-component-in-head": "error",
+
+    // ── Unused code ──────────────────────────────────────────────────────────
+    // oxlint's `no-unused-vars` covers both the core and @typescript-eslint
+    // variants. The bridged `unused-imports` rule stays for its --fix, which
+    // removes a dead import line instead of only reporting it.
+    "no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "unused-imports/no-unused-imports": "error",
+
+    // ── TypeScript ───────────────────────────────────────────────────────────
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": true,
+        "ts-nocheck": true
+      }
+    ],
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "typescript/no-empty-interface": "warn",
+    // Let TypeScript infer what it can: no `: string = 'x'`, no `: number = 0`
+    // (`no-inferrable-types`), and no `: ReactElement` / `: JSX.Element` on a
+    // component — TypeScript infers it from the JSX (`no-component-return-type`).
+    // Explicit return types stay on hooks, utilities and the server layer.
+    "typescript/no-inferrable-types": "error",
+    "boudreaux/no-component-return-type": "error",
+    // Remainder of the typescript-eslint `recommended` preset that oxlint does
+    // not enable by default.
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "no-array-constructor": "error",
+
+    // ── React ────────────────────────────────────────────────────────────────
+    "react/self-closing-comp": "error",
+    "react/jsx-curly-brace-presence": ["error", { "props": "never", "children": "never" }],
+    "react/jsx-boolean-value": ["error", "never"],
+    "react/jsx-no-target-blank": "error",
+    "react/no-array-index-key": "warn",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    // React Compiler rules (oxlint ships them in `correctness`; the ESLint setup
+    // only ran rules-of-hooks + exhaustive-deps, and had `refs` off for a
+    // react-hook-form false positive). Off until adopted deliberately.
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/immutability": "off",
+    "react/purity": "off",
+    "react/static-components": "off",
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/error-boundaries": "off",
+
+    // ── Accessibility (eslint-plugin-jsx-a11y `recommended`) ─────────────────
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/anchor-is-valid": [
+      "error",
+      {
+        "components": ["Link"],
+        "specialLink": ["hrefLeft", "hrefRight"],
+        "aspects": ["invalidHref", "preferButton"]
+      }
+    ],
+    "jsx-a11y/aria-activedescendant-has-tabindex": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-proptypes": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/aria-unsupported-elements": "error",
+    "jsx-a11y/autocomplete-valid": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/heading-has-content": ["error", { "components": ["Heading"] }],
+    "jsx-a11y/html-has-lang": "error",
+    "jsx-a11y/iframe-has-title": "error",
+    "jsx-a11y/img-redundant-alt": "error",
+    "jsx-a11y/interactive-supports-focus": [
+      "error",
+      { "tabbable": ["button", "checkbox", "link", "searchbox", "spinbutton", "switch", "textbox"] }
+    ],
+    "jsx-a11y/label-has-associated-control": "error",
+    "jsx-a11y/media-has-caption": "error",
+    "jsx-a11y/mouse-events-have-key-events": "error",
+    "jsx-a11y/no-access-key": "error",
+    "jsx-a11y/no-autofocus": "error",
+    "jsx-a11y/no-distracting-elements": "error",
+    // The options below are the ones jsx-a11y's `recommended` preset passes;
+    // oxlint's defaults are stricter without them.
+    "jsx-a11y/no-interactive-element-to-noninteractive-role": [
+      "error",
+      { "tr": ["none", "presentation"], "canvas": ["img"] }
+    ],
+    "jsx-a11y/no-noninteractive-element-interactions": [
+      "error",
+      {
+        "handlers": [
+          "onClick",
+          "onError",
+          "onLoad",
+          "onMouseDown",
+          "onMouseUp",
+          "onKeyPress",
+          "onKeyDown",
+          "onKeyUp"
+        ],
+        "alert": ["onKeyUp", "onKeyDown", "onKeyPress"],
+        "body": ["onError", "onLoad"],
+        "dialog": ["onKeyUp", "onKeyDown", "onKeyPress"],
+        "iframe": ["onError", "onLoad"],
+        "img": ["onError", "onLoad"]
+      }
+    ],
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": [
+      "error",
+      {
+        "ul": ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+        "ol": ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+        "li": ["menuitem", "menuitemradio", "menuitemcheckbox", "option", "row", "tab", "treeitem"],
+        "table": ["grid"],
+        "td": ["gridcell"],
+        "fieldset": ["radiogroup", "presentation"]
+      }
+    ],
+    "jsx-a11y/no-noninteractive-tabindex": [
+      "error",
+      { "tags": [], "roles": ["tabpanel"], "allowExpressionValues": true }
+    ],
+    "jsx-a11y/no-redundant-roles": "error",
+    "jsx-a11y/no-static-element-interactions": [
+      "error",
+      {
+        "allowExpressionValues": true,
+        "handlers": ["onClick", "onMouseDown", "onMouseUp", "onKeyPress", "onKeyDown", "onKeyUp"]
+      }
+    ],
+    // `recommended` turns this off; oxlint enables it by default.
+    "jsx-a11y/control-has-associated-label": "off",
+    "jsx-a11y/role-has-required-aria-props": "error",
+    "jsx-a11y/role-supports-aria-props": "error",
+    "jsx-a11y/scope": "error",
+    "jsx-a11y/tabindex-no-positive": "error",
+    // Not in jsx-a11y's `recommended`; oxlint enables it by default. Radix
+    // primitives legitimately put `role` on non-native elements.
+    "jsx-a11y/prefer-tag-over-role": "off",
+
+    // ── Vitest defaults the ESLint setup never ran ───────────────────────────
+    // oxlint enables these for every file once the vitest plugin is on. They
+    // are not in @vitest/eslint-plugin's `recommended`: `vi.fn()` generics are
+    // inferred from the assignment here, and `toThrow()` without a message is
+    // the repo's norm.
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/require-to-throw-message": "off",
+
+    // ── Imports ──────────────────────────────────────────────────────────────
+    "importx/order": [
+      "error",
+      {
+        "groups": [
+          "builtin",
+          "external",
+          "internal",
+          ["parent", "sibling"],
+          "index",
+          "object",
+          "type"
+        ],
+        "pathGroups": [
+          { "pattern": "react", "group": "external", "position": "before" },
+          { "pattern": "next/**", "group": "external", "position": "before" },
+          { "pattern": "@/**", "group": "internal", "position": "after" }
+        ],
+        "pathGroupsExcludedImportTypes": ["react", "next"],
+        "newlines-between": "always",
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
+      }
+    ],
+    "import/no-duplicates": "error",
+    "import/first": "error",
+    "import/newline-after-import": "error",
+    "import/no-anonymous-default-export": "warn",
+
+    // ── General ──────────────────────────────────────────────────────────────
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+    "no-debugger": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "object-shorthand": "error",
+    "no-unneeded-ternary": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    // Remainder of `@eslint/js` recommended that oxlint leaves off by default
+    // and typescript-eslint does not disable for TS.
+    "no-case-declarations": "error",
+    "no-empty": "error",
+    "no-fallthrough": "error",
+    "no-prototype-builtins": "error",
+    "no-regex-spaces": "error",
+    "no-unexpected-multiline": "error",
+    "no-useless-assignment": "error",
+    "preserve-caught-error": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+
+    // ── Arrow functions ──────────────────────────────────────────────────────
+    "prefer-arrow-functions/prefer-arrow-functions": [
+      "error",
+      {
+        "allowNamedFunctions": false,
+        "allowObjectProperties": true,
+        "classPropertiesAllowed": false,
+        "returnStyle": "unchanged"
+      }
+    ],
+
+    // ── Size and complexity ──────────────────────────────────────────────────
+    "max-lines-per-function": [
+      "error",
+      { "max": 75, "skipBlankLines": true, "skipComments": true, "IIFEs": true }
+    ],
+    "complexity": ["error", { "max": 10 }],
+    "max-params": ["error", { "max": 4 }],
+    "max-depth": ["error", { "max": 3 }],
+
+    // ── Security (eslint-plugin-security `recommended`) ──────────────────────
+    "security/detect-buffer-noassert": "warn",
+    "security/detect-child-process": "warn",
+    "security/detect-disable-mustache-escape": "warn",
+    "security/detect-eval-with-expression": "warn",
+    "security/detect-new-buffer": "warn",
+    "security/detect-no-csrf-before-method-override": "warn",
+    "security/detect-non-literal-fs-filename": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-non-literal-require": "warn",
+    "security/detect-object-injection": "warn",
+    "security/detect-possible-timing-attacks": "warn",
+    "security/detect-pseudoRandomBytes": "warn",
+    "security/detect-unsafe-regex": "warn",
+    "security/detect-bidi-characters": "warn",
+
+    // ── TanStack Query (`flat/recommended`) ──────────────────────────────────
+    "tanstack-query/exhaustive-deps": "error",
+    "tanstack-query/no-rest-destructuring": "warn",
+    "tanstack-query/stable-query-client": "error",
+    "tanstack-query/no-unstable-deps": "error",
+    "tanstack-query/infinite-query-property-order": "error",
+    "tanstack-query/no-void-query-fn": "error",
+    "tanstack-query/mutation-property-order": "error"
+  },
+  "overrides": [
+    {
+      // Validation only. Class *ordering/formatting* is owned by
+      // prettier-plugin-tailwindcss (prettier.config.js), so better-tailwindcss's
+      // stylistic rules (enforce-consistent-class-order, line-wrapping, etc.) are
+      // intentionally omitted to avoid fighting Prettier. Tailwind v4 is
+      // CSS-first: `entryPoint` is the stylesheet that `@import`s tailwindcss so
+      // the plugin can resolve the full set of valid utility classes.
+      "files": ["src/app/**/*.{js,jsx,cjs,mjs,ts,tsx}"],
+      "rules": {
+        "better-tailwindcss/no-conflicting-classes": [
+          "error",
+          { "entryPoint": "src/app/globals.css" }
+        ],
+        "better-tailwindcss/no-duplicate-classes": [
+          "error",
+          { "entryPoint": "src/app/globals.css" }
+        ],
+        "better-tailwindcss/no-deprecated-classes": [
+          "error",
+          { "entryPoint": "src/app/globals.css" }
+        ],
+        // Catches invalid/typo'd utilities that compile to nothing. `ignore` is a
+        // list of anchored regexes for genuine non-Tailwind classes the resolver
+        // can't know about: video.js skin classes (`vjs-*`) and its player-container
+        // hook, sonner's wrapper, the banner animation marker (keyframes live in
+        // globals.css), and the bio figure markers (`bio-figure`, its float
+        // modifiers, and the caption classes) that mirror the sanitizer's figure
+        // contract for stable selectors (parsed by bio-figure-extension.ts and
+        // rendered by the NodeView). Test placeholder classNames are handled by
+        // the spec override below. See
+        // docs/auto-generated/BETTER_TAILWINDCSS_FINDINGS.md.
+        "better-tailwindcss/no-unknown-classes": [
+          "error",
+          {
+            "entryPoint": "src/app/globals.css",
+            "ignore": [
+              "^vjs-",
+              "^audio-player-wrapper$",
+              "^toaster$",
+              "^banner-strip-slide$",
+              "^bio-figure(--(left|right|center)|-(caption|title|subtitle|attribution))?$"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Specs pass placeholder classNames (`custom-class`, `class1`, …) to assert
+      // className plumbing; those aren't real utilities, so don't flag them.
+      "files": ["**/*.spec.{js,jsx,ts,tsx}"],
+      "rules": {
+        "better-tailwindcss/no-unknown-classes": "off"
+      }
+    },
+    {
+      // Components may be longer than plain functions.
+      "files": ["**/components/**/*.tsx", "**/app/**/*.tsx", "**/*.component.tsx"],
+      "rules": {
+        "max-lines-per-function": [
+          "error",
+          { "max": 250, "skipBlankLines": true, "skipComments": true }
+        ]
+      }
+    },
+    {
+      // The MusicBrainz client's search functions share one injectable signature
+      // shape — `(…domain args, limit, fetchFn, options)` — so the Lambda can mock
+      // `fetchFn`/`sleep` deterministically in tests. The recording search keys on
+      // BOTH an artist and a title (two domain args), which pushes it to five
+      // positional params; `max-params` is genuinely inapplicable to this
+      // established, test-driven convention here.
+      "files": ["bio-generator/src/musicbrainz.ts"],
+      "rules": {
+        "max-params": "off"
+      }
+    },
+    {
+      // Tests, E2E specs, scripts and test utilities read better as one long
+      // function than as a dozen tiny helpers.
+      "files": [
+        "**/*.spec.{ts,tsx}",
+        "e2e/**",
+        "scripts/**/*.{ts,tsx}",
+        "**/test-utils/**",
+        "tests/**"
+      ],
+      "rules": {
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      // Email templates and legal pages are long static markup.
+      "files": ["src/lib/email/**/*.{ts,tsx}", "src/app/legal/**/*.tsx"],
+      "rules": {
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      // shadcn chart primitive: Recharts formatter callbacks take 5 positional args.
+      "files": ["src/app/components/ui/chart.tsx"],
+      "rules": {
+        "max-params": "off"
+      }
+    },
+    {
+      // The bio figure NodeView renders images from scraped remote hosts that
+      // cannot be enumerated in `images.remotePatterns`, so `next/image` is
+      // genuinely inapplicable — the editor-only plain `<img>` is intentional.
+      // global-error likewise replaces the crashed root layout and must stay
+      // dependency-light (no next/image) — its heading is a plain <img>.
+      // link-preview-card renders a bounded, self-generated `data:` webp
+      // thumbnail (no remote host to enumerate), so `next/image` adds nothing.
+      "files": [
+        "src/app/components/ui/bio-figure-node-view.tsx",
+        "src/app/global-error.tsx",
+        "src/app/components/forms/link-preview-card.tsx"
+      ],
+      "rules": {
+        "nextjs/no-img-element": "off"
+      }
+    },
+    {
+      // App Router special files must be `function` declarations (default
+      // exports Next.js introspects), so the arrow-function rule is off there.
+      "files": [
+        "**/page.tsx",
+        "**/layout.tsx",
+        "**/loading.tsx",
+        "**/error.tsx",
+        "**/global-error.tsx",
+        "**/not-found.tsx",
+        "**/template.tsx",
+        "**/default.tsx",
+        "**/route.ts",
+        "**/middleware.ts",
+        "**/instrumentation.ts",
+        "**/manifest.ts",
+        "**/sitemap.ts",
+        "**/robots.ts",
+        "**/opengraph-image.tsx",
+        "**/icon.tsx",
+        "**/apple-icon.tsx"
+      ],
+      "rules": {
+        "prefer-arrow-functions/prefer-arrow-functions": "off"
+      }
+    },
+    {
+      // Vitest specs: the plugin's `recommended` set plus repo tuning.
+      "files": ["**/*.spec.ts", "**/*.spec.tsx", "tests/**", "**/test-utils/**"],
+      "env": { "vitest": true },
+      "rules": {
+        "vitest/expect-expect": "warn",
+        "vitest/no-commented-out-tests": "error",
+        "vitest/no-conditional-expect": "warn",
+        "vitest/no-disabled-tests": "warn",
+        "vitest/no-focused-tests": "error",
+        "vitest/no-identical-title": "error",
+        "vitest/no-import-node-test": "error",
+        "vitest/no-interpolation-in-snapshots": "error",
+        "vitest/no-mocks-import": "error",
+        "vitest/no-standalone-expect": "error",
+        "vitest/no-unneeded-async-expect-function": "error",
+        "vitest/prefer-called-exactly-once-with": "error",
+        "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+        "vitest/valid-describe-callback": "error",
+        "vitest/valid-expect": "error",
+        "vitest/valid-expect-in-promise": "error",
+        "vitest/valid-title": "off",
+        "vitest/max-nested-describe": ["error", { "max": 5 }],
+        "nextjs/no-html-link-for-pages": "off"
+      }
+    },
+    {
+      // Combobox triggers built on Radix Popover (`<PopoverTrigger asChild>`):
+      // Radix injects `aria-controls` at runtime, only while the listbox is
+      // mounted, so it never appears in source. oxlint checks WAI-ARIA 1.2,
+      // which lists `aria-controls` as required on `combobox`; ESLint's
+      // jsx-a11y (aria-query 5.3) required only `aria-expanded`, which these
+      // triggers set. Every other role keeps the rule.
+      "files": [
+        "src/app/admin/notifications/notification-search.tsx",
+        "src/app/admin/tours/components/venue-select.tsx",
+        "src/app/components/forms/fields/artist-multi-select.tsx",
+        "src/app/components/forms/fields/artist-search-combobox.tsx",
+        "src/app/components/forms/fields/combobox-field.tsx",
+        "src/app/components/forms/fields/combobox.tsx",
+        "src/app/components/forms/fields/cover-art-image-combobox.tsx",
+        "src/app/components/forms/fields/featured-artists-combobox.tsx",
+        "src/app/components/forms/fields/multi-combobox.tsx",
+        "src/app/components/forms/fields/producer-multi-combobox.tsx",
+        "src/app/components/forms/fields/release-select.tsx",
+        "src/app/components/forms/fields/vocabulary-multi-combobox.tsx",
+        "src/app/components/ui/timezone-select.tsx"
+      ],
+      "rules": {
+        "jsx-a11y/role-has-required-aria-props": "off"
+      }
+    },
+    {
+      // The spec's `InvalidFormFieldConsumer` calls `useFormField()` inside a
+      // try/catch on purpose: it asserts the hook throws outside FormProvider.
+      // oxlint's rules-of-hooks counts a try block as conditional; ESLint's did
+      // not. The call is unconditional on every render, so the rule is
+      // inapplicable to this one harness.
+      "files": ["src/app/components/ui/form.spec.tsx"],
+      "rules": {
+        "react/rules-of-hooks": "off"
+      }
+    },
+    {
+      // ── Scoped rule exceptions (the only two) ──────────────────────────────
+      // The project forbids inline disable comments. `detect-non-literal-fs-filename`
+      // is purely syntactic (it flags any non-literal path argument with no
+      // "validated/safe" escape), so code doing real file I/O on runtime-computed
+      // paths cannot satisfy it: CLI/build scripts, the format upload module's
+      // temp file (and the stored copy the local object store reads back), the
+      // ffmpeg sibling temp file, and specs that read the repo's own sources.
+      // These paths are all server-generated, never user input. Every other rule
+      // is satisfied in code repo-wide, except the nginx and Grafana dashboard
+      // config guards below.
+      "files": [
+        "scripts/**/*.{ts,tsx}",
+        "docs/**/*.{js,mjs}",
+        "src/lib/services/format-upload/*.ts",
+        "src/lib/audio-metadata/ffmpeg.ts",
+        "bio-generator/src/template.spec.ts",
+        "src/test-utils/lazy-lucide-react.ts",
+        "vitest.config.spec.ts",
+        "src/test-utils/repository-sources.ts",
+        "prisma/seed.spec.ts",
+        // Lint-config specs: one writes fixtures to its own temp dir, the
+        // other checks that every path this file allowlists still exists.
+        "lint/boudreaux-plugin.spec.ts",
+        "oxlintrc.spec.ts"
+      ],
+      "rules": {
+        "security/detect-non-literal-fs-filename": "off"
+      }
+    },
+    {
+      // These specs build RegExps from config text they read on purpose.
+      "files": ["nginx/nginx.conf.spec.ts", "observability/grafana/dashboards/app-logs.spec.ts"],
+      "rules": {
+        "security/detect-non-literal-regexp": "off"
+      }
+    },
+    {
+      // Server-only modules: forbid every `console.*` call. Use the project
+      // logger (`loggers` from @/lib/utils/logger) instead. The global
+      // `no-console` allows warn/error/info; here the allow list is empty.
+      "files": [
+        "src/lib/actions/**/*.{ts,tsx}",
+        "src/lib/services/**/*.{ts,tsx}",
+        "src/lib/email/**/*.{ts,tsx}",
+        "src/lib/repositories/**/*.{ts,tsx}",
+        "src/app/api/**/*.{ts,tsx}"
+      ],
+      "excludeFiles": ["**/*.spec.{ts,tsx}"],
+      "rules": {
+        "no-console": ["error", { "allow": [] }]
+      }
+    },
+    {
+      // Confine Prisma to the data-access layer of the app source. Only files under
+      // `src/lib/repositories/**` (and the DB-client infra files, allowlisted in the
+      // override block below) may import `@prisma/client` or the `@/lib/prisma`
+      // client singleton. Every other layer depends on the hand-written, Prisma-free
+      // domain types in `@/lib/types/domain` and catches `DataError`
+      // (`@/lib/types/domain/errors`) instead of Prisma error classes. Scoped to
+      // `src/**` so e2e tests, seed/maintenance scripts, and the standalone
+      // `stripe-webhook` project keep their direct Prisma access.
+      // `allowTypeImports` stays false so even `import type` is blocked.
+      "files": ["src/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@prisma/client",
+                "message": "Prisma may only be imported in src/lib/repositories/**. Use hand-written domain types from @/lib/types/domain instead."
+              },
+              {
+                "name": "@prisma/client/runtime/library",
+                "message": "Prisma may only be imported in src/lib/repositories/**. Catch DataError from @/lib/types/domain/errors instead."
+              },
+              {
+                "name": "@/lib/prisma",
+                "message": "The Prisma client may only be used in src/lib/repositories/**. Add the query to the owning repository and call that instead."
+              }
+            ],
+            // Defense-in-depth: also catch any current/future Prisma submodule
+            // (e.g. @prisma/client/edge, @prisma/client/extension). `paths` above
+            // give the precise messages; this glob closes the gap.
+            "patterns": [
+              {
+                "group": ["@prisma/client", "@prisma/client/*"],
+                "allowTypeImports": false,
+                "message": "Prisma may only be imported in src/lib/repositories/**. Use @/lib/types/domain types and DataError instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Allowlist: the data-access layer and the DB-client infra files (the only
+      // places Prisma is permitted) are exempt from the no-prisma-import ban above.
+      "files": [
+        "src/lib/repositories/**",
+        "src/lib/prisma.ts",
+        "src/lib/prisma.spec.ts",
+        "src/lib/utils/slow-query-extension.ts",
+        "src/lib/utils/slow-query-extension.spec.ts",
+        // Reads the generated data model (schema metadata, no data access) to pin
+        // better-auth's fail-closed startup schema check to the real Prisma schema.
+        "src/lib/auth-schema-validation.spec.ts",
+        // Client-singleton consumers with no query of their own: better-auth's
+        // adapter takes the client, and the health check pings it.
+        "src/lib/auth.ts",
+        "src/lib/utils/database-utils.ts",
+        // Database contract specs drive the real client against Docker Mongo
+        // (`pnpm run test:db`); seeding and asserting rows is their whole job.
+        "src/**/*.contract.spec.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

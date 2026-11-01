@@ -36,15 +36,15 @@ vi.mock('winston', () => {
     defaultMeta: { service: string; module: string };
   }): Record<string, unknown> => {
     harness.createdOptions.push(options);
-    const module = options.defaultMeta.module;
+    const moduleName = options.defaultMeta.module;
     const instance = {
       level: options.level,
-      debug: makeLevelMethod('debug', module),
-      info: makeLevelMethod('info', module),
-      warn: makeLevelMethod('warn', module),
-      error: makeLevelMethod('error', module),
+      debug: makeLevelMethod('debug', moduleName),
+      info: makeLevelMethod('info', moduleName),
+      warn: makeLevelMethod('warn', moduleName),
+      error: makeLevelMethod('error', moduleName),
     };
-    harness.instances = { ...harness.instances, [module]: instance };
+    harness.instances = { ...harness.instances, [moduleName]: instance };
     return instance;
   };
 

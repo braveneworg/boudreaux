@@ -314,7 +314,6 @@ export default defineConfig((): ViteUserConfig => {
           '**/vitest.config.ts',
           '**/next.config.ts',
           '**/postcss.config.mjs',
-          '**/eslint.config.mjs',
           '**/tsconfig*.json',
 
           // Type declarations and interfaces

@@ -606,8 +606,9 @@ describe('VideoEnrichmentPanel — poll deadline give-up', () => {
     });
 
     expect(vi.mocked(toast.error)).toHaveBeenCalledWith(STALE_JOB_TIMEOUT_MESSAGE);
-    const lastCall = mocks.useVideoEnrichmentStatusQuery.mock.calls.at(-1);
-    expect((lastCall?.[1] as { enabled: boolean }).enabled).toBe(false);
+    const { calls } = mocks.useVideoEnrichmentStatusQuery.mock;
+    const lastCall = calls[calls.length - 1];
+    expect((lastCall[1] as { enabled: boolean }).enabled).toBe(false);
     vi.useRealTimers();
   });
 
@@ -615,7 +616,8 @@ describe('VideoEnrichmentPanel — poll deadline give-up', () => {
     setStatus({ ...baseStatus, status: 'processing' });
     render(<Harness />);
 
-    const lastCall = mocks.useVideoEnrichmentStatusQuery.mock.calls.at(-1);
-    expect((lastCall?.[1] as { enabled: boolean }).enabled).toBe(true);
+    const { calls } = mocks.useVideoEnrichmentStatusQuery.mock;
+    const lastCall = calls[calls.length - 1];
+    expect((lastCall[1] as { enabled: boolean }).enabled).toBe(true);
   });
 });
