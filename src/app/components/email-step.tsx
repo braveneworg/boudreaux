@@ -42,7 +42,7 @@ export const EmailStep = ({ onCancel, onConfirm }: EmailStepProps) => {
   const [isPending, setIsPending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   // Focus the email input on mount via a ref + effect instead of the native
   // `autoFocus` attribute (jsx-a11y/no-autofocus), preserving identical behavior.

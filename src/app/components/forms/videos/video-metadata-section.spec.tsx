@@ -120,11 +120,7 @@ interface WrapperProps {
   releaseDateLookupStatus?: 'idle' | 'searching' | 'found' | 'exhausted';
 }
 
-const Wrapper = ({
-  setValueRef,
-  omitCategory = false,
-  releaseDateLookupStatus,
-}: WrapperProps): React.ReactElement => {
+const Wrapper = ({ setValueRef, omitCategory = false, releaseDateLookupStatus }: WrapperProps) => {
   const form = useForm<VideoFormData>({
     resolver: zodResolver(createVideoSchema),
     defaultValues: {

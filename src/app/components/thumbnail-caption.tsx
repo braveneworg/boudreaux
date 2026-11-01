@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ReactElement } from 'react';
 
 interface ThumbnailCaptionProps {
   caption?: string | null;
@@ -19,7 +18,7 @@ export const ThumbnailCaption = ({
   attribution,
   license,
   sourceUrl,
-}: ThumbnailCaptionProps): ReactElement | null => {
+}: ThumbnailCaptionProps) => {
   if (!caption && !attribution && !license) return null;
   return (
     <figcaption className="text-muted-foreground text-xs">

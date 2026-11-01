@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { BookCheck, Send } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
@@ -36,7 +34,7 @@ export const PublishEntityDialog = ({
   isPublished,
   isPending,
   onConfirm,
-}: PublishEntityDialogProps): ReactElement => (
+}: PublishEntityDialogProps) => (
   <Dialog>
     <DialogTrigger asChild>
       <Button disabled={isPublished}>

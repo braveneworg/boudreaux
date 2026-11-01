@@ -129,7 +129,7 @@ const NextFramesButton = ({ onRequest, isCapturing, blocker }: NextFramesControl
 export const posterCandidateToFile = (candidate: Blob): File =>
   new File([candidate], 'poster.jpg', { type: 'image/jpeg' });
 
-const PosterPreview = ({ src }: { src: string | null }): React.ReactElement =>
+const PosterPreview = ({ src }: { src: string | null }) =>
   src ? (
     <div className="border-input relative h-40 w-64 overflow-hidden rounded-none border">
       <Image src={src} alt="Video poster" fill className="object-cover" sizes="256px" unoptimized />
@@ -161,7 +161,7 @@ const PosterCandidateStrip = ({
   selectedIndex,
   isUploading,
   onSelectCandidate,
-}: PosterCandidateStripProps): React.ReactElement => (
+}: PosterCandidateStripProps) => (
   <RadioGroupPrimitive.Root
     aria-label="Captured poster frames"
     orientation="horizontal"
@@ -214,7 +214,7 @@ export const VideoPosterSection = ({
   errorMessage,
   uploadPoster,
   nextFrames,
-}: VideoPosterSectionProps): React.ReactElement => {
+}: VideoPosterSectionProps) => {
   const inputId = useId();
   const existingPosterUrl = useWatch({ control, name: 'posterUrl' });
 

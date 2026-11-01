@@ -18,7 +18,7 @@ vi.mock('@/hooks/use-session', () => ({
 // Renders the resolved nav item names into a single string. renderToString
 // never runs effects, so it reflects the server / first-paint (pre-mount)
 // render of the hook.
-const NavNamesProbe = (): React.ReactElement =>
+const NavNamesProbe = () =>
   createElement(
     'span',
     null,

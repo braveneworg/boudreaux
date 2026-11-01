@@ -64,7 +64,7 @@ export const VideoArtistSuggestionCard = ({
   isBusy,
   onApplySuggestion,
   onDismissSuggestion,
-}: VideoArtistSuggestionCardProps): React.ReactElement => {
+}: VideoArtistSuggestionCardProps) => {
   const pending = suggestions.filter((suggestion) => suggestion.status === 'pending');
 
   const applyAll = async (): Promise<void> => {

@@ -21,10 +21,7 @@ interface ImagePreviewDialogProps {
 /**
  * Full-size preview dialog for a selected image.
  */
-export const ImagePreviewDialog = ({
-  previewImage,
-  onClose,
-}: ImagePreviewDialogProps): React.JSX.Element => (
+export const ImagePreviewDialog = ({ previewImage, onClose }: ImagePreviewDialogProps) => (
   <Dialog open={!!previewImage} onOpenChange={onClose}>
     <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
       <DialogTitle className="sr-only">{previewImage?.altText || 'Image preview'}</DialogTitle>
@@ -61,7 +58,7 @@ export const ImageDeleteDialog = ({
   imageToDelete,
   onCancel,
   onConfirm,
-}: ImageDeleteDialogProps): React.JSX.Element => (
+}: ImageDeleteDialogProps) => (
   <Dialog open={!!imageToDelete} onOpenChange={onCancel}>
     <DialogContent className="sm:max-w-md">
       <DialogTitle>Delete Image</DialogTitle>

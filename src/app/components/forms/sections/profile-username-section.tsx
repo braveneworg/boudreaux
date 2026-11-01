@@ -33,7 +33,7 @@ export const ProfileUsernameSection = ({
   isTransitionPending,
   wasSuccessful,
   onEditToggle,
-}: ProfileUsernameSectionProps): React.ReactElement => {
+}: ProfileUsernameSectionProps) => {
   const isDirty = form.formState.isDirty;
   const isSaving = isPending || isTransitionPending;
 

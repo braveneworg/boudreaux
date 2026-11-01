@@ -144,7 +144,7 @@ const ChatMessageHeader = ({
   );
 };
 
-const AdminMarkdownBody = ({ nodes }: { nodes: AdminMarkdownNode[] }): React.ReactNode[] =>
+const AdminMarkdownBody = ({ nodes }: { nodes: AdminMarkdownNode[] }) =>
   nodes.map((node, idx) => {
     const key = `md-${idx}`;
     if (node.kind === 'bold') {
@@ -174,11 +174,7 @@ const AdminMarkdownBody = ({ nodes }: { nodes: AdminMarkdownNode[] }): React.Rea
     return <span key={key}>{renderMentionTokens(node.value, key)}</span>;
   });
 
-const PlainBody = ({
-  bodyTokens,
-}: {
-  bodyTokens: { token: MentionToken; key: string }[];
-}): React.ReactNode[] =>
+const PlainBody = ({ bodyTokens }: { bodyTokens: { token: MentionToken; key: string }[] }) =>
   bodyTokens.map(({ token, key }) =>
     token.kind === 'mention' ? (
       <span

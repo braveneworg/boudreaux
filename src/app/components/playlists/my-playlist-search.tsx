@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import { SearchComboboxTrigger } from '@/components/search-combobox-trigger';
 import { SEARCH_RESULT_ITEM_CLASS, SearchResultRow } from '@/components/search-result-row';
@@ -37,7 +37,7 @@ const SEARCH_PLACEHOLDER = 'Search your playlists…';
  * (each item's `value`); selecting a row fires `onSelect` with its id and
  * closes the popover.
  */
-export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps): ReactElement => {
+export const MyPlaylistSearch = ({ onSelect, className }: MyPlaylistSearchProps) => {
   const [open, setOpen] = useState(false);
   const { rows } = usePlaylistsQuery();
   const listRows = rows ?? [];

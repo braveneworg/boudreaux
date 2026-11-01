@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { JSX } from 'react';
-
 import { act, render } from '@testing-library/react';
 
 import { BioEditorRegistryProvider, useBioEditorRegistry } from './bio-editor-registry';
@@ -14,7 +12,7 @@ import type { Editor } from '@tiptap/react';
 const fakeEditor = (name: string): Editor => ({ name }) as unknown as Editor;
 
 describe('BioEditorRegistry', () => {
-  const Probe = (): JSX.Element => {
+  const Probe = () => {
     const registry = useBioEditorRegistry();
     return (
       <button type="button" onClick={() => registry.setActive('short')}>

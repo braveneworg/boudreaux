@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { NodeViewWrapper } from '@tiptap/react';
 import { ExternalLink, X } from 'lucide-react';
 
@@ -25,7 +23,7 @@ export const BioLinkNodeView = ({
   deleteNode,
   getPos,
   extension,
-}: NodeViewProps): JSX.Element => {
+}: NodeViewProps) => {
   const { href, text, external } = node.attrs as BioLinkAttributes;
   const { onEditRequest } = extension.options as BioLinkOptions;
 

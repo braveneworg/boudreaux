@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef } from 'react';
-import type { JSX } from 'react';
 
 import { Check, Circle, Loader2 } from 'lucide-react';
 
@@ -77,7 +76,7 @@ interface StageRowProps {
 }
 
 /** One stage row: state-driven icon + label, with counts inline when active. */
-const StageRow = ({ label, state, counts }: StageRowProps): JSX.Element => {
+const StageRow = ({ label, state, counts }: StageRowProps) => {
   const Icon = STATE_ICON.get(state) ?? Circle;
   const isActive = state === 'active';
   return (
@@ -108,9 +107,7 @@ const StageRow = ({ label, state, counts }: StageRowProps): JSX.Element => {
  *
  * @param progress - The latest polled progress checkpoint (or null/undefined).
  */
-export const BioGenerationProgressTimeline = ({
-  progress,
-}: BioGenerationProgressTimelineProps): JSX.Element => {
+export const BioGenerationProgressTimeline = ({ progress }: BioGenerationProgressTimelineProps) => {
   // High-water mark of the furthest stage seen this run, so an out-of-order
   // lower checkpoint can never rewind the highlight. Mutating a ref during
   // render is safe here: it is an idempotent max, so re-renders with the same

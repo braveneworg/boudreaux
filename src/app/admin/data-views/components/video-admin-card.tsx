@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Link from 'next/link';
 
 import { Pencil } from 'lucide-react';
@@ -79,7 +77,7 @@ const VideoStatusBadges = ({
 }: {
   publishState: PublishState;
   isArchived: boolean;
-}): ReactElement => {
+}) => {
   // Map.get is always defined for valid PublishState values; non-null assertion avoided via nullish coalescing
   const { label, variant } = PUBLISH_BADGE.get(publishState) ?? {
     label: 'Draft',
@@ -105,7 +103,7 @@ export const VideoAdminCard = ({
   onArchive,
   onRestore,
   onDelete,
-}: VideoAdminCardProps): ReactElement => {
+}: VideoAdminCardProps) => {
   const isPublished = video.publishedAt !== null;
   const isArchived = video.archivedAt !== null;
   const publishState = derivePublishState(video.publishedAt);

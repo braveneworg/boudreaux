@@ -50,7 +50,7 @@ export const ReleaseDescriptionField = ({
   control,
   setValue,
   artistName,
-}: ReleaseDescriptionFieldProps): React.ReactElement => {
+}: ReleaseDescriptionFieldProps) => {
   const title = useWatch({ control, name: 'title', defaultValue: '' });
   const releasedOn = useWatch({ control, name: 'releasedOn', defaultValue: '' });
   const catalogNumber = useWatch({ control, name: 'catalogNumber', defaultValue: '' });

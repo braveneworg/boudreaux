@@ -19,7 +19,7 @@ interface HarnessProps {
 }
 
 /** A real RHF form providing the context the bound editor needs. */
-const Harness = ({ description, onForm }: HarnessProps): React.ReactElement => {
+const Harness = ({ description, onForm }: HarnessProps) => {
   const form = useForm<VideoFormData>({
     defaultValues: description === undefined ? {} : { description },
   });

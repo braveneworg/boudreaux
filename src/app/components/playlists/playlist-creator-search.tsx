@@ -4,14 +4,7 @@
 
 'use client';
 
-import {
-  Fragment,
-  useImperativeHandle,
-  useRef,
-  useState,
-  type ReactElement,
-  type Ref,
-} from 'react';
+import { Fragment, useImperativeHandle, useRef, useState, type Ref } from 'react';
 
 import { ZINE_SEARCH_FIELD_CLASS } from '@/components/search-combobox-trigger';
 import {
@@ -58,7 +51,7 @@ interface SearchStatusProps {
  * while the first fetch for a query is in flight, otherwise the cmdk empty
  * state (auto-hidden by cmdk whenever result rows are rendered).
  */
-const PlaylistSearchStatus = ({ hasQuery, isSearching }: SearchStatusProps): ReactElement => {
+const PlaylistSearchStatus = ({ hasQuery, isSearching }: SearchStatusProps) => {
   if (!hasQuery) {
     return (
       <div className="py-6 text-center text-sm text-zinc-500">
@@ -85,7 +78,7 @@ export const PlaylistCreatorSearch = ({
   onAdd,
   onNewPlaylist,
   ref,
-}: PlaylistCreatorSearchProps): ReactElement => {
+}: PlaylistCreatorSearchProps) => {
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const debounced = useDebounce(search, 300);

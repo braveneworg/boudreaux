@@ -27,10 +27,7 @@ interface VideoPublishSectionProps {
  * Publish stamps this date (or today if empty). Leave empty and click Save to
  * keep it a draft. A future date schedules the video.
  */
-export const VideoPublishSection = ({
-  control,
-  onSelectDate,
-}: VideoPublishSectionProps): React.ReactElement => (
+export const VideoPublishSection = ({ control, onSelectDate }: VideoPublishSectionProps) => (
   <section className="space-y-3">
     <h2 className="font-semibold">Publishing</h2>
     <FormField

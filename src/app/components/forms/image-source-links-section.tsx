@@ -95,11 +95,7 @@ interface ImageSourcePillsProps {
 }
 
 /** The stored links as removable pills; renders nothing when there are none. */
-const ImageSourcePills = ({
-  links,
-  disabled,
-  onRemove,
-}: ImageSourcePillsProps): React.ReactElement | null => {
+const ImageSourcePills = ({ links, disabled, onRemove }: ImageSourcePillsProps) => {
   if (links.length === 0) return null;
   return (
     <ul aria-label="Image source links" className="flex flex-wrap gap-1.5">
@@ -125,11 +121,7 @@ interface GenerateImagesButtonProps {
 }
 
 /** The trigger button plus its in-flight status line. */
-const GenerateImagesButton = ({
-  busy,
-  disabled,
-  onClick,
-}: GenerateImagesButtonProps): React.ReactElement => (
+const GenerateImagesButton = ({ busy, disabled, onClick }: GenerateImagesButtonProps) => (
   <div className="flex items-center gap-2">
     <Button type="button" variant="outline" size="sm" onClick={onClick} disabled={disabled}>
       {busy ? (
@@ -157,7 +149,7 @@ const GenerateImagesButton = ({
 export const ImageSourceLinksSection = ({
   artistId,
   disabled = false,
-}: ImageSourceLinksSectionProps): React.ReactElement => {
+}: ImageSourceLinksSectionProps) => {
   const inputId = useId();
   const [draft, setDraft] = useState('');
   const { links, busy, generate } = useImageLinksJob(artistId);

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX, MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 
 import Link from 'next/link';
 
@@ -30,12 +30,7 @@ interface BioReleaseLinkProps {
  * Chrome lets that start, since the click left sticky user activation;
  * Safari may open it paused, and the visitor presses play.
  */
-export const BioReleaseLink = ({
-  href,
-  artistSlug,
-  releaseId,
-  children,
-}: BioReleaseLinkProps): JSX.Element => {
+export const BioReleaseLink = ({ href, artistSlug, releaseId, children }: BioReleaseLinkProps) => {
   const hydrated = useHydrated();
   // The modal fetches the release once warmed or opened; the heading reads
   // the same cached result.

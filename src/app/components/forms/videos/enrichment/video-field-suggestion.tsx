@@ -42,7 +42,7 @@ export const VideoFieldSuggestion = ({
   onApply,
   onDismiss,
   isBusy,
-}: VideoFieldSuggestionProps): React.ReactElement => {
+}: VideoFieldSuggestionProps) => {
   const displayed: EnrichmentSuggestion =
     isAppliedToForm && suggestion.status === 'pending'
       ? { ...suggestion, status: 'applied' }

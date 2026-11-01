@@ -34,7 +34,7 @@ interface WorkSectionProps {
   children: React.ReactNode;
 }
 
-const WorkSection = ({ heading, note, children }: WorkSectionProps): React.JSX.Element => {
+const WorkSection = ({ heading, note, children }: WorkSectionProps) => {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId}>
@@ -53,11 +53,7 @@ const WorkSection = ({ heading, note, children }: WorkSectionProps): React.JSX.E
  * and the tour dates the artist headlines (ADR-0015). The work itself stays
  * public. Hiding is never blocked; this only makes the consequence known.
  */
-export const HidingWarningDialog = ({
-  work,
-  onConfirm,
-  onCancel,
-}: HidingWarningDialogProps): React.JSX.Element => {
+export const HidingWarningDialog = ({ work, onConfirm, onCancel }: HidingWarningDialogProps) => {
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {

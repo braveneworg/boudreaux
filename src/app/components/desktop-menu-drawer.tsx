@@ -71,10 +71,7 @@ export interface DesktopMenuDrawerProps {
  * clipping lives on the backdrop layer, not on any of the drawer's ancestors.
  * Trigger wears the group color and underlines while a child route is active.
  */
-export const DesktopMenuDrawer = ({
-  group,
-  pathname,
-}: DesktopMenuDrawerProps): React.ReactElement => {
+export const DesktopMenuDrawer = ({ group, pathname }: DesktopMenuDrawerProps) => {
   const isTrailActive = group.items.some((item) => isActiveHref(item.href, pathname));
   const triggerColor = TRIGGER_COLOR_CLASS.get(group.label);
 

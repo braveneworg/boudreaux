@@ -4,7 +4,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReactElement } from 'react';
 
 import {
   Dialog,
@@ -55,7 +54,7 @@ export const PlaylistSaveDialog = ({
   availableArtistImages,
   onSaved,
   onAddSongs,
-}: PlaylistSaveDialogProps): ReactElement => {
+}: PlaylistSaveDialogProps) => {
   const [isSaving, setIsSaving] = useState(false);
 
   const isEditMode = mode === 'edit';

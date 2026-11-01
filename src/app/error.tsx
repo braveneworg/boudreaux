@@ -19,7 +19,7 @@ interface ErrorPageProps {
  * Route-segment error boundary. Reports the error (digest + truncated
  * message only) to the server log endpoint and offers a retry.
  */
-export default function ErrorPage({ error, reset }: ErrorPageProps): React.JSX.Element {
+export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
     reportClientError(error, 'route');
   }, [error]);

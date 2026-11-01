@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import type { Format } from '@/lib/types/domain/shared';
@@ -37,7 +35,7 @@ export const ReleaseSummaryCard = ({
   releasedOn,
   formats,
   className,
-}: ReleaseSummaryCardProps): ReactElement => (
+}: ReleaseSummaryCardProps) => (
   <aside className={cn('shadow-zine-sm border-2 border-black bg-white p-3', className)}>
     <div className="relative aspect-square w-full overflow-hidden border-2 border-black bg-zinc-100">
       {coverArt ? (

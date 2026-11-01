@@ -33,7 +33,7 @@ export const SectionHeader = ({
   helpText,
   level = 1,
   className,
-}: SectionHeaderProps): React.ReactElement => (
+}: SectionHeaderProps) => (
   <div className={cn('flex items-center gap-2', className)}>
     <Icon className="text-primary size-6 shrink-0" aria-hidden="true" />
     <Heading level={level} className="h-auto">

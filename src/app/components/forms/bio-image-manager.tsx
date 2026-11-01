@@ -4,7 +4,6 @@
 'use client';
 
 import { useId, useState } from 'react';
-import type { JSX } from 'react';
 
 import { Plus } from 'lucide-react';
 
@@ -89,11 +88,7 @@ interface PoolTileBadgeProps {
  * A pool tile's display-state badge, by precedence: its chosen position, else
  * that the page shows it from a fallback tier, else that the job suggested it.
  */
-const PoolTileBadge = ({
-  position,
-  shownLabel,
-  isSuggested,
-}: PoolTileBadgeProps): JSX.Element | null => {
+const PoolTileBadge = ({ position, shownLabel, isSuggested }: PoolTileBadgeProps) => {
   let label: string | null = null;
   if (position !== -1) label = `Display ${position + 1}`;
   else if (shownLabel) label = shownLabel;
@@ -176,7 +171,7 @@ export const BioImageManager = ({
   uploadError = null,
   disabled = false,
   isPublished,
-}: BioImageManagerProps): JSX.Element => {
+}: BioImageManagerProps) => {
   const hintIdBase = useId();
   const [filter, setFilter] = useState('');
 

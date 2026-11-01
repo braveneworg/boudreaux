@@ -10,7 +10,7 @@ import { ZinePanel } from '@/components/ui/zine-panel';
 import { Button } from '@/ui/button';
 import { Separator } from '@/ui/separator';
 
-export const SuccessContainer = (): React.ReactElement => (
+export const SuccessContainer = () => (
   <ZinePanel accent="kraft">
     <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
 

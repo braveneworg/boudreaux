@@ -17,7 +17,7 @@ interface HarnessProps {
   onRead: (values: unknown, isDirty: boolean) => void;
 }
 
-const Harness = ({ groups, onRead }: HarnessProps): React.ReactElement => {
+const Harness = ({ groups, onRead }: HarnessProps) => {
   const form = useForm<ArtistFormData>({
     defaultValues: { contactLinkGroups: groups } as ArtistFormData,
   });

@@ -4,7 +4,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { ImagePreviewDialog } from './components/image-preview-dialog';
 
@@ -22,7 +22,7 @@ const ImagePreviewContext = createContext<ImagePreviewContextValue | null>(null)
  * the card tree call {@link useImagePreview} to open the dialog without threading a
  * setter through every intermediate component.
  */
-export const ImagePreviewProvider = ({ children }: { children: ReactNode }): ReactElement => {
+export const ImagePreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
 
   const openPreview = useCallback((image: PreviewImage) => setPreviewImage(image), []);

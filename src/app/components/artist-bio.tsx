@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { JSX } from 'react';
 
 import { BIO_PROSE_CLASS, BioHtml } from './bio-html';
 
@@ -18,7 +17,7 @@ const HEADING_ID = 'artist-bio-heading';
  * heading, the prose in the treatment the editor preview shares. Renders on
  * the server (no hooks); the page is the only place a bio is shown.
  */
-export const ArtistBio = ({ html, className }: ArtistBioProps): JSX.Element => (
+export const ArtistBio = ({ html, className }: ArtistBioProps) => (
   <article aria-labelledby={HEADING_ID} className={className}>
     <h2 id={HEADING_ID} className="mb-4 text-2xl font-semibold">
       Biography

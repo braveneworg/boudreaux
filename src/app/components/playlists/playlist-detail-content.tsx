@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Link from 'next/link';
 
 import { Share2 } from 'lucide-react';
@@ -29,7 +27,7 @@ const metaLine = ({ itemCount, isPublic }: PlaylistDetailResponse): string =>
   `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · ${isPublic ? 'Public' : 'Private'}`;
 
 /** Placeholder blocks while the (already-seeded) detail hydrates. */
-const PlaylistDetailSkeleton = (): ReactElement => (
+const PlaylistDetailSkeleton = () => (
   <div aria-busy="true" className="flex flex-col gap-4 py-4">
     <p role="status" className="sr-only">
       Loading playlist…
@@ -45,7 +43,7 @@ const PlaylistDetailSkeleton = (): ReactElement => (
  * inline player (spec order), items sorted by `sortOrder`. The page seeds the
  * detail cache, so the skeleton only shows on client-side cache misses.
  */
-export const PlaylistDetailContent = ({ playlistId }: PlaylistDetailContentProps): ReactElement => {
+export const PlaylistDetailContent = ({ playlistId }: PlaylistDetailContentProps) => {
   const { isPending, data } = usePlaylistQuery(playlistId);
 
   if (isPending) return <PlaylistDetailSkeleton />;

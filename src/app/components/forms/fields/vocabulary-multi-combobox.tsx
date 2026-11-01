@@ -81,7 +81,7 @@ interface TriggerLabelProps {
   noun: string;
 }
 
-const TriggerLabel = ({ count, noun }: TriggerLabelProps): React.ReactElement => (
+const TriggerLabel = ({ count, noun }: TriggerLabelProps) => (
   <>
     <span className="truncate">
       {count === 0 ? `Add ${noun}…` : `${count} selected — add another…`}
@@ -98,13 +98,7 @@ interface ResultsListProps {
   onSelect: (term: string) => void;
 }
 
-const ResultsList = ({
-  isPending,
-  results,
-  search,
-  noun,
-  onSelect,
-}: ResultsListProps): React.ReactElement => {
+const ResultsList = ({ isPending, results, search, noun, onSelect }: ResultsListProps) => {
   const trimmed = search.trim();
   const normalized = normalizeVocabularyTerm(trimmed);
   const hasExactMatch = results.some((entry) => entry.value === normalized);
@@ -209,7 +203,7 @@ export const VocabularyMultiCombobox = ({
   helperText,
   highlightCount,
   disabled = false,
-}: VocabularyMultiComboboxProps): React.ReactElement => {
+}: VocabularyMultiComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerId = useId();

@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -38,12 +36,7 @@ interface ArtistCardPhotoProps {
  * to the artist page. The thumbnail zooms when a mouse moves onto it or the
  * keyboard focuses it, never as the list scrolls past a resting cursor.
  */
-export const ArtistCardPhoto = ({
-  slug,
-  displayName,
-  image,
-  className,
-}: ArtistCardPhotoProps): ReactElement => {
+export const ArtistCardPhoto = ({ slug, displayName, image, className }: ArtistCardPhotoProps) => {
   const alt = image.alt ?? image.title ?? `${displayName} image`;
 
   return (

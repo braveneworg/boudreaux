@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /** Classes for the `CommandItem` that wraps a `SearchResultRow`. */
 export const SEARCH_RESULT_ITEM_CLASS = 'flex items-center gap-3 px-2 py-1.5';
@@ -27,7 +27,7 @@ export const SearchResultRow = ({
   primary,
   secondary,
   trailing,
-}: SearchResultRowProps): ReactElement => (
+}: SearchResultRowProps) => (
   <>
     {thumbnail}
     <span className="flex min-w-0 flex-1 flex-col">

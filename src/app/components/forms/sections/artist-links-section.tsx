@@ -4,7 +4,6 @@
 'use client';
 
 import { useId } from 'react';
-import type { JSX } from 'react';
 
 import { ArtistLinkGroupsEditor } from '@/app/components/forms/artist-link-groups-editor';
 import { ArtistLinkListEditor } from '@/app/components/forms/artist-link-list-editor';
@@ -22,7 +21,7 @@ interface ArtistLinksSectionProps {
  * mode only, like the image manager: the arrays are loaded from the stored
  * composite, and the form holds them until Save.
  */
-export const ArtistLinksSection = ({ control }: ArtistLinksSectionProps): JSX.Element => {
+export const ArtistLinksSection = ({ control }: ArtistLinksSectionProps) => {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="space-y-6">

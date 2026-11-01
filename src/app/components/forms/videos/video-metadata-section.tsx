@@ -26,7 +26,7 @@ interface VideoMetadataSectionProps {
   releaseDateLookupStatus?: ReleaseDateLookupStatus;
 }
 
-const CategoryField = ({ control }: { control: Control<VideoFormData> }): React.ReactElement => (
+const CategoryField = ({ control }: { control: Control<VideoFormData> }) => (
   <FormField
     control={control}
     name="category"
@@ -60,7 +60,7 @@ export const VideoMetadataSection = ({
   setValue,
   onSelectDate,
   releaseDateLookupStatus,
-}: VideoMetadataSectionProps): React.ReactElement => {
+}: VideoMetadataSectionProps) => {
   const { primary, featured, setPrimary, setFeatured } = useVideoArtistFields({
     control,
     setValue,

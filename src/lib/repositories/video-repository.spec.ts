@@ -455,10 +455,9 @@ describe('VideoRepository', () => {
 
       await VideoRepository.findPublished({});
 
-      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
-      const publishedClause = (arg?.where as { AND: { publishedAt?: { lte?: Date } }[] }).AND.find(
-        (c) => c.publishedAt?.lte instanceof Date
-      );
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0][0];
+      const where = arg?.where as { AND: { publishedAt?: { lte?: Date } }[] };
+      const publishedClause = where.AND.find((c) => c.publishedAt?.lte instanceof Date);
       expect(publishedClause).toBeDefined();
     });
 
@@ -467,8 +466,9 @@ describe('VideoRepository', () => {
 
       await VideoRepository.count({ published: true });
 
-      const arg = vi.mocked(prisma.video.count).mock.calls[0]?.[0];
-      expect((arg?.where as { publishedAt: { lte: Date } }).publishedAt.lte).toBeInstanceOf(Date);
+      const arg = vi.mocked(prisma.video.count).mock.calls[0][0];
+      const where = arg?.where as { publishedAt: { lte: Date } };
+      expect(where.publishedAt.lte).toBeInstanceOf(Date);
     });
 
     it('admin listing published filter stays presence-based (not null, no lte)', async () => {
@@ -476,10 +476,9 @@ describe('VideoRepository', () => {
 
       await VideoRepository.findMany({ published: true });
 
-      const arg = vi.mocked(prisma.video.findMany).mock.calls[0]?.[0];
-      const publishedClause = (arg?.where as { AND: { publishedAt?: unknown }[] }).AND.find(
-        (c) => c.publishedAt !== undefined
-      );
+      const arg = vi.mocked(prisma.video.findMany).mock.calls[0][0];
+      const where = arg?.where as { AND: { publishedAt?: unknown }[] };
+      const publishedClause = where.AND.find((c) => c.publishedAt !== undefined);
       // The admin toggle: dated (scheduled ∪ live), not live-at-now.
       expect(publishedClause).toEqual(videoWhere.published);
     });

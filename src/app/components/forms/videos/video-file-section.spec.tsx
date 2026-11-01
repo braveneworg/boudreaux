@@ -27,7 +27,7 @@ const Harness = ({
 }: {
   upload: UseVideoUploadResult;
   defaults?: Partial<VideoFormData>;
-}): React.ReactElement => {
+}) => {
   const form = useForm<VideoFormData>({
     defaultValues: { ...buildVideoDefaults(), ...defaults },
   });

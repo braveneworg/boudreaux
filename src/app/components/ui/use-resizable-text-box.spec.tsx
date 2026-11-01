@@ -35,7 +35,7 @@ const Harness = ({
   onWidthChange,
   onHeightChange,
   onSelect,
-}: HarnessProps): React.JSX.Element => {
+}: HarnessProps) => {
   const { containerRef, handleResizeStart } = useResizableTextBox({
     width,
     height,

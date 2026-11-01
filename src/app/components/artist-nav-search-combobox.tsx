@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef, useState, type ReactElement } from 'react';
+import { useRef, useState } from 'react';
 
 import nextDynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -29,7 +29,7 @@ export const ARTIST_NAV_SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_PLACEHOLDER = 'Search artists, releases & videos';
 
 /** Reserves the panel's resting footprint so the popover doesn't jump when the chunk lands. */
-const PanelFallback = (): ReactElement => <div aria-hidden className="h-[6.75rem] bg-zinc-50" />;
+const PanelFallback = () => <div aria-hidden className="h-[6.75rem] bg-zinc-50" />;
 
 // cmdk and the result rows stay out of the home page's initial bundle — they
 // load on first open. `ssr: false` + `loading` give the lazy panel its own
@@ -55,7 +55,7 @@ const pickArtist = ({ artistName, artistSlug }: ArtistNavSearchResult): HomeSear
  * and the query clears, so the trigger rests on its placeholder, and closing
  * the modal puts focus back on the trigger.
  */
-export const ArtistNavSearchCombobox = (): ReactElement => {
+export const ArtistNavSearchCombobox = () => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');

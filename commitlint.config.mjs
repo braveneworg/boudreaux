@@ -1,5 +1,5 @@
 /** @type {import('@commitlint/types').UserConfig} */
-export default {
+const config = {
   extends: ['@commitlint/config-conventional'],
   rules: {
     // Subject ≤ 50 chars (industry convention; keeps `git log --oneline` readable)
@@ -9,3 +9,5 @@ export default {
     'footer-max-line-length': [2, 'always', 72],
   },
 };
+
+export default config;

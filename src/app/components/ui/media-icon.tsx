@@ -13,7 +13,7 @@ interface MediaIconProps {
 /**
  * Renders the appropriate file icon for an audio or video media item.
  */
-export const MediaIcon = ({ mediaType, className }: MediaIconProps): React.JSX.Element => {
+export const MediaIcon = ({ mediaType, className }: MediaIconProps) => {
   if (mediaType === 'video') {
     return <FileVideo className={className} />;
   }

@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ComponentProps, ReactElement } from 'react';
+import type { ComponentProps } from 'react';
 
 import Image from 'next/image';
 
@@ -32,10 +32,7 @@ interface BreakpointImageProps extends ComponentProps<typeof Image> {
  * `display: contents`, so a `fill` image still sizes to the nearest positioned
  * ancestor exactly as before.
  */
-export const BreakpointImage = ({
-  hiddenMedia,
-  ...imageProps
-}: BreakpointImageProps): ReactElement => (
+export const BreakpointImage = ({ hiddenMedia, ...imageProps }: BreakpointImageProps) => (
   <picture className="contents">
     <source media={hiddenMedia} srcSet={BLANK_IMAGE_DATA_URI} />
     <Image {...imageProps} />

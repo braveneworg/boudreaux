@@ -4,7 +4,7 @@
 
 'use client';
 
-import { type ReactElement, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import dynamic from 'next/dynamic';
 
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
  * empty-state height, and a button-height block — so the popover measures the
  * same size before and after the panel lands and doesn't jump.
  */
-const AddToPlaylistPanelFallback = (): ReactElement => (
+const AddToPlaylistPanelFallback = () => (
   <div className="flex w-full flex-col gap-2" aria-busy="true">
     <p className="px-2 text-sm font-semibold">Add to a playlist</p>
     <Skeleton className="my-0 h-9 w-full" />
@@ -69,10 +69,7 @@ interface AddToPlaylistMenuProps {
  * Creating a new playlist closes the popover *before* opening the dialog to avoid
  * a Radix focus-teardown race.
  */
-export const AddToPlaylistMenu = ({
-  item,
-  className,
-}: AddToPlaylistMenuProps): ReactElement | null => {
+export const AddToPlaylistMenu = ({ item, className }: AddToPlaylistMenuProps) => {
   const { status } = useSession();
   const [mounted, setMounted] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);

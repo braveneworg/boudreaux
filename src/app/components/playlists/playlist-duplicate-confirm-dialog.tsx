@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +36,7 @@ export const PlaylistDuplicateConfirmDialog = ({
   onOpenChange,
   itemTitle,
   onConfirm,
-}: PlaylistDuplicateConfirmDialogProps): ReactElement => (
+}: PlaylistDuplicateConfirmDialogProps) => (
   <AlertDialog open={open} onOpenChange={onOpenChange}>
     <AlertDialogContent>
       <AlertDialogHeader>

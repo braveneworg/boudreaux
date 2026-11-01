@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { ZinePanel } from '@/components/ui/zine-panel';
 
-export const SuccessContainer = ({ email }: { email: string }): React.ReactElement => (
+export const SuccessContainer = ({ email }: { email: string }) => (
   <ZinePanel accent="kraft">
     <ImageHeading src="/media/headings/SUCCESS.webp" alt="success" imageHeight={480} priority />
     {/* Copy stays centered at reading width inside the full-width panel */}

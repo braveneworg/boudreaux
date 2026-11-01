@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { ReactElement } from 'react';
 
 import { Loader2, Users } from 'lucide-react';
 
@@ -62,7 +61,7 @@ const formatArtistCount = (count: number, search: string, hasNextPage: boolean):
  * frame size, inset, and row spacing — so nothing jumps when the first page
  * lands.
  */
-const ArtistsSkeleton = (): ReactElement => (
+const ArtistsSkeleton = () => (
   <div className="flex flex-col gap-8 py-4" aria-busy="true">
     <p role="status" className="sr-only">
       Loading artists…
@@ -92,7 +91,7 @@ const ArtistsSkeleton = (): ReactElement => (
 );
 
 /** Error state with a retry that refetches the listing in place. */
-const ArtistsError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
+const ArtistsError = ({ onRetry }: { onRetry: () => void }) => (
   <div role="alert" className="flex flex-col items-center gap-4 py-12 text-center">
     <p className="text-zinc-950">Unable to load artists. Please try again later.</p>
     <Button variant="outline" onClick={onRetry}>
@@ -102,7 +101,7 @@ const ArtistsError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
 );
 
 /** Empty state for no listed artists at all, or none matching the search. */
-const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
+const ArtistsEmpty = ({ search }: { search: string }) => (
   <div className="border-muted-foreground/25 flex min-h-60 flex-col items-center justify-center gap-3 border-2 border-dashed p-8 text-center">
     <Users className="text-muted-foreground size-8" aria-hidden />
     <p className="text-muted-foreground">
@@ -134,7 +133,7 @@ const ArtistsEmpty = ({ search }: { search: string }): ReactElement => (
  * at the toolbar's right edge where the row was otherwise empty. The toolbar
  * wraps from `sm` up, so its controls never overflow a narrow row.
  */
-export const ArtistsContent = (): ReactElement => {
+export const ArtistsContent = () => {
   const [sort, setSort] = useState<ArtistListingSort>('alpha');
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, SEARCH_DEBOUNCE_MS).trim();

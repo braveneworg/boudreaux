@@ -47,7 +47,7 @@ interface TriggerLabelProps {
   count: number;
 }
 
-const TriggerLabel = ({ count }: TriggerLabelProps): React.ReactElement => (
+const TriggerLabel = ({ count }: TriggerLabelProps) => (
   <>
     {count > 0 ? `${count} producer${count === 1 ? '' : 's'} selected` : 'Search producers…'}
     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -61,12 +61,7 @@ interface ResultsListProps {
   onSelect: (pill: ProducerPill) => void;
 }
 
-const ResultsList = ({
-  isPending,
-  results,
-  search,
-  onSelect,
-}: ResultsListProps): React.ReactElement => {
+const ResultsList = ({ isPending, results, search, onSelect }: ResultsListProps) => {
   const trimmed = search.trim();
   const hasExactMatch = results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
   const showAddNew = trimmed.length > 0 && !hasExactMatch;
@@ -108,7 +103,7 @@ interface PillsListProps {
   onRemove: (name: string) => void;
 }
 
-const PillsList = ({ pills, disabled, onRemove }: PillsListProps): React.ReactElement => (
+const PillsList = ({ pills, disabled, onRemove }: PillsListProps) => (
   <div className="flex flex-wrap gap-2" role="list" aria-label="Selected producers">
     {pills.map((pill) => (
       <span key={pill.id ?? pill.name} role="listitem" className="flex items-center gap-1">
@@ -132,7 +127,7 @@ export const ProducerMultiCombobox = ({
   onChange,
   label,
   disabled = false,
-}: ProducerMultiComboboxProps): React.ReactElement => {
+}: ProducerMultiComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerId = useId();

@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { JSX, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { Check, X } from 'lucide-react';
 
@@ -34,7 +34,7 @@ export const BioImageInlineTextEditor = ({
   initialValue,
   onSave,
   onCancel,
-}: BioImageInlineTextEditorProps): JSX.Element => {
+}: BioImageInlineTextEditorProps) => {
   const [draft, setDraft] = useState(initialValue);
 
   const save = (): void => {

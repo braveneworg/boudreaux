@@ -18,12 +18,7 @@ interface ArtistDateFieldProps {
   onSelectDate: (dateString: string, fieldName: string) => void;
 }
 
-const ArtistDateField = ({
-  control,
-  name,
-  label,
-  onSelectDate,
-}: ArtistDateFieldProps): React.ReactElement => (
+const ArtistDateField = ({ control, name, label, onSelectDate }: ArtistDateFieldProps) => (
   <FormField
     control={control}
     name={name}
@@ -49,10 +44,7 @@ interface ArtistDatesSectionProps {
  * section; they moved up beside the slug in `ArtistDetailsSection` (ADR-0009),
  * next to the bio panel that generates them.
  */
-export const ArtistDatesSection = ({
-  control,
-  onSelectDate,
-}: ArtistDatesSectionProps): React.ReactElement => (
+export const ArtistDatesSection = ({ control, onSelectDate }: ArtistDatesSectionProps) => (
   <section className="space-y-4">
     <h2 className="font-semibold">Important Dates</h2>
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

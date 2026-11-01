@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { JSX } from 'react';
 
 import type { HealthStatus } from '@/lib/types/health-status';
 
@@ -14,10 +13,7 @@ interface HealthStatusMessageProps {
  * Displays the health status message with database information
  * Shows loading state, database status, latency, and errors
  */
-export const HealthStatusMessage = ({
-  healthStatus,
-  isLoading,
-}: HealthStatusMessageProps): JSX.Element => {
+export const HealthStatusMessage = ({ healthStatus, isLoading }: HealthStatusMessageProps) => {
   if (isLoading) {
     return <>Checking database connection...</>;
   }

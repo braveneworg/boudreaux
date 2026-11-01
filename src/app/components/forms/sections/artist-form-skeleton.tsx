@@ -11,7 +11,7 @@ interface ArtistFormSkeletonProps {
   isEditMode: boolean;
 }
 
-export const ArtistFormSkeleton = ({ isEditMode }: ArtistFormSkeletonProps): React.ReactElement => (
+export const ArtistFormSkeleton = ({ isEditMode }: ArtistFormSkeletonProps) => (
   <div className="space-y-6">
     <SectionHeader
       icon={Users}

@@ -211,6 +211,6 @@ const replace: HTMLReactParserOptions['replace'] = (domNode) => {
  * @param html - Sanitized bio HTML string.
  * @param className - Optional wrapper class (e.g. prose styles).
  */
-export const BioHtml = ({ html, className }: BioHtmlProps): JSX.Element => (
+export const BioHtml = ({ html, className }: BioHtmlProps) => (
   <div className={className}>{parse(html, { replace })}</div>
 );

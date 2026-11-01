@@ -29,7 +29,7 @@ interface WrapperProps {
   artistName?: string | null;
 }
 
-const Wrapper = ({ setValueRef, artistName = 'Ceschi' }: WrapperProps): React.ReactElement => {
+const Wrapper = ({ setValueRef, artistName = 'Ceschi' }: WrapperProps) => {
   const form = useForm<ReleaseFormData>({
     defaultValues: {
       title: '',

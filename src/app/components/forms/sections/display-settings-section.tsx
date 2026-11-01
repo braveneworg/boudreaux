@@ -40,7 +40,7 @@ export const DisplaySettingsSection = ({
   featuredArtistId,
   onDateSelect,
   onUploadComplete,
-}: DisplaySettingsSectionProps): React.ReactElement => (
+}: DisplaySettingsSectionProps) => (
   <div className="space-y-4">
     <h3 className="text-lg font-medium">Display Settings</h3>
 

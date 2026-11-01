@@ -12,7 +12,7 @@ import type { MediaItem, MediaType } from './media-uploader-types';
 /**
  * The drop-zone icon for the given media type.
  */
-export const MediaUploadIcon = ({ mediaType }: { mediaType: MediaType }): React.JSX.Element => {
+export const MediaUploadIcon = ({ mediaType }: { mediaType: MediaType }) => {
   if (mediaType === 'audio') {
     return <FileAudio className="mb-2 h-10 w-10 text-zinc-950" />;
   }
@@ -35,7 +35,7 @@ export const MediaUploaderList = ({
   mediaItems,
   isDisabled,
   onDeleteRequest,
-}: MediaUploaderListProps): React.JSX.Element | null => {
+}: MediaUploaderListProps) => {
   if (mediaItems.length === 0) return null;
 
   return (

@@ -167,7 +167,7 @@ const EditModeLinks = ({
 }: {
   control: Control<ArtistFormData>;
   isEditMode: boolean;
-}): React.ReactElement | null =>
+}) =>
   isEditMode ? (
     <>
       <Separator />
@@ -220,10 +220,7 @@ const fullNameOf = (data: ArtistFormData): string =>
 const artistFormBreadcrumbTitle = (isEditMode: boolean): string =>
   isEditMode ? 'Edit Artist' : 'Create Artist';
 
-export const ArtistForm = ({
-  artistId: initialArtistId,
-  returnTo,
-}: ArtistFormProps): React.ReactElement => {
+export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormProps) => {
   const [isTransitionPending, startTransition] = useTransition();
   const { createArtistAsync, isCreatingArtist } = useCreateArtistMutation();
   const { updateArtistAsync, isUpdatingArtist } = useUpdateArtistMutation();

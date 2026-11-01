@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import Image from 'next/image';
 
@@ -30,12 +30,7 @@ export interface VideoPlayerProps {
  * policies) and swaps in the lazily-imported video.js surface. Safe to render
  * many times in an infinite list (admin cards, /videos feed).
  */
-export const VideoPlayer = ({
-  title,
-  src,
-  posterUrl,
-  className,
-}: VideoPlayerProps): ReactElement => {
+export const VideoPlayer = ({ title, src, posterUrl, className }: VideoPlayerProps) => {
   const [activated, setActivated] = useState(false);
   const { primeMediaEl, takeMediaEl } = usePrimedMediaHandoff('video');
 

@@ -36,7 +36,7 @@ export const FormatSelectStep = ({
   resetInHours,
   availableFormats,
   onDownloadComplete,
-}: FormatSelectStepProps): React.ReactElement => (
+}: FormatSelectStepProps) => (
   <>
     <DialogHeader>
       <DialogTitle>{hasPurchase ? 'Download Again' : 'Download'}</DialogTitle>

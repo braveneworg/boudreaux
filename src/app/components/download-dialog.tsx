@@ -212,7 +212,7 @@ const renderDialogStep = (
   }
 };
 
-export const DownloadDialog = (props: DownloadDialogProps): ReactElement => {
+export const DownloadDialog = (props: DownloadDialogProps) => {
   const resolved = resolveDialogProps(props);
   const state = useDownloadDialogState(props);
 

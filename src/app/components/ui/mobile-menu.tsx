@@ -48,12 +48,7 @@ interface MobileMenuLinkProps {
   onNavigate: () => void;
 }
 
-const MobileMenuLink = ({
-  item,
-  index,
-  pathname,
-  onNavigate,
-}: MobileMenuLinkProps): React.ReactElement => (
+const MobileMenuLink = ({ item, index, pathname, onNavigate }: MobileMenuLinkProps) => (
   <li
     className="menu-item-stagger font-fake-four-cutout"
     // index / 10 (not index * 0.1) keeps the delay an exact decimal — 3 * 0.1
@@ -85,7 +80,7 @@ const MobileMenuLink = ({
  * `isActiveHref`. Rendered inside the hamburger sheet, which remounts it on
  * every open, so the initial expansion recomputes per open.
  */
-export const MobileMenu = ({ entries, onNavigate }: MobileMenuProps): React.ReactElement => {
+export const MobileMenu = ({ entries, onNavigate }: MobileMenuProps) => {
   const pathname = usePathname();
 
   return (

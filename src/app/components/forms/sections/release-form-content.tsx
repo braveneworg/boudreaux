@@ -67,7 +67,7 @@ export const ReleaseFormContent = ({
   onImagesChange,
   onReorder,
   onDelete,
-}: ReleaseFormContentProps): React.ReactElement => (
+}: ReleaseFormContentProps) => (
   <CardContent className="space-y-6">
     {/* Digital Formats Section - Always visible */}
     <section className="space-y-4">

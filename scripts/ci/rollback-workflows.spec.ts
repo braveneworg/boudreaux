@@ -281,7 +281,7 @@ describe('rollback.yml — manual, two inputs, nothing rebuilt', () => {
     expect(text).not.toMatch(/pnpm/);
     expect(text).not.toMatch(/prisma db/);
     expect(text).not.toMatch(/docker buildx build/);
-    expect(text).not.toMatch(/vitest|eslint|tsc\b/);
+    expect(text).not.toMatch(/vitest|oxlint|eslint|tsc\b/);
   });
 
   it('reads the registry with the workflow token and nothing wider in resolve', () => {

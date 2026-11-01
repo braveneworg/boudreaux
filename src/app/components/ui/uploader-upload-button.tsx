@@ -29,7 +29,7 @@ export const UploaderUploadButton = ({
   isUploading,
   pendingCount,
   noun,
-}: UploaderUploadButtonProps): React.JSX.Element => (
+}: UploaderUploadButtonProps) => (
   <div className="flex justify-end">
     <Button type="button" onClick={onClick} disabled={disabled} size="sm">
       {isUploading ? (

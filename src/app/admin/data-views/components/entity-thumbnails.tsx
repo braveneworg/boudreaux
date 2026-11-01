@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import { Eye } from 'lucide-react';
@@ -24,7 +22,7 @@ interface EntityThumbnailsProps<T extends Record<string, unknown>> {
 }
 
 /** A single clickable thumbnail that opens the shared image-preview dialog. */
-const PreviewThumbnail = ({ src, altText }: { src: string; altText: string }): ReactElement => {
+const PreviewThumbnail = ({ src, altText }: { src: string; altText: string }) => {
   const { openPreview } = useImagePreview();
   const isBase64 = src.startsWith('data:');
 
@@ -60,7 +58,7 @@ export const EntityThumbnails = <T extends Record<string, unknown>>({
   entity,
   imageField,
   coverArtField,
-}: EntityThumbnailsProps<T>): ReactElement | null => {
+}: EntityThumbnailsProps<T>) => {
   // First check for a direct coverArt URL field.
   let coverArtUrl = coverArtField
     ? (readField(item, coverArtField) as string | undefined)

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import Link from 'next/link';
 
@@ -34,13 +34,7 @@ export interface PlayDialogHeadingProps {
 }
 
 /** The artist's name, a link to their page when an href is given. */
-const ArtistLine = ({
-  artistName,
-  artistHref,
-}: {
-  artistName: string;
-  artistHref?: string;
-}): ReactElement =>
+const ArtistLine = ({ artistName, artistHref }: { artistName: string; artistHref?: string }) =>
   artistHref ? (
     <Link href={artistHref} className="no-underline underline-offset-4 hover:underline">
       {artistName}
@@ -77,7 +71,7 @@ const PlayDialogLines = ({
   headingOrder,
   centered,
   compactOnPhone,
-}: PlayDialogLinesProps): ReactElement => {
+}: PlayDialogLinesProps) => {
   const artistFirst = headingOrder === 'artist-first' && artistName !== null;
   const titleLine = year === undefined ? title : `${title} (${year})`;
   const artistLine =
@@ -100,7 +94,7 @@ const PlayDialogLines = ({
  * hover only, and the title line carries the year when `year` is given. An
  * `action` (the add-to-playlist kebab) sits at the heading's right.
  */
-export const PlayDialogHeading = ({ action, ...lines }: PlayDialogHeadingProps): ReactElement =>
+export const PlayDialogHeading = ({ action, ...lines }: PlayDialogHeadingProps) =>
   action ? (
     <DialogHeader className="flex-row items-start gap-2 pr-8">
       <div

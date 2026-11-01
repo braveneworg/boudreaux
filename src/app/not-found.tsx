@@ -13,7 +13,7 @@ import { ZinePanel } from '@/app/components/ui/zine-panel';
  * Root 404 page — rendered inside the root layout for any unmatched route.
  * No breadcrumb (the route is unknown); a denim zine panel points back home.
  */
-export default function NotFound(): React.JSX.Element {
+export default function NotFound() {
   return (
     <PageContainer>
       <ContentContainer>

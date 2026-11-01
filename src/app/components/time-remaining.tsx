@@ -25,7 +25,7 @@ interface TimeRemainingProps {
  * Feature: 007-free-digital-downloads (US2, T052).
  */
 export const TimeRemaining = ({ resetsAtIso, className, id }: TimeRemainingProps) => {
-  const [now, setNow] = useState<number>(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const handle = globalThis.setInterval(() => setNow(Date.now()), 1000);

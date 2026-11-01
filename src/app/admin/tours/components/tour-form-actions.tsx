@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { Button } from '@/app/components/ui/button';
 
 interface TourFormActionsProps {
@@ -23,7 +21,7 @@ export const TourFormActions = ({
   isTourDateDialogOpen,
   onBack,
   onDelete,
-}: TourFormActionsProps): JSX.Element => (
+}: TourFormActionsProps) => (
   <div className="flex justify-between pt-6">
     <div className="flex gap-2">
       <Button

@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { ListPlus } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
@@ -34,7 +32,7 @@ export const AddToPlaylistPanel = ({
   item,
   onCreatePlaylist,
   onAdded,
-}: AddToPlaylistPanelProps): ReactElement => {
+}: AddToPlaylistPanelProps) => {
   const flow = useAddToPlaylistFlow({ item, onAdded });
 
   return (

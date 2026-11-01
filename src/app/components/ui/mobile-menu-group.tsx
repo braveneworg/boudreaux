@@ -70,12 +70,7 @@ export interface MobileMenuGroupProps {
  * enforces one-open-at-a-time; Radix supplies `aria-expanded` and keyboard
  * support on the trigger.
  */
-export const MobileMenuGroup = ({
-  group,
-  index,
-  pathname,
-  onNavigate,
-}: MobileMenuGroupProps): React.ReactElement => {
+export const MobileMenuGroup = ({ group, index, pathname, onNavigate }: MobileMenuGroupProps) => {
   const isTrailActive = group.items.some((item) => isActiveHref(item.href, pathname));
   const colors = TRIGGER_COLOR_CLASS.get(group.label);
 

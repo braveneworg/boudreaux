@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import {
   Dialog,
   DialogContent,
@@ -30,7 +28,7 @@ interface PlaylistPlayerDialogProps {
 const SKELETON_KEYS = ['player-skeleton-1', 'player-skeleton-2', 'player-skeleton-3'] as const;
 
 /** Placeholder lines while the playlist detail loads. */
-const PlaylistPlayerDialogSkeleton = (): ReactElement => (
+const PlaylistPlayerDialogSkeleton = () => (
   <div className="flex flex-col gap-3 py-2">
     {SKELETON_KEYS.map((key) => (
       <Skeleton
@@ -48,10 +46,7 @@ interface PlaylistPlayerDialogBodyProps {
 }
 
 /** Dialog body: skeleton → error line → download row stacked above the player. */
-const PlaylistPlayerDialogBody = ({
-  isPending,
-  detail,
-}: PlaylistPlayerDialogBodyProps): ReactElement => {
+const PlaylistPlayerDialogBody = ({ isPending, detail }: PlaylistPlayerDialogBodyProps) => {
   if (isPending) return <PlaylistPlayerDialogSkeleton />;
 
   if (!detail) {
@@ -76,7 +71,7 @@ export const PlaylistPlayerDialog = ({
   playlistId,
   open,
   onOpenChange,
-}: PlaylistPlayerDialogProps): ReactElement => {
+}: PlaylistPlayerDialogProps) => {
   const { isPending, data } = usePlaylistQuery(playlistId, {
     enabled: open && playlistId !== null,
   });

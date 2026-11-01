@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Plus } from 'lucide-react';
 
@@ -53,7 +53,7 @@ export const PlaylistPickerCombobox = ({
   onPick,
   excludePlaylistId,
   focusOnMount = false,
-}: PlaylistPickerComboboxProps): ReactElement => {
+}: PlaylistPickerComboboxProps) => {
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { isPending, rows } = usePlaylistsQuery();

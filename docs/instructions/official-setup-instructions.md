@@ -207,7 +207,7 @@ These run automatically via Husky:
 - `gitleaks protect --staged` — secret scan. It now reads `.gitleaks.toml`, which
   allowlists `bio-generator/src/*.spec.ts` (those tests use a literal `"test-key"`
   placeholder, not a real secret).
-- `lint-staged` — `tsc-files` + `eslint --fix` + `prettier` on staged files.
+- `lint-staged` — `tsc-files` + `oxlint --fix` + `prettier` on staged files.
 - `vitest --changed` — tests touching your changes.
 
 **pre-push**

@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, JSX, KeyboardEvent, PointerEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent, PointerEvent } from 'react';
 
 import { NodeViewWrapper } from '@tiptap/react';
 import { AlignCenterVertical, AlignEndVertical, AlignStartVertical, Pencil, X } from 'lucide-react';
@@ -209,7 +209,7 @@ interface FigureCaptionProps {
 }
 
 /** Caption lines below the image — fixed at 11px, never scaling with width. */
-const FigureCaption = ({ title, subtitle }: FigureCaptionProps): JSX.Element | null => {
+const FigureCaption = ({ title, subtitle }: FigureCaptionProps) => {
   if (!title && !subtitle) return null;
   return (
     <figcaption className="bio-figure-caption mt-1 space-y-0.5 text-[11px] leading-snug">
@@ -230,11 +230,7 @@ interface AttributionFieldProps {
  * is editable. Pencil triggers a text input; Enter/blur commits (empty → null);
  * Escape cancels. Read-only when `isEditable` is false.
  */
-const AttributionField = ({
-  attribution,
-  isEditable,
-  updateAttributes,
-}: AttributionFieldProps): JSX.Element | null => {
+const AttributionField = ({ attribution, isEditable, updateAttributes }: AttributionFieldProps) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -318,11 +314,7 @@ interface FigureControlsProps {
 }
 
 /** Hover/selection overlay: delete X (top-right) + float radio-group buttons. */
-const FigureControls = ({
-  float,
-  updateAttributes,
-  deleteNode,
-}: FigureControlsProps): JSX.Element => (
+const FigureControls = ({ float, updateAttributes, deleteNode }: FigureControlsProps) => (
   <div
     className={cn(
       'absolute inset-x-1 top-1 flex items-start justify-between gap-1',
@@ -376,7 +368,7 @@ export const BioFigureNodeView = ({
   deleteNode,
   selected,
   editor,
-}: NodeViewProps): JSX.Element => {
+}: NodeViewProps) => {
   const { src, alt, width, float, title, subtitle, attribution } =
     node.attrs as BioFigureAttributes;
   const { cornerHandlers, onKeyDown, pinchHandlers } = useFigureResize({ width, updateAttributes });

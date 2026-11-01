@@ -17,10 +17,7 @@ import { cn } from '@/lib/utils';
  * The selected item fills with `--card-accent-soft`, the lighter shade of
  * whichever `zine-accent-*` the surrounding page panel sets.
  */
-const ZineToggleGroup = ({
-  className,
-  ...props
-}: React.ComponentProps<typeof ToggleGroup>): React.ReactElement => (
+const ZineToggleGroup = ({ className, ...props }: React.ComponentProps<typeof ToggleGroup>) => (
   <ToggleGroup
     className={cn('shadow-zine-ink w-fit border-2 border-black bg-zinc-50', className)}
     {...props}
@@ -36,7 +33,7 @@ const ZineToggleGroup = ({
 const ZineToggleGroupItem = ({
   className,
   ...props
-}: React.ComponentProps<typeof ToggleGroupItem>): React.ReactElement => (
+}: React.ComponentProps<typeof ToggleGroupItem>) => (
   <ToggleGroupItem
     className={cn(
       'h-9 flex-none px-4 text-xs font-semibold tracking-wider uppercase not-first:border-l-2 not-first:border-black hover:bg-zinc-200 data-[state=on]:bg-(--card-accent-soft) data-[state=on]:text-black',

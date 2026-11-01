@@ -26,7 +26,7 @@ const SCROLL_STEP = 200;
  * subpage. On narrow viewports the row scrolls horizontally (swipe) and shows
  * light left/right arrow overlays that nudge it when there is more to reveal.
  */
-export const AdminNav = (): React.ReactElement => {
+export const AdminNav = () => {
   const pathname = usePathname();
   const scrollRef = React.useRef<HTMLUListElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);

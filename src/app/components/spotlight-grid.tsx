@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { SPOTLIGHT_LIMIT } from '@/hooks/queries/use-active-featured-artists-query';
 import {
   SPOTLIGHT_GRID_CLASS,
@@ -25,7 +23,7 @@ interface SpotlightGridProps {
  * a new loud accent on each open, the artist linked to their page, the year,
  * and a "View all releases" link. Renders nothing without cards.
  */
-export const SpotlightGrid = ({ cards }: SpotlightGridProps): ReactElement | null => {
+export const SpotlightGrid = ({ cards }: SpotlightGridProps) => {
   if (cards.length === 0) return null;
 
   return (

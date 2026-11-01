@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  * The animated "marching ants" selection border, shown only when the box is
  * selected.
  */
-export const MarchingAntsBorder = (): React.JSX.Element => (
+export const MarchingAntsBorder = () => (
   <div
     className="pointer-events-none absolute inset-0"
     style={{
@@ -48,7 +48,7 @@ export const ResizableTextBoxContent = ({
   title,
   onDragStart,
   onDoubleClick,
-}: ResizableTextBoxContentProps): React.JSX.Element => (
+}: ResizableTextBoxContentProps) => (
   <div
     role="button"
     tabIndex={-1}

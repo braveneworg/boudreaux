@@ -4,7 +4,6 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { ReactElement } from 'react';
 
 import { useSelectedLayoutSegment } from 'next/navigation';
 
@@ -23,7 +22,7 @@ import {
  * done since the swap. A layout survives a child segment change, so the
  * form instance stays for its own draft and is replaced for any other video.
  */
-export const VideoEditorHost = (): ReactElement => {
+export const VideoEditorHost = () => {
   const segment = useSelectedLayoutSegment();
   const [instance, setInstance] = useState(() => initialEditorInstance(segment));
 

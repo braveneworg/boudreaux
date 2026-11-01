@@ -64,7 +64,7 @@ const DropZoneCount = ({
   currentCount: number;
   maxCount: number;
   countUnit: string;
-}): React.JSX.Element | null => {
+}) => {
   if (currentCount === 0) return null;
 
   return (
@@ -100,7 +100,7 @@ export const UploaderDropZone = ({
   maxSizeMb,
   maxReachedLabel,
   containerClassName,
-}: UploaderDropZoneProps): React.JSX.Element => {
+}: UploaderDropZoneProps) => {
   const canAddMore = canAddMoreItems(currentCount, maxCount, disabled);
 
   return (

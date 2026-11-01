@@ -68,11 +68,7 @@ interface AwaitingCreditRowProps {
 }
 
 /** One artist awaiting a decision: what goes live, and the publish toggle. */
-const AwaitingCreditRow = ({
-  credit,
-  publish,
-  onPublishChange,
-}: AwaitingCreditRowProps): React.JSX.Element => {
+const AwaitingCreditRow = ({ credit, publish, onPublishChange }: AwaitingCreditRowProps) => {
   const handleCheckedChange = useCallback(
     (checked: boolean) => onPublishChange(credit.id, checked),
     [credit.id, onPublishChange]
@@ -120,7 +116,7 @@ const AwaitingCreditRow = ({
 };
 
 /** One credit that publishing cannot make public, with the reason. */
-const HiddenCreditRow = ({ credit }: { credit: CreditThatStaysHidden }): React.JSX.Element => (
+const HiddenCreditRow = ({ credit }: { credit: CreditThatStaysHidden }) => (
   <li data-testid={`hidden-${credit.id}`} className="text-sm text-zinc-700">
     {credit.name} — {reasonLabel(credit.reason)}
   </li>
@@ -139,7 +135,7 @@ const CreditConfirmationBody = ({
   confirmLabel,
   onConfirm,
   onCancel,
-}: CreditConfirmationBodyProps): React.JSX.Element => {
+}: CreditConfirmationBodyProps) => {
   const [publishIds, setPublishIds] = useState<ReadonlySet<string>>(new Set());
   const hiddenHeadingId = useId();
 
@@ -227,7 +223,7 @@ export const CreditConfirmationDialog = ({
   confirmLabel,
   onConfirm,
   onCancel,
-}: CreditConfirmationDialogProps): React.JSX.Element => {
+}: CreditConfirmationDialogProps) => {
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {

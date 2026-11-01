@@ -4,7 +4,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { JSX } from 'react';
 
 import { useHealthStatusQuery } from '@/hooks/queries/use-health-status-query';
 
@@ -16,7 +15,7 @@ import { HealthStatusMessage } from './health-status-message';
  * Displays the health status of the database connection
  * Uses TanStack Query with built-in retry (10 attempts) and exponential backoff
  */
-export const DataStoreHealthStatus = (): JSX.Element => {
+export const DataStoreHealthStatus = () => {
   const { isPending: isLoading, data: healthStatus } = useHealthStatusQuery();
   const [failsafe, setFailsafe] = useState(false);
 

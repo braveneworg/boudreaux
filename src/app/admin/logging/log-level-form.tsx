@@ -38,7 +38,7 @@ export const LogLevelForm = ({ initialState }: LogLevelFormProps) => {
   const router = useRouter();
   const [state, setState] = useState<LogLevelState>(initialState);
   const [level, setLevel] = useState<LogLevel>(initialState.effectiveLevel);
-  const [duration, setDuration] = useState<string>('60');
+  const [duration, setDuration] = useState('60');
   const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 

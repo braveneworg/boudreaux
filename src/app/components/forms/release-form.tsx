@@ -278,9 +278,7 @@ const applyLoadedRelease = (
   }
 };
 
-export const ReleaseForm = ({
-  releaseId: initialReleaseId,
-}: ReleaseFormProps): React.ReactElement => {
+export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) => {
   const [isTransitionPending, startTransition] = useTransition();
   const { createReleaseAsync, isCreatingRelease } = useCreateReleaseMutation();
   const { updateReleaseAsync, isUpdatingRelease } = useUpdateReleaseMutation();
@@ -293,7 +291,7 @@ export const ReleaseForm = ({
   // Pre-generate a MongoDB ObjectId so digital format uploads can begin before the release
   // is saved. In edit mode this equals initialReleaseId; in create mode it enables immediate
   // uploads whose DB confirms are flushed after createReleaseAction succeeds.
-  const [preGeneratedId] = useState<string>(() => initialReleaseId ?? generateObjectId());
+  const [preGeneratedId] = useState(() => initialReleaseId ?? generateObjectId());
 
   const router = useRouter();
   const { data: session } = useSession();

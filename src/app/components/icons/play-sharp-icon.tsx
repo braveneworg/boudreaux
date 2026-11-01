@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { ReactElement, SVGProps } from 'react';
+import type { SVGProps } from 'react';
 
 interface PlaySharpIconProps extends SVGProps<SVGSVGElement> {
   size?: number;
@@ -17,11 +17,7 @@ interface PlaySharpIconProps extends SVGProps<SVGSVGElement> {
  * glyph itself. It fills with `currentColor` and carries no stroke, so the
  * only visible shape is the triangle's crisp outline.
  */
-export const PlaySharpIcon = ({
-  size = 24,
-  className,
-  ...props
-}: PlaySharpIconProps): ReactElement => (
+export const PlaySharpIcon = ({ size = 24, className, ...props }: PlaySharpIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"

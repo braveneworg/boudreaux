@@ -248,7 +248,7 @@ The CI pipeline runs on every push and pull request:
 1. **Tests with Coverage** - Runs all tests and generates coverage report
 2. **Coverage Regression Check** - Fails if coverage drops below baseline
 3. **Codecov Upload** - Uploads coverage for PR comments
-4. **ESLint** - Enforces zero warnings
+4. **oxlint** - Enforces zero warnings
 5. **TypeScript** - Type checking
 6. **Build** - Verifies production build
 

@@ -15,9 +15,7 @@ interface ReleaseFormSkeletonProps {
   isEditMode: boolean;
 }
 
-export const ReleaseFormSkeleton = ({
-  isEditMode,
-}: ReleaseFormSkeletonProps): React.ReactElement => (
+export const ReleaseFormSkeleton = ({ isEditMode }: ReleaseFormSkeletonProps) => (
   <Card className="w-full">
     <CardHeader>
       <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>

@@ -39,7 +39,7 @@ interface MatchedEntryProps {
   entry: VideoArtistReviewEntry;
 }
 
-const MatchedEntry = ({ entry }: MatchedEntryProps): React.ReactElement | null => {
+const MatchedEntry = ({ entry }: MatchedEntryProps) => {
   if (!entry.match) return null;
 
   const { id, displayName, firstName, surname } = entry.match;
@@ -58,11 +58,7 @@ interface NewEntryFieldsProps {
   updateDraft: (sourceName: string, patch: Partial<ArtistNameParts>) => void;
 }
 
-const NewEntryFields = ({
-  entry,
-  idPrefix,
-  updateDraft,
-}: NewEntryFieldsProps): React.ReactElement => {
+const NewEntryFields = ({ entry, idPrefix, updateDraft }: NewEntryFieldsProps) => {
   const { sourceName, draft } = entry;
   const firstName = draft?.firstName ?? '';
   const middleName = draft?.middleName ?? '';
@@ -116,7 +112,7 @@ interface ReviewEntryProps {
   updateDraft: (sourceName: string, patch: Partial<ArtistNameParts>) => void;
 }
 
-const ReviewEntry = ({ entry, idPrefix, updateDraft }: ReviewEntryProps): React.ReactElement => (
+const ReviewEntry = ({ entry, idPrefix, updateDraft }: ReviewEntryProps) => (
   <div className={cn('rounded-none border border-zinc-200 p-3', entry.status === 'new' && 'p-4')}>
     {entry.status === 'matched' ? (
       <MatchedEntry entry={entry} />
@@ -132,7 +128,7 @@ interface PrimarySplitHintProps {
 }
 
 /** Nudge the admin to split a multi-artist primary name into separate artists. */
-const PrimarySplitHint = ({ parts, onApplySplit }: PrimarySplitHintProps): React.ReactElement => (
+const PrimarySplitHint = ({ parts, onApplySplit }: PrimarySplitHintProps) => (
   <div className="space-y-2 rounded-none border border-zinc-200 p-3 text-sm" role="note">
     <p>
       Multiple artists? Split as <strong>{parts.join(' + ')}</strong>
@@ -150,7 +146,7 @@ export const VideoArtistReviewSection = ({
   updateDraft,
   primarySplitParts,
   onApplySplit,
-}: VideoArtistReviewSectionProps): React.ReactElement | null => {
+}: VideoArtistReviewSectionProps) => {
   const idPrefix = useId();
 
   if (entries.length === 0 && !primarySplitParts) return null;

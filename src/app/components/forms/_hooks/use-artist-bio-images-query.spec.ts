@@ -72,7 +72,7 @@ describe('useArtistBioImagesQuery', () => {
 
     renderHook(() => useArtistBioImagesQuery(['a', '']));
 
-    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { queries } = mockUseQueries.mock.calls[0][0] as { queries: MockQueryConfig[] };
 
     expect(queries[0]?.queryKey).toEqual(['artists', 'bioImages', 'a']);
     expect(queries[0]?.enabled).toBe(true);
@@ -85,7 +85,7 @@ describe('useArtistBioImagesQuery', () => {
 
     renderHook(() => useArtistBioImagesQuery(['a']));
 
-    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { queries } = mockUseQueries.mock.calls[0][0] as { queries: MockQueryConfig[] };
     const { signal } = new AbortController();
 
     await expect(queries[0]?.queryFn({ signal })).resolves.toEqual([
@@ -112,7 +112,7 @@ describe('useArtistBioImagesQuery', () => {
 
     renderHook(() => useArtistBioImagesQuery([''], { staleTime: 5_000, enabled: true }));
 
-    const { queries } = mockUseQueries.mock.calls[0]?.[0] as { queries: MockQueryConfig[] };
+    const { queries } = mockUseQueries.mock.calls[0][0] as { queries: MockQueryConfig[] };
 
     expect(queries[0]?.staleTime).toBe(5_000);
     expect(queries[0]?.enabled).toBe(false);

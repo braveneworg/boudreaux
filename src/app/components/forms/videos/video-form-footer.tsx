@@ -34,11 +34,7 @@ export interface VideoFormFooterProps {
 }
 
 /** Confirm dialog shown before unpublishing a video with unsaved edits. */
-const UnpublishConfirmDialog = ({
-  onUnpublish,
-}: {
-  onUnpublish: () => void;
-}): React.ReactElement => (
+const UnpublishConfirmDialog = ({ onUnpublish }: { onUnpublish: () => void }) => (
   <AlertDialog>
     <AlertDialogTrigger asChild>
       <Button type="button" variant="outline">
@@ -62,7 +58,7 @@ const UnpublishConfirmDialog = ({
 );
 
 /** Draft-mode secondary action: a Publish submit button. */
-const PublishButton = ({ onPublish }: { onPublish: () => void }): React.ReactElement => (
+const PublishButton = ({ onPublish }: { onPublish: () => void }) => (
   <Button type="submit" variant="outline" onClick={onPublish}>
     Publish
   </Button>
@@ -75,7 +71,7 @@ const UnpublishButton = ({
 }: {
   isDirty: boolean;
   onUnpublish: () => void;
-}): React.ReactElement =>
+}) =>
   isDirty ? (
     <UnpublishConfirmDialog onUnpublish={onUnpublish} />
   ) : (
@@ -102,7 +98,7 @@ export const VideoFormFooter = ({
   onPublish,
   onUnpublish,
   isDirty = false,
-}: VideoFormFooterProps): React.ReactElement => (
+}: VideoFormFooterProps) => (
   <CardFooter className="flex justify-end gap-4 px-0">
     <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
       Cancel

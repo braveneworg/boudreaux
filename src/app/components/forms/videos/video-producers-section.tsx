@@ -15,9 +15,7 @@ interface VideoProducersSectionProps {
   control: Control<VideoFormData>;
 }
 
-export const VideoProducersSection = ({
-  control,
-}: VideoProducersSectionProps): React.ReactElement => (
+export const VideoProducersSection = ({ control }: VideoProducersSectionProps) => (
   <section className="space-y-3">
     <h2 className="font-semibold">Producers</h2>
     <Controller

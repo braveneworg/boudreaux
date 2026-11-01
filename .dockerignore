@@ -62,8 +62,7 @@ backups
 music
 
 # Linting/formatting config
-eslint.config.*
-.eslintrc*
+.oxlintrc*
 .prettierrc*
 .prettierignore
 .editorconfig

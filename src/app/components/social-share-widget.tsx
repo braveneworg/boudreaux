@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { MessageSquareIcon } from 'lucide-react';
 import {
@@ -51,7 +51,7 @@ interface ShareIconLayersProps {
  * brand one on top, faded in by the control's `group` state. Only the gray
  * layer is announced; the control's `aria-label` names it.
  */
-const ShareIconLayers = ({ gray, brand }: ShareIconLayersProps): ReactElement => (
+const ShareIconLayers = ({ gray, brand }: ShareIconLayersProps) => (
   <span className="relative inline-flex">
     <span data-share-layer="gray" className="inline-flex">
       {gray}

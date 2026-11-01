@@ -66,7 +66,7 @@ export const LightboxTrigger = ({
   onPointerMove,
   onPointerLeave,
   ...props
-}: LightboxTriggerProps): ReactElement => {
+}: LightboxTriggerProps) => {
   const { isHovered, hoverProps } = usePointerHover();
 
   return (
@@ -122,7 +122,7 @@ interface LightboxImageProps {
  * credit, and link under it stay on screen — 60% of the screen in the drawer,
  * 75% of the window in the dialog.
  */
-export const LightboxImage = ({ src, alt, className }: LightboxImageProps): ReactElement => (
+export const LightboxImage = ({ src, alt, className }: LightboxImageProps) => (
   <Image
     src={src}
     alt={alt}
@@ -175,7 +175,7 @@ export const ResponsiveLightbox = ({
   descriptionClassName,
   dialogClassName,
   children,
-}: ResponsiveLightboxProps): ReactElement => {
+}: ResponsiveLightboxProps) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;

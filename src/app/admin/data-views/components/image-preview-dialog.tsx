@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import { X } from 'lucide-react';
@@ -26,10 +24,7 @@ interface ImagePreviewDialogProps {
  * Full-screen preview of a single thumbnail. Base64 data URLs are passed through
  * `unoptimized`; remote URLs are cleaned of duplicate protocols first.
  */
-export const ImagePreviewDialog = ({
-  previewImage,
-  onClose,
-}: ImagePreviewDialogProps): ReactElement => (
+export const ImagePreviewDialog = ({ previewImage, onClose }: ImagePreviewDialogProps) => (
   <Dialog open={!!previewImage} onOpenChange={onClose}>
     <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
       <DialogTitle className="sr-only">{previewImage?.altText || 'Image preview'}</DialogTitle>

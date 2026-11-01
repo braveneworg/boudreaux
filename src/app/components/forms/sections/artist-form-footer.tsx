@@ -29,10 +29,7 @@ const PublishButton = ({
   canPublish,
   isSubmitting,
   onPublish,
-}: Pick<
-  ArtistFormFooterProps,
-  'isPublished' | 'canPublish' | 'isSubmitting' | 'onPublish'
->): React.ReactElement => {
+}: Pick<ArtistFormFooterProps, 'isPublished' | 'canPublish' | 'isSubmitting' | 'onPublish'>) => {
   const needsImage = !isPublished && !canPublish;
   return (
     <>
@@ -62,7 +59,7 @@ const EditModeActions = ({
   isDirty,
   onPublish,
   onDelete,
-}: Omit<ArtistFormFooterProps, 'isEditMode'>): React.ReactElement => (
+}: Omit<ArtistFormFooterProps, 'isEditMode'>) => (
   <>
     {artistId && (
       <EntityDeleteButton
@@ -92,9 +89,7 @@ const EditModeActions = ({
  * Create mode saves an unpublished artist; it is published from the edit
  * form once it has a chosen display image (ADR-0019).
  */
-const CreateModeActions = ({
-  isSubmitting,
-}: Pick<ArtistFormFooterProps, 'isSubmitting'>): React.ReactElement => (
+const CreateModeActions = ({ isSubmitting }: Pick<ArtistFormFooterProps, 'isSubmitting'>) => (
   <Button type="submit" disabled={isSubmitting}>
     {isSubmitting ? 'Creating...' : 'Create'}
   </Button>
@@ -109,7 +104,7 @@ export const ArtistFormFooter = ({
   isDirty,
   onPublish,
   onDelete,
-}: ArtistFormFooterProps): React.ReactElement => (
+}: ArtistFormFooterProps) => (
   <div className="flex justify-end gap-4 pt-6">
     {isEditMode ? (
       <EditModeActions

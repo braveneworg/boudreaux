@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import { Music } from 'lucide-react';
@@ -43,7 +41,7 @@ export const PlaylistCoverTiles = ({
   alt,
   size = 'sm',
   className,
-}: PlaylistCoverTilesProps): ReactElement => {
+}: PlaylistCoverTilesProps) => {
   const tiles = images
     .slice(0, 4)
     .map((src, index) => ({ id: `cover-${index}`, isFirst: index === 0, src }));

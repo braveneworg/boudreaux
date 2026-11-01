@@ -64,7 +64,7 @@ const Harness = ({
   uploadPoster = async () => undefined,
   existingPosterUrl,
   nextFrames = null,
-}: HarnessProps): React.ReactElement => {
+}: HarnessProps) => {
   const form = useForm<VideoFormData>({
     defaultValues: { posterUrl: existingPosterUrl ?? '' } as Partial<VideoFormData>,
   });

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useImperativeHandle, useState, type ReactElement, type Ref, type RefObject } from 'react';
+import { useImperativeHandle, useState, type Ref, type RefObject } from 'react';
 
 import Link from 'next/link';
 
@@ -69,7 +69,7 @@ interface HomeSearchPlayDialogProps {
 const FOOTER_LINK_CLASS = 'underline underline-offset-4 hover:no-underline';
 
 /** The sentence-case link under the player, as the spotlight caption sets its links. */
-const ViewAllLink = ({ href, children }: { href: string; children: string }): ReactElement => (
+const ViewAllLink = ({ href, children }: { href: string; children: string }) => (
   <p className="text-center">
     <Link href={href} className={FOOTER_LINK_CLASS}>
       {children}
@@ -127,7 +127,7 @@ export const HomeSearchPlayDialog = ({
   ref,
   returnFocusRef,
   pickAccent = pickLoudZineAccent,
-}: HomeSearchPlayDialogProps): ReactElement | null => {
+}: HomeSearchPlayDialogProps) => {
   const [selection, setSelection] = useState<HomeSearchSelection | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
   const media = usePrimedMediaHandoff('video');

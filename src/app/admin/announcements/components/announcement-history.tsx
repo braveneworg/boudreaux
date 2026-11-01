@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ReactElement } from 'react';
 
 import { Heading } from '@/app/components/ui/heading';
 import { formatTourDate } from '@/lib/utils/date-utils';
@@ -28,7 +27,7 @@ interface AnnouncementHistoryProps {
  * Presentational history of past SMS blasts, newest first. Rendered by the
  * server Announcements page — holds no state and fires no effects.
  */
-export const AnnouncementHistory = ({ blasts }: AnnouncementHistoryProps): ReactElement => (
+export const AnnouncementHistory = ({ blasts }: AnnouncementHistoryProps) => (
   <section className="space-y-4">
     <Heading level={2}>History</Heading>
 

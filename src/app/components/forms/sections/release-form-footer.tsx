@@ -24,7 +24,7 @@ const EditModeActions = ({
   isDirty,
   onPublish,
   onDelete,
-}: Omit<ReleaseFormFooterProps, 'isEditMode'>): React.ReactElement => (
+}: Omit<ReleaseFormFooterProps, 'isEditMode'>) => (
   <>
     {releaseId && (
       <EntityDeleteButton
@@ -55,7 +55,7 @@ const EditModeActions = ({
 const CreateModeActions = ({
   isSubmitting,
   onPublish,
-}: Pick<ReleaseFormFooterProps, 'isSubmitting' | 'onPublish'>): React.ReactElement => (
+}: Pick<ReleaseFormFooterProps, 'isSubmitting' | 'onPublish'>) => (
   <>
     <Button type="button" disabled={isSubmitting} onClick={onPublish}>
       Create &amp; Publish
@@ -74,7 +74,7 @@ export const ReleaseFormFooter = ({
   isDirty,
   onPublish,
   onDelete,
-}: ReleaseFormFooterProps): React.ReactElement => (
+}: ReleaseFormFooterProps) => (
   <CardFooter className="flex justify-end gap-4">
     {isEditMode ? (
       <EditModeActions

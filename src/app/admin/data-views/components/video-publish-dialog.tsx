@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ComponentProps, ReactElement } from 'react';
+import type { ComponentProps } from 'react';
 
 import { EyeOff, Send } from 'lucide-react';
 
@@ -63,11 +63,7 @@ const resolvePublishConfig = (verb: VideoPublishVerb): PublishVerbConfig =>
  * video. Mirrors the shared `PublishEntityDialog` but supports both directions,
  * keeping that shared component untouched for the other admin data views.
  */
-export const VideoPublishDialog = ({
-  verb,
-  title,
-  onConfirm,
-}: VideoPublishDialogProps): ReactElement => {
+export const VideoPublishDialog = ({ verb, title, onConfirm }: VideoPublishDialogProps) => {
   const { Icon, label, heading, action, triggerVariant } = resolvePublishConfig(verb);
 
   return (

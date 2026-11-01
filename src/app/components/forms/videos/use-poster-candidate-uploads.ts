@@ -97,7 +97,7 @@ export const usePosterCandidateUploads = ({
 }): UsePosterCandidateUploadsResult => {
   const [alignedNow, setAlignedNow] = useState<(VideoPosterCandidate | null)[]>([]);
   const settledRef = useRef<Promise<(VideoPosterCandidate | null)[]>>(Promise.resolve([]));
-  const generationRef = useRef<number>(0);
+  const generationRef = useRef(0);
 
   const runUploads = useCallback(
     async (

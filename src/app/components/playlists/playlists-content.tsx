@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useRef, useState, type ReactElement } from 'react';
+import { useRef, useState } from 'react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -26,7 +26,7 @@ const BELOW_LG_QUERY = '(max-width: 1023px)';
  * `PlaylistPlayerDialog`, while sharing is owned entirely by the row
  * actions' `PlaylistSharePopover`.
  */
-export const PlaylistsContent = (): ReactElement => {
+export const PlaylistsContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editParam = searchParams.get('edit');

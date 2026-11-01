@@ -34,7 +34,7 @@ vi.mock('@/app/components/forms/fields/vocabulary-multi-combobox', () => ({
   ),
 }));
 
-const Harness = ({ genres, tags }: { genres?: string; tags?: string }): React.ReactElement => {
+const Harness = ({ genres, tags }: { genres?: string; tags?: string }) => {
   const form = useForm<ArtistFormData>({
     defaultValues: { genres, tags } as Partial<ArtistFormData> as ArtistFormData,
   });

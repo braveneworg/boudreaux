@@ -5,13 +5,9 @@ peerDependencyRules:
     react: '^19.2.0'
     react-dom: '^19.2.0'
     nodemailer: '^9.0.1'
-    # eslint-plugin-react and eslint-plugin-jsx-a11y have not yet published a release
-    # declaring an ESLint 10 peer, but both run on v10 with the rules this repo enables
-    # (the rule files using v10-removed APIs are all formatting rules we don't turn on).
-    'eslint-plugin-react>eslint': '10'
-    'eslint-plugin-jsx-a11y>eslint': '10'
-    # Transitive only: eslint-import-resolver-typescript pulls in the legacy
-    # eslint-plugin-import (we lint with eslint-plugin-import-x). Cosmetic peer.
+    # Transitive only: eslint-import-resolver-typescript (the resolver the
+    # bridged import-x `order` rule uses) pulls in the legacy
+    # eslint-plugin-import, whose peer range predates ESLint 10. Cosmetic.
     'eslint-plugin-import>eslint': '10'
     # better-auth lists vitest (^2 || ^3 || ^4) as an OPTIONAL peer for its own
     # test utilities, which this repo never imports. Vitest 5 is safe here.
@@ -28,11 +24,6 @@ onlyBuiltDependencies:
 overrides:
   esbuild@<0.28.1: ^0.28.1
   c12>magicast: ^0.3.5
-  typescript-eslint: ^8.58.0
-  '@typescript-eslint/utils': ^8.58.0
-  '@typescript-eslint/typescript-estree': ^8.58.0
-  '@typescript-eslint/tsconfig-utils': ^8.58.0
-  '@typescript-eslint/project-service': ^8.58.0
   '@xmldom/xmldom': ^0.9.12
   lodash: 4.18.1
   vite: ^8.0.16

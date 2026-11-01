@@ -36,7 +36,7 @@ jobs:
       - name: Assert installed toolchain matches mise.toml
         run: sh scripts/assert-toolchain.sh
 
-      - name: Run ESLint
+      - name: Run oxlint
         run: pnpm run lint
 
       - name: Run TypeScript type check

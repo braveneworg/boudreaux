@@ -375,7 +375,7 @@ const EnrichmentPanelMount = ({
   videoId,
   control,
   onApplyVideoSuggestion,
-}: EnrichmentPanelMountProps): React.ReactElement | null =>
+}: EnrichmentPanelMountProps) =>
   videoId !== undefined ? (
     <VideoEnrichmentErrorBoundary>
       <VideoEnrichmentPanel
@@ -386,10 +386,10 @@ const EnrichmentPanelMount = ({
     </VideoEnrichmentErrorBoundary>
   ) : null;
 
-export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps): React.ReactElement => {
+export const VideoForm = ({ videoId, onDraftCreated }: VideoFormProps) => {
   const router = useRouter();
   const isEditMode = videoId !== undefined;
-  const [preGeneratedId] = useState<string>(() => videoId ?? generateObjectId());
+  const [preGeneratedId] = useState(() => videoId ?? generateObjectId());
 
   /** Tracks whether the next submit is a Save or a Publish. */
   const submitIntentRef = useRef<SubmitIntent>('save');

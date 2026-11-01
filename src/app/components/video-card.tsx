@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import Image from 'next/image';
 
@@ -37,7 +37,7 @@ interface VideoCardProps {
  * the modal back instead of starting a second playback. The read-only
  * counterpart to the admin `VideoAdminCard` — no lifecycle actions.
  */
-export const VideoCard = ({ video }: VideoCardProps): ReactElement => {
+export const VideoCard = ({ video }: VideoCardProps) => {
   const [playerOpen, setPlayerOpen] = useState(false);
   const { primeMediaEl, takeMediaEl, discardMediaEl } = usePrimedMediaHandoff('video');
   const src = resolveStreamUrl(video);

@@ -4,7 +4,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReactElement } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -63,7 +62,7 @@ export const EntityDeleteButton = ({
   failureMessage,
   redirectTo,
   disabled = false,
-}: EntityDeleteButtonProps): ReactElement => {
+}: EntityDeleteButtonProps) => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);

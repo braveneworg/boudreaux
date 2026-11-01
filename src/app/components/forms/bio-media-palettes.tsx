@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { toast } from 'sonner';
 
 import { buildBioFigureContent, buildBioLinkContent } from '@/app/components/ui/bio-editor-insert';
@@ -39,10 +37,7 @@ const NO_EDITOR_TARGET_COPY = 'Click into a bio editor first, then insert.';
  * @param artistId - The artist whose media to manage (edit mode only).
  * @param isPublished - Whether the artist is published (its last display image then stays).
  */
-export const BioMediaPalettes = ({
-  artistId,
-  isPublished = false,
-}: BioMediaPalettesProps): JSX.Element => {
+export const BioMediaPalettes = ({ artistId, isPublished = false }: BioMediaPalettesProps) => {
   const pool = useArtistPool(artistId);
   const registry = useBioEditorRegistry();
 

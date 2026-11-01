@@ -4,7 +4,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import type { DragEvent, JSX, ReactNode } from 'react';
+import type { DragEvent, ReactNode } from 'react';
 
 import Image from 'next/image';
 
@@ -80,12 +80,7 @@ interface DeleteButtonProps {
 }
 
 /** The tile's pool-delete control; a reason both disables it and describes why. */
-const DeleteButton = ({
-  label,
-  disabled,
-  disabledReason,
-  onClick,
-}: DeleteButtonProps): JSX.Element => {
+const DeleteButton = ({ label, disabled, disabledReason, onClick }: DeleteButtonProps) => {
   const reasonId = useId();
   return (
     <>
@@ -138,7 +133,7 @@ const EditableTextRow = ({
   onEdit,
   onSave,
   onCancel,
-}: EditableTextRowProps): JSX.Element =>
+}: EditableTextRowProps) =>
   editing ? (
     <BioImageInlineTextEditor
       label={label}
@@ -187,7 +182,7 @@ export const BioImageTile = ({
   deleteDisabledReason = null,
   actions,
   badges,
-}: BioImageTileProps): JSX.Element => {
+}: BioImageTileProps) => {
   const { thumbSrc, title, deleteLabel, previewLabel, alt } = resolveImageLabels(image);
   const [editing, setEditing] = useState<EditingField>(null);
 

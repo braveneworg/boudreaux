@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { Dialog, DialogContent } from '@/app/components/ui/dialog';
 import { PlayDialogHeading } from '@/app/components/ui/play-dialog-heading';
@@ -137,7 +137,7 @@ const playerWidthClasses = (fitPhoneSheet: boolean, stacked: boolean): string =>
 };
 
 /** Loading placeholder shaped like the player: square cover + controls bar. */
-const ReleasePlayerSkeleton = (): ReactElement => (
+const ReleasePlayerSkeleton = () => (
   <div className="flex flex-col" aria-busy="true">
     <p role="status" className="sr-only">
       Loading release…
@@ -174,7 +174,7 @@ const ReleasePlayDialogPlayer = ({
   initialTrackNumber,
   fitPhoneSheet,
   stacked,
-}: ReleasePlayDialogPlayerProps): ReactElement => {
+}: ReleasePlayDialogPlayerProps) => {
   // min-w-0: the ticker's no-wrap line would otherwise widen the dialog
   // (docs/lessons/react-nextjs/dialog-grid-child-needs-min-w-0.md).
   const slotClass = cn('mx-auto min-w-0', playerWidthClasses(fitPhoneSheet, stacked));
@@ -237,7 +237,7 @@ export const ReleasePlayDialog = ({
   initialTrackNumber,
   shareWidget,
   accent,
-}: ReleasePlayDialogProps): ReactElement => {
+}: ReleasePlayDialogProps) => {
   const {
     isPending,
     isError,

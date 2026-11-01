@@ -42,7 +42,7 @@ interface ActionButtonProps {
 }
 
 /** One ghost icon button in the row's action cluster. */
-const ActionButton = ({ label, onAction, children }: ActionButtonProps): ReactElement => (
+const ActionButton = ({ label, onAction, children }: ActionButtonProps) => (
   <Button
     type="button"
     variant="ghost"
@@ -61,12 +61,7 @@ const ActionButton = ({ label, onAction, children }: ActionButtonProps): ReactEl
  * `PlaylistSharePopover` (the popover owns the make-public mutation), and
  * the trash button gates `onDelete` behind an AlertDialog confirm.
  */
-export const PlaylistRowActions = ({
-  row,
-  onEdit,
-  onPlay,
-  onDelete,
-}: PlaylistRowActionsProps): ReactElement => (
+export const PlaylistRowActions = ({ row, onEdit, onPlay, onDelete }: PlaylistRowActionsProps) => (
   <div className="flex shrink-0 items-center gap-1">
     <ActionButton label="Play playlist" onAction={onPlay}>
       <Play aria-hidden="true" />

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -78,7 +78,7 @@ const VideoPlayDialogContent = ({
   footer,
   action,
   onCloseAutoFocus,
-}: VideoPlayDialogContentProps): ReactElement => (
+}: VideoPlayDialogContentProps) => (
   <DialogContent
     className={cn('gap-3 p-4 sm:max-w-3xl lg:max-w-5xl', accent && getZineAccentClass(accent))}
     onCloseAutoFocus={onCloseAutoFocus}
@@ -155,7 +155,7 @@ export const VideoPlayDialog = ({
   onOpenChange,
   takeMediaEl,
   ...contentProps
-}: VideoPlayDialogProps): ReactElement => {
+}: VideoPlayDialogProps) => {
   const [surfaceHost] = useState(() =>
     typeof document === 'undefined' ? null : document.createElement('div')
   );
