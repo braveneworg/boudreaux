@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import videojs from 'video.js';
 
@@ -80,7 +80,7 @@ export const VideoPlayerSurface = ({
   onEnterPictureInPicture,
   onLeavePictureInPicture,
   takeMediaEl,
-}: VideoPlayerSurfaceProps): ReactElement => {
+}: VideoPlayerSurfaceProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceId = useId();
   const [hasError, setHasError] = useState(false);

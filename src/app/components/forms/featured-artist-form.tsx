@@ -91,7 +91,7 @@ export const FeaturedArtistForm = ({
   const [featuredArtistId, setFeaturedArtistId] = useState<string | null>(
     initialFeaturedArtistId || null
   );
-  const [preGeneratedId] = useState<string>(() => initialFeaturedArtistId ?? generateObjectId());
+  const [preGeneratedId] = useState(() => initialFeaturedArtistId ?? generateObjectId());
   const isEditMode = featuredArtistId !== null;
   const router = useRouter();
   const { createFeaturedArtistAsync } = useCreateFeaturedArtistMutation();

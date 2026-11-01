@@ -4,7 +4,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -92,7 +92,7 @@ const DataViewBody = <T extends Record<string, unknown>>({
   onDelete,
   onRestore,
   onHardDelete,
-}: DataViewBodyProps<T>): ReactElement => (
+}: DataViewBodyProps<T>) => (
   <div className="relative min-h-[60vh]" aria-busy={showRefreshSkeleton}>
     {items.length > 0 ? (
       <>
@@ -166,7 +166,7 @@ export const DataView = <T extends Record<string, unknown>>({
   isPending,
   isFetching = false,
   error,
-}: DataViewProps<T>): ReactElement => {
+}: DataViewProps<T>) => {
   const router = useRouter();
 
   const resolveDisplayName = useCallback(

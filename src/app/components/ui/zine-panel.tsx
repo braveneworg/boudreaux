@@ -126,7 +126,7 @@ export const ZinePanel = ({
   className,
   children,
   ...props
-}: ZinePanelProps): React.ReactElement => (
+}: ZinePanelProps) => (
   <section
     data-slot="zine-panel"
     className={cn(

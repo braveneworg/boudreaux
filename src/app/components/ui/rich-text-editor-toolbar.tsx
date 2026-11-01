@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import {
   Bold,
   Eye,
@@ -81,7 +79,7 @@ export const RichTextEditorToolbar = ({
   onOpenImage,
   isPreview,
   onTogglePreview,
-}: RichTextEditorToolbarProps): JSX.Element => (
+}: RichTextEditorToolbarProps) => (
   <div className="border-input flex flex-wrap items-center gap-1 border-b p-1" role="toolbar">
     <fieldset disabled={isPreview} className="contents">
       <Button

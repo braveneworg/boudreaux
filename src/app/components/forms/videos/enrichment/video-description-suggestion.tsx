@@ -40,7 +40,7 @@ export const VideoDescriptionSuggestion = ({
   isApplied,
   isBusy,
   onApply,
-}: VideoDescriptionSuggestionProps): React.ReactElement | null => {
+}: VideoDescriptionSuggestionProps) => {
   if (suggestion.status !== 'pending') return null;
 
   return (

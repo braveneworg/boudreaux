@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { TourDateList } from '@/app/admin/tours/components/tour-date-list';
 import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload';
 import { Separator } from '@/app/components/ui/separator';
@@ -42,7 +40,7 @@ export const TourEditSections = ({
   isDeletingTour,
   onDialogOpenChange,
   onUploadComplete,
-}: TourEditSectionsProps): JSX.Element | null => {
+}: TourEditSectionsProps) => {
   if (!isEditMode || !tourId) {
     return null;
   }

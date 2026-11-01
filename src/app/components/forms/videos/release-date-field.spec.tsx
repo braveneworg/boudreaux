@@ -39,7 +39,7 @@ interface WrapperProps {
   lookupStatus?: ReleaseDateLookupStatus;
 }
 
-const Wrapper = ({ onSelectDate = vi.fn(), lookupStatus }: WrapperProps): React.ReactElement => {
+const Wrapper = ({ onSelectDate = vi.fn(), lookupStatus }: WrapperProps) => {
   const form = useForm<VideoFormData>({
     resolver: zodResolver(createVideoSchema),
     defaultValues: {

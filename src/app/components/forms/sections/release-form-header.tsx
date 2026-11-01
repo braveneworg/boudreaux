@@ -10,7 +10,7 @@ interface ReleaseCardHeaderProps {
   isEditMode: boolean;
 }
 
-export const ReleaseCardHeader = ({ isEditMode }: ReleaseCardHeaderProps): React.ReactElement => (
+export const ReleaseCardHeader = ({ isEditMode }: ReleaseCardHeaderProps) => (
   <CardHeader>
     <CardTitle>{isEditMode ? 'Edit Release' : 'Create New Release'}</CardTitle>
     <CardDescription className="text-sm">

@@ -4,7 +4,6 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import type { ReactElement } from 'react';
 
 import Link from 'next/link';
 
@@ -55,7 +54,7 @@ const VideoListBody = ({
   pagination,
   handlers,
   onRetry,
-}: VideoListBodyProps): ReactElement => {
+}: VideoListBodyProps) => {
   if (hasError) {
     return (
       <div role="alert" className="space-y-3 py-8 text-center">
@@ -111,7 +110,7 @@ const VideoListBody = ({
  * toasts and a refetch. Composes the shared building blocks rather than the
  * generic `DataView`, which has no place for inline video playback.
  */
-export const VideoDataView = (): ReactElement => {
+export const VideoDataView = () => {
   const { search, showPublished, showUnpublished, showArchived, sort } = useDataViewFilters(
     (state) => state.videos
   );

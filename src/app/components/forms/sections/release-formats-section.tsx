@@ -39,12 +39,7 @@ interface FormatSwitchProps {
   onFormatChange: (format: Format, checked: boolean) => void;
 }
 
-const FormatSwitch = ({
-  format,
-  formats,
-  isSubmitting,
-  onFormatChange,
-}: FormatSwitchProps): React.ReactElement => (
+const FormatSwitch = ({ format, formats, isSubmitting, onFormatChange }: FormatSwitchProps) => (
   <div className="flex items-center justify-between">
     <label
       htmlFor={`format-${format}`}
@@ -79,7 +74,7 @@ export const ReleaseFormatsSection = ({
   formats,
   isSubmitting,
   onFormatChange,
-}: ReleaseFormatsSectionProps): React.ReactElement => (
+}: ReleaseFormatsSectionProps) => (
   <section className="space-y-4">
     <h2 className="font-semibold">Formats *</h2>
     <FormDescription>Select all formats this release is available in.</FormDescription>

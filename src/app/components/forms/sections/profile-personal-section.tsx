@@ -31,7 +31,7 @@ export const ProfilePersonalSection = ({
   onSubmit,
   isPending,
   isTransitionPending,
-}: ProfilePersonalSectionProps): React.ReactElement => {
+}: ProfilePersonalSectionProps) => {
   const isDirty = form.formState.isDirty;
   const isSaving = isPending || isTransitionPending;
 

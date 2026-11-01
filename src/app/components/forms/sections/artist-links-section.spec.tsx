@@ -10,7 +10,7 @@ import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
 import { ArtistLinksSection } from './artist-links-section';
 
-const Harness = (): React.ReactElement => {
+const Harness = () => {
   const form = useForm<ArtistFormData>({
     defaultValues: toArtistLinksFormValues(null) as ArtistFormData,
   });

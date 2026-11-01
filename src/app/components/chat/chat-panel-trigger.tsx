@@ -16,7 +16,7 @@ import { useChatOpen } from './use-chat-open';
  * fixed trigger hide itself via CSS `:has()` whenever a docked trigger is
  * on the page — no client state or hydration flash involved.
  */
-export const ChatPanelTrigger = (): React.ReactElement => {
+export const ChatPanelTrigger = () => {
   const { setOpen } = useChatOpen();
   const handleOpen = useCallback(() => setOpen(true), [setOpen]);
 

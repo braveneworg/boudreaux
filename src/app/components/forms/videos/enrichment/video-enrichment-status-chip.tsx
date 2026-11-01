@@ -30,9 +30,7 @@ const CHIP_VARIANTS = new Map<EnrichmentStatus, BadgeVariant>([
 ]);
 
 /** Compact text badge reflecting the enrichment job lifecycle. */
-export const VideoEnrichmentStatusChip = ({
-  status,
-}: VideoEnrichmentStatusChipProps): React.ReactElement => (
+export const VideoEnrichmentStatusChip = ({ status }: VideoEnrichmentStatusChipProps) => (
   <Badge
     data-testid="video-enrichment-status-chip"
     variant={CHIP_VARIANTS.get(status) ?? 'secondary'}

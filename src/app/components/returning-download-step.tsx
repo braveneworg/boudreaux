@@ -20,7 +20,7 @@ export const ReturningDownloadStep = ({
   releaseTitle,
   guestAtCap,
   guestResetInHours,
-}: ReturningDownloadStepProps): React.ReactElement => (
+}: ReturningDownloadStepProps) => (
   <>
     <DialogHeader>
       <DialogTitle>Welcome Back!</DialogTitle>

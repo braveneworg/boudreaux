@@ -20,7 +20,7 @@ export interface BrandIconProps {
   className?: string;
 }
 
-export const AppleIcon = ({ className }: BrandIconProps): React.ReactElement => (
+export const AppleIcon = ({ className }: BrandIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -32,7 +32,7 @@ export const AppleIcon = ({ className }: BrandIconProps): React.ReactElement => 
   </svg>
 );
 
-export const GoogleIcon = ({ className }: BrandIconProps): React.ReactElement => (
+export const GoogleIcon = ({ className }: BrandIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -44,7 +44,7 @@ export const GoogleIcon = ({ className }: BrandIconProps): React.ReactElement =>
   </svg>
 );
 
-export const FacebookIcon = ({ className }: BrandIconProps): React.ReactElement => (
+export const FacebookIcon = ({ className }: BrandIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -56,7 +56,7 @@ export const FacebookIcon = ({ className }: BrandIconProps): React.ReactElement 
   </svg>
 );
 
-export const XIcon = ({ className }: BrandIconProps): React.ReactElement => (
+export const XIcon = ({ className }: BrandIconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"

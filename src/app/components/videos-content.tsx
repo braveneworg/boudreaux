@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { ReactElement } from 'react';
 
 import Link from 'next/link';
 
@@ -55,7 +54,7 @@ type VideoSort = 'asc' | 'desc';
  * and a few poster-left/details-right placeholder rows — so nothing jumps
  * when the first page lands.
  */
-const VideosSkeleton = (): ReactElement => (
+const VideosSkeleton = () => (
   <div className="flex flex-col gap-8 py-4" aria-busy="true">
     <p role="status" className="sr-only">
       Loading videos…
@@ -92,7 +91,7 @@ const SuggestionPlayDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   takeMediaEl: () => HTMLVideoElement | null;
-}): ReactElement | null => {
+}) => {
   const src = video ? resolveStreamUrl(video) : null;
   if (!video || !src) return null;
   return (
@@ -112,7 +111,7 @@ const SuggestionPlayDialog = ({
  * artist's videos, as `/releases?artist=` shows them; nothing when the
  * listing is not filtered.
  */
-const VideosArtistContext = ({ artistName }: { artistName?: string }): ReactElement | null =>
+const VideosArtistContext = ({ artistName }: { artistName?: string }) =>
   artistName ? (
     <div>
       <h2 className="text-xl font-semibold text-zinc-950">Videos by {artistName}</h2>
@@ -129,7 +128,7 @@ const VideosArtistContext = ({ artistName }: { artistName?: string }): ReactElem
   ) : null;
 
 /** Error state with a retry that refetches the listing in place. */
-const VideosError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
+const VideosError = ({ onRetry }: { onRetry: () => void }) => (
   <div role="alert" className="flex flex-col items-center gap-4 py-12 text-center">
     <p className="text-zinc-950">Unable to load videos. Please try again later.</p>
     <Button variant="outline" onClick={onRetry}>
@@ -159,7 +158,7 @@ interface VideosContentProps {
  * videos credited to that artist, under the artist's name and a link back to
  * every artist's videos.
  */
-export const VideosContent = ({ artist = '', artistName }: VideosContentProps): ReactElement => {
+export const VideosContent = ({ artist = '', artistName }: VideosContentProps) => {
   const [sort, setSort] = useState<VideoSort>('desc');
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, 300).trim();

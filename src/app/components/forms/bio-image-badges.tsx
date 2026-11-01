@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { Badge } from '@/app/components/ui/badge';
 
 interface LicenseBadgeProps {
@@ -17,7 +15,7 @@ interface LicenseBadgeProps {
  * (linked to its machine-readable license page when known), or muted
  * "Rights unknown" text when the discovery captured no license at all.
  */
-export const LicenseBadge = ({ license, licenseUrl }: LicenseBadgeProps): JSX.Element => {
+export const LicenseBadge = ({ license, licenseUrl }: LicenseBadgeProps) => {
   if (!license) {
     return <span className="text-muted-foreground text-[10px]">Rights unknown</span>;
   }
@@ -55,7 +53,7 @@ interface FaceBadgeProps {
  * the badge is never a negative marker, so the absence of a face is simply the
  * absence of a badge.
  */
-export const FaceBadge = ({ hasFace, faceScore }: FaceBadgeProps): JSX.Element | null => {
+export const FaceBadge = ({ hasFace, faceScore }: FaceBadgeProps) => {
   if (faceScore != null) {
     const percent = Math.round(faceScore);
     return (

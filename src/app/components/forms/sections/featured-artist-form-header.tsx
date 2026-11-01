@@ -11,9 +11,7 @@ interface FeaturedArtistFormHeaderProps {
   isEditMode: boolean;
 }
 
-export const FeaturedArtistFormHeader = ({
-  isEditMode,
-}: FeaturedArtistFormHeaderProps): React.ReactElement => (
+export const FeaturedArtistFormHeader = ({ isEditMode }: FeaturedArtistFormHeaderProps) => (
   <>
     {/* The breadcrumb docks inside the form's storm panel. */}
     <div className="space-y-1">

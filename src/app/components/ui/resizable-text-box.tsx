@@ -80,7 +80,7 @@ export const ResizableTextBox = ({
   maxWidth = 100,
   minHeight = 5,
   maxHeight = 100,
-}: ResizableTextBoxProps): React.JSX.Element => {
+}: ResizableTextBoxProps) => {
   const { containerRef, handleResizeStart } = useResizableTextBox({
     width,
     height,

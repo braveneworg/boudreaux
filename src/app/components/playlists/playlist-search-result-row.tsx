@@ -28,7 +28,7 @@ interface PlaylistSearchResultRowProps {
 }
 
 /** 40px square cover thumb with a muted fallback block when the item has no art. */
-const ResultThumb = ({ coverArt }: { coverArt: string | null }): ReactElement =>
+const ResultThumb = ({ coverArt }: { coverArt: string | null }) =>
   coverArt ? (
     <Image
       src={coverArt}
@@ -53,7 +53,7 @@ interface SecondaryActionProps {
  * neither the cmdk row select nor outer layers (popovers, drawers) ever see
  * the interaction.
  */
-const SecondaryAction = ({ label, onAction, children }: SecondaryActionProps): ReactElement => (
+const SecondaryAction = ({ label, onAction, children }: SecondaryActionProps) => (
   <Button
     type="button"
     variant="ghost"
@@ -81,7 +81,7 @@ export const PlaylistSearchResultRow = ({
   onAdd,
   onNewPlaylist,
   onAddToOther,
-}: PlaylistSearchResultRowProps): ReactElement => {
+}: PlaylistSearchResultRowProps) => {
   const { key, itemType, title, artistName, coverArt, duration, context } = item;
   const subtext = context ?? artistName;
 

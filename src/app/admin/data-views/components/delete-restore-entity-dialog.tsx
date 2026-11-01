@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
@@ -64,7 +62,7 @@ export const DeleteRestoreEntityDialog = ({
   permanent = false,
   displayName,
   onConfirm,
-}: DeleteRestoreEntityDialogProps): ReactElement => {
+}: DeleteRestoreEntityDialogProps) => {
   const copy = resolveCopy(showRestore, permanent);
 
   return (

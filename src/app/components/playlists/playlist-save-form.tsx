@@ -4,7 +4,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -95,7 +94,7 @@ export const PlaylistSaveForm = ({
   onSavingChange,
   onCancel,
   onAddSongs,
-}: PlaylistSaveFormProps): ReactElement => {
+}: PlaylistSaveFormProps) => {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const form = useForm<PlaylistSaveFormValues>({
     resolver: zodResolver(playlistSaveFormSchema),

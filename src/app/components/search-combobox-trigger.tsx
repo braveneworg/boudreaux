@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ComponentProps, ReactElement } from 'react';
+import type { ComponentProps } from 'react';
 
 import { Search } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export const SearchComboboxTrigger = ({
   label,
   className,
   ...props
-}: SearchComboboxTriggerProps): ReactElement => (
+}: SearchComboboxTriggerProps) => (
   <button
     type="button"
     className={cn(

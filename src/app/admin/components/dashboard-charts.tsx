@@ -31,7 +31,7 @@ export interface DashboardChartsProps {
  * publish state. Rendered as a grouped, responsive bar chart that stacks
  * legibly down to mobile widths via the shared ChartContainer.
  */
-export const DashboardCharts = ({ stats }: DashboardChartsProps): React.ReactElement => {
+export const DashboardCharts = ({ stats }: DashboardChartsProps) => {
   const data = [
     {
       category: 'Releases',

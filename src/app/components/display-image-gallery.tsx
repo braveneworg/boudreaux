@@ -4,7 +4,6 @@
 'use client';
 
 import { useCallback, useEffect } from 'react';
-import type { JSX } from 'react';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -46,7 +45,7 @@ export const DisplayImageGallery = ({
   index,
   onIndexChange,
   displayName,
-}: DisplayImageGalleryProps): JSX.Element | null => {
+}: DisplayImageGalleryProps) => {
   const count = images.length;
   const image = images.at(index);
 

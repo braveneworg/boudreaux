@@ -15,9 +15,7 @@ export interface UploaderStatusBannerProps {
  * (e.g. "Saving order..." or "Deleting..."). Renders nothing when `message` is
  * empty, so callers can pass a conditionally-computed message directly.
  */
-export const UploaderStatusBanner = ({
-  message,
-}: UploaderStatusBannerProps): React.JSX.Element | null => {
+export const UploaderStatusBanner = ({ message }: UploaderStatusBannerProps) => {
   if (!message) return null;
 
   return (

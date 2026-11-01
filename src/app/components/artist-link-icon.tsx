@@ -72,12 +72,7 @@ interface ArtistLinkIconProps {
 }
 
 /** The decorative icon beside an artist link, chosen from its href. */
-export const ArtistLinkIcon = ({
-  href,
-  section,
-  size = 16,
-  className,
-}: ArtistLinkIconProps): React.ReactElement => {
+export const ArtistLinkIcon = ({ href, section, size = 16, className }: ArtistLinkIconProps) => {
   const kind = artistLinkIconKind(href, section);
   const Icon = ICONS.get(kind) ?? Globe;
   return (

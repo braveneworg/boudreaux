@@ -28,12 +28,7 @@ interface VideoDropzoneProps {
  * Dashed drop zone + click-to-pick file input restricted to MP4/WebM. Shared by
  * the idle, retry, and replace states of the video file section.
  */
-export const VideoDropzone = ({
-  label,
-  hint,
-  onFile,
-  compact = false,
-}: VideoDropzoneProps): React.ReactElement => {
+export const VideoDropzone = ({ label, hint, onFile, compact = false }: VideoDropzoneProps) => {
   const inputId = useId();
   // "false" in the server markup, "true" once the change handler is attached:
   // the E2E specs wait for it before picking a file (a file set earlier is lost).

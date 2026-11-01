@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef } from 'react';
-import type { ReactElement } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -93,7 +92,7 @@ const linkedHeadingProps = (
  * none when there is no artist name; then the title line; then the release
  * year on its own line, in a quieter ink.
  */
-const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps): ReactElement => {
+const SpotlightCardCaption = ({ card, caption }: SpotlightCardCaptionProps) => {
   const { title, year, artistName, artistSlug } = card;
   const artistHref = (slug: string): string =>
     caption === 'releases' ? artistReleasesHref(slug) : `/artists/${slug}`;
@@ -139,7 +138,7 @@ export const SpotlightCard = ({
   caption = 'artist-and-title',
   accent,
   linkedHeading,
-}: SpotlightCardProps): ReactElement => {
+}: SpotlightCardProps) => {
   const { releaseId, title, artistName, artistSlug, coverArt, playSrc } = card;
   const coverButtonRef = useRef<HTMLButtonElement>(null);
   const hydrated = useHydrated();

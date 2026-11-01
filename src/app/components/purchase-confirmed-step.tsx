@@ -23,7 +23,7 @@ export const PurchaseConfirmedStep = ({
   downloadCount,
   resetInHours,
   onContinue,
-}: PurchaseConfirmedStepProps): React.ReactElement => (
+}: PurchaseConfirmedStepProps) => (
   <>
     <DialogHeader>
       <DialogTitle>Download</DialogTitle>

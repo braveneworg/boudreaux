@@ -11,7 +11,7 @@ interface ArtistFormHeaderProps {
   isEditMode: boolean;
 }
 
-export const ArtistFormHeader = ({ isEditMode }: ArtistFormHeaderProps): React.ReactElement => (
+export const ArtistFormHeader = ({ isEditMode }: ArtistFormHeaderProps) => (
   <div className="space-y-1">
     <SectionHeader
       icon={Users}

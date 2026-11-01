@@ -11,7 +11,7 @@ import { PageSectionParagraph } from '@/app/components/ui/page-section-paragraph
 import { ImageHeading } from '@/components/ui/image-heading';
 import { ZinePanel } from '@/components/ui/zine-panel';
 
-export const SuccessContainer = ({ email }: { email: string }): React.ReactElement => {
+export const SuccessContainer = ({ email }: { email: string }) => {
   const path = usePathname();
   const isSignupPath = path === '/signup';
 

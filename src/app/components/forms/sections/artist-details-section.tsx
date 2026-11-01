@@ -18,10 +18,7 @@ interface ArtistDetailsSectionProps {
   isNameRequired: boolean;
 }
 
-export const ArtistDetailsSection = ({
-  control,
-  isNameRequired,
-}: ArtistDetailsSectionProps): React.ReactElement => {
+export const ArtistDetailsSection = ({ control, isNameRequired }: ArtistDetailsSectionProps) => {
   const genres = useVocabularyField({ control, name: 'genres' });
   const tags = useVocabularyField({ control, name: 'tags' });
 

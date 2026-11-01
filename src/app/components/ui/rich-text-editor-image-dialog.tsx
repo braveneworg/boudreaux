@@ -4,7 +4,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { JSX } from 'react';
 
 import NextImage from 'next/image';
 
@@ -46,7 +45,7 @@ export const LabeledTextField = ({
   type = 'text',
   disabled = false,
   hint,
-}: LabeledTextFieldProps): JSX.Element => (
+}: LabeledTextFieldProps) => (
   <div className="space-y-2">
     <Label htmlFor={id}>{label}</Label>
     <Input
@@ -72,7 +71,7 @@ interface ImageLibraryGridProps {
 }
 
 /** The existing pick-from-library grid of the artist's re-hosted bio images. */
-const ImageLibraryGrid = ({ images, onInsertImage }: ImageLibraryGridProps): JSX.Element => (
+const ImageLibraryGrid = ({ images, onInsertImage }: ImageLibraryGridProps) => (
   <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto">
     {images.map((image) => (
       <li key={image.url}>
@@ -115,7 +114,7 @@ const ImageUploadPanel = ({
   imageSubtitle,
   imageAttribution,
   onInsertImage,
-}: ImageUploadPanelProps): JSX.Element => {
+}: ImageUploadPanelProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -245,7 +244,7 @@ export const ImageDialog = ({
   onImageAttributionChange,
   onInsertImage,
   onUploadImage,
-}: ImageDialogProps): JSX.Element => (
+}: ImageDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>

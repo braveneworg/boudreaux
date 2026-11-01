@@ -4,7 +4,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import type { DragEvent, JSX, KeyboardEvent } from 'react';
+import type { DragEvent, KeyboardEvent } from 'react';
 
 import Image from 'next/image';
 
@@ -47,7 +47,7 @@ const removeReasonIdFor = (isPublished: boolean, count: number, id: string): str
   isPublished && count === 1 ? id : null;
 
 /** The notice a disabled remove button points at; nothing when removal is allowed. */
-const LastImageNotice = ({ id }: { id: string | null }): JSX.Element | null =>
+const LastImageNotice = ({ id }: { id: string | null }) =>
   id ? (
     <p id={id} className="text-muted-foreground text-xs">
       {LAST_IMAGE_REASON}
@@ -81,7 +81,7 @@ const DisplayImageDropTarget = ({
   canDrop,
   onDropPoolImage,
   onDropFile,
-}: DisplayImageDropTargetProps): JSX.Element => {
+}: DisplayImageDropTargetProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>): void => {
@@ -153,7 +153,7 @@ const DisplayImageItem = ({
   onMove,
   onKeyDown,
   onRemove,
-}: DisplayImageItemProps): JSX.Element => {
+}: DisplayImageItemProps) => {
   const { thumbSrc, previewLabel, alt } = resolveImageLabels(image);
   return (
     <li
@@ -232,7 +232,7 @@ export const DisplayImageStrip = ({
   uploadError = null,
   disabled = false,
   isPublished,
-}: DisplayImageStripProps): JSX.Element => {
+}: DisplayImageStripProps) => {
   const [announcement, setAnnouncement] = useState('');
   const removeReasonId = removeReasonIdFor(isPublished, images.length, useId());
   const ids = images.map(({ id }) => id);

@@ -20,9 +20,7 @@ interface VideoDescriptionEditorProps {
  * "Use this description" on a pending suggestion / the server's auto-apply.
  * Needs the surrounding `<Form>` provider like every other bound field.
  */
-export const VideoDescriptionEditor = ({
-  control,
-}: VideoDescriptionEditorProps): React.ReactElement => (
+export const VideoDescriptionEditor = ({ control }: VideoDescriptionEditorProps) => (
   <FormField
     control={control}
     name="description"

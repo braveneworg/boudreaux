@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { Fragment, useEffect, useRef, type ReactElement } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 
 import Image from 'next/image';
 
@@ -64,7 +64,7 @@ const SUB_GROUP_CLASS =
 const SUB_ROW_CLASS = 'flex items-center gap-3 py-1.5 pr-2 pl-6';
 
 /** A video row's 16:9 poster, or a film tile when it has none. */
-const VideoPoster = ({ posterSrc }: { posterSrc: string | null }): ReactElement =>
+const VideoPoster = ({ posterSrc }: { posterSrc: string | null }) =>
   posterSrc ? (
     <Image
       {...resolveCdnImageSource(posterSrc)}
@@ -116,7 +116,7 @@ export const ArtistNavSearchPanel = ({
   onArtistSelect,
   onReleaseSelect,
   onVideoSelect,
-}: ArtistNavSearchPanelProps): ReactElement => {
+}: ArtistNavSearchPanelProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -28,7 +26,7 @@ interface PlaylistListProps {
 const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 
 /** Three placeholder rows approximating the thumb + two-line row layout. */
-const PlaylistListSkeleton = ({ className }: { className?: string }): ReactElement => (
+const PlaylistListSkeleton = ({ className }: { className?: string }) => (
   <div className={cn(className)} aria-busy="true">
     <p role="status" className="sr-only">
       Loading playlists…
@@ -57,7 +55,7 @@ const PlaylistListSkeleton = ({ className }: { className?: string }): ReactEleme
  * error line when the query settles without data, and the empty-state copy
  * when the user has no playlists yet.
  */
-export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps): ReactElement => {
+export const PlaylistList = ({ onEdit, onPlay, className }: PlaylistListProps) => {
   const { isPending, rows, nextSkip, loadMore, isLoadingMore } = usePlaylistsQuery();
   const { deletePlaylist, isDeletingPlaylist } = useDeletePlaylistMutation();
 

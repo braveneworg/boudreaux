@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { MouseEvent, ReactElement } from 'react';
+import type { MouseEvent } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -39,10 +39,7 @@ const FOOTER_LINK_CLASS = 'underline underline-offset-4 hover:no-underline';
  * accent, it shares the deep link and closes onto the artist's releases with
  * `router.replace`, so back and refresh do not reopen it.
  */
-export const DeepLinkPlayDialog = ({
-  release,
-  artistSlug,
-}: DeepLinkPlayDialogProps): ReactElement | null => {
+export const DeepLinkPlayDialog = ({ release, artistSlug }: DeepLinkPlayDialogProps) => {
   const router = useRouter();
   const allReleasesHref = artistReleasesHref(artistSlug);
 

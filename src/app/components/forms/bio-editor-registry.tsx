@@ -4,7 +4,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, useRef } from 'react';
-import type { JSX, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import type { Editor } from '@tiptap/react';
 
@@ -35,7 +35,7 @@ export const useBioEditorRegistry = (): BioEditorRegistryValue =>
  * path; HTML5 drag does not exist on touchscreens). Refs, not state: focus
  * changes must not re-render the whole form.
  */
-export const BioEditorRegistryProvider = ({ children }: { children: ReactNode }): JSX.Element => {
+export const BioEditorRegistryProvider = ({ children }: { children: ReactNode }) => {
   const editorsRef = useRef(new Map<string, Editor>());
   const activeRef = useRef<string | null>(null);
 

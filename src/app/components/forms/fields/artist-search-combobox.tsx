@@ -45,7 +45,7 @@ interface TriggerLabelProps {
   placeholder: string;
 }
 
-const TriggerLabel = ({ value, placeholder }: TriggerLabelProps): React.ReactElement => (
+const TriggerLabel = ({ value, placeholder }: TriggerLabelProps) => (
   <>
     {value || placeholder}
     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -59,12 +59,7 @@ interface ResultsListProps {
   onSelect: (name: string) => void;
 }
 
-const ResultsList = ({
-  isPending,
-  artists,
-  search,
-  onSelect,
-}: ResultsListProps): React.ReactElement => {
+const ResultsList = ({ isPending, artists, search, onSelect }: ResultsListProps) => {
   const trimmed = search.trim();
   const hasExactMatch = artists.some(
     (a) => getArtistDisplayName(a).toLowerCase() === trimmed.toLowerCase()
@@ -111,7 +106,7 @@ export const ArtistSearchCombobox = ({
   label,
   placeholder = 'Search artists…',
   disabled = false,
-}: ArtistSearchComboboxProps): React.ReactElement => {
+}: ArtistSearchComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerId = useId();

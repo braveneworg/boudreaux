@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -84,10 +84,7 @@ const runDownloadPreflight = async (
  * a quota 403 degrades to a toast steering the user to MP3. Videos are never
  * bundled (server-side skip; the muted line sets expectations).
  */
-export const PlaylistDownloadRow = ({
-  playlistId,
-  disabled,
-}: PlaylistDownloadRowProps): ReactElement => {
+export const PlaylistDownloadRow = ({ playlistId, disabled }: PlaylistDownloadRowProps) => {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [inFlightFormat, setInFlightFormat] = useState<FreeFormatType | null>(null);
 

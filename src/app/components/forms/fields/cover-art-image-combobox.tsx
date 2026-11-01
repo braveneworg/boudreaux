@@ -77,7 +77,7 @@ export const CoverArtImageCombobox = ({
   disabled,
   isUploading,
   onSelect,
-}: CoverArtImageComboboxProps): React.ReactElement | null => {
+}: CoverArtImageComboboxProps) => {
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const artistIdsKey = JSON.stringify([...artistIds].sort());

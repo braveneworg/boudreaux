@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef } from 'react';
-import type { JSX } from 'react';
 
 import { Check, Circle, Loader2 } from 'lucide-react';
 
@@ -65,7 +64,7 @@ interface StageRowProps {
   counts: string | null;
 }
 
-const StageRow = ({ label, state, counts }: StageRowProps): JSX.Element => {
+const StageRow = ({ label, state, counts }: StageRowProps) => {
   const Icon = STATE_ICON.get(state) ?? Circle;
   const isActive = state === 'active';
   return (
@@ -94,7 +93,7 @@ const StageRow = ({ label, state, counts }: StageRowProps): JSX.Element => {
  */
 export const VideoEnrichmentProgressTimeline = ({
   progress,
-}: VideoEnrichmentProgressTimelineProps): JSX.Element => {
+}: VideoEnrichmentProgressTimelineProps) => {
   const highestIndexRef = useRef(-1);
   const currentIndex = progress ? VIDEO_PROGRESS_STAGES.indexOf(progress.stage) : -1;
   if (currentIndex > highestIndexRef.current) {

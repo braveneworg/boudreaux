@@ -110,7 +110,7 @@ const useReleaseListFilters = (withoutByline: boolean): ReleaseListFilters => {
 };
 
 /** Says what the list shows while it holds only the releases without a byline. */
-const WithoutBylineNotice = (): React.ReactElement => (
+const WithoutBylineNotice = () => (
   <Alert role="status" className="border-amber-700 bg-amber-50 text-amber-900">
     <AlertTriangle aria-hidden="true" />
     <AlertTitle>Published releases without a byline</AlertTitle>

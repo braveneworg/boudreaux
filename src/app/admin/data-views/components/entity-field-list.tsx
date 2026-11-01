@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { ReactElement } from 'react';
 
 import { formatFieldDate, readField, toFieldLabel } from '../data-view-utils';
 
@@ -21,7 +20,7 @@ export const EntityFieldList = <T extends Record<string, unknown>>({
   item,
   fieldsToShow,
   resolveDisplayName,
-}: EntityFieldListProps<T>): ReactElement => (
+}: EntityFieldListProps<T>) => (
   <>
     {fieldsToShow.map((field, index) => {
       const fieldValue = readField(item, field);

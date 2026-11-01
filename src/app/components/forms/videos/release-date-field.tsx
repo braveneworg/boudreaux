@@ -35,7 +35,7 @@ export const ReleaseDateField = ({
   control,
   onSelectDate,
   lookupStatus = 'idle',
-}: ReleaseDateFieldProps): React.ReactElement => (
+}: ReleaseDateFieldProps) => (
   <FormField
     control={control}
     name="releasedOn"

@@ -26,7 +26,7 @@ export const ChatMessageReactionBar = ({
   onToggleReaction,
   onRequestDelete,
   onTogglePin,
-}: ChatMessageReactionBarProps): React.ReactNode => {
+}: ChatMessageReactionBarProps) => {
   if (message.tempId) return null;
 
   return (
@@ -84,7 +84,7 @@ export const ChatMessagePinIndicator = ({
   message,
   isAdmin,
   onTogglePin,
-}: ChatMessagePinIndicatorProps): React.ReactNode => {
+}: ChatMessagePinIndicatorProps) => {
   if (isAdmin) {
     return (
       <button

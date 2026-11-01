@@ -4,7 +4,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { ReactElement } from 'react';
 
 import { ChevronDown } from 'lucide-react';
 
@@ -25,7 +24,7 @@ interface ExpandableDescriptionProps {
  * text (rotating into a collapse control). Short descriptions render as a
  * plain paragraph.
  */
-export const ExpandableDescription = ({ text }: ExpandableDescriptionProps): ReactElement => {
+export const ExpandableDescription = ({ text }: ExpandableDescriptionProps) => {
   const [expanded, setExpanded] = useState(false);
 
   if (text.length <= CLAMP_THRESHOLD) {

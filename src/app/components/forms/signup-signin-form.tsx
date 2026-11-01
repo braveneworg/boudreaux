@@ -82,12 +82,7 @@ interface EmailFieldProps {
   state: FormState;
 }
 
-const EmailField = ({
-  control,
-  isSigningIn,
-  isVerified,
-  state,
-}: EmailFieldProps): React.ReactElement => (
+const EmailField = ({ control, isSigningIn, isVerified, state }: EmailFieldProps) => (
   <FormField
     control={control}
     name="email"
@@ -121,7 +116,7 @@ interface TermsFieldProps {
   state: FormState;
 }
 
-const TermsField = ({ control, state }: TermsFieldProps): React.ReactElement => (
+const TermsField = ({ control, state }: TermsFieldProps) => (
   <FormField
     control={control}
     name="termsAndConditions"
@@ -155,7 +150,7 @@ interface SmsOptInFieldProps {
   control: Control<BaseFormSchema>;
 }
 
-const SmsOptInField = ({ control }: SmsOptInFieldProps): React.ReactElement => (
+const SmsOptInField = ({ control }: SmsOptInFieldProps) => (
   <FormField
     control={control}
     name="allowSmsNotifications"
@@ -185,7 +180,7 @@ interface EmailOptInFieldProps {
   control: Control<BaseFormSchema>;
 }
 
-const EmailOptInField = ({ control }: EmailOptInFieldProps): React.ReactElement => (
+const EmailOptInField = ({ control }: EmailOptInFieldProps) => (
   <FormField
     control={control}
     name="allowEmailNotifications"
@@ -231,7 +226,7 @@ const AgreementsBlock = ({
   onTurnstileToken,
   showOptIns,
   state,
-}: AgreementsBlockProps): React.ReactElement => (
+}: AgreementsBlockProps) => (
   <div className="mb-6">
     {showOptIns && (
       <>
@@ -260,12 +255,7 @@ interface MagicLinkSectionProps {
 }
 
 /** The "magic link" heading + the Turnstile-gated email field. */
-const MagicLinkSection = ({
-  control,
-  isSigningIn,
-  isVerified,
-  state,
-}: MagicLinkSectionProps): React.ReactElement => (
+const MagicLinkSection = ({ control, isSigningIn, isVerified, state }: MagicLinkSectionProps) => (
   <>
     <p className="mb-4">
       <span className="font-fake-four-cutout bg-menu-item-yellow-200 px-1.5 text-xl tracking-wide text-black uppercase">
@@ -291,12 +281,7 @@ interface FormSubmitRowProps {
   state: FormState;
 }
 
-const FormSubmitRow = ({
-  isPending,
-  isVerified,
-  signupsPaused,
-  state,
-}: FormSubmitRowProps): React.ReactElement => (
+const FormSubmitRow = ({ isPending, isVerified, signupsPaused, state }: FormSubmitRowProps) => (
   <div className="mt-4 flex items-center gap-3">
     {!isVerified && <Skeleton className="h-10 w-24" />}
     {isVerified && (
@@ -322,7 +307,7 @@ interface FormStatusMessagesProps {
   state: FormState;
 }
 
-const FormStatusMessages = ({ state }: FormStatusMessagesProps): React.ReactElement => (
+const FormStatusMessages = ({ state }: FormStatusMessagesProps) => (
   <>
     {state.hasTimeout && (
       <div className="mt-2 text-center">
@@ -341,7 +326,7 @@ interface OrDividerProps {
   label: string;
 }
 
-const OrDivider = ({ label }: OrDividerProps): React.ReactElement => (
+const OrDivider = ({ label }: OrDividerProps) => (
   <div className="relative my-7 flex items-center gap-3">
     <Separator className="h-0.5 flex-1 bg-black" />
     <span className="shadow-zine-ink shrink-0 -rotate-1 border border-black bg-[var(--card-accent-soft)] px-2.5 py-0.5 text-xs font-bold tracking-[0.12em] text-black uppercase">
@@ -355,7 +340,7 @@ interface ModeSwitchLinkProps {
   isSigningIn: boolean;
 }
 
-const ModeSwitchLink = ({ isSigningIn }: ModeSwitchLinkProps): React.ReactElement => (
+const ModeSwitchLink = ({ isSigningIn }: ModeSwitchLinkProps) => (
   <p className="text-muted-foreground mt-6 text-center text-sm">
     {isSigningIn ? (
       <>
@@ -395,7 +380,7 @@ export const SignupSigninForm = ({
   breadcrumbs,
   socialDisabled,
   onBeforeSocialSignIn,
-}: SignupSigninFormProps): React.ReactElement => {
+}: SignupSigninFormProps) => {
   const pathName = usePathname();
   const isSigningIn = pathName === '/signin';
   const { data: signupStatus } = useSignupStatusQuery({ enabled: hasTermsAndConditions });

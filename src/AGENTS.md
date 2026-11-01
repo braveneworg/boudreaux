@@ -42,8 +42,12 @@ Deeper rules: [`src/app/AGENTS.md`](app/AGENTS.md) (UI, forms, styling),
 
 - No `any`, no non-null assertion (`!`) — define a narrower type or handle the
   null. Prefer specific types over `unknown` / `Record<string, unknown>`.
-- Explicit types on function params and return values (always on exported
-  components and hooks). `interface` for object shapes; discriminated unions
+- Explicit types on function params, and on the return values of hooks,
+  utilities and the server layer. Components never annotate their return
+  type — TypeScript infers it from the JSX, and the local
+  `boudreaux/no-component-return-type` rule removes `: ReactElement` /
+  `: JSX.Element` on `--fix`. Never annotate what a literal already states
+  (`no-inferrable-types`). `interface` for object shapes; discriminated unions
   for variants; `as const` over enums. Reuse existing types before adding new
   ones.
 - Arrow functions over `function` (enforced by `prefer-arrow-functions`; App
@@ -52,9 +56,9 @@ Deeper rules: [`src/app/AGENTS.md`](app/AGENTS.md) (UI, forms, styling),
 - Named exports only — except App Router files that require a default export
   (`page`, `layout`, `loading`, `error`, `not-found`, `template`, `default`,
   `route`, `middleware`).
-- Never suppress lint/type errors — no `eslint-disable`, no `@ts-ignore` /
+- Never suppress lint/type errors — no `oxlint-disable`, no `@ts-ignore` /
   `@ts-expect-error` / `@ts-nocheck`. Fix the code, or — only when a rule is
-  genuinely inapplicable — scope it in `eslint.config.mjs`.
+  genuinely inapplicable — scope it in an `overrides` block in `.oxlintrc.json`.
 - Prefer destructuring everywhere, including function parameters. Implicit
   return for single-expression bodies; no parens around single params.
 - Imports use path aliases — never `../../` traversal except adjacent files:

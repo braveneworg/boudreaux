@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import Link from 'next/link';
 
@@ -62,7 +62,7 @@ export const DataViewCard = <T extends Record<string, unknown>>({
   onDelete,
   onRestore,
   onHardDelete,
-}: DataViewCardProps<T>): ReactElement => {
+}: DataViewCardProps<T>) => {
   const id = item.id as string;
   const displayName = resolveDisplayName(item);
   // Releases use publishedAt; other entities use publishedOn.

@@ -11,7 +11,7 @@ import { SignupsPausedToggle } from './signups-paused-toggle';
 
 export const dynamic = 'force-dynamic';
 
-const AdminSettingsPage = async (): Promise<React.JSX.Element> => {
+const AdminSettingsPage = async () => {
   const paused = await SignupSettingsService.areSignupsPaused();
   const envForced = SignupSettingsService.isEnvForced();
 

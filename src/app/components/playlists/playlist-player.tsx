@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { useTrackNavigation } from '@/components/use-track-navigation';
@@ -46,7 +46,7 @@ const PlaylistPlayerArt = ({
   tilesAlt,
   isPlaying,
   onTogglePlay,
-}: PlaylistPlayerArtProps): ReactElement =>
+}: PlaylistPlayerArtProps) =>
   coverArt ? (
     <MediaPlayer.InteractiveCoverArt
       src={coverArt}
@@ -72,7 +72,7 @@ interface PlaylistQueueRowProps {
 }
 
 /** One queue row: title (+video badge), artist, duration; disabled when unplayable. */
-const PlaylistQueueRow = ({ item, isCurrent, onSelect }: PlaylistQueueRowProps): ReactElement => {
+const PlaylistQueueRow = ({ item, isCurrent, onSelect }: PlaylistQueueRowProps) => {
   const playable = isPlayableItem(item);
   const mutedClass = isCurrent ? 'text-zinc-300' : 'text-zinc-500';
 
@@ -132,7 +132,7 @@ const PlaylistTrackSurface = ({
   onNextTrack,
   onTogglePlay,
   setPlayerControls,
-}: PlaylistTrackSurfaceProps): ReactElement => (
+}: PlaylistTrackSurfaceProps) => (
   <>
     <PlaylistPlayerArt
       coverArt={item.coverArt}
@@ -167,10 +167,7 @@ interface PlaylistPlayerStageProps extends Omit<PlaylistTrackSurfaceProps, 'src'
  * change the key, so the outgoing surface always disposes before the next
  * one initializes.
  */
-const PlaylistPlayerStage = ({
-  onVideoEnded,
-  ...surface
-}: PlaylistPlayerStageProps): ReactElement =>
+const PlaylistPlayerStage = ({ onVideoEnded, ...surface }: PlaylistPlayerStageProps) =>
   surface.item.itemType === 'video' ? (
     <LazyVideoSurface
       key={`video-${surface.item.id}`}
@@ -189,7 +186,7 @@ const PlaylistPlayerStage = ({
  * Navigation runs over the playable subset only, so unavailable items are
  * skipped on ended/next while still shown (disabled) in the queue below.
  */
-export const PlaylistPlayer = ({ items, title }: PlaylistPlayerProps): ReactElement => {
+export const PlaylistPlayer = ({ items, title }: PlaylistPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerControls, setPlayerControls] = useState<MediaPlayerControls | null>(null);
 

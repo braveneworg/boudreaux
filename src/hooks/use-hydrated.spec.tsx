@@ -6,7 +6,7 @@ import { renderToString } from 'react-dom/server';
 
 import { useHydrated } from './use-hydrated';
 
-const Probe = (): React.ReactElement => <span>{useHydrated() ? 'hydrated' : 'server'}</span>;
+const Probe = () => <span>{useHydrated() ? 'hydrated' : 'server'}</span>;
 
 describe('useHydrated', () => {
   it('is false in the server render, so the markup matches the first client render', () => {

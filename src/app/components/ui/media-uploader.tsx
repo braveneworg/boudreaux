@@ -51,7 +51,7 @@ export const MediaUploader = ({
   disabled = false,
   className,
   label = 'Upload media files',
-}: MediaUploaderProps): React.JSX.Element => {
+}: MediaUploaderProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const acceptedTypes = resolveAcceptedTypes(mediaType);

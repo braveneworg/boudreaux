@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -98,7 +98,7 @@ interface OpenerProps extends Partial<ListeningModalOptions> {
 }
 
 /** An opener as the six use the module: a trigger, a warm on intent, the modal. */
-const Opener = ({ pick, release = RELEASE, ...options }: OpenerProps): ReactElement => {
+const Opener = ({ pick, release = RELEASE, ...options }: OpenerProps) => {
   const [picked, setPicked] = useState<ListeningModalRelease | null>(null);
   const listening = useListeningModal({ ...options, release: picked ?? release });
   latest.current = listening;

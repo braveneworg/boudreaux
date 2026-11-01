@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { MouseEvent, ReactElement } from 'react';
+import type { MouseEvent } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -70,9 +70,7 @@ const buildSentToastMessage = ({
  * The submit button only opens a confirmation dialog; the blast is sent when
  * the admin confirms. Guards a re-entrant send with the `isSending` flag.
  */
-export const AnnouncementComposeForm = ({
-  recipientCount,
-}: AnnouncementComposeFormProps): ReactElement => {
+export const AnnouncementComposeForm = ({ recipientCount }: AnnouncementComposeFormProps) => {
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);

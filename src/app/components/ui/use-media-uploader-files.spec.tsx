@@ -82,7 +82,7 @@ const buildParams = (overrides: Partial<HookParams> = {}): HookParams => ({
  */
 const uploadToFileList = async (files: File[]): Promise<FileList> => {
   let captured: FileList | null = null;
-  const Capture = (): React.JSX.Element => (
+  const Capture = () => (
     <input
       aria-label="capture"
       multiple
@@ -424,7 +424,7 @@ describe('useMediaUploaderFiles', () => {
       stubDurationDecoding('loaded', 12);
       const onMediaChange = vi.fn();
 
-      const Harness = (): React.JSX.Element => {
+      const Harness = () => {
         const inputRef = useRef<HTMLInputElement>(null);
         const { handleInputChange } = useMediaUploaderFiles(
           buildParams({ onMediaChange, inputRef })
@@ -444,7 +444,7 @@ describe('useMediaUploaderFiles', () => {
     it('resets the input value to allow re-selecting the same file', async () => {
       const onMediaChange = vi.fn();
 
-      const Harness = (): React.JSX.Element => {
+      const Harness = () => {
         const inputRef = useRef<HTMLInputElement>(null);
         const { handleInputChange } = useMediaUploaderFiles(
           buildParams({ onMediaChange, inputRef })
@@ -471,7 +471,7 @@ describe('useMediaUploaderFiles', () => {
       );
       const files = await uploadToFileList([new File(['x'], 'song.mp3', { type: 'audio/mpeg' })]);
 
-      const Trigger = (): React.JSX.Element => (
+      const Trigger = () => (
         <input aria-label="trigger" onChange={result.current.handleInputChange} type="file" />
       );
 

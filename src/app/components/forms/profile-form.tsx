@@ -171,7 +171,7 @@ const showUsernameErrorToasts = (errors: Record<string, string[]>): void => {
   }
 };
 
-const ProfileFormSkeleton = (): React.ReactElement => (
+const ProfileFormSkeleton = () => (
   <ZinePanel accent="kraft">
     <div className="mb-6 space-y-2">
       <Skeleton className="h-8 w-48" />
@@ -185,7 +185,7 @@ const ProfileFormSkeleton = (): React.ReactElement => (
   </ZinePanel>
 );
 
-export const ProfileForm = (): React.ReactElement => {
+export const ProfileForm = () => {
   const [formState, profileFormAction, isPending] = useActionState(
     updateProfileAction,
     initialFormState

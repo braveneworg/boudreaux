@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { JSX } from 'react';
-
 import { Skeleton } from '@/app/components/ui/skeleton';
 import type { LinkPreview } from '@/lib/validation/link-preview-schema';
 
@@ -30,7 +28,7 @@ const hostOf = (url: string): string => {
  * bold title and a line-clamped description. Extracted from `LinkPreviewCard`
  * so each render path stays within the complexity budget.
  */
-const ResolvedPreview = ({ url, data }: { url: string; data: LinkPreview }): JSX.Element => {
+const ResolvedPreview = ({ url, data }: { url: string; data: LinkPreview }) => {
   const { title, description, siteName, imageDataUri, faviconDataUri } = data;
 
   return (
@@ -69,7 +67,7 @@ const ResolvedPreview = ({ url, data }: { url: string; data: LinkPreview }): JSX
  * @param enabled - Whether the card is open; drives the lazy query.
  * @returns The preview card body.
  */
-export const LinkPreviewCard = ({ url, enabled }: LinkPreviewCardProps): JSX.Element => {
+export const LinkPreviewCard = ({ url, enabled }: LinkPreviewCardProps) => {
   const { data, isPending, isError } = useLinkPreviewQuery(url, { enabled });
 
   if (enabled && isPending) {

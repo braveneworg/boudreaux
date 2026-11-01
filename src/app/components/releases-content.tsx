@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef } from 'react';
-import type { ReactElement } from 'react';
 
 import Link from 'next/link';
 
@@ -36,7 +35,7 @@ const SKELETON_CARD_COUNT = 6;
  * jumps when the first page lands. Also the `/releases` route's `loading.tsx`
  * fallback.
  */
-export const ReleasesSkeleton = (): ReactElement => (
+export const ReleasesSkeleton = () => (
   <div aria-busy="true">
     <p role="status" className="sr-only">
       Loading releases…
@@ -68,7 +67,7 @@ export const ReleasesSkeleton = (): ReactElement => (
 );
 
 /** Error state with a retry that refetches the listing in place. */
-const ReleasesError = ({ onRetry }: { onRetry: () => void }): ReactElement => (
+const ReleasesError = ({ onRetry }: { onRetry: () => void }) => (
   <div className="flex flex-col items-center gap-4 py-12 text-center">
     <p className="text-zinc-950">Unable to load releases. Please try again later.</p>
     <Button variant="outline" onClick={onRetry}>
@@ -92,11 +91,7 @@ interface ReleasesHeaderProps {
  * and the "View releases by all artists" link under the wordmark when the
  * listing is filtered by artist, then the touch-only tap hint.
  */
-const ReleasesHeader = ({
-  showTapHint,
-  showAllArtistsLink,
-  artistName,
-}: ReleasesHeaderProps): ReactElement => (
+const ReleasesHeader = ({ showTapHint, showAllArtistsLink, artistName }: ReleasesHeaderProps) => (
   <div className="mb-8">
     {/* The search and the wordmark share this column so the wordmark's left
         edge sits on the search box's left edge at every column count. */}
@@ -175,7 +170,7 @@ export const ReleasesContent = ({
   artist = '',
   artistName = '',
   initialRelease = null,
-}: ReleasesContentProps): ReactElement => (
+}: ReleasesContentProps) => (
   <>
     <ReleasesListing artist={artist} artistName={artistName} />
     {initialRelease && artist ? (
@@ -185,7 +180,7 @@ export const ReleasesContent = ({
 );
 
 /** The search, the wordmark and the paged cover grid, in their loading, error and empty states. */
-const ReleasesListing = ({ artist, artistName }: ReleasesListingProps): ReactElement => {
+const ReleasesListing = ({ artist, artistName }: ReleasesListingProps) => {
   const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfinitePublishedReleasesQuery('', artist);
   const showAllArtistsLink = artist !== '';

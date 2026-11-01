@@ -4,8 +4,6 @@
 
 'use client';
 
-import { type ReactElement } from 'react';
-
 import { useRouter } from 'next/navigation';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -28,11 +26,7 @@ interface CreatePlaylistDialogProps {
  * "Open in My Playlists" closes the dialog and deep-links to the saved
  * playlist's edit view.
  */
-export const CreatePlaylistDialog = ({
-  open,
-  onOpenChange,
-  item,
-}: CreatePlaylistDialogProps): ReactElement => {
+export const CreatePlaylistDialog = ({ open, onOpenChange, item }: CreatePlaylistDialogProps) => {
   const router = useRouter();
 
   return (

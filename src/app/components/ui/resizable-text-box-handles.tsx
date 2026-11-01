@@ -32,7 +32,7 @@ const ResizeHandle = ({
   className,
   label,
   onResizeStart,
-}: ResizeHandleProps): React.JSX.Element => (
+}: ResizeHandleProps) => (
   <div
     role="button"
     tabIndex={-1}
@@ -58,7 +58,7 @@ export const ResizableTextBoxHandles = ({
   rotation,
   onResizeStart,
   onRotateStart,
-}: ResizableTextBoxHandlesProps): React.JSX.Element => (
+}: ResizableTextBoxHandlesProps) => (
   <>
     {/* Edge handles */}
     <ResizeHandle

@@ -18,7 +18,7 @@ interface GlobalErrorPageProps {
  * Root error boundary — replaces the root layout when it crashes, so it must
  * render its own <html>/<body> and stay dependency-light (no shadcn/ui).
  */
-export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps): React.JSX.Element {
+export default function GlobalErrorPage({ error, reset }: GlobalErrorPageProps) {
   useEffect(() => {
     reportClientError(error, 'global');
   }, [error]);

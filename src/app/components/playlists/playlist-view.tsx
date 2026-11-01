@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import { Pencil, Play } from 'lucide-react';
@@ -34,7 +32,7 @@ interface PlaylistViewProps {
 const SKELETON_KEYS = ['view-skeleton-1', 'view-skeleton-2', 'view-skeleton-3'] as const;
 
 /** Three placeholder lines while the playlist detail loads. */
-const PlaylistViewSkeleton = (): ReactElement => (
+const PlaylistViewSkeleton = () => (
   <div className="flex flex-col gap-3 py-2">
     {SKELETON_KEYS.map((key) => (
       <Skeleton key={key} data-testid="playlist-view-skeleton" className="my-0 h-6 w-full" />
@@ -47,7 +45,7 @@ const metaLine = ({ itemCount, isPublic }: PlaylistDetailResponse): string =>
   `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · ${isPublic ? 'Public' : 'Private'}`;
 
 /** 40px square cover thumb with a muted fallback block when the item has no art. */
-const ViewItemThumb = ({ coverArt }: { coverArt: string | null }): ReactElement =>
+const ViewItemThumb = ({ coverArt }: { coverArt: string | null }) =>
   coverArt ? (
     <Image
       src={coverArt}
@@ -68,7 +66,7 @@ const PlaylistViewItem = ({
   artistName,
   duration,
   coverArt,
-}: PlaylistItemPayload): ReactElement => (
+}: PlaylistItemPayload) => (
   <li className="flex items-center gap-3 border-b py-2">
     <ViewItemThumb coverArt={coverArt} />
     <div className="flex min-w-0 flex-1 flex-col">
@@ -97,7 +95,7 @@ const PlaylistViewBody = ({
   detail,
   onEdit,
   onPlay,
-}: PlaylistViewBodyProps): ReactElement => {
+}: PlaylistViewBodyProps) => {
   if (isPending) return <PlaylistViewSkeleton />;
 
   if (!detail) {
@@ -149,7 +147,7 @@ export const PlaylistView = ({
   onBackToCreator,
   onEdit,
   onPlay,
-}: PlaylistViewProps): ReactElement => {
+}: PlaylistViewProps) => {
   const { isPending, data } = usePlaylistQuery(playlistId);
 
   const handleToggle = (value: string): void => {

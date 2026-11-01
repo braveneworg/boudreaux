@@ -4,15 +4,7 @@
 
 'use client';
 
-import {
-  useEffect,
-  useId,
-  useImperativeHandle,
-  useRef,
-  useState,
-  type ReactElement,
-  type Ref,
-} from 'react';
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 
 import { Pencil } from 'lucide-react';
 
@@ -136,7 +128,7 @@ const CreatorHeading = ({
   isSaving,
   onSave,
   onEdit,
-}: CreatorHeadingProps): ReactElement =>
+}: CreatorHeadingProps) =>
   isDraft ? (
     <div className="flex items-center gap-3">
       <h2 className="text-lg font-semibold">New playlist</h2>
@@ -203,7 +195,7 @@ const CreatorSaveSurface = ({
   onSavingChange,
   onOpenChange,
   onAddSongs,
-}: CreatorSaveSurfaceProps): ReactElement =>
+}: CreatorSaveSurfaceProps) =>
   variant === 'embedded' ? (
     <PlaylistSaveForm
       variant="inline"
@@ -246,7 +238,7 @@ const EmbeddedMyPlaylistsLink = ({
   variant,
   savedId,
   onOpenInMyPlaylists,
-}: EmbeddedMyPlaylistsLinkProps): ReactElement | null =>
+}: EmbeddedMyPlaylistsLinkProps) =>
   variant === 'embedded' && savedId ? (
     <div className="flex justify-end">
       <Button type="button" variant="outline" onClick={() => onOpenInMyPlaylists?.(savedId)}>
@@ -274,7 +266,7 @@ export const PlaylistCreator = ({
   variant = 'page',
   seedItem,
   onOpenInMyPlaylists,
-}: PlaylistCreatorProps): ReactElement => {
+}: PlaylistCreatorProps) => {
   const {
     state,
     addItem,

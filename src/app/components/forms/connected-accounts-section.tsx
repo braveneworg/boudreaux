@@ -65,7 +65,7 @@ const findLinkedAccount = (
  * Calls `authClient.linkSocial` to initiate OAuth redirect, and
  * `authClient.unlinkAccount` (behind an AlertDialog confirm) to disconnect.
  */
-export const ConnectedAccountsSection = (): React.ReactElement => {
+export const ConnectedAccountsSection = () => {
   const { accounts, isLoading, error, refetch } = useConnectedAccounts();
 
   const handleLink = (provider: SocialProvider): void => {

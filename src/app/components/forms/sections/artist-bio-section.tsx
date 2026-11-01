@@ -4,7 +4,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { JSX } from 'react';
 
 import dynamic from 'next/dynamic';
 
@@ -53,7 +52,7 @@ const BioEditorField = ({
   ariaLabel,
   images,
   onUploadImage,
-}: BioEditorFieldProps): JSX.Element => {
+}: BioEditorFieldProps) => {
   const registry = useBioEditorRegistry();
 
   useEffect(() => () => registry.unregister(name), [name, registry]);
@@ -110,7 +109,7 @@ export const ArtistBioSection = ({
   bioEditorImages,
   onBioGenerated,
   onUploadImage,
-}: ArtistBioSectionProps): JSX.Element => (
+}: ArtistBioSectionProps) => (
   <section className="space-y-4">
     <h2 className="font-semibold">Biography</h2>
 

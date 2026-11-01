@@ -19,7 +19,7 @@ export const ReleaseImagesSection = ({
   onImagesChange,
   onReorder,
   onDelete,
-}: ReleaseImagesSectionProps): React.ReactElement => (
+}: ReleaseImagesSectionProps) => (
   <section className="space-y-4">
     <h2 className="font-semibold">Images</h2>
     <p className="text-sm text-zinc-950">

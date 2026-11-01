@@ -44,7 +44,7 @@ interface TriggerLabelProps {
   count: number;
 }
 
-const TriggerLabel = ({ count }: TriggerLabelProps): React.ReactElement => (
+const TriggerLabel = ({ count }: TriggerLabelProps) => (
   <>
     {count > 0
       ? `${count} featured artist${count === 1 ? '' : 's'} selected`
@@ -60,12 +60,7 @@ interface ResultsListProps {
   onSelect: (name: string) => void;
 }
 
-const ResultsList = ({
-  isPending,
-  artists,
-  search,
-  onSelect,
-}: ResultsListProps): React.ReactElement => {
+const ResultsList = ({ isPending, artists, search, onSelect }: ResultsListProps) => {
   const trimmed = search.trim();
   const hasExactMatch = artists.some(
     (a) => getArtistDisplayName(a).toLowerCase() === trimmed.toLowerCase()
@@ -108,7 +103,7 @@ interface PillsListProps {
   onRemove: (name: string) => void;
 }
 
-const PillsList = ({ names, disabled, onRemove }: PillsListProps): React.ReactElement => (
+const PillsList = ({ names, disabled, onRemove }: PillsListProps) => (
   <div className="flex flex-wrap gap-2" role="list" aria-label="Selected featured artists">
     {names.map((name) => (
       <span key={name} role="listitem" className="flex items-center gap-1">
@@ -127,7 +122,7 @@ export const FeaturedArtistsCombobox = ({
   onChange,
   label,
   disabled = false,
-}: FeaturedArtistsComboboxProps): React.ReactElement => {
+}: FeaturedArtistsComboboxProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerId = useId();

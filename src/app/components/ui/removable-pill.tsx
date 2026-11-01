@@ -43,7 +43,7 @@ export const RemovablePill = ({
   muted = false,
   className,
   ...rest
-}: RemovablePillProps): React.ReactElement => (
+}: RemovablePillProps) => (
   <Badge variant="secondary" className={cn('gap-1', muted && 'opacity-60', className)} {...rest}>
     {leading}
     {label}

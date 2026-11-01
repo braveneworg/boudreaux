@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import type { ChangeEvent, ReactElement } from 'react';
+import type { ChangeEvent } from 'react';
 
 import Image from 'next/image';
 
@@ -54,7 +54,7 @@ interface PendingPreview {
   url: string;
 }
 
-const CoverThumb = ({ src, label, disabled, onRemove }: CoverThumbProps): ReactElement => (
+const CoverThumb = ({ src, label, disabled, onRemove }: CoverThumbProps) => (
   <li className="relative size-16 overflow-hidden border-2 border-black">
     <Image src={src} alt={label} fill sizes="64px" className="object-cover" />
     <button
@@ -93,7 +93,7 @@ export const PlaylistCoverArtField = ({
   availableArtistImages,
   pendingFiles,
   onPendingFilesChange,
-}: PlaylistCoverArtFieldProps): ReactElement => {
+}: PlaylistCoverArtFieldProps) => {
   const inputId = useId();
   const { uploadFiles, isUploading, error } = usePlaylistCoverUpload();
   const [pendingPreviews, setPendingPreviews] = useState<PendingPreview[]>([]);

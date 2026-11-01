@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { DragEvent, JSX } from 'react';
+import type { DragEvent } from 'react';
 
 import { ExternalLink, Eye, Plus, X } from 'lucide-react';
 
@@ -38,12 +38,7 @@ interface LinkPreviewTriggerProps {
 /** Eye button that opens an unfurl preview for one external link. Holds its own
  *  open state so the `LinkPreviewCard` query stays idle until this row's card is
  *  opened. Desktop uses a hover card (hover/focus); mobile uses a popover (tap). */
-const LinkPreviewTrigger = ({
-  url,
-  label,
-  disabled,
-  isMobile,
-}: LinkPreviewTriggerProps): JSX.Element => {
+const LinkPreviewTrigger = ({ url, label, disabled, isMobile }: LinkPreviewTriggerProps) => {
   const [open, setOpen] = useState(false);
 
   const trigger = (
@@ -90,7 +85,7 @@ export const BioLinkPalette = ({
   onDelete,
   onInsert,
   disabled = false,
-}: BioLinkPaletteProps): JSX.Element => {
+}: BioLinkPaletteProps) => {
   const [filter, setFilter] = useState('');
   const isMobile = useIsMobile();
 

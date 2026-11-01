@@ -15,10 +15,7 @@ interface SignupsPausedToggleProps {
   envForced: boolean;
 }
 
-export const SignupsPausedToggle = ({
-  paused,
-  envForced,
-}: SignupsPausedToggleProps): React.JSX.Element => {
+export const SignupsPausedToggle = ({ paused, envForced }: SignupsPausedToggleProps) => {
   const [isPending, startTransition] = useTransition();
 
   if (envForced) {

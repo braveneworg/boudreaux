@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
  */
 export const useMediaQuery = (query: string): boolean => {
   // Initialize with the current match state
-  const [matches, setMatches] = useState<boolean>(() =>
+  const [matches, setMatches] = useState(() =>
     /* v8 ignore next -- jsdom always defines `window`; SSR fallback is unreachable in tests */
     typeof window !== 'undefined' ? window.matchMedia(query).matches : false
   );

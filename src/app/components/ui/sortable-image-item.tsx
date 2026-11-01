@@ -37,7 +37,7 @@ const desktopDragProps = (
     ? { ...attributes, ...listeners }
     : {};
 
-const ImageUploadingOverlay = ({ progress }: { progress?: number }): React.JSX.Element => (
+const ImageUploadingOverlay = ({ progress }: { progress?: number }) => (
   <div className="bg-background/80 absolute inset-0 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
     <SpinnerRingCircle size="md" variant="primary" />
     {progress !== undefined && (
@@ -62,7 +62,7 @@ const thumbnailContainerClass = (item: ImageItem, isDragging: boolean): string =
     item.isUploading && 'pointer-events-none'
   );
 
-const ImageThumbnail = ({ item }: { item: ImageItem }): React.JSX.Element => (
+const ImageThumbnail = ({ item }: { item: ImageItem }) => (
   // Image preview - using next/image for blob URLs requires unoptimized
   <Image
     src={cleanImageUrl(item.preview)}
@@ -73,7 +73,7 @@ const ImageThumbnail = ({ item }: { item: ImageItem }): React.JSX.Element => (
   />
 );
 
-const ImageSuccessBadge = (): React.JSX.Element => (
+const ImageSuccessBadge = () => (
   <div className="absolute bottom-1 left-1 bg-green-500/90 p-1">
     <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -99,7 +99,7 @@ const ImageItemControls = ({
   listeners,
   onDeleteRequest,
   onPreview,
-}: ImageItemControlsProps): React.JSX.Element => (
+}: ImageItemControlsProps) => (
   <>
     <div
       className="bg-background/80 sm:hover:bg-background pointer-events-none absolute top-1 left-1 flex h-6 w-6 items-center justify-center shadow-sm backdrop-blur-sm sm:pointer-events-auto sm:cursor-grab sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:active:cursor-grabbing"
@@ -143,7 +143,7 @@ export const SortableImageItem = ({
   onDeleteRequest,
   onPreview,
   disabled,
-}: SortableImageItemProps): React.JSX.Element => {
+}: SortableImageItemProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: disabled || item.isUploading,

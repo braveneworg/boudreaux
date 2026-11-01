@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ComponentProps, ReactElement, ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 
@@ -92,11 +92,7 @@ const resolveVerbConfig = (verb: VideoArchiveVerb, title: string): VerbConfig =>
  * delete transition. The delete copy warns that the video and its stored files
  * are permanently removed.
  */
-export const VideoArchiveDialog = ({
-  verb,
-  title,
-  onConfirm,
-}: VideoArchiveDialogProps): ReactElement => {
+export const VideoArchiveDialog = ({ verb, title, onConfirm }: VideoArchiveDialogProps) => {
   const { Icon, label, heading, body, triggerVariant, confirmVariant } = resolveVerbConfig(
     verb,
     title

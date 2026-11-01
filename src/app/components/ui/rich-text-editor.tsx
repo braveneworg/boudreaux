@@ -4,7 +4,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { JSX } from 'react';
 
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
@@ -105,7 +104,7 @@ const LinkDialog = ({
   onLinkExternalChange,
   onApply,
   onRemove,
-}: LinkDialogProps): JSX.Element => (
+}: LinkDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>
@@ -211,7 +210,7 @@ export const RichTextEditor = ({
   onEditorReady,
   onEditorFocus,
   onUploadImage,
-}: RichTextEditorProps): JSX.Element => {
+}: RichTextEditorProps) => {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');

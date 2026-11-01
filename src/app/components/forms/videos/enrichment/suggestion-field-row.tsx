@@ -66,7 +66,7 @@ export const SuggestionFieldRow = ({
   applyLabel = 'Apply',
   onApply,
   onDismiss,
-}: SuggestionFieldRowProps): React.ReactElement => {
+}: SuggestionFieldRowProps) => {
   const label = suggestionFieldLabel(suggestion.field);
 
   if (suggestion.status === 'dismissed') {

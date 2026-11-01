@@ -22,7 +22,7 @@ export interface SectionHelpProps {
  * therefore receive a lucide icon component as a prop without crossing the
  * server→client boundary).
  */
-export const SectionHelp = ({ label, children }: SectionHelpProps): React.ReactElement => (
+export const SectionHelp = ({ label, children }: SectionHelpProps) => (
   <Popover>
     <PopoverTrigger
       aria-label={label}

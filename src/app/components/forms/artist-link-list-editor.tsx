@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { JSX, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useFieldArray, useWatch } from 'react-hook-form';
@@ -77,7 +77,7 @@ const LinkRow = ({
   urlPlaceholder,
   onMove,
   onRemove,
-}: LinkRowProps): JSX.Element => {
+}: LinkRowProps) => {
   const urlName: FieldPath<ArtistFormData> = `${name}.${index}.url`;
   const labelName: FieldPath<ArtistFormData> = `${name}.${index}.label`;
   const url = useWatch({ control, name: urlName }) ?? '';
@@ -212,7 +212,7 @@ export const ArtistLinkListEditor = ({
   emptyCopy = `No ${heading.toLowerCase()} links yet.`,
   urlPlaceholder = 'https://…',
   ...target
-}: ArtistLinkListEditorProps): JSX.Element => {
+}: ArtistLinkListEditorProps) => {
   const { name, section } = target;
   const { fields, append, remove, move } = useFieldArray({ control, name });
   const values = useWatch({ control, name }) ?? [];

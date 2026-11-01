@@ -35,7 +35,7 @@ export const ImageUploaderGrid = ({
   onDragEnd,
   onDeleteRequest,
   onPreview,
-}: ImageUploaderGridProps): React.JSX.Element | null => {
+}: ImageUploaderGridProps) => {
   if (images.length === 0) return null;
 
   return (

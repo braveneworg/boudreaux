@@ -32,7 +32,7 @@ const Bullet = () => (
  * insets keep true centering while making logo/"Home" overlap geometrically
  * impossible at every xl viewport — the row wraps instead of colliding.
  */
-export const DesktopMenu = (): React.ReactElement => {
+export const DesktopMenu = () => {
   const pathname = usePathname();
   const entries = useNavMenuGroups();
 

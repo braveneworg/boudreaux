@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import type { PlaylistListRow } from '@/lib/types/domain/playlist';
 import { formatDurationLong } from '@/lib/utils/format-duration';
 
@@ -33,7 +31,7 @@ const metaLine = ({ itemCount, isPublic }: PlaylistListRow): string =>
  * per-row action cluster. Pure presentation — the list owns the delete
  * mutation and passes per-row callbacks.
  */
-export const PlaylistRow = ({ row, onEdit, onPlay, onDelete }: PlaylistRowProps): ReactElement => (
+export const PlaylistRow = ({ row, onEdit, onPlay, onDelete }: PlaylistRowProps) => (
   <li className="flex items-center gap-3 border-b py-2">
     {/* Decorative: the adjacent title text names the row. */}
     <PlaylistCoverTiles images={row.coverImages} alt="" size="sm" />

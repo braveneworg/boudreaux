@@ -37,7 +37,7 @@ const iconWrapperClass = (mediaType: MediaItem['mediaType']): string =>
 const iconClass = (mediaType: MediaItem['mediaType']): string =>
   cn('h-6 w-6', mediaType === 'audio' ? 'text-primary' : 'text-purple-500');
 
-const MediaUploadProgress = ({ item }: { item: MediaItem }): React.JSX.Element | null => {
+const MediaUploadProgress = ({ item }: { item: MediaItem }) => {
   if (!item.isUploading || item.uploadProgress === undefined) return null;
 
   return (
@@ -50,7 +50,7 @@ const MediaUploadProgress = ({ item }: { item: MediaItem }): React.JSX.Element |
   );
 };
 
-const MediaItemMeta = ({ item }: { item: MediaItem }): React.JSX.Element => (
+const MediaItemMeta = ({ item }: { item: MediaItem }) => (
   <div className="min-w-0 flex-1">
     <p className="truncate text-sm font-medium" title={item.fileName}>
       {item.fileName}
@@ -73,7 +73,7 @@ const MediaItemMeta = ({ item }: { item: MediaItem }): React.JSX.Element => (
   </div>
 );
 
-const MediaSuccessBadge = (): React.JSX.Element => (
+const MediaSuccessBadge = () => (
   <div className="flex h-6 w-6 items-center justify-center bg-green-500/90">
     <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -87,11 +87,7 @@ interface MediaItemStatusProps {
   onDeleteRequest: (item: MediaItem) => void;
 }
 
-const MediaItemStatus = ({
-  item,
-  isInteractive,
-  onDeleteRequest,
-}: MediaItemStatusProps): React.JSX.Element => (
+const MediaItemStatus = ({ item, isInteractive, onDeleteRequest }: MediaItemStatusProps) => (
   <div className="flex shrink-0 items-center gap-2">
     {item.isUploading && <SpinnerRingCircle size="sm" variant="primary" />}
 
@@ -114,11 +110,7 @@ const MediaItemStatus = ({
  * A single media file row showing its icon, metadata, upload progress, and
  * status/remove controls.
  */
-export const MediaItemCard = ({
-  item,
-  onDeleteRequest,
-  disabled,
-}: MediaItemCardProps): React.JSX.Element => {
+export const MediaItemCard = ({ item, onDeleteRequest, disabled }: MediaItemCardProps) => {
   const isInteractive = !item.isUploading && !disabled;
 
   return (

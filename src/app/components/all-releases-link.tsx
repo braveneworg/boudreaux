@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import type { JSX } from 'react';
 
 import Link from 'next/link';
 
@@ -20,7 +19,7 @@ interface AllReleasesLinkProps {
  * (ADR-0006). Shown on the artist page beneath the latest release, or alone
  * when the artist's only releases are their bands'.
  */
-export const AllReleasesLink = ({ slug }: AllReleasesLinkProps): JSX.Element => (
+export const AllReleasesLink = ({ slug }: AllReleasesLinkProps) => (
   <Link
     href={artistReleasesHref(slug)}
     className="inline-flex items-center gap-1.5 underline underline-offset-2 hover:no-underline"

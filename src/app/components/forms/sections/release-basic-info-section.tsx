@@ -44,7 +44,7 @@ export const ReleaseBasicInfoSection = ({
   artistName,
   onSelectDate,
   onCoverArtUploadComplete,
-}: ReleaseBasicInfoSectionProps): React.ReactElement => (
+}: ReleaseBasicInfoSectionProps) => (
   <section className="space-y-4 pt-0">
     <h2 className="font-semibold">Basic Information</h2>
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

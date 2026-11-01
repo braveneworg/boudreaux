@@ -18,7 +18,7 @@ interface FormatProgressListProps {
   progress: FormatProgress[];
 }
 
-export const FormatProgressList = ({ progress }: FormatProgressListProps): React.ReactElement => (
+export const FormatProgressList = ({ progress }: FormatProgressListProps) => (
   <ul className="space-y-1" role="status">
     {progress.map((fp) => (
       <li key={fp.formatType} className="flex items-center gap-2 text-sm">

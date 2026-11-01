@@ -28,7 +28,7 @@ export const MediaUploaderDeleteDialog = ({
   itemToDelete,
   onCancel,
   onConfirm,
-}: MediaUploaderDeleteDialogProps): React.JSX.Element => (
+}: MediaUploaderDeleteDialogProps) => (
   <Dialog open={!!itemToDelete} onOpenChange={onCancel}>
     <DialogContent className="sm:max-w-md">
       <DialogTitle>Delete File</DialogTitle>

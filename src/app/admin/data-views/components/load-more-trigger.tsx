@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef } from 'react';
-import type { ReactElement } from 'react';
 
 import { Button } from '@/app/components/ui/button';
 import { Spinner } from '@/app/components/ui/spinner/spinner';
@@ -20,7 +19,7 @@ export const LoadMoreTrigger = ({
   hasNextPage,
   fetchNextPage,
   isFetchingNextPage = false,
-}: DataViewPagination): ReactElement => {
+}: DataViewPagination) => {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useInfiniteScroll(loadMoreRef, {

@@ -4,7 +4,7 @@
 'use client';
 
 import { useRef } from 'react';
-import type { JSX, MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -72,7 +72,7 @@ export const LatestReleasePlayLink = ({
   slug,
   variant,
   className,
-}: LatestReleasePlayLinkProps): JSX.Element => {
+}: LatestReleasePlayLinkProps) => {
   const router = useRouter();
   const hydrated = useHydrated();
   const linkRef = useRef<HTMLAnchorElement>(null);

@@ -4,8 +4,6 @@
 
 'use client';
 
-import type { ReactElement } from 'react';
-
 import Image from 'next/image';
 
 import { useSortable } from '@dnd-kit/sortable';
@@ -47,7 +45,7 @@ interface PlaylistCreatorItemProps extends PlaylistCreatorItemData {
 }
 
 /** 40px square cover thumb with a muted fallback block when the item has no art. */
-const ItemThumb = ({ coverArt }: { coverArt: string | null }): ReactElement =>
+const ItemThumb = ({ coverArt }: { coverArt: string | null }) =>
   coverArt ? (
     <Image
       src={coverArt}
@@ -74,7 +72,7 @@ export const PlaylistCreatorItem = ({
   coverArt,
   isVideo,
   onRemove,
-}: PlaylistCreatorItemProps): ReactElement => {
+}: PlaylistCreatorItemProps) => {
   const {
     attributes,
     listeners,

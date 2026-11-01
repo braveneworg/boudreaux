@@ -43,7 +43,7 @@ const PurchasedSignedInActions = ({
   resetInHours,
   releaseTitle,
   onContinueToFormatSelect,
-}: PurchasedSignedInActionsProps): React.ReactElement => (
+}: PurchasedSignedInActionsProps) => (
   <>
     <p className="text-sm text-zinc-900">
       Purchased on{' '}
@@ -109,7 +109,7 @@ const PurchaseDownloadForm = ({
   freeRadioDisabled,
   onSubmit,
   artistName,
-}: PurchaseDownloadFormProps): React.ReactElement => (
+}: PurchaseDownloadFormProps) => (
   <Form {...form}>
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       {/* Download option radio group */}
@@ -270,7 +270,7 @@ export const DownloadStep = ({
   onSubmit,
   onContinueToFormatSelect,
   artistName,
-}: DownloadStepProps): React.ReactElement => (
+}: DownloadStepProps) => (
   <>
     <DialogHeader>
       <DialogTitle>Download</DialogTitle>

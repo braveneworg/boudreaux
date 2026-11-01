@@ -101,7 +101,7 @@ const MISSING_ARTIST_HINT = 'Add an artist or creator to enable web enrichment.'
 const isRunDisabled = (isBusy: boolean, hasArtist: boolean): boolean => isBusy || !hasArtist;
 
 /** Muted explainer rendered whenever the gate disables the run affordances. */
-const MissingArtistHint = (): React.ReactElement => (
+const MissingArtistHint = () => (
   <p className="text-muted-foreground text-sm">{MISSING_ARTIST_HINT}</p>
 );
 
@@ -170,7 +170,7 @@ const VideoLevelSuggestionList = ({
   isBusy,
   onApplyVideoSuggestion,
   onDismissSuggestion,
-}: VideoLevelSuggestionListProps): React.ReactElement => {
+}: VideoLevelSuggestionListProps) => {
   const releasedOn = useWatch({ control, name: 'releasedOn' });
   const description = useWatch({ control, name: 'description' });
   const artist = useWatch({ control, name: 'artist' });
@@ -262,20 +262,14 @@ const EnrichmentResults = ({
 );
 
 /** Terminal-state polite announcement (screen-reader only). */
-const TerminalAnnouncement = ({ succeeded }: { succeeded: boolean }): React.ReactElement => (
+const TerminalAnnouncement = ({ succeeded }: { succeeded: boolean }) => (
   <p role="status" aria-live="polite" className="sr-only">
     {succeeded ? 'Enrichment succeeded.' : 'Enrichment failed.'}
   </p>
 );
 
 /** Empty-state trigger — the only run affordance that skips the confirm dialog. */
-const RunEnrichmentButton = ({
-  disabled,
-  onRun,
-}: {
-  disabled: boolean;
-  onRun: () => void;
-}): React.ReactElement => (
+const RunEnrichmentButton = ({ disabled, onRun }: { disabled: boolean; onRun: () => void }) => (
   <Button type="button" disabled={disabled} onClick={onRun}>
     <Sparkles className="size-4" aria-hidden />
     Run enrichment
@@ -283,7 +277,7 @@ const RunEnrichmentButton = ({
 );
 
 /** Two-line skeleton shown before the first status payload arrives. */
-const EnrichmentSkeleton = (): React.ReactElement => (
+const EnrichmentSkeleton = () => (
   <div className="space-y-2" aria-hidden>
     <Skeleton className="h-4 w-3/4" />
     <Skeleton className="h-20 w-full" />
@@ -330,7 +324,7 @@ const PhaseContent = ({
   onRun,
   onApplySuggestion,
   onDismissSuggestion,
-}: PhaseContentProps): React.ReactElement | null => {
+}: PhaseContentProps) => {
   switch (phase) {
     case 'loading':
       return <EnrichmentSkeleton />;
@@ -362,7 +356,7 @@ const PhaseContent = ({
  * Re-run / succeeded results + Re-run. Extracted from the panel (and split into
  * per-phase parts) to keep every component under the complexity cap.
  */
-const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps): React.ReactElement => {
+const EnrichmentPanelBody = (props: EnrichmentPanelBodyProps) => {
   const { data, isBusy, hasArtist, onRun } = props;
   const phase = panelPhase(data);
   const isTerminal = phase === 'succeeded' || phase === 'failed';
@@ -398,7 +392,7 @@ export const VideoEnrichmentPanel = ({
   videoId,
   control,
   onApplyVideoSuggestion,
-}: VideoEnrichmentPanelProps): React.ReactElement => {
+}: VideoEnrichmentPanelProps) => {
   const [gaveUp, setGaveUp] = useState(false);
   const { data } = useVideoEnrichmentStatusQuery(videoId, { enabled: !gaveUp });
   const { runVideoEnrichment, isRunningVideoEnrichment } = useRunVideoEnrichmentMutation(videoId);

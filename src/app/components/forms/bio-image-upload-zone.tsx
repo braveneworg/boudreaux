@@ -4,7 +4,7 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
-import type { ChangeEvent, JSX } from 'react';
+import type { ChangeEvent } from 'react';
 
 import { ImageIcon } from 'lucide-react';
 
@@ -41,7 +41,7 @@ export const BioImageUploadZone = ({
   isUploading = false,
   errorMessage = null,
   disabled = false,
-}: BioImageUploadZoneProps): JSX.Element => {
+}: BioImageUploadZoneProps) => {
   const inputId = useId();
   const altId = useId();
   const attributionId = useId();

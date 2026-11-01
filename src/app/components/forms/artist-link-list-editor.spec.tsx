@@ -26,7 +26,7 @@ const Harness = ({
   heading = 'Website',
   defaults = {},
   onRead,
-}: HarnessProps): React.ReactElement => {
+}: HarnessProps) => {
   const form = useForm<ArtistFormData>({
     resolver: zodResolver(createArtistSchema),
     defaultValues: defaults as ArtistFormData,

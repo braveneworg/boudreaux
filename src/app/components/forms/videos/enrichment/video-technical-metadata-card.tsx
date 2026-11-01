@@ -42,9 +42,7 @@ export const buildTechnicalMetadataRows = (video: VideoRow): TechnicalMetadataRo
  *
  * @param video - The loaded video row from the admin detail query.
  */
-export const VideoTechnicalMetadataCard = ({
-  video,
-}: VideoTechnicalMetadataCardProps): React.ReactElement | null => {
+export const VideoTechnicalMetadataCard = ({ video }: VideoTechnicalMetadataCardProps) => {
   if (!video.probedAt && !video.probeError) return null;
 
   return (

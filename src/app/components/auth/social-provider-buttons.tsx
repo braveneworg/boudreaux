@@ -73,7 +73,7 @@ export const SocialProviderButtons = ({
   onError,
   disabled = false,
   beforeSignIn,
-}: SocialProviderButtonsProps): React.ReactElement => {
+}: SocialProviderButtonsProps) => {
   const [isPending, setIsPending] = useState(false);
 
   const handleSignIn = async (provider: SocialProvider): Promise<void> => {

@@ -4,7 +4,7 @@
 
 'use client';
 
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import nextDynamic from 'next/dynamic';
 
@@ -59,7 +59,7 @@ export const PlaylistSharePopover = ({
   playlistTitle,
   isPublic,
   children,
-}: PlaylistSharePopoverProps): ReactElement => {
+}: PlaylistSharePopoverProps) => {
   const { updatePlaylist, isUpdatingPlaylist } = useUpdatePlaylistMutation();
   const shareUrl = `${clientOrigin()}/playlists/${playlistId}`;
 

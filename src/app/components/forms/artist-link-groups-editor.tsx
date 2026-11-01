@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { JSX, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useFieldArray, useWatch } from 'react-hook-form';
@@ -33,14 +33,7 @@ interface LinkGroupProps {
 }
 
 /** One Contact & Misc group: its heading input, controls, and its own link list. */
-const LinkGroup = ({
-  control,
-  index,
-  count,
-  heading,
-  onMove,
-  onRemove,
-}: LinkGroupProps): JSX.Element => {
+const LinkGroup = ({ control, index, count, heading, onMove, onRemove }: LinkGroupProps) => {
   const position = `Group ${index + 1}`;
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
@@ -125,7 +118,7 @@ const LinkGroup = ({
  * Booking and Merch headings come from the form's defaults, so they do not
  * dirty the form and are not saved while empty.
  */
-export const ArtistLinkGroupsEditor = ({ control }: ArtistLinkGroupsEditorProps): JSX.Element => {
+export const ArtistLinkGroupsEditor = ({ control }: ArtistLinkGroupsEditorProps) => {
   const { fields, append, remove, move } = useFieldArray({ control, name: 'contactLinkGroups' });
   const groups = useWatch({ control, name: 'contactLinkGroups' }) ?? [];
   const [announcement, setAnnouncement] = useState('');

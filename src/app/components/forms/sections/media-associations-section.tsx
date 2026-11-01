@@ -46,7 +46,7 @@ export const MediaAssociationsSection = ({
   formatTracks,
   derivedArtistNames,
   onReleaseChange,
-}: MediaAssociationsSectionProps): React.ReactElement => (
+}: MediaAssociationsSectionProps) => (
   <div className="space-y-4">
     <h3 className="text-lg font-medium">Media Associations</h3>
     <p className="text-sm text-zinc-950">
@@ -130,10 +130,7 @@ interface FeaturedTrackFieldProps {
   formatTracks: TrackOption[];
 }
 
-const FeaturedTrackField = ({
-  control,
-  formatTracks,
-}: FeaturedTrackFieldProps): React.ReactElement => (
+const FeaturedTrackField = ({ control, formatTracks }: FeaturedTrackFieldProps) => (
   <FormField
     control={control}
     name="featuredTrackNumber"

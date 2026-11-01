@@ -3,8 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import type { ReactElement } from 'react';
-
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Switch } from '@/app/components/ui/switch';
@@ -33,7 +31,7 @@ const FilterToggle = ({
   checked: boolean;
   onCheckedChange: (value: boolean) => void;
   className?: string;
-}): ReactElement => (
+}) => (
   <div className={cn('flex items-center gap-2', className)}>
     <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     <Label htmlFor={id} className="cursor-pointer">
@@ -47,7 +45,7 @@ export const DataViewFiltersToolbar = ({
   filters,
   entityDisplayLabel,
   supportsSoftDelete,
-}: DataViewFiltersToolbarProps): ReactElement => (
+}: DataViewFiltersToolbarProps) => (
   <>
     <Input
       className="my-4 w-full"

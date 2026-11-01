@@ -26,13 +26,7 @@ interface VideoFileSectionProps {
  * offered only once the multipart has started (`uploading`) — before that no
  * abort controller exists, so there is nothing to cancel yet.
  */
-const PreparingView = ({
-  canCancel,
-  onCancel,
-}: {
-  canCancel: boolean;
-  onCancel: () => void;
-}): React.ReactElement => (
+const PreparingView = ({ canCancel, onCancel }: { canCancel: boolean; onCancel: () => void }) => (
   <div className="space-y-3">
     <div
       role="status"
@@ -54,13 +48,7 @@ const PreparingView = ({
   </div>
 );
 
-const UploadingView = ({
-  progress,
-  onCancel,
-}: {
-  progress: number;
-  onCancel: () => void;
-}): React.ReactElement => (
+const UploadingView = ({ progress, onCancel }: { progress: number; onCancel: () => void }) => (
   <div className="space-y-3">
     <Progress value={progress} aria-label="Upload progress" />
     <div className="flex items-center justify-between">
@@ -81,7 +69,7 @@ const UploadErrorView = ({
   message: string;
   onRetry: () => void;
   onFile: (file: File) => void;
-}): React.ReactElement => (
+}) => (
   <div className="space-y-3">
     <p role="alert" className="text-destructive text-sm">
       {message}
@@ -106,7 +94,7 @@ const UploadDoneView = ({
   fileSize: string | number | undefined;
   durationSeconds: string | number | undefined;
   onFile: (file: File) => void;
-}): React.ReactElement => (
+}) => (
   <div className="space-y-3">
     <div className="border-input flex items-center gap-2 rounded-none border p-3">
       <CheckCircle2 className="size-5 text-green-700" aria-hidden />
@@ -132,10 +120,7 @@ const UploadDoneView = ({
  * done/replace, driven by the upload state machine. Blocks nothing itself; the
  * parent gates submit on the hidden `s3Key` the successful upload writes.
  */
-export const VideoFileSection = ({
-  control,
-  upload,
-}: VideoFileSectionProps): React.ReactElement => {
+export const VideoFileSection = ({ control, upload }: VideoFileSectionProps) => {
   const s3Key = useWatch({ control, name: 's3Key' });
   const fileName = useWatch({ control, name: 'fileName' });
   const fileSize = useWatch({ control, name: 'fileSize' });

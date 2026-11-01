@@ -31,7 +31,7 @@ export const ProfileEmailSection = ({
   isTransitionPending,
   onEditToggle,
   emailOptIn,
-}: ProfileEmailSectionProps): React.ReactElement => {
+}: ProfileEmailSectionProps) => {
   const isDirty = form.formState.isDirty;
   const isSaving = isPending || isTransitionPending;
 

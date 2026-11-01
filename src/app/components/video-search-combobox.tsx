@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState } from 'react';
 
 import Image from 'next/image';
 
@@ -54,7 +54,7 @@ export const VideoSearchCombobox = ({
   isFetching,
   onSelect,
   className,
-}: VideoSearchComboboxProps): ReactElement => {
+}: VideoSearchComboboxProps) => {
   const [open, setOpen] = useState(false);
   const hasQuery = search.trim().length > 0;
 

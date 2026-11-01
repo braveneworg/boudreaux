@@ -22,9 +22,7 @@ interface ReleaseCreditsSectionProps {
   control: Control<ReleaseFormData>;
 }
 
-export const ReleaseCreditsSection = ({
-  control,
-}: ReleaseCreditsSectionProps): React.ReactElement => (
+export const ReleaseCreditsSection = ({ control }: ReleaseCreditsSectionProps) => (
   <>
     {/* Credits Section */}
     <section className="space-y-4">

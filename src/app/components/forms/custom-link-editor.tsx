@@ -4,7 +4,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import type { JSX, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 
 import { Plus } from 'lucide-react';
 
@@ -36,7 +36,7 @@ interface CustomLinkEditorProps {
  * `useState`, no form library) since the row is tiny and nested inside the
  * artist admin form (a nested `<form>` would be invalid HTML).
  */
-export const CustomLinkEditor = ({ artistId }: CustomLinkEditorProps): JSX.Element => {
+export const CustomLinkEditor = ({ artistId }: CustomLinkEditorProps) => {
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
   const [kind, setKind] = useState<'' | BioLinkKind>('');

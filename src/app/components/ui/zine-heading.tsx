@@ -12,12 +12,7 @@ import { Heading, type HeadingProps } from './heading';
  * fixed level heights so the strip isn't clipped; the strip background reads
  * `--card-accent-soft` so it matches the ambient page accent automatically.
  */
-export const ZineHeading = ({
-  level,
-  className,
-  children,
-  ...props
-}: HeadingProps): React.ReactElement => (
+export const ZineHeading = ({ level, className, children, ...props }: HeadingProps) => (
   <Heading level={level} className={cn('mt-1 mb-4 h-auto', className)} {...props}>
     {/* Explicit `uppercase` / `tracking-wide` sort after the `font-fake-four-cutout` resets. */}
     <span

@@ -47,7 +47,7 @@ export const ImageUploader = ({
   disabled = false,
   className,
   label = 'Upload images',
-}: ImageUploaderProps): React.JSX.Element => {
+}: ImageUploaderProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
 

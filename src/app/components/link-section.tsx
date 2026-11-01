@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { useId } from 'react';
-import type { JSX } from 'react';
 
 import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
 import type { ArtistContactLink, ArtistLink, ArtistLinkGroup } from '@/lib/types/domain/artist';
@@ -67,7 +66,7 @@ interface LinkValueProps {
  * hardening, `mailto:`/`tel:` open in place. A stored href that fails the
  * rule at render (ADR-0020) is shown as text and never as a link.
  */
-const LinkValue = ({ href, text, renderable, className }: LinkValueProps): JSX.Element =>
+const LinkValue = ({ href, text, renderable, className }: LinkValueProps) =>
   renderable ? (
     <a
       href={href}
@@ -97,7 +96,7 @@ type LinkItemProps =
  * description is plain text and wraps. The link itself is a
  * {@link LinkValue}.
  */
-export const LinkItem = ({ link, section }: LinkItemProps): JSX.Element => {
+export const LinkItem = ({ link, section }: LinkItemProps) => {
   const text = linkText(link.url, section);
   const stacked = section === 'contact';
   const description = stacked ? link.description : null;
@@ -143,7 +142,7 @@ interface LinkSectionProps {
 }
 
 /** A flat link section (Websites, Social Media): a heading over its rows; nothing when empty. */
-export const LinkSection = ({ heading, section, links }: LinkSectionProps): JSX.Element | null => {
+export const LinkSection = ({ heading, section, links }: LinkSectionProps) => {
   const headingId = useId();
   if (links.length === 0) return null;
   return (
@@ -165,7 +164,7 @@ interface LinkGroupProps {
 }
 
 /** One Contact & Misc group: its heading over its rows. */
-export const LinkGroup = ({ group }: LinkGroupProps): JSX.Element => (
+export const LinkGroup = ({ group }: LinkGroupProps) => (
   <div className="space-y-2">
     <h3 className="text-sm font-semibold text-zinc-800">{group.heading}</h3>
     <ul className="space-y-3">
@@ -181,7 +180,7 @@ interface ContactLinkSectionProps {
 }
 
 /** The Contact & Misc section: every group that has a link; nothing when none has. */
-export const ContactLinkSection = ({ groups }: ContactLinkSectionProps): JSX.Element | null => {
+export const ContactLinkSection = ({ groups }: ContactLinkSectionProps) => {
   const headingId = useId();
   const filled = groups.filter((group) => group.links.length > 0);
   if (filled.length === 0) return null;

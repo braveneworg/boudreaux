@@ -4,7 +4,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { JSX } from 'react';
 
 import Image from 'next/image';
 
@@ -51,10 +50,10 @@ export const DisplayImageCollage = ({
   images,
   displayName,
   className,
-}: DisplayImageCollageProps): JSX.Element => {
+}: DisplayImageCollageProps) => {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
-  const openedFromRef = useRef<number>(0);
+  const openedFromRef = useRef(0);
   const tileRefs = useRef(new Map<number, HTMLButtonElement>());
 
   if (images.length === 0) {
