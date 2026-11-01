@@ -121,7 +121,8 @@ Versions track `package.json` — update this block when they change.
   upload); better-auth (magic-link + social OAuth, admin plugin); Stripe 21
   (payment-mode checkout, PWYW); AWS SES.
 - shadcn/ui (Radix), Tailwind v4, lucide-react, Jost font; RHF 7 + Zod 4;
-  TanStack Query 5; Vitest 4 + Playwright.
+  TanStack Query 5; Vitest 4 + Playwright; oxlint 1 (`.oxlintrc.json`, with
+  ESLint plugins oxlint lacks bridged through `jsPlugins`) + Prettier.
 
 Shipped: digital formats + S3 presigned up/download + freemium quota; Stripe
 PWYW checkout + download gate; tour management + admin CRUD; release search +
@@ -140,7 +141,7 @@ pnpm run test:e2e             # Playwright E2E
 pnpm run e2e:docker:up        # Start isolated E2E Mongo (localhost:27018)
 pnpm run e2e:docker:down      # Tear down E2E Mongo + volumes
 pnpm run typecheck            # tsc on tracked types
-pnpm run lint                 # ESLint check + auto-fix (--max-warnings 0)
+pnpm run lint                 # oxlint check + auto-fix (--max-warnings 0)
 pnpm run format               # Prettier write (format:check = no write)
 pnpm exec prisma db push      # Push schema to MongoDB
 pnpm run seed                 # Seed dev DB (tsx prisma/seed.ts)

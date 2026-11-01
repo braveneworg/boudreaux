@@ -35,7 +35,7 @@ _Defined in_ `src/lib/services/service.types.d.ts`.
 ## Layers
 
 **Repository** — the only layer permitted to import Prisma, enforced by
-`no-restricted-imports` in `eslint.config.mjs` with a small infra allowlist. Owns
+`no-restricted-imports` in `.oxlintrc.json` with a small infra allowlist. Owns
 query construction, compare-and-swap claims, and race guards.
 _In_ `src/lib/repositories/`.
 

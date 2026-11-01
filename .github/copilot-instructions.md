@@ -136,7 +136,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Keep functions small and focused
 - Use meaningful variable and function names
 - Add JSDoc comments for complex functions and components
-- Use ESLint and Prettier for code formatting and linting
+- Use oxlint and Prettier for code formatting and linting
 - Follow existing code style and patterns in the project
 - Avoid using any type; prefer specific types or generics over unknown / Record<string, unknown>
 - Use React.FC only when necessary, prefer function declarations
@@ -195,7 +195,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Always use Zod for runtime validation of external data (API responses, user input)
 - Always write tests for new features and bug fixes
 - Always aim for high test coverage (90-95%+)
-- Always use ESLint and Prettier for code quality and consistency
+- Always use oxlint and Prettier for code quality and consistency
 - Always follow the project's coding standards and guidelines
 - Always use shadcn/ui components and design patterns for UI consistency
 - Always use Tailwind v4 CSS for styling
@@ -239,7 +239,7 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Never user a checkbox in a mobile first scenario. Prefer using toggle switches or radio buttons for better usability on mobile devices.
 - Never use a checkbox for binary options in mobile interfaces, as they can be difficult to interact with on smaller screens. Instead, use toggle switches or radio buttons that are more touch-friendly and provide clearer visual feedback to users. Checkboxes can be easily missed or mis-tapped on mobile devices, leading to a frustrating user experience. Always prioritize usability and accessibility when designing forms for mobile users.
 - Never use the non-null assertion operator (!) in TypeScript code
-- Never disable ESLint rules globally or with eslint-disable comments without a very good reason
+- Never disable lint rules globally or with oxlint-disable comments without a very good reason
 - Don't call `expect` inside conditional statements
 - Don't use conditional expects in tests (e.g., if (condition) { expect(...) }) — instead, write separate test cases for different conditions
 - Don't use localStorage/sessionStorage
@@ -251,8 +251,8 @@ const res = await fetch(url, { cache: 'no-store' }); // for fresh data
 - Never expose secrets or sensitive information in the codebase
 - Don't commit generated files or build artifacts
 - Don't use any type in TypeScript code
-- Don't disable ESLint or Prettier rules globally
-- Don't use eslint-disable or prettier-ignore comments without a very good reason
+- Don't disable oxlint or Prettier rules globally
+- Don't use oxlint-disable or prettier-ignore comments without a very good reason
 - Don't write large files with multiple components or functions (break them down into smaller files)
 - Don't write large functions or components (break them down)
 - Don't ignore TypeScript errors or warnings

@@ -238,7 +238,7 @@ Implement automated reporting with:
     "test:coverage": "vitest --coverage",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "oxlint --max-warnings 0",
     "type-check": "tsc --noEmit"
   }
 }
