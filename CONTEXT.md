@@ -494,6 +494,30 @@ video without either side knowing the other exists. Distinct from **player
 preferences** (volume and mute), which are shared by every player but are
 settings, not playback state.
 
+**Tour** — a run of shows an admin files under one title (with subtitles, a
+description and notes): its **tour dates** and up to ten **tour images**. The
+public sees a Tour only through the dates and headliners it may see; a Tour
+whose dates are all hidden reads as not found (ADR-0015).
+_Defined in_ `src/lib/services/tours/tour-service.ts`.
+
+**tour date** — one show of a **Tour**: a venue, a start date and show times
+with the venue's time zone, ticketing, and an ordered list of headliners
+(Artists). Saving a tour date's headliners rewrites their rows, so a
+headliner's id can go stale while the admin form is open; a set-time update
+or removal that misses by id retries once by tour date + artist.
+_Defined in_ `src/lib/services/tours/tour-date-service.ts`.
+_Avoid_: show, gig, event.
+
+**tour image** — one image a **Tour** or a **tour date** holds (its owner),
+uploaded by an admin through a presigned S3 URL and served from the CDN. A
+Tour holds up to ten, a tour date up to twenty; the cap is checked when the
+URL is issued and again at confirm. One module owns both owner kinds — the
+cap, the key namespace, the display order, the check that an image belongs
+to the owner named, and a delete that removes the object and then the row,
+even when the object delete fails.
+_Defined in_ `src/lib/services/tours/tour-images/`.
+_Avoid_: tour photo, `Image` (the release image table), bio image.
+
 ## Shipping vocabulary
 
 **version** — one shipped build of the software, named by its `vX.Y.Z` tag.
