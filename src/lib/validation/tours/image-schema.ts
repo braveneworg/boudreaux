@@ -14,6 +14,9 @@ export const SUPPORTED_IMAGE_TYPES = [
   'image/webp',
 ] as const;
 
+/** One supported image MIME type. */
+export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
+
 /**
  * Maximum file size in bytes (10MB)
  */

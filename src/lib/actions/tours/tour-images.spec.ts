@@ -5,376 +5,276 @@
 import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { ImageRepository } from '@/lib/repositories/tours/image-repository';
-import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
-import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
+import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
 
 import {
   confirmTourDateUploadAction,
-  deleteTourDateImageAction,
-  generateTourDateUploadUrlAction,
-  reorderTourDateImagesAction,
-  updateTourDateImageAltTextAction,
-} from './tour-date-images';
-import {
   confirmUploadAction,
   deleteImageAction,
+  deleteTourDateImageAction,
+  generateTourDateUploadUrlAction,
   generateUploadUrlAction,
   reorderImagesAction,
+  reorderTourDateImagesAction,
   updateImageAltTextAction,
+  updateTourDateImageAltTextAction,
 } from './tour-images';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/auth/action-gate');
-vi.mock('@/lib/repositories/tours/image-repository');
-vi.mock('@/lib/repositories/tours/tour-date-image-repository');
-vi.mock('@/lib/services/tours/image-upload-service');
+vi.mock('@/lib/services/tours/tour-images/tour-images', () => ({
+  tourImages: {
+    requestUpload: vi.fn(),
+    confirmUpload: vi.fn(),
+    delete: vi.fn(),
+    reorder: vi.fn(),
+    updateAltText: vi.fn(),
+  },
+}));
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
 const SESSION = { user: { id: 'admin-1', role: 'admin', email: 'admin@example.com' } };
-
 const OWNER_ID = 'owner-1';
 const IMAGE_ID = 'image-1';
-const PRESIGNED = {
-  uploadUrl: 'https://bucket.s3.amazonaws.com/put',
-  s3Key: 'media/key.jpg',
-  s3Bucket: 'bucket',
-  expiresIn: 900,
-};
+const FAILURE = { success: false as const, error: 'Image not found', code: 'NOT_FOUND' as const };
 
-/** The repository surface both image models share, as the actions call it. */
-interface ImageRepositoryMock {
-  count: (ownerId: string) => Promise<number>;
-  findByOwner: (ownerId: string) => Promise<unknown[]>;
-  findById: (id: string) => Promise<unknown>;
-  create: (data: never) => Promise<unknown>;
-  delete: (id: string) => Promise<unknown>;
-  reorderImages: (orders: never) => Promise<unknown>;
-  updateAltText: (id: string, altText: string | null) => Promise<unknown>;
-}
+type ActionResult = Promise<{ success: boolean }>;
 
-/** One owner's action set and the facts the rules depend on. */
+/** One owner kind's action set and the facts its actions depend on. */
 interface OwnerCase {
-  ownerKey: 'tourId' | 'tourDateId';
   label: string;
-  max: number;
-  repository: ImageRepositoryMock;
-  presign: () => unknown;
-  generate: (request: never) => Promise<{ success: boolean; error?: string; data?: unknown }>;
-  confirm: (request: never) => Promise<{ success: boolean; error?: string; data?: unknown }>;
-  remove: (request: never) => Promise<{ success: boolean; error?: string }>;
-  reorder: (request: never) => Promise<{ success: boolean; error?: string }>;
-  updateAltText: (request: never) => Promise<{ success: boolean; error?: string }>;
+  kind: 'tour' | 'tourDate';
+  ownerKey: 'tourId' | 'tourDateId';
+  generate: (request: never) => ActionResult;
+  confirm: (request: never) => ActionResult;
+  remove: (request: never) => ActionResult;
+  reorder: (request: never) => ActionResult;
+  updateAltText: (request: never) => ActionResult;
   revalidated: string[];
 }
 
-const tourCase = (): OwnerCase => ({
-  ownerKey: 'tourId',
-  label: 'tour',
-  max: 10,
-  repository: {
-    count: ImageRepository.count,
-    findByOwner: ImageRepository.findByTourId,
-    findById: ImageRepository.findById,
-    create: ImageRepository.create as never,
-    delete: ImageRepository.delete,
-    reorderImages: ImageRepository.reorderImages as never,
-    updateAltText: ImageRepository.updateAltText,
+const OWNERS: OwnerCase[] = [
+  {
+    label: 'tour',
+    kind: 'tour',
+    ownerKey: 'tourId',
+    generate: generateUploadUrlAction as never,
+    confirm: confirmUploadAction as never,
+    remove: deleteImageAction as never,
+    reorder: reorderImagesAction as never,
+    updateAltText: updateImageAltTextAction as never,
+    revalidated: [`/admin/tours/${OWNER_ID}`, `/tours/${OWNER_ID}`, '/tours'],
   },
-  presign: () => ImageUploadService.generatePresignedUploadUrl,
-  generate: generateUploadUrlAction as never,
-  confirm: confirmUploadAction as never,
-  remove: deleteImageAction as never,
-  reorder: reorderImagesAction as never,
-  updateAltText: updateImageAltTextAction as never,
-  revalidated: [`/admin/tours/${OWNER_ID}`, `/tours/${OWNER_ID}`, '/tours'],
-});
-
-const tourDateCase = (): OwnerCase => ({
-  ownerKey: 'tourDateId',
-  label: 'tour date',
-  max: 20,
-  repository: {
-    count: TourDateImageRepository.count,
-    findByOwner: TourDateImageRepository.findByTourDateId,
-    findById: TourDateImageRepository.findById,
-    create: TourDateImageRepository.create as never,
-    delete: TourDateImageRepository.delete,
-    reorderImages: TourDateImageRepository.reorderImages as never,
-    updateAltText: TourDateImageRepository.updateAltText,
+  {
+    label: 'tour date',
+    kind: 'tourDate',
+    ownerKey: 'tourDateId',
+    generate: generateTourDateUploadUrlAction as never,
+    confirm: confirmTourDateUploadAction as never,
+    remove: deleteTourDateImageAction as never,
+    reorder: reorderTourDateImagesAction as never,
+    updateAltText: updateTourDateImageAltTextAction as never,
+    revalidated: ['/admin/tours', '/tours'],
   },
-  presign: () => ImageUploadService.generateTourDatePresignedUploadUrl,
-  generate: generateTourDateUploadUrlAction as never,
-  confirm: confirmTourDateUploadAction as never,
-  remove: deleteTourDateImageAction as never,
-  reorder: reorderTourDateImagesAction as never,
-  updateAltText: updateTourDateImageAltTextAction as never,
-  revalidated: ['/admin/tours', '/tours'],
-});
+];
 
-const imageRow = (ownerKey: OwnerCase['ownerKey'], overrides: Record<string, unknown> = {}) => ({
-  id: IMAGE_ID,
-  [ownerKey]: OWNER_ID,
-  s3Key: 'media/key.jpg',
-  s3Url: 'https://cdn.example.com/media/key.jpg',
-  s3Bucket: 'bucket',
-  fileName: 'photo.jpg',
-  fileSize: 1024,
-  mimeType: 'image/jpeg',
-  displayOrder: 0,
-  altText: null,
-  createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  uploadedBy: 'admin-1',
-  ...overrides,
-});
+const FILE = { fileName: 'photo.jpg', fileSize: 1024, mimeType: 'image/jpeg' };
+const UPLOAD = { ...FILE, s3Key: 'media/key.jpg', s3Bucket: 'bucket', altText: 'A crowd' };
+const ORDERS = [
+  { id: 'b', displayOrder: 0 },
+  { id: 'a', displayOrder: 1 },
+];
 
-const uploadRequest = (ownerKey: OwnerCase['ownerKey']) => ({
-  [ownerKey]: OWNER_ID,
-  fileName: 'photo.jpg',
-  fileSize: 1024,
-  mimeType: 'image/jpeg',
-});
+const revalidatedPaths = (): string[] => vi.mocked(revalidatePath).mock.calls.map(([path]) => path);
 
-const confirmRequest = (ownerKey: OwnerCase['ownerKey']) => ({
-  [ownerKey]: OWNER_ID,
-  s3Key: 'media/key.jpg',
-  s3Bucket: 'bucket',
-  fileName: 'photo.jpg',
-  fileSize: 1024,
-  mimeType: 'image/jpeg',
-  altText: 'A crowd',
-});
-
-describe.each([
-  { owner: 'tour', makeCase: tourCase },
-  { owner: 'tour date', makeCase: tourDateCase },
-])('$owner image actions', ({ makeCase }) => {
-  let owner: OwnerCase;
+describe.each(OWNERS)('$label image actions', (owner) => {
+  const ownerRef = { kind: owner.kind, id: OWNER_ID };
+  const withOwner = <T extends object>(fields: T) => ({ [owner.ownerKey]: OWNER_ID, ...fields });
 
   beforeEach(() => {
-    vi.resetAllMocks();
-    owner = makeCase();
     vi.mocked(gateAction).mockResolvedValue({ success: true, session: SESSION as never });
-    vi.mocked(ImageUploadService.generateCdnUrl).mockReturnValue(
-      'https://cdn.example.com/media/key.jpg'
-    );
   });
 
   describe('generate upload URL', () => {
-    it('returns the gate refusal without counting images', async () => {
+    it('returns the gate refusal without reaching the module', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await owner.generate(uploadRequest(owner.ownerKey) as never);
+      const result = await owner.generate(withOwner(FILE) as never);
 
       expect(result).toEqual(REFUSAL);
-      expect(owner.repository.count).not.toHaveBeenCalled();
+      expect(tourImages.requestUpload).not.toHaveBeenCalled();
     });
 
-    it('refuses once the owner already holds the maximum number of images', async () => {
-      vi.mocked(owner.repository.count).mockResolvedValueOnce(owner.max);
-
-      const result = await owner.generate(uploadRequest(owner.ownerKey) as never);
+    it('answers an invalid request with the first validation message', async () => {
+      const result = await owner.generate(withOwner({ ...FILE, fileName: '' }) as never);
 
       expect(result).toEqual({
         success: false,
-        error: `Maximum of ${owner.max} images per ${owner.label} exceeded`,
+        error: 'File name is required',
+        code: 'VALIDATION',
       });
-      expect(owner.presign()).not.toHaveBeenCalled();
+      expect(tourImages.requestUpload).not.toHaveBeenCalled();
     });
 
-    it('issues a presigned URL while the owner is one under the maximum', async () => {
-      vi.mocked(owner.repository.count).mockResolvedValueOnce(owner.max - 1);
-      vi.mocked(owner.presign() as () => Promise<unknown>).mockResolvedValueOnce({
-        success: true,
-        data: PRESIGNED,
-      });
+    it("asks the module for the owner's next upload and hands its answer back", async () => {
+      const signed = {
+        success: true as const,
+        data: { uploadUrl: 'https://signed', s3Key: 'k', s3Bucket: 'b', expiresIn: 900 },
+      };
+      vi.mocked(tourImages.requestUpload).mockResolvedValueOnce(signed);
 
-      const result = await owner.generate(uploadRequest(owner.ownerKey) as never);
+      const result = await owner.generate(withOwner(FILE) as never);
 
-      expect(owner.repository.count).toHaveBeenCalledWith(OWNER_ID);
-      expect(result).toEqual({ success: true, data: PRESIGNED });
+      expect(vi.mocked(tourImages.requestUpload).mock.calls).toEqual([[ownerRef, FILE]]);
+      expect(result).toEqual(signed);
     });
 
-    it('passes a presign failure through', async () => {
-      vi.mocked(owner.repository.count).mockResolvedValueOnce(0);
-      vi.mocked(owner.presign() as () => Promise<unknown>).mockResolvedValueOnce({
+    it('never hands a thrown error’s own text to the client', async () => {
+      vi.mocked(tourImages.requestUpload).mockRejectedValueOnce(
+        new Error('connect ECONNREFUSED mongodb://admin:hunter2@db')
+      );
+
+      const result = await owner.generate(withOwner(FILE) as never);
+
+      expect(result).toEqual({
         success: false,
         error: 'Failed to generate upload URL',
         code: 'UNKNOWN',
       });
-
-      const result = await owner.generate(uploadRequest(owner.ownerKey) as never);
-
-      expect(result).toEqual({ success: false, error: 'Failed to generate upload URL' });
     });
   });
 
   describe('confirm upload', () => {
-    it('appends the image after the existing ones, uploaded by the admin', async () => {
-      vi.mocked(owner.repository.findByOwner).mockResolvedValueOnce([
-        imageRow(owner.ownerKey, { id: 'a' }),
-        imageRow(owner.ownerKey, { id: 'b', displayOrder: 1 }),
-      ]);
-      vi.mocked(owner.repository.count).mockResolvedValueOnce(2);
-      vi.mocked(owner.repository.create).mockResolvedValueOnce(
-        imageRow(owner.ownerKey, { displayOrder: 2, altText: 'A crowd' })
-      );
+    it('records the upload as the admin and revalidates the owner surfaces', async () => {
+      const confirmed = { success: true as const, data: { id: IMAGE_ID } };
+      vi.mocked(tourImages.confirmUpload).mockResolvedValueOnce(confirmed as never);
 
-      const result = await owner.confirm(confirmRequest(owner.ownerKey) as never);
+      const result = await owner.confirm(withOwner(UPLOAD) as never);
 
-      expect(vi.mocked(owner.repository.create).mock.calls).toEqual([
-        [
-          {
-            [owner.ownerKey]: OWNER_ID,
-            s3Key: 'media/key.jpg',
-            s3Url: 'https://cdn.example.com/media/key.jpg',
-            s3Bucket: 'bucket',
-            fileName: 'photo.jpg',
-            fileSize: 1024,
-            mimeType: 'image/jpeg',
-            displayOrder: 2,
-            altText: 'A crowd',
-            uploadedBy: 'admin-1',
-          },
-        ],
+      expect(vi.mocked(tourImages.confirmUpload).mock.calls).toEqual([
+        [ownerRef, UPLOAD, 'admin-1'],
       ]);
-      expect(result).toEqual({
-        success: true,
-        data: {
-          id: IMAGE_ID,
-          [owner.ownerKey]: OWNER_ID,
-          s3Key: 'media/key.jpg',
-          s3Url: 'https://cdn.example.com/media/key.jpg',
-          s3Bucket: 'bucket',
-          fileName: 'photo.jpg',
-          fileSize: 1024,
-          mimeType: 'image/jpeg',
-          displayOrder: 2,
-          altText: 'A crowd',
-          uploadedBy: 'admin-1',
-        },
-      });
+      expect(revalidatedPaths()).toEqual(owner.revalidated);
+      expect(result).toEqual(confirmed);
     });
 
-    it('revalidates the owner surfaces', async () => {
-      vi.mocked(owner.repository.findByOwner).mockResolvedValueOnce([]);
-      vi.mocked(owner.repository.count).mockResolvedValueOnce(0);
-      vi.mocked(owner.repository.create).mockResolvedValueOnce(imageRow(owner.ownerKey));
+    it('revalidates nothing when the module refuses', async () => {
+      vi.mocked(tourImages.confirmUpload).mockResolvedValueOnce(FAILURE);
 
-      await owner.confirm(confirmRequest(owner.ownerKey) as never);
+      const result = await owner.confirm(withOwner(UPLOAD) as never);
 
-      expect(vi.mocked(revalidatePath).mock.calls.map(([path]) => path)).toEqual(owner.revalidated);
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(result).toEqual(FAILURE);
+    });
+
+    it('answers a throw with generic copy', async () => {
+      vi.mocked(tourImages.confirmUpload).mockRejectedValueOnce(new Error('raw'));
+
+      const result = await owner.confirm(withOwner(UPLOAD) as never);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to confirm upload',
+        code: 'UNKNOWN',
+      });
     });
   });
 
   describe('delete image', () => {
-    it('refuses an image that does not exist', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(null);
+    it('deletes through the module and revalidates the owner surfaces', async () => {
+      vi.mocked(tourImages.delete).mockResolvedValueOnce({ success: true, data: undefined });
 
-      const result = await owner.remove({ imageId: IMAGE_ID, [owner.ownerKey]: OWNER_ID } as never);
+      const result = await owner.remove(withOwner({ imageId: IMAGE_ID }) as never);
 
-      expect(result).toEqual({ success: false, error: 'Image not found' });
-      expect(owner.repository.delete).not.toHaveBeenCalled();
+      expect(vi.mocked(tourImages.delete).mock.calls).toEqual([[ownerRef, IMAGE_ID]]);
+      expect(revalidatedPaths()).toEqual(owner.revalidated);
+      expect(result).toEqual({ success: true, data: undefined });
     });
 
-    it('refuses an image that belongs to another owner, leaving S3 and the row alone', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(
-        imageRow(owner.ownerKey, { [owner.ownerKey]: 'someone-else' })
-      );
+    it('hands a refusal back without revalidating', async () => {
+      vi.mocked(tourImages.delete).mockResolvedValueOnce(FAILURE);
 
-      const result = await owner.remove({ imageId: IMAGE_ID, [owner.ownerKey]: OWNER_ID } as never);
+      const result = await owner.remove(withOwner({ imageId: IMAGE_ID }) as never);
 
-      expect(result).toEqual({
-        success: false,
-        error: `Image does not belong to specified ${owner.label}`,
-      });
-      expect(ImageUploadService.deleteFromS3).not.toHaveBeenCalled();
-      expect(owner.repository.delete).not.toHaveBeenCalled();
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(result).toEqual(FAILURE);
     });
 
-    it('deletes the S3 object, then the row', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(imageRow(owner.ownerKey));
-      vi.mocked(ImageUploadService.deleteFromS3).mockResolvedValueOnce({
-        success: true,
-        data: undefined,
-      });
+    it('refuses a request without an image id', async () => {
+      const result = await owner.remove(withOwner({ imageId: '' }) as never);
 
-      const result = await owner.remove({ imageId: IMAGE_ID, [owner.ownerKey]: OWNER_ID } as never);
-
-      expect(ImageUploadService.deleteFromS3).toHaveBeenCalledWith('media/key.jpg');
-      expect(owner.repository.delete).toHaveBeenCalledWith(IMAGE_ID);
-      expect(result).toEqual({ success: true });
-    });
-
-    it('still deletes the row when the S3 delete fails', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(imageRow(owner.ownerKey));
-      vi.mocked(ImageUploadService.deleteFromS3).mockResolvedValueOnce({
-        success: false,
-        error: 'Failed to delete file from S3',
-        code: 'UNKNOWN',
-      });
-
-      const result = await owner.remove({ imageId: IMAGE_ID, [owner.ownerKey]: OWNER_ID } as never);
-
-      expect(owner.repository.delete).toHaveBeenCalledWith(IMAGE_ID);
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({ success: false, error: 'Image ID is required', code: 'VALIDATION' });
     });
   });
 
   describe('reorder images', () => {
-    it('refuses an order naming an image the owner does not hold', async () => {
-      vi.mocked(owner.repository.findByOwner).mockResolvedValueOnce([imageRow(owner.ownerKey)]);
+    it('reorders through the module and revalidates the owner surfaces', async () => {
+      vi.mocked(tourImages.reorder).mockResolvedValueOnce({ success: true, data: undefined });
 
-      const result = await owner.reorder({
-        [owner.ownerKey]: OWNER_ID,
-        imageOrders: [
-          { id: IMAGE_ID, displayOrder: 1 },
-          { id: 'stranger', displayOrder: 0 },
-        ],
-      } as never);
+      const result = await owner.reorder(withOwner({ imageOrders: ORDERS }) as never);
+
+      expect(vi.mocked(tourImages.reorder).mock.calls).toEqual([[ownerRef, ORDERS]]);
+      expect(revalidatedPaths()).toEqual(owner.revalidated);
+      expect(result).toEqual({ success: true, data: undefined });
+    });
+
+    it('refuses an empty order', async () => {
+      const result = await owner.reorder(withOwner({ imageOrders: [] }) as never);
 
       expect(result).toEqual({
         success: false,
-        error: `Image stranger does not belong to ${owner.label} ${OWNER_ID}`,
+        error: 'At least one image must be provided',
+        code: 'VALIDATION',
       });
-      expect(owner.repository.reorderImages).not.toHaveBeenCalled();
     });
 
-    it('writes the new order when every image is the owner’s', async () => {
-      vi.mocked(owner.repository.findByOwner).mockResolvedValueOnce([
-        imageRow(owner.ownerKey, { id: 'a' }),
-        imageRow(owner.ownerKey, { id: 'b' }),
-      ]);
-      const imageOrders = [
-        { id: 'b', displayOrder: 0 },
-        { id: 'a', displayOrder: 1 },
-      ];
+    it('answers a throw with generic copy', async () => {
+      vi.mocked(tourImages.reorder).mockRejectedValueOnce(new Error('raw'));
 
-      const result = await owner.reorder({ [owner.ownerKey]: OWNER_ID, imageOrders } as never);
+      const result = await owner.reorder(withOwner({ imageOrders: ORDERS }) as never);
 
-      expect(owner.repository.reorderImages).toHaveBeenCalledWith(imageOrders);
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to reorder images',
+        code: 'UNKNOWN',
+      });
     });
   });
 
   describe('update alt text', () => {
-    it('refuses an image that does not exist', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(null);
+    it("updates through the module and revalidates the image owner's surfaces", async () => {
+      vi.mocked(tourImages.updateAltText).mockResolvedValueOnce({
+        success: true,
+        data: { ownerId: OWNER_ID },
+      });
 
       const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
 
-      expect(result).toEqual({ success: false, error: 'Image not found' });
-      expect(owner.repository.updateAltText).not.toHaveBeenCalled();
+      expect(vi.mocked(tourImages.updateAltText).mock.calls).toEqual([[owner.kind, IMAGE_ID, 'x']]);
+      expect(revalidatedPaths()).toEqual(owner.revalidated);
+      expect(result).toEqual({ success: true, data: { ownerId: OWNER_ID } });
     });
 
-    it('clears blank alt text to null', async () => {
-      vi.mocked(owner.repository.findById).mockResolvedValueOnce(imageRow(owner.ownerKey));
+    it('hands a refusal back without revalidating', async () => {
+      vi.mocked(tourImages.updateAltText).mockResolvedValueOnce(FAILURE);
 
-      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: '' } as never);
+      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
 
-      expect(owner.repository.updateAltText).toHaveBeenCalledWith(IMAGE_ID, null);
-      expect(result).toEqual({ success: true });
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(result).toEqual(FAILURE);
+    });
+
+    it('answers a throw with generic copy', async () => {
+      vi.mocked(tourImages.updateAltText).mockRejectedValueOnce(new Error('raw'));
+
+      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update alt text',
+        code: 'UNKNOWN',
+      });
     });
   });
 });

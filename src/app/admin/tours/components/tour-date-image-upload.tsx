@@ -11,7 +11,7 @@ import {
   deleteTourDateImageAction,
   generateTourDateUploadUrlAction,
   reorderTourDateImagesAction,
-} from '@/lib/actions/tours/tour-date-images';
+} from '@/lib/actions/tours/tour-images';
 import { MAX_FILE_SIZE, SUPPORTED_IMAGE_TYPES } from '@/lib/validation/tours/image-schema';
 import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validation/tours/tour-date-image-schema';
 
