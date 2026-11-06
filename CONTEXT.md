@@ -32,6 +32,16 @@ See [ADR-0001](docs/adr/0001-service-failures-carry-a-data-error-code.md).
 `{ success: true, data: T } | { success: false, error: string, code: DataErrorCode }`.
 _Defined in_ `src/lib/services/service.types.d.ts`.
 
+**failure field table** — how a form-backed **Server Action** puts a failed
+service write on its form: a `FailureFieldTable` maps a **DataErrorCode** to
+the field it marks and the copy shown there, with fallback copy for every
+other code, applied by `applyServiceFailure`. On the client,
+`useEntitySubmit` marks those fields through `setFormErrors`. See the
+2026-11-05 amendments to
+[ADR-0001](docs/adr/0001-service-failures-carry-a-data-error-code.md) and
+[ADR-0003](docs/adr/0003-entity-forms-share-one-submit-protocol.md).
+_Defined in_ `src/lib/actions/form-state-helpers.ts`.
+
 ## Layers
 
 **Repository** — the only layer permitted to import Prisma, enforced by

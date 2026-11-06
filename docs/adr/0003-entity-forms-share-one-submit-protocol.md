@@ -166,3 +166,35 @@ scope section); `tour-form` was not looked at here.
 
 The protocol now has six members: `entity`, `reset`, `create`, `update`,
 `onSuccess` and `onFailure`.
+
+## Amendment (2026-11-05): The protocol marks server field errors; `featured-artist-form` joins
+
+Without `onFailure`, a failed write ended in one toast, "Failed to
+<verb> <entity>. Please check the form for errors." The release and
+artist actions put a duplicate title or slug on `errors.title` /
+`errors.slug`, and both forms threw that away: nothing was marked.
+`video-form` got field errors only by passing its own `onFailure`, and
+`featured-artist-form` by an inline effect. Three mappers did one job.
+
+The default failure now does what every form needed. `reset` is replaced
+by `form` (`{ reset, setError }` of the form being submitted), and a
+failure marks each field the server's errors name through
+`setFormErrors` (`src/lib/utils/forms/set-form-errors.ts`, the one
+mapper), then toasts the server's `general` error, or the
+entity-and-verb copy when there is none. `onFailure` still replaces
+that for a form that needs more.
+
+- `video-form` drops its `onFailure` and `applyServerFieldErrors`; the
+  default does the same. Its fallback copy is now the shared sentence.
+- `featured-artist-form` submits through the protocol. The blocker the
+  scope section recorded is gone: `useUpdateFeaturedArtistMutation`
+  wraps `updateFeaturedArtistAction`, so there is an
+  `update(id, values)` to pass. Its inline field-error effect and its
+  `buildCreateErrorMessage` / `buildEditErrorMessage` copy are deleted.
+  A failure that names only fields now toasts the shared sentence
+  instead of listing them.
+- `tour-form` is still off the protocol; it uses `setFormErrors`
+  directly.
+
+The protocol keeps six members: `entity`, `form`, `create`, `update`,
+`onSuccess` and `onFailure`.
