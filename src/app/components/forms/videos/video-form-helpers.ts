@@ -158,16 +158,3 @@ export const shapePublish = (
   }
   return isDraft ? { ...data, publishedAt: '' } : data;
 };
-
-/** Copy server-side field errors from a FormState onto the RHF form for inline display. */
-export const applyServerFieldErrors = (
-  setError: UseFormReturn<VideoFormData>['setError'],
-  errors: Record<string, string[]> | undefined
-): void => {
-  if (!errors) return;
-  for (const [field, messages] of Object.entries(errors)) {
-    if (field !== 'general' && messages && messages.length > 0) {
-      setError(field as keyof VideoFormData, { type: 'server', message: messages[0] });
-    }
-  }
-};

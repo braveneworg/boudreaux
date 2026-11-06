@@ -19,7 +19,8 @@ import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
-import { refusedFormState } from './form-state-helpers';
+import { ARTIST_WRITE_FAILURES } from './artist-action-failures';
+import { applyServiceFailure, refusedFormState } from './form-state-helpers';
 
 const PERMITTED_FIELD_NAMES = [
   'firstName',
@@ -93,21 +94,6 @@ const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => (
   ...toLinksPayload(data),
 });
 
-const applyServiceErrorToFormState = (formState: FormState, errorMessage: string): void => {
-  if (!formState.errors) {
-    formState.errors = {};
-  }
-  const lower = errorMessage.toLowerCase();
-  const isSlugError =
-    lower.includes('slug') &&
-    (lower.includes('unique') || lower.includes('already exists') || lower.includes('duplicate'));
-  if (isSlugError) {
-    formState.errors.slug = ['This slug is already in use. Please choose a different one.'];
-  } else {
-    formState.errors = { general: [errorMessage] };
-  }
-};
-
 export const updateArtistAction = async (
   artistId: string,
   _initialState: FormState,
@@ -150,7 +136,7 @@ export const updateArtistAction = async (
       formState.errors = undefined;
       formState.data = { artistId: response.data?.id };
     } else {
-      applyServiceErrorToFormState(formState, response.error ?? 'Failed to update artist');
+      applyServiceFailure(formState, response, ARTIST_WRITE_FAILURES);
     }
 
     formState.success = response.success;

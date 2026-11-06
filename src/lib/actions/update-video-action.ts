@@ -20,7 +20,11 @@ import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
-import { refusedFormState } from './form-state-helpers';
+import {
+  applyServiceFailure,
+  type FailureFieldTable,
+  refusedFormState,
+} from './form-state-helpers';
 import {
   buildVideoUpdateInput,
   confirmVideoUpload,
@@ -30,32 +34,24 @@ import {
   VIDEO_PERMITTED_FIELD_NAMES,
 } from './video-action-helpers';
 
-/** Map a `VideoService.updateVideo` error message onto the form state. */
-const mapVideoServiceError = (errorMessage: string, formState: FormState): void => {
-  const msg = errorMessage.toLowerCase();
-  if (msg.includes('not found')) {
-    formState.errors = { ...formState.errors, general: ['Video not found'] };
-  } else {
-    formState.errors = { general: ['Failed to update video'] };
-  }
+const UPDATE_VIDEO_FAILURES: FailureFieldTable = {
+  fields: new Map([['NOT_FOUND', { field: 'general', message: 'Video not found' }]]),
+  fallback: 'Failed to update video',
 };
 
-/** Apply the update result: the video id on success, or a mapped error. */
+/** Apply the update result: the video id on success, or the mapped failure. */
 const applyUpdateResult = (
   response: ServiceResponse<Video>,
   videoId: string,
   formState: FormState
 ): void => {
-  if (response.success) {
-    formState.errors = undefined;
-    formState.data = { videoId };
-  } else {
-    if (!formState.errors) {
-      formState.errors = {};
-    }
-    mapVideoServiceError(response.error || 'Failed to update video', formState);
+  if (!response.success) {
+    applyServiceFailure(formState, response, UPDATE_VIDEO_FAILURES);
+    return;
   }
-  formState.success = response.success;
+  formState.errors = undefined;
+  formState.data = { videoId };
+  formState.success = true;
 };
 
 /**
