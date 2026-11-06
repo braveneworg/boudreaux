@@ -4,7 +4,13 @@
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-import { ENV_MANIFEST, type EnvPhase } from '../../src/lib/config/env-manifest';
+import {
+  ENV_MANIFEST,
+  FEATURE_GROUPS,
+  featureGroupMembers,
+  type EnvPhase,
+} from '../../src/lib/config/env-manifest';
+import { SOCIAL_PROVIDER_IDS } from '../../src/lib/config/social-providers';
 
 /**
  * A configuration name is spelled in four places: a GitHub secret, the
@@ -175,6 +181,77 @@ describe('runtime config drift — the deploy env file and compose', () => {
       .map(([name]) => name);
 
     expect(renamed).toEqual([]);
+  });
+});
+
+describe('runtime config drift — required values are checked before the roll', () => {
+  const STEP = 'Check the required runtime config is set';
+  const required = stepBlock(rollHost, STEP);
+  const requiredEnv = yamlEnv(required);
+  const stepNames = [...rollHost.matchAll(/\n +- name: ([^\n]+)/g)].map(([, name]) => name);
+  const REQUIRED = ENV_MANIFEST.filter(
+    ({ phase, requirement }) => phase === 'runtime' && requirement === 'required'
+  ).map(({ name }) => name);
+  const checkedNames = (): string[] => {
+    const command = /bash scripts\/ci\/check-required-config\.sh([^\n]*)/.exec(required)?.[1] ?? '';
+    return command.trim().split(/ +/).filter(Boolean);
+  };
+
+  it('checks exactly the manifest’s required runtime names', () => {
+    expect([...checkedNames()].sort()).toEqual([...REQUIRED].sort());
+  });
+
+  it('gives each one the value the env file will get', () => {
+    expect(
+      missingFrom(
+        REQUIRED,
+        (name) =>
+          requiredEnv.get(name) !== undefined && requiredEnv.get(name) === ENV_FILE.get(name)
+      )
+    ).toEqual([]);
+  });
+
+  it('checks before the host is touched or the env file is written', () => {
+    const at = stepNames.indexOf(STEP);
+
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(stepNames.indexOf('Configure AWS credentials'));
+    expect(at).toBeLessThan(stepNames.indexOf('Create .env for remote'));
+  });
+});
+
+describe('runtime config drift — intended social providers', () => {
+  const STEP = 'Check the intended social providers have credentials';
+  const intent = stepBlock(rollHost, STEP);
+  const intentEnv = yamlEnv(intent);
+  const stepNames = [...rollHost.matchAll(/\n +- name: ([^\n]+)/g)].map(([, name]) => name);
+
+  it('runs the intent check in roll-host', () => {
+    expect(intent).toContain('run: bash scripts/ci/check-social-provider-intent.sh');
+  });
+
+  it('reads the intent from the repository variable, defaulting to the live providers', () => {
+    expect(intentEnv.get('ENABLED_SOCIAL_PROVIDERS')).toBe(
+      "${{ vars.ENABLED_SOCIAL_PROVIDERS || 'google,apple,facebook' }}"
+    );
+  });
+
+  it('hands the check every social credential, from the secret of the same name', () => {
+    const names = FEATURE_GROUPS.filter(({ id }) =>
+      (SOCIAL_PROVIDER_IDS as readonly string[]).includes(id)
+    ).flatMap(featureGroupMembers);
+
+    expect(missingFrom(names, (name) => intentEnv.get(name) === `\${{ secrets.${name} }}`)).toEqual(
+      []
+    );
+  });
+
+  it('checks before the host is touched or the env file is written', () => {
+    const at = stepNames.indexOf(STEP);
+
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(stepNames.indexOf('Configure AWS credentials'));
+    expect(at).toBeLessThan(stepNames.indexOf('Create .env for remote'));
   });
 });
 

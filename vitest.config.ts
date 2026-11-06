@@ -38,6 +38,8 @@ const NATIVE_ADDON_SPECS = ['**/image-quality.spec.ts', '**/thumbnail-data-uri.s
 // scripts, so they run under the `shell-scripts` project in CI (and on demand
 // via `pnpm run test:shell`) and stay out of the default local run.
 export const SHELL_SCRIPT_SPECS = [
+  'scripts/ci/check-required-config.spec.ts',
+  'scripts/ci/check-social-provider-intent.spec.ts',
   'scripts/ci/nginx-config-test.spec.ts',
   'scripts/ci/release-deployed-sha.spec.ts',
   'scripts/ci/rollback-resolve.spec.ts',
