@@ -73,8 +73,26 @@ describe('release-image-actions', () => {
       expect(ImageRepository.findSourceById).not.toHaveBeenCalled();
     });
 
+    it('deletes from the AWS_S3_BUCKET_NAME bucket that uploads use', async () => {
+      vi.stubEnv('S3_BUCKET', '');
+      vi.stubEnv('AWS_S3_BUCKET_NAME', 'uploads-bucket');
+      vi.mocked(ImageRepository.findSourceById).mockResolvedValue({
+        id: 'image-123',
+        src: 'https://cdn.example.com/images/release-cover.jpg',
+        releaseId: 'release-123',
+      } as never);
+      vi.mocked(ImageRepository.delete).mockResolvedValue({} as never);
+
+      await deleteReleaseImageAction('image-123');
+
+      expect(mockS3Send.mock.calls.map(([command]) => command.params)).toEqual([
+        { Bucket: 'uploads-bucket', Key: 'images/release-cover.jpg' },
+      ]);
+    });
+
     it('should skip S3 delete when no S3 bucket configured', async () => {
       vi.stubEnv('S3_BUCKET', undefined);
+      vi.stubEnv('AWS_S3_BUCKET_NAME', '');
       const mockImage = {
         id: 'image-123',
         src: 'https://cdn.example.com/images/release-cover.jpg',

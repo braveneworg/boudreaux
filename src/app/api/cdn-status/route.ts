@@ -9,6 +9,7 @@ import {
   ListInvalidationsCommand,
 } from '@aws-sdk/client-cloudfront';
 
+import { getCloudFrontDistributionId } from '@/lib/config/runtime-config';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { loggers } from '@/lib/utils/logger';
 
@@ -63,7 +64,7 @@ const buildStatusResponse = (items: InvalidationSummary[] | undefined): NextResp
 
 export const GET = withAdmin(async () => {
   try {
-    const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+    const distributionId = getCloudFrontDistributionId();
 
     if (!distributionId) {
       return NextResponse.json({ status: 'unknown', message: 'CDN not configured' });

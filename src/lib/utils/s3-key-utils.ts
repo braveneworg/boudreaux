@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { resolveS3BucketName } from '@/lib/config/runtime-config';
+
 import { localSinkKey } from './local-upload-sink';
 /** Entity namespaces media keys are filed under. */
 export type MediaEntityType =
@@ -106,7 +108,7 @@ const s3HostBucket = (host: string): string | null => {
 const extractKeyFromS3Host = (host: string, key: string): string | null => {
   const bucket = s3HostBucket(host);
   if (!bucket || !key) return null;
-  const ourBucket = process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET;
+  const ourBucket = resolveS3BucketName();
   return !ourBucket || bucket === ourBucket ? key : null;
 };
 

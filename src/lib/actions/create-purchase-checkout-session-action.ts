@@ -8,6 +8,7 @@ import 'server-only';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
+import { getAuthUrl } from '@/lib/config/runtime-config';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { PurchaseService } from '@/lib/services/purchase-service';
@@ -86,7 +87,8 @@ const createStripeSession = async (params: SessionParams): Promise<ActionResult>
       metadata: { type: 'release_purchase', releaseId, ...(userId ? { userId } : {}) },
     },
     metadata: { type: 'release_purchase', releaseId, ...(userId ? { userId } : {}) },
-    return_url: `${process.env.AUTH_URL ?? 'http://localhost:3000'}/collection`,
+    // AUTH_URL is required in production (boot check); localhost is the dev fallback.
+    return_url: `${getAuthUrl() ?? 'http://localhost:3000'}/collection`,
   });
 
   if (!session.client_secret) {
