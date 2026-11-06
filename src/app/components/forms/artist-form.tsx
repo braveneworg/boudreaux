@@ -325,11 +325,6 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
     }
   }, [artistId, initialArtistId, returnTo, router]);
 
-  const resetArtistForm = useCallback(
-    (values: ArtistFormData): void => artistForm.reset(values),
-    [artistForm]
-  );
-
   const createArtist = useCallback(
     (values: ArtistFormData): Promise<FormState> => createArtistAsync(values),
     [createArtistAsync]
@@ -373,7 +368,7 @@ export const ArtistForm = ({ artistId: initialArtistId, returnTo }: ArtistFormPr
 
   const submitArtist = useEntitySubmit<ArtistFormData, FormState>({
     entity: 'artist',
-    reset: resetArtistForm,
+    form: artistForm,
     create: createArtist,
     update: updateArtist,
     onSuccess: onArtistSubmitSuccess,

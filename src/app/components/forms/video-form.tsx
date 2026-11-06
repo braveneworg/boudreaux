@@ -45,7 +45,6 @@ import { VideoArtistReviewSection } from './videos/video-artist-review-section';
 import { VideoFileSection } from './videos/video-file-section';
 import { VideoFormFooter } from './videos/video-form-footer';
 import {
-  applyServerFieldErrors,
   applyServerProbePrefill,
   buildVideoDefaults,
   mapVideoToFormValues,
@@ -124,9 +123,9 @@ interface VideoSubmit {
 /**
  * The video form on the shared submit protocol. A persisted row (edit, or the
  * draft created at upload) updates; anything else creates under the
- * pre-generated id. A failure maps the server's field errors inline and toasts
- * its general message. Extracted to keep `VideoForm` within the ESLint size
- * caps.
+ * pre-generated id. A failure marks the server's field errors inline and
+ * toasts its general message (the protocol's default). Extracted to keep
+ * `VideoForm` within the size caps.
  */
 const useVideoSubmit = ({ form, preGeneratedId }: UseVideoSubmitArgs): VideoSubmit => {
   const router = useRouter();
@@ -152,21 +151,12 @@ const useVideoSubmit = ({ form, preGeneratedId }: UseVideoSubmitArgs): VideoSubm
     },
     [router, preGeneratedId]
   );
-  const onFailure = useCallback(
-    (result: FormState, _values: VideoFormData, mode: SubmitMode): void => {
-      applyServerFieldErrors(form.setError, result.errors);
-      toast.error(result.errors?.general?.[0] ?? `Failed to ${mode} the video.`);
-    },
-    [form]
-  );
-
   const submit = useEntitySubmit<VideoFormData, FormState>({
     entity: 'video',
-    reset: form.reset,
+    form,
     create,
     update,
     onSuccess,
-    onFailure,
   });
   return { submit, isSubmitting: isCreatingVideo || isUpdatingVideo };
 };

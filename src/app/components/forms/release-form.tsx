@@ -359,11 +359,6 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
     [images]
   );
 
-  const resetReleaseForm = useCallback(
-    (values: ReleaseFormData): void => releaseForm.reset(values),
-    [releaseForm]
-  );
-
   // A publishing save waits for the admin to decide each credited artist.
   const creditGate = useReleaseCreditGate({ isPublished });
   const { getDecisions } = creditGate;
@@ -437,7 +432,7 @@ export const ReleaseForm = ({ releaseId: initialReleaseId }: ReleaseFormProps) =
 
   const submitRelease = useEntitySubmit<ReleaseFormData, FormState>({
     entity: 'release',
-    reset: resetReleaseForm,
+    form: releaseForm,
     create: createRelease,
     update: updateRelease,
     onSuccess: onReleaseSubmitSuccess,
