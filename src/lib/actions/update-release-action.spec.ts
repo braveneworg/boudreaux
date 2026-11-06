@@ -715,7 +715,8 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
@@ -723,7 +724,7 @@ describe('updateReleaseAction', () => {
       expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
-    it('should handle title uniqueness error', async () => {
+    it('marks the title field for a DUPLICATE whatever the copy says', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -737,20 +738,21 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce({
         success: false,
-        error: 'Release title already exists',
-      } as never);
+        error: 'Some reworded copy',
+        code: 'DUPLICATE',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.title).toEqual([
-        'This title is already in use. Please choose a different one.',
-      ]);
+      expect(result.errors).toEqual({
+        title: ['This title is already in use. Please choose a different one.'],
+      });
     });
 
-    it('should handle title unique constraint error', async () => {
+    it('keeps a non-DUPLICATE failure off the title field even when its copy names the title', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -764,69 +766,15 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce({
         success: false,
-        error: 'Title must be unique',
-      } as never);
+        error: 'Release with this title already exists',
+        code: 'UNKNOWN',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
-      expect(result.success).toBe(false);
-      expect(result.errors?.title).toEqual([
-        'This title is already in use. Please choose a different one.',
-      ]);
-    });
-
-    it('should handle duplicate title error', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Duplicate Title',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
-        success: false,
-        error: 'Duplicate title found',
-      } as never);
-
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.title).toEqual([
-        'This title is already in use. Please choose a different one.',
-      ]);
-    });
-
-    it('should handle error with no message', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            title: 'Updated Album',
-            releasedOn: '2024-01-15',
-            coverArt: 'https://example.com/cover.jpg',
-            formats: ['DIGITAL'],
-          },
-        },
-      } as never);
-
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
-        success: false,
-        error: undefined,
-      } as never);
-
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Failed to update release']);
+      expect(result.errors).toEqual({ general: ['Failed to update release'] });
     });
 
     it('should preserve existing errors on failure', async () => {
@@ -846,7 +794,8 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
@@ -871,7 +820,8 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
@@ -880,7 +830,7 @@ describe('updateReleaseAction', () => {
       expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
-    it('should handle release not found error', async () => {
+    it('reports NOT_FOUND as a missing release whatever the copy says', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -894,15 +844,41 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce({
         success: false,
-        error: 'Release not found',
-      } as never);
+        error: 'Some reworded copy',
+        code: 'NOT_FOUND',
+      });
 
       const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Release not found']);
+      expect(result.errors).toEqual({ general: ['Release not found'] });
+    });
+
+    it('does not read "not found" in the copy of a failure with another code', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            title: 'Updated Album',
+            releasedOn: '2024-01-15',
+            coverArt: 'https://example.com/cover.jpg',
+            formats: ['DIGITAL'],
+          },
+        },
+      } as never);
+
+      vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce({
+        success: false,
+        error: 'Credit artist not found',
+        code: 'UNKNOWN',
+      });
+
+      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+
+      expect(result.errors).toEqual({ general: ['Failed to update release'] });
     });
   });
 
@@ -957,7 +933,8 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Update failed',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
@@ -1041,7 +1018,8 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
 
