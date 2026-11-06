@@ -28,16 +28,18 @@ import type {
   UpdatePlaylistInput,
 } from '@/lib/validation/playlist-schema';
 
+import { PlaylistActionError } from './playlist-action-error';
+
 /**
  * Unwrap a {@link PlaylistActionResult}: resolve with the success payload, or
- * throw the action's error message so the mutation rejects and callers handle
- * the failure via `onError`.
+ * throw a {@link PlaylistActionError} carrying the action's code and copy so
+ * the mutation rejects and callers handle the failure via `onError`.
  */
 const unwrapActionResult = async <T>(
   resultPromise: Promise<PlaylistActionResult<T>>
 ): Promise<T> => {
   const result = await resultPromise;
-  if (!result.success) throw new Error(result.error);
+  if (!result.success) throw new PlaylistActionError(result.code, result.error);
   return result.data;
 };
 
@@ -149,12 +151,12 @@ export const useDeletePlaylistMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link addPlaylistItemAction}. Unlike the other
- * playlist mutations this NEVER rejects on a `{ success: false }` result — it
- * resolves with the discriminated {@link PlaylistActionResult} untouched so
- * callers branch on `error: 'DUPLICATE_ITEM'` (and the other add signals)
- * without exception flow. Caches (`playlists.mine()` + `playlists.detail(id)`)
- * are invalidated only when the resolved result is a success.
+ * Mutation hook wrapping {@link addPlaylistItemAction}. Like its siblings, a
+ * failure result rejects with a {@link PlaylistActionError}; an already-present
+ * source rejects with code `DUPLICATE_ITEM`, which the add-to-playlist module
+ * (`useAddToPlaylist`) turns into a confirm and a `force: true` retry. On
+ * success the `playlists.mine()` listing and the playlist's
+ * `playlists.detail(id)` caches are invalidated.
  */
 export const useAddPlaylistItemMutation = () => {
   const queryClient = useQueryClient();
@@ -164,15 +166,12 @@ export const useAddPlaylistItemMutation = () => {
     isPending: isAddingPlaylistItem,
     isError: isAddPlaylistItemError,
     error: addPlaylistItemError,
-    data: addPlaylistItemResult,
+    data: addedPlaylistItem,
     reset: resetAddPlaylistItem,
-  } = useMutation<PlaylistActionResult<{ item: PlaylistItemPayload }>, Error, AddPlaylistItemInput>(
-    {
-      mutationFn: (input) => addPlaylistItemAction(input),
-      onSuccess: (result, { playlistId }) =>
-        result.success ? invalidateMineAndDetail(queryClient, playlistId) : undefined,
-    }
-  );
+  } = useMutation<{ item: PlaylistItemPayload }, Error, AddPlaylistItemInput>({
+    mutationFn: (input) => unwrapActionResult(addPlaylistItemAction(input)),
+    onSuccess: (_result, { playlistId }) => invalidateMineAndDetail(queryClient, playlistId),
+  });
 
   return {
     addPlaylistItem,
@@ -180,7 +179,7 @@ export const useAddPlaylistItemMutation = () => {
     isAddingPlaylistItem,
     isAddPlaylistItemError,
     addPlaylistItemError,
-    addPlaylistItemResult,
+    addedPlaylistItem,
     resetAddPlaylistItem,
   };
 };

@@ -10,9 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
-import { PlaylistService, SOURCE_NOT_FOUND_MESSAGE } from '@/lib/services/playlist-service';
-import { DataError } from '@/lib/types/domain/errors';
+import { PlaylistService } from '@/lib/services/playlist-service';
 import type {
   PlaylistActionResult,
   PlaylistItemPayload,
@@ -27,10 +25,11 @@ import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
 
 import { failureFromError, invalidInputFailure, PLAYLISTS_PATH } from './playlist-action-helpers';
 
-/** Signal for the 200-item cap (service `LIMIT_EXCEEDED`). */
-const PLAYLIST_FULL_ERROR = 'PLAYLIST_FULL';
-/** Signal for an add whose source track/video no longer resolves. */
-const SOURCE_NOT_FOUND_ERROR = 'SOURCE_NOT_FOUND';
+/**
+ * Copy for a `DUPLICATE_ITEM` answer. Callers branch on the code and ask the
+ * listener to confirm; the copy is only for a caller that shows it as is.
+ */
+const DUPLICATE_ITEM_MESSAGE = 'This is already in the playlist';
 
 /** Remove-input guard: both ids ObjectId-shaped. */
 const removePlaylistItemInputSchema = z.object({
@@ -45,28 +44,11 @@ const toSourceRef = (data: AddPlaylistItemInput): PlaylistItemSourceRef =>
     : { itemType: 'video', videoId: data.videoId };
 
 /**
- * Add-specific failure mapping ahead of the shared one: the item cap becomes
- * the `PLAYLIST_FULL` signal, and the source-resolution `NOT_FOUND` (matched
- * by the service's exported message — same code as the playlist `NOT_FOUND`)
- * becomes `SOURCE_NOT_FOUND`. Everything else defers to `failureFromError`,
- * so a missing/unowned playlist still surfaces as 'Playlist not found'.
- */
-const addItemFailure = (error: unknown): PlaylistActionResult<never> => {
-  if (error instanceof DataError) {
-    if (error.code === 'LIMIT_EXCEEDED') {
-      return { success: false, error: PLAYLIST_FULL_ERROR };
-    }
-    if (error.code === 'NOT_FOUND' && error.message === SOURCE_NOT_FOUND_MESSAGE) {
-      return { success: false, error: SOURCE_NOT_FOUND_ERROR };
-    }
-  }
-  return failureFromError(error, 'Failed to add playlist item');
-};
-
-/**
  * Add one track/video to an owned playlist. A duplicate source answers with
- * the exact `DUPLICATE_ITEM` error signal (no revalidation — nothing changed);
- * the caller confirms and retries with `force: true`.
+ * code `DUPLICATE_ITEM` (no revalidation — nothing changed); the caller
+ * confirms and retries with `force: true`. Every other failure keeps the
+ * service's code and copy: a full playlist is `LIMIT_EXCEEDED`, and a missing
+ * playlist or source is `NOT_FOUND`, each with its own service-authored copy.
  */
 export const addPlaylistItemAction = async (
   input: unknown
@@ -82,11 +64,13 @@ export const addPlaylistItemAction = async (
       ref: toSourceRef(parsed.data),
       force: parsed.data.force,
     });
-    if (result.duplicate) return { success: false, error: DUPLICATE_ITEM_ERROR };
+    if (result.duplicate) {
+      return { success: false, error: DUPLICATE_ITEM_MESSAGE, code: 'DUPLICATE_ITEM' };
+    }
     revalidatePath(PLAYLISTS_PATH);
     return { success: true, data: { item: result.item } };
   } catch (error) {
-    return addItemFailure(error);
+    return failureFromError(error, 'Failed to add playlist item');
   }
 };
 

@@ -27,7 +27,6 @@ vi.mock('@/lib/services/playlist-service', () => ({
     removeItem: vi.fn(),
     reorder: vi.fn(),
   },
-  SOURCE_NOT_FOUND_MESSAGE: 'Source track or video not found',
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -43,7 +42,6 @@ const VIDEO_ID = '507f1f77bcf86cd799439013';
 const ITEM_ID = '507f1f77bcf86cd799439014';
 const OTHER_ITEM_ID = '507f1f77bcf86cd799439015';
 const RELEASE_ID = '507f1f77bcf86cd799439016';
-const SOURCE_NOT_FOUND_MESSAGE = 'Source track or video not found';
 
 const addedItem: PlaylistItemPayload = {
   id: ITEM_ID,
@@ -179,7 +177,11 @@ describe('addPlaylistItemAction', () => {
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'DUPLICATE_ITEM' });
+    expect(result).toEqual({
+      success: false,
+      error: 'This is already in the playlist',
+      code: 'DUPLICATE_ITEM',
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -196,34 +198,46 @@ describe('addPlaylistItemAction', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/playlists');
   });
 
-  it('maps LIMIT_EXCEEDED to PLAYLIST_FULL', async () => {
+  it('answers a full playlist with LIMIT_EXCEEDED and the service copy', async () => {
     vi.mocked(PlaylistService.addItem).mockRejectedValue(
-      new DataError('LIMIT_EXCEEDED', 'Playlists are limited to 200 items')
+      new DataError('LIMIT_EXCEEDED', 'This playlist is full.')
     );
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'PLAYLIST_FULL' });
+    expect(result).toEqual({
+      success: false,
+      error: 'This playlist is full.',
+      code: 'LIMIT_EXCEEDED',
+    });
   });
 
-  it('maps an unresolvable source to SOURCE_NOT_FOUND', async () => {
+  it('answers a missing source or playlist with NOT_FOUND and the service copy', async () => {
     vi.mocked(PlaylistService.addItem).mockRejectedValue(
-      new DataError('NOT_FOUND', SOURCE_NOT_FOUND_MESSAGE)
+      new DataError('NOT_FOUND', 'This song or video is no longer available.')
     );
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'SOURCE_NOT_FOUND' });
+    expect(result).toEqual({
+      success: false,
+      error: 'This song or video is no longer available.',
+      code: 'NOT_FOUND',
+    });
   });
 
-  it('surfaces a missing playlist as its not-found message, not SOURCE_NOT_FOUND', async () => {
+  it('keeps the code of a data-layer failure while hiding its message', async () => {
     vi.mocked(PlaylistService.addItem).mockRejectedValue(
-      new DataError('NOT_FOUND', 'Playlist not found')
+      new DataError('UNAVAILABLE', 'raw driver text', new Error('socket'))
     );
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to add playlist item',
+      code: 'UNAVAILABLE',
+    });
   });
 
   it('collapses unexpected errors to a generic message without revalidating', async () => {
@@ -231,7 +245,11 @@ describe('addPlaylistItemAction', () => {
 
     const result = await addPlaylistItemAction(validAddInput);
 
-    expect(result).toEqual({ success: false, error: 'Failed to add playlist item' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to add playlist item',
+      code: 'UNKNOWN',
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
@@ -263,7 +281,11 @@ describe('removePlaylistItemAction', () => {
 
     const result = await removePlaylistItemAction(validRemoveInput);
 
-    expect(result).toEqual({ success: false, error: 'Playlist item not found' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Playlist item not found',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('masks a repo-mapped NOT_FOUND (cause set) behind the generic message', async () => {
@@ -273,7 +295,11 @@ describe('removePlaylistItemAction', () => {
 
     const result = await removePlaylistItemAction(validRemoveInput);
 
-    expect(result).toEqual({ success: false, error: 'Failed to remove playlist item' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to remove playlist item',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('collapses unexpected errors to a generic message', async () => {
@@ -281,7 +307,11 @@ describe('removePlaylistItemAction', () => {
 
     const result = await removePlaylistItemAction(validRemoveInput);
 
-    expect(result).toEqual({ success: false, error: 'Failed to remove playlist item' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to remove playlist item',
+      code: 'UNKNOWN',
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
@@ -325,6 +355,7 @@ describe('reorderPlaylistItemsAction', () => {
     expect(result).toEqual({
       success: false,
       error: 'orderedItemIds must contain every playlist item id exactly once',
+      code: 'INVALID_INPUT',
     });
   });
 
@@ -335,6 +366,6 @@ describe('reorderPlaylistItemsAction', () => {
 
     const result = await reorderPlaylistItemsAction(validReorderInput);
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({ success: false, error: 'Playlist not found', code: 'NOT_FOUND' });
   });
 });

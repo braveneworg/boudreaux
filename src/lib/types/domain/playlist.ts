@@ -10,6 +10,9 @@
  * in src/lib/validation/playlist-schema.ts and re-export under the same names.
  */
 
+import type { ActionGateCode } from '@/lib/auth/action-gate';
+import type { DataErrorCode } from '@/lib/types/domain/errors';
+
 /** Item type union — mirrors the `itemType` string column in PlaylistItem. */
 export type PlaylistItemType = 'track' | 'video';
 
@@ -177,13 +180,29 @@ export interface PlaylistSearchResponse {
 }
 
 /**
+ * Why a playlist Server Action failed — the stable fact callers branch on
+ * (ADR-0001). A `DataErrorCode` from the service, an `ActionGateCode` from
+ * the action gate, or one of the playlist actions' own:
+ * - `DUPLICATE_ITEM` — the source is already in the playlist; nothing was
+ *   added. Not a failure of the data layer but a question for the listener,
+ *   who may confirm and add it again with `force: true`.
+ * - `RATE_LIMITED` — too many cover-upload requests in the window.
+ */
+export type PlaylistActionCode = DataErrorCode | ActionGateCode | 'DUPLICATE_ITEM' | 'RATE_LIMITED';
+
+/**
  * Discriminated-union result type returned by every playlist Server Action.
- * Add-item uses its own `DUPLICATE_ITEM` error signal (callers branch on it
- * without exception flow).
+ * A failure carries its {@link PlaylistActionCode} to branch on and `error`,
+ * human copy safe to show as written — never branch on the copy.
  */
 export type PlaylistActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+  | {
+      success: false;
+      error: string;
+      code: PlaylistActionCode;
+      fieldErrors?: Record<string, string[]>;
+    };
 
 /**
  * Data returned per-file by `generatePlaylistCoverUploadUrlsAction`.

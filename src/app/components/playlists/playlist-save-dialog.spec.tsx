@@ -409,6 +409,7 @@ describe('PlaylistSaveDialog', () => {
       updateActionMock.mockResolvedValue({
         success: false,
         error: 'Failed to update playlist',
+        code: 'UNKNOWN',
       });
       const { props } = renderDialog({ initialValues: VALID_INITIAL_VALUES });
 
@@ -427,6 +428,7 @@ describe('PlaylistSaveDialog', () => {
       createActionMock.mockResolvedValue({
         success: false,
         error: 'Invalid input',
+        code: 'INVALID_INPUT',
         fieldErrors: { title: ['You already have a playlist with this title'] },
       });
       renderDialog({ initialValues: VALID_INITIAL_VALUES });
@@ -443,6 +445,7 @@ describe('PlaylistSaveDialog', () => {
       createActionMock.mockResolvedValue({
         success: false,
         error: 'Invalid input',
+        code: 'INVALID_INPUT',
         fieldErrors: { title: ['You already have a playlist with this title'] },
       });
       const { props } = renderDialog({ initialValues: VALID_INITIAL_VALUES });
@@ -460,6 +463,7 @@ describe('PlaylistSaveDialog', () => {
       createActionMock.mockResolvedValue({
         success: false,
         error: 'Failed to create playlist',
+        code: 'UNKNOWN',
       });
       const { props } = renderDialog({ initialValues: VALID_INITIAL_VALUES });
 
@@ -475,6 +479,7 @@ describe('PlaylistSaveDialog', () => {
       createActionMock.mockResolvedValue({
         success: false,
         error: 'Invalid input',
+        code: 'INVALID_INPUT',
         fieldErrors: {},
       });
       renderDialog({ initialValues: VALID_INITIAL_VALUES });
@@ -553,6 +558,7 @@ describe('PlaylistSaveDialog', () => {
       updateActionMock.mockResolvedValue({
         success: false,
         error: 'Invalid input',
+        code: 'INVALID_INPUT',
         fieldErrors: { title: ['You already have a playlist with this title'] },
       });
       renderDialog(editProps);
@@ -673,7 +679,7 @@ describe('PlaylistSaveDialog', () => {
       await clickSave(user);
       await screen.findByRole('button', { name: 'Saving…' });
 
-      deferred.resolve({ success: false, error: 'Failed to create playlist' });
+      deferred.resolve({ success: false, error: 'Failed to create playlist', code: 'UNKNOWN' });
       await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 
       // The dialog's close gate is a mirror of the form's saving state, pushed
