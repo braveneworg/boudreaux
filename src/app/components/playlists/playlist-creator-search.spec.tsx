@@ -19,6 +19,8 @@ import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
 
 import { PlaylistCreatorSearch, type PlaylistCreatorSearchHandle } from './playlist-creator-search';
 
+const FULL_COPY = 'This playlist is full — playlists hold up to 200 items.';
+
 const searchQueryMock = vi.hoisted(() => vi.fn());
 const playlistsQueryMock = vi.hoisted(() => vi.fn());
 const addPlaylistItemAsyncMock = vi.hoisted(() =>
@@ -371,14 +373,18 @@ describe('PlaylistCreatorSearch', () => {
 
     it('toasts the error and keeps the picker open on a non-duplicate failure', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValue({ success: false, error: 'UNAUTHORIZED' });
+      addPlaylistItemAsyncMock.mockResolvedValue({
+        success: false,
+        error: 'Unauthorized',
+        code: 'UNAUTHENTICATED',
+      });
       renderSearch();
 
       await typeQuery(user);
       await openPickerFor(user, songRow());
       await user.click(screen.getByRole('option', { name: 'Road Trip' }));
 
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('UNAUTHORIZED'));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Unauthorized'));
       expect(findPicker()).toBeInTheDocument();
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
@@ -387,7 +393,11 @@ describe('PlaylistCreatorSearch', () => {
   describe('duplicate flow', () => {
     it('opens the duplicate confirm dialog naming the item on DUPLICATE_ITEM', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' });
+      addPlaylistItemAsyncMock.mockResolvedValueOnce({
+        success: false,
+        error: 'This is already in the playlist',
+        code: 'DUPLICATE_ITEM',
+      });
       renderSearch();
 
       await typeQuery(user);
@@ -401,7 +411,11 @@ describe('PlaylistCreatorSearch', () => {
     it('re-calls the mutation with force on confirm and toasts success', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' })
+        .mockResolvedValueOnce({
+          success: false,
+          error: 'This is already in the playlist',
+          code: 'DUPLICATE_ITEM',
+        })
         .mockResolvedValueOnce(SUCCESS_RESULT);
       renderSearch();
 
@@ -424,7 +438,11 @@ describe('PlaylistCreatorSearch', () => {
     it('closes the picker after a successful forced add', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' })
+        .mockResolvedValueOnce({
+          success: false,
+          error: 'This is already in the playlist',
+          code: 'DUPLICATE_ITEM',
+        })
         .mockResolvedValueOnce(SUCCESS_RESULT);
       renderSearch();
 
@@ -439,8 +457,12 @@ describe('PlaylistCreatorSearch', () => {
     it('toasts the error when the forced add still fails', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' })
-        .mockResolvedValueOnce({ success: false, error: 'PLAYLIST_FULL' });
+        .mockResolvedValueOnce({
+          success: false,
+          error: 'This is already in the playlist',
+          code: 'DUPLICATE_ITEM',
+        })
+        .mockResolvedValueOnce({ success: false, error: FULL_COPY, code: 'LIMIT_EXCEEDED' });
       renderSearch();
 
       await typeQuery(user);
@@ -448,12 +470,16 @@ describe('PlaylistCreatorSearch', () => {
       await user.click(screen.getByRole('option', { name: 'Road Trip' }));
       await user.click(await screen.findByRole('button', { name: 'Add again' }));
 
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('PLAYLIST_FULL'));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(FULL_COPY));
     });
 
     it('does not re-call the mutation when the dialog is cancelled', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' });
+      addPlaylistItemAsyncMock.mockResolvedValueOnce({
+        success: false,
+        error: 'This is already in the playlist',
+        code: 'DUPLICATE_ITEM',
+      });
       renderSearch();
 
       await typeQuery(user);

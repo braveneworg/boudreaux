@@ -8,7 +8,6 @@ import { useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
@@ -66,7 +65,7 @@ export const useAddToOtherPlaylist = (): UseAddToOtherPlaylistResult => {
         setDuplicateTarget(null);
         return;
       }
-      if (!force && result.error === DUPLICATE_ITEM_ERROR) {
+      if (!force && result.code === 'DUPLICATE_ITEM') {
         setDuplicateTarget({ item, playlist });
         return;
       }

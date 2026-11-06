@@ -61,6 +61,8 @@ interface SaveFormStubProps {
   id?: string;
 }
 
+const FULL_COPY = 'This playlist is full — playlists hold up to 200 items.';
+
 const playlistQueryMock = vi.hoisted(() => vi.fn());
 const addPlaylistItemAsyncMock = vi.hoisted(() =>
   vi.fn<
@@ -489,7 +491,11 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' });
+      addPlaylistItemAsyncMock.mockResolvedValueOnce({
+        success: false,
+        error: 'This is already in the playlist',
+        code: 'DUPLICATE_ITEM',
+      });
       addSong(SONG);
 
       const dialog = await screen.findByRole('alertdialog');
@@ -501,7 +507,11 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({ success: false, error: 'DUPLICATE_ITEM' });
+      addPlaylistItemAsyncMock.mockResolvedValueOnce({
+        success: false,
+        error: 'This is already in the playlist',
+        code: 'DUPLICATE_ITEM',
+      });
       addSong(SONG);
       await user.click(await screen.findByRole('button', { name: 'Add again' }));
 
@@ -519,10 +529,14 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({ success: false, error: 'PLAYLIST_FULL' });
+      addPlaylistItemAsyncMock.mockResolvedValueOnce({
+        success: false,
+        error: FULL_COPY,
+        code: 'LIMIT_EXCEEDED',
+      });
       addSong(SONG);
 
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('PLAYLIST_FULL'));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(FULL_COPY));
     });
 
     it('toasts a generic error when the add mutation rejects', async () => {

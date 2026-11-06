@@ -3,8 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Playlist feature constants — limits, page sizes, search tunables, and
- * shared action error signals.
+ * Playlist feature constants — limits, page sizes and search tunables.
  * Feature: 011-playlists
  */
 
@@ -25,9 +24,3 @@ export const PLAYLIST_SEARCH_MIN_QUERY_LENGTH = 2 as const;
 
 /** Default page size for the My Playlists list API. */
 export const PLAYLISTS_PAGE_SIZE = 24 as const;
-
-/**
- * Exact error signal `addPlaylistItemAction` returns for an already-present
- * source; clients switch on it to open the duplicate-confirm dialog.
- */
-export const DUPLICATE_ITEM_ERROR = 'DUPLICATE_ITEM' as const;

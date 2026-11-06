@@ -8,7 +8,6 @@ import { useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
 import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
@@ -66,7 +65,7 @@ export const useCreatorAddFlow = ({
     try {
       const result = await addPlaylistItemAsync(buildAddPlaylistItemInput(item, playlistId, force));
       if (result.success) return;
-      if (!force && result.error === DUPLICATE_ITEM_ERROR) {
+      if (!force && result.code === 'DUPLICATE_ITEM') {
         setPendingDuplicate({ kind: 'server', title: item.title, item });
         return;
       }

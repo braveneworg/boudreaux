@@ -138,6 +138,7 @@ describe('useCreatePlaylistMutation', () => {
     vi.mocked(createPlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to create playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<PlaylistDetailResponse, CreatePlaylistInput>(useCreatePlaylistMutation);
 
@@ -180,6 +181,7 @@ describe('useUpdatePlaylistMutation', () => {
     vi.mocked(updatePlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to update playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<PlaylistDetailResponse, UpdatePlaylistInput>(useUpdatePlaylistMutation);
 
@@ -214,6 +216,7 @@ describe('useDeletePlaylistMutation', () => {
     vi.mocked(deletePlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to delete playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ deleted: true }, { playlistId: string }>(useDeletePlaylistMutation);
 
@@ -258,7 +261,8 @@ describe('useAddPlaylistItemMutation', () => {
   it('resolves with a failure result untouched instead of throwing', async () => {
     const duplicateResult: PlaylistActionResult<{ item: PlaylistItemPayload }> = {
       success: false,
-      error: 'DUPLICATE_ITEM',
+      error: 'This is already in the playlist',
+      code: 'DUPLICATE_ITEM',
     };
     vi.mocked(addPlaylistItemAction).mockResolvedValue(duplicateResult);
     const opts = getOptions<
@@ -275,7 +279,10 @@ describe('useAddPlaylistItemMutation', () => {
       AddPlaylistItemInput
     >(useAddPlaylistItemMutation);
 
-    await opts.onSuccess({ success: false, error: 'DUPLICATE_ITEM' }, addInput);
+    await opts.onSuccess(
+      { success: false, error: 'This is already in the playlist', code: 'DUPLICATE_ITEM' },
+      addInput
+    );
 
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
@@ -316,6 +323,7 @@ describe('useRemovePlaylistItemMutation', () => {
     vi.mocked(removePlaylistItemAction).mockResolvedValue({
       success: false,
       error: 'Failed to remove playlist item',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ removed: true }, { playlistId: string; itemId: string }>(
       useRemovePlaylistItemMutation
@@ -362,6 +370,7 @@ describe('useReorderPlaylistItemsMutation', () => {
     vi.mocked(reorderPlaylistItemsAction).mockResolvedValue({
       success: false,
       error: 'Failed to reorder playlist items',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ reordered: true }, ReorderPlaylistItemsInput>(
       useReorderPlaylistItemsMutation

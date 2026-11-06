@@ -74,7 +74,11 @@ describe('useAddToPlaylistFlow', () => {
   });
 
   it('opens the duplicate dialog without an error toast on DUPLICATE_ITEM', async () => {
-    addPlaylistItemAsyncMock.mockResolvedValue({ success: false, error: 'DUPLICATE_ITEM' });
+    addPlaylistItemAsyncMock.mockResolvedValue({
+      success: false,
+      error: 'This is already in the playlist',
+      code: 'DUPLICATE_ITEM',
+    });
     const { result } = renderHook(() => useAddToPlaylistFlow({ item: ITEM }));
 
     await act(async () => result.current.pickPlaylist(PLAYLIST_ROW));
@@ -84,7 +88,11 @@ describe('useAddToPlaylistFlow', () => {
   });
 
   it('confirmDuplicate re-runs the add with force:true', async () => {
-    addPlaylistItemAsyncMock.mockResolvedValue({ success: false, error: 'DUPLICATE_ITEM' });
+    addPlaylistItemAsyncMock.mockResolvedValue({
+      success: false,
+      error: 'This is already in the playlist',
+      code: 'DUPLICATE_ITEM',
+    });
     const { result } = renderHook(() => useAddToPlaylistFlow({ item: ITEM }));
     await act(async () => result.current.pickPlaylist(PLAYLIST_ROW));
 
@@ -97,7 +105,11 @@ describe('useAddToPlaylistFlow', () => {
   });
 
   it('toasts the action error on any other failure', async () => {
-    addPlaylistItemAsyncMock.mockResolvedValue({ success: false, error: 'Playlist not found' });
+    addPlaylistItemAsyncMock.mockResolvedValue({
+      success: false,
+      error: 'Playlist not found',
+      code: 'NOT_FOUND',
+    });
     const { result } = renderHook(() => useAddToPlaylistFlow({ item: ITEM }));
 
     await act(async () => result.current.pickPlaylist(PLAYLIST_ROW));
