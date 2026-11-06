@@ -9,7 +9,6 @@ import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import type {
-  PlaylistActionResult,
   PlaylistItemPayload,
   PlaylistListRow,
   PlaylistSearchItem,
@@ -17,6 +16,7 @@ import type {
 } from '@/lib/types/domain/playlist';
 import type { AddPlaylistItemInput } from '@/lib/validation/playlist-schema';
 
+import { PlaylistActionError } from './_hooks/mutations/playlist-action-error';
 import { PlaylistCreatorSearch, type PlaylistCreatorSearchHandle } from './playlist-creator-search';
 
 const FULL_COPY = 'This playlist is full — playlists hold up to 200 items.';
@@ -24,9 +24,7 @@ const FULL_COPY = 'This playlist is full — playlists hold up to 200 items.';
 const searchQueryMock = vi.hoisted(() => vi.fn());
 const playlistsQueryMock = vi.hoisted(() => vi.fn());
 const addPlaylistItemAsyncMock = vi.hoisted(() =>
-  vi.fn<
-    (input: AddPlaylistItemInput) => Promise<PlaylistActionResult<{ item: PlaylistItemPayload }>>
-  >()
+  vi.fn<(input: AddPlaylistItemInput) => Promise<{ item: PlaylistItemPayload }>>()
 );
 
 vi.mock('./_hooks/use-playlist-media-search-query', () => ({
@@ -40,7 +38,6 @@ vi.mock('./_hooks/use-playlists-query', () => ({
 vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
-    isAddingPlaylistItem: false,
   }),
 }));
 
@@ -115,10 +112,7 @@ const ADDED_ITEM: PlaylistItemPayload = {
   posterUrl: null,
 };
 
-const SUCCESS_RESULT: PlaylistActionResult<{ item: PlaylistItemPayload }> = {
-  success: true,
-  data: { item: ADDED_ITEM },
-};
+const SUCCESS_RESULT: { item: PlaylistItemPayload } = { item: ADDED_ITEM };
 
 const mockSearchReturn = ({
   isPending = false,
@@ -373,11 +367,9 @@ describe('PlaylistCreatorSearch', () => {
 
     it('toasts the error and keeps the picker open on a non-duplicate failure', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValue({
-        success: false,
-        error: 'Unauthorized',
-        code: 'UNAUTHENTICATED',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValue(
+        new PlaylistActionError('UNAUTHENTICATED', 'Unauthorized')
+      );
       renderSearch();
 
       await typeQuery(user);
@@ -393,11 +385,9 @@ describe('PlaylistCreatorSearch', () => {
   describe('duplicate flow', () => {
     it('opens the duplicate confirm dialog naming the item on DUPLICATE_ITEM', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({
-        success: false,
-        error: 'This is already in the playlist',
-        code: 'DUPLICATE_ITEM',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValueOnce(
+        new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+      );
       renderSearch();
 
       await typeQuery(user);
@@ -411,11 +401,9 @@ describe('PlaylistCreatorSearch', () => {
     it('re-calls the mutation with force on confirm and toasts success', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({
-          success: false,
-          error: 'This is already in the playlist',
-          code: 'DUPLICATE_ITEM',
-        })
+        .mockRejectedValueOnce(
+          new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+        )
         .mockResolvedValueOnce(SUCCESS_RESULT);
       renderSearch();
 
@@ -438,11 +426,9 @@ describe('PlaylistCreatorSearch', () => {
     it('closes the picker after a successful forced add', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({
-          success: false,
-          error: 'This is already in the playlist',
-          code: 'DUPLICATE_ITEM',
-        })
+        .mockRejectedValueOnce(
+          new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+        )
         .mockResolvedValueOnce(SUCCESS_RESULT);
       renderSearch();
 
@@ -457,12 +443,10 @@ describe('PlaylistCreatorSearch', () => {
     it('toasts the error when the forced add still fails', async () => {
       const user = userEvent.setup();
       addPlaylistItemAsyncMock
-        .mockResolvedValueOnce({
-          success: false,
-          error: 'This is already in the playlist',
-          code: 'DUPLICATE_ITEM',
-        })
-        .mockResolvedValueOnce({ success: false, error: FULL_COPY, code: 'LIMIT_EXCEEDED' });
+        .mockRejectedValueOnce(
+          new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+        )
+        .mockRejectedValueOnce(new PlaylistActionError('LIMIT_EXCEEDED', FULL_COPY));
       renderSearch();
 
       await typeQuery(user);
@@ -475,11 +459,9 @@ describe('PlaylistCreatorSearch', () => {
 
     it('does not re-call the mutation when the dialog is cancelled', async () => {
       const user = userEvent.setup();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({
-        success: false,
-        error: 'This is already in the playlist',
-        code: 'DUPLICATE_ITEM',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValueOnce(
+        new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+      );
       renderSearch();
 
       await typeQuery(user);

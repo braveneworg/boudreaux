@@ -9,20 +9,13 @@ import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/pla
 
 import { useAddToOtherPlaylist } from './use-add-to-other-playlist';
 
-const addPlaylistItemAsyncMock = vi.hoisted(() => vi.fn());
-const isAddingPlaylistItemMock = vi.hoisted(() => ({ value: false }));
+import type { AddToPlaylistTarget, UseAddToPlaylistArgs } from './use-add-to-playlist';
 
-vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
-  useAddPlaylistItemMutation: () => ({
-    addPlaylistItemAsync: addPlaylistItemAsyncMock,
-    get isAddingPlaylistItem() {
-      return isAddingPlaylistItemMock.value;
-    },
-  }),
-}));
+const addMock = vi.hoisted(() => vi.fn());
+const useAddToPlaylistMock = vi.hoisted(() => vi.fn());
 
-vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+vi.mock('./use-add-to-playlist', () => ({
+  useAddToPlaylist: useAddToPlaylistMock,
 }));
 
 const ITEM_A: PlaylistSearchItem = {
@@ -55,32 +48,81 @@ const PLAYLIST_ROW: PlaylistListRow = {
   updatedAt: '2026-07-01T00:00:00.000Z',
 };
 
+/** Report a successful add the way `useAddToPlaylist` does, through `onAdded`. */
+const reportAdded = (target: AddToPlaylistTarget): void => {
+  const [args] = useAddToPlaylistMock.mock.calls.at(-1) as [UseAddToPlaylistArgs];
+  args.onAdded?.(target);
+};
+
 beforeEach(() => {
-  isAddingPlaylistItemMock.value = false;
-  addPlaylistItemAsyncMock.mockResolvedValue({ success: true, data: {} });
+  useAddToPlaylistMock.mockReturnValue({
+    add: addMock,
+    duplicateItemTitle: null,
+    confirmDuplicate: vi.fn(),
+    dismissDuplicate: vi.fn(),
+  });
 });
 
 describe('useAddToOtherPlaylist', () => {
-  it('ignores pickPlaylist while an add is in flight', () => {
-    isAddingPlaylistItemMock.value = true;
+  it('starts with every picker closed', () => {
+    const { result } = renderHook(() => useAddToOtherPlaylist());
+
+    expect(result.current.openPickerKey).toBeNull();
+  });
+
+  it('opens one row picker at a time', () => {
+    const { result } = renderHook(() => useAddToOtherPlaylist());
+
+    act(() => result.current.togglePicker(ITEM_A));
+    act(() => result.current.togglePicker(ITEM_B));
+
+    expect(result.current.openPickerKey).toBe(ITEM_B.key);
+  });
+
+  it('closes the open picker when its row is toggled again', () => {
+    const { result } = renderHook(() => useAddToOtherPlaylist());
+
+    act(() => result.current.togglePicker(ITEM_A));
+    act(() => result.current.togglePicker(ITEM_A));
+
+    expect(result.current.openPickerKey).toBeNull();
+  });
+
+  it("adds the open row's item to the picked playlist, naming it", () => {
     const { result } = renderHook(() => useAddToOtherPlaylist());
     act(() => result.current.togglePicker(ITEM_A));
 
     act(() => result.current.pickPlaylist(PLAYLIST_ROW));
 
-    expect(addPlaylistItemAsyncMock).not.toHaveBeenCalled();
-    isAddingPlaylistItemMock.value = false;
+    expect(addMock.mock.calls).toEqual([
+      [{ item: ITEM_A, playlistId: 'pl-1', playlistTitle: 'Road Trip' }],
+    ]);
   });
 
-  it('keeps a newly opened picker open when a stale add for another row succeeds', async () => {
-    let resolveAdd: (r: { success: true; data: unknown }) => void = () => undefined;
-    addPlaylistItemAsyncMock.mockReturnValue(new Promise((resolve) => (resolveAdd = resolve)));
+  it('ignores a pick with no picker open', () => {
+    const { result } = renderHook(() => useAddToOtherPlaylist());
+
+    act(() => result.current.pickPlaylist(PLAYLIST_ROW));
+
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('closes the picker its add started from once the add succeeds', () => {
+    const { result } = renderHook(() => useAddToOtherPlaylist());
+    act(() => result.current.togglePicker(ITEM_A));
+
+    act(() => reportAdded({ item: ITEM_A, playlistId: 'pl-1', playlistTitle: 'Road Trip' }));
+
+    expect(result.current.openPickerKey).toBeNull();
+  });
+
+  it('keeps a newly opened picker open when a stale add for another row succeeds', () => {
     const { result } = renderHook(() => useAddToOtherPlaylist());
     act(() => result.current.togglePicker(ITEM_A));
     act(() => result.current.pickPlaylist(PLAYLIST_ROW)); // add for row A in flight
     act(() => result.current.togglePicker(ITEM_B)); // user opens row B meanwhile
 
-    await act(async () => resolveAdd({ success: true, data: {} }));
+    act(() => reportAdded({ item: ITEM_A, playlistId: 'pl-1', playlistTitle: 'Road Trip' }));
 
     expect(result.current.openPickerKey).toBe(ITEM_B.key); // NOT nulled by row A's success
   });

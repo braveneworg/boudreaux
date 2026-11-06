@@ -9,7 +9,6 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import type {
-  PlaylistActionResult,
   PlaylistDetailResponse,
   PlaylistItemPayload,
   PlaylistItemSourceRef,
@@ -20,6 +19,7 @@ import type {
   ReorderPlaylistItemsInput,
 } from '@/lib/validation/playlist-schema';
 
+import { PlaylistActionError } from './_hooks/mutations/playlist-action-error';
 import { PlaylistCreator, type PlaylistCreatorHandle } from './playlist-creator';
 
 import type { PlaylistCreatorItemData } from './playlist-creator-item';
@@ -65,9 +65,7 @@ const FULL_COPY = 'This playlist is full — playlists hold up to 200 items.';
 
 const playlistQueryMock = vi.hoisted(() => vi.fn());
 const addPlaylistItemAsyncMock = vi.hoisted(() =>
-  vi.fn<
-    (input: AddPlaylistItemInput) => Promise<PlaylistActionResult<{ item: PlaylistItemPayload }>>
-  >()
+  vi.fn<(input: AddPlaylistItemInput) => Promise<{ item: PlaylistItemPayload }>>()
 );
 const removePlaylistItemMock = vi.hoisted(() =>
   vi.fn<
@@ -151,7 +149,6 @@ vi.mock('./_hooks/use-playlist-query', () => ({
 vi.mock('./_hooks/mutations/use-playlist-mutations', () => ({
   useAddPlaylistItemMutation: () => ({
     addPlaylistItemAsync: addPlaylistItemAsyncMock,
-    isAddingPlaylistItem: false,
   }),
   useRemovePlaylistItemMutation: () => ({
     removePlaylistItem: removePlaylistItemMock,
@@ -292,10 +289,7 @@ beforeEach(() => {
   removePlaylistItemMock.mockReset();
   reorderPlaylistItemsMock.mockReset();
   playlistQueryMock.mockReturnValue(queryReturn({ isPending: true }));
-  addPlaylistItemAsyncMock.mockResolvedValue({
-    success: true,
-    data: { item: detailItem({}) },
-  });
+  addPlaylistItemAsyncMock.mockResolvedValue({ item: detailItem({}) });
 });
 
 describe('PlaylistCreator', () => {
@@ -491,11 +485,9 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({
-        success: false,
-        error: 'This is already in the playlist',
-        code: 'DUPLICATE_ITEM',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValueOnce(
+        new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+      );
       addSong(SONG);
 
       const dialog = await screen.findByRole('alertdialog');
@@ -507,11 +499,9 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({
-        success: false,
-        error: 'This is already in the playlist',
-        code: 'DUPLICATE_ITEM',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValueOnce(
+        new PlaylistActionError('DUPLICATE_ITEM', 'This is already in the playlist')
+      );
       addSong(SONG);
       await user.click(await screen.findByRole('button', { name: 'Add again' }));
 
@@ -529,11 +519,9 @@ describe('PlaylistCreator', () => {
       renderCreator();
 
       goToSaved();
-      addPlaylistItemAsyncMock.mockResolvedValueOnce({
-        success: false,
-        error: FULL_COPY,
-        code: 'LIMIT_EXCEEDED',
-      });
+      addPlaylistItemAsyncMock.mockRejectedValueOnce(
+        new PlaylistActionError('LIMIT_EXCEEDED', FULL_COPY)
+      );
       addSong(SONG);
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(FULL_COPY));

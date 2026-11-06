@@ -7,11 +7,11 @@
 import { ListPlus } from 'lucide-react';
 
 import { Button } from '@/app/components/ui/button';
-import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
+import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/playlist';
 
 import { PlaylistDuplicateConfirmDialog } from './playlist-duplicate-confirm-dialog';
 import { PlaylistPickerCombobox } from './playlist-picker-combobox';
-import { useAddToPlaylistFlow } from './use-add-to-playlist-flow';
+import { useAddToPlaylist } from './use-add-to-playlist';
 
 interface AddToPlaylistPanelProps {
   /** The single fixed item every add in this panel targets. */
@@ -24,16 +24,20 @@ interface AddToPlaylistPanelProps {
 
 /**
  * Body of the "add to playlist" kebab popover: a picker that adds the fixed
- * `item` to whichever playlist the user selects (via {@link useAddToPlaylistFlow},
- * including its duplicate-confirm dialog), plus a "Create playlist" shortcut the
- * parent wires to close this popover and open the create dialog.
+ * `item` to whichever playlist the user selects (via {@link useAddToPlaylist},
+ * including its duplicate-confirm dialog and toasts), plus a "Create playlist"
+ * shortcut the parent wires to close this popover and open the create dialog.
  */
 export const AddToPlaylistPanel = ({
   item,
   onCreatePlaylist,
   onAdded,
 }: AddToPlaylistPanelProps) => {
-  const flow = useAddToPlaylistFlow({ item, onAdded });
+  const { add, duplicateItemTitle, confirmDuplicate, dismissDuplicate } = useAddToPlaylist({
+    onAdded: () => onAdded?.(),
+  });
+  const pickPlaylist = ({ id, title }: PlaylistListRow): void =>
+    add({ item, playlistId: id, playlistTitle: title });
 
   return (
     // This panel renders inside a portaled popover, outside the page's
@@ -44,18 +48,18 @@ export const AddToPlaylistPanel = ({
       {/* focusOnMount: this panel is lazy-loaded into an already-open popover,
           so Radix FocusScope's mount-time autofocus already ran (against the
           loading fallback) — the picker must take focus itself when it lands. */}
-      <PlaylistPickerCombobox onPick={flow.pickPlaylist} focusOnMount />
+      <PlaylistPickerCombobox onPick={pickPlaylist} focusOnMount />
       <Button variant="outline" className="w-full" onClick={onCreatePlaylist}>
         <ListPlus aria-hidden="true" />
         Create playlist
       </Button>
       <PlaylistDuplicateConfirmDialog
-        open={flow.duplicateItemTitle !== null}
+        open={duplicateItemTitle !== null}
         onOpenChange={(o) => {
-          if (!o) flow.dismissDuplicate();
+          if (!o) dismissDuplicate();
         }}
-        itemTitle={flow.duplicateItemTitle ?? ''}
-        onConfirm={flow.confirmDuplicate}
+        itemTitle={duplicateItemTitle ?? ''}
+        onConfirm={confirmDuplicate}
       />
     </div>
   );
