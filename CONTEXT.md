@@ -494,6 +494,30 @@ video without either side knowing the other exists. Distinct from **player
 preferences** (volume and mute), which are shared by every player but are
 settings, not playback state.
 
+**Playlist** — a signed-in listener's own ordered list of songs (MP3 tracks
+of Releases) and Videos, private or public. Holds at most
+`MAX_PLAYLIST_ITEMS` (200) **playlist items**; an add past that is refused
+with `LIMIT_EXCEEDED`.
+
+**playlist item** — one song or Video in a Playlist: a snapshot of its title,
+artist and duration, plus a reference to its live source. A source that goes
+away later (deleted, unpublished, archived) leaves the item listed but
+unavailable; adding a source that is already gone is refused with
+`NOT_FOUND`.
+
+**duplicate item** — an add whose source is already in the Playlist. Not a
+failure but a question: the add answers code `DUPLICATE_ITEM` and adds
+nothing, the listener is asked, and confirming adds it again with
+`force: true`.
+
+**add to playlist** — the one client module every add of a song or Video to a
+saved Playlist goes through (`useAddToPlaylist`): the add, the **duplicate
+item** question and its forced retry, and the toasts. It branches only on the
+failure's code (`PlaylistActionCode`) and shows the action's **error copy**
+as written. A playlist Server Action's failure carries both
+(`PlaylistActionResult`), the same split ADR-0001 gives `ServiceResponse`.
+_Defined in_ `src/app/components/playlists/use-add-to-playlist.ts`.
+
 ## Shipping vocabulary
 
 **version** — one shipped build of the software, named by its `vX.Y.Z` tag.
