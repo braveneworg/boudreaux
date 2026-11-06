@@ -7,6 +7,7 @@ import 'server-only';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+import { resolveS3BucketName } from '@/lib/config/runtime-config';
 import { PRESIGNED_URL_EXPIRATION } from '@/lib/constants/digital-formats';
 import { generateCloudFrontSignedUrl } from '@/lib/utils/cloudfront-signed-url';
 import { buildContentDisposition } from '@/lib/utils/content-disposition';
@@ -38,12 +39,13 @@ export const getS3Client = (): S3Client => {
 };
 
 /**
- * Get S3 bucket name from environment variables
+ * Get the media bucket name, resolved as every S3 path resolves it
+ * (`resolveS3BucketName`: AWS_S3_BUCKET_NAME, then the legacy S3_BUCKET).
  *
- * @throws {Error} If S3_BUCKET or AWS_S3_BUCKET_NAME not configured
+ * @throws {Error} If neither is configured
  */
 export const getS3BucketName = (): string => {
-  const bucketName = process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET;
+  const bucketName = resolveS3BucketName();
 
   if (!bucketName) {
     throw new Error(

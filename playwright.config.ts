@@ -97,6 +97,23 @@ export default defineConfig({
       CLOUDFRONT_KEY_PAIR_ID: '',
       CLOUDFRONT_PRIVATE_KEY_BASE64: '',
       CLOUDFRONT_DISTRIBUTION_ID: '',
+      // The sign-in and profile pages render a button only for a provider
+      // the server registered (enabledSocialProviders), so the E2E server
+      // registers all four with dummy, non-secret credentials. No spec
+      // completes an OAuth round trip; they assert the client initiates one.
+      // Apple's key material is blanked so the static secret is used and a
+      // local `.env*` key is never read.
+      GOOGLE_CLIENT_ID: 'e2e-google-client-id',
+      GOOGLE_CLIENT_SECRET: 'e2e-google-client-secret-not-a-secret',
+      FACEBOOK_CLIENT_ID: 'e2e-facebook-client-id',
+      FACEBOOK_CLIENT_SECRET: 'e2e-facebook-client-secret-not-a-secret',
+      TWITTER_CLIENT_ID: 'e2e-twitter-client-id',
+      TWITTER_CLIENT_SECRET: 'e2e-twitter-client-secret-not-a-secret',
+      APPLE_CLIENT_ID: 'e2e.apple.client',
+      APPLE_CLIENT_SECRET: 'e2e-apple-client-secret-not-a-secret',
+      APPLE_TEAM_ID: '',
+      APPLE_KEY_ID: '',
+      APPLE_PRIVATE_KEY_BASE64: '',
       // The carousel rotation speed is NOT env-driven — it comes from the
       // SiteSettings row seeded in e2e/helpers/seed-test-db.ts (pinned to
       // the 3s service minimum for fast, non-flaky rotation tests).

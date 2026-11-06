@@ -15,6 +15,8 @@
 
 import { generateKeyPairSync } from 'crypto';
 
+import { enabledSocialProviders } from '@/lib/config/runtime-config';
+import { SOCIAL_PROVIDER_IDS } from '@/lib/config/social-providers';
 import { loggers } from '@/lib/utils/logger';
 
 import {
@@ -222,6 +224,54 @@ describe('buildSocialProvidersConfig', () => {
 
     const config = buildSocialProvidersConfig();
     expect(config.apple).toMatchObject({ appBundleIdentifier: 'com.example.boudreaux' });
+  });
+});
+
+describe('buildSocialProvidersConfig agrees with enabledSocialProviders', () => {
+  const PROVIDER_NAMES = [
+    ...Object.keys(ALL_VARS),
+    'APPLE_TEAM_ID',
+    'APPLE_KEY_ID',
+    'APPLE_PRIVATE_KEY_BASE64',
+  ];
+
+  beforeEach(() => {
+    for (const name of PROVIDER_NAMES) {
+      vi.stubEnv(name, '');
+    }
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** The registered provider ids, in button order, for comparison. */
+  const registered = (): string[] =>
+    SOCIAL_PROVIDER_IDS.filter((id) => id in buildSocialProvidersConfig());
+
+  it('registers every enabled provider when all are configured', () => {
+    for (const [key, value] of Object.entries(ALL_VARS)) {
+      vi.stubEnv(key, value);
+    }
+
+    expect(registered()).toEqual(enabledSocialProviders());
+  });
+
+  it('registers no provider whose secret is blank', () => {
+    vi.stubEnv('GOOGLE_CLIENT_ID', 'google-id');
+    vi.stubEnv('GOOGLE_CLIENT_SECRET', '   ');
+
+    expect(registered()).toEqual(enabledSocialProviders());
+  });
+
+  it('registers Apple from key material exactly when it is enabled', () => {
+    vi.stubEnv('APPLE_CLIENT_ID', 'apple-id');
+    vi.stubEnv('APPLE_TEAM_ID', 'TEAM123456');
+    vi.stubEnv('APPLE_KEY_ID', 'KEY9876543');
+    vi.stubEnv('APPLE_PRIVATE_KEY_BASE64', MINT_PRIVATE_KEY_BASE64);
+
+    expect(registered()).toEqual(['apple']);
+    expect(enabledSocialProviders()).toEqual(['apple']);
   });
 });
 

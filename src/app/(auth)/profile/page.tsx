@@ -4,13 +4,14 @@
 import { ProfileForm } from '@/app/components/forms/profile-form';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
+import { enabledSocialProviders } from '@/lib/config/runtime-config';
 
 export default async function ProfilePage() {
   return (
     <PageContainer>
       <ContentContainer>
         {/* The breadcrumb docks inside the first profile section's panel. */}
-        <ProfileForm />
+        <ProfileForm socialProviders={enabledSocialProviders()} />
       </ContentContainer>
     </PageContainer>
   );

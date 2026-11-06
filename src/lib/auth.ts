@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/social-providers-config';
 import { turnstileGateBeforeHook } from '@/lib/auth/turnstile-gate-hook';
 import { userCreateBeforeHook } from '@/lib/auth/user-create-before-hook';
+import { getAuthUrl } from '@/lib/config/runtime-config';
 import { sendMagicLinkEmail } from '@/lib/email/send-magic-link-email';
 import { prisma } from '@/lib/prisma';
 import { UserRepository } from '@/lib/repositories/user-repository';
@@ -83,7 +84,7 @@ if (process.env.SKIP_ENV_VALIDATION !== 'true') {
  * which targets the served origin on the client.
  */
 const buildAuthBaseURL = (): BetterAuthOptions['baseURL'] => {
-  const authUrl = process.env.AUTH_URL;
+  const authUrl = getAuthUrl();
   if (!authUrl) {
     return undefined;
   }

@@ -522,3 +522,24 @@ _Avoid_: revert (that is a git operation on main), redeploy.
 **live version** removed or retyped a field, or dropped an index, that the
 target still declares. Older code may need those, and a rollback never puts
 them back, so the run stops unless the operator forces it. Additions pass.
+
+**runtime config manifest** — the one list of every environment variable the
+app reads, each with its phase (`runtime`, `build`, `local`) and whether
+production can run without it. The boot check, the getters and the drift spec
+are all derived from it.
+See [ADR-0024](docs/adr/0024-runtime-config-has-one-manifest.md).
+_Defined in_ `src/lib/config/env-manifest.ts`.
+_Avoid_: env schema, required list.
+
+**feature group** — optional configuration values that only work together,
+such as an OAuth client id and secret. With none set the feature is off by
+choice; with some set but not enough it is **half-set**: off by mistake,
+logged as one error at boot, the server still running.
+See [ADR-0024](docs/adr/0024-runtime-config-has-one-manifest.md).
+
+**provider intent** — the social providers the operator means to offer, stated
+in the `ENABLED_SOCIAL_PROVIDERS` repository variable. A deploy fails before it
+touches the host when an intended provider has no credentials. Distinct from
+the providers the server registers (`enabledSocialProviders()`), which follow
+the credentials that are actually present.
+See [ADR-0024](docs/adr/0024-runtime-config-has-one-manifest.md).

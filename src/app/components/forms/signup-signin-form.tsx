@@ -45,6 +45,11 @@ interface SignupSigninFormProps {
   setIsVerified: (isVerified: boolean) => void;
   onTurnstileToken?: (token: string) => void;
   state: FormState;
+  /**
+   * The social providers the server registered, from `enabledSocialProviders()`.
+   * With none, the social block and its "or" divider are left out.
+   */
+  socialProviders: readonly SocialProvider[];
   /** URL to redirect to after successful social sign-in. Defaults to "/". */
   callbackURL?: string;
   /**
@@ -374,6 +379,7 @@ export const SignupSigninForm = ({
   setIsVerified,
   onTurnstileToken,
   state,
+  socialProviders,
   callbackURL = '/',
   onSocialError,
   heading,
@@ -413,17 +419,21 @@ export const SignupSigninForm = ({
           state={state}
         />
 
-        {/* Social sign-in — gated on terms + Turnstile via socialDisabled */}
-        <SocialProviderButtons
-          callbackURL={callbackURL}
-          className="mb-2"
-          onError={onSocialError}
-          disabled={socialDisabled}
-          beforeSignIn={onBeforeSocialSignIn}
-        />
-
-        {/* Divider */}
-        <OrDivider label="or continue with email" />
+        {/* Social sign-in — gated on terms + Turnstile via socialDisabled; only
+            the providers the server registered, and no divider without them */}
+        {socialProviders.length > 0 && (
+          <>
+            <SocialProviderButtons
+              providers={socialProviders}
+              callbackURL={callbackURL}
+              className="mb-2"
+              onError={onSocialError}
+              disabled={socialDisabled}
+              beforeSignIn={onBeforeSocialSignIn}
+            />
+            <OrDivider label="or continue with email" />
+          </>
+        )}
 
         {/* Magic-link heading + Turnstile-gated email field */}
         <MagicLinkSection

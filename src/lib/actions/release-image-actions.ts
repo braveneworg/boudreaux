@@ -8,6 +8,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
+import { resolveS3BucketName } from '@/lib/config/runtime-config';
 import { ImageRepository } from '@/lib/repositories/image-repository';
 import type { ImageListingRecord } from '@/lib/types/domain/image';
 import { loggers } from '@/lib/utils/logger';
@@ -63,7 +64,7 @@ export const deleteReleaseImageAction = async (imageId: string): Promise<AdminAc
     }
 
     // Extract S3 key from URL and delete from S3
-    const s3Bucket = process.env.S3_BUCKET;
+    const s3Bucket = resolveS3BucketName();
     const cdnDomain = process.env.CDN_DOMAIN?.replace(/^https?:\/\//, '');
 
     if (image.src && s3Bucket) {
