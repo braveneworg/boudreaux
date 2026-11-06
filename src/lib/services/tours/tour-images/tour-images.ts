@@ -58,6 +58,12 @@ const policyOf = (kind: TourImageOwnerKind): OwnerPolicy =>
 
 const IMAGE_NOT_FOUND = 'Image not found';
 
+const capExceeded = ({ maxImages, label }: OwnerPolicy): ServiceResponse<never> => ({
+  success: false,
+  error: `Maximum of ${maxImages} images per ${label} exceeded`,
+  code: 'LIMIT_EXCEEDED',
+});
+
 /** A row in the shape the confirm action has always returned. */
 const toConfirmed = <Row extends { altText: string | null; uploadedBy: string | null }>({
   createdAt: _createdAt,
@@ -111,7 +117,8 @@ export class TourImages {
 
   /**
    * A presigned PUT for one more image, refused once the owner holds its
-   * cap. The cap is counted here, before any object exists.
+   * cap. The cap is counted here, before any object exists, and again at
+   * confirm, since two URLs can be issued while the owner is one under it.
    */
   async requestUpload<K extends TourImageOwnerKind>(
     { kind, id }: TourImageOwner<K>,
@@ -121,11 +128,7 @@ export class TourImages {
     try {
       const existing = await this.recordsOf(kind).count(id);
       if (existing >= policy.maxImages) {
-        return {
-          success: false,
-          error: `Maximum of ${policy.maxImages} images per ${policy.label} exceeded`,
-          code: 'LIMIT_EXCEEDED',
-        };
+        return capExceeded(policy);
       }
 
       return await this.deps.store.presignPut({
@@ -143,15 +146,28 @@ export class TourImages {
     }
   }
 
-  /** Record an uploaded object as the owner's last image, served from its public URL. */
+  /**
+   * Record an uploaded object as the owner's last image, served from its
+   * public URL. A confirm that would pass the cap is refused and its object
+   * deleted. The count and the insert are separate reads, so two confirms
+   * racing at the same instant can still both pass.
+   */
   async confirmUpload<K extends TourImageOwnerKind>(
     { kind, id }: TourImageOwner<K>,
     upload: UploadedTourImage,
     userId: string
   ): Promise<ServiceResponse<ConfirmedTourImage<TourImageRowMap[K]>>> {
     const records = this.recordsOf(kind);
+    const policy = policyOf(kind);
     try {
       const displayOrder = await records.count(id);
+      if (displayOrder >= policy.maxImages) {
+        // Another upload filled the cap after this one's URL was issued:
+        // refuse it and remove the object it left in the bucket.
+        await this.deps.store.delete(upload.s3Key);
+        return capExceeded(policy);
+      }
+
       const row = await records.create({
         ownerId: id,
         s3Key: upload.s3Key,

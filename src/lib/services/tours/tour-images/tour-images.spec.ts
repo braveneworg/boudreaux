@@ -337,6 +337,28 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
       ]);
     });
 
+    it('refuses a confirm that would pass the cap, deleting the uploaded object', async () => {
+      await seed(max);
+
+      const result = await images.confirmUpload(owner, upload, 'admin-1');
+
+      expect(result).toEqual({
+        success: false,
+        error: `Maximum of ${max} images per ${label} exceeded`,
+        code: 'LIMIT_EXCEEDED',
+      });
+      expect(log).toEqual(['store.delete media/new.jpg']);
+      expect(records.rows.size).toBe(max);
+    });
+
+    it('confirms the image that fills the cap', async () => {
+      await seed(max - 1);
+
+      const result = await images.confirmUpload(owner, upload, 'admin-1');
+
+      expect(result.success && result.data.displayOrder).toBe(max - 1);
+    });
+
     it('fails with generic copy when the write throws', async () => {
       records.create = async () => {
         throw new Error('E11000 duplicate key');
