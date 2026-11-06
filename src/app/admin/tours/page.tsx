@@ -15,24 +15,12 @@ import {
 } from '@/app/components/ui/card';
 import { SectionHeader } from '@/app/components/ui/section-header';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
-import { TourService, type TourWithDisplayNames } from '@/lib/services/tours/tour-service';
+import { TourService, type PaginatedToursResponse } from '@/lib/services/tours/tour-service';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Display type for tour list items.
- * Extends TourWithDisplayNames with optional tourDates for display purposes.
- */
-interface TourListItem extends TourWithDisplayNames {
-  tourDates?: Array<{
-    startDate: Date;
-    venue?: {
-      name: string;
-      city?: string | null;
-      state?: string | null;
-    } | null;
-  }>;
-}
+/** One tour in the admin listing, with its dates and their venues. */
+type TourListItem = PaginatedToursResponse['data'][number];
 
 export default async function ToursPage() {
   let tours: TourListItem[] = [];

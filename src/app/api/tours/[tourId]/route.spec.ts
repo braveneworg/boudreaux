@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { TourService } from '@/lib/services/tours/tour-service';
 
 import { GET } from './route';
 
@@ -36,9 +36,9 @@ vi.mock('@/lib/decorators/with-auth', async () => {
   };
 });
 
-vi.mock('@/lib/repositories/tours/tour-repository', () => ({
-  TourRepository: {
-    findById: vi.fn(),
+vi.mock('@/lib/services/tours/tour-service', () => ({
+  TourService: {
+    findAdminById: vi.fn(),
     findPublicById: vi.fn(),
   },
 }));
@@ -63,21 +63,21 @@ describe('Tour by ID API Route', () => {
       ) as Promise<Response>;
 
     beforeEach(() => {
-      vi.mocked(TourRepository.findById).mockResolvedValue(mockTour as never);
+      vi.mocked(TourService.findAdminById).mockResolvedValue(mockTour as never);
     });
 
     afterEach(() => {
       authState.isAdmin = true;
-      vi.mocked(TourRepository.findById).mockReset();
-      vi.mocked(TourRepository.findPublicById).mockReset();
+      vi.mocked(TourService.findAdminById).mockReset();
+      vi.mocked(TourService.findPublicById).mockReset();
     });
 
     it('gives an admin the unfiltered tour', async () => {
       await getAdmin();
 
       expect({
-        admin: vi.mocked(TourRepository.findById).mock.calls,
-        public: vi.mocked(TourRepository.findPublicById).mock.calls,
+        admin: vi.mocked(TourService.findAdminById).mock.calls,
+        public: vi.mocked(TourService.findPublicById).mock.calls,
       }).toEqual({ admin: [[tourId]], public: [] });
     });
 
@@ -94,12 +94,12 @@ describe('Tour by ID API Route', () => {
 
       expect({
         status: response.status,
-        reads: vi.mocked(TourRepository.findById).mock.calls,
+        reads: vi.mocked(TourService.findAdminById).mock.calls,
       }).toEqual({ status: 401, reads: [] });
     });
 
     it('returns 404 when the tour does not exist', async () => {
-      vi.mocked(TourRepository.findById).mockResolvedValueOnce(null);
+      vi.mocked(TourService.findAdminById).mockResolvedValueOnce(null);
 
       const response = await getAdmin();
 
@@ -109,14 +109,14 @@ describe('Tour by ID API Route', () => {
 
   describe('GET /api/tours/[tourId] public read (ADR-0015)', () => {
     it('reads the tour as the public may see it', async () => {
-      vi.mocked(TourRepository.findPublicById).mockResolvedValueOnce(mockTour as never);
+      vi.mocked(TourService.findPublicById).mockResolvedValueOnce(mockTour as never);
 
       await GET(
         new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011'),
         createParams('507f1f77bcf86cd799439011')
       );
 
-      expect(vi.mocked(TourRepository.findById).mock.calls).toEqual([]);
+      expect(vi.mocked(TourService.findAdminById).mock.calls).toEqual([]);
     });
   });
 
@@ -128,11 +128,11 @@ describe('Tour by ID API Route', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({ error: 'Invalid tour ID' });
-      expect(TourRepository.findPublicById).not.toHaveBeenCalled();
+      expect(TourService.findPublicById).not.toHaveBeenCalled();
     });
 
     it('should accept valid 24-char hex ObjectId', async () => {
-      vi.mocked(TourRepository.findPublicById).mockResolvedValue(mockTour as never);
+      vi.mocked(TourService.findPublicById).mockResolvedValue(mockTour as never);
 
       const request = new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011');
       const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
@@ -140,11 +140,11 @@ describe('Tour by ID API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ tour: mockTour });
-      expect(TourRepository.findPublicById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
+      expect(TourService.findPublicById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
     });
 
     it('should return 404 when tour not found', async () => {
-      vi.mocked(TourRepository.findPublicById).mockResolvedValue(null);
+      vi.mocked(TourService.findPublicById).mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011');
       const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
@@ -155,7 +155,7 @@ describe('Tour by ID API Route', () => {
     });
 
     it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(TourRepository.findPublicById).mockRejectedValue(new Error('Unexpected error'));
+      vi.mocked(TourService.findPublicById).mockRejectedValue(new Error('Unexpected error'));
 
       const request = new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011');
       const response = await GET(request, createParams('507f1f77bcf86cd799439011'));

@@ -5,31 +5,10 @@
 import 'server-only';
 
 import { TourRepository, type TourWithRelations } from '@/lib/repositories/tours/tour-repository';
-import type { TourDateWithRelations, TourScalars } from '@/lib/types/tours';
-import {
-  tourCreateSchema,
-  tourUpdateSchema,
-  type TourCreateInput,
-  type TourUpdateInput,
-} from '@/lib/validation/tours/tour-schema';
+import type { TourScalars } from '@/lib/types/tours';
+import type { TourCreateInput, TourUpdateInput } from '@/lib/validation/tours/tour-schema';
 
-/**
- * Explicit base fields matching the Prisma Tour model.
- * Ensures TourWithDisplayNames always has the correct shape
- * even if generated Prisma types are stale.
- */
-interface TourBaseFields {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  subtitle2: string | null;
-  description: string | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-}
+export type { TourWithRelations };
 
 export interface TourQueryParams {
   search?: string;
@@ -37,26 +16,26 @@ export interface TourQueryParams {
   limit?: number;
 }
 
-export interface TourWithDisplayNames extends TourBaseFields {
-  displayHeadliners: string[];
-}
-
 export interface PaginatedToursResponse {
-  data: TourWithDisplayNames[];
+  data: TourWithRelations[];
   total: number;
   page: number;
   limit: number;
 }
 
+/** One skip/offset page of the public tours listing. */
+export interface PublicTourPageParams {
+  skip: number;
+  take: number;
+  search?: string;
+}
+
 /**
- * Service for tour business logic.
- * Provides validation, data transformation, and orchestration of tour operations.
+ * Service for tours. Callers reach the tour repository only through it
+ * (ADR-0002); input arrives already parsed by the action or route.
  */
 export class TourService {
-  /**
-   * Find all tours with optional filtering and pagination
-   * Enriches tours with displayHeadliners array
-   */
+  /** Every tour, with its dates, for the admin listing. */
   static async findAll(params?: TourQueryParams): Promise<PaginatedToursResponse> {
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 100;
@@ -66,140 +45,36 @@ export class TourService {
       TourRepository.count(params),
     ]);
 
-    // Enrich tours with display names
-    const enrichedTours = tours.map((tour) => this.enrichTourWithDisplayNames(tour));
-
-    return {
-      data: enrichedTours,
-      total,
-      page,
-      limit,
-    };
+    return { data: tours, total, page, limit };
   }
 
-  /**
-   * Find a tour by ID
-   * Returns tour with displayHeadliners array
-   */
-  static async findById(id: string): Promise<TourWithDisplayNames | null> {
-    const tour = await TourRepository.findById(id);
-
-    if (!tour) {
-      return null;
-    }
-
-    return this.enrichTourWithDisplayNames(tour);
+  /** One page of the tours, dates and headliners the public may see (ADR-0015). */
+  static async findPublicPage(params: PublicTourPageParams): Promise<TourWithRelations[]> {
+    return TourRepository.findAllPublic(params);
   }
 
-  /**
-   * Create a new tour with validation
-   */
-  static async create(input: TourCreateInput): Promise<TourWithDisplayNames> {
-    // Validate input
-    const validated = tourCreateSchema.parse(input);
-
-    // Create tour
-    const tour = await TourRepository.create(validated);
-
-    return this.enrichTourWithDisplayNames(tour);
+  /** A tour as the public may see it, or null when it has nothing public. */
+  static async findPublicById(id: string): Promise<TourWithRelations | null> {
+    return TourRepository.findPublicById(id);
   }
 
-  /**
-   * Update an existing tour with validation
-   */
-  static async update(
-    id: string,
-    input: TourUpdateInput,
-    userId: string
-  ): Promise<TourWithDisplayNames> {
-    // Validate input
-    const validated = tourUpdateSchema.parse(input);
-
-    // Update tour
-    const tour = await TourRepository.update(id, validated, userId);
-
-    return this.enrichTourWithDisplayNames(tour);
+  /** A tour with every date and headliner whatever their state, for the admin edit form. */
+  static async findAdminById(id: string): Promise<TourWithRelations | null> {
+    return TourRepository.findById(id);
   }
 
-  /**
-   * Delete a tour
-   * Cascades to related records (headliners, images)
-   */
+  /** Create a tour. */
+  static async create(input: TourCreateInput): Promise<TourScalars> {
+    return TourRepository.create(input);
+  }
+
+  /** Update a tour, recording who changed it. */
+  static async update(id: string, input: TourUpdateInput, userId: string): Promise<TourScalars> {
+    return TourRepository.update(id, input, userId);
+  }
+
+  /** Delete a tour; its headliners and images cascade. */
   static async delete(id: string): Promise<TourScalars> {
     return TourRepository.delete(id);
-  }
-
-  /**
-   * Enrich a tour with displayHeadliners array
-   * Aggregates unique headliners from all tour dates
-   * @private
-   */
-  private static enrichTourWithDisplayNames(
-    tour: TourWithRelations | TourScalars
-  ): TourWithDisplayNames {
-    // Extract headliners from tour dates if available
-    const displayHeadliners =
-      'tourDates' in tour && Array.isArray(tour.tourDates)
-        ? this.collectHeadlinerNames(tour.tourDates)
-        : [];
-
-    return {
-      ...tour,
-      displayHeadliners,
-    } as TourWithDisplayNames;
-  }
-
-  /**
-   * Aggregate the unique headliner display names across a tour's dates,
-   * preserving first-seen order.
-   * @private
-   */
-  private static collectHeadlinerNames(tourDates: TourDateWithRelations[]): string[] {
-    const headlinerNames = new Set<string>();
-
-    for (const tourDate of tourDates) {
-      if (!tourDate.headliners || !Array.isArray(tourDate.headliners)) {
-        continue;
-      }
-      for (const headliner of tourDate.headliners) {
-        const name = this.getArtistDisplayName(headliner);
-        if (name) {
-          headlinerNames.add(name);
-        }
-      }
-    }
-
-    return Array.from(headlinerNames);
-  }
-
-  /**
-   * Get display name for a tour headliner
-   * Priority: artist.displayName > "firstName surname" > firstName > surname > null
-   * @private
-   */
-  private static getArtistDisplayName(headliner: {
-    artist?: { displayName?: string | null; firstName?: string; surname?: string } | null;
-  }): string | null {
-    // Handle artist headliners
-    if (headliner.artist) {
-      const { displayName, firstName, surname } = headliner.artist;
-
-      // Use displayName if available
-      if (displayName) {
-        return displayName;
-      }
-
-      // Build name from firstName and surname
-      const nameParts: string[] = [];
-      if (firstName) nameParts.push(firstName);
-      if (surname) nameParts.push(surname);
-
-      if (nameParts.length > 0) {
-        return nameParts.join(' ');
-      }
-    }
-
-    // No name available
-    return null;
   }
 }
