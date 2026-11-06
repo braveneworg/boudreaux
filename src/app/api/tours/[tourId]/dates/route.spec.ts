@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import { TourDateService } from '@/lib/services/tours/tour-date-service';
 
 import { GET } from './route';
 
@@ -24,8 +24,8 @@ vi.mock('@/lib/decorators/with-auth', async () => {
   };
 });
 
-vi.mock('@/lib/repositories/tours/tour-date-repository', () => ({
-  TourDateRepository: { findByTourId: vi.fn() },
+vi.mock('@/lib/services/tours/tour-date-service', () => ({
+  TourDateService: { findByTourId: vi.fn() },
 }));
 
 vi.mock('@/lib/utils/logger', () => ({ loggers: { media: { error: vi.fn() } } }));
@@ -40,12 +40,15 @@ const get = (id = tourId): Promise<Response> =>
 
 describe('GET /api/tours/[tourId]/dates', () => {
   beforeEach(() => {
-    vi.mocked(TourDateRepository.findByTourId).mockResolvedValue(tourDates as never);
+    vi.mocked(TourDateService.findByTourId).mockResolvedValue({
+      success: true,
+      data: tourDates as never,
+    });
   });
 
   afterEach(() => {
     authState.isAdmin = true;
-    vi.mocked(TourDateRepository.findByTourId).mockReset();
+    vi.mocked(TourDateService.findByTourId).mockReset();
   });
 
   it("returns every date of the tour to an admin, for the tour's edit screen", async () => {
@@ -64,7 +67,7 @@ describe('GET /api/tours/[tourId]/dates', () => {
 
     expect({
       status: response.status,
-      reads: vi.mocked(TourDateRepository.findByTourId).mock.calls,
+      reads: vi.mocked(TourDateService.findByTourId).mock.calls,
     }).toEqual({ status: 401, reads: [] });
   });
 
@@ -79,12 +82,27 @@ describe('GET /api/tours/[tourId]/dates', () => {
 
     expect({
       body: await response.json(),
-      reads: vi.mocked(TourDateRepository.findByTourId).mock.calls,
+      reads: vi.mocked(TourDateService.findByTourId).mock.calls,
     }).toEqual({ body: { tourDates: [] }, reads: [] });
   });
 
-  it('returns 500 when the read fails', async () => {
-    vi.mocked(TourDateRepository.findByTourId).mockRejectedValueOnce(new Error('down'));
+  it('answers a failed read with the status its code maps to', async () => {
+    vi.mocked(TourDateService.findByTourId).mockResolvedValueOnce({
+      success: false,
+      error: 'Database unavailable',
+      code: 'UNAVAILABLE',
+    });
+
+    const response = await get();
+
+    expect({ status: response.status, body: await response.json() }).toEqual({
+      status: 503,
+      body: { error: 'Database unavailable' },
+    });
+  });
+
+  it('returns 500 when the read throws', async () => {
+    vi.mocked(TourDateService.findByTourId).mockRejectedValueOnce(new Error('down'));
 
     const response = await get();
 
