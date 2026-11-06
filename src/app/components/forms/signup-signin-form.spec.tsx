@@ -151,12 +151,14 @@ let capturedSocialOnError: ((provider: SocialProvider, error: unknown) => void) 
 let capturedSocialBeforeSignIn: ((provider: SocialProvider) => Promise<boolean>) | undefined;
 vi.mock('@/app/components/auth/social-provider-buttons', () => ({
   SocialProviderButtons: ({
+    providers,
     callbackURL,
     className,
     onError,
     disabled,
     beforeSignIn,
   }: {
+    providers: readonly SocialProvider[];
     callbackURL: string;
     className?: string;
     onError?: (provider: SocialProvider, error: unknown) => void;
@@ -168,6 +170,7 @@ vi.mock('@/app/components/auth/social-provider-buttons', () => ({
     return (
       <div
         data-testid="social-provider-buttons"
+        data-providers={providers.join(',')}
         data-callback-url={callbackURL}
         data-disabled={disabled ? 'true' : 'false'}
         className={className}
@@ -301,6 +304,7 @@ describe('SignupSigninForm', () => {
   const defaultProps = {
     control: {} as Control<BaseFormSchema>, // Simple mock since FormField component is mocked
     hasTermsAndConditions: true,
+    socialProviders: ['apple', 'google', 'facebook', 'twitter'] as SocialProvider[],
     isPending: false,
     isVerified: true,
     setIsVerified: vi.fn(),
@@ -420,6 +424,22 @@ describe('SignupSigninForm', () => {
       render(<SignupSigninForm {...defaultProps} />);
       // OrDivider renders two Separator elements (left + right of label)
       expect(screen.getAllByTestId('separator').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('passes the enabled providers to the social buttons', () => {
+      render(<SignupSigninForm {...defaultProps} socialProviders={['google']} />);
+
+      expect(screen.getByTestId('social-provider-buttons')).toHaveAttribute(
+        'data-providers',
+        'google'
+      );
+    });
+
+    it('drops the social block and its divider when no provider is enabled', () => {
+      render(<SignupSigninForm {...defaultProps} socialProviders={[]} />);
+
+      expect(screen.queryByTestId('social-provider-buttons')).not.toBeInTheDocument();
+      expect(screen.queryByText(/or continue with email/i)).not.toBeInTheDocument();
     });
 
     it('renders "or continue with email" label near the separator', () => {
@@ -852,6 +872,7 @@ describe('SignupSigninForm', () => {
       const completeProps = {
         control: {} as Control<BaseFormSchema>,
         hasTermsAndConditions: true,
+        socialProviders: ['google'] as SocialProvider[],
         isPending: true,
         isVerified: true,
         setIsVerified: vi.fn(),

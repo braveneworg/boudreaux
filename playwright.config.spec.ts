@@ -1,6 +1,13 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import {
+  FEATURE_GROUPS,
+  evaluateFeatureGroup,
+  presentEnvNames,
+} from './src/lib/config/env-manifest';
+import { SOCIAL_PROVIDER_IDS } from './src/lib/config/social-providers';
+
 const BLANKED_CLOUDFRONT_KEYS = [
   'CLOUDFRONT_KEY_PAIR_ID',
   'CLOUDFRONT_PRIVATE_KEY_BASE64',
@@ -37,5 +44,28 @@ describe('playwright.config web server env', () => {
 
       expect(env).toHaveProperty(key, '');
     });
+
+    // The pages render a button only for a registered provider, and the
+    // auth E2E specs click every one of them.
+    it('registers every social provider so every button renders', async () => {
+      const present = presentEnvNames(await webServerEnv());
+      const states = FEATURE_GROUPS.filter(({ id }) =>
+        (SOCIAL_PROVIDER_IDS as readonly string[]).includes(id)
+      ).map((group) => [group.id, evaluateFeatureGroup(group, present).state]);
+
+      expect(Object.fromEntries(states)).toEqual({
+        google: 'enabled',
+        facebook: 'enabled',
+        twitter: 'enabled',
+        apple: 'enabled',
+      });
+    });
+
+    it.each(['APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY_BASE64'])(
+      'blanks %s so a local Apple key is never read',
+      async (key) => {
+        expect(await webServerEnv()).toHaveProperty(key, '');
+      }
+    );
   });
 });

@@ -6,6 +6,8 @@ import userEvent from '@testing-library/user-event';
 
 import { SocialProviderButtons } from './social-provider-buttons';
 
+const ALL_PROVIDERS = ['apple', 'google', 'facebook', 'twitter'] as const;
+
 // Mock the auth client at the boundary
 const mockSignInSocial = vi.fn();
 
@@ -64,8 +66,22 @@ describe('SocialProviderButtons', () => {
   });
 
   describe('rendering', () => {
+    it('renders only the providers it is given', () => {
+      render(<SocialProviderButtons providers={['google', 'apple']} callbackURL="/" />);
+
+      expect(
+        screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+      ).toEqual(['Continue with Apple', 'Continue with Google']);
+    });
+
+    it('renders nothing when no provider is enabled', () => {
+      const { container } = render(<SocialProviderButtons providers={[]} callbackURL="/" />);
+
+      expect(container).toBeEmptyDOMElement();
+    });
+
     it('renders four provider buttons', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       expect(screen.getByRole('button', { name: /apple/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
@@ -74,31 +90,31 @@ describe('SocialProviderButtons', () => {
     });
 
     it('renders Apple button with accessible name', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
       const btn = screen.getByRole('button', { name: /continue with apple/i });
       expect(btn).toBeInTheDocument();
     });
 
     it('renders Google button with accessible name', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
       const btn = screen.getByRole('button', { name: /continue with google/i });
       expect(btn).toBeInTheDocument();
     });
 
     it('renders Facebook button with accessible name', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
       const btn = screen.getByRole('button', { name: /continue with facebook/i });
       expect(btn).toBeInTheDocument();
     });
 
     it('renders X (Twitter) button with accessible name', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
       const btn = screen.getByRole('button', { name: /continue with x \(twitter\)/i });
       expect(btn).toBeInTheDocument();
     });
 
     it('renders brand icons with aria-hidden', () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
       expect(screen.getByTestId('apple-icon')).toHaveAttribute('aria-hidden', 'true');
       expect(screen.getByTestId('google-icon')).toHaveAttribute('aria-hidden', 'true');
       expect(screen.getByTestId('facebook-icon')).toHaveAttribute('aria-hidden', 'true');
@@ -108,7 +124,7 @@ describe('SocialProviderButtons', () => {
 
   describe('interactions', () => {
     it('calls authClient.signIn.social with apple provider on Apple button click', async () => {
-      render(<SocialProviderButtons callbackURL="/collection" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/collection" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
@@ -118,7 +134,7 @@ describe('SocialProviderButtons', () => {
     });
 
     it('calls authClient.signIn.social with google provider on Google button click', async () => {
-      render(<SocialProviderButtons callbackURL="/collection" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/collection" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with google/i }));
 
@@ -128,7 +144,7 @@ describe('SocialProviderButtons', () => {
     });
 
     it('calls authClient.signIn.social with facebook provider on Facebook button click', async () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with facebook/i }));
 
@@ -138,7 +154,7 @@ describe('SocialProviderButtons', () => {
     });
 
     it('calls authClient.signIn.social with twitter provider on X button click', async () => {
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with x \(twitter\)/i }));
 
@@ -156,7 +172,7 @@ describe('SocialProviderButtons', () => {
         })
       );
 
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       const appleBtn = screen.getByRole('button', { name: /continue with apple/i });
       await userEvent.click(appleBtn);
@@ -173,7 +189,7 @@ describe('SocialProviderButtons', () => {
     it('re-enables buttons after sign-in resolves', async () => {
       mockSignInSocial.mockResolvedValue({ data: null, error: null });
 
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
@@ -187,11 +203,15 @@ describe('SocialProviderButtons', () => {
 
   describe('optional props', () => {
     it('renders without crashing when callbackURL is an internal path', () => {
-      expect(() => render(<SocialProviderButtons callbackURL="/releases" />)).not.toThrow();
+      expect(() =>
+        render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/releases" />)
+      ).not.toThrow();
     });
 
     it('accepts a className prop for layout customisation', () => {
-      const { container } = render(<SocialProviderButtons callbackURL="/" className="mt-4" />);
+      const { container } = render(
+        <SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" className="mt-4" />
+      );
       expect(container.firstChild).toHaveClass('mt-4');
     });
   });
@@ -202,7 +222,7 @@ describe('SocialProviderButtons', () => {
       mockSignInSocial.mockRejectedValue(networkError);
       const onError = vi.fn();
 
-      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" onError={onError} />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
@@ -219,7 +239,7 @@ describe('SocialProviderButtons', () => {
       mockSignInSocial.mockResolvedValue({ data: null, error: authError });
       const onError = vi.fn();
 
-      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" onError={onError} />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with google/i }));
 
@@ -230,7 +250,7 @@ describe('SocialProviderButtons', () => {
       const networkError = new Error('Connection refused');
       mockSignInSocial.mockRejectedValue(networkError);
 
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
@@ -241,7 +261,7 @@ describe('SocialProviderButtons', () => {
       const authError = new Error('Provider disabled');
       mockSignInSocial.mockResolvedValue({ data: null, error: authError });
 
-      render(<SocialProviderButtons callbackURL="/" />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with facebook/i }));
 
@@ -252,7 +272,7 @@ describe('SocialProviderButtons', () => {
       mockSignInSocial.mockResolvedValue({ data: { session: {} }, error: null });
       const onError = vi.fn();
 
-      render(<SocialProviderButtons callbackURL="/" onError={onError} />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" onError={onError} />);
 
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
@@ -263,14 +283,14 @@ describe('SocialProviderButtons', () => {
 
   describe('disabled gating', () => {
     it('disables every button when disabled is true', () => {
-      render(<SocialProviderButtons callbackURL="/" disabled />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" disabled />);
 
       expect(screen.getByRole('button', { name: /continue with apple/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /continue with google/i })).toBeDisabled();
     });
 
     it('enables the buttons when disabled is false', () => {
-      render(<SocialProviderButtons callbackURL="/" disabled={false} />);
+      render(<SocialProviderButtons providers={ALL_PROVIDERS} callbackURL="/" disabled={false} />);
 
       expect(screen.getByRole('button', { name: /continue with apple/i })).toBeEnabled();
     });
@@ -281,7 +301,13 @@ describe('SocialProviderButtons', () => {
       mockSignInSocial.mockResolvedValue({ data: { session: {} }, error: null });
       const beforeSignIn = vi.fn().mockResolvedValue(true);
 
-      render(<SocialProviderButtons callbackURL="/" beforeSignIn={beforeSignIn} />);
+      render(
+        <SocialProviderButtons
+          providers={ALL_PROVIDERS}
+          callbackURL="/"
+          beforeSignIn={beforeSignIn}
+        />
+      );
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
       expect(beforeSignIn).toHaveBeenCalledWith('apple');
@@ -291,7 +317,13 @@ describe('SocialProviderButtons', () => {
     it('aborts sign-in when beforeSignIn resolves false', async () => {
       const beforeSignIn = vi.fn().mockResolvedValue(false);
 
-      render(<SocialProviderButtons callbackURL="/" beforeSignIn={beforeSignIn} />);
+      render(
+        <SocialProviderButtons
+          providers={ALL_PROVIDERS}
+          callbackURL="/"
+          beforeSignIn={beforeSignIn}
+        />
+      );
       await userEvent.click(screen.getByRole('button', { name: /continue with apple/i }));
 
       expect(beforeSignIn).toHaveBeenCalledWith('apple');
