@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { ImageRepository } from '@/lib/repositories/tours/image-repository';
+import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
 
 import { GET } from './route';
 
@@ -22,10 +22,8 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   PUBLIC_LIMIT: 100,
 }));
 
-vi.mock('@/lib/repositories/tours/image-repository', () => ({
-  ImageRepository: {
-    findByTourId: vi.fn(),
-  },
+vi.mock('@/lib/services/tours/tour-images/tour-images', () => ({
+  tourImages: { list: vi.fn() },
 }));
 
 describe('Tour Images API Route', () => {
@@ -40,12 +38,15 @@ describe('Tour Images API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ images: [] });
-      expect(ImageRepository.findByTourId).not.toHaveBeenCalled();
+      expect(tourImages.list).not.toHaveBeenCalled();
     });
 
     it('should accept valid 24-char hex ObjectId', async () => {
       const mockImages = [{ id: 'img-1', url: 'https://example.com/img.jpg' }];
-      vi.mocked(ImageRepository.findByTourId).mockResolvedValue(mockImages as never);
+      vi.mocked(tourImages.list).mockResolvedValueOnce({
+        success: true,
+        data: mockImages as never,
+      });
 
       const request = new NextRequest(
         'http://localhost:3000/api/tours/507f1f77bcf86cd799439011/images'
@@ -55,11 +56,32 @@ describe('Tour Images API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ images: mockImages });
-      expect(ImageRepository.findByTourId).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
+      expect(tourImages.list).toHaveBeenCalledWith({
+        kind: 'tour',
+        id: '507f1f77bcf86cd799439011',
+      });
+    });
+
+    it('answers a failed read with the status its code maps to', async () => {
+      vi.mocked(tourImages.list).mockResolvedValueOnce({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
+
+      const response = await GET(
+        new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011/images'),
+        createParams('507f1f77bcf86cd799439011')
+      );
+
+      expect({ status: response.status, body: await response.json() }).toEqual({
+        status: 503,
+        body: { error: 'Failed to fetch tour images' },
+      });
     });
 
     it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(ImageRepository.findByTourId).mockRejectedValue(new Error('Unexpected error'));
+      vi.mocked(tourImages.list).mockRejectedValueOnce(new Error('Unexpected error'));
 
       const request = new NextRequest(
         'http://localhost:3000/api/tours/507f1f77bcf86cd799439011/images'

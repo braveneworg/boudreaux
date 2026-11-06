@@ -5,7 +5,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { withAdmin } from '@/lib/decorators/with-auth';
-import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import { TourDateService } from '@/lib/services/tours/tour-date-service';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
@@ -25,10 +26,16 @@ export const GET = withAdmin(
         return NextResponse.json({ tourDates: [] });
       }
 
-      const tourDates = await TourDateRepository.findByTourId(tourId);
+      const result = await TourDateService.findByTourId(tourId);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: httpStatusForCode(result.code) }
+        );
+      }
 
       return NextResponse.json(
-        { tourDates },
+        { tourDates: result.data },
         { headers: { 'Cache-Control': 'private, no-store' } }
       );
     } catch (error) {

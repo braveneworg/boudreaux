@@ -192,7 +192,6 @@ describe('Tour Actions', () => {
       vi.mocked(TourService.update).mockResolvedValue({
         id: tourId,
         title: 'Updated Tour Title',
-        displayHeadliners: ['Artist One'],
       } as never);
     });
 

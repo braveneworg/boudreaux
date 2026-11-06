@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
+import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
 
 import { GET } from './route';
 
@@ -22,10 +22,8 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   PUBLIC_LIMIT: 100,
 }));
 
-vi.mock('@/lib/repositories/tours/tour-date-image-repository', () => ({
-  TourDateImageRepository: {
-    findByTourDateId: vi.fn(),
-  },
+vi.mock('@/lib/services/tours/tour-images/tour-images', () => ({
+  tourImages: { list: vi.fn() },
 }));
 
 describe('Tour Date Images API Route', () => {
@@ -42,7 +40,7 @@ describe('Tour Date Images API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ images: [] });
-      expect(TourDateImageRepository.findByTourDateId).not.toHaveBeenCalled();
+      expect(tourImages.list).not.toHaveBeenCalled();
     });
 
     it('should return empty images array for invalid tour date ID format', async () => {
@@ -54,12 +52,15 @@ describe('Tour Date Images API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ images: [] });
-      expect(TourDateImageRepository.findByTourDateId).not.toHaveBeenCalled();
+      expect(tourImages.list).not.toHaveBeenCalled();
     });
 
     it('should accept valid 24-char hex ObjectIds', async () => {
       const mockImages = [{ id: 'img-1', url: 'https://example.com/img.jpg' }];
-      vi.mocked(TourDateImageRepository.findByTourDateId).mockResolvedValue(mockImages as never);
+      vi.mocked(tourImages.list).mockResolvedValueOnce({
+        success: true,
+        data: mockImages as never,
+      });
 
       const request = new NextRequest(
         'http://localhost:3000/api/tours/507f1f77bcf86cd799439011/dates/507f1f77bcf86cd799439022/images'
@@ -72,15 +73,34 @@ describe('Tour Date Images API Route', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ images: mockImages });
-      expect(TourDateImageRepository.findByTourDateId).toHaveBeenCalledWith(
-        '507f1f77bcf86cd799439022'
+      expect(tourImages.list).toHaveBeenCalledWith({
+        kind: 'tourDate',
+        id: '507f1f77bcf86cd799439022',
+      });
+    });
+
+    it('answers a failed read with the status its code maps to', async () => {
+      vi.mocked(tourImages.list).mockResolvedValueOnce({
+        success: false,
+        error: 'Database unavailable',
+        code: 'UNAVAILABLE',
+      });
+
+      const response = await GET(
+        new NextRequest(
+          'http://localhost:3000/api/tours/507f1f77bcf86cd799439011/dates/507f1f77bcf86cd799439022/images'
+        ),
+        createParams('507f1f77bcf86cd799439011', '507f1f77bcf86cd799439022')
       );
+
+      expect({ status: response.status, body: await response.json() }).toEqual({
+        status: 503,
+        body: { error: 'Failed to fetch tour date images' },
+      });
     });
 
     it('should return 500 when an exception is thrown', async () => {
-      vi.mocked(TourDateImageRepository.findByTourDateId).mockRejectedValue(
-        new Error('Unexpected error')
-      );
+      vi.mocked(tourImages.list).mockRejectedValueOnce(new Error('Unexpected error'));
 
       const request = new NextRequest(
         'http://localhost:3000/api/tours/507f1f77bcf86cd799439011/dates/507f1f77bcf86cd799439022/images'
