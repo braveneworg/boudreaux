@@ -4,28 +4,16 @@
 'use client';
 
 import { TourDateList } from '@/app/admin/tours/components/tour-date-list';
-import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload';
+import {
+  TourImageUpload,
+  type StoredTourImage,
+} from '@/app/admin/tours/components/tour-image-upload';
 import { Separator } from '@/app/components/ui/separator';
-
-interface TourImageFields {
-  id: string;
-  tourId: string;
-  s3Key: string;
-  s3Url: string;
-  s3Bucket: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  displayOrder: number;
-  altText: string | null;
-  createdAt: Date;
-  uploadedBy: string | null;
-}
 
 interface TourEditSectionsProps {
   isEditMode: boolean;
   tourId: string | undefined;
-  tourImages: TourImageFields[];
+  tourImages: StoredTourImage[];
   isSubmitting: boolean;
   isDeletingTour: boolean;
   onDialogOpenChange: (open: boolean) => void;
@@ -60,7 +48,7 @@ export const TourEditSections = ({
           </p>
         </div>
         <TourImageUpload
-          tourId={tourId}
+          owner={{ kind: 'tour', id: tourId }}
           initialImages={tourImages}
           onUploadComplete={onUploadComplete}
           disabled={isSubmitting || isDeletingTour}

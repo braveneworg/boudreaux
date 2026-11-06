@@ -18,26 +18,24 @@ import {
   deleteImageSchema,
   imageReorderSchema,
   imageUploadRequestSchema,
+  tourDateConfirmUploadSchema,
+  tourDateDeleteImageSchema,
+  tourDateImageReorderSchema,
+  tourDateImageUploadRequestSchema,
+  tourDateUpdateImageAltTextSchema,
   updateImageAltTextSchema,
   type ConfirmUploadRequest,
   type DeleteImageRequest,
   type ImageReorder,
   type ImageUploadRequest,
   type PresignedUrlResponse,
-  type UpdateImageAltText,
-} from '@/lib/validation/tours/image-schema';
-import {
-  tourDateConfirmUploadSchema,
-  tourDateDeleteImageSchema,
-  tourDateImageReorderSchema,
-  tourDateImageUploadRequestSchema,
-  tourDateUpdateImageAltTextSchema,
   type TourDateConfirmUploadRequest,
   type TourDateDeleteImageRequest,
   type TourDateImageReorder,
   type TourDateImageUploadRequest,
   type TourDateUpdateImageAltText,
-} from '@/lib/validation/tours/tour-date-image-schema';
+  type UpdateImageAltText,
+} from '@/lib/validation/tours/image-schema';
 
 import type { z } from 'zod';
 

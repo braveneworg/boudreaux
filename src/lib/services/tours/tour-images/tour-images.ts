@@ -9,9 +9,9 @@ import { loggers } from '@/lib/utils/logger';
 import { buildMediaS3Key, type MediaEntityType } from '@/lib/utils/s3-key-utils';
 import {
   MAX_IMAGES_PER_TOUR,
+  MAX_IMAGES_PER_TOUR_DATE,
   type PresignedUrlResponse,
 } from '@/lib/validation/tours/image-schema';
-import { MAX_IMAGES_PER_TOUR_DATE } from '@/lib/validation/tours/tour-date-image-schema';
 
 import { tourDateImageRecords, tourImageRecords } from './tour-image-records';
 import { s3TourImageStore } from './tour-image-store';
