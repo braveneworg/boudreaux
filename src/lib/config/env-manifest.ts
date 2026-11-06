@@ -231,3 +231,53 @@ export const featureGroupMembers = (group: FeatureGroupSpec): string[] => [
   ...group.requires,
   ...(group.oneOf ?? []).flat(),
 ];
+
+/**
+ * - `enabled` — complete: the feature works.
+ * - `disabled` — none of its names is set: the feature is off by choice.
+ * - `half-set` — some names are set but not enough: off by mistake.
+ */
+export type FeatureGroupState = 'enabled' | 'disabled' | 'half-set';
+
+export interface FeatureGroupStatus {
+  id: FeatureGroupId;
+  feature: string;
+  state: FeatureGroupState;
+  /** Names to set for the group to be complete (the shortest alternative); empty when enabled. */
+  missing: string[];
+}
+
+/**
+ * Decide a feature group's state from the names that hold a non-empty value.
+ * Takes the set of present names rather than the environment so callers never
+ * index `process.env` with a computed key.
+ */
+export const evaluateFeatureGroup = (
+  group: FeatureGroupSpec,
+  present: ReadonlySet<string>
+): FeatureGroupStatus => {
+  const unset = (names: readonly string[]): string[] => names.filter((name) => !present.has(name));
+  const alternatives = (group.oneOf ?? [[]]).map((alternative) => unset(alternative));
+  const shortestAlternative = alternatives.reduce((best, next) =>
+    next.length < best.length ? next : best
+  );
+  const missing = [...unset(group.requires), ...shortestAlternative];
+  const anySet = featureGroupMembers(group).some((name) => present.has(name));
+  const state: FeatureGroupState =
+    missing.length === 0 ? 'enabled' : anySet ? 'half-set' : 'disabled';
+
+  return {
+    id: group.id,
+    feature: group.feature,
+    state,
+    missing: state === 'enabled' ? [] : missing,
+  };
+};
+
+/** The names in `env` that hold a non-empty value. */
+export const presentEnvNames = (env: Readonly<Record<string, string | undefined>>): Set<string> =>
+  new Set(
+    Object.entries(env)
+      .filter(([, value]) => value !== undefined && value.trim() !== '')
+      .map(([name]) => name)
+  );

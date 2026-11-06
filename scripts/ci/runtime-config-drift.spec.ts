@@ -242,16 +242,25 @@ describe('runtime config drift — the code reads only manifest names', () => {
         .filter((name) => name.length > 0)
     );
 
-  /** `process.env.NAME` reads and destructured names, each mapped to one file reading it. */
+  /**
+   * `process.env.NAME` reads (and `env.NAME` on an injected environment, as
+   * the boot check takes one), plus destructured names, each mapped to one
+   * file reading it. Prisma's schema reads its connection string itself.
+   */
   const namesRead = (): Map<string, string> => {
     const found = new Map<string, string>();
     for (const path of sources(SRC)) {
       const text = readFileSync(path, 'utf8');
       const where = path.replace(`${ROOT}/`, '');
-      const direct = [...text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)].map(([, name]) => name);
+      const direct = [...text.matchAll(/\benv\.([A-Z][A-Z0-9_]*)/g)].map(([, name]) => name);
       for (const name of [...direct, ...destructuredNames(text)]) {
         found.set(name, where);
       }
+    }
+    for (const [, name] of read('prisma', 'schema.prisma').matchAll(
+      /env\("([A-Z][A-Z0-9_]*)"\)/g
+    )) {
+      found.set(name, 'prisma/schema.prisma');
     }
     return found;
   };
@@ -259,8 +268,9 @@ describe('runtime config drift — the code reads only manifest names', () => {
   const READ = namesRead();
 
   it('finds the reads it scans for', () => {
-    expect(READ.has('DATABASE_URL')).toBe(true);
-    expect(READ.has('APPLE_TEAM_ID')).toBe(true);
+    expect(READ.get('AUTH_SECRET')).toBeDefined();
+    expect(READ.get('PUSHER_APP_ID')).toBe('src/lib/utils/pusher-server.ts');
+    expect(READ.get('DATABASE_URL')).toBeDefined();
   });
 
   it('reads no name missing from the manifest', () => {

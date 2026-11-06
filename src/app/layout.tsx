@@ -50,15 +50,6 @@ const jost = localFont({
   preload: false,
 });
 
-// Server-side environment validation on startup
-/* v8 ignore next 5 -- module-level server-only code; window is always defined in jsdom test env */
-if (typeof window === 'undefined') {
-  // Dynamic import to avoid bundling in client
-  import('@/lib/config/env-validation').then(({ validateEnvironment }) => {
-    validateEnvironment();
-  });
-}
-
 // Client-side: Detect and warn about HTTPS/HTTP mismatch in development
 /* v8 ignore next 7 -- development-only HTTPS localhost warning; requires specific window.location mock */
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

@@ -4,6 +4,22 @@
 import type { Instrumentation } from 'next';
 
 /**
+ * Runs once before the server takes its first request. Checks the runtime
+ * configuration against the manifest (`src/lib/config/boot-check.ts`): in
+ * production a missing required value throws here, and Next.js exits rather
+ * than serve with the feature silently off. Not called during `next build`.
+ */
+export const register = async (): Promise<void> => {
+  // The boot check reads secrets and loads winston: Node.js runtime only.
+  if (process.env.NEXT_RUNTIME !== 'nodejs') {
+    return;
+  }
+
+  const { runBootCheck } = await import('@/lib/config/boot-check');
+  runBootCheck();
+};
+
+/**
  * Captures uncaught server-side errors (route handlers, Server Components,
  * Server Actions) and writes them to the structured log. The digest field
  * correlates these entries with client error-boundary reports.

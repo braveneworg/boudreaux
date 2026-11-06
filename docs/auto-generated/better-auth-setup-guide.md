@@ -33,7 +33,7 @@ on). Everything here is derived from the application code, never from any
 | `src/lib/auth/apple-client-secret.ts`          | Standalone helper to mint the Apple ES256 client-secret JWT (offline)                                                                                        |
 | `src/lib/email/send-magic-link-email.ts`       | Sends the magic-link email via **AWS SES SDK** (`SendRawEmailCommand`)                                                                                       |
 | `src/lib/utils/ses-client.ts`                  | Lazy SES client — reads `AWS_REGION` (+ standard AWS credential chain)                                                                                       |
-| `src/lib/config/env-validation.ts`             | Boot-time required-env gate (production only)                                                                                                                |
+| `src/lib/config/env-manifest.ts`               | Boot-time required-env gate (production only)                                                                                                                |
 | `scripts/migrate-email-verified-to-boolean.ts` | One-time `emailVerified` DateTime → Boolean migration                                                                                                        |
 
 ## External services to provision
@@ -109,7 +109,7 @@ out). The SES client uses the standard AWS credential chain.
 
 > **No SMTP vars.** The old SMTP config — `EMAIL_SERVER_HOST` /
 > `EMAIL_SERVER_USER` / `EMAIL_SERVER_PASSWORD` / `EMAIL_SERVER_PORT` — has been
-> removed from `env-validation.ts` and is no longer read or required anywhere.
+> removed from `env-manifest.ts` and is no longer read or required anywhere.
 > Do not set them.
 
 ### CAPTCHA — Cloudflare Turnstile (required)
@@ -427,7 +427,7 @@ secrets.
 
 - **Startup**: the app logs `✅ Environment validation passed`. A
   `Missing required environment variables: …` throw means one of the
-  `env-validation.ts` required keys is unset.
+  `env-manifest.ts` required keys is unset.
 - **Magic-link**: a successful send logs `[sendMagicLinkEmail] Magic-link email
 sent to <addr>`. `EMAIL_FROM is not configured` ⇒ `EMAIL_FROM` is unset.
 - **Same-origin**: the browser's `get-session` request should be same-origin
