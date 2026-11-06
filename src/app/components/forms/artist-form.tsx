@@ -31,6 +31,7 @@ import { useSession } from '@/hooks/use-session';
 import { type FormState } from '@/lib/types/form-state';
 import { toArtistLinksFormValues } from '@/lib/utils/artist-links';
 import { error } from '@/lib/utils/console-logger';
+import { formatValidationErrors } from '@/lib/utils/forms/format-validation-errors';
 import { generateSlug } from '@/lib/utils/generate-slug';
 import { plainTextToBioHtml } from '@/lib/utils/plain-text-to-bio-html';
 import { type GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
@@ -193,13 +194,6 @@ const computeIsNameRequired = (
   displayName: string | undefined,
   akaNames: string | undefined
 ): boolean => !displayName?.trim() && !akaNames?.trim();
-
-const formatValidationErrors = (errors: Record<string, { message?: string }>): string => {
-  const errorMessages = Object.entries(errors)
-    .map(([field, err]) => `${field}: ${err.message || 'Invalid'}`)
-    .join(', ');
-  return errorMessages || 'Please check the form for errors.';
-};
 
 interface SubmittingState {
   isCreatingArtist: boolean;

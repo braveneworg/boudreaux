@@ -45,6 +45,7 @@ import { type DigitalFormatType } from '@/lib/constants/digital-formats';
 import { type FormState } from '@/lib/types/form-state';
 import { type Format } from '@/lib/types/media-models';
 import { error } from '@/lib/utils/console-logger';
+import { formatValidationErrors } from '@/lib/utils/forms/format-validation-errors';
 import { generateObjectId } from '@/lib/utils/generate-object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
@@ -165,13 +166,6 @@ const buildReleaseDefaults = (userId: string | undefined): ReleaseFormData => ({
   suggestedPrice: '',
   createdBy: userId,
 });
-
-const formatValidationErrors = (errors: Record<string, { message?: string }>): string => {
-  const errorMessages = Object.entries(errors)
-    .map(([field, err]) => `${field}: ${err.message || 'Invalid'}`)
-    .join(', ');
-  return errorMessages || 'Please check the form for errors.';
-};
 
 /** Pre-populate release fields from audio metadata extracted on first upload. */
 const applyExtractedMetadata = (
