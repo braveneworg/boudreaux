@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -32,6 +32,7 @@ import {
   type FeaturedArtistFormData,
 } from '@/lib/validation/create-featured-artist-schema';
 
+import { useEntitySubmit } from './_hooks/use-entity-submit';
 import { DisplaySettingsSection } from './sections/display-settings-section';
 import { FeaturedArtistFormHeader } from './sections/featured-artist-form-header';
 import { MediaAssociationsSection } from './sections/media-associations-section';
@@ -43,32 +44,6 @@ type FormFieldName = keyof FeaturedArtistFormData;
 interface FeaturedArtistFormProps {
   featuredArtistId?: string;
 }
-
-const initialFormState: FormState = {
-  fields: {},
-  success: false,
-};
-
-/**
- * Composes a toast message from the server error map. Extracted as a pure
- * helper to keep the submit handlers under the cyclomatic-complexity ceiling.
- */
-const buildErrorMessage = (errors: FormState['errors'], fallback: string): string => {
-  const generalMsg = errors?.general?.[0];
-  if (generalMsg) return generalMsg;
-  const errorDetails = errors
-    ? Object.entries(errors)
-        .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
-        .join('; ')
-    : 'Unknown error';
-  return `${fallback}: ${errorDetails}`;
-};
-
-const buildCreateErrorMessage = (errors: FormState['errors']): string =>
-  buildErrorMessage(errors, 'Failed to create featured artist');
-
-const buildEditErrorMessage = (errors: FormState['errors']): string =>
-  buildErrorMessage(errors, 'Failed to update featured artist');
 
 const ToastContent = ({
   displayName,
@@ -86,7 +61,6 @@ const ToastContent = ({
 export const FeaturedArtistForm = ({
   featuredArtistId: initialFeaturedArtistId,
 }: FeaturedArtistFormProps) => {
-  const [formState, setFormState] = useState<FormState>(initialFormState);
   const [isPending, setIsPending] = useState(false);
   const [featuredArtistId, setFeaturedArtistId] = useState<string | null>(
     initialFeaturedArtistId || null
@@ -132,20 +106,6 @@ export const FeaturedArtistForm = ({
     setFormatStatus,
   });
 
-  // Sync server-side field errors with React Hook Form for inline display
-  useEffect(() => {
-    if (formState.errors) {
-      Object.entries(formState.errors).forEach(([field, messages]) => {
-        if (field !== 'general' && messages && messages.length > 0) {
-          form.setError(field as FormFieldName, {
-            type: 'server',
-            message: messages[0],
-          });
-        }
-      });
-    }
-  }, [formState.errors, form]);
-
   useDigitalFormatSync(watchedReleaseId, isLoadingFeaturedArtist, form, {
     setFormatStatus,
     setFormatFileCount,
@@ -177,62 +137,43 @@ export const FeaturedArtistForm = ({
     }
   };
 
+  const submit = useEntitySubmit<FeaturedArtistFormData, FormState>({
+    entity: 'featured artist',
+    form,
+    create: (values) => createFeaturedArtistAsync({ ...values, artistIds: derivedArtistIds }),
+    update: (id, values) =>
+      updateFeaturedArtistAsync({
+        featuredArtistId: id,
+        values: { ...values, artistIds: derivedArtistIds },
+      }),
+    onSuccess: (result, values, mode) => {
+      const createdId = result.data?.featuredArtistId;
+      if (mode === 'create' && typeof createdId === 'string') {
+        setFeaturedArtistId(createdId);
+      }
+      toast.success(
+        <ToastContent displayName={values.displayName || ''} isEditMode={mode === 'update'} />
+      );
+      router.push('/admin?entity=featuredArtist');
+    },
+  });
+
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const isValid = await form.trigger();
     if (!isValid) {
-      const errors = form.formState.errors;
-      const errorFields = Object.keys(errors);
+      const errorFields = Object.keys(form.formState.errors);
       toast.error(`Validation failed on: ${errorFields.join(', ')}`);
       return;
     }
-    const values = form.getValues();
     setIsPending(true);
     try {
-      await handleFormSubmit(values);
+      await submit(formRef.current, featuredArtistId, form.getValues());
     } catch (err) {
       error('Featured artist submission failed:', err);
       toast.error('An unexpected error occurred while saving.');
     } finally {
       setIsPending(false);
-    }
-  };
-
-  const handleFormSubmit = async (values: FeaturedArtistFormData) => {
-    if (isEditMode && featuredArtistId) {
-      await handleEditSubmit(values, featuredArtistId);
-    } else {
-      await handleCreateSubmit(values);
-    }
-  };
-
-  const handleEditSubmit = async (values: FeaturedArtistFormData, id: string) => {
-    const result = await updateFeaturedArtistAsync({
-      featuredArtistId: id,
-      values: { ...values, artistIds: derivedArtistIds },
-    });
-    setFormState(result);
-    if (result.success) {
-      const displayName = form.getValues('displayName');
-      toast.success(<ToastContent displayName={displayName || ''} isEditMode />);
-      router.push('/admin?entity=featuredArtist');
-    } else {
-      toast.error(buildEditErrorMessage(result.errors));
-    }
-  };
-
-  const handleCreateSubmit = async (values: FeaturedArtistFormData) => {
-    const result = await createFeaturedArtistAsync({ ...values, artistIds: derivedArtistIds });
-    setFormState(result);
-    if (result.success && result.data?.featuredArtistId) {
-      const displayName = form.getValues('displayName');
-      toast.success(<ToastContent displayName={displayName || ''} isEditMode={false} />);
-      const newId =
-        typeof result.data.featuredArtistId === 'string' ? result.data.featuredArtistId : null;
-      setFeaturedArtistId(newId);
-      router.push('/admin?entity=featuredArtist');
-    } else if (!result.success) {
-      toast.error(buildCreateErrorMessage(result.errors));
     }
   };
 

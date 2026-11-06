@@ -4,11 +4,12 @@
 import React from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, waitFor, act } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 
+import { createFeaturedArtistAction } from '@/lib/actions/create-featured-artist-action';
 import { deleteFeaturedArtistAction } from '@/lib/actions/delete-featured-artist-action';
 import { updateFeaturedArtistAction } from '@/lib/actions/update-featured-artist-action';
 
@@ -129,12 +130,22 @@ vi.mock('./_hooks/use-release-digital-format-query', () => ({
   })),
 }));
 
-// Mock form field subcomponents as simple stubs, capturing props we care about
-vi.mock('@/app/components/forms/fields', () => ({
-  TextField: ({ name, label }: { name: string; label: string }) => (
-    <div data-testid={`text-field-${name}`}>{label}</div>
-  ),
-}));
+// Mock form field subcomponents as simple stubs that show the field's error,
+// so a spec can see what the server marked.
+vi.mock('@/app/components/forms/fields', async () => {
+  const { useFormContext } = await vi.importActual<typeof ReactHookFormTypes>('react-hook-form');
+  const TextField = ({ name, label }: { name: string; label: string }) => {
+    const { getFieldState, formState } = useFormContext();
+    const { error } = getFieldState(name, formState);
+    return (
+      <div data-testid={`text-field-${name}`}>
+        {label}
+        {error?.message ? <p>{error.message}</p> : null}
+      </div>
+    );
+  };
+  return { TextField };
+});
 
 vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
   CoverArtField: ({ name }: { name: string }) => (
@@ -711,6 +722,42 @@ describe('FeaturedArtistForm', () => {
       });
     });
 
+    it('marks the field the server names', async () => {
+      vi.mocked(updateFeaturedArtistAction).mockResolvedValueOnce({
+        fields: {},
+        success: false,
+        errors: { displayName: ['Display name is taken.'] },
+      });
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      expect(
+        await within(screen.getByTestId('text-field-displayName')).findByText(
+          'Display name is taken.'
+        )
+      ).toBeVisible();
+    });
+
+    it('toasts the shared failure copy when the server names only fields', async () => {
+      vi.mocked(updateFeaturedArtistAction).mockResolvedValueOnce({
+        fields: {},
+        success: false,
+        errors: { displayName: ['Display name is taken.'] },
+      });
+      render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
+
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await save(user);
+
+      await waitFor(() =>
+        expect(vi.mocked(toast.error).mock.calls).toEqual([
+          ['Failed to update featured artist. Please check the form for errors.'],
+        ])
+      );
+    });
+
     it('shows a generic error toast when the update action throws', async () => {
       vi.mocked(updateFeaturedArtistAction).mockRejectedValue(new Error('boom'));
       render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
@@ -723,6 +770,65 @@ describe('FeaturedArtistForm', () => {
           'An unexpected error occurred while saving.'
         );
       });
+    });
+  });
+
+  describe('create save', () => {
+    const releaseId = 'abc123def456abc123def456';
+    const formatId = 'def456abc123def456abc123';
+
+    const createWithRelease = async (): Promise<void> => {
+      vi.mocked(useReleaseDigitalFormatQuery).mockReturnValue({
+        data: makeFormat(formatId, 1),
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+      render(<FeaturedArtistForm />);
+      await act(() => {
+        capturedReleaseSelectSetValue?.('releaseId', releaseId, { shouldDirty: true });
+      });
+      await waitFor(() =>
+        expect(mockSetValue).toHaveBeenCalledWith('digitalFormatId', formatId, {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+      );
+      const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getByRole('button', { name: 'Create Featured Artist' }));
+    };
+
+    afterEach(() => {
+      vi.mocked(createFeaturedArtistAction).mockReset();
+    });
+
+    it('creates through the create action and returns to the admin listing', async () => {
+      vi.mocked(createFeaturedArtistAction).mockResolvedValueOnce({
+        fields: {},
+        success: true,
+        data: { featuredArtistId: '507f1f77bcf86cd799439011' },
+      });
+
+      await createWithRelease();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/admin?entity=featuredArtist'));
+      expect(vi.mocked(createFeaturedArtistAction)).toHaveBeenCalledTimes(1);
+    });
+
+    it("toasts the server's general error and stays put when the create fails", async () => {
+      vi.mocked(createFeaturedArtistAction).mockResolvedValueOnce({
+        fields: {},
+        success: false,
+        errors: { general: ['Failed to create featured artist'] },
+      });
+
+      await createWithRelease();
+
+      await waitFor(() =>
+        expect(vi.mocked(toast.error).mock.calls).toEqual([['Failed to create featured artist']])
+      );
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
