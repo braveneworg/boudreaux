@@ -204,6 +204,10 @@ jobs:
           LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
           SMS_PROVIDER=${{ vars.SMS_PROVIDER || 'noop' }}
           SNS_SMS_ORIGINATION_NUMBER=${{ vars.SNS_SMS_ORIGINATION_NUMBER }}
+          AUTH_DISABLE_SIGNUP=${{ vars.AUTH_DISABLE_SIGNUP }}
+          CONTACT_EMAIL=${{ vars.CONTACT_EMAIL }}
+          LOG_DEBUG_MODULES=${{ vars.LOG_DEBUG_MODULES }}
+          SLOW_QUERY_MS=${{ vars.SLOW_QUERY_MS }}
           EOF
 
           # Base64-encoded private keys can be stored line-wrapped (multi-line):

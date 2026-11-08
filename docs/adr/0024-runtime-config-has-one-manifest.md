@@ -110,6 +110,11 @@ saves the roll and its downtime.)
 - A rollback runs the same pre-roll checks with main's manifest, so a missing
   required secret blocks a rollback as well as a forward deploy.
 - `AUTH_DISABLE_SIGNUP`, `CONTACT_EMAIL`, `LOG_DEBUG_MODULES` and
-  `SLOW_QUERY_MS` are `local` because production does not forward them
-  today; forwarding one is a manifest change plus the env-file and compose
-  lines the drift spec will ask for.
+  `SLOW_QUERY_MS` were `local` at first. Since 2026-11-08 they are optional
+  `runtime` values read from repository variables of the same name; an
+  unset variable writes an empty value, which each reader treats exactly as
+  unset. Signups could already be paused in production from
+  `/admin/settings`; `AUTH_DISABLE_SIGNUP` is the override that the toggle
+  cannot undo, and it needs a roll to change. Forwarding any other name is
+  the same change: a manifest line plus the env-file and compose lines the
+  drift spec asks for.
