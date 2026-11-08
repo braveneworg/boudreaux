@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { Prisma } from '@prisma/client';
-
 import { ImageRepository } from './image-repository';
 
 // Mock Prisma Client
@@ -129,89 +127,100 @@ describe('ImageRepository', () => {
     });
   });
 
-  describe('create', () => {
-    it('should create a new tour image record', async () => {
-      const input = {
-        tourId: 'tour123',
-        s3Key: 'media/tours/tour123/poster-123456.jpg',
-        s3Url: 'https://cdn.example.com/poster-123456.jpg',
-        s3Bucket: 'test-bucket',
-        fileName: 'poster.jpg',
-        fileSize: 1024000,
-        mimeType: 'image/jpeg',
-        displayOrder: 0,
-        altText: 'Tour promotional poster',
-        uploadedBy: 'user1',
-      };
+  describe('ImageRepository.createWithinCap', () => {
+    const data = {
+      tourId: 'owner-1',
+      s3Key: 'media/x/owner-1/photo-1-ab.jpg',
+      s3Url: 'https://cdn.example.com/media/x/owner-1/photo-1-ab.jpg',
+      s3Bucket: 'bucket',
+      fileName: 'photo.jpg',
+      fileSize: 1024,
+      mimeType: 'image/jpeg',
+      altText: 'alt',
+      uploadedBy: 'admin-1',
+    };
 
-      const mockCreated = {
-        id: 'img-new',
-        ...input,
-        createdAt: new Date(),
-      };
+    // A failing case can leave a queued transaction unconsumed; drain it so it
+    // never reaches a shuffled neighbour.
+    afterEach(() => {
+      vi.mocked(prisma.$transaction).mockReset();
+    });
 
-      (prisma.tourImage.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockCreated);
+    /** A transaction client that logs each call, holding `count` images already. */
+    const txHolding = (count: number, log: string[]) => ({
+      tour: {
+        update: vi.fn(async () => {
+          log.push('tour.update');
+        }),
+      },
+      tourImage: {
+        count: vi.fn(async () => {
+          log.push('tourImage.count');
+          return count;
+        }),
+        create: vi.fn(async ({ data: row }: { data: Record<string, unknown> }) => {
+          log.push('tourImage.create');
+          return { id: 'img-new', ...row };
+        }),
+      },
+    });
 
-      const result = await ImageRepository.create(input);
+    const runIn = (tx: unknown) =>
+      vi
+        .mocked(prisma.$transaction)
+        .mockImplementationOnce(((callback: (client: unknown) => unknown) =>
+          Promise.resolve(callback(tx))) as never);
 
-      expect(result).toEqual(mockCreated);
-      expect(prisma.tourImage.create).toHaveBeenCalledWith({
-        data: input,
+    it('writes the tour first, then counts, then stores the image as its last', async () => {
+      const log: string[] = [];
+      const tx = txHolding(3, log);
+      runIn(tx);
+
+      const row = await ImageRepository.createWithinCap(data, 10);
+
+      expect({ log, row, owner: tx.tour.update.mock.calls }).toEqual({
+        log: ['tour.update', 'tourImage.count', 'tourImage.create'],
+        row: { id: 'img-new', ...data, displayOrder: 3 },
+        owner: [[{ where: { id: 'owner-1' }, data: { updatedAt: expect.any(Date) } }]],
       });
     });
 
-    it('should handle optional fields correctly', async () => {
-      const input = {
-        tourId: 'tour123',
-        s3Key: 'media/tours/tour123/poster.jpg',
-        s3Url: 'https://cdn.example.com/poster.jpg',
-        s3Bucket: 'test-bucket',
-        fileName: 'poster.jpg',
-        fileSize: 1024000,
-        mimeType: 'image/jpeg',
-        displayOrder: 0,
-        // altText and uploadedBy are optional
-      };
+    it('stores nothing and answers null once the tour holds the cap', async () => {
+      const log: string[] = [];
+      runIn(txHolding(10, log));
 
-      const mockCreated = {
-        id: 'img-new',
-        ...input,
-        altText: null,
-        uploadedBy: null,
-        createdAt: new Date(),
-      };
+      const row = await ImageRepository.createWithinCap(data, 10);
 
-      (prisma.tourImage.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockCreated);
-
-      const result = await ImageRepository.create(input);
-
-      expect(result.altText).toBeNull();
-      expect(result.uploadedBy).toBeNull();
+      expect({ log, row }).toEqual({
+        log: ['tour.update', 'tourImage.count'],
+        row: null,
+      });
     });
 
-    it('should throw error on database constraint violation', async () => {
-      const input = {
-        tourId: 'tour123',
-        s3Key: 'media/tours/tour123/poster.jpg',
-        s3Url: 'https://cdn.example.com/poster.jpg',
-        s3Bucket: 'test-bucket',
-        fileName: 'poster.jpg',
-        fileSize: 1024000,
-        mimeType: 'image/jpeg',
-        displayOrder: 0,
-      };
+    it('runs again when it loses a write conflict to a concurrent confirm', async () => {
+      const log: string[] = [];
+      vi.mocked(prisma.$transaction).mockRejectedValueOnce(
+        Object.assign(new Error('Transaction failed due to a write conflict'), { code: 'P2034' })
+      );
+      runIn(txHolding(9, log));
 
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Foreign key constraint failed',
-        {
-          code: 'P2003',
-          clientVersion: '5.0.0',
-        }
+      const row = await ImageRepository.createWithinCap(data, 10);
+
+      expect({ attempts: vi.mocked(prisma.$transaction).mock.calls.length, row }).toEqual({
+        attempts: 2,
+        row: { id: 'img-new', ...data, displayOrder: 9 },
+      });
+    });
+
+    it('fails at once on any other error', async () => {
+      vi.mocked(prisma.$transaction).mockRejectedValueOnce(
+        Object.assign(new Error('Record to update not found'), { code: 'P2025' })
       );
 
-      (prisma.tourImage.create as ReturnType<typeof vi.fn>).mockRejectedValue(prismaError);
-
-      await expect(ImageRepository.create(input)).rejects.toThrow();
+      await expect(ImageRepository.createWithinCap(data, 10)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      expect(vi.mocked(prisma.$transaction).mock.calls).toHaveLength(1);
     });
   });
 

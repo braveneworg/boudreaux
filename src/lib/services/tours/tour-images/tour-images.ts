@@ -166,8 +166,8 @@ export class TourImages {
    * {@link requestUpload} signed it: any other key is refused and left alone,
    * so a confirm can neither record nor delete another owner's object. A
    * confirm that would pass the cap is refused and its object deleted. The
-   * count and the insert are separate reads, so two confirms racing at the
-   * same instant can still both pass.
+   * cap is applied atomically per owner, so confirms racing at the same
+   * instant (two admins, or two tabs) store no more than the cap.
    */
   async confirmUpload<K extends TourImageOwnerKind>(
     { kind, id }: TourImageOwner<K>,
@@ -184,26 +184,27 @@ export class TourImages {
       };
     }
     try {
-      const displayOrder = await records.count(id);
-      if (displayOrder >= policy.maxImages) {
+      const row = await records.createWithinCap(
+        {
+          ownerId: id,
+          s3Key: upload.s3Key,
+          s3Url: this.deps.store.publicUrl(upload.s3Key),
+          s3Bucket: upload.s3Bucket,
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          mimeType: upload.mimeType,
+          altText: upload.altText,
+          uploadedBy: userId,
+        },
+        policy.maxImages
+      );
+      if (row === null) {
         // Another upload filled the cap after this one's URL was issued:
         // refuse it and remove the object it left in the bucket.
         await this.deps.store.delete(upload.s3Key);
         return capExceeded(policy);
       }
 
-      const row = await records.create({
-        ownerId: id,
-        s3Key: upload.s3Key,
-        s3Url: this.deps.store.publicUrl(upload.s3Key),
-        s3Bucket: upload.s3Bucket,
-        fileName: upload.fileName,
-        fileSize: upload.fileSize,
-        mimeType: upload.mimeType,
-        displayOrder,
-        altText: upload.altText,
-        uploadedBy: userId,
-      });
       return { success: true, data: toConfirmed(row) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to confirm upload' });

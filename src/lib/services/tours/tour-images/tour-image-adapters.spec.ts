@@ -22,7 +22,6 @@ const NEW_RECORD = {
   fileName: 'photo.jpg',
   fileSize: 1024,
   mimeType: 'image/jpeg',
-  displayOrder: 3,
   altText: 'A crowd',
   uploadedBy: 'admin-1',
 };
@@ -78,11 +77,11 @@ describe('s3TourImageStore', () => {
 });
 
 describe('tourImageRecords', () => {
-  it('stores the owner as the tour id', async () => {
-    await tourImageRecords.create(NEW_RECORD);
+  it('stores the owner as the tour id, within the cap it is given', async () => {
+    await tourImageRecords.createWithinCap(NEW_RECORD, 7);
 
-    expect(vi.mocked(ImageRepository.create).mock.calls).toEqual([
-      [{ tourId: 'owner-1', ...STORED_FIELDS }],
+    expect(vi.mocked(ImageRepository.createWithinCap).mock.calls).toEqual([
+      [{ tourId: 'owner-1', ...STORED_FIELDS }, 7],
     ]);
   });
 
@@ -110,11 +109,11 @@ describe('tourImageRecords', () => {
 });
 
 describe('tourDateImageRecords', () => {
-  it('stores the owner as the tour date id', async () => {
-    await tourDateImageRecords.create(NEW_RECORD);
+  it('stores the owner as the tour date id, within the cap it is given', async () => {
+    await tourDateImageRecords.createWithinCap(NEW_RECORD, 7);
 
-    expect(vi.mocked(TourDateImageRepository.create).mock.calls).toEqual([
-      [{ tourDateId: 'owner-1', ...STORED_FIELDS }],
+    expect(vi.mocked(TourDateImageRepository.createWithinCap).mock.calls).toEqual([
+      [{ tourDateId: 'owner-1', ...STORED_FIELDS }, 7],
     ]);
   });
 

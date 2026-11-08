@@ -69,6 +69,8 @@ const createFakeStore = (log: string[]): FakeStore => {
 /** The in-memory records adapter for one model, storing rows under `ownerKey`. */
 interface FakeRecords extends TourImageRecords<FakeRow> {
   rows: Map<string, FakeRow>;
+  /** Store a row at a given display order, bypassing the cap (for seeding). */
+  insert: (record: NewTourImageRecord & { displayOrder: number }) => FakeRow;
 }
 
 const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
@@ -80,24 +82,35 @@ const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
       .filter((row) => owners.get(row.id) === ownerId)
       .toSorted((a, b) => a.displayOrder - b.displayOrder);
 
+  const insert = ({
+    ownerId,
+    altText,
+    uploadedBy,
+    ...rest
+  }: NewTourImageRecord & { displayOrder: number }): FakeRow => {
+    const row: FakeRow = {
+      ...rest,
+      id: `image-${nextId++}`,
+      [ownerKey]: ownerId,
+      altText: altText ?? null,
+      uploadedBy: uploadedBy ?? null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    rows.set(row.id, row);
+    owners.set(row.id, ownerId);
+    return row;
+  };
+
   return {
     rows,
+    insert,
     ownerIdOf: (row) => owners.get(row.id) ?? '',
     findByOwner: async (ownerId) => ownedBy(ownerId),
     count: async (ownerId) => ownedBy(ownerId).length,
     findById: async (id) => rows.get(id) ?? null,
-    create: async ({ ownerId, altText, uploadedBy, ...rest }: NewTourImageRecord) => {
-      const row: FakeRow = {
-        ...rest,
-        id: `image-${nextId++}`,
-        [ownerKey]: ownerId,
-        altText: altText ?? null,
-        uploadedBy: uploadedBy ?? null,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      };
-      rows.set(row.id, row);
-      owners.set(row.id, ownerId);
-      return row;
+    createWithinCap: async (record, maxImages) => {
+      const displayOrder = ownedBy(record.ownerId).length;
+      return displayOrder >= maxImages ? null : insert({ ...record, displayOrder });
     },
     delete: async (id) => {
       log.push(`records.delete ${id}`);
@@ -154,7 +167,7 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
     const seeded: FakeRow[] = [];
     for (let index = 0; index < count; index++) {
       seeded.push(
-        await records.create({
+        records.insert({
           ownerId,
           s3Key: `media/seed-${ownerId}-${index}.jpg`,
           s3Url: `${CDN}/media/seed-${ownerId}-${index}.jpg`,
@@ -384,7 +397,7 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
     });
 
     it('fails with generic copy when the write throws', async () => {
-      records.create = async () => {
+      records.createWithinCap = async () => {
         throw new Error('E11000 duplicate key');
       };
 

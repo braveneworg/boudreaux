@@ -41,7 +41,7 @@ export interface TourImageOrder {
   displayOrder: number;
 }
 
-/** A row to create, with the owner named generically. */
+/** A row to create, with the owner named generically; its display order is the owner's next. */
 export interface NewTourImageRecord {
   ownerId: string;
   s3Key: string;
@@ -50,7 +50,6 @@ export interface NewTourImageRecord {
   fileName: string;
   fileSize: number;
   mimeType: string;
-  displayOrder: number;
   altText?: string;
   uploadedBy?: string;
 }
@@ -66,7 +65,12 @@ export interface TourImageRecords<Row> {
   findByOwner: (ownerId: string) => Promise<Row[]>;
   count: (ownerId: string) => Promise<number>;
   findById: (id: string) => Promise<Row | null>;
-  create: (record: NewTourImageRecord) => Promise<Row>;
+  /**
+   * Store the row as the owner's last image unless the owner already holds
+   * `maxImages`, atomically per owner: concurrent calls never store more
+   * than `maxImages`. Null when the owner is at its cap.
+   */
+  createWithinCap: (record: NewTourImageRecord, maxImages: number) => Promise<Row | null>;
   delete: (id: string) => Promise<void>;
   reorder: (orders: TourImageOrder[]) => Promise<void>;
   updateAltText: (id: string, altText: string | null) => Promise<void>;

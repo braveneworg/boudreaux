@@ -46,26 +46,100 @@ describe('TourDateImageRepository.findById', () => {
   });
 });
 
-describe('TourDateImageRepository.create', () => {
-  it('persists the supplied data fields verbatim', async () => {
-    vi.mocked(prisma.tourDateImage.create).mockResolvedValue({ id: 'img-1' } as never);
+describe('TourDateImageRepository.createWithinCap', () => {
+  const data = {
+    tourDateId: 'owner-1',
+    s3Key: 'media/x/owner-1/photo-1-ab.jpg',
+    s3Url: 'https://cdn.example.com/media/x/owner-1/photo-1-ab.jpg',
+    s3Bucket: 'bucket',
+    fileName: 'photo.jpg',
+    fileSize: 1024,
+    mimeType: 'image/jpeg',
+    altText: 'alt',
+    uploadedBy: 'admin-1',
+  };
 
-    const data = {
-      tourDateId: 'td-1',
-      s3Key: 'key',
-      s3Url: 'https://cdn.example.com/key',
-      s3Bucket: 'bucket',
-      fileName: 'photo.jpg',
-      fileSize: 1024,
-      mimeType: 'image/jpeg',
-      displayOrder: 0,
-      altText: 'alt',
-      uploadedBy: 'admin-1',
-    };
+  // A failing case can leave a queued transaction unconsumed; drain it so it
+  // never reaches a shuffled neighbour.
+  afterEach(() => {
+    vi.mocked(prisma.$transaction).mockReset();
+  });
 
-    await TourDateImageRepository.create(data);
+  /** A transaction client that logs each call, holding `count` images already. */
+  const txHolding = (count: number, log: string[]) => ({
+    tourDate: {
+      update: vi.fn(async () => {
+        log.push('tourDate.update');
+      }),
+    },
+    tourDateImage: {
+      count: vi.fn(async () => {
+        log.push('tourDateImage.count');
+        return count;
+      }),
+      create: vi.fn(async ({ data: row }: { data: Record<string, unknown> }) => {
+        log.push('tourDateImage.create');
+        return { id: 'img-new', ...row };
+      }),
+    },
+  });
 
-    expect(prisma.tourDateImage.create).toHaveBeenCalledWith({ data });
+  const runIn = (tx: unknown) =>
+    vi
+      .mocked(prisma.$transaction)
+      .mockImplementationOnce(((callback: (client: unknown) => unknown) =>
+        Promise.resolve(callback(tx))) as never);
+
+  it('writes the tour date first, then counts, then stores the image as its last', async () => {
+    const log: string[] = [];
+    const tx = txHolding(3, log);
+    runIn(tx);
+
+    const row = await TourDateImageRepository.createWithinCap(data, 10);
+
+    expect({ log, row, owner: tx.tourDate.update.mock.calls }).toEqual({
+      log: ['tourDate.update', 'tourDateImage.count', 'tourDateImage.create'],
+      row: { id: 'img-new', ...data, displayOrder: 3 },
+      owner: [[{ where: { id: 'owner-1' }, data: { updatedAt: expect.any(Date) } }]],
+    });
+  });
+
+  it('stores nothing and answers null once the tour date holds the cap', async () => {
+    const log: string[] = [];
+    runIn(txHolding(10, log));
+
+    const row = await TourDateImageRepository.createWithinCap(data, 10);
+
+    expect({ log, row }).toEqual({
+      log: ['tourDate.update', 'tourDateImage.count'],
+      row: null,
+    });
+  });
+
+  it('runs again when it loses a write conflict to a concurrent confirm', async () => {
+    const log: string[] = [];
+    vi.mocked(prisma.$transaction).mockRejectedValueOnce(
+      Object.assign(new Error('Transaction failed due to a write conflict'), { code: 'P2034' })
+    );
+    runIn(txHolding(9, log));
+
+    const row = await TourDateImageRepository.createWithinCap(data, 10);
+
+    expect({ attempts: vi.mocked(prisma.$transaction).mock.calls.length, row }).toEqual({
+      attempts: 2,
+      row: { id: 'img-new', ...data, displayOrder: 9 },
+    });
+  });
+
+  it('fails at once on any other error', async () => {
+    vi.mocked(prisma.$transaction).mockRejectedValueOnce(
+      Object.assign(new Error('Record to update not found'), { code: 'P2025' })
+    );
+
+    await expect(TourDateImageRepository.createWithinCap(data, 10)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    expect(vi.mocked(prisma.$transaction).mock.calls).toHaveLength(1);
   });
 });
 

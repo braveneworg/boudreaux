@@ -545,7 +545,8 @@ _Avoid_: show, gig, event.
 **tour image** — one image a **Tour** or a **tour date** holds (its owner),
 uploaded by an admin through a presigned S3 URL and served from the CDN. A
 Tour holds up to ten, a tour date up to twenty; the cap is checked when the
-URL is issued and again at confirm, and a confirm must name an object in
+URL is issued and again, atomically per owner, at confirm, so two admins
+confirming at once cannot pass it; and a confirm must name an object in
 the owner's own key namespace. One module owns both owner kinds — the
 cap, the key namespace, the display order, the check that an image belongs
 to the owner named, and a delete that removes the object and then the row,

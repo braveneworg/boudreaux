@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import type { TourDateImageScalars } from '@/lib/types/tours';
 
 import { runQuery } from '../_internal/map-prisma-error';
+import { retryOnWriteConflict } from '../_internal/write-conflict';
 
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -20,7 +21,6 @@ export interface CreateTourDateImageInput {
   fileName: string;
   fileSize: number;
   mimeType: string;
-  displayOrder: number;
   altText?: string;
   uploadedBy?: string;
 }
@@ -29,6 +29,13 @@ export interface TourDateImageOrderUpdate {
   id: string;
   displayOrder: number;
 }
+
+/**
+ * How many confirms may race on one owner before the last is refused with a
+ * conflict rather than an answer. Two admins (or two tabs) is the case that
+ * happens; the margin covers more.
+ */
+const CONFIRM_ATTEMPTS = 5;
 
 // Compile-time drift guard: fail `pnpm run typecheck` if the hand-written
 // `TourDateImageScalars` diverges from the Prisma tour-date-image model scalars.
@@ -64,12 +71,37 @@ export class TourDateImageRepository {
   }
 
   /**
-   * Create a new tour date image record.
+   * Record a new image as the tour date's last, unless it already holds
+   * `maxImages`: null then, and nothing is written. The count and the insert
+   * run in one transaction that first writes the tour date's own document,
+   * so two confirms for one tour date cannot both count under the cap: the
+   * second to write the document loses a write conflict, runs again, and
+   * counts the first one's image. A tour date that does not exist fails
+   * `NOT_FOUND` instead of gaining an orphaned image.
    */
-  static async create(data: CreateTourDateImageInput): Promise<TourDateImageScalars> {
-    return prisma.tourDateImage.create({
-      data,
-    });
+  static async createWithinCap(
+    data: CreateTourDateImageInput,
+    maxImages: number
+  ): Promise<TourDateImageScalars | null> {
+    return retryOnWriteConflict(
+      () =>
+        runQuery(() =>
+          prisma.$transaction(async (tx) => {
+            await tx.tourDate.update({
+              where: { id: data.tourDateId },
+              data: { updatedAt: new Date() },
+            });
+            const displayOrder = await tx.tourDateImage.count({
+              where: { tourDateId: data.tourDateId },
+            });
+            if (displayOrder >= maxImages) {
+              return null;
+            }
+            return tx.tourDateImage.create({ data: { ...data, displayOrder } });
+          })
+        ),
+      CONFIRM_ATTEMPTS
+    );
   }
 
   /**
