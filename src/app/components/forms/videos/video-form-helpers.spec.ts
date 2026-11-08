@@ -6,7 +6,6 @@ import type { VideoRow } from '@/lib/validation/video-schema';
 import type { ProbePrefillTags } from '@/lib/video-probe/probe-tags';
 
 import {
-  applyServerFieldErrors,
   applyServerProbePrefill,
   applyVideoPrefill,
   buildVideoDefaults,
@@ -113,34 +112,6 @@ describe('validateVideoFile', () => {
   it('accepts a valid webm file', () => {
     const file = new File(['x'], 'a.webm', { type: 'video/webm' });
     expect(validateVideoFile(file)).toBeNull();
-  });
-});
-
-describe('applyServerFieldErrors', () => {
-  const makeSetError = () => vi.fn() as unknown as UseFormReturn<VideoFormData>['setError'];
-
-  it('does nothing when there are no errors', () => {
-    const setError = makeSetError();
-    applyServerFieldErrors(setError, undefined);
-    expect(setError).not.toHaveBeenCalled();
-  });
-
-  it('skips the general error key', () => {
-    const setError = makeSetError();
-    applyServerFieldErrors(setError, { general: ['boom'] });
-    expect(setError).not.toHaveBeenCalled();
-  });
-
-  it('skips fields with an empty message list', () => {
-    const setError = makeSetError();
-    applyServerFieldErrors(setError, { title: [] });
-    expect(setError).not.toHaveBeenCalled();
-  });
-
-  it('maps a field error onto the form', () => {
-    const setError = makeSetError();
-    applyServerFieldErrors(setError, { title: ['Taken'] });
-    expect(setError).toHaveBeenCalledWith('title', { type: 'server', message: 'Taken' });
   });
 });
 

@@ -4,16 +4,19 @@
 import React from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import { archiveArtistAction } from '@/lib/actions/archive-artist-action';
+import { createArtistAction } from '@/lib/actions/create-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import type { GeneratedBioContent } from '@/lib/validation/bio-generation-schema';
 
 import { useArtistPool } from './_hooks/use-artist-pool';
 import { ArtistForm } from './artist-form';
+
+import type * as ReactHookForm from 'react-hook-form';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -52,18 +55,34 @@ vi.mock('@/hooks/use-hiding-warning', () => ({
 }));
 
 vi.mock('@/hooks/use-session', () => ({
-  useSession: () => ({ data: { user: { id: 'admin-1', role: 'admin' } }, status: 'authenticated' }),
+  // A real ObjectId: the form stamps `createdBy` from the session and validates it.
+  useSession: () => ({
+    data: { user: { id: '5'.repeat(24), role: 'admin' } },
+    status: 'authenticated',
+  }),
 }));
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/app/components/forms/fields', () => ({
-  TextField: ({ name, label }: { name: string; label: string }) => (
-    <div data-testid={`text-field-${name}`}>{label}</div>
-  ),
-}));
+// A stand-in field: a registered input plus the field's error, so a spec can
+// type into the form and see what the server marked.
+vi.mock('@/app/components/forms/fields', async () => {
+  const { useFormContext } = await vi.importActual<typeof ReactHookForm>('react-hook-form');
+  const TextField = ({ name, label }: { name: string; label: string }) => {
+    const { register, getFieldState, formState } = useFormContext();
+    const { error } = getFieldState(name, formState);
+    return (
+      <div data-testid={`text-field-${name}`}>
+        {label}
+        <input aria-label={`${name} input`} {...register(name)} />
+        {error?.message ? <p>{error.message}</p> : null}
+      </div>
+    );
+  };
+  return { TextField };
+});
 
 // Mock BioHtml (pulled in transitively via the bio-generation section) so this
 // spec stays on the fast vmThreads pool; the real BioHtml needs the forks pool.
@@ -217,6 +236,35 @@ describe('ArtistForm', () => {
       render(<ArtistForm />);
 
       expect(screen.queryByRole('button', { name: 'Delete Artist' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('a refused create', () => {
+    const slugInUse = 'This slug is already in use. Please choose a different one.';
+
+    afterEach(() => {
+      vi.mocked(createArtistAction).mockReset();
+    });
+
+    // The defect: the action put the duplicate on `errors.slug`, and the form
+    // showed only "Failed to create artist. Please check the form for errors."
+    it("marks the slug field with the server's duplicate-slug message", async () => {
+      vi.mocked(createArtistAction).mockResolvedValueOnce({
+        fields: {},
+        success: false,
+        errors: { slug: [slugInUse] },
+      });
+      render(<ArtistForm />);
+      const user = userEvent.setup({ delay: null });
+      await user.type(screen.getByLabelText('firstName input'), 'Jane');
+      await user.type(screen.getByLabelText('surname input'), 'Doe');
+
+      await user.click(screen.getByRole('button', { name: 'Create' }));
+      await waitFor(() => expect(createArtistAction).toHaveBeenCalledTimes(1));
+
+      expect(
+        await within(screen.getByTestId('text-field-slug')).findByText(slugInUse)
+      ).toBeVisible();
     });
   });
 

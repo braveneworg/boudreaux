@@ -10,8 +10,11 @@ import { toast } from 'sonner';
 
 import { ReleaseForm } from '@/app/components/forms/release-form';
 import { useReleaseDetailQuery } from '@/hooks/queries/use-release-query';
+import { createReleaseAction } from '@/lib/actions/create-release-action';
 import { deleteReleaseAction } from '@/lib/actions/delete-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
+
+import type * as ReactHookForm from 'react-hook-form';
 
 /**
  * Render helper that wraps the form in a fresh TanStack Query client so the
@@ -108,11 +111,40 @@ vi.mock('@/hooks/queries/use-release-query', () => ({
 vi.mock('@/app/components/forms/digital-formats-accordion', () => ({
   DigitalFormatsAccordion: () => <div data-testid="digital-formats-accordion" />,
 }));
-vi.mock('@/app/components/forms/fields/artist-multi-select', () => ({
-  ArtistMultiSelect: () => <div data-testid="artist-multi-select" />,
-}));
+// A stand-in picker: one click credits an artist, which the schema requires.
+vi.mock('@/app/components/forms/fields/artist-multi-select', async () => {
+  const { useController } = await vi.importActual<typeof ReactHookForm>('react-hook-form');
+  const ArtistMultiSelect = ({ control, name }: { control: never; name: string }) => {
+    const { field } = useController({ control, name });
+    return (
+      <div data-testid="artist-multi-select">
+        <button type="button" onClick={() => field.onChange(['a'.repeat(24)])}>
+          Credit an artist
+        </button>
+      </div>
+    );
+  };
+  return { ArtistMultiSelect };
+});
+// A stand-in upload: one click sets the cover art, so a create-mode form can
+// pass validation and reach the action.
 vi.mock('@/app/components/forms/fields/cover-art-field', () => ({
-  CoverArtField: () => <div data-testid="cover-art-field" />,
+  CoverArtField: ({
+    name,
+    setValue,
+  }: {
+    name: string;
+    setValue: (field: string, value: string, options: { shouldDirty: boolean }) => void;
+  }) => (
+    <div data-testid="cover-art-field">
+      <button
+        type="button"
+        onClick={() => setValue(name, 'https://cdn.example.com/cover.jpg', { shouldDirty: true })}
+      >
+        Set cover art
+      </button>
+    </div>
+  ),
 }));
 vi.mock('@/app/components/ui/image-uploader', () => ({
   ImageUploader: () => <div data-testid="image-uploader" />,
@@ -125,13 +157,15 @@ vi.mock('../ui/datepicker', () => ({
     onChange,
     value,
     label,
+    fieldName,
   }: {
     onChange: (d: string) => void;
     value: string;
     label: string;
+    fieldName?: string;
   }) => (
     <input
-      data-testid={`datepicker-${label?.toLowerCase().replace(/\s+/g, '-')}`}
+      data-testid={`datepicker-${label?.toLowerCase().replace(/\s+/g, '-') ?? fieldName}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={label}
@@ -194,6 +228,40 @@ describe('ReleaseForm — suggestedPrice field', () => {
 
     const input = await screen.findByLabelText('Suggested price in dollars');
     expect(input).toHaveValue('');
+  });
+});
+
+describe('ReleaseForm — a refused create', () => {
+  const titleInUse = 'This title is already in use. Please choose a different one.';
+
+  const submitCreate = async (): Promise<void> => {
+    render(<ReleaseForm />);
+    const user = userEvent.setup({ delay: null });
+    await user.type(await screen.findByLabelText('Title *'), 'Taken Title');
+    await user.type(screen.getByTestId('datepicker-releasedOn'), '2024-01-01');
+    await user.click(screen.getByRole('button', { name: 'Set cover art' }));
+    await user.click(screen.getByRole('button', { name: 'Credit an artist' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+  };
+
+  afterEach(() => {
+    vi.mocked(createReleaseAction).mockReset();
+  });
+
+  // The defect: the action put the duplicate on `errors.title`, and the form
+  // showed only "Failed to create release. Please check the form for errors."
+  it("marks the title field with the server's duplicate-title message", async () => {
+    vi.mocked(createReleaseAction).mockResolvedValueOnce({
+      fields: {},
+      success: false,
+      errors: { title: [titleInUse] },
+    });
+
+    await submitCreate();
+    await waitFor(() => expect(createReleaseAction).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByText(titleInUse)).toBeInTheDocument();
+    expect(screen.getByLabelText('Title *')).toHaveAttribute('aria-invalid', 'true');
   });
 });
 

@@ -263,42 +263,21 @@ describe('createVideoAction', () => {
       expect(result.errors).toBeUndefined();
     });
 
-    it('should map a title conflict to a title field error', async () => {
+    // Video has no unique title (prisma/schema.prisma): a DUPLICATE on create
+    // is the pre-generated id already saved, never a title clash.
+    it('reports a DUPLICATE as an already-saved video, not a title clash', async () => {
       mockParsedSuccess();
-      vi.mocked(VideoService.createVideo).mockResolvedValue({
+      vi.mocked(VideoService.createVideo).mockResolvedValueOnce({
         success: false,
         error: 'Video with this title already exists',
-      } as never);
+        code: 'DUPLICATE',
+      });
 
       const result = await createVideoAction(initialFormState, buildFormData());
 
-      expect(result.success).toBe(false);
-      expect(result.errors?.title).toEqual([
-        'This title is already in use. Please choose a different one.',
-      ]);
-    });
-
-    it.each(['Title is not unique', 'Duplicate title found'])(
-      'should map the title conflict message "%s" to a title field error',
-      async (error) => {
-        mockParsedSuccess();
-        vi.mocked(VideoService.createVideo).mockResolvedValue({ success: false, error } as never);
-
-        const result = await createVideoAction(initialFormState, buildFormData());
-
-        expect(result.errors?.title).toEqual([
-          'This title is already in use. Please choose a different one.',
-        ]);
-      }
-    );
-
-    it('should map a service failure without a message to a general error', async () => {
-      mockParsedSuccess();
-      vi.mocked(VideoService.createVideo).mockResolvedValue({ success: false } as never);
-
-      const result = await createVideoAction(initialFormState, buildFormData());
-
-      expect(result.errors?.general).toEqual(['Failed to create video']);
+      expect(result.errors).toEqual({
+        general: ['This video has already been saved. Reload the page to edit it.'],
+      });
     });
 
     it('should overwrite a pre-existing errors object on a generic failure', async () => {
@@ -309,7 +288,8 @@ describe('createVideoAction', () => {
       vi.mocked(VideoService.createVideo).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await createVideoAction(initialFormState, buildFormData());
 
@@ -332,7 +312,8 @@ describe('createVideoAction', () => {
       vi.mocked(VideoService.createVideo).mockResolvedValue({
         success: false,
         error: 'Database connection failed',
-      } as never);
+        code: 'UNAVAILABLE',
+      });
 
       const result = await createVideoAction(initialFormState, buildFormData());
 
@@ -389,7 +370,8 @@ describe('createVideoAction', () => {
       vi.mocked(VideoService.createVideo).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await createVideoAction(initialFormState, buildFormData());
 
@@ -434,7 +416,8 @@ describe('createVideoAction', () => {
       vi.mocked(VideoService.createVideo).mockResolvedValue({
         success: false,
         error: 'boom',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await createVideoAction(initialFormState, buildFormData());
 

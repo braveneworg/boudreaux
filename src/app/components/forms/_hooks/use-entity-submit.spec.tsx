@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { renderHook } from '@testing-library/react';
 
+import type { FormState } from '@/lib/types/form-state';
+
 import { useEntitySubmit } from './use-entity-submit';
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
@@ -11,9 +13,7 @@ vi.mock('sonner', () => ({ toast: { error: toastErrorMock, success: vi.fn() } })
 const consoleErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/utils/console-logger', () => ({ error: consoleErrorMock }));
 
-interface Values {
-  title: string;
-}
+type Values = { title: string };
 
 const values: Values = { title: 'A Title' };
 
@@ -21,14 +21,15 @@ const formEl = {} as HTMLFormElement;
 
 const setup = (overrides: Record<string, unknown> = {}) => {
   const reset = vi.fn();
+  const setError = vi.fn();
   const create = vi.fn().mockResolvedValue({ success: true });
   const update = vi.fn().mockResolvedValue({ success: true });
   const onSuccess = vi.fn();
 
   const { result } = renderHook(() =>
-    useEntitySubmit<Values, { success: boolean }>({
+    useEntitySubmit<Values, FormState>({
       entity: 'artist',
-      reset,
+      form: { reset, setError },
       create,
       update,
       onSuccess,
@@ -36,7 +37,7 @@ const setup = (overrides: Record<string, unknown> = {}) => {
     })
   );
 
-  return { submit: result.current, reset, create, update, onSuccess };
+  return { submit: result.current, reset, setError, create, update, onSuccess };
 };
 
 describe('useEntitySubmit', () => {
@@ -107,6 +108,42 @@ describe('useEntitySubmit', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(
       'Failed to update artist. Please check the form for errors.'
     );
+  });
+
+  /**
+   * The server's field errors land on the fields they name, so a duplicate
+   * title is marked on the title field rather than only in a toast.
+   */
+  it("marks each field the server's errors name", async () => {
+    const failed = { success: false, errors: { title: ['This title is already in use.'] } };
+    const { submit, setError } = setup({ create: vi.fn().mockResolvedValue(failed) });
+
+    await submit(formEl, null, values);
+
+    expect(setError.mock.calls).toEqual([
+      ['title', { type: 'server', message: 'This title is already in use.' }],
+    ]);
+  });
+
+  it("toasts the server's general error in place of the default copy", async () => {
+    const failed = { success: false, errors: { general: ['Release not found'] } };
+    const { submit } = setup({ update: vi.fn().mockResolvedValue(failed) });
+
+    await submit(formEl, 'a1', values);
+
+    expect(toastErrorMock.mock.calls).toEqual([['Release not found']]);
+  });
+
+  it('marks no field when onFailure handles the failure', async () => {
+    const failed = { success: false, errors: { title: ['Taken.'] } };
+    const { submit, setError } = setup({
+      create: vi.fn().mockResolvedValue(failed),
+      onFailure: vi.fn(),
+    });
+
+    await submit(formEl, null, values);
+
+    expect(setError).not.toHaveBeenCalled();
   });
 
   /**

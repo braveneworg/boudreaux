@@ -84,3 +84,25 @@ overridden per call site; `code` is the stable fact callers branch on.
 - **Keep string matching, centralise the literals as constants.** Rejected:
   couples HTTP semantics to copy permanently, just with better spelling. It also
   cannot express "this service overrode the message but it is still an outage."
+
+## Amendment (2026-11-05): Form-backed actions map codes to fields
+
+The action layer still chose a form field by reading the copy
+(`includes('title') && includes('already exists')`, `includes('not
+found')`) in the release, video and artist create/update actions, the
+third dialect this ADR names. Rewording a service message moved the
+error off its field with no failing type or test.
+
+Those actions now pass the failure to `applyServiceFailure`
+(`src/lib/actions/form-state-helpers.ts`) with a `FailureFieldTable`:
+a map from `DataErrorCode` to the field it marks and the copy shown
+there, plus fallback copy for every other code. `DUPLICATE` marks the
+entity's one unique field from the schema: `title` for a release,
+`slug` for an artist. A video has no unique field besides its id, so a
+video `DUPLICATE` is a general error, not a title clash.
+
+The failure vocabulary is unchanged. `DUPLICATE` carries no field; the
+table can name one only because each of these models has a single
+unique field besides its id. A model with two would need the
+repository to report which constraint failed (Prisma P2002
+`meta.target`), and that is the point to extend `DataError`.

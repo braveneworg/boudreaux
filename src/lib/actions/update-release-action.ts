@@ -22,7 +22,12 @@ import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 
-import { refusedFormState } from './form-state-helpers';
+import {
+  applyServiceFailure,
+  DUPLICATE_TITLE,
+  type FailureFieldTable,
+  refusedFormState,
+} from './form-state-helpers';
 
 const PERMITTED_FIELD_NAMES = [
   'title',
@@ -164,44 +169,31 @@ const writeRelease = ({
     creditArtistIds: data.artistIds,
   });
 
+/** A release's only unique field besides its id is its title (prisma/schema.prisma). */
+const UPDATE_RELEASE_FAILURES: FailureFieldTable = {
+  fields: new Map([
+    ['DUPLICATE', DUPLICATE_TITLE],
+    ['NOT_FOUND', { field: 'general', message: 'Release not found' }],
+  ]),
+  fallback: 'Failed to update release',
+};
+
 /** Put the outcome of the write on the form and refresh the affected pages. */
 const applyWriteResult = (
   formState: FormState,
   releaseId: string,
   response: ReleaseWriteResult
 ): void => {
-  if (response.success) {
-    formState.errors = undefined;
-    formState.data = { releaseId };
-  } else {
-    formState.errors = formState.errors ?? {};
-    mapReleaseServiceError(response.error || 'Failed to update release', formState);
-  }
-  formState.success = response.success;
-
   revalidatePath(`/admin/releases/${releaseId}`);
-  if (response.success) {
-    revalidatePath('/releases');
-    revalidatePath('/artists/[slug]', 'page');
+  if (!response.success) {
+    applyServiceFailure(formState, response, UPDATE_RELEASE_FAILURES);
+    return;
   }
-};
-
-const mapReleaseServiceError = (errorMessage: string, formState: FormState): void => {
-  const msg = errorMessage.toLowerCase();
-  const isTitleError =
-    msg.includes('title') &&
-    (msg.includes('unique') || msg.includes('already exists') || msg.includes('duplicate'));
-
-  if (isTitleError) {
-    formState.errors = {
-      ...formState.errors,
-      title: ['This title is already in use. Please choose a different one.'],
-    };
-  } else if (msg.includes('not found')) {
-    formState.errors = { ...formState.errors, general: ['Release not found'] };
-  } else {
-    formState.errors = { general: ['Failed to update release'] };
-  }
+  formState.errors = undefined;
+  formState.data = { releaseId };
+  formState.success = true;
+  revalidatePath('/releases');
+  revalidatePath('/artists/[slug]', 'page');
 };
 
 export const updateReleaseAction = async (
