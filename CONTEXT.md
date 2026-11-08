@@ -32,6 +32,16 @@ See [ADR-0001](docs/adr/0001-service-failures-carry-a-data-error-code.md).
 `{ success: true, data: T } | { success: false, error: string, code: DataErrorCode }`.
 _Defined in_ `src/lib/services/service.types.d.ts`.
 
+**failure field table** — how a form-backed **Server Action** puts a failed
+service write on its form: a `FailureFieldTable` maps a **DataErrorCode** to
+the field it marks and the copy shown there, with fallback copy for every
+other code, applied by `applyServiceFailure`. On the client,
+`useEntitySubmit` marks those fields through `setFormErrors`. See the
+2026-11-05 amendments to
+[ADR-0001](docs/adr/0001-service-failures-carry-a-data-error-code.md) and
+[ADR-0003](docs/adr/0003-entity-forms-share-one-submit-protocol.md).
+_Defined in_ `src/lib/actions/form-state-helpers.ts`.
+
 ## Layers
 
 **Repository** — the only layer permitted to import Prisma, enforced by
@@ -493,6 +503,54 @@ it. The session knows only `{ id, pause }`, which is what lets it span audio and
 video without either side knowing the other exists. Distinct from **player
 preferences** (volume and mute), which are shared by every player but are
 settings, not playback state.
+
+**Playlist** — a signed-in listener's own ordered list of songs (MP3 tracks
+of Releases) and Videos, private or public. Holds at most
+`MAX_PLAYLIST_ITEMS` (200) **playlist items**; an add past that is refused
+with `LIMIT_EXCEEDED`.
+
+**playlist item** — one song or Video in a Playlist: a snapshot of its title,
+artist and duration, plus a reference to its live source. A source that goes
+away later (deleted, unpublished, archived) leaves the item listed but
+unavailable; adding a source that is already gone is refused with
+`NOT_FOUND`.
+
+**duplicate item** — an add whose source is already in the Playlist. Not a
+failure but a question: the add answers code `DUPLICATE_ITEM` and adds
+nothing, the listener is asked, and confirming adds it again with
+`force: true`.
+
+**add to playlist** — the one client module every add of a song or Video to a
+saved Playlist goes through (`useAddToPlaylist`): the add, the **duplicate
+item** question and its forced retry, and the toasts. It branches only on the
+failure's code (`PlaylistActionCode`) and shows the action's **error copy**
+as written. A playlist Server Action's failure carries both
+(`PlaylistActionResult`), the same split ADR-0001 gives `ServiceResponse`.
+_Defined in_ `src/app/components/playlists/use-add-to-playlist.ts`.
+
+**Tour** — a run of shows an admin files under one title (with subtitles, a
+description and notes): its **tour dates** and up to ten **tour images**. The
+public sees a Tour only through the dates and headliners it may see; a Tour
+whose dates are all hidden reads as not found (ADR-0015).
+_Defined in_ `src/lib/services/tours/tour-service.ts`.
+
+**tour date** — one show of a **Tour**: a venue, a start date and show times
+with the venue's time zone, ticketing, and an ordered list of headliners
+(Artists). Saving a tour date's headliners rewrites their rows, so a
+headliner's id can go stale while the admin form is open; a set-time update
+or removal that misses by id retries once by tour date + artist.
+_Defined in_ `src/lib/services/tours/tour-date-service.ts`.
+_Avoid_: show, gig, event.
+
+**tour image** — one image a **Tour** or a **tour date** holds (its owner),
+uploaded by an admin through a presigned S3 URL and served from the CDN. A
+Tour holds up to ten, a tour date up to twenty; the cap is checked when the
+URL is issued and again at confirm. One module owns both owner kinds — the
+cap, the key namespace, the display order, the check that an image belongs
+to the owner named, and a delete that removes the object and then the row,
+even when the object delete fails.
+_Defined in_ `src/lib/services/tours/tour-images/`.
+_Avoid_: tour photo, `Image` (the release image table), bio image.
 
 ## Shipping vocabulary
 

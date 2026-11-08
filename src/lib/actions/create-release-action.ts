@@ -23,7 +23,12 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
 import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
 
-import { refusedFormState } from './form-state-helpers';
+import {
+  applyServiceFailure,
+  DUPLICATE_TITLE,
+  type FailureFieldTable,
+  refusedFormState,
+} from './form-state-helpers';
 
 const buildReleaseCreateInput = (data: ReleaseFormData, preGeneratedId: string | undefined) => {
   const {
@@ -62,29 +67,23 @@ const buildReleaseCreateInput = (data: ReleaseFormData, preGeneratedId: string |
   };
 };
 
+/** A release's only unique field besides its id is its title (prisma/schema.prisma). */
+const CREATE_RELEASE_FAILURES: FailureFieldTable = {
+  fields: new Map([['DUPLICATE', DUPLICATE_TITLE]]),
+  fallback: 'Failed to create release',
+};
+
 const applyServiceResponseToFormState = (
   formState: FormState,
   response: ServiceResponse<Release>
 ): void => {
-  if (response.success) {
-    formState.errors = undefined;
-    formState.data = { releaseId: response.data?.id };
-  } else {
-    if (!formState.errors) {
-      formState.errors = {};
-    }
-    const errorMessage = response.error || 'Failed to create release';
-    const lower = errorMessage.toLowerCase();
-    const isTitleConflict =
-      lower.includes('title') &&
-      (lower.includes('unique') || lower.includes('already exists') || lower.includes('duplicate'));
-    if (isTitleConflict) {
-      formState.errors.title = ['This title is already in use. Please choose a different one.'];
-    } else {
-      formState.errors = { general: ['Failed to create release'] };
-    }
+  if (!response.success) {
+    applyServiceFailure(formState, response, CREATE_RELEASE_FAILURES);
+    return;
   }
-  formState.success = response.success;
+  formState.errors = undefined;
+  formState.data = { releaseId: response.data.id };
+  formState.success = true;
 };
 
 /**

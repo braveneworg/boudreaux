@@ -250,7 +250,11 @@ describe('usePlaylistCoverUpload', () => {
   });
 
   it('surfaces an action failure as the error state and resolves empty', async () => {
-    actionMock.mockResolvedValue({ success: false, error: 'Playlist not found' });
+    actionMock.mockResolvedValue({
+      success: false,
+      error: 'Playlist not found',
+      code: 'NOT_FOUND',
+    });
     const { result, upload } = setup();
 
     const urls = await upload([makeFile('a.jpg', 'image/jpeg')]);
@@ -258,15 +262,6 @@ describe('usePlaylistCoverUpload', () => {
     expect(urls).toEqual([]);
     expect(result.current.error).toBe('Playlist not found');
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('maps a RATE_LIMITED failure to a friendly message', async () => {
-    actionMock.mockResolvedValue({ success: false, error: 'RATE_LIMITED' });
-    const { result, upload } = setup();
-
-    await upload([makeFile('a.jpg', 'image/jpeg')]);
-
-    expect(result.current.error).toBe('Too many upload requests — try again in a minute.');
   });
 
   it('surfaces a failed PUT as the error state and resolves empty', async () => {
@@ -292,7 +287,11 @@ describe('usePlaylistCoverUpload', () => {
   });
 
   it('resets isUploading after a failure', async () => {
-    actionMock.mockResolvedValue({ success: false, error: 'Playlist not found' });
+    actionMock.mockResolvedValue({
+      success: false,
+      error: 'Playlist not found',
+      code: 'NOT_FOUND',
+    });
     const { result, upload } = setup();
 
     await upload([makeFile('a.jpg', 'image/jpeg')]);

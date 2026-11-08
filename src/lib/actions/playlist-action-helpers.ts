@@ -41,12 +41,14 @@ const USER_FACING_CODES: ReadonlySet<DataErrorCode> = new Set([
 export const invalidInputFailure = (issues: ZodIssues): PlaylistActionResult<never> => ({
   success: false,
   error: INVALID_INPUT_MESSAGE,
+  code: 'INVALID_INPUT',
   fieldErrors: fieldErrorsFromZodIssues(issues, { formKey: '_form' }),
 });
 
 /**
- * Map a thrown error to the action failure shape: the unique-title violation
- * (`DataError` code `DUPLICATE` from `@@unique([ownerId, title])`) becomes the
+ * Map a thrown error to the action failure shape. A `DataError` keeps its code
+ * whatever copy it ends with; anything else is `UNKNOWN`. The unique-title
+ * violation (`DUPLICATE` from `@@unique([ownerId, title])`) becomes the
  * friendly message plus a `title` field error; other user-facing `DataError`
  * codes pass their message through — but only when the error carries no
  * `cause`. Service-authored `DataError`s never set one, while the repository's
@@ -63,13 +65,18 @@ export const failureFromError = (error: unknown, fallback: string): PlaylistActi
       return {
         success: false,
         error: DUPLICATE_TITLE_MESSAGE,
+        code: 'DUPLICATE',
         fieldErrors: { title: [DUPLICATE_TITLE_MESSAGE] },
       };
     }
     if (USER_FACING_CODES.has(error.code) && error.cause === undefined) {
-      return { success: false, error: error.message };
+      return { success: false, error: error.message, code: error.code };
     }
   }
   logger.error(fallback, { error: error instanceof Error ? error.message : String(error) });
-  return { success: false, error: fallback };
+  return {
+    success: false,
+    error: fallback,
+    code: error instanceof DataError ? error.code : 'UNKNOWN',
+  };
 };

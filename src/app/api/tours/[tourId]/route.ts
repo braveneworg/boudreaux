@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withAdmin } from '@/lib/decorators/with-auth';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { TourService } from '@/lib/services/tours/tour-service';
 import { loggers } from '@/lib/utils/logger';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
@@ -20,7 +20,7 @@ type TourRouteContext = { params: Promise<{ tourId: string }> };
  */
 const getAdminTour = withAdmin(async (_request: NextRequest, { params }: TourRouteContext) => {
   const { tourId } = await params;
-  const tour = await TourRepository.findById(tourId);
+  const tour = await TourService.findAdminById(tourId);
 
   if (!tour) {
     return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
@@ -31,7 +31,7 @@ const getAdminTour = withAdmin(async (_request: NextRequest, { params }: TourRou
 
 /** The public read: the tour with only the dates and headliners the public may see. */
 const getPublicTour = async (tourId: string): Promise<NextResponse> => {
-  const tour = await TourRepository.findPublicById(tourId);
+  const tour = await TourService.findPublicById(tourId);
 
   if (!tour) {
     return NextResponse.json({ error: 'Tour not found' }, { status: 404 });

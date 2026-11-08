@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { TourService } from '@/lib/services/tours/tour-service';
 
 import { GET } from './route';
 
@@ -24,9 +24,9 @@ vi.mock('@/lib/config/rate-limit-tiers', () => ({
   PUBLIC_LIMIT: 100,
 }));
 
-vi.mock('@/lib/repositories/tours/tour-repository', () => ({
-  TourRepository: {
-    findAllPublic: vi.fn(),
+vi.mock('@/lib/services/tours/tour-service', () => ({
+  TourService: {
+    findPublicPage: vi.fn(),
   },
 }));
 
@@ -39,7 +39,7 @@ describe('GET /api/tours', () => {
   ];
 
   it('returns a page of tours with a nextSkip cursor', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue(mockTours as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue(mockTours as never);
 
     const response = await GET(makeRequest('?skip=0&take=2'), dummyContext);
     const data = await response.json();
@@ -47,7 +47,7 @@ describe('GET /api/tours', () => {
     expect(response.status).toBe(200);
     // A full page (rows.length === take) yields the next offset.
     expect(data).toEqual({ rows: mockTours, nextSkip: 2 });
-    expect(TourRepository.findAllPublic).toHaveBeenCalledWith({
+    expect(TourService.findPublicPage).toHaveBeenCalledWith({
       skip: 0,
       take: 2,
       search: undefined,
@@ -55,7 +55,7 @@ describe('GET /api/tours', () => {
   });
 
   it('returns nextSkip null when a short page signals the end', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue(mockTours as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue(mockTours as never);
 
     const response = await GET(makeRequest('?skip=0&take=24'), dummyContext);
     const data = await response.json();
@@ -64,11 +64,11 @@ describe('GET /api/tours', () => {
   });
 
   it('forwards the search term and defaults skip to 0', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue([] as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue([] as never);
 
     await GET(makeRequest('?search=Summer'), dummyContext);
 
-    expect(TourRepository.findAllPublic).toHaveBeenCalledWith({
+    expect(TourService.findPublicPage).toHaveBeenCalledWith({
       skip: 0,
       take: 24,
       search: 'Summer',
@@ -76,17 +76,15 @@ describe('GET /api/tours', () => {
   });
 
   it('clamps take to the maximum of 100', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue([] as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue([] as never);
 
     await GET(makeRequest('?take=500'), dummyContext);
 
-    expect(TourRepository.findAllPublic).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 100 })
-    );
+    expect(TourService.findPublicPage).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
   });
 
   it('sets a no-store Cache-Control header', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue([] as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue([] as never);
 
     const response = await GET(makeRequest(), dummyContext);
 
@@ -94,7 +92,7 @@ describe('GET /api/tours', () => {
   });
 
   it('returns an empty page when there are no tours', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockResolvedValue([] as never);
+    vi.mocked(TourService.findPublicPage).mockResolvedValue([] as never);
 
     const response = await GET(makeRequest(), dummyContext);
     const data = await response.json();
@@ -103,7 +101,7 @@ describe('GET /api/tours', () => {
   });
 
   it('returns 500 when an exception is thrown', async () => {
-    vi.mocked(TourRepository.findAllPublic).mockRejectedValue(new Error('DB error'));
+    vi.mocked(TourService.findPublicPage).mockRejectedValue(new Error('DB error'));
 
     const response = await GET(makeRequest(), dummyContext);
     const data = await response.json();

@@ -7,16 +7,26 @@ import { useCallback } from 'react';
 
 import { toast } from 'sonner';
 
+import type { FormState } from '@/lib/types/form-state';
 import { error } from '@/lib/utils/console-logger';
+import { setFormErrors } from '@/lib/utils/forms/set-form-errors';
+
+import type { FieldValues, UseFormReturn } from 'react-hook-form';
 
 /** Whether a submit created a new entity or updated an existing one. */
 export type SubmitMode = 'create' | 'update';
 
-interface UseEntitySubmitOptions<TValues, TResult extends { success: boolean }> {
+/** What the protocol needs of a write's result: whether it landed, and the server's errors. */
+type EntitySubmitResult = Pick<FormState, 'success' | 'errors'>;
+
+interface UseEntitySubmitOptions<TValues extends FieldValues, TResult extends EntitySubmitResult> {
   /** Lower-case singular noun used in the failure copy, e.g. `'artist'`. */
   entity: string;
-  /** Reset the form to the submitted values once the write has succeeded. */
-  reset: (values: TValues) => void;
+  /**
+   * The form being submitted: reset to the submitted values once the write has
+   * succeeded, and marked with the server's field errors when it fails.
+   */
+  form: Pick<UseFormReturn<TValues>, 'reset' | 'setError'>;
   create: (values: TValues) => Promise<TResult>;
   update: (id: string, values: TValues) => Promise<TResult>;
   /**
@@ -26,18 +36,20 @@ interface UseEntitySubmitOptions<TValues, TResult extends { success: boolean }> 
    */
   onSuccess?: (result: TResult, values: TValues, mode: SubmitMode) => void | Promise<void>;
   /**
-   * Handle a failed write in place of the default toast — for a form that maps
-   * the server's field errors and message itself. The form is not reset.
+   * Handle a failed write in place of the default — for a form whose failure
+   * needs more than marked fields and a toast. The form is not reset.
    */
   onFailure?: (result: TResult, values: TValues, mode: SubmitMode) => void;
 }
 
 /**
  * The submit protocol shared by every entity form: guard the form ref, dispatch
- * create-or-update on the presence of an id, stop on failure with a message
- * naming the entity, then hand off to the entity's own success handling and
- * reset the form. A form whose server returns field-level errors passes
- * `onFailure`, which replaces the default failure toast.
+ * create-or-update on the presence of an id, stop on failure, then hand off to
+ * the entity's own success handling and reset the form.
+ *
+ * A failure marks each field the server's errors name (through
+ * {@link setFormErrors}) and toasts the server's `general` error, or a message
+ * naming the entity and the verb when there is none. `onFailure` replaces that.
  *
  * Deliberately owns only what every form does identically. Entity-specific
  * work stays in `onSuccess` rather than being threaded in as a bag of
@@ -48,15 +60,16 @@ interface UseEntitySubmitOptions<TValues, TResult extends { success: boolean }> 
  * Not used by `profile-form`, which stays on `useActionState` for progressive
  * enhancement (see ADR-0003).
  */
-export const useEntitySubmit = <TValues, TResult extends { success: boolean }>({
+export const useEntitySubmit = <TValues extends FieldValues, TResult extends EntitySubmitResult>({
   entity,
-  reset,
+  form,
   create,
   update,
   onSuccess,
   onFailure,
-}: UseEntitySubmitOptions<TValues, TResult>) =>
-  useCallback(
+}: UseEntitySubmitOptions<TValues, TResult>) => {
+  const { reset, setError } = form;
+  return useCallback(
     async (formEl: HTMLFormElement | null, id: string | null, values: TValues): Promise<void> => {
       if (!formEl) {
         error(`${entity} form: form reference is null on submit.`);
@@ -70,14 +83,18 @@ export const useEntitySubmit = <TValues, TResult extends { success: boolean }>({
       if (!result.success) {
         if (onFailure) {
           onFailure(result, values, mode);
-        } else {
-          toast.error(`Failed to ${mode} ${entity}. Please check the form for errors.`);
+          return;
         }
+        const { generalError } = setFormErrors(setError, result);
+        toast.error(
+          generalError ?? `Failed to ${mode} ${entity}. Please check the form for errors.`
+        );
         return;
       }
 
       await onSuccess?.(result, values, mode);
       reset(values);
     },
-    [entity, reset, create, update, onSuccess, onFailure]
+    [entity, reset, setError, create, update, onSuccess, onFailure]
   );
+};

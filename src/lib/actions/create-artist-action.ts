@@ -15,8 +15,8 @@ import { createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
-import { applyCreateArtistFailure } from './create-artist-action-helpers';
-import { refusedFormState } from './form-state-helpers';
+import { ARTIST_WRITE_FAILURES } from './artist-action-failures';
+import { applyServiceFailure, refusedFormState } from './form-state-helpers';
 
 export const createArtistAction = async (
   _initialState: FormState,
@@ -71,7 +71,7 @@ export const createArtistAction = async (
         // Include the created artist ID in the response for image uploads
         formState.data = { artistId: response.data?.id };
       } else {
-        applyCreateArtistFailure(formState, response.error);
+        applyServiceFailure(formState, response, ARTIST_WRITE_FAILURES);
       }
 
       formState.success = response.success;

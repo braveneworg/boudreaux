@@ -35,6 +35,7 @@ import type { PlaylistCoverUploadInput } from '@/lib/validation/playlist-schema'
 import { failureFromError, invalidInputFailure, PLAYLISTS_PATH } from './playlist-action-helpers';
 
 const PLAYLIST_NOT_FOUND_MESSAGE = 'Playlist not found';
+const RATE_LIMITED_MESSAGE = 'Too many upload requests — try again in a minute.';
 const UPLOAD_URL_EXPIRY_SECONDS = 900;
 
 /** One file entry of the (already validated) cover-upload input. */
@@ -125,7 +126,7 @@ export const updatePlaylistAction = async (
     await PlaylistService.update(userId, parsed.data);
     revalidatePath(PLAYLISTS_PATH);
     const detail = await PlaylistService.getOwnedOrPublicDetail(parsed.data.playlistId, userId);
-    if (!detail) return { success: false, error: PLAYLIST_NOT_FOUND_MESSAGE };
+    if (!detail) return { success: false, error: PLAYLIST_NOT_FOUND_MESSAGE, code: 'NOT_FOUND' };
     return { success: true, data: detail };
   } catch (error) {
     return failureFromError(error, 'Failed to update playlist');
@@ -167,7 +168,7 @@ export const generatePlaylistCoverUploadUrlsAction = async (
   try {
     await playlistCoverUploadLimiter.check(PLAYLIST_COVER_UPLOAD_LIMIT, userId);
   } catch {
-    return { success: false, error: 'RATE_LIMITED' };
+    return { success: false, error: RATE_LIMITED_MESSAGE, code: 'RATE_LIMITED' };
   }
   try {
     await PlaylistService.requireOwned(parsed.data.playlistId, userId);

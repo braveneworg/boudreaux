@@ -9,17 +9,17 @@ import type { PlaylistListRow, PlaylistSearchItem } from '@/lib/types/domain/pla
 
 import { AddToPlaylistPanel } from './add-to-playlist-panel';
 
-import type { UseAddToPlaylistFlowResult } from './use-add-to-playlist-flow';
+import type { UseAddToPlaylistResult } from './use-add-to-playlist';
 
 const usePlaylistsQueryMock = vi.hoisted(() => vi.fn());
-const useAddToPlaylistFlowMock = vi.hoisted(() => vi.fn());
+const useAddToPlaylistMock = vi.hoisted(() => vi.fn());
 
 vi.mock('./_hooks/use-playlists-query', () => ({
   usePlaylistsQuery: usePlaylistsQueryMock,
 }));
 
-vi.mock('./use-add-to-playlist-flow', () => ({
-  useAddToPlaylistFlow: useAddToPlaylistFlowMock,
+vi.mock('./use-add-to-playlist', () => ({
+  useAddToPlaylist: useAddToPlaylistMock,
 }));
 
 interface TilesStubProps {
@@ -74,18 +74,15 @@ const mockRows = (rows: PlaylistListRow[]): void => {
   });
 };
 
-const mockFlow = (
-  overrides: Partial<UseAddToPlaylistFlowResult> = {}
-): UseAddToPlaylistFlowResult => {
-  const flow: UseAddToPlaylistFlowResult = {
-    pickPlaylist: vi.fn(),
+const mockFlow = (overrides: Partial<UseAddToPlaylistResult> = {}): UseAddToPlaylistResult => {
+  const flow: UseAddToPlaylistResult = {
+    add: vi.fn(),
     duplicateItemTitle: null,
     confirmDuplicate: vi.fn(),
     dismissDuplicate: vi.fn(),
-    isAdding: false,
     ...overrides,
   };
-  useAddToPlaylistFlowMock.mockReturnValue(flow);
+  useAddToPlaylistMock.mockReturnValue(flow);
   return flow;
 };
 
@@ -105,7 +102,7 @@ describe('AddToPlaylistPanel', () => {
     expect(container.firstElementChild).toHaveClass('zine-accent-kraft');
   });
 
-  it('calls pickPlaylist with the selected row when a picker option is clicked', async () => {
+  it('adds the item to the picked playlist, naming it for the toast', async () => {
     const user = userEvent.setup();
     mockRows([ROAD_TRIP, CHILL_MIX]);
     const flow = mockFlow();
@@ -113,8 +110,23 @@ describe('AddToPlaylistPanel', () => {
 
     await user.click(screen.getByRole('option', { name: 'Chill Mix' }));
 
-    expect(flow.pickPlaylist).toHaveBeenCalledTimes(1);
-    expect(flow.pickPlaylist).toHaveBeenCalledWith(CHILL_MIX);
+    expect(vi.mocked(flow.add).mock.calls).toEqual([
+      [{ item: ITEM, playlistId: 'pl-2', playlistTitle: 'Chill Mix' }],
+    ]);
+  });
+
+  it('calls onAdded once the hook reports an add', () => {
+    mockRows([]);
+    mockFlow();
+    const onAdded = vi.fn();
+    renderPanel({ onAdded });
+
+    const [{ onAdded: reportAdded }] = useAddToPlaylistMock.mock.calls.at(-1) as [
+      { onAdded: () => void },
+    ];
+    reportAdded();
+
+    expect(onAdded).toHaveBeenCalledTimes(1);
   });
 
   it('focuses the picker input on mount', () => {

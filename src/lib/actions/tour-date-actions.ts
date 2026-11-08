@@ -6,29 +6,30 @@
 import 'server-only';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
+import type { ServiceResponse } from '@/lib/services/service.types';
+import { TourDateService } from '@/lib/services/tours/tour-date-service';
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { loggers } from '@/lib/utils/logger';
 import {
   tourDateCreateSchema,
   tourDateUpdateSchema,
 } from '@/lib/validation/tours/tour-date-schema';
-import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 import { OBJECT_ID_REGEX } from '@/utils/validation/object-id';
 
 import { refusedFormState } from './form-state-helpers';
-import {
-  attemptRemoveFallback,
-  attemptSetTimeFallback,
-  getHeadlinerFallbackIds,
-  revalidateTourPaths,
-} from './tour-date-actions-helpers';
+import { revalidateTourPaths } from './tour-date-actions-helpers';
 
 import type { AdminActionResult } from './run-admin-entity-action';
 
-const logger = loggers.media;
+/** Revalidate after a write that succeeded, and answer in the admin action shape. */
+const settleWrite = (result: ServiceResponse<void>): AdminActionResult => {
+  if (!result.success) {
+    return result;
+  }
+  revalidateTourPaths();
+  return { success: true };
+};
 
 /**
  * Server action to create a new tour date entry
@@ -75,32 +76,13 @@ export const createTourDateAction = async (
     return formState;
   }
 
-  try {
-    // Create tour date
-    const tourDate = await TourDateRepository.create({
-      ...parsed.data,
-      headlinerIds: parsed.data.headlinerIds,
-    });
-
-    // Log security event
-    logSecurityEvent({
-      event: 'tourDate.created',
-      userId: session.user.id,
-      metadata: {
-        tourDateId: tourDate.id,
-        tourId: parsed.data.tourId,
-        venueId: parsed.data.venueId,
-        headlinerCount: parsed.data.headlinerIds.length,
-      },
-    });
-
+  const result = await TourDateService.create(parsed.data, session.user.id);
+  if (result.success) {
     formState.success = true;
     formState.errors = undefined;
-    formState.data = { tourDateId: tourDate.id };
-
-    // Revalidate paths
+    formState.data = { tourDateId: result.data.id };
     revalidateTourPaths();
-  } catch {
+  } else {
     formState.success = false;
     setUnknownError(formState);
   }
@@ -153,28 +135,12 @@ export const updateTourDateAction = async (
     return formState;
   }
 
-  try {
-    // Update tour date
-    await TourDateRepository.update(tourDateId, {
-      ...parsed.data,
-    });
-
-    // Log security event
-    logSecurityEvent({
-      event: 'tourDate.updated',
-      userId: session.user.id,
-      metadata: {
-        tourDateId,
-        updatedFields: Object.keys(parsed.data),
-      },
-    });
-
+  const result = await TourDateService.update(tourDateId, parsed.data, session.user.id);
+  if (result.success) {
     formState.success = true;
     formState.errors = undefined;
-
-    // Revalidate paths
     revalidateTourPaths();
-  } catch {
+  } else {
     formState.success = false;
     setUnknownError(formState);
   }
@@ -196,23 +162,7 @@ export const deleteTourDateAction = async (tourDateId: string): Promise<AdminAct
     return { success: false, error: 'Invalid tour date ID', code: 'INVALID_INPUT' };
   }
 
-  try {
-    await TourDateRepository.delete(tourDateId);
-
-    // Log security event
-    logSecurityEvent({
-      event: 'tourDate.deleted',
-      userId: session.user.id,
-      metadata: { tourDateId },
-    });
-
-    // Revalidate paths
-    revalidateTourPaths();
-
-    return { success: true };
-  } catch {
-    return { success: false, error: 'Failed to delete tour date', code: 'UNKNOWN' };
-  }
+  return settleWrite(await TourDateService.delete(tourDateId, session.user.id));
 };
 
 /**
@@ -240,37 +190,12 @@ export const updateHeadlinerSetTimeAction = async (
     return { success: false, error: 'Invalid set time format', code: 'INVALID_INPUT' };
   }
 
-  try {
-    await TourDateRepository.updateHeadlinerSetTime(headlinerId, parsedSetTime);
-
-    logSecurityEvent({
-      event: 'tourDateHeadliner.setTimeUpdated',
-      userId: session.user.id,
-      metadata: { headlinerId, setTime },
-    });
-
-    revalidateTourPaths();
-
-    return { success: true };
-  } catch (error) {
-    const fallbackIds = getHeadlinerFallbackIds(error, tourDateId, artistId);
-
-    if (
-      fallbackIds &&
-      (await attemptSetTimeFallback({
-        fallbackIds,
-        headlinerId,
-        setTime,
-        parsedSetTime,
-        userId: session.user.id,
-      }))
-    ) {
-      return { success: true };
-    }
-
-    logger.error('[updateHeadlinerSetTimeAction]', error);
-    return { success: false, error: 'Failed to update set time', code: 'UNKNOWN' };
-  }
+  return settleWrite(
+    await TourDateService.updateHeadlinerSetTime(
+      { headlinerId, setTime, tourDateId, artistId },
+      session.user.id
+    )
+  );
 };
 
 /**
@@ -292,31 +217,9 @@ export const removeHeadlinerAction = async (
     return { success: false, error: 'Invalid headliner ID', code: 'INVALID_INPUT' };
   }
 
-  try {
-    await TourDateRepository.removeHeadliner(headlinerId);
-
-    logSecurityEvent({
-      event: 'tourDateHeadliner.removed',
-      userId: session.user.id,
-      metadata: { headlinerId },
-    });
-
-    revalidateTourPaths();
-
-    return { success: true };
-  } catch (error) {
-    const fallbackIds = getHeadlinerFallbackIds(error, tourDateId, artistId);
-
-    if (
-      fallbackIds &&
-      (await attemptRemoveFallback({ fallbackIds, headlinerId, userId: session.user.id }))
-    ) {
-      return { success: true };
-    }
-
-    logger.error('[removeHeadlinerAction]', error);
-    return { success: false, error: 'Failed to remove headliner', code: 'UNKNOWN' };
-  }
+  return settleWrite(
+    await TourDateService.removeHeadliner({ headlinerId, tourDateId, artistId }, session.user.id)
+  );
 };
 
 /**
@@ -342,20 +245,7 @@ export const reorderHeadlinersAction = async (
     }
   }
 
-  try {
-    await TourDateRepository.reorderHeadliners(tourDateId, headlinerIds);
-
-    logSecurityEvent({
-      event: 'tourDateHeadliner.reordered',
-      userId: session.user.id,
-      metadata: { tourDateId, headlinerIds },
-    });
-
-    revalidateTourPaths();
-
-    return { success: true };
-  } catch (error) {
-    logger.error('[reorderHeadlinersAction]', error);
-    return { success: false, error: 'Failed to reorder headliners', code: 'UNKNOWN' };
-  }
+  return settleWrite(
+    await TourDateService.reorderHeadliners(tourDateId, headlinerIds, session.user.id)
+  );
 };

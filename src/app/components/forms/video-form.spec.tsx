@@ -965,7 +965,9 @@ describe('VideoForm — submit outcome', () => {
     await saveEdit(setup());
 
     await waitFor(() =>
-      expect(vi.mocked(toast.error).mock.calls).toEqual([['Failed to update the video.']])
+      expect(vi.mocked(toast.error).mock.calls).toEqual([
+        ['Failed to update video. Please check the form for errors.'],
+      ])
     );
   });
 
@@ -975,7 +977,9 @@ describe('VideoForm — submit outcome', () => {
     await saveCreate(setup());
 
     await waitFor(() =>
-      expect(vi.mocked(toast.error).mock.calls).toEqual([['Failed to create the video.']])
+      expect(vi.mocked(toast.error).mock.calls).toEqual([
+        ['Failed to create video. Please check the form for errors.'],
+      ])
     );
   });
 

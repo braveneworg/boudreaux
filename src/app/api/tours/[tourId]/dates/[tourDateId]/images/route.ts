@@ -6,7 +6,8 @@ import { NextResponse } from 'next/server';
 
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { TourDateImageRepository } from '@/lib/repositories/tours/tour-date-image-repository';
+import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
+import { httpStatusForCode } from '@/lib/utils/http-status-for-code';
 import { loggers } from '@/lib/utils/logger';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 
@@ -22,10 +23,16 @@ export const GET = withRateLimit<{ tourId: string; tourDateId: string }>(
     if (!OBJECT_ID_REGEX.test(tourId) || !OBJECT_ID_REGEX.test(tourDateId)) {
       return NextResponse.json({ images: [] });
     }
-    const images = await TourDateImageRepository.findByTourDateId(tourDateId);
+    const result = await tourImages.list({ kind: 'tourDate', id: tourDateId });
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Failed to fetch tour date images' },
+        { status: httpStatusForCode(result.code) }
+      );
+    }
 
     return NextResponse.json(
-      { images },
+      { images: result.data },
       {
         headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
       }

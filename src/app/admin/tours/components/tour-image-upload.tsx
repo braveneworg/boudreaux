@@ -7,15 +7,22 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ImageUploader, type ImageItem } from '@/app/components/ui/image-uploader';
 import {
-  generateUploadUrlAction,
+  confirmTourDateUploadAction,
   confirmUploadAction,
   deleteImageAction,
+  deleteTourDateImageAction,
+  generateTourDateUploadUrlAction,
+  generateUploadUrlAction,
   reorderImagesAction,
+  reorderTourDateImagesAction,
 } from '@/lib/actions/tours/tour-images';
+import { error as logError } from '@/lib/utils/console-logger';
 import {
   MAX_FILE_SIZE,
   MAX_IMAGES_PER_TOUR,
+  MAX_IMAGES_PER_TOUR_DATE,
   SUPPORTED_IMAGE_TYPES,
+  type SupportedImageType,
 } from '@/lib/validation/tours/image-schema';
 
 import {
@@ -24,73 +31,121 @@ import {
   markImageUploaded,
   setImageProgress,
   uploadImageToS3,
+  type ConfirmedUpload,
+  type ImageActionResult,
+  type PresignedUploadTarget,
 } from './image-upload-helpers';
 
-/** Narrows a File's MIME type to the supported image union expected by the actions. */
-type SupportedMimeType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-
-/**
- * Local interface matching Prisma TourImage model.
- * Client components do not import the generated Prisma client types directly.
- */
-interface TourImageFields {
+/** What a tour image belongs to: a Tour, or one of its tour dates. */
+export interface TourImageOwnerRef {
+  kind: 'tour' | 'tourDate';
   id: string;
-  tourId: string;
-  s3Key: string;
+}
+
+/** A stored image, as the images routes return it; only these fields are read. */
+export interface StoredTourImage {
+  id: string;
   s3Url: string;
-  s3Bucket: string;
   fileName: string;
-  fileSize: number;
-  mimeType: string;
-  displayOrder: number;
   altText: string | null;
-  createdAt: Date;
-  uploadedBy: string | null;
+  displayOrder: number;
 }
 
 export interface TourImageUploadProps {
-  /** Tour ID to associate images with */
-  tourId: string;
+  /** The tour or tour date the images belong to */
+  owner: TourImageOwnerRef;
   /** Initial images from database */
-  initialImages?: TourImageFields[];
+  initialImages?: StoredTourImage[];
   /** Called when images are successfully uploaded */
   onUploadComplete?: () => void;
   /** Whether the component is disabled */
   disabled?: boolean;
 }
 
+interface UploadFile {
+  fileName: string;
+  fileSize: number;
+  mimeType: SupportedImageType;
+}
+
+/** The image actions and limits of one owner kind, keyed by the owner's id. */
+interface OwnerImageActions {
+  label: string;
+  maxImages: number;
+  generate: (
+    ownerId: string,
+    file: UploadFile
+  ) => Promise<ImageActionResult<PresignedUploadTarget>>;
+  confirm: (
+    ownerId: string,
+    upload: UploadFile & { s3Key: string; s3Bucket: string }
+  ) => Promise<ImageActionResult<ConfirmedUpload>>;
+  reorder: (
+    ownerId: string,
+    imageOrders: Array<{ id: string; displayOrder: number }>
+  ) => Promise<ImageActionResult<void>>;
+  remove: (ownerId: string, imageId: string) => Promise<ImageActionResult<void>>;
+}
+
+const TOUR_ACTIONS: OwnerImageActions = {
+  label: 'Upload tour images',
+  maxImages: MAX_IMAGES_PER_TOUR,
+  generate: (tourId, file) => generateUploadUrlAction({ tourId, ...file }),
+  confirm: (tourId, upload) => confirmUploadAction({ tourId, ...upload }),
+  reorder: (tourId, imageOrders) => reorderImagesAction({ tourId, imageOrders }),
+  remove: (tourId, imageId) => deleteImageAction({ imageId, tourId }),
+};
+
+const TOUR_DATE_ACTIONS: OwnerImageActions = {
+  label: 'Upload tour date images',
+  maxImages: MAX_IMAGES_PER_TOUR_DATE,
+  generate: (tourDateId, file) => generateTourDateUploadUrlAction({ tourDateId, ...file }),
+  confirm: (tourDateId, upload) => confirmTourDateUploadAction({ tourDateId, ...upload }),
+  reorder: (tourDateId, imageOrders) => reorderTourDateImagesAction({ tourDateId, imageOrders }),
+  remove: (tourDateId, imageId) => deleteTourDateImageAction({ imageId, tourDateId }),
+};
+
+const actionsFor = (kind: TourImageOwnerRef['kind']): OwnerImageActions =>
+  kind === 'tour' ? TOUR_ACTIONS : TOUR_DATE_ACTIONS;
+
+/** The upload fields of a picked file; the uploader only offers supported types. */
+const uploadFileOf = (file: File): UploadFile => ({
+  fileName: file.name,
+  fileSize: file.size,
+  mimeType: file.type as SupportedImageType,
+});
+
 /**
- * Tour-specific image uploader that integrates with TourImage Server Actions.
- * Uses presigned S3 URLs for direct uploads.
+ * The image uploader for a Tour or a tour date: presigned S3 uploads,
+ * drag-and-drop reorder and delete, through that owner's image actions.
  */
 export const TourImageUpload = ({
-  tourId,
+  owner,
   initialImages = [],
   onUploadComplete,
   disabled = false,
 }: TourImageUploadProps) => {
   const [images, setImages] = useState<ImageItem[]>([]);
+  const { kind, id: ownerId } = owner;
+  const actions = actionsFor(kind);
 
-  // Convert TourImages to ImageItems on mount
+  // Convert stored images to ImageItems whenever they (re)load
   useEffect(() => {
     if (initialImages.length > 0) {
-      const convertedImages: ImageItem[] = initialImages.map((img) => ({
-        id: img.id,
-        preview: img.s3Url,
-        altText: img.altText || img.fileName,
-        uploadedUrl: img.s3Url,
-        sortOrder: img.displayOrder,
-      }));
-      setImages(convertedImages);
+      setImages(
+        initialImages.map((img) => ({
+          id: img.id,
+          preview: img.s3Url,
+          altText: img.altText || img.fileName,
+          uploadedUrl: img.s3Url,
+          sortOrder: img.displayOrder,
+        }))
+      );
     }
   }, [initialImages]);
 
-  /**
-   * Upload images via presigned URLs to S3
-   */
   const handleUpload = useCallback(
     async (imagesToUpload: ImageItem[]) => {
-      // Update images to show uploading state
       setImages((prev) => markImagesUploading(prev, imagesToUpload));
 
       for (const imageItem of imagesToUpload) {
@@ -99,90 +154,54 @@ export const TourImageUpload = ({
         try {
           const uploaded = await uploadImageToS3({
             imageItem,
-            generateUrl: (file) =>
-              generateUploadUrlAction({
-                tourId,
-                fileName: file.name,
-                fileSize: file.size,
-                mimeType: file.type as SupportedMimeType,
-              }),
+            generateUrl: (file) => actionsFor(kind).generate(ownerId, uploadFileOf(file)),
             confirmUpload: (s3Key, s3Bucket, file) =>
-              confirmUploadAction({
-                tourId,
-                s3Key,
-                s3Bucket,
-                fileName: file.name,
-                fileSize: file.size,
-                mimeType: file.type as SupportedMimeType,
-              }),
-            // Update progress to 50% after S3 upload
+              actionsFor(kind).confirm(ownerId, { s3Key, s3Bucket, ...uploadFileOf(file) }),
             onS3Uploaded: () => setImages((prev) => setImageProgress(prev, imageItem.id, 50)),
           });
 
-          // Update to completed state with server-provided URL
           setImages((prev) => markImageUploaded(prev, imageItem.id, uploaded));
 
-          // Revoke blob URL after successful upload
           if (imageItem.preview.startsWith('blob:')) {
             URL.revokeObjectURL(imageItem.preview);
           }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-          console.error('Upload error:', error);
-
-          // Update to error state
-          setImages((prev) => markImageError(prev, imageItem.id, errorMessage));
+        } catch (uploadError) {
+          logError('Tour image upload failed:', uploadError);
+          const message = uploadError instanceof Error ? uploadError.message : 'Upload failed';
+          setImages((prev) => markImageError(prev, imageItem.id, message));
         }
       }
 
-      // Call completion callback if provided
-      if (onUploadComplete) {
-        onUploadComplete();
-      }
+      onUploadComplete?.();
     },
-    [tourId, onUploadComplete]
+    [kind, ownerId, onUploadComplete]
   );
 
-  /**
-   * Reorder images and persist to database
-   */
+  /** Persist a new order; a refusal rejects so the uploader rolls back. */
   const handleReorder = useCallback(
     async (imageIds: string[]) => {
-      const imageOrders = imageIds.map((id, index) => ({
-        id,
-        displayOrder: index,
-      }));
-
-      const result = await reorderImagesAction({
-        tourId,
-        imageOrders,
-      });
+      const imageOrders = imageIds.map((id, index) => ({ id, displayOrder: index }));
+      const result = await actionsFor(kind).reorder(ownerId, imageOrders);
 
       if (!result.success) {
-        console.error('Failed to reorder images:', result.error);
+        logError('Failed to reorder tour images:', result.error);
         throw new Error(result.error || 'Failed to reorder images');
       }
     },
-    [tourId]
+    [kind, ownerId]
   );
 
-  /**
-   * Delete image from S3 and database
-   */
   const handleDelete = useCallback(
     async (imageId: string) => {
-      const result = await deleteImageAction({
-        imageId,
-        tourId,
-      });
+      const result = await actionsFor(kind).remove(ownerId, imageId);
 
       if (!result.success) {
-        console.error('Failed to delete image:', result.error);
+        logError('Failed to delete tour image:', result.error);
       }
 
       return result;
     },
-    [tourId]
+    [kind, ownerId]
   );
 
   return (
@@ -192,11 +211,11 @@ export const TourImageUpload = ({
       onUpload={handleUpload}
       onReorder={handleReorder}
       onDelete={handleDelete}
-      maxImages={MAX_IMAGES_PER_TOUR}
+      maxImages={actions.maxImages}
       maxFileSize={MAX_FILE_SIZE}
       acceptedTypes={[...SUPPORTED_IMAGE_TYPES]}
       disabled={disabled}
-      label="Upload tour images"
+      label={actions.label}
     />
   );
 };
