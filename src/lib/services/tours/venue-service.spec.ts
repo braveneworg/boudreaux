@@ -13,6 +13,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/repositories/tours/venue-repository', () => ({
   VenueRepository: {
     findAll: vi.fn(),
+    findRecent: vi.fn(),
     findById: vi.fn(),
     findByName: vi.fn(),
     create: vi.fn(),
@@ -101,6 +102,32 @@ describe('VenueService', () => {
 
       expect(result.data).toEqual([]);
       expect(result.total).toBe(0);
+    });
+  });
+
+  describe('findForPicker', () => {
+    it('offers the five most recently added venues when nothing is typed', async () => {
+      vi.mocked(VenueRepository.findRecent).mockResolvedValueOnce([mockVenue]);
+
+      const result = await VenueService.findForPicker();
+
+      expect({
+        result,
+        recent: vi.mocked(VenueRepository.findRecent).mock.calls,
+        searched: vi.mocked(VenueRepository.findAll).mock.calls,
+      }).toEqual({ result: [mockVenue], recent: [[5]], searched: [] });
+    });
+
+    it('offers up to fifty matches for a search', async () => {
+      vi.mocked(VenueRepository.findAll).mockResolvedValueOnce([mockVenue]);
+
+      const result = await VenueService.findForPicker('grand');
+
+      expect({
+        result,
+        recent: vi.mocked(VenueRepository.findRecent).mock.calls,
+        searched: vi.mocked(VenueRepository.findAll).mock.calls,
+      }).toEqual({ result: [mockVenue], recent: [], searched: [[{ search: 'grand', limit: 50 }]] });
     });
   });
 

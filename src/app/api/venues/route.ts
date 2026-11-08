@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
+import { VenueService } from '@/lib/services/tours/venue-service';
 import { loggers } from '@/lib/utils/logger';
 
 /**
@@ -28,9 +28,7 @@ export const GET = withRateLimit(
     const { searchParams } = request.nextUrl;
     const search = searchParams.get('search') ?? undefined;
 
-    const raw = search
-      ? await VenueRepository.findAll({ search, limit: 50 })
-      : await VenueRepository.findRecent(5);
+    const raw = await VenueService.findForPicker(search);
 
     const venues = raw.map((venue) => ({
       id: venue.id,

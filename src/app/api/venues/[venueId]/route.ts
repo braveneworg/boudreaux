@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
+import { VenueService } from '@/lib/services/tours/venue-service';
 import { loggers } from '@/lib/utils/logger';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
@@ -26,7 +26,7 @@ export const GET = withRateLimit<{ venueId: string }>(
       return NextResponse.json({ error: 'Invalid venue ID' }, { status: 400 });
     }
 
-    const venue = await VenueRepository.findById(venueId);
+    const venue = await VenueService.findById(venueId);
 
     if (!venue) {
       return NextResponse.json({ error: 'Venue not found' }, { status: 404 });
