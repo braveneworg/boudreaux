@@ -298,6 +298,33 @@ describe('runtime config drift — build-time values', () => {
   it('only manifests NEXT_PUBLIC_ names as build-time', () => {
     expect(namesOf('build').filter((name) => !name.startsWith('NEXT_PUBLIC_'))).toEqual([]);
   });
+
+  /** NEXT_PUBLIC_ names in a text, each once. */
+  const publicNamesIn = (text: string): string[] => [
+    ...new Set([...text.matchAll(/\bNEXT_PUBLIC_[A-Z0-9_]+/g)].map(([name]) => name)),
+  ];
+  const BUILD_NAMES = new Set(namesOf('build'));
+  const notBuildTime = (text: string): string[] =>
+    missingFrom(publicNamesIn(text), (name) => BUILD_NAMES.has(name));
+
+  it('sets no NEXT_PUBLIC_ name in the CI build that is not build-time', () => {
+    expect(notBuildTime(ciBuild)).toEqual([]);
+  });
+
+  it('declares no NEXT_PUBLIC_ build arg in the Dockerfile that is not build-time', () => {
+    expect(notBuildTime(dockerfile)).toEqual([]);
+  });
+
+  it('passes no NEXT_PUBLIC_ build arg from deploy that is not build-time', () => {
+    expect(notBuildTime(deployBuild)).toEqual([]);
+  });
+
+  it('sets only NEXT_PUBLIC_ names the code reads in the E2E build', () => {
+    const e2eBuild = stepBlock(ciWorkflow, 'Build Next.js (E2E)');
+
+    expect(e2eBuild).toMatch(/next build/);
+    expect(missingFrom(publicNamesIn(e2eBuild), (name) => MANIFEST_NAMES.has(name))).toEqual([]);
+  });
 });
 
 describe('runtime config drift — the code reads only manifest names', () => {

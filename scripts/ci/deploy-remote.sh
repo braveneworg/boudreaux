@@ -6,8 +6,13 @@
 # Executed on the remote EC2 instance via SSH during deployment.
 # Handles: Docker setup, TLS certificate management (Let's Encrypt / self-signed
 # fallback), image pull with digest pinning, container restart, health check,
-# automatic rollback on a failed health check (forward deploys only), and
-# digest audit persistence.
+# automatic rollback (forward deploys only), and digest audit persistence.
+#
+# Once the old containers are stopped, any failure (compose cannot start the
+# new ones, website or nginx is not running, the health check fails) rolls
+# back to the digests found on the host and still exits non-zero, with an
+# `::error::` line naming the failure, so the workflow is red and deploy.yml
+# never tags or releases the failed images.
 #
 # Usage: ./deploy-remote.sh
 # Env (required):
@@ -21,7 +26,7 @@
 #   REQUIRE_TRUSTED_CERT - 'true' to fail deploy if self-signed cert remains
 #   LETSENCRYPT_EMAIL   - Email for Let's Encrypt registration
 #   ROLLBACK_RUN        - 'true' when rollback.yml is rolling an older version:
-#                         a failed health check then exits non-zero with the
+#                         any of those failures then exits non-zero with the
 #                         containers left as they are, instead of re-pulling
 #                         the digests found on the host (the version being
 #                         rolled back from). See ADR-0021.
@@ -305,10 +310,74 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Start, check and roll back helpers
+# ---------------------------------------------------------------------------
+compose() {
+  $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml "$@"
+}
+
+CURL_OPTS="-fsS --max-time 10"
+if [ -f "$HOME/boudreaux/.selfsigned" ]; then
+  echo "Self-signed cert in use; allowing insecure TLS for health checks"
+  CURL_OPTS="-k $CURL_OPTS"
+fi
+
+health_check() {
+  # shellcheck disable=SC2086
+  curl $CURL_OPTS https://fakefourrecords.com/api/health
+}
+
+# How many of website and nginx `docker ps` lists (a restarting container
+# counts). Prints 0 rather than failing when nothing matches, so the check
+# below rolls back instead of `set -e` ending the script on the grep.
+count_app_containers() {
+  $DOCKER_CMD ps --format '{{.Names}}' | grep -cxE 'website|nginx' || true
+}
+
+# Called once the old containers are gone and the new ones did not come up
+# healthy. It always exits non-zero: a deploy that needed it is never green.
+fail_deploy() {
+  local reason="$1"
+
+  echo "❌ Deploy failed: $reason"
+  $DOCKER_CMD ps -a || true
+  compose logs --tail=50 || true
+
+  if [ "${ROLLBACK_RUN:-false}" = "true" ]; then
+    # The digests captured above are the version the operator is escaping
+    # from. Putting them back would serve the version the rollback was meant
+    # to remove. Fail loudly instead.
+    echo "::error::Rollback failed: $reason. Containers left as they are (website $NEW_WEBSITE_DIGEST, nginx $NEW_NGINX_DIGEST); nothing was rolled back automatically. Pick another version or fix forward."
+    exit 1
+  fi
+
+  if [ -z "$PREV_WEBSITE_DIGEST" ]; then
+    echo "::error::Deploy failed: $reason. There is no previous version on the host to roll back to; manual intervention required."
+    exit 1
+  fi
+
+  echo "Rolling back to website $PREV_WEBSITE_DIGEST, nginx ${PREV_NGINX_DIGEST:-unchanged}"
+  $DOCKER_CMD pull "$PREV_WEBSITE_DIGEST" || true
+  $DOCKER_CMD tag "$PREV_WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
+  if [ -n "$PREV_NGINX_DIGEST" ]; then
+    $DOCKER_CMD pull "$PREV_NGINX_DIGEST" || true
+    $DOCKER_CMD tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
+  fi
+
+  if compose up -d --force-recreate && sleep 5 && health_check; then
+    echo "::error::Deploy failed: $reason. Rolled back to the previous version (website $PREV_WEBSITE_DIGEST), which is serving and healthy. Fix forward with a new commit."
+    exit 1
+  fi
+
+  echo "::error::Deploy failed: $reason. The rolled-back version (website $PREV_WEBSITE_DIGEST) did not come up healthy either; manual intervention required."
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
 # Container restart
 # ---------------------------------------------------------------------------
 echo "Stopping existing containers..."
-$DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml down --remove-orphans || true
+compose down --remove-orphans || true
 
 echo "Removing old containers..."
 $DOCKER_CMD rm -f website nginx 2>/dev/null || true
@@ -320,17 +389,16 @@ echo "  Website image ID: $CURRENT_WEBSITE_ID"
 echo "  Nginx image ID:   $CURRENT_NGINX_ID"
 
 echo "Starting containers with fresh images..."
-$DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d --force-recreate
+if ! compose up -d --force-recreate; then
+  fail_deploy "docker compose could not start the new containers"
+fi
 
 # Verify containers are running
 echo "Verifying containers started successfully..."
 sleep 5
-RUNNING_CONTAINERS=$($DOCKER_CMD ps --format '{{.Names}}' | grep -E 'website|nginx' | wc -l)
+RUNNING_CONTAINERS=$(count_app_containers)
 if [ "$RUNNING_CONTAINERS" -lt 2 ]; then
-  echo "ERROR: Expected 2 containers (website, nginx) but found $RUNNING_CONTAINERS"
-  $DOCKER_CMD ps -a
-  $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml logs --tail=50
-  exit 1
+  fail_deploy "only $RUNNING_CONTAINERS of 2 containers (website, nginx) are running after the start"
 fi
 echo "✓ Both containers are running"
 
@@ -355,44 +423,8 @@ sleep 5
 # Health check with rollback
 # ---------------------------------------------------------------------------
 echo "Running health check..."
-CURL_OPTS="-fsS --max-time 10"
-if [ -f "$HOME/boudreaux/.selfsigned" ]; then
-  echo "Self-signed cert in use; allowing insecure TLS for health check"
-  CURL_OPTS="-k $CURL_OPTS"
-fi
-
-# shellcheck disable=SC2086
-if ! curl $CURL_OPTS https://fakefourrecords.com/api/health; then
-  if [ "${ROLLBACK_RUN:-false}" = "true" ]; then
-    # The digests captured above are the version the operator is escaping
-    # from. Putting them back would report a green run while production runs
-    # the version the rollback was meant to remove. Fail loudly instead.
-    echo '❌ Health check failed during a rollback - leaving the containers as they are.'
-    echo "   Running: website $NEW_WEBSITE_DIGEST, nginx $NEW_NGINX_DIGEST"
-    echo '   Pick another version or fix forward; nothing was rolled back automatically.'
-    $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml logs --tail=50 website || true
-    exit 1
-  fi
-
-  echo 'Health check failed - attempting rollback'
-
-  if [ -n "$PREV_WEBSITE_DIGEST" ]; then
-    $DOCKER_CMD pull "$PREV_WEBSITE_DIGEST" || true
-    $DOCKER_CMD tag "$PREV_WEBSITE_DIGEST" "$WEBSITE_IMAGE:latest" || true
-  fi
-  if [ -n "$PREV_NGINX_DIGEST" ]; then
-    $DOCKER_CMD pull "$PREV_NGINX_DIGEST" || true
-    $DOCKER_CMD tag "$PREV_NGINX_DIGEST" "$NGINX_IMAGE:latest" || true
-  fi
-
-  $DOCKER_CMD compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d --force-recreate
-  sleep 5
-  if ! curl -fsS --max-time 10 https://fakefourrecords.com/api/health; then
-    echo 'Rollback health check failed - manual intervention required'
-    exit 1
-  else
-    echo 'Rollback successful'
-  fi
+if ! health_check; then
+  fail_deploy "the health check of the new containers failed"
 fi
 
 # ---------------------------------------------------------------------------

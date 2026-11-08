@@ -94,6 +94,15 @@ services:
       # AWS credentials above).
       SMS_PROVIDER: ${SMS_PROVIDER:-noop}
       SNS_SMS_ORIGINATION_NUMBER: ${SNS_SMS_ORIGINATION_NUMBER}
+      # Operator knobs from repository variables; empty keeps the default.
+      # AUTH_DISABLE_SIGNUP='true' pauses signups over the /admin/settings
+      # toggle (read at boot); CONTACT_EMAIL receives the contact form (else
+      # EMAIL_FROM); LOG_DEBUG_MODULES forces the listed logger modules to
+      # debug; SLOW_QUERY_MS is the slow-query warning threshold (else 200).
+      AUTH_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP}
+      CONTACT_EMAIL: ${CONTACT_EMAIL}
+      LOG_DEBUG_MODULES: ${LOG_DEBUG_MODULES}
+      SLOW_QUERY_MS: ${SLOW_QUERY_MS}
     expose:
       - "3000"
     networks:

@@ -288,6 +288,14 @@ must admit GitHub Actions runners.
   callers pass `secrets: inherit`, so the env list cannot drift between a deploy and a rollback.
 - Every built image is tagged `sha-<commit>` at build time, and `deploy.yml`'s version-bump
   retags the deployed digests `vX.Y.Z` once the release exists. `latest` is the live image.
+- A forward roll that fails after the old containers stop (compose cannot start the new ones,
+  website or nginx is not running, or the health check fails) is rolled back on the host to the
+  digests it found there, and the run still goes red with an `::error::` annotation naming the
+  failure and whether the previous version is serving. No release, version tag or changelog
+  entry is made for it. GHCR's `latest` still points at the failed build until the next deploy
+  or rollback; a rollback with an empty `version` resolves to the newest tagged version, which
+  is the one serving. If the annotation says manual intervention is required, the rolled-back
+  version did not come up healthy either.
 
 **`.github/workflows/rollback.yml`** — manual rollback to an earlier version (ADR-0021).
 
@@ -313,10 +321,11 @@ What it refuses:
   pushes the schema, so the older code would run without something it may need. Read the diff;
   if the older code does not depend on it, re-run with `force: true`. If it does, fix forward or
   apply the index by hand (see the `prisma db push` section above) before rolling.
-- **A failed health check after the roll.** The remote script leaves the containers as they are
-  and the run goes red (`ROLLBACK_RUN=true` turns off its re-pull of the digests it found on the
-  host, which would be the version you just tried to remove). Pick another version or fix
-  forward.
+- **A failed start or health check after the roll.** When compose cannot start the containers,
+  website or nginx is not running, or the health check fails, the remote script leaves the
+  containers as they are and the run goes red (`ROLLBACK_RUN=true` turns off its re-pull of the
+  digests it found on the host, which would be the version you just tried to remove). Pick
+  another version or fix forward.
 
 What no rollback fixes: a version that already wrote documents the older code cannot read. That
 is a data migration, not a deploy. The rule in `prisma/AGENTS.md` (every version readable by its
