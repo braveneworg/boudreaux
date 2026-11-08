@@ -19,7 +19,8 @@ export type TourDateImagesResponse = z.infer<typeof tourDateImagesResponseSchema
  * Fetches a tour date's images from the
  * `/api/tours/{tourId}/dates/{tourDateId}/images` route handler.
  *
- * The route always responds 200 with `{ images: [] }`, so no 404 special-casing
+ * The route is admin-only (no public page shows tour date images) and answers
+ * an admin 200, `{ images: [] }` when there are none, so no 404 special-casing
  * is needed. Forwards the TanStack Query {@link AbortSignal} to `fetch` so the
  * request is cancelled automatically on unmount, invalidation, or a superseding
  * refetch.

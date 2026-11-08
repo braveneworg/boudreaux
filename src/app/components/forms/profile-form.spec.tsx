@@ -3,8 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { createElement } from 'react';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 
 import { ProfileForm } from './profile-form';
 
@@ -215,6 +217,61 @@ describe('ProfileForm', () => {
       render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(screen.queryByText('Personal Information')).not.toBeInTheDocument();
+    });
+  });
+
+  // Regression: better-auth resolves the session from a fetch that the header
+  // starts on mount. The profile segment hydrates later, under its own
+  // Suspense boundary, so the session can already be resolved when this node
+  // hydrates. The server can only render the pending branch (the skeleton),
+  // so the hydrating render must render it too. renderToString runs no
+  // effects and uses server snapshots, so it stands in for that render.
+  describe('hydration safety', () => {
+    it('renders the skeleton on the server even when the session has resolved', () => {
+      const html = renderToString(<ProfileForm socialProviders={ALL_PROVIDERS} />);
+
+      expect(html).not.toContain('Personal Information');
+    });
+
+    it('hydrates without a mismatch when the session resolves before hydration', async () => {
+      useSessionMock.mockReturnValue({ data: null, update: vi.fn(), status: 'loading' });
+      const container = document.createElement('div');
+      container.innerHTML = renderToString(<ProfileForm socialProviders={ALL_PROVIDERS} />);
+      useSessionMock.mockReturnValue({
+        data: { user: buildUser() },
+        update: vi.fn(),
+        status: 'authenticated',
+      });
+
+      const recoverableErrors: string[] = [];
+      const root = await act(async () =>
+        hydrateRoot(container, <ProfileForm socialProviders={ALL_PROVIDERS} />, {
+          onRecoverableError: (error) => recoverableErrors.push(String(error)),
+        })
+      );
+
+      expect(recoverableErrors).toEqual([]);
+      act(() => root.unmount());
+    });
+
+    it('shows the form once hydrated with a resolved session', async () => {
+      useSessionMock.mockReturnValue({ data: null, update: vi.fn(), status: 'loading' });
+      const container = document.createElement('div');
+      container.innerHTML = renderToString(<ProfileForm socialProviders={ALL_PROVIDERS} />);
+      useSessionMock.mockReturnValue({
+        data: { user: buildUser() },
+        update: vi.fn(),
+        status: 'authenticated',
+      });
+
+      const root = await act(async () =>
+        hydrateRoot(container, <ProfileForm socialProviders={ALL_PROVIDERS} />, {
+          onRecoverableError: () => {},
+        })
+      );
+
+      expect(container.textContent).toContain('Personal Information');
+      act(() => root.unmount());
     });
   });
 

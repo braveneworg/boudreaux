@@ -231,23 +231,29 @@ describe('ChatMessageRow', () => {
     expect(container.querySelector('p')).toHaveClass('pr-8');
   });
 
-  describe('SITE_HOST resolution (NEXT_PUBLIC_BASE_URL)', () => {
+  // The chat drawer renders client-side only, and production's client bundle
+  // has no NEXT_PUBLIC_BASE_URL (it is not a build value), so the row must
+  // learn the site's host from the page it runs on.
+  describe("site host resolution (the page's own host)", () => {
     const adminUser = { id: 'admin-1', username: 'mod', gravatarHash: 'h', role: 'admin' as const };
+
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', undefined);
+    });
 
     afterEach(() => {
       vi.unstubAllEnvs();
       vi.resetModules();
     });
 
-    it('treats a link on the configured host as internal (no new tab)', async () => {
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://chat.example.com');
+    it("treats a link on the page's host as internal (no new tab)", async () => {
       vi.resetModules();
       const mod = await import('./chat-message-row');
       const { container } = render(
         <mod.ChatMessageRow
           message={makeMsg({
             user: adminUser,
-            body: 'see [home](https://chat.example.com/welcome)',
+            body: `see [home](${window.location.origin}/welcome)`,
           })}
         />
       );
@@ -256,8 +262,7 @@ describe('ChatMessageRow', () => {
       expect(anchor.getAttribute('target')).toBeNull();
     });
 
-    it('falls back to external classification when NEXT_PUBLIC_BASE_URL is unparseable', async () => {
-      vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'not a valid url');
+    it('treats a link on another host as external (new tab)', async () => {
       vi.resetModules();
       const mod = await import('./chat-message-row');
       const { container } = render(
