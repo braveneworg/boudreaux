@@ -4,6 +4,7 @@
 import { z } from 'zod';
 
 import { FORMATS } from '@/lib/types/media-models';
+import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
 
 import { objectId } from './primitives';
 
@@ -134,3 +135,16 @@ export const createReleaseSchema = releaseBaseSchema.refine(
 
 type schemaType = typeof createReleaseSchema & Partial<FormData>;
 export type ReleaseFormData = z.infer<schemaType>;
+
+/**
+ * Input of the release update action: the form's values plus the admin's
+ * credit decisions (ADR-0015), which come from the confirmation dialog, not
+ * the form.
+ */
+export type ReleaseActionInput = ReleaseFormData & { creditDecisions?: CreditDecisions };
+
+/**
+ * Input of the release create action: an update's input plus the ObjectId the
+ * form pre-generated so uploads can be keyed to the release before it exists.
+ */
+export type CreateReleaseActionInput = ReleaseActionInput & { preGeneratedId?: string };

@@ -432,9 +432,7 @@ describe('ReleaseForm — publishing (ADR-0015)', () => {
     await clickPublish();
 
     await waitFor(() => expect(updateReleaseAction).toHaveBeenCalled());
-    expect(vi.mocked(updateReleaseAction).mock.calls[0][2].get('creditDecisions')).toBe(
-      JSON.stringify(decisions)
-    );
+    expect(vi.mocked(updateReleaseAction).mock.calls[0][1].creditDecisions).toEqual(decisions);
   });
 
   it('saves nothing when the admin cancels', async () => {
@@ -465,13 +463,13 @@ describe('ReleaseForm — publishing (ADR-0015)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(updateReleaseAction).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(updateReleaseAction).mock.calls[0][2].get('publishedAt')).toBeTruthy();
+    expect(vi.mocked(updateReleaseAction).mock.calls[0][1].publishedAt).toBeTruthy();
 
     // The refused submit settles before Save reads "Save" again.
     await user.click(await screen.findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(updateReleaseAction).toHaveBeenCalledTimes(2));
 
-    expect(vi.mocked(updateReleaseAction).mock.calls[1][2].get('publishedAt')).toBeFalsy();
+    expect(vi.mocked(updateReleaseAction).mock.calls[1][1].publishedAt).toBeFalsy();
   });
 });
 
