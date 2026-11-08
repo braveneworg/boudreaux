@@ -81,6 +81,10 @@ Leaving it to the boot check alone would not: `deploy-remote.sh` stops the
 old containers before it starts the new ones, its container-count check can
 exit before its health-check rollback runs, and when that rollback does run
 it exits 0, so the deploy reads green while the old version serves.
+(Amended 2026-11-08: `deploy-remote.sh` now rolls back on every failure
+after it stops the old containers and exits non-zero after a successful
+rollback, so a bad image fails the run red. The runner-side check still
+saves the roll and its downtime.)
 
 ## Alternatives rejected
 
