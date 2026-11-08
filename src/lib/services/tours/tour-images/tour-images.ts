@@ -58,6 +58,20 @@ const policyOf = (kind: TourImageOwnerKind): OwnerPolicy =>
 
 const IMAGE_NOT_FOUND = 'Image not found';
 
+/**
+ * The one file name {@link buildMediaS3Key} gives an object inside an owner's
+ * namespace: lowercase letters, digits and dashes, then a dotted extension.
+ * No slash and no second dot, so the name can neither climb out of the
+ * namespace nor sit in a folder below it.
+ */
+const OWNED_FILE_NAME = /^[a-z0-9-]+\.[a-z0-9]{1,8}$/;
+
+/** Whether an object key sits directly in the owner's `media/<entity>/<id>/` namespace. */
+const isOwnersKey = ({ keyEntity }: OwnerPolicy, ownerId: string, s3Key: string): boolean => {
+  const namespace = `media/${keyEntity}/${ownerId}/`;
+  return s3Key.startsWith(namespace) && OWNED_FILE_NAME.test(s3Key.slice(namespace.length));
+};
+
 const capExceeded = ({ maxImages, label }: OwnerPolicy): ServiceResponse<never> => ({
   success: false,
   error: `Maximum of ${maxImages} images per ${label} exceeded`,
@@ -148,9 +162,12 @@ export class TourImages {
 
   /**
    * Record an uploaded object as the owner's last image, served from its
-   * public URL. A confirm that would pass the cap is refused and its object
-   * deleted. The count and the insert are separate reads, so two confirms
-   * racing at the same instant can still both pass.
+   * public URL. The object must sit in the owner's key namespace, where
+   * {@link requestUpload} signed it: any other key is refused and left alone,
+   * so a confirm can neither record nor delete another owner's object. A
+   * confirm that would pass the cap is refused and its object deleted. The
+   * count and the insert are separate reads, so two confirms racing at the
+   * same instant can still both pass.
    */
   async confirmUpload<K extends TourImageOwnerKind>(
     { kind, id }: TourImageOwner<K>,
@@ -159,6 +176,13 @@ export class TourImages {
   ): Promise<ServiceResponse<ConfirmedTourImage<TourImageRowMap[K]>>> {
     const records = this.recordsOf(kind);
     const policy = policyOf(kind);
+    if (!isOwnersKey(policy, id, upload.s3Key)) {
+      return {
+        success: false,
+        error: `The uploaded object is not one of this ${policy.label}'s images`,
+        code: 'INVALID_INPUT',
+      };
+    }
     try {
       const displayOrder = await records.count(id);
       if (displayOrder >= policy.maxImages) {
