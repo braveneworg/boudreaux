@@ -202,6 +202,7 @@ describe('createPlaylistAction', () => {
     expect(result).toEqual({
       success: false,
       error: DUPLICATE_TITLE_MESSAGE,
+      code: 'DUPLICATE',
       fieldErrors: { title: [DUPLICATE_TITLE_MESSAGE] },
     });
   });
@@ -219,7 +220,11 @@ describe('createPlaylistAction', () => {
 
     const result = await createPlaylistAction(validCreateInput);
 
-    expect(result).toEqual({ success: false, error: 'Failed to create playlist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to create playlist',
+      code: 'UNKNOWN',
+    });
   });
 });
 
@@ -242,7 +247,7 @@ describe('updatePlaylistAction', () => {
 
     const result = await updatePlaylistAction(input);
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({ success: false, error: 'Playlist not found', code: 'NOT_FOUND' });
   });
 
   it('maps a duplicate-title DataError to a friendly title field error', async () => {
@@ -253,6 +258,7 @@ describe('updatePlaylistAction', () => {
     expect(result).toEqual({
       success: false,
       error: DUPLICATE_TITLE_MESSAGE,
+      code: 'DUPLICATE',
       fieldErrors: { title: [DUPLICATE_TITLE_MESSAGE] },
     });
   });
@@ -275,7 +281,7 @@ describe('updatePlaylistAction', () => {
 
     const result = await updatePlaylistAction(input);
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({ success: false, error: 'Playlist not found', code: 'NOT_FOUND' });
   });
 });
 
@@ -306,7 +312,7 @@ describe('deletePlaylistAction', () => {
 
     const result = await deletePlaylistAction({ playlistId: PLAYLIST_ID });
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({ success: false, error: 'Playlist not found', code: 'NOT_FOUND' });
   });
 
   it('masks a repo-mapped NOT_FOUND (cause set) behind the generic message', async () => {
@@ -316,7 +322,11 @@ describe('deletePlaylistAction', () => {
 
     const result = await deletePlaylistAction({ playlistId: PLAYLIST_ID });
 
-    expect(result).toEqual({ success: false, error: 'Failed to delete playlist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to delete playlist',
+      code: 'NOT_FOUND',
+    });
   });
 
   it('collapses non-user-facing DataError codes to the generic message', async () => {
@@ -326,7 +336,11 @@ describe('deletePlaylistAction', () => {
 
     const result = await deletePlaylistAction({ playlistId: PLAYLIST_ID });
 
-    expect(result).toEqual({ success: false, error: 'Failed to delete playlist' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to delete playlist',
+      code: 'UNAVAILABLE',
+    });
   });
 });
 
@@ -343,12 +357,16 @@ describe('generatePlaylistCoverUploadUrlsAction', () => {
     expect(playlistCoverUploadLimiter.check).not.toHaveBeenCalled();
   });
 
-  it('returns RATE_LIMITED when the limiter rejects', async () => {
+  it('answers RATE_LIMITED with copy when the limiter rejects', async () => {
     vi.mocked(playlistCoverUploadLimiter.check).mockRejectedValue(new Error('Rate limit exceeded'));
 
     const result = await generatePlaylistCoverUploadUrlsAction(validUploadInput);
 
-    expect(result).toEqual({ success: false, error: 'RATE_LIMITED' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Too many upload requests — try again in a minute.',
+      code: 'RATE_LIMITED',
+    });
     expect(PlaylistService.requireOwned).not.toHaveBeenCalled();
   });
 
@@ -370,7 +388,7 @@ describe('generatePlaylistCoverUploadUrlsAction', () => {
 
     const result = await generatePlaylistCoverUploadUrlsAction(validUploadInput);
 
-    expect(result).toEqual({ success: false, error: 'Playlist not found' });
+    expect(result).toEqual({ success: false, error: 'Playlist not found', code: 'NOT_FOUND' });
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 
@@ -487,6 +505,10 @@ describe('generatePlaylistCoverUploadUrlsAction', () => {
 
     const result = await generatePlaylistCoverUploadUrlsAction(validUploadInput);
 
-    expect(result).toEqual({ success: false, error: 'Failed to generate upload URLs' });
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to generate upload URLs',
+      code: 'UNKNOWN',
+    });
   });
 });

@@ -21,8 +21,6 @@ export const PLAYLIST_COVER_ACCEPTED_IMAGE_TYPES: readonly string[] =
 
 const MAX_COVER_IMAGE_MEGABYTES = Math.round(MAX_PLAYLIST_COVER_IMAGE_BYTES / 1024 / 1024);
 
-const RATE_LIMITED_ERROR = 'RATE_LIMITED';
-const RATE_LIMITED_MESSAGE = 'Too many upload requests — try again in a minute.';
 const GENERIC_UPLOAD_ERROR = 'Upload failed';
 
 interface UsePlaylistCoverUpload {
@@ -99,7 +97,7 @@ export const usePlaylistCoverUpload = (): UsePlaylistCoverUpload => {
         })),
       });
       if (!result.success) {
-        setError(result.error === RATE_LIMITED_ERROR ? RATE_LIMITED_MESSAGE : result.error);
+        setError(result.error);
         return [];
       }
       await Promise.all(
