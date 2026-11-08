@@ -14,9 +14,8 @@ import {
   type UpdateFeaturedArtistCoverArtResult,
 } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
-import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
+import type { FormState } from '@/lib/types/form-state';
+import type { FeaturedArtistActionInput } from '@/lib/validation/create-featured-artist-schema';
 
 import { useEntityMutation } from './use-entity-mutation';
 
@@ -30,23 +29,15 @@ const invalidateFeaturedArtistQueries = (queryClient: QueryClient): Promise<unkn
   queryClient.invalidateQueries({ queryKey: queryKeys.featuredArtists.all });
 
 /**
- * Mutation hook wrapping {@link createFeaturedArtistAction}. Accepts the featured
- * artist values plus the derived `artistIds`, which the action reads via
- * `FormData.getAll`, so they are appended individually rather than JSON-encoded.
- * The featured-artist caches are invalidated on a successful result.
+ * Mutation hook wrapping {@link createFeaturedArtistAction}. Passes the featured
+ * artist values plus the derived `artistIds` to the action as they are. The
+ * featured-artist caches are invalidated on a successful result.
  */
 export const useCreateFeaturedArtistMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
     FormState,
-    FeaturedArtistFormData & { artistIds: string[] }
-  >(
-    (values) =>
-      createFeaturedArtistAction(
-        EMPTY_FORM_STATE,
-        objectToFormData(values, { repeatKeys: ['artistIds'] })
-      ),
-    invalidateFeaturedArtistQueries
-  );
+    FeaturedArtistActionInput
+  >((values) => createFeaturedArtistAction(values), invalidateFeaturedArtistQueries);
 
   return {
     createFeaturedArtist: mutate,
@@ -57,23 +48,16 @@ export const useCreateFeaturedArtistMutation = () => {
 
 /**
  * Mutation hook wrapping {@link updateFeaturedArtistAction} — the whole-entity
- * edit save. Takes the same values as the create hook plus the row's id, and
- * appends `artistIds` individually so the action can read them via
- * `FormData.getAll`. Empty fields are KEPT (`keepEmptyStrings`): a blank is
- * how the admin clears an optional field, and the action maps it to `null`.
- * The featured-artist caches are invalidated on success.
+ * edit save. Takes the same values as the create hook plus the row's id. A
+ * blank field is sent as `''`, which is how the admin clears it; the action
+ * maps it to `null`. The featured-artist caches are invalidated on success.
  */
 export const useUpdateFeaturedArtistMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
     FormState,
-    { featuredArtistId: string; values: FeaturedArtistFormData & { artistIds: string[] } }
+    { featuredArtistId: string; values: FeaturedArtistActionInput }
   >(
-    ({ featuredArtistId, values }) =>
-      updateFeaturedArtistAction(
-        featuredArtistId,
-        EMPTY_FORM_STATE,
-        objectToFormData(values, { repeatKeys: ['artistIds'], keepEmptyStrings: true })
-      ),
+    ({ featuredArtistId, values }) => updateFeaturedArtistAction(featuredArtistId, values),
     invalidateFeaturedArtistQueries
   );
 

@@ -5,9 +5,9 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
-import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { cache } from '@/lib/utils/simple-cache';
+import type { FeaturedArtistActionInput } from '@/lib/validation/create-featured-artist-schema';
 
 import { updateFeaturedArtistAction } from './update-featured-artist-action';
 
@@ -30,31 +30,22 @@ const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDD
 
 const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@example.com' } };
 
-/** Builds the FormData the featured-artist form submits for an edit. */
-const buildPayload = (
-  overrides: Record<string, string> = {},
+/** The values the featured-artist form submits for an edit. */
+const buildInput = (
+  overrides: Partial<FeaturedArtistActionInput> = {},
   artistIds: string[] = [ARTIST_A]
-): FormData => {
-  const payload = new FormData();
-  const fields: Record<string, string> = {
-    displayName: 'Alpha',
-    description: 'A description',
-    coverArt: 'https://cdn.example.com/cover.jpg',
-    position: '3',
-    featuredOn: '2026-07-01',
-    featuredUntil: '2026-08-01',
-    digitalFormatId: DIGITAL_FORMAT_ID,
-    releaseId: RELEASE_ID,
-    ...overrides,
-  };
-  for (const [key, value] of Object.entries(fields)) {
-    payload.append(key, value);
-  }
-  for (const artistId of artistIds) {
-    payload.append('artistIds', artistId);
-  }
-  return payload;
-};
+): FeaturedArtistActionInput => ({
+  displayName: 'Alpha',
+  description: 'A description',
+  coverArt: 'https://cdn.example.com/cover.jpg',
+  position: 3,
+  featuredOn: '2026-07-01',
+  featuredUntil: '2026-08-01',
+  digitalFormatId: DIGITAL_FORMAT_ID,
+  releaseId: RELEASE_ID,
+  ...overrides,
+  artistIds,
+});
 
 /** The update payload handed to the service on the most recent call. */
 const lastUpdateData = () =>
@@ -73,20 +64,20 @@ describe('updateFeaturedArtistAction', () => {
   it('resolves the gate refusal as a form error without updating the featured artist', async () => {
     vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    const result = await updateFeaturedArtistAction(ID, buildInput());
 
     expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
     expect(FeaturedArtistsService.updateFeaturedArtist).not.toHaveBeenCalled();
   });
 
   it('reports success with the featured artist id', async () => {
-    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    const result = await updateFeaturedArtistAction(ID, buildInput());
 
     expect(result).toMatchObject({ success: true, data: { featuredArtistId: ID } });
   });
 
   it('updates the featured artist addressed by id', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(FeaturedArtistsService.updateFeaturedArtist).toHaveBeenCalledWith(
       ID,
@@ -95,7 +86,7 @@ describe('updateFeaturedArtistAction', () => {
   });
 
   it('clears errors on success', async () => {
-    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    const result = await updateFeaturedArtistAction(ID, buildInput());
 
     expect(result.errors).toBeUndefined();
   });
@@ -103,7 +94,7 @@ describe('updateFeaturedArtistAction', () => {
   // The route handler this replaced translated `artistIds` into a relation
   // `set`, which replaces the connected artists rather than appending.
   it('replaces the connected artists with the submitted ids', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({}, [ARTIST_A, ARTIST_B]));
+    await updateFeaturedArtistAction(ID, buildInput({}, [ARTIST_A, ARTIST_B]));
 
     expect(lastUpdateData()).toMatchObject({
       artists: { set: [{ id: ARTIST_A }, { id: ARTIST_B }] },
@@ -111,19 +102,19 @@ describe('updateFeaturedArtistAction', () => {
   });
 
   it('omits the artist relation entirely when no ids are submitted', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({}, []));
+    await updateFeaturedArtistAction(ID, buildInput({}, []));
 
     expect(lastUpdateData()).not.toHaveProperty('artists');
   });
 
   it('converts featuredOn to a Date', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData()).toMatchObject({ featuredOn: new Date('2026-07-01') });
   });
 
   it('converts featuredUntil to a Date', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData()).toMatchObject({ featuredUntil: new Date('2026-08-01') });
   });
@@ -131,23 +122,20 @@ describe('updateFeaturedArtistAction', () => {
   // A blank date must not be reinterpreted as "now" — that would silently
   // re-stamp the feature window on every save.
   it('leaves featuredOn unwritten when submitted blank', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ featuredOn: '' }));
+    await updateFeaturedArtistAction(ID, buildInput({ featuredOn: '' }));
 
     expect(lastUpdateData().featuredOn).toBeUndefined();
   });
 
   // The date picker's Clear button submits a blank: feature indefinitely.
   it('clears featuredUntil when submitted blank', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ featuredUntil: '' }));
+    await updateFeaturedArtistAction(ID, buildInput({ featuredUntil: '' }));
 
     expect(lastUpdateData().featuredUntil).toBeNull();
   });
 
   it('leaves featuredUntil unwritten when it is not submitted', async () => {
-    const payload = buildPayload();
-    payload.delete('featuredUntil');
-
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, payload);
+    await updateFeaturedArtistAction(ID, { ...buildInput(), featuredUntil: undefined });
 
     expect(lastUpdateData()).not.toHaveProperty('featuredUntil');
   });
@@ -155,19 +143,19 @@ describe('updateFeaturedArtistAction', () => {
   // Unlike the create action, an update must never stamp publishedOn — doing so
   // would publish a draft entry as a side effect of an unrelated edit.
   it('never writes publishedOn', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData()).not.toHaveProperty('publishedOn');
   });
 
-  it('coerces the numeric position from its form string', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ position: '7' }));
+  it('writes the position the form holds', async () => {
+    await updateFeaturedArtistAction(ID, buildInput({ position: 7 }));
 
     expect(lastUpdateData()).toMatchObject({ position: 7 });
   });
 
   it('connects the digital format by id', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData()).toMatchObject({
       digitalFormat: { connect: { id: DIGITAL_FORMAT_ID } },
@@ -175,40 +163,32 @@ describe('updateFeaturedArtistAction', () => {
   });
 
   it('connects the release by id', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData()).toMatchObject({ release: { connect: { id: RELEASE_ID } } });
   });
 
   it('writes a submitted featuredTrackNumber', async () => {
-    await updateFeaturedArtistAction(
-      ID,
-      EMPTY_FORM_STATE,
-      buildPayload({ featuredTrackNumber: '4' })
-    );
+    await updateFeaturedArtistAction(ID, buildInput({ featuredTrackNumber: 4 }));
 
     expect(lastUpdateData().featuredTrackNumber).toBe(4);
   });
 
   // Picking another release resets the track, so the form sends none.
   it('clears featuredTrackNumber to null when none is submitted', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(lastUpdateData().featuredTrackNumber).toBeNull();
   });
 
   it('clears a blank optional string to null rather than keeping the old value', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ description: '' }));
+    await updateFeaturedArtistAction(ID, buildInput({ description: '' }));
 
     expect(lastUpdateData().description).toBeNull();
   });
 
   it('rejects an invalid payload without calling the service', async () => {
-    await updateFeaturedArtistAction(
-      ID,
-      EMPTY_FORM_STATE,
-      buildPayload({ displayName: 'x'.repeat(201) })
-    );
+    await updateFeaturedArtistAction(ID, buildInput({ displayName: 'x'.repeat(201) }));
 
     expect(FeaturedArtistsService.updateFeaturedArtist).not.toHaveBeenCalled();
   });
@@ -216,8 +196,7 @@ describe('updateFeaturedArtistAction', () => {
   it('reports field errors for an invalid payload', async () => {
     const result = await updateFeaturedArtistAction(
       ID,
-      EMPTY_FORM_STATE,
-      buildPayload({ displayName: 'x'.repeat(201) })
+      buildInput({ displayName: 'x'.repeat(201) })
     );
 
     expect(result.success).toBe(false);
@@ -229,7 +208,7 @@ describe('updateFeaturedArtistAction', () => {
       error: 'Featured artist not found',
     } as never);
 
-    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    const result = await updateFeaturedArtistAction(ID, buildInput());
 
     expect(result).toMatchObject({
       success: false,
@@ -240,13 +219,13 @@ describe('updateFeaturedArtistAction', () => {
   it('fails softly when the service throws', async () => {
     vi.mocked(FeaturedArtistsService.updateFeaturedArtist).mockRejectedValue(Error('boom'));
 
-    const result = await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    const result = await updateFeaturedArtistAction(ID, buildInput());
 
     expect(result.success).toBe(false);
   });
 
   it('logs the update audit event', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(logSecurityEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -258,7 +237,7 @@ describe('updateFeaturedArtistAction', () => {
   });
 
   it('revalidates the admin featured-artists listing', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(revalidatePath).toHaveBeenCalledWith('/admin/featured-artists');
   });
@@ -266,13 +245,13 @@ describe('updateFeaturedArtistAction', () => {
   // The landing-page carousel reads through the featured-artists cache, so a
   // successful edit has to drop it or the change is invisible until it expires.
   it('drops the featured-artists cache on success', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(cache.deleteByPrefix).toHaveBeenCalledWith('featured-artists:');
   });
 
   it('revalidates the landing page on success', async () => {
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(revalidatePath).toHaveBeenCalledWith('/');
   });
@@ -283,7 +262,7 @@ describe('updateFeaturedArtistAction', () => {
       error: 'Featured artist not found',
     } as never);
 
-    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+    await updateFeaturedArtistAction(ID, buildInput());
 
     expect(cache.deleteByPrefix).not.toHaveBeenCalled();
   });
