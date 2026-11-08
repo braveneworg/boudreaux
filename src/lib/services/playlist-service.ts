@@ -113,11 +113,13 @@ interface ArtistReleaseTarget {
 const PLAYLIST_NOT_FOUND = 'Playlist not found';
 
 /**
- * Message of the `NOT_FOUND` thrown when an add-item source ref cannot be
- * resolved. Exported so the add-item Server Action can distinguish this case
- * (→ `SOURCE_NOT_FOUND`) from the playlist-level `NOT_FOUND` (same code).
+ * Copy of the `NOT_FOUND` an add throws when its source no longer resolves
+ * (deleted, unpublished or archived). Shown to the listener as written.
  */
-export const SOURCE_NOT_FOUND_MESSAGE = 'Source track or video not found';
+const SOURCE_GONE_MESSAGE = 'This song or video is no longer available.';
+
+/** Copy of the `LIMIT_EXCEEDED` an add throws at the item cap. */
+const PLAYLIST_FULL_MESSAGE = `This playlist is full — playlists hold up to ${MAX_PLAYLIST_ITEMS} items.`;
 
 /** How many release-title matches are expanded into track suggestions. */
 const RELEASE_MATCH_TAKE = 3;
@@ -815,13 +817,13 @@ export class PlaylistService {
   ): Promise<AddItemResult> {
     const playlist = await PlaylistService.requireOwned(playlistId, userId);
     const [resolved] = await PlaylistService.resolveSources([ref]);
-    if (!resolved) throw new DataError('NOT_FOUND', SOURCE_NOT_FOUND_MESSAGE);
+    if (!resolved) throw new DataError('NOT_FOUND', SOURCE_GONE_MESSAGE);
     if (!force) {
       const existing = await PlaylistRepository.findDuplicateItem(playlistId, ref);
       if (existing) return { duplicate: true };
     }
     if (playlist.itemCount >= MAX_PLAYLIST_ITEMS) {
-      throw new DataError('LIMIT_EXCEEDED', `Playlists are limited to ${MAX_PLAYLIST_ITEMS} items`);
+      throw new DataError('LIMIT_EXCEEDED', PLAYLIST_FULL_MESSAGE);
     }
     const record = await PlaylistRepository.addItem(playlistId, resolved.data);
     return { duplicate: false, item: toAddedItemPayload(record, resolved) };

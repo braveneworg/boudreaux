@@ -16,11 +16,7 @@ import {
   reorderPlaylistItemsAction,
 } from '@/lib/actions/playlist-item-actions';
 import { queryKeys } from '@/lib/query-keys';
-import type {
-  PlaylistActionResult,
-  PlaylistDetailResponse,
-  PlaylistItemPayload,
-} from '@/lib/types/domain/playlist';
+import type { PlaylistDetailResponse, PlaylistItemPayload } from '@/lib/types/domain/playlist';
 import type {
   AddPlaylistItemInput,
   CreatePlaylistInput,
@@ -138,10 +134,22 @@ describe('useCreatePlaylistMutation', () => {
     vi.mocked(createPlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to create playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<PlaylistDetailResponse, CreatePlaylistInput>(useCreatePlaylistMutation);
 
     await expect(opts.mutationFn(createInput)).rejects.toThrow('Failed to create playlist');
+  });
+
+  it('rejects with the action code beside its copy', async () => {
+    vi.mocked(createPlaylistAction).mockResolvedValue({
+      success: false,
+      error: 'A playlist with this title already exists',
+      code: 'DUPLICATE',
+    });
+    const opts = getOptions<PlaylistDetailResponse, CreatePlaylistInput>(useCreatePlaylistMutation);
+
+    await expect(opts.mutationFn(createInput)).rejects.toMatchObject({ code: 'DUPLICATE' });
   });
 
   it('seeds the detail cache with the returned playlist on success', async () => {
@@ -180,6 +188,7 @@ describe('useUpdatePlaylistMutation', () => {
     vi.mocked(updatePlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to update playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<PlaylistDetailResponse, UpdatePlaylistInput>(useUpdatePlaylistMutation);
 
@@ -214,6 +223,7 @@ describe('useDeletePlaylistMutation', () => {
     vi.mocked(deletePlaylistAction).mockResolvedValue({
       success: false,
       error: 'Failed to delete playlist',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ deleted: true }, { playlistId: string }>(useDeletePlaylistMutation);
 
@@ -245,48 +255,50 @@ describe('useAddPlaylistItemMutation', () => {
       success: true,
       data: { item: itemPayload },
     });
-    const opts = getOptions<
-      PlaylistActionResult<{ item: PlaylistItemPayload }>,
-      AddPlaylistItemInput
-    >(useAddPlaylistItemMutation);
+    const opts = getOptions<{ item: PlaylistItemPayload }, AddPlaylistItemInput>(
+      useAddPlaylistItemMutation
+    );
 
     await opts.mutationFn(addInput);
 
     expect(addPlaylistItemAction).toHaveBeenCalledWith(addInput);
   });
 
-  it('resolves with a failure result untouched instead of throwing', async () => {
-    const duplicateResult: PlaylistActionResult<{ item: PlaylistItemPayload }> = {
+  it('resolves with the added item on success', async () => {
+    vi.mocked(addPlaylistItemAction).mockResolvedValue({
+      success: true,
+      data: { item: itemPayload },
+    });
+    const opts = getOptions<{ item: PlaylistItemPayload }, AddPlaylistItemInput>(
+      useAddPlaylistItemMutation
+    );
+
+    await expect(opts.mutationFn(addInput)).resolves.toEqual({ item: itemPayload });
+  });
+
+  it('rejects a failure with its code and copy, like the other playlist mutations', async () => {
+    vi.mocked(addPlaylistItemAction).mockResolvedValue({
       success: false,
-      error: 'DUPLICATE_ITEM',
-    };
-    vi.mocked(addPlaylistItemAction).mockResolvedValue(duplicateResult);
-    const opts = getOptions<
-      PlaylistActionResult<{ item: PlaylistItemPayload }>,
-      AddPlaylistItemInput
-    >(useAddPlaylistItemMutation);
+      error: 'This is already in the playlist',
+      code: 'DUPLICATE_ITEM',
+    });
+    const opts = getOptions<{ item: PlaylistItemPayload }, AddPlaylistItemInput>(
+      useAddPlaylistItemMutation
+    );
 
-    await expect(opts.mutationFn(addInput)).resolves.toBe(duplicateResult);
+    await expect(opts.mutationFn(addInput)).rejects.toMatchObject({
+      name: 'PlaylistActionError',
+      code: 'DUPLICATE_ITEM',
+      message: 'This is already in the playlist',
+    });
   });
 
-  it('does not invalidate anything when the resolved result is a failure', async () => {
-    const opts = getOptions<
-      PlaylistActionResult<{ item: PlaylistItemPayload }>,
-      AddPlaylistItemInput
-    >(useAddPlaylistItemMutation);
+  it('invalidates the my-playlists and detail caches on success', async () => {
+    const opts = getOptions<{ item: PlaylistItemPayload }, AddPlaylistItemInput>(
+      useAddPlaylistItemMutation
+    );
 
-    await opts.onSuccess({ success: false, error: 'DUPLICATE_ITEM' }, addInput);
-
-    expect(invalidateQueriesMock).not.toHaveBeenCalled();
-  });
-
-  it('invalidates the my-playlists and detail caches on a success result', async () => {
-    const opts = getOptions<
-      PlaylistActionResult<{ item: PlaylistItemPayload }>,
-      AddPlaylistItemInput
-    >(useAddPlaylistItemMutation);
-
-    await opts.onSuccess({ success: true, data: { item: itemPayload } }, addInput);
+    await opts.onSuccess({ item: itemPayload }, addInput);
 
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.playlists.mine() });
     expect(invalidateQueriesMock).toHaveBeenCalledWith({
@@ -316,6 +328,7 @@ describe('useRemovePlaylistItemMutation', () => {
     vi.mocked(removePlaylistItemAction).mockResolvedValue({
       success: false,
       error: 'Failed to remove playlist item',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ removed: true }, { playlistId: string; itemId: string }>(
       useRemovePlaylistItemMutation
@@ -362,6 +375,7 @@ describe('useReorderPlaylistItemsMutation', () => {
     vi.mocked(reorderPlaylistItemsAction).mockResolvedValue({
       success: false,
       error: 'Failed to reorder playlist items',
+      code: 'UNKNOWN',
     });
     const opts = getOptions<{ reordered: true }, ReorderPlaylistItemsInput>(
       useReorderPlaylistItemsMutation

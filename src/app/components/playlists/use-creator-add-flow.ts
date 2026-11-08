@@ -6,19 +6,10 @@
 
 import { useState } from 'react';
 
-import { toast } from 'sonner';
-
-import { DUPLICATE_ITEM_ERROR } from '@/lib/constants/playlists';
 import type { PlaylistSearchItem } from '@/lib/types/domain/playlist';
-import { buildAddPlaylistItemInput } from '@/lib/utils/build-add-playlist-item-input';
 
-import { useAddPlaylistItemMutation } from './_hooks/mutations/use-playlist-mutations';
+import { useAddToPlaylist } from './use-add-to-playlist';
 import { draftItemFromSearchItem, type DraftItem } from './use-playlist-creator';
-
-/** The duplicate awaiting confirmation, tagged by which add path produced it. */
-type PendingDuplicate =
-  | { kind: 'draft'; title: string; draft: DraftItem }
-  | { kind: 'server'; title: string; item: PlaylistSearchItem };
 
 interface UseCreatorAddFlowArgs {
   /** Draft phase stages locally; any other phase adds through the server mutation. */
@@ -45,12 +36,13 @@ export interface UseCreatorAddFlowResult {
 
 /**
  * Phase-branched add flow for the playlist creator's search box. In the draft
- * phase items stage into the machine (a duplicate source opens the confirm
- * dialog, confirming force-stages the same draft item). In the saved/editing
- * phases items go through the add-item mutation: `DUPLICATE_ITEM` opens the
- * confirm dialog for a `force: true` retry, any other failure toasts the
- * action's error, and a thrown rejection toasts a generic message. One confirm
- * dialog (driven by `duplicateItemTitle`) serves both paths.
+ * phase items stage into the machine: a source already staged opens the
+ * confirm dialog, and confirming force-stages the same draft item. In the
+ * saved/editing phases items go to the saved playlist through
+ * {@link useAddToPlaylist}, which owns the server duplicate question, the
+ * forced retry and the failure toasts; a success lands silently in the
+ * creator's list. One confirm dialog (driven by `duplicateItemTitle`) serves
+ * both paths.
  */
 export const useCreatorAddFlow = ({
   isDraft,
@@ -58,49 +50,36 @@ export const useCreatorAddFlow = ({
   addItem,
   addItemForced,
 }: UseCreatorAddFlowArgs): UseCreatorAddFlowResult => {
-  const [pendingDuplicate, setPendingDuplicate] = useState<PendingDuplicate | null>(null);
-  const { addPlaylistItemAsync } = useAddPlaylistItemMutation();
-
-  const runServerAdd = async (item: PlaylistSearchItem, force: boolean): Promise<void> => {
-    if (!playlistId) return;
-    try {
-      const result = await addPlaylistItemAsync(buildAddPlaylistItemInput(item, playlistId, force));
-      if (result.success) return;
-      if (!force && result.error === DUPLICATE_ITEM_ERROR) {
-        setPendingDuplicate({ kind: 'server', title: item.title, item });
-        return;
-      }
-      toast.error(result.error);
-    } catch {
-      toast.error('Failed to add to playlist');
-    }
-  };
+  const [pendingDraft, setPendingDraft] = useState<DraftItem | null>(null);
+  const serverAdd = useAddToPlaylist();
 
   const handleAdd = (item: PlaylistSearchItem): void => {
     if (!isDraft) {
-      void runServerAdd(item, false);
+      if (playlistId) serverAdd.add({ item, playlistId });
       return;
     }
     const draft = draftItemFromSearchItem(item);
     const { duplicate } = addItem(draft);
-    if (duplicate) setPendingDuplicate({ kind: 'draft', title: draft.title, draft });
+    if (duplicate) setPendingDraft(draft);
   };
 
   const confirmDuplicate = (): void => {
-    if (!pendingDuplicate) return;
-    setPendingDuplicate(null);
-    if (pendingDuplicate.kind === 'draft') {
-      addItemForced(pendingDuplicate.draft);
+    if (!pendingDraft) {
+      serverAdd.confirmDuplicate();
       return;
     }
-    void runServerAdd(pendingDuplicate.item, true);
+    setPendingDraft(null);
+    addItemForced(pendingDraft);
   };
 
-  const dismissDuplicate = (): void => setPendingDuplicate(null);
+  const dismissDuplicate = (): void => {
+    setPendingDraft(null);
+    serverAdd.dismissDuplicate();
+  };
 
   return {
     handleAdd,
-    duplicateItemTitle: pendingDuplicate?.title ?? null,
+    duplicateItemTitle: pendingDraft?.title ?? serverAdd.duplicateItemTitle,
     confirmDuplicate,
     dismissDuplicate,
   };
