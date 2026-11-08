@@ -15,6 +15,7 @@ import type { UpdateFeaturedArtistData } from '@/lib/types/domain/featured-artis
 import type { FormState } from '@/lib/types/form-state';
 import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { cache } from '@/lib/utils/simple-cache';
 import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
@@ -59,17 +60,26 @@ type ParsedData = ReturnType<ReturnType<typeof buildServerSchema>['parse']>;
  * feature window on every save), and `publishedOn` is never written at all
  * (which would publish a draft as a side effect of an unrelated edit).
  *
+ * A field the admin emptied is cleared, not kept: a blank `displayName`,
+ * `description` or `coverArt` becomes `null` (`toClearableString`), a blank
+ * `featuredUntil` (the date picker's Clear) becomes `null` (feature
+ * indefinitely), and a missing `featuredTrackNumber` becomes `null` (start
+ * at track 1), because picking another release resets it to nothing. This
+ * is the whole-entity edit save, so every field is always sent.
+ *
  * `artistIds` becomes a relation `set`, replacing the connected artists rather
  * than appending to them, and is omitted entirely when none were submitted.
  */
 const buildUpdateData = (data: ParsedData, artistIds: string[]): UpdateFeaturedArtistData => ({
-  displayName: data.displayName || undefined,
-  description: data.description || undefined,
-  coverArt: data.coverArt || undefined,
+  displayName: toClearableString(data.displayName),
+  description: toClearableString(data.description),
+  coverArt: toClearableString(data.coverArt),
   position: data.position,
-  featuredTrackNumber: data.featuredTrackNumber ?? undefined,
+  featuredTrackNumber: data.featuredTrackNumber ?? null,
   ...(data.featuredOn && { featuredOn: new Date(data.featuredOn) }),
-  ...(data.featuredUntil && { featuredUntil: new Date(data.featuredUntil) }),
+  ...(data.featuredUntil !== undefined && {
+    featuredUntil: data.featuredUntil ? new Date(data.featuredUntil) : null,
+  }),
   ...(artistIds.length > 0 && { artists: { set: artistIds.map((id) => ({ id })) } }),
   ...(data.digitalFormatId && { digitalFormat: { connect: { id: data.digitalFormatId } } }),
   ...(data.releaseId && { release: { connect: { id: data.releaseId } } }),

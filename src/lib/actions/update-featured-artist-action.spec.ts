@@ -136,10 +136,20 @@ describe('updateFeaturedArtistAction', () => {
     expect(lastUpdateData().featuredOn).toBeUndefined();
   });
 
-  it('leaves featuredUntil unwritten when submitted blank', async () => {
+  // The date picker's Clear button submits a blank: feature indefinitely.
+  it('clears featuredUntil when submitted blank', async () => {
     await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ featuredUntil: '' }));
 
-    expect(lastUpdateData().featuredUntil).toBeUndefined();
+    expect(lastUpdateData().featuredUntil).toBeNull();
+  });
+
+  it('leaves featuredUntil unwritten when it is not submitted', async () => {
+    const payload = buildPayload();
+    payload.delete('featuredUntil');
+
+    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, payload);
+
+    expect(lastUpdateData()).not.toHaveProperty('featuredUntil');
   });
 
   // Unlike the create action, an update must never stamp publishedOn — doing so
@@ -170,10 +180,27 @@ describe('updateFeaturedArtistAction', () => {
     expect(lastUpdateData()).toMatchObject({ release: { connect: { id: RELEASE_ID } } });
   });
 
-  it('maps a blank optional string to undefined rather than writing an empty value', async () => {
+  it('writes a submitted featuredTrackNumber', async () => {
+    await updateFeaturedArtistAction(
+      ID,
+      EMPTY_FORM_STATE,
+      buildPayload({ featuredTrackNumber: '4' })
+    );
+
+    expect(lastUpdateData().featuredTrackNumber).toBe(4);
+  });
+
+  // Picking another release resets the track, so the form sends none.
+  it('clears featuredTrackNumber to null when none is submitted', async () => {
+    await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload());
+
+    expect(lastUpdateData().featuredTrackNumber).toBeNull();
+  });
+
+  it('clears a blank optional string to null rather than keeping the old value', async () => {
     await updateFeaturedArtistAction(ID, EMPTY_FORM_STATE, buildPayload({ description: '' }));
 
-    expect(lastUpdateData().description).toBeUndefined();
+    expect(lastUpdateData().description).toBeNull();
   });
 
   it('rejects an invalid payload without calling the service', async () => {

@@ -59,7 +59,9 @@ export const useCreateFeaturedArtistMutation = () => {
  * Mutation hook wrapping {@link updateFeaturedArtistAction} — the whole-entity
  * edit save. Takes the same values as the create hook plus the row's id, and
  * appends `artistIds` individually so the action can read them via
- * `FormData.getAll`. The featured-artist caches are invalidated on success.
+ * `FormData.getAll`. Empty fields are KEPT (`keepEmptyStrings`): a blank is
+ * how the admin clears an optional field, and the action maps it to `null`.
+ * The featured-artist caches are invalidated on success.
  */
 export const useUpdateFeaturedArtistMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
@@ -70,7 +72,7 @@ export const useUpdateFeaturedArtistMutation = () => {
       updateFeaturedArtistAction(
         featuredArtistId,
         EMPTY_FORM_STATE,
-        objectToFormData(values, { repeatKeys: ['artistIds'] })
+        objectToFormData(values, { repeatKeys: ['artistIds'], keepEmptyStrings: true })
       ),
     invalidateFeaturedArtistQueries
   );
