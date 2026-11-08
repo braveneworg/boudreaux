@@ -124,12 +124,6 @@ const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
         }
       }
     },
-    updateAltText: async (id, altText) => {
-      const row = rows.get(id);
-      if (row) {
-        rows.set(id, { ...row, altText });
-      }
-    },
   };
 };
 
@@ -506,47 +500,6 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
       expect(result).toEqual({
         success: false,
         error: 'Failed to reorder images',
-        code: 'UNKNOWN',
-      });
-    });
-  });
-
-  describe('updateAltText', () => {
-    it('refuses an image that does not exist', async () => {
-      const result = await images.updateAltText(kind, 'missing', 'x');
-
-      expect(result).toEqual({ success: false, error: 'Image not found', code: 'NOT_FOUND' });
-    });
-
-    it('stores the alt text and names the owner', async () => {
-      const [image] = await seed(1);
-
-      const result = await images.updateAltText(kind, image.id, 'A crowd');
-
-      expect(result).toEqual({ success: true, data: { ownerId: OWNER_ID } });
-      expect(records.rows.get(image.id)?.altText).toBe('A crowd');
-    });
-
-    it('clears a blank alt text to null', async () => {
-      const [image] = await seed(1);
-      await records.updateAltText(image.id, 'old');
-
-      await images.updateAltText(kind, image.id, '');
-
-      expect(records.rows.get(image.id)?.altText).toBeNull();
-    });
-
-    it('fails with generic copy when the write throws', async () => {
-      const [image] = await seed(1);
-      records.updateAltText = async () => {
-        throw new Error('raw driver text');
-      };
-
-      const result = await images.updateAltText(kind, image.id, 'x');
-
-      expect(result).toEqual({
-        success: false,
-        error: 'Failed to update alt text',
         code: 'UNKNOWN',
       });
     });

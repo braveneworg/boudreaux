@@ -156,14 +156,4 @@ export class ImageRepository {
       where: { tourId },
     });
   }
-
-  /**
-   * Update alt text for an image.
-   */
-  static async updateAltText(id: string, altText: string | null): Promise<TourImageScalars> {
-    return prisma.tourImage.update({
-      where: { id },
-      data: { altText },
-    });
-  }
 }

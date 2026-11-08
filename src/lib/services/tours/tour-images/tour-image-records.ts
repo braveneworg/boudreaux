@@ -23,9 +23,6 @@ export const tourImageRecords: TourImageRecords<TourImageScalars> = {
   reorder: async (orders) => {
     await ImageRepository.reorderImages(orders);
   },
-  updateAltText: async (id, altText) => {
-    await ImageRepository.updateAltText(id, altText);
-  },
 };
 
 /** The `TourDateImage` model's adapter: the owner is the row's `tourDateId`. */
@@ -41,8 +38,5 @@ export const tourDateImageRecords: TourImageRecords<TourDateImageScalars> = {
   },
   reorder: async (orders) => {
     await TourDateImageRepository.reorderImages(orders);
-  },
-  updateAltText: async (id, altText) => {
-    await TourDateImageRepository.updateAltText(id, altText);
   },
 };

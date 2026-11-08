@@ -212,27 +212,3 @@ describe('TourDateImageRepository.count', () => {
     expect(prisma.tourDateImage.count).toHaveBeenCalledWith({ where: { tourDateId: 'td-1' } });
   });
 });
-
-describe('TourDateImageRepository.updateAltText', () => {
-  it('updates altText to a string value', async () => {
-    vi.mocked(prisma.tourDateImage.update).mockResolvedValue({} as never);
-
-    await TourDateImageRepository.updateAltText('img-1', 'new alt');
-
-    expect(prisma.tourDateImage.update).toHaveBeenCalledWith({
-      where: { id: 'img-1' },
-      data: { altText: 'new alt' },
-    });
-  });
-
-  it('clears altText when null is supplied', async () => {
-    vi.mocked(prisma.tourDateImage.update).mockResolvedValue({} as never);
-
-    await TourDateImageRepository.updateAltText('img-1', null);
-
-    expect(prisma.tourDateImage.update).toHaveBeenCalledWith({
-      where: { id: 'img-1' },
-      data: { altText: null },
-    });
-  });
-});

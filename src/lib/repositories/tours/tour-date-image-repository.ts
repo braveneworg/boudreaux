@@ -159,14 +159,4 @@ export class TourDateImageRepository {
       where: { tourDateId },
     });
   }
-
-  /**
-   * Update alt text for an image.
-   */
-  static async updateAltText(id: string, altText: string | null): Promise<TourDateImageScalars> {
-    return prisma.tourDateImage.update({
-      where: { id },
-      data: { altText },
-    });
-  }
 }

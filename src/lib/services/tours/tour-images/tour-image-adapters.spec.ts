@@ -89,7 +89,7 @@ describe('tourImageRecords', () => {
     expect(tourImageRecords.ownerIdOf({ tourId: 't-1' } as never)).toBe('t-1');
   });
 
-  it('reads, counts, deletes, reorders and relabels through the tour image repository', async () => {
+  it('reads, counts, deletes and reorders through the tour image repository', async () => {
     const orders = [{ id: 'a', displayOrder: 0 }];
 
     await tourImageRecords.findByOwner('t-1');
@@ -97,14 +97,12 @@ describe('tourImageRecords', () => {
     await tourImageRecords.findById('a');
     await tourImageRecords.delete('a');
     await tourImageRecords.reorder(orders);
-    await tourImageRecords.updateAltText('a', null);
 
     expect(ImageRepository.findByTourId).toHaveBeenCalledWith('t-1');
     expect(ImageRepository.count).toHaveBeenCalledWith('t-1');
     expect(ImageRepository.findById).toHaveBeenCalledWith('a');
     expect(ImageRepository.delete).toHaveBeenCalledWith('a');
     expect(ImageRepository.reorderImages).toHaveBeenCalledWith(orders);
-    expect(ImageRepository.updateAltText).toHaveBeenCalledWith('a', null);
   });
 });
 
@@ -121,7 +119,7 @@ describe('tourDateImageRecords', () => {
     expect(tourDateImageRecords.ownerIdOf({ tourDateId: 'd-1' } as never)).toBe('d-1');
   });
 
-  it('reads, counts, deletes, reorders and relabels through the tour date image repository', async () => {
+  it('reads, counts, deletes and reorders through the tour date image repository', async () => {
     const orders = [{ id: 'a', displayOrder: 0 }];
 
     await tourDateImageRecords.findByOwner('d-1');
@@ -129,13 +127,11 @@ describe('tourDateImageRecords', () => {
     await tourDateImageRecords.findById('a');
     await tourDateImageRecords.delete('a');
     await tourDateImageRecords.reorder(orders);
-    await tourDateImageRecords.updateAltText('a', 'alt');
 
     expect(TourDateImageRepository.findByTourDateId).toHaveBeenCalledWith('d-1');
     expect(TourDateImageRepository.count).toHaveBeenCalledWith('d-1');
     expect(TourDateImageRepository.findById).toHaveBeenCalledWith('a');
     expect(TourDateImageRepository.delete).toHaveBeenCalledWith('a');
     expect(TourDateImageRepository.reorderImages).toHaveBeenCalledWith(orders);
-    expect(TourDateImageRepository.updateAltText).toHaveBeenCalledWith('a', 'alt');
   });
 });

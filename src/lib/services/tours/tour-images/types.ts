@@ -73,7 +73,6 @@ export interface TourImageRecords<Row> {
   createWithinCap: (record: NewTourImageRecord, maxImages: number) => Promise<Row | null>;
   delete: (id: string) => Promise<void>;
   reorder: (orders: TourImageOrder[]) => Promise<void>;
-  updateAltText: (id: string, altText: string | null) => Promise<void>;
 }
 
 /** Every owner kind's persistence adapter. */

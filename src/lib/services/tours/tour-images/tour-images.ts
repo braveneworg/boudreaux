@@ -271,26 +271,6 @@ export class TourImages {
       return failFromError(error, { UNKNOWN: 'Failed to reorder images' });
     }
   }
-
-  /** Set an image's alt text (blank clears it); resolves with the owner, for revalidation. */
-  async updateAltText<K extends TourImageOwnerKind>(
-    kind: K,
-    imageId: string,
-    altText: string | undefined
-  ): Promise<ServiceResponse<{ ownerId: string }>> {
-    const records = this.recordsOf(kind);
-    try {
-      const image = await records.findById(imageId);
-      if (!image) {
-        return { success: false, error: IMAGE_NOT_FOUND, code: 'NOT_FOUND' };
-      }
-
-      await records.updateAltText(imageId, altText || null);
-      return { success: true, data: { ownerId: records.ownerIdOf(image) } };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to update alt text' });
-    }
-  }
 }
 
 /** The tour image module over S3 and the two image models. */

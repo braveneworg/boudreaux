@@ -73,11 +73,6 @@ const imageOrders = (max: number) =>
 
 const imageId = { imageId: z.string().min(1, 'Image ID is required') };
 
-const altTextFields = {
-  ...imageId,
-  altText: z.string().max(500, 'Alt text too long').optional(),
-};
-
 /**
  * Schema for presigned URL response
  */
@@ -107,9 +102,6 @@ export type ImageReorder = z.infer<typeof imageReorderSchema>;
 export const deleteImageSchema = z.object({ ...imageId, ...tourOwner });
 export type DeleteImageRequest = z.infer<typeof deleteImageSchema>;
 
-export const updateImageAltTextSchema = z.object(altTextFields);
-export type UpdateImageAltText = z.infer<typeof updateImageAltTextSchema>;
-
 // ── A tour date's images ────────────────────────────────────────────────────
 
 export const tourDateImageUploadRequestSchema = z.object({ ...tourDateOwner, ...fileFields });
@@ -126,6 +118,3 @@ export type TourDateImageReorder = z.infer<typeof tourDateImageReorderSchema>;
 
 export const tourDateDeleteImageSchema = z.object({ ...imageId, ...tourDateOwner });
 export type TourDateDeleteImageRequest = z.infer<typeof tourDateDeleteImageSchema>;
-
-export const tourDateUpdateImageAltTextSchema = z.object(altTextFields);
-export type TourDateUpdateImageAltText = z.infer<typeof tourDateUpdateImageAltTextSchema>;
