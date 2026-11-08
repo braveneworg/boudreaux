@@ -252,6 +252,15 @@ describe('nginx.conf OAuth callback routing', () => {
   });
 });
 
+describe('nginx.conf Stripe webhook client IP', () => {
+  // The route's IP allowlist trusts only X-Real-IP; it must be the TCP peer.
+  it('sets X-Real-IP to $remote_addr on the webhook location', () => {
+    const location = resolveLocation(appLocations, '/api/stripe/webhook');
+
+    expect(location?.body).toMatch(/proxy_set_header X-Real-IP \$remote_addr;/);
+  });
+});
+
 describe('nginx.conf location resolver (parser sanity)', () => {
   it('sees the exact-match Stripe webhook location', () => {
     const location = resolveLocation(appLocations, '/api/stripe/webhook');

@@ -97,6 +97,8 @@ it exits 0, so the deploy reads green while the old version serves.
   the name is there, and, for a runtime name, until it is forwarded.
 - Forwarding `STRIPE_WEBHOOK_IP_RANGES` turns the IP allowlist on in
   production for the first time; a stale secret would 403 Stripe webhooks.
+  The route reads the source IP only from nginx's `X-Real-IP`
+  (`$remote_addr`), never from the client-controlled `X-Forwarded-For`.
 - A rollback runs the same pre-roll checks with main's manifest, so a missing
   required secret blocks a rollback as well as a forward deploy.
 - `AUTH_DISABLE_SIGNUP`, `CONTACT_EMAIL`, `LOG_DEBUG_MODULES` and
