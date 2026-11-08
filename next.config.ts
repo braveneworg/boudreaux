@@ -127,7 +127,7 @@ const buildResponseHeaders = () => [
       {
         key: 'Permissions-Policy',
         value:
-          'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(self "https://js.stripe.com")',
+          'camera=(), microphone=(), geolocation=(), browsing-topics=(), payment=(self "https://js.stripe.com")',
       },
       {
         key: 'Cross-Origin-Opener-Policy',
