@@ -59,9 +59,11 @@ const isSent = (value: unknown, blankStrings: BlankStrings): boolean =>
  * Action can be anything — so a non-object reads as an empty one and the
  * schema decides.
  *
- * Replaces `getActionState` for actions that only a mutation hook calls. An
- * action that a real `<form action>` posts to keeps `getActionState`, which
- * reads `FormData`.
+ * The release, artist, featured-artist and video create/update actions read
+ * their input this way; only their mutation hooks call them. An action that a
+ * real `<form action>` or `useActionState` posts to (profile, sign-in) still
+ * receives `FormData` and reads it with `getActionState`, and so, for now, do
+ * the hook-called tour, venue and banner actions.
  */
 export const readActionInput = <TForm>(
   input: unknown,

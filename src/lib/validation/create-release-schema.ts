@@ -133,8 +133,7 @@ export const createReleaseSchema = releaseBaseSchema.refine(
   }
 );
 
-type schemaType = typeof createReleaseSchema & Partial<FormData>;
-export type ReleaseFormData = z.infer<schemaType>;
+export type ReleaseFormData = z.infer<typeof createReleaseSchema>;
 
 /**
  * Input of the release update action: the form's values plus the admin's
