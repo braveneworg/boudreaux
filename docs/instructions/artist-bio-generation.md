@@ -102,7 +102,7 @@ editor** rather than a plain textarea.
 | File                                         | Purpose                                                                                                |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `next.config.ts`                             | Allow `upload.wikimedia.org` / `commons.wikimedia.org` remote images                                   |
-| `src/lib/config/env-validation.ts`           | Require `BIO_GENERATOR_LAMBDA_NAME`                                                                    |
+| `src/lib/config/env-manifest.ts`             | Require `BIO_GENERATOR_LAMBDA_NAME`                                                                    |
 | `package.json`                               | Add `@aws-sdk/client-lambda`, `@tiptap/*`, `html-react-parser`                                         |
 | `vitest.config.ts`                           | Exclude `bio-generator/**` from the app suite; new `jsdom-forks` project for `html-react-parser` specs |
 | `.github/workflows/deploy-bio-generator.yml` | **New.** OIDC + `sam build`/`sam deploy`, triggered on `bio-generator/**`                              |
@@ -151,13 +151,13 @@ editor** rather than a plain textarea.
 
 ### Web app env vars
 
-| Var                                 | Purpose                                                                                | Where read                                                                                |
-| ----------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `BIO_GENERATOR_LAMBDA_NAME`         | Function name to invoke (default `fakefour-bio-generator`)                             | `BioGenerationService.generate`; validated by `env-validation.ts` in production boot only |
-| `BIO_GENERATOR_FAKE`                | `true` → use the deterministic fixture instead of the Lambda; also skips S3 re-hosting | `BioGenerationService.generate`, `BioImageService.shouldSkipRehost`                       |
-| `AWS_REGION`                        | Lambda client region (defaults to `us-east-1`)                                         | `BioGenerationService`                                                                    |
-| `E2E_MODE` / `NEXT_PUBLIC_E2E_MODE` | Also short-circuit image re-hosting                                                    | `BioImageService.shouldSkipRehost`                                                        |
-| existing `AWS_*`, S3, CDN vars      | Image re-hosting (S3 put + variants + CDN URL)                                         | `BioImageService` via `s3-client` / `cdn-url`                                             |
+| Var                                 | Purpose                                                                                | Where read                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `BIO_GENERATOR_LAMBDA_NAME`         | Function name to invoke (default `fakefour-bio-generator`)                             | `BioGenerationService.generate`; validated by `env-manifest.ts` in production boot only |
+| `BIO_GENERATOR_FAKE`                | `true` → use the deterministic fixture instead of the Lambda; also skips S3 re-hosting | `BioGenerationService.generate`, `BioImageService.shouldSkipRehost`                     |
+| `AWS_REGION`                        | Lambda client region (defaults to `us-east-1`)                                         | `BioGenerationService`                                                                  |
+| `E2E_MODE` / `NEXT_PUBLIC_E2E_MODE` | Also short-circuit image re-hosting                                                    | `BioImageService.shouldSkipRehost`                                                      |
+| existing `AWS_*`, S3, CDN vars      | Image re-hosting (S3 put + variants + CDN URL)                                         | `BioImageService` via `s3-client` / `cdn-url`                                           |
 
 `deploy.yml` injects `BIO_GENERATOR_LAMBDA_NAME=${{ vars.BIO_GENERATOR_LAMBDA_NAME || 'fakefour-bio-generator' }}`.
 For local dev, add `BIO_GENERATOR_FAKE=true` to `.env.local` to avoid AWS entirely.
@@ -377,18 +377,18 @@ exclusively from the real sources — which is why generated bios don't 404.
 
 ## Troubleshooting
 
-| Symptom                                                               | Likely cause / fix                                                                                                                                                                                                 |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `"Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)"` | Set `BIO_GENERATOR_LAMBDA_NAME`, or set `BIO_GENERATOR_FAKE=true` for offline dev                                                                                                                                  |
-| Env validation fails on boot                                          | `BIO_GENERATOR_LAMBDA_NAME` is now in `env-validation.ts`'s required list, enforced only when `NODE_ENV=production` and skipped during the build phase or with `SKIP_ENV_VALIDATION=true`; local dev is unaffected |
-| `"Failed to reach the bio generator"` / `"Bio generation failed"`     | App can't invoke the Lambda — check `lambda:InvokeFunction` IAM, `AWS_REGION`, and the function name; check the CloudWatch error alarm                                                                             |
-| `"Bio generation returned an unexpected response"`                    | Lambda payload failed Zod validation — the two contracts drifted; re-sync `bio-generator/src/types.ts` and `bio-generation-schema.ts`                                                                              |
-| Discovered images silently missing                                    | Re-host is best-effort; a fetch failure, non-image content-type, or >50MB source drops that image (logged as a warn)                                                                                               |
-| Next.js image error for `upload.wikimedia.org`                        | Only relevant before re-hosting/in fixture mode — ensure the Wikimedia `remotePatterns` (added to `next.config.ts`) are present                                                                                    |
-| `bio-html.spec.tsx` crashes with a `domhandler`/ESM error             | It must run under the `jsdom-forks` Vitest project (see `vitest.config.ts`); the default `vmThreads` pool ignores `server.deps.inline`                                                                             |
-| Prisma transaction error on `replaceBioContent`                       | MongoDB must be a **replica set** — transactions are unsupported on a standalone server                                                                                                                            |
-| E2E generation hits AWS / is non-deterministic                        | `BIO_GENERATOR_FAKE=true` must be set (it is, in `playwright.config.ts` and `ci.yml`)                                                                                                                              |
-| Empty `/artists` / "artist not found" in E2E                          | Wrong database — confirm `localhost:27018`; do **not** retry against another DB                                                                                                                                    |
+| Symptom                                                               | Likely cause / fix                                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"Bio generator is not configured (BIO_GENERATOR_LAMBDA_NAME unset)"` | Set `BIO_GENERATOR_LAMBDA_NAME`, or set `BIO_GENERATOR_FAKE=true` for offline dev                                                                                                                                |
+| Env validation fails on boot                                          | `BIO_GENERATOR_LAMBDA_NAME` is now in `env-manifest.ts`'s required list, enforced only when `NODE_ENV=production` and skipped during the build phase or with `SKIP_ENV_VALIDATION=true`; local dev is unaffected |
+| `"Failed to reach the bio generator"` / `"Bio generation failed"`     | App can't invoke the Lambda — check `lambda:InvokeFunction` IAM, `AWS_REGION`, and the function name; check the CloudWatch error alarm                                                                           |
+| `"Bio generation returned an unexpected response"`                    | Lambda payload failed Zod validation — the two contracts drifted; re-sync `bio-generator/src/types.ts` and `bio-generation-schema.ts`                                                                            |
+| Discovered images silently missing                                    | Re-host is best-effort; a fetch failure, non-image content-type, or >50MB source drops that image (logged as a warn)                                                                                             |
+| Next.js image error for `upload.wikimedia.org`                        | Only relevant before re-hosting/in fixture mode — ensure the Wikimedia `remotePatterns` (added to `next.config.ts`) are present                                                                                  |
+| `bio-html.spec.tsx` crashes with a `domhandler`/ESM error             | It must run under the `jsdom-forks` Vitest project (see `vitest.config.ts`); the default `vmThreads` pool ignores `server.deps.inline`                                                                           |
+| Prisma transaction error on `replaceBioContent`                       | MongoDB must be a **replica set** — transactions are unsupported on a standalone server                                                                                                                          |
+| E2E generation hits AWS / is non-deterministic                        | `BIO_GENERATOR_FAKE=true` must be set (it is, in `playwright.config.ts` and `ci.yml`)                                                                                                                            |
+| Empty `/artists` / "artist not found" in E2E                          | Wrong database — confirm `localhost:27018`; do **not** retry against another DB                                                                                                                                  |
 
 ---
 

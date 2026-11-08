@@ -2,9 +2,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { onRequestError } from './instrumentation';
+import { onRequestError, register } from './instrumentation';
 
 const errorMock = vi.hoisted(() => vi.fn());
+const runBootCheckMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/config/boot-check', () => ({ runBootCheck: runBootCheckMock }));
 
 vi.mock('@/lib/utils/logger', () => ({
   createLogger: vi.fn(() => ({ error: errorMock })),
@@ -75,5 +78,36 @@ describe('onRequestError', () => {
 
     const meta = errorMock.mock.calls[0][2] as Record<string, unknown>;
     expect(meta.digest).toBeUndefined();
+  });
+});
+
+describe('register', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('runs the runtime config boot check on the nodejs runtime', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+
+    await register();
+
+    expect(runBootCheckMock.mock.calls).toEqual([[]]);
+  });
+
+  it('skips the boot check on the edge runtime', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'edge');
+
+    await register();
+
+    expect(runBootCheckMock).not.toHaveBeenCalled();
+  });
+
+  it('lets a failed boot check fail registration', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+    runBootCheckMock.mockImplementationOnce(() => {
+      throw new Error('Missing required environment variables: AUTH_URL');
+    });
+
+    await expect(register()).rejects.toThrow('Missing required environment variables: AUTH_URL');
   });
 });

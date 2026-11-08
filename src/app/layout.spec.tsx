@@ -28,11 +28,6 @@ const findBody = (jsx: React.JSX.Element): React.JSX.Element => {
 const classesOf = (element: React.JSX.Element): string[] =>
   String(element.props.className ?? '').split(/\s+/);
 
-// Mock env-validation dynamic import
-vi.mock('@/lib/config/env-validation', () => ({
-  validateEnvironment: vi.fn(),
-}));
-
 // Mock CSS imports (vitest has css: false, but explicit mocks prevent resolution errors)
 vi.mock('./globals.css', () => ({}));
 

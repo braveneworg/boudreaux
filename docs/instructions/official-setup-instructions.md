@@ -104,10 +104,10 @@ your local `.env`):
 | Variable                    | When you need it             | Notes                                                                                                        |
 | --------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `BIO_GENERATOR_FAKE`        | Local dev / E2E              | `true` → skip AWS + Gemini entirely and use the deterministic fixture. **Use this for everyday local work.** |
-| `BIO_GENERATOR_LAMBDA_NAME` | Only for real Lambda invokes | `fakefour-bio-generator`. **Required by `env-validation.ts`** when env validation runs.                      |
+| `BIO_GENERATOR_LAMBDA_NAME` | Only for real Lambda invokes | `fakefour-bio-generator`. **Required by `env-manifest.ts`** when env validation runs.                        |
 
 > ⚠️ `BIO_GENERATOR_LAMBDA_NAME` is in the required list in
-> `src/lib/config/env-validation.ts`. If you don't want to set it locally, run with
+> `src/lib/config/env-manifest.ts`. If you don't want to set it locally, run with
 > `SKIP_ENV_VALIDATION=true` (env validation is also skipped automatically in test/E2E).
 > `BIO_GENERATOR_FAKE=true` alone does **not** bypass validation.
 

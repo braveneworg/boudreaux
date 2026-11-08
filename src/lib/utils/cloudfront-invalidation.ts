@@ -6,6 +6,8 @@ import 'server-only';
 
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
 
+import { getCloudFrontDistributionId } from '@/lib/config/runtime-config';
+
 /**
  * Invalidate specific paths in the CloudFront distribution.
  *
@@ -24,7 +26,7 @@ import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-clo
  * ```
  */
 export const invalidateCloudFrontPaths = async (paths: string[]): Promise<void> => {
-  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  const distributionId = getCloudFrontDistributionId();
 
   if (!distributionId) {
     throw new Error('CLOUDFRONT_DISTRIBUTION_ID environment variable is not configured');

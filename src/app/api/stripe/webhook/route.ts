@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { z } from 'zod';
 
+import { getStripeWebhookIpRanges } from '@/lib/config/runtime-config';
 import { sendPurchaseConfirmationEmail } from '@/lib/email/send-purchase-confirmation';
 import { PurchaseRepository } from '@/lib/repositories/purchase-repository';
 import { ReleaseService } from '@/lib/services/release-service';
@@ -30,22 +31,22 @@ const releaseMetadataSchema = z.object({
 });
 
 /**
- * Checks whether the request IP is allowed by the STRIPE_WEBHOOK_IP_RANGES
- * env var. Returns null when the check passes (or is skipped), or a
- * NextResponse with status 403 when the IP is blocked.
+ * Checks whether the request IP (nginx's X-Real-IP) is allowed by the
+ * STRIPE_WEBHOOK_IP_RANGES env var (local only: production webhooks go to
+ * the stripe-webhook Lambda, which keeps its own allowlist). Returns null when the check passes (or
+ * is skipped), or a NextResponse with status 403 when the IP is blocked.
  */
 const checkIpAllowlist = (request: NextRequest): NextResponse | null => {
   const skipIpCheck = process.env.SKIP_STRIPE_IP_CHECK === 'true';
   if (skipIpCheck) return null;
 
-  const ipRangesEnv = process.env.STRIPE_WEBHOOK_IP_RANGES ?? '';
-  if (!ipRangesEnv) return null;
+  const allowedRanges = getStripeWebhookIpRanges();
+  if (allowedRanges.length === 0) return null;
 
-  const forwarded = request.headers.get('x-forwarded-for');
-  const remoteIp = forwarded
-    ? forwarded.split(',')[0].trim()
-    : (request.headers.get('x-real-ip')?.trim() ?? '');
-  const allowedRanges = ipRangesEnv.split(',').map((r) => r.trim());
+  // nginx sets X-Real-IP to the TCP peer ($remote_addr), which a client
+  // cannot forge. X-Forwarded-For is never read: its first entry is
+  // whatever the client sent. A missing header fails closed.
+  const remoteIp = request.headers.get('x-real-ip')?.trim() ?? '';
   const isAllowed = allowedRanges.some((range) => isIpInCidr(remoteIp, range));
   if (!isAllowed) {
     logger.warn('Webhook rejected: IP not in allowlist', { ip: remoteIp });

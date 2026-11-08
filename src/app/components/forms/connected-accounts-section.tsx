@@ -60,13 +60,25 @@ const findLinkedAccount = (
   providerId: string
 ): ConnectedAccount | undefined => accounts?.find((account) => account.providerId === providerId);
 
+interface ConnectedAccountsSectionProps {
+  /** The social providers the server registered (`enabledSocialProviders()`). */
+  enabledProviders: readonly SocialProvider[];
+}
+
 /**
- * Profile panel showing all 4 social providers with their link/unlink status.
- * Calls `authClient.linkSocial` to initiate OAuth redirect, and
- * `authClient.unlinkAccount` (behind an AlertDialog confirm) to disconnect.
+ * Profile panel listing the enabled social providers with their link/unlink
+ * status. A provider the server no longer registers still shows when this
+ * user has an account linked to it, with Unlink but no Link, so the account
+ * can be disconnected. Calls `authClient.linkSocial` to initiate the OAuth
+ * redirect, and `authClient.unlinkAccount` (behind an AlertDialog confirm) to
+ * disconnect.
  */
-export const ConnectedAccountsSection = () => {
+export const ConnectedAccountsSection = ({ enabledProviders }: ConnectedAccountsSectionProps) => {
   const { accounts, isLoading, error, refetch } = useConnectedAccounts();
+  const rows = PROVIDERS.filter(
+    ({ provider, providerId }) =>
+      enabledProviders.includes(provider) || findLinkedAccount(accounts, providerId) !== undefined
+  );
 
   const handleLink = (provider: SocialProvider): void => {
     void authClient.linkSocial({ provider, callbackURL: '/profile' });
@@ -103,10 +115,9 @@ export const ConnectedAccountsSection = () => {
 
       {isLoading && (
         <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
+          {enabledProviders.map((provider) => (
+            <Skeleton key={provider} className="h-10 w-full" />
+          ))}
         </div>
       )}
 
@@ -118,7 +129,7 @@ export const ConnectedAccountsSection = () => {
 
       {!isLoading && error === null && (
         <div>
-          {PROVIDERS.map(({ provider, providerId, label, Icon }) => {
+          {rows.map(({ provider, providerId, label, Icon }) => {
             const linkedAccount = findLinkedAccount(accounts, providerId);
 
             return (
@@ -158,6 +169,7 @@ export const ConnectedAccountsSection = () => {
                     </AlertDialogContent>
                   </AlertDialog>
                 ) : (
+                  // Unlinked rows are always enabled providers (see `rows`).
                   <Button variant="outline" size="sm" onClick={() => handleLink(provider)}>
                     Link
                   </Button>

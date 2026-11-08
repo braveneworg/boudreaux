@@ -54,7 +54,7 @@ is skipped when it is unset). MusicBrainz/Wikidata/Wikimedia need no API key (on
 | Rendering       | `src/app/components/{bio-html,artist-bio-content,artist-list-card}.tsx`, `ui/rich-text-editor.tsx`                | Tiptap editor + Next `Link`/`Image` rendering                                           |
 | Data            | `prisma/schema.prisma`                                                                                            | `Artist.bio/shortBio/altBio/bioGeneratedAt/bioModel`, `ArtistBioImage`, `ArtistBioLink` |
 | Config          | `next.config.ts`                                                                                                  | `images.remotePatterns` for CDN + Wikimedia/picsum                                      |
-| Config          | `src/lib/config/env-validation.ts`                                                                                | Requires `BIO_GENERATOR_LAMBDA_NAME`                                                    |
+| Config          | `src/lib/config/env-manifest.ts`                                                                                  | Requires `BIO_GENERATOR_LAMBDA_NAME`                                                    |
 
 ---
 
@@ -173,7 +173,7 @@ Set these on the **running web app** (EC2/container runtime env — the same pla
 | `AWS_S3_BUCKET_NAME` (or `S3_BUCKET`)         | ✅       | `s3-client.ts`                                      | Media bucket that backs the CDN                          |
 | `NEXT_PUBLIC_CDN_DOMAIN` (or `CDN_DOMAIN`)    | ✅       | `cdn-url.ts`, `build-cdn-image-variant-url.ts`      | `https://cdn.fakefourrecords.com`                        |
 
-`BIO_GENERATOR_LAMBDA_NAME` is enforced by `env-validation.ts`. After deploying the Lambda, read
+`BIO_GENERATOR_LAMBDA_NAME` is enforced by `env-manifest.ts`. After deploying the Lambda, read
 the name back with:
 
 ```bash

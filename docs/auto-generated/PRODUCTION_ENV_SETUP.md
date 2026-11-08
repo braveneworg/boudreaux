@@ -231,7 +231,7 @@ Complete list of all environment variables the application uses:
 - `AUTH_SECRET` - Authentication secret (32+ chars)
 - `EMAIL_FROM` - SES-verified sender address
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` - SES + S3
-- (see `env-validation.ts` for the full required list: Stripe, Pusher, Upstash,
+- (see `env-manifest.ts` for the full required list: Stripe, Pusher, Upstash,
   Cloudflare, bio-generator Lambda, etc.)
 
 ### Optional (Has defaults or gracefully degrades)
@@ -279,4 +279,4 @@ Then fill in your local development values. Never commit `.env.local` to git.
 - `docker-compose.yml` - Local development configuration
 - `docker-compose.prod.yml` - Production configuration
 - `.github/workflows/deploy.yml` - CI/CD pipeline
-- `src/lib/config/env-validation.ts` - Environment validation logic
+- `src/lib/config/env-manifest.ts` - Environment validation logic

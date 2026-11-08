@@ -195,7 +195,7 @@ describe('POST /api/stripe/webhook', () => {
       const headers = new Headers({
         'content-type': 'application/json',
         'stripe-signature': 'sig_test',
-        'x-forwarded-for': '1.2.3.4',
+        'x-real-ip': '1.2.3.4',
       });
       const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
         method: 'POST',
@@ -220,28 +220,6 @@ describe('POST /api/stripe/webhook', () => {
       const headers = new Headers({
         'content-type': 'application/json',
         'stripe-signature': 'sig_test',
-        'x-forwarded-for': '3.18.12.63',
-      });
-      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
-        method: 'POST',
-        body: '{}',
-        headers,
-      });
-
-      const response = await POST(request);
-      expect(response.status).toBe(400);
-    });
-
-    it('uses x-real-ip as fallback when x-forwarded-for is absent and IP is allowed', async () => {
-      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
-      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
-      mockConstructEvent.mockImplementation(() => {
-        throw new Error('Invalid signature');
-      });
-
-      const headers = new Headers({
-        'content-type': 'application/json',
-        'stripe-signature': 'sig_test',
         'x-real-ip': '3.18.12.63',
       });
       const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
@@ -254,13 +232,16 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(400);
     });
 
-    it('returns 403 when x-forwarded-for is absent and x-real-ip is not in the allowed range', async () => {
+    // nginx sets X-Real-IP to the TCP peer ($remote_addr); a client can put
+    // anything in X-Forwarded-For, so the allowlist must never read it.
+    it('returns 403 when a spoofed x-forwarded-for carries an allowed IP', async () => {
       vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
       vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
 
       const headers = new Headers({
         'content-type': 'application/json',
         'stripe-signature': 'sig_test',
+        'x-forwarded-for': '3.18.12.63',
         'x-real-ip': '9.9.9.9',
       });
       const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
@@ -273,9 +254,31 @@ describe('POST /api/stripe/webhook', () => {
       expect(response.status).toBe(403);
     });
 
-    it('prefers x-forwarded-for over x-real-ip when both headers are present', async () => {
+    it('returns 403 when x-real-ip is missing even if x-forwarded-for is allowed', async () => {
       vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
       vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'stripe-signature': 'sig_test',
+        'x-forwarded-for': '3.18.12.63',
+      });
+      const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
+        method: 'POST',
+        body: '{}',
+        headers,
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(403);
+    });
+
+    it('reads x-real-ip and ignores x-forwarded-for when both are present', async () => {
+      vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
+      vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
+      mockConstructEvent.mockImplementation(() => {
+        throw new Error('Invalid signature');
+      });
 
       const headers = new Headers({
         'content-type': 'application/json',
@@ -290,7 +293,7 @@ describe('POST /api/stripe/webhook', () => {
       });
 
       const response = await POST(request);
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(400);
     });
 
     it('bypasses the IP check when SKIP_STRIPE_IP_CHECK=true regardless of remote IP', async () => {
@@ -303,7 +306,7 @@ describe('POST /api/stripe/webhook', () => {
       const headers = new Headers({
         'content-type': 'application/json',
         'stripe-signature': 'sig_test',
-        'x-forwarded-for': '9.9.9.9',
+        'x-real-ip': '9.9.9.9',
       });
       const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
         method: 'POST',
@@ -316,13 +319,13 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     describe('IP allowlist — malformed inputs', () => {
-      const makeRequest = (forwardedFor: string) => {
+      const makeRequest = (realIp: string) => {
         vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
         vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': forwardedFor,
+          'x-real-ip': realIp,
         });
         return new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -331,27 +334,27 @@ describe('POST /api/stripe/webhook', () => {
         });
       };
 
-      it('returns 403 when x-forwarded-for is an empty string', async () => {
+      it('returns 403 when x-real-ip is an empty string', async () => {
         const response = await POST(makeRequest(''));
         expect(response.status).toBe(403);
       });
 
-      it('returns 403 when x-forwarded-for has too few octets', async () => {
+      it('returns 403 when x-real-ip has too few octets', async () => {
         const response = await POST(makeRequest('3.18.12'));
         expect(response.status).toBe(403);
       });
 
-      it('returns 403 when x-forwarded-for has too many octets', async () => {
+      it('returns 403 when x-real-ip has too many octets', async () => {
         const response = await POST(makeRequest('3.18.12.63.99'));
         expect(response.status).toBe(403);
       });
 
-      it('returns 403 when x-forwarded-for contains non-numeric octets', async () => {
+      it('returns 403 when x-real-ip contains non-numeric octets', async () => {
         const response = await POST(makeRequest('3.abc.12.63'));
         expect(response.status).toBe(403);
       });
 
-      it('returns 403 when x-forwarded-for contains an octet above 255', async () => {
+      it('returns 403 when x-real-ip contains an octet above 255', async () => {
         const response = await POST(makeRequest('3.18.12.256'));
         expect(response.status).toBe(403);
       });
@@ -362,7 +365,7 @@ describe('POST /api/stripe/webhook', () => {
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': '3.18.12.63',
+          'x-real-ip': '3.18.12.63',
         });
         const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -379,7 +382,7 @@ describe('POST /api/stripe/webhook', () => {
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': '3.18.12.63',
+          'x-real-ip': '3.18.12.63',
         });
         const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -396,7 +399,7 @@ describe('POST /api/stripe/webhook', () => {
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': '3.18.12.63',
+          'x-real-ip': '3.18.12.63',
         });
         const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -416,7 +419,7 @@ describe('POST /api/stripe/webhook', () => {
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': '3.18.12.200',
+          'x-real-ip': '3.18.12.200',
         });
         const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -433,7 +436,7 @@ describe('POST /api/stripe/webhook', () => {
         const headers = new Headers({
           'content-type': 'application/json',
           'stripe-signature': 'sig_test',
-          'x-forwarded-for': '3.18.13.1',
+          'x-real-ip': '3.18.13.1',
         });
         const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
           method: 'POST',
@@ -1021,7 +1024,7 @@ describe('POST /api/stripe/webhook', () => {
     const headers = new Headers({
       'content-type': 'application/json',
       'stripe-signature': 'sig_test',
-      'x-forwarded-for': '3.18.12.63',
+      'x-real-ip': '3.18.12.63',
     });
     const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
       method: 'POST',
@@ -1041,7 +1044,7 @@ describe('POST /api/stripe/webhook', () => {
     const headers = new Headers({
       'content-type': 'application/json',
       'stripe-signature': 'sig_test',
-      'x-forwarded-for': '123.45.67.89',
+      'x-real-ip': '123.45.67.89',
     });
     const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
       method: 'POST',
@@ -1058,7 +1061,7 @@ describe('POST /api/stripe/webhook', () => {
     const headers = new Headers({
       'content-type': 'application/json',
       'stripe-signature': 'sig_test',
-      'x-forwarded-for': '03.18.12.63',
+      'x-real-ip': '03.18.12.63',
     });
     const request = new NextRequest('http://localhost:3000/api/stripe/webhook', {
       method: 'POST',
@@ -1069,7 +1072,7 @@ describe('POST /api/stripe/webhook', () => {
     expect(response.status).toBe(403);
   });
 
-  it('returns 403 when neither x-forwarded-for nor x-real-ip headers are present', async () => {
+  it('returns 403 when the x-real-ip header is missing', async () => {
     vi.stubEnv('STRIPE_WEBHOOK_IP_RANGES', '3.18.12.63/32');
     vi.stubEnv('SKIP_STRIPE_IP_CHECK', '');
     const headers = new Headers({

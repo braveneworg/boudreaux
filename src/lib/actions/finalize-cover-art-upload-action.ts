@@ -9,6 +9,7 @@ import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-clo
 import { DeleteObjectsCommand, ListObjectsV2Command, type _Object } from '@aws-sdk/client-s3';
 
 import { gateAction } from '@/lib/auth/action-gate';
+import { getCloudFrontDistributionId } from '@/lib/config/runtime-config';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
@@ -123,7 +124,7 @@ const invalidateCloudFront = async (
   entityType: string,
   entityId: string
 ): Promise<string | undefined> => {
-  const distributionId = process.env.CLOUDFRONT_DISTRIBUTION_ID;
+  const distributionId = getCloudFrontDistributionId();
   if (!distributionId) return undefined;
 
   try {

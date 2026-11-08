@@ -40,6 +40,8 @@ const makeAccount = (providerId: string) => ({
   scopes: [] as string[],
 });
 
+const ALL_PROVIDERS = ['apple', 'google', 'facebook', 'twitter'] as const;
+
 const defaultHookResult = {
   accounts: null,
   isLoading: false,
@@ -62,7 +64,7 @@ describe('ConnectedAccountsSection', () => {
     it('shows 4 skeleton rows while loading', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, isLoading: true });
 
-      const { container } = render(<ConnectedAccountsSection />);
+      const { container } = render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       const skeletons = container.querySelectorAll('[data-slot="skeleton"], .animate-pulse');
       expect(skeletons.length).toBe(4);
@@ -71,7 +73,7 @@ describe('ConnectedAccountsSection', () => {
     it('does not show provider names while loading', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, isLoading: true });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.queryByText('Apple')).not.toBeInTheDocument();
       expect(screen.queryByText('Google')).not.toBeInTheDocument();
@@ -85,7 +87,7 @@ describe('ConnectedAccountsSection', () => {
         error: new Error('Could not load accounts'),
       });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText(/Could not load accounts/i)).toBeInTheDocument();
@@ -93,10 +95,43 @@ describe('ConnectedAccountsSection', () => {
   });
 
   describe('provider list', () => {
+    it('lists only the enabled providers', () => {
+      useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
+
+      render(<ConnectedAccountsSection enabledProviders={['google', 'facebook']} />);
+
+      expect(screen.getAllByRole('button', { name: 'Link' })).toHaveLength(2);
+      expect(screen.queryByText('Apple')).not.toBeInTheDocument();
+      expect(screen.queryByText('X (Twitter)')).not.toBeInTheDocument();
+    });
+
+    it('keeps a linked account of a disabled provider so it can be unlinked, without Link', () => {
+      useConnectedAccountsMock.mockReturnValue({
+        ...defaultHookResult,
+        accounts: [makeAccount('twitter')],
+      });
+
+      render(<ConnectedAccountsSection enabledProviders={['google']} />);
+
+      expect(screen.getByText('X (Twitter)')).toBeInTheDocument();
+      expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+        'Link',
+        'Unlink',
+      ]);
+    });
+
+    it('shows one skeleton row per enabled provider while loading', () => {
+      useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, isLoading: true });
+
+      const { container } = render(<ConnectedAccountsSection enabledProviders={['google']} />);
+
+      expect(container.querySelectorAll('[data-slot="skeleton"], .animate-pulse')).toHaveLength(1);
+    });
+
     it('renders all 4 provider names when accounts are loaded', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByText('Apple')).toBeInTheDocument();
       expect(screen.getByText('Google')).toBeInTheDocument();
@@ -110,7 +145,7 @@ describe('ConnectedAccountsSection', () => {
         accounts: [makeAccount('google')],
       });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByText('Connected')).toBeInTheDocument();
     });
@@ -118,7 +153,7 @@ describe('ConnectedAccountsSection', () => {
     it('shows "Not connected" text for an unlinked provider', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       const notConnectedElements = screen.getAllByText('Not connected');
       expect(notConnectedElements.length).toBe(4);
@@ -130,7 +165,7 @@ describe('ConnectedAccountsSection', () => {
         accounts: [makeAccount('google')],
       });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByRole('button', { name: 'Unlink' })).toBeInTheDocument();
     });
@@ -138,7 +173,7 @@ describe('ConnectedAccountsSection', () => {
     it('shows "Link" buttons for unlinked providers', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       const linkButtons = screen.getAllByRole('button', { name: 'Link' });
       expect(linkButtons.length).toBe(4);
@@ -150,7 +185,7 @@ describe('ConnectedAccountsSection', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
       linkSocialMock.mockResolvedValue({ data: null, error: null });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       const linkButtons = screen.getAllByRole('button', { name: 'Link' });
       await userEvent.click(linkButtons[0]); // Apple is first
@@ -169,7 +204,7 @@ describe('ConnectedAccountsSection', () => {
         accounts: [makeAccount('google')],
       });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
 
@@ -186,7 +221,7 @@ describe('ConnectedAccountsSection', () => {
       });
       unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
       await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -208,7 +243,7 @@ describe('ConnectedAccountsSection', () => {
       });
       unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       // Rows follow PROVIDERS order, so the linked rows are Google then Facebook.
       const unlinkButtons = screen.getAllByRole('button', { name: 'Unlink' });
@@ -231,7 +266,7 @@ describe('ConnectedAccountsSection', () => {
       });
       unlinkAccountMock.mockResolvedValueOnce({ data: {}, error: null });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
       await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -251,7 +286,7 @@ describe('ConnectedAccountsSection', () => {
       const unlinkError = new Error('Unlink failed');
       unlinkAccountMock.mockResolvedValue({ data: null, error: unlinkError });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
       await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -271,7 +306,7 @@ describe('ConnectedAccountsSection', () => {
       });
       unlinkAccountMock.mockRejectedValue(new Error('Network failure'));
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
       await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
@@ -289,7 +324,7 @@ describe('ConnectedAccountsSection', () => {
         refetch: vi.fn(),
       });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Unlink' }));
       await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -302,7 +337,7 @@ describe('ConnectedAccountsSection', () => {
     it('renders the section heading', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
-      render(<ConnectedAccountsSection />);
+      render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByRole('heading', { name: /Social accounts/i })).toBeInTheDocument();
     });
@@ -312,7 +347,7 @@ describe('ConnectedAccountsSection', () => {
     it('carries the zine offset shadow and kraft accent on the section panel', () => {
       useConnectedAccountsMock.mockReturnValue({ ...defaultHookResult, accounts: [] });
 
-      const { container } = render(<ConnectedAccountsSection />);
+      const { container } = render(<ConnectedAccountsSection enabledProviders={ALL_PROVIDERS} />);
 
       const panel = container.querySelector('[data-slot="zine-panel"]');
       expect(panel).toHaveClass('shadow-zine');

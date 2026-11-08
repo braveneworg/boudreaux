@@ -3,6 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import {
+  enabledSocialProviders,
+  getAppleKeyMaterial,
+  getOAuthClient,
+  type OAuthClient,
+} from '@/lib/config/runtime-config';
 import { loggers } from '@/lib/utils/logger';
 
 import { generateAppleClientSecret } from './apple-client-secret';
@@ -46,20 +52,15 @@ export interface AppleClientSecretResolution {
  * philosophy of this module. Returns `null` when Apple is not configured.
  */
 export const resolveAppleClientSecret = (): AppleClientSecretResolution | null => {
-  const { APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY_BASE64 } = process.env;
-  if (!APPLE_CLIENT_ID) {
+  const { clientId, teamId, keyId, privateKeyBase64, staticSecret } = getAppleKeyMaterial();
+  if (!clientId) {
     return null;
   }
-  if (APPLE_TEAM_ID && APPLE_KEY_ID && APPLE_PRIVATE_KEY_BASE64) {
+  if (teamId && keyId && privateKeyBase64) {
     try {
-      const privateKey = Buffer.from(APPLE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
-      const secret = generateAppleClientSecret({
-        teamId: APPLE_TEAM_ID,
-        keyId: APPLE_KEY_ID,
-        clientId: APPLE_CLIENT_ID,
-        privateKey,
-      });
-      return { clientId: APPLE_CLIENT_ID, secret, source: 'minted' };
+      const privateKey = Buffer.from(privateKeyBase64, 'base64').toString('utf8');
+      const secret = generateAppleClientSecret({ teamId, keyId, clientId, privateKey });
+      return { clientId, secret, source: 'minted' };
     } catch (error) {
       loggers.auth.error(
         'Apple client secret minting failed; falling back to APPLE_CLIENT_SECRET',
@@ -67,55 +68,55 @@ export const resolveAppleClientSecret = (): AppleClientSecretResolution | null =
       );
     }
   }
-  if (process.env.APPLE_CLIENT_SECRET) {
-    return { clientId: APPLE_CLIENT_ID, secret: process.env.APPLE_CLIENT_SECRET, source: 'static' };
+  if (staticSecret) {
+    return { clientId, secret: staticSecret, source: 'static' };
   }
   return null;
 };
 
 /**
  * Builds the `socialProviders` config object for `betterAuth({...})`.
- * Only providers with fully-configured credentials are included.
+ *
+ * Registers exactly the providers `enabledSocialProviders()` lists — the same
+ * list the sign-in and profile pages render buttons for — so a button never
+ * shows for a provider the server did not register. The one exception is an
+ * Apple secret that fails to mint with no static fallback: that is logged as
+ * an error and Apple is left out.
  *
  * Call this once at auth-config init time; it reads `process.env` at call
  * time so that `vi.stubEnv` works in tests without `vi.resetModules()`.
  */
 export const buildSocialProvidersConfig = (): SocialProviders => {
-  const providers: SocialProviders = {};
+  const enabled = new Set(enabledSocialProviders());
+  /** The id/secret client of an enabled provider; undefined when it is off. */
+  const clientFor = (provider: 'google' | 'facebook' | 'twitter'): OAuthClient | undefined =>
+    (enabled.has(provider) ? getOAuthClient(provider) : null) ?? undefined;
 
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    providers.google = {
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    };
-  }
+  const google = clientFor('google');
+  const facebook = clientFor('facebook');
+  const twitter = clientFor('twitter');
+  const apple = enabled.has('apple') ? appleProviderConfig() : undefined;
 
-  if (process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET) {
-    providers.facebook = {
-      clientId: process.env.FACEBOOK_CLIENT_ID,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-    };
-  }
+  return {
+    ...(google ? { google } : {}),
+    ...(facebook ? { facebook } : {}),
+    ...(twitter ? { twitter } : {}),
+    ...(apple ? { apple } : {}),
+  };
+};
 
-  if (process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET) {
-    providers.twitter = {
-      clientId: process.env.TWITTER_CLIENT_ID,
-      clientSecret: process.env.TWITTER_CLIENT_SECRET,
-    };
-  }
-
+/** Apple's better-auth config, or undefined when no client secret resolves. */
+const appleProviderConfig = (): SocialProviders['apple'] => {
   const apple = resolveAppleClientSecret();
-  if (apple) {
-    providers.apple = {
-      clientId: apple.clientId,
-      clientSecret: apple.secret,
-      ...(process.env.APPLE_APP_BUNDLE_IDENTIFIER
-        ? { appBundleIdentifier: process.env.APPLE_APP_BUNDLE_IDENTIFIER }
-        : {}),
-    };
+  if (!apple) {
+    return undefined;
   }
-
-  return providers;
+  const { appBundleIdentifier } = getAppleKeyMaterial();
+  return {
+    clientId: apple.clientId,
+    clientSecret: apple.secret,
+    ...(appBundleIdentifier ? { appBundleIdentifier } : {}),
+  };
 };
 
 /**

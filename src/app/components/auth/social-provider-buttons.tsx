@@ -8,10 +8,11 @@ import { useState } from 'react';
 import { AppleIcon, FacebookIcon, GoogleIcon, XIcon } from '@/app/components/ui/brand-icons';
 import { Button } from '@/app/components/ui/button';
 import { authClient } from '@/lib/auth-client';
+import type { SocialProviderId } from '@/lib/config/social-providers';
 import { reportClientError } from '@/lib/utils/report-client-error';
 import { cn } from '@/lib/utils/tailwind-utils';
 
-export type SocialProvider = 'apple' | 'google' | 'facebook' | 'twitter';
+export type SocialProvider = SocialProviderId;
 
 interface SocialProviderConfig {
   provider: SocialProvider;
@@ -33,6 +34,12 @@ const PROVIDERS: SocialProviderConfig[] = [
 ];
 
 interface SocialProviderButtonsProps {
+  /**
+   * The providers the server registered (`enabledSocialProviders()`), passed
+   * down from a server component. Only these render, in the fixed button
+   * order; with none, nothing renders.
+   */
+  providers: readonly SocialProviderId[];
   /** The URL to redirect to after successful social sign-in. */
   callbackURL: string;
   /** Optional className applied to the wrapping element for layout customisation. */
@@ -59,7 +66,8 @@ interface SocialProviderButtonsProps {
 }
 
 /**
- * Renders a block of four social sign-in buttons (Apple, Google, Facebook, X).
+ * Renders a social sign-in button for each enabled provider (Apple, Google,
+ * Facebook, X, in that order).
  * Calls `authClient.signIn.social` on click. Disables all buttons during a
  * pending sign-in to prevent double-submissions. Reusable across auth flows
  * (sign-in/up page, profile connected-accounts — Task 7).
@@ -68,6 +76,7 @@ interface SocialProviderButtonsProps {
  * the optional `onError` prop so the parent decides how to surface them.
  */
 export const SocialProviderButtons = ({
+  providers,
   callbackURL,
   className,
   onError,
@@ -104,9 +113,14 @@ export const SocialProviderButtons = ({
     }
   };
 
+  const visible = PROVIDERS.filter(({ provider }) => providers.includes(provider));
+  if (visible.length === 0) {
+    return null;
+  }
+
   return (
     <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2', className)}>
-      {PROVIDERS.map(({ provider, label, short, Icon }) => (
+      {visible.map(({ provider, label, short, Icon }) => (
         <Button
           key={provider}
           type="button"

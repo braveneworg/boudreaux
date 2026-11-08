@@ -21,6 +21,7 @@ import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
 import { updateProfileAction } from '@/lib/actions/update-profile-action';
+import type { SocialProviderId } from '@/lib/config/social-providers';
 import type {
   ProfileFormData,
   ChangeEmailFormData,
@@ -185,7 +186,12 @@ const ProfileFormSkeleton = () => (
   </ZinePanel>
 );
 
-export const ProfileForm = () => {
+interface ProfileFormProps {
+  /** The social providers the server registered, for the connected-accounts panel. */
+  socialProviders: readonly SocialProviderId[];
+}
+
+export const ProfileForm = ({ socialProviders }: ProfileFormProps) => {
   const [formState, profileFormAction, isPending] = useActionState(
     updateProfileAction,
     initialFormState
@@ -472,7 +478,7 @@ export const ProfileForm = () => {
         onEditToggle={handleEditFieldButtonClick}
       />
 
-      <ConnectedAccountsSection />
+      <ConnectedAccountsSection enabledProviders={socialProviders} />
     </div>
   );
 };

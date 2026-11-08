@@ -165,6 +165,8 @@ const resetForms = () => {
   };
 };
 
+const ALL_PROVIDERS = ['apple', 'google', 'facebook', 'twitter'] as const;
+
 describe('ProfileForm', () => {
   beforeEach(() => {
     resetForms();
@@ -181,11 +183,17 @@ describe('ProfileForm', () => {
     toastMock.error.mockReset();
   });
 
+  it('offers to link only the enabled social providers', () => {
+    render(<ProfileForm socialProviders={['google']} />);
+
+    expect(screen.getAllByRole('button', { name: 'Link' })).toHaveLength(1);
+  });
+
   describe('loading and guard states', () => {
     it('renders skeletons while the session is loading', () => {
       useSessionMock.mockReturnValue({ data: null, update: vi.fn(), status: 'loading' });
 
-      const { container } = render(<ProfileForm />);
+      const { container } = render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(
         container.querySelectorAll('[data-slot="skeleton"], .animate-pulse').length
@@ -196,7 +204,7 @@ describe('ProfileForm', () => {
     it('renders skeletons when authenticated but the user is missing', () => {
       useSessionMock.mockReturnValue({ data: {}, update: vi.fn(), status: 'authenticated' });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(screen.queryByText('Personal Information')).not.toBeInTheDocument();
     });
@@ -204,7 +212,7 @@ describe('ProfileForm', () => {
     it('renders skeletons when a form control is not yet initialized', () => {
       forms.current.profile.control = null;
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(screen.queryByText('Personal Information')).not.toBeInTheDocument();
     });
@@ -212,7 +220,7 @@ describe('ProfileForm', () => {
 
   describe('rendering', () => {
     it('renders the profile heading image and section titles', () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const headingImage = screen.getByRole('img', { name: /profile/i });
       expect(headingImage).toHaveAttribute('src', '/media/headings/PROFILE.webp');
@@ -222,7 +230,7 @@ describe('ProfileForm', () => {
     });
 
     it('shows the Edit Email and Edit Username buttons by default', () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(screen.getByRole('button', { name: 'Edit Email' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Edit Username' })).toBeInTheDocument();
@@ -230,7 +238,7 @@ describe('ProfileForm', () => {
     });
 
     it('renders the four profile sections as kraft zine panels', () => {
-      const { container } = render(<ProfileForm />);
+      const { container } = render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const panels = container.querySelectorAll('[data-slot="zine-panel"]');
       expect(panels).toHaveLength(4);
@@ -238,13 +246,13 @@ describe('ProfileForm', () => {
     });
 
     it('spaces the three section forms with space-y-6', () => {
-      const { container } = render(<ProfileForm />);
+      const { container } = render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(container.querySelectorAll('form.space-y-6')).toHaveLength(3);
     });
 
     it('lays out the personal name grid two-up from sm with no md override', () => {
-      const { container } = render(<ProfileForm />);
+      const { container } = render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const nameGrid = screen.getByLabelText('First Name').closest('.grid');
       expect(nameGrid).toHaveClass('sm:grid-cols-2');
@@ -252,7 +260,7 @@ describe('ProfileForm', () => {
     });
 
     it('renders the SMS toggle row without a rounded frame', () => {
-      const { container } = render(<ProfileForm />);
+      const { container } = render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const smsRow = container.querySelector('#allowSmsNotifications')?.parentElement;
       expect(smsRow).toHaveClass('p-4');
@@ -262,7 +270,7 @@ describe('ProfileForm', () => {
 
   describe('form population effect', () => {
     it('resets the personal form from the session user when not dirty', () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.profile.reset).toHaveBeenCalled();
     });
@@ -274,7 +282,7 @@ describe('ProfileForm', () => {
         status: 'authenticated',
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const resetArg = forms.current.profile.reset.mock.calls[0][0] as Record<string, string>;
       expect(resetArg.firstName).toBe('Jane');
@@ -284,13 +292,13 @@ describe('ProfileForm', () => {
     it('does not reset the personal form when it already has dirty fields', () => {
       forms.current.profile.formState.dirtyFields = { firstName: true };
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.profile.reset).not.toHaveBeenCalled();
     });
 
     it('seeds the email and username forms from the session user', () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.email.setValue).toHaveBeenCalledWith('email', 'john@example.com');
       expect(forms.current.email.setValue).toHaveBeenCalledWith(
@@ -305,7 +313,7 @@ describe('ProfileForm', () => {
     it('clears the confirm-email error when email and confirmation match', () => {
       watched.values = { email: 'a@b.com', confirmEmail: 'a@b.com' };
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.email.clearErrors).toHaveBeenCalledWith('confirmEmail');
     });
@@ -313,7 +321,7 @@ describe('ProfileForm', () => {
     it('does not clear the confirm-email error when the values differ', () => {
       watched.values = { email: 'a@b.com', confirmEmail: 'different@b.com' };
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.email.clearErrors).not.toHaveBeenCalled();
     });
@@ -321,7 +329,7 @@ describe('ProfileForm', () => {
     it('clears the confirm-username error when username and confirmation match', () => {
       watched.values = { username: 'sameuser', confirmUsername: 'sameuser' };
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       expect(forms.current.username.clearErrors).toHaveBeenCalledWith('confirmUsername');
     });
@@ -337,7 +345,7 @@ describe('ProfileForm', () => {
       });
       updateProfileActionMock.mockResolvedValue({ success: true, fields: {} });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
       await waitFor(() => {
@@ -359,7 +367,7 @@ describe('ProfileForm', () => {
         fields: {},
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
       await waitFor(() => {
@@ -375,7 +383,7 @@ describe('ProfileForm', () => {
         })
       );
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
       expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled();
@@ -385,7 +393,7 @@ describe('ProfileForm', () => {
 
   describe('email editing and submission', () => {
     it('toggles into edit mode then cancels, clearing errors', async () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Edit Email' }));
       expect(screen.getByRole('button', { name: 'Save Email' })).toBeInTheDocument();
@@ -406,7 +414,7 @@ describe('ProfileForm', () => {
       });
       changeEmailActionMock.mockResolvedValue({ success: true, fields: {} });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Email' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Email' }));
 
@@ -425,7 +433,7 @@ describe('ProfileForm', () => {
     it('submits the username change and shows a success toast', async () => {
       changeUsernameActionMock.mockResolvedValue({ success: true, fields: {} });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Username' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Username' }));
 
@@ -446,7 +454,7 @@ describe('ProfileForm', () => {
         fields: {},
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Username' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Username' }));
 
@@ -464,7 +472,7 @@ describe('ProfileForm', () => {
     });
 
     it('cancels username editing and clears the confirmation', async () => {
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Edit Username' }));
       await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -480,7 +488,7 @@ describe('ProfileForm', () => {
         fields: {},
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Username' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Username' }));
 
@@ -498,7 +506,7 @@ describe('ProfileForm', () => {
         fields: {},
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Username' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Username' }));
 
@@ -526,7 +534,7 @@ describe('ProfileForm', () => {
       };
       updateProfileActionMock.mockResolvedValue({ success: false, fields: {} });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
       await waitFor(() => {
@@ -546,7 +554,7 @@ describe('ProfileForm', () => {
       };
       changeEmailActionMock.mockResolvedValue({ success: false, fields: {} });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
       await userEvent.click(screen.getByRole('button', { name: 'Edit Email' }));
       await userEvent.click(screen.getByRole('button', { name: 'Save Email' }));
 
@@ -566,7 +574,7 @@ describe('ProfileForm', () => {
         status: 'authenticated',
       });
 
-      render(<ProfileForm />);
+      render(<ProfileForm socialProviders={ALL_PROVIDERS} />);
 
       const resetArg = forms.current.profile.reset.mock.calls[0][0] as Record<string, string>;
       expect(resetArg.firstName).toBe('');
