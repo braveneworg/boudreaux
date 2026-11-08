@@ -172,15 +172,19 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
 
   // ── Optional runtime values with fallbacks ──────────────────────────────
   runtime('CDN_DOMAIN', 'optional', 'Media CDN host for server-side URL building.'),
+  // Despite the prefix these two are runtime values: Next.js inlines a name
+  // present at `next build` into server code as well, which would freeze the
+  // server reads below into the image. Client bundles never see them; their
+  // reads fall back to https://fakefourrecords.com, the production origin.
   runtime(
     'NEXT_PUBLIC_HOST_NAME',
     'optional',
-    'Public origin for share links. Not in the build env, so client reads use their fallback.'
+    'Public origin for audio metadata comments and server-built share links.'
   ),
   runtime(
     'NEXT_PUBLIC_BASE_URL',
     'optional',
-    'Public origin for emails and server links. Not in the build env, so client reads use their fallback.'
+    'Public origin for emails, SMS, job callbacks and internal API calls.'
   ),
   runtime('LOG_LEVEL', 'optional', 'Root winston level; defaults to info in production.'),
   runtime('SMS_PROVIDER', 'optional', "SMS transport: 'sns' or 'noop' (default)."),
