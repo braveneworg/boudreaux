@@ -17,6 +17,7 @@ import { ProfileUsernameSection } from '@/app/components/forms/sections/profile-
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Switch } from '@/app/components/ui/switch';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { useSession } from '@/hooks/use-session';
 import { changeEmailAction } from '@/lib/actions/change-email-action';
 import { changeUsernameAction } from '@/lib/actions/change-username-action';
@@ -206,6 +207,7 @@ export const ProfileForm = ({ socialProviders }: ProfileFormProps) => {
   );
   const [isTransitionPending, startTransition] = useTransition();
   const { data: session, update, status } = useSession();
+  const isHydrated = useHydrated();
   const user = session?.user;
   const [areFormValuesSet, setAreFormValuesSet] = useState(false);
   const [isEditingUserEmail, setIsEditingUserEmail] = useState(false);
@@ -409,8 +411,10 @@ export const ProfileForm = ({ socialProviders }: ProfileFormProps) => {
     [isEditingUserEmail, isEditingUsername, changeEmailForm, changeUsernameForm]
   );
 
-  // Wait for session to load before rendering forms
-  if (status === 'loading' || !user) {
+  // Wait for session to load before rendering forms. The server can only
+  // render the skeleton, and the header's session fetch can resolve before
+  // this segment hydrates, so the hydrating render shows the skeleton too.
+  if (!isHydrated || status === 'loading' || !user) {
     return <ProfileFormSkeleton />;
   }
 
