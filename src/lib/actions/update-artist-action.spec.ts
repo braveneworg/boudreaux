@@ -415,7 +415,8 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Artist with this slug already exists',
-      } as never);
+        code: 'DUPLICATE',
+      });
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
@@ -425,7 +426,7 @@ describe('updateArtistAction', () => {
       ]);
     });
 
-    it('should handle slug unique constraint error', async () => {
+    it('marks the slug field for a DUPLICATE whatever the copy says', async () => {
       vi.mocked(getActionState).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
@@ -438,17 +439,42 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
+      vi.mocked(ArtistService.updateArtist).mockResolvedValueOnce({
         success: false,
-        error: 'Duplicate slug detected',
-      } as never);
+        error: 'Some reworded copy',
+        code: 'DUPLICATE',
+      });
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
-      expect(result.errors?.slug).toEqual([
-        'This slug is already in use. Please choose a different one.',
-      ]);
+      expect(result.errors).toEqual({
+        slug: ['This slug is already in use. Please choose a different one.'],
+      });
+    });
+
+    it('keeps a non-DUPLICATE failure off the slug field even when its copy names the slug', async () => {
+      vi.mocked(getActionState).mockReturnValue({
+        formState: { fields: {}, success: false },
+        parsed: {
+          success: true,
+          data: {
+            firstName: 'John',
+            surname: 'Doe',
+            slug: 'john-doe',
+          },
+        },
+      } as never);
+
+      vi.mocked(ArtistService.updateArtist).mockResolvedValueOnce({
+        success: false,
+        error: 'Duplicate slug detected',
+        code: 'UNKNOWN',
+      });
+
+      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+
+      expect(result.errors).toEqual({ general: ['Duplicate slug detected'] });
     });
 
     it('should handle service returning generic error', async () => {
@@ -467,35 +493,13 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Database connection failed',
-      } as never);
+        code: 'UNAVAILABLE',
+      });
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Database connection failed']);
-    });
-
-    it('should handle service returning error without message', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false },
-        parsed: {
-          success: true,
-          data: {
-            firstName: 'John',
-            surname: 'Doe',
-            slug: 'john-doe',
-          },
-        },
-      } as never);
-
-      vi.mocked(ArtistService.updateArtist).mockResolvedValue({
-        success: false,
-      } as never);
-
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
-
-      expect(result.success).toBe(false);
-      expect(result.errors?.general).toEqual(['Failed to update artist']);
     });
 
     it('should pass empty string when firstName is falsy', async () => {
@@ -596,7 +600,8 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Some generic error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
@@ -676,7 +681,8 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
@@ -789,7 +795,8 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 
@@ -812,7 +819,8 @@ describe('updateArtistAction', () => {
       vi.mocked(ArtistService.updateArtist).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateArtistAction(mockArtistId, initialFormState, mockFormData);
 

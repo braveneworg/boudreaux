@@ -161,7 +161,8 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.getVideoById).mockResolvedValue({
         success: false,
         error: 'Video not found',
-      } as never);
+        code: 'NOT_FOUND',
+      });
 
       const result = await updateVideoAction(videoId, initialFormState, mockFormData);
 
@@ -174,7 +175,8 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.getVideoById).mockResolvedValue({
         success: false,
         error: 'Video not found',
-      } as never);
+        code: 'NOT_FOUND',
+      });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
@@ -287,7 +289,8 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.updateVideo).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       const result = await updateVideoAction(videoId, initialFormState, mockFormData);
 
@@ -299,48 +302,38 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.updateVideo).mockResolvedValue({
         success: false,
         error: 'Database error',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
       expect(deleteS3Object).not.toHaveBeenCalled();
     });
 
-    it('should map a not-found update failure to a not-found error', async () => {
+    it('reports NOT_FOUND as a missing video whatever the copy says', async () => {
       mockParsedSuccess();
-      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+      vi.mocked(VideoService.updateVideo).mockResolvedValueOnce({
         success: false,
-        error: 'Video not found',
-      } as never);
+        error: 'Some reworded copy',
+        code: 'NOT_FOUND',
+      });
 
       const result = await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(result.errors?.general).toEqual(['Video not found']);
+      expect(result.errors).toEqual({ general: ['Video not found'] });
     });
 
-    it('should map a failure without a message to a general error', async () => {
+    it('does not read "not found" in the copy of a failure with another code', async () => {
       mockParsedSuccess();
-      vi.mocked(VideoService.updateVideo).mockResolvedValue({ success: false } as never);
-
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
-
-      expect(result.errors?.general).toEqual(['Failed to update video']);
-    });
-
-    it('should preserve a pre-existing errors object on a not-found failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
-        formState: { fields: {}, success: false, errors: { prior: ['stale'] } },
-        parsed: { success: true, data: parsedData },
-      } as never);
-      vi.mocked(VideoService.updateVideo).mockResolvedValue({
+      vi.mocked(VideoService.updateVideo).mockResolvedValueOnce({
         success: false,
-        error: 'Video not found',
-      } as never);
+        error: 'Poster not found',
+        code: 'UNKNOWN',
+      });
 
       const result = await updateVideoAction(videoId, initialFormState, mockFormData);
 
-      expect(result.errors?.prior).toEqual(['stale']);
-      expect(result.errors?.general).toEqual(['Video not found']);
+      expect(result.errors).toEqual({ general: ['Failed to update video'] });
     });
 
     it('should handle an unexpected error', async () => {
@@ -410,7 +403,8 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.updateVideo).mockResolvedValue({
         success: false,
         error: 'nope',
-      } as never);
+        code: 'UNKNOWN',
+      });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 
@@ -422,7 +416,8 @@ describe('updateVideoAction', () => {
       vi.mocked(VideoService.getVideoById).mockResolvedValue({
         success: false,
         error: 'Video not found',
-      } as never);
+        code: 'NOT_FOUND',
+      });
 
       await updateVideoAction(videoId, initialFormState, mockFormData);
 

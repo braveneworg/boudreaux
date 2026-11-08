@@ -19,7 +19,11 @@ import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
-import { refusedFormState } from './form-state-helpers';
+import {
+  applyServiceFailure,
+  type FailureFieldTable,
+  refusedFormState,
+} from './form-state-helpers';
 import {
   buildVideoCreateInput,
   confirmVideoUpload,
@@ -28,33 +32,35 @@ import {
 } from './video-action-helpers';
 
 /**
- * Apply a `VideoService.createVideo` result to the form state: the created id on
- * success, a title-field error for a duplicate-title conflict, or a general
- * error otherwise. Mirrors the release create action.
+ * A video has no unique field besides its id (prisma/schema.prisma), so a
+ * DUPLICATE on create is the pre-generated id already saved, never a title
+ * clash.
  */
+const CREATE_VIDEO_FAILURES: FailureFieldTable = {
+  fields: new Map([
+    [
+      'DUPLICATE',
+      {
+        field: 'general',
+        message: 'This video has already been saved. Reload the page to edit it.',
+      },
+    ],
+  ]),
+  fallback: 'Failed to create video',
+};
+
+/** Apply a `VideoService.createVideo` result: the created id, or the mapped failure. */
 const applyServiceResponseToFormState = (
   formState: FormState,
   response: ServiceResponse<Video>
 ): void => {
-  if (response.success) {
-    formState.errors = undefined;
-    formState.data = { videoId: response.data.id };
-  } else {
-    if (!formState.errors) {
-      formState.errors = {};
-    }
-    const errorMessage = response.error || 'Failed to create video';
-    const lower = errorMessage.toLowerCase();
-    const isTitleConflict =
-      lower.includes('title') &&
-      (lower.includes('unique') || lower.includes('already exists') || lower.includes('duplicate'));
-    if (isTitleConflict) {
-      formState.errors.title = ['This title is already in use. Please choose a different one.'];
-    } else {
-      formState.errors = { general: ['Failed to create video'] };
-    }
+  if (!response.success) {
+    applyServiceFailure(formState, response, CREATE_VIDEO_FAILURES);
+    return;
   }
-  formState.success = response.success;
+  formState.errors = undefined;
+  formState.data = { videoId: response.data.id };
+  formState.success = true;
 };
 
 /** Set a single general error on the form state (S3 confirmation failures). */
