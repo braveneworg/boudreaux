@@ -11,10 +11,8 @@ in `docker-compose.prod.yml`, and the `process.env` reads in `src/`. Nothing
 checked one against another. A name dropped anywhere reached the code as an
 empty value, and most code reads "empty" as "feature off" without saying so.
 
-On 2026-11-05 that had happened four times:
+On 2026-11-05 that had happened three times:
 
-- `STRIPE_WEBHOOK_IP_RANGES` was a secret that never reached the container,
-  so the webhook IP allowlist that `nginx.conf` described was off.
 - `CLOUDFRONT_DISTRIBUTION_ID` reached only the CI CDN sync, so cover-art
   invalidation never ran.
 - `S3_BUCKET` was written to the env file and never passed to the container,
@@ -23,6 +21,11 @@ On 2026-11-05 that had happened four times:
 - The Facebook secrets were created as `AUTH_FACEBOOK_*` while the workflow
   read `FACEBOOK_CLIENT_*`. The server skipped Facebook; the sign-in page,
   which hard-coded four buttons, still offered it.
+
+The review also named `STRIPE_WEBHOOK_IP_RANGES`, a secret that never
+reached the container, but nothing was broken there. Production Stripe
+webhooks go to the `stripe-webhook` Lambda, and the container's webhook
+route returns 404 in production.
 
 The required-value check was a hand-written list of 21 names, run lazily from
 the root layout through a dynamic import nobody awaited.
@@ -95,10 +98,11 @@ it exits 0, so the deploy reads green while the old version serves.
 
 - Adding an env read means adding a manifest line; the drift spec fails until
   the name is there, and, for a runtime name, until it is forwarded.
-- Forwarding `STRIPE_WEBHOOK_IP_RANGES` turns the IP allowlist on in
-  production for the first time; a stale secret would 403 Stripe webhooks.
-  The route reads the source IP only from nginx's `X-Real-IP`
-  (`$remote_addr`), never from the client-controlled `X-Forwarded-For`.
+- `STRIPE_WEBHOOK_IP_RANGES` is `local`. Production's allowlist lives in
+  the Lambda's SSM parameter, which `RefreshIpAllowlistFunction` rewrites
+  daily from Stripe's published list. The dev-only route reads the source
+  IP only from `X-Real-IP`, never from the client-controlled
+  `X-Forwarded-For`.
 - A rollback runs the same pre-roll checks with main's manifest, so a missing
   required secret blocks a rollback as well as a forward deploy.
 - `AUTH_DISABLE_SIGNUP`, `CONTACT_EMAIL`, `LOG_DEBUG_MODULES` and

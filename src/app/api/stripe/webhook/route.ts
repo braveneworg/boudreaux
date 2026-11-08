@@ -32,7 +32,8 @@ const releaseMetadataSchema = z.object({
 
 /**
  * Checks whether the request IP (nginx's X-Real-IP) is allowed by the
- * STRIPE_WEBHOOK_IP_RANGES env var. Returns null when the check passes (or
+ * STRIPE_WEBHOOK_IP_RANGES env var (local only: production webhooks go to
+ * the stripe-webhook Lambda, which keeps its own allowlist). Returns null when the check passes (or
  * is skipped), or a NextResponse with status 403 when the IP is blocked.
  */
 const checkIpAllowlist = (request: NextRequest): NextResponse | null => {

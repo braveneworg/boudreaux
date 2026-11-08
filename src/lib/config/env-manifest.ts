@@ -54,13 +54,7 @@ export interface EnvVarSpec {
 }
 
 export type FeatureGroupId =
-  | 'google'
-  | 'facebook'
-  | 'twitter'
-  | 'apple'
-  | 'cloudfrontSignedUrls'
-  | 'cloudfrontInvalidation'
-  | 'stripeWebhookIpAllowlist';
+  'google' | 'facebook' | 'twitter' | 'apple' | 'cloudfrontSignedUrls' | 'cloudfrontInvalidation';
 
 /**
  * A feature group: optional values that only work together. The feature is
@@ -109,11 +103,6 @@ export const FEATURE_GROUPS: readonly FeatureGroupSpec[] = [
     id: 'cloudfrontInvalidation',
     feature: 'CloudFront cache invalidation after cover-art and media changes',
     requires: ['CLOUDFRONT_DISTRIBUTION_ID'],
-  },
-  {
-    id: 'stripeWebhookIpAllowlist',
-    feature: 'Stripe webhook source-IP allowlist (signature verification still applies)',
-    requires: ['STRIPE_WEBHOOK_IP_RANGES'],
   },
 ];
 
@@ -180,7 +169,6 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
   runtime('CLOUDFRONT_KEY_PAIR_ID', 'optional', 'CloudFront URL signing key pair.'),
   runtime('CLOUDFRONT_PRIVATE_KEY_BASE64', 'optional', 'CloudFront URL signing private key.'),
   runtime('CLOUDFRONT_DISTRIBUTION_ID', 'optional', 'CloudFront distribution to invalidate.'),
-  runtime('STRIPE_WEBHOOK_IP_RANGES', 'optional', 'Comma-separated Stripe webhook CIDRs.'),
 
   // ── Optional runtime values with fallbacks ──────────────────────────────
   runtime('CDN_DOMAIN', 'optional', 'Media CDN host for server-side URL building.'),
@@ -214,6 +202,9 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
   local('NEXT_PUBLIC_E2E_MODE', 'E2E build switch.'),
   local('BIO_GENERATOR_FAKE', 'Deterministic bio-generation fixture for E2E.'),
   local('BIO_GENERATOR_FAKE_DELAY_MS', 'Delay of the bio-generation fixture.'),
+  // Production webhooks go to the stripe-webhook Lambda, whose allowlist a
+  // daily Lambda refreshes from Stripe's list; this route 404s in production.
+  local('STRIPE_WEBHOOK_IP_RANGES', 'CIDRs for the dev-only Stripe webhook route.'),
   local('SKIP_STRIPE_IP_CHECK', 'Bypasses the Stripe webhook IP allowlist locally.'),
   local('SHOW_DEV_LOGS', 'Verbose development logging.'),
   local('NEXT_PUBLIC_CLOUDFLARE_TEST_SITE_KEY', 'Turnstile test site key for E2E.'),

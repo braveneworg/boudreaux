@@ -70,9 +70,6 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      # Comma-separated CIDRs the webhook route accepts. When unset the route
-      # skips the IP check and relies on the signature alone.
-      STRIPE_WEBHOOK_IP_RANGES: ${STRIPE_WEBHOOK_IP_RANGES}
       # Pusher (live chat realtime)
       PUSHER_APP_ID: ${PUSHER_APP_ID}
       PUSHER_KEY: ${PUSHER_KEY}

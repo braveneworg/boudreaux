@@ -155,7 +155,6 @@ jobs:
           # line — see the newline-stripping block after the heredoc.
           CLOUDFRONT_PRIVATE_KEY_BASE64: ${{ secrets.CLOUDFRONT_PRIVATE_KEY_BASE64 }}
           APPLE_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_PRIVATE_KEY_BASE64 }}
-          STRIPE_WEBHOOK_IP_RANGES: ${{ secrets.STRIPE_WEBHOOK_IP_RANGES }}
         run: |
           cat > .env.deploy << 'EOF'
           NEXT_APP_WEBSITE_IMAGE=${{ env.WEBSITE_IMAGE }}
@@ -214,13 +213,9 @@ jobs:
           # incident: a header-only PEM that fails to parse). Collapse each to a
           # single line so the whole value survives regardless of how it was
           # encoded. `tr -d '\r\n'` on an already-single-line value is a no-op.
-          # The Stripe webhook CIDR list gets the same treatment for the same
-          # reason, joining one-per-line or space-separated ranges with commas:
-          # a truncated list would 403 every webhook from the ranges it lost.
           {
             printf 'CLOUDFRONT_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$CLOUDFRONT_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
             printf 'APPLE_PRIVATE_KEY_BASE64=%s\n' "$(printf '%s' "$APPLE_PRIVATE_KEY_BASE64" | tr -d '\r\n')"
-            printf 'STRIPE_WEBHOOK_IP_RANGES=%s\n' "$(printf '%s' "$STRIPE_WEBHOOK_IP_RANGES" | tr -s '\r\n\t ,' ',' | sed 's/^,//; s/,$//')"
           } >> .env.deploy
 
       # One transfer instead of three: each scp-action opens its own SSH

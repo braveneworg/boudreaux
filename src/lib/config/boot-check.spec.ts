@@ -156,17 +156,17 @@ describe('checkRuntimeConfig', () => {
       checkRuntimeConfig({ env: completeEnv(), logger, isProduction: true });
 
       const disabled = messages(logger.warn).filter((line) => line.startsWith('Feature disabled'));
-      expect(disabled).toHaveLength(7);
+      expect(disabled).toHaveLength(6);
       expect(disabled).toContainEqual(expect.stringContaining('CLOUDFRONT_DISTRIBUTION_ID'));
     });
 
     it('logs nothing for an enabled group', () => {
       const logger = fakeLogger();
-      const env = { ...completeEnv(), STRIPE_WEBHOOK_IP_RANGES: '3.18.12.63/32' };
+      const env = { ...completeEnv(), CLOUDFRONT_DISTRIBUTION_ID: 'E2EXAMPLE' };
 
       checkRuntimeConfig({ env, logger, isProduction: true });
 
-      expect(messages(logger.warn).join('\n')).not.toContain('STRIPE_WEBHOOK_IP_RANGES');
+      expect(messages(logger.warn).join('\n')).not.toContain('CLOUDFRONT_DISTRIBUTION_ID');
     });
 
     it('never logs a value', () => {
