@@ -10,33 +10,23 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ServiceResponse } from '@/lib/services/service.types';
 import { loggers } from '@/lib/utils/logger';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
-import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 import {
   MAX_FILE_SIZE,
   SUPPORTED_IMAGE_TYPES,
-  type ImageUploadRequest,
   type PresignedUrlResponse,
 } from '@/lib/validation/tours/image-schema';
-import type { TourDateImageUploadRequest } from '@/lib/validation/tours/tour-date-image-schema';
+
+import type { TourImagePut } from './tour-images/types';
+
+/** A presigned PUT is valid for 15 minutes. */
+const PRESIGNED_PUT_TTL_SECONDS = 900;
 
 /**
- * Service for handling tour image uploads to S3
+ * The S3 calls tour images make: sign a PUT, delete an object, and name the
+ * URL an object is served from. The tour image module reaches them through
+ * its S3 store adapter.
  */
 export class ImageUploadService {
-  /**
-   * Generate a unique S3 key for an image
-   */
-  static generateS3Key(tourId: string, fileName: string): string {
-    return buildMediaS3Key({ entityType: 'tours', entityId: tourId, fileName });
-  }
-
-  /**
-   * Generate a unique S3 key for a tour date image
-   */
-  static generateTourDateS3Key(tourDateId: string, fileName: string): string {
-    return buildMediaS3Key({ entityType: 'tour-dates', entityId: tourDateId, fileName });
-  }
-
   /**
    * Generate CDN URL from S3 key
    */
@@ -84,105 +74,42 @@ export class ImageUploadService {
   }
 
   /**
-   * Generate a presigned URL for uploading an image to S3
-   * URL expires in 15 minutes (900 seconds)
+   * Sign a PUT of one image object under the key the caller chose. The URL
+   * expires in 15 minutes (900 seconds); the object is cached as immutable.
    */
-  static async generatePresignedUploadUrl(
-    request: ImageUploadRequest
-  ): Promise<ServiceResponse<PresignedUrlResponse>> {
+  static async presignPut({
+    s3Key,
+    mimeType,
+    fileSize,
+    metadata,
+  }: TourImagePut): Promise<ServiceResponse<PresignedUrlResponse>> {
     try {
       const s3Bucket = getS3BucketName();
 
-      // Validate file
-      const validation = this.validateImageFile(request.mimeType, request.fileSize);
+      const validation = this.validateImageFile(mimeType, fileSize);
       if (!validation.valid) {
         return { success: false, error: validation.error || 'Invalid file', code: 'VALIDATION' };
       }
 
-      // Generate S3 key
-      const s3Key = this.generateS3Key(request.tourId, request.fileName);
-
-      // Create Put command for presigned URL
       const putCommand = new PutObjectCommand({
         Bucket: s3Bucket,
         Key: s3Key,
-        ContentType: request.mimeType,
-        ContentLength: request.fileSize,
+        ContentType: mimeType,
+        ContentLength: fileSize,
         CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: {
-          tourId: request.tourId,
-          originalFileName: request.fileName,
-          uploadedAt: new Date().toISOString(),
-        },
+        Metadata: metadata,
       });
 
-      // Generate presigned URL (expires in 15 minutes)
-      const s3Client = getS3Client();
-      const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
+      const uploadUrl = await getSignedUrl(getS3Client(), putCommand, {
+        expiresIn: PRESIGNED_PUT_TTL_SECONDS,
+      });
 
       return {
         success: true,
-        data: {
-          uploadUrl,
-          s3Key,
-          s3Bucket,
-          expiresIn: 900,
-        },
+        data: { uploadUrl, s3Key, s3Bucket, expiresIn: PRESIGNED_PUT_TTL_SECONDS },
       };
     } catch (error) {
       loggers.media.error('Error generating presigned URL', error);
-      return { success: false, error: 'Failed to generate upload URL', code: 'UNKNOWN' };
-    }
-  }
-
-  /**
-   * Generate a presigned URL for uploading a tour date image to S3
-   * URL expires in 15 minutes (900 seconds)
-   */
-  static async generateTourDatePresignedUploadUrl(
-    request: TourDateImageUploadRequest
-  ): Promise<ServiceResponse<PresignedUrlResponse>> {
-    try {
-      const s3Bucket = getS3BucketName();
-
-      // Validate file
-      const validation = this.validateImageFile(request.mimeType, request.fileSize);
-      if (!validation.valid) {
-        return { success: false, error: validation.error || 'Invalid file', code: 'VALIDATION' };
-      }
-
-      // Generate S3 key for tour date
-      const s3Key = this.generateTourDateS3Key(request.tourDateId, request.fileName);
-
-      // Create Put command for presigned URL
-      const putCommand = new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: s3Key,
-        ContentType: request.mimeType,
-        ContentLength: request.fileSize,
-        CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: {
-          tourDateId: request.tourDateId,
-          originalFileName: request.fileName,
-          uploadedAt: new Date().toISOString(),
-        },
-      });
-
-      // Generate presigned URL (expires in 15 minutes)
-      const s3Client = getS3Client();
-      const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 900 });
-
-      return {
-        success: true,
-        data: {
-          uploadUrl,
-          s3Key,
-          s3Bucket,
-          expiresIn: 900,
-        },
-      };
-    } catch (error) {
-      loggers.media.error('Error generating tour date presigned URL', error);
       return { success: false, error: 'Failed to generate upload URL', code: 'UNKNOWN' };
     }
   }

@@ -12,6 +12,8 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/repositories/tours/tour-repository', () => ({
   TourRepository: {
     findAll: vi.fn(),
+    findAllPublic: vi.fn(),
+    findPublicById: vi.fn(),
     findById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -136,14 +138,13 @@ describe('TourService', () => {
     images: [],
   };
   describe('findAll', () => {
-    it('should return paginated tours with artist display names', async () => {
+    it('should return paginated tours as the repository reads them', async () => {
       vi.mocked(TourRepository.findAll).mockResolvedValue([mockTour] as never);
       vi.mocked(TourRepository.count).mockResolvedValue(1);
 
       const result = await TourService.findAll();
 
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0].displayHeadliners).toEqual(['JDoe']);
+      expect(result.data).toEqual([mockTour]);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(100);
@@ -175,163 +176,38 @@ describe('TourService', () => {
       expect(result.page).toBe(2);
       expect(result.limit).toBe(20);
     });
-
-    it('should handle artist display name fallback when stageName missing', async () => {
-      const tourWithoutStageName = {
-        ...mockTour,
-        tourDates: [
-          {
-            ...mockTour.tourDates[0],
-            headliners: [
-              {
-                ...mockTour.tourDates[0].headliners[0],
-                artist: {
-                  ...mockTour.tourDates[0].headliners[0].artist,
-                  firstName: 'John',
-                  surname: 'Doe',
-                  displayName: null,
-                },
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(TourRepository.findAll).mockResolvedValue([tourWithoutStageName] as never);
-      vi.mocked(TourRepository.count).mockResolvedValue(1);
-
-      const result = await TourService.findAll();
-
-      expect(result.data[0].displayHeadliners).toEqual(['John Doe']);
-    });
-
-    it('should handle artist with only firstName', async () => {
-      const tourWithFirstNameOnly = {
-        ...mockTour,
-        tourDates: [
-          {
-            ...mockTour.tourDates[0],
-            headliners: [
-              {
-                ...mockTour.tourDates[0].headliners[0],
-                artist: {
-                  ...mockTour.tourDates[0].headliners[0].artist,
-                  firstName: 'Prince',
-                  surname: null,
-                  displayName: null,
-                },
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(TourRepository.findAll).mockResolvedValue([tourWithFirstNameOnly] as never);
-      vi.mocked(TourRepository.count).mockResolvedValue(1);
-
-      const result = await TourService.findAll();
-
-      expect(result.data[0].displayHeadliners).toEqual(['Prince']);
-    });
-
-    it('should handle artist with only surname', async () => {
-      const tourWithSurnameOnly = {
-        ...mockTour,
-        tourDates: [
-          {
-            ...mockTour.tourDates[0],
-            headliners: [
-              {
-                ...mockTour.tourDates[0].headliners[0],
-                artist: {
-                  ...mockTour.tourDates[0].headliners[0].artist,
-                  firstName: null,
-                  surname: 'Madonna',
-                  displayName: null,
-                },
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(TourRepository.findAll).mockResolvedValue([tourWithSurnameOnly] as never);
-      vi.mocked(TourRepository.count).mockResolvedValue(1);
-
-      const result = await TourService.findAll();
-
-      expect(result.data[0].displayHeadliners).toEqual(['Madonna']);
-    });
-
-    it('should filter out headliners with no resolved name', async () => {
-      const tourWithNoNames = {
-        ...mockTour,
-        tourDates: [
-          {
-            ...mockTour.tourDates[0],
-            headliners: [
-              {
-                ...mockTour.tourDates[0].headliners[0],
-                artist: {
-                  ...mockTour.tourDates[0].headliners[0].artist,
-                  firstName: null,
-                  surname: null,
-                  displayName: null,
-                },
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(TourRepository.findAll).mockResolvedValue([tourWithNoNames] as never);
-      vi.mocked(TourRepository.count).mockResolvedValue(1);
-
-      const result = await TourService.findAll();
-
-      expect(result.data[0].displayHeadliners).toEqual([]);
-    });
   });
 
-  describe('findById', () => {
-    it('should return tour with display names', async () => {
-      vi.mocked(TourRepository.findById).mockResolvedValue(mockTour as never);
+  describe('route reads', () => {
+    it('reads one page of public tours', async () => {
+      vi.mocked(TourRepository.findAllPublic).mockResolvedValueOnce([mockTour] as never);
 
-      const result = await TourService.findById('tour-123');
+      const result = await TourService.findPublicPage({ skip: 24, take: 24, search: 'x' });
 
-      expect(result).toBeTruthy();
-      expect(result?.displayHeadliners).toEqual(['JDoe']);
+      expect(TourRepository.findAllPublic).toHaveBeenCalledWith({
+        skip: 24,
+        take: 24,
+        search: 'x',
+      });
+      expect(result).toEqual([mockTour]);
     });
 
-    it('should return null when tour not found', async () => {
-      vi.mocked(TourRepository.findById).mockResolvedValue(null);
+    it('reads one tour as the public may see it', async () => {
+      vi.mocked(TourRepository.findPublicById).mockResolvedValueOnce(mockTour as never);
 
-      const result = await TourService.findById('nonexistent-id');
+      const result = await TourService.findPublicById('tour-123');
 
+      expect(TourRepository.findPublicById).toHaveBeenCalledWith('tour-123');
+      expect(result).toEqual(mockTour);
+    });
+
+    it('reads one tour whole, for the admin edit form', async () => {
+      vi.mocked(TourRepository.findById).mockResolvedValueOnce(null);
+
+      const result = await TourService.findAdminById('missing');
+
+      expect(TourRepository.findById).toHaveBeenCalledWith('missing');
       expect(result).toBeNull();
-    });
-
-    it('should return empty displayHeadliners when tour has no tourDates property', async () => {
-      const tourWithoutTourDates = {
-        id: 'tour-123',
-        title: 'Minimal Tour',
-        subtitle: null,
-        subtitle2: null,
-        description: null,
-        notes: null,
-        createdBy: 'user-123',
-        updatedBy: null,
-        createdAt: new Date('2026-03-01'),
-        updatedAt: new Date('2026-03-01'),
-        images: [],
-      };
-
-      vi.mocked(TourRepository.findById).mockResolvedValue(tourWithoutTourDates as never);
-
-      const result = await TourService.findById('tour-123');
-
-      expect(result).toBeTruthy();
-      expect(result?.displayHeadliners).toEqual([]);
     });
   });
 
@@ -343,18 +219,13 @@ describe('TourService', () => {
       createdBy: 'user-123',
     };
 
-    it('should validate input and create tour', async () => {
+    it('should create the tour from the parsed input', async () => {
       vi.mocked(TourRepository.create).mockResolvedValue(mockTour);
 
       const result = await TourService.create(validCreateInput);
 
-      expect(TourRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'New Tour',
-          createdBy: 'user-123',
-        })
-      );
-      expect(result.displayHeadliners).toBeDefined();
+      expect(TourRepository.create).toHaveBeenCalledWith(validCreateInput);
+      expect(result).toEqual(mockTour);
     });
 
     it('should accept title-only create payload', async () => {
@@ -371,15 +242,6 @@ describe('TourService', () => {
           title: 'Title Only Tour',
         })
       );
-    });
-
-    it('should reject invalid input - title too long', async () => {
-      const invalidInput = {
-        ...validCreateInput,
-        title: 'x'.repeat(256),
-      };
-
-      await expect(TourService.create(invalidInput)).rejects.toThrow();
     });
 
     it('should accept minimal valid input', async () => {
@@ -402,7 +264,7 @@ describe('TourService', () => {
       subtitle: 'Updated Subtitle',
     };
 
-    it('should validate input and update tour', async () => {
+    it('should update the tour from the parsed input', async () => {
       vi.mocked(TourRepository.update).mockResolvedValue({
         ...mockTour,
         ...validUpdateInput,
@@ -412,14 +274,6 @@ describe('TourService', () => {
 
       expect(TourRepository.update).toHaveBeenCalledWith('tour-123', validUpdateInput, 'user-123');
       expect(result.title).toBe('Updated Tour Title');
-    });
-
-    it('should reject invalid update input', async () => {
-      const invalidInput = {
-        title: '',
-      };
-
-      await expect(TourService.update('tour-123', invalidInput, 'user-123')).rejects.toThrow();
     });
 
     it('should allow partial updates', async () => {
@@ -459,88 +313,6 @@ describe('TourService', () => {
       vi.mocked(TourRepository.delete).mockRejectedValue(new Error('Record not found'));
 
       await expect(TourService.delete('nonexistent-id')).rejects.toThrow('Record not found');
-    });
-  });
-
-  describe('getArtistDisplayName', () => {
-    it('should use stageName when available', () => {
-      const headliner = {
-        artist: {
-          displayName: 'Bono',
-          firstName: 'Paul',
-          surname: 'Hewson',
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBe('Bono');
-    });
-
-    it('should use firstName + surname when stageName null', () => {
-      const headliner = {
-        artist: {
-          displayName: null,
-          firstName: 'John',
-          surname: 'Doe',
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBe('John Doe');
-    });
-
-    it('should use firstName only when surname null', () => {
-      const headliner = {
-        artist: {
-          displayName: null,
-          firstName: 'Prince',
-          surname: null,
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBe('Prince');
-    });
-
-    it('should use surname only when firstName null', () => {
-      const headliner = {
-        artist: {
-          displayName: null,
-          firstName: null,
-          surname: 'Cher',
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBe('Cher');
-    });
-
-    it('should return null when all artist fields null', () => {
-      const headliner = {
-        artist: {
-          displayName: null,
-          firstName: null,
-          surname: null,
-        },
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBeNull();
-    });
-
-    it('should return null when artist is null', () => {
-      const headliner = {
-        artist: null,
-      };
-
-      const result = TourService['getArtistDisplayName'](headliner as never);
-
-      expect(result).toBeNull();
     });
   });
 });

@@ -5,8 +5,8 @@
 
 import { TourDateArtistsSection } from '@/app/admin/tours/components/tour-date-artists-section';
 import { TourDateDatetimeSection } from '@/app/admin/tours/components/tour-date-datetime-section';
-import { TourDateImageUpload } from '@/app/admin/tours/components/tour-date-image-upload';
 import { TourDateTicketingSection } from '@/app/admin/tours/components/tour-date-ticketing-section';
+import { TourImageUpload } from '@/app/admin/tours/components/tour-image-upload';
 import {
   type TourDateWithHeadliners,
   useTourDateForm,
@@ -127,8 +127,8 @@ export const TourDateForm = (props: TourDateFormProps) => {
                 <Separator />
                 <section className="space-y-4">
                   <h4 className="text-sm font-semibold">Images</h4>
-                  <TourDateImageUpload
-                    tourDateId={tourDate.id}
+                  <TourImageUpload
+                    owner={{ kind: 'tourDate', id: tourDate.id }}
                     initialImages={tourDateImages}
                     onUploadComplete={handleImageUploadComplete}
                     disabled={isSaving}

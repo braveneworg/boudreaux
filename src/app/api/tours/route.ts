@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 
 import { PUBLIC_LIMIT, publicLimiter } from '@/lib/config/rate-limit-tiers';
 import { withRateLimit } from '@/lib/decorators/with-rate-limit';
-import { TourRepository, type TourWithRelations } from '@/lib/repositories/tours/tour-repository';
+import { TourService, type TourWithRelations } from '@/lib/services/tours/tour-service';
 import { computeNextSkip, type PaginatedResponse } from '@/lib/types/pagination';
 import { loggers } from '@/lib/utils/logger';
 
@@ -40,7 +40,7 @@ export const GET = withRateLimit(
     );
     const search = searchParams.get('search') ?? undefined;
 
-    const rows = await TourRepository.findAllPublic({ skip, take, search });
+    const rows = await TourService.findPublicPage({ skip, take, search });
 
     return NextResponse.json(
       { rows, nextSkip: computeNextSkip(rows.length, skip, take) } satisfies ToursPageResponse,

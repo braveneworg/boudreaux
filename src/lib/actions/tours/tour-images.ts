@@ -6,297 +6,294 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { gateAction } from '@/lib/auth/action-gate';
-import { ImageRepository } from '@/lib/repositories/tours/image-repository';
-import { ImageUploadService } from '@/lib/services/tours/image-upload-service';
+import { gateAction, type ActionGateCode } from '@/lib/auth/action-gate';
+import type { ServiceResponse } from '@/lib/services/service.types';
+import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
+import type { ConfirmedTourImage } from '@/lib/services/tours/tour-images/types';
+import type { DataErrorCode } from '@/lib/types/domain/errors';
+import type { TourDateImageScalars, TourImageScalars } from '@/lib/types/tours';
 import { loggers } from '@/lib/utils/logger';
 import {
   confirmUploadSchema,
   deleteImageSchema,
   imageReorderSchema,
   imageUploadRequestSchema,
-  MAX_IMAGES_PER_TOUR,
+  tourDateConfirmUploadSchema,
+  tourDateDeleteImageSchema,
+  tourDateImageReorderSchema,
+  tourDateImageUploadRequestSchema,
+  tourDateUpdateImageAltTextSchema,
   updateImageAltTextSchema,
   type ConfirmUploadRequest,
   type DeleteImageRequest,
-  type ImageMetadata,
   type ImageReorder,
   type ImageUploadRequest,
   type PresignedUrlResponse,
+  type TourDateConfirmUploadRequest,
+  type TourDateDeleteImageRequest,
+  type TourDateImageReorder,
+  type TourDateImageUploadRequest,
+  type TourDateUpdateImageAltText,
   type UpdateImageAltText,
 } from '@/lib/validation/tours/image-schema';
 
+import type { z } from 'zod';
+
 const logger = loggers.s3;
 
-export interface TourImageActionResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
+/** What every tour image action resolves to. */
+export type TourImageActionResponse<T = void> =
+  | { success: true; data: T }
+  | { success: false; error: string; code: DataErrorCode | ActionGateCode };
+
+/** The first message the schema refused the request with. */
+const invalidRequest = (error: z.ZodError): TourImageActionResponse<never> => ({
+  success: false,
+  error: error.issues[0]?.message ?? 'Invalid request',
+  code: 'VALIDATION',
+});
 
 /**
- * Generate a presigned URL for uploading an image to S3
- * Requires admin role
+ * Run one action's work, answering anything it throws with `failure` copy:
+ * a thrown error's own text never reaches the client.
  */
+const settle = async <T>(
+  failure: string,
+  work: () => Promise<TourImageActionResponse<T>>
+): Promise<TourImageActionResponse<T>> => {
+  try {
+    return await work();
+  } catch (error) {
+    logger.error(failure, error);
+    return { success: false, error: failure, code: 'UNKNOWN' };
+  }
+};
+
+/** Revalidate after a write that succeeded, and hand the result on. */
+const afterWrite = <T>(
+  result: ServiceResponse<T>,
+  revalidate: () => void
+): TourImageActionResponse<T> => {
+  if (result.success) {
+    revalidate();
+  }
+  return result;
+};
+
+const revalidateTour = (tourId: string) => (): void => {
+  revalidatePath(`/admin/tours/${tourId}`);
+  revalidatePath(`/tours/${tourId}`);
+  revalidatePath('/tours');
+};
+
+const revalidateTourDates = (): void => {
+  revalidatePath('/admin/tours');
+  revalidatePath('/tours');
+};
+
+/** A presigned PUT for one more image of a tour. Admin only. */
 export const generateUploadUrlAction = async (
   request: ImageUploadRequest
-): Promise<TourImageActionResponse<PresignedUrlResponse>> => {
-  try {
-    // Require admin authentication
+): Promise<TourImageActionResponse<PresignedUrlResponse>> =>
+  settle('Failed to generate upload URL', async () => {
     const gate = await gateAction('admin');
     if (!gate.success) {
       return gate;
     }
-
-    // Validate request
-    const validated = imageUploadRequestSchema.parse(request);
-
-    // Check max images limit
-    const existingCount = await ImageRepository.count(validated.tourId);
-    if (existingCount >= MAX_IMAGES_PER_TOUR) {
-      return {
-        success: false,
-        error: `Maximum of ${MAX_IMAGES_PER_TOUR} images per tour exceeded`,
-      };
+    const parsed = imageUploadRequestSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    // Generate presigned URL
-    const result = await ImageUploadService.generatePresignedUploadUrl(validated);
+    const { tourId, ...file } = parsed.data;
+    return tourImages.requestUpload({ kind: 'tour', id: tourId }, file);
+  });
 
-    if (!result.success) {
-      return { success: false, error: result.error };
-    }
-
-    return { success: true, data: result.data };
-  } catch (error) {
-    logger.error('Error generating upload URL', error);
-
-    if (error instanceof Error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: false, error: 'Failed to generate upload URL' };
-  }
-};
-
-/**
- * Confirm image upload by creating TourImage database record
- * Call this after successful client-side upload to S3
- * Requires admin role
- */
+/** Record an image the browser put in the bucket as the tour's last image. Admin only. */
 export const confirmUploadAction = async (
-  uploadData: ConfirmUploadRequest
-): Promise<TourImageActionResponse<ImageMetadata>> => {
-  try {
-    // Require admin authentication
+  request: ConfirmUploadRequest
+): Promise<TourImageActionResponse<ConfirmedTourImage<TourImageScalars>>> =>
+  settle('Failed to confirm upload', async () => {
     const gate = await gateAction('admin');
     if (!gate.success) {
       return gate;
     }
-    const { session } = gate;
-
-    // Validate metadata
-    const validated = confirmUploadSchema.parse(uploadData);
-
-    // Get next display order
-    const existingImages = await ImageRepository.findByTourId(validated.tourId);
-    const nextDisplayOrder = existingImages.length;
-
-    // Generate CDN URL from S3 key
-    const cdnUrl = ImageUploadService.generateCdnUrl(validated.s3Key);
-
-    // Create TourImage record
-    const tourImage = await ImageRepository.create({
-      tourId: validated.tourId,
-      s3Key: validated.s3Key,
-      s3Url: cdnUrl,
-      s3Bucket: validated.s3Bucket,
-      fileName: validated.fileName,
-      fileSize: validated.fileSize,
-      mimeType: validated.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-      displayOrder: nextDisplayOrder,
-      altText: validated.altText,
-      uploadedBy: session.user.id,
-    });
-
-    // Revalidate tour pages
-    revalidatePath(`/admin/tours/${validated.tourId}`);
-    revalidatePath(`/tours/${validated.tourId}`);
-    revalidatePath('/tours');
-
-    return {
-      success: true,
-      data: {
-        id: tourImage.id,
-        tourId: tourImage.tourId,
-        s3Key: tourImage.s3Key,
-        s3Url: tourImage.s3Url,
-        s3Bucket: tourImage.s3Bucket,
-        fileName: tourImage.fileName,
-        fileSize: tourImage.fileSize,
-        mimeType: tourImage.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-        displayOrder: tourImage.displayOrder,
-        altText: tourImage.altText || undefined,
-        uploadedBy: tourImage.uploadedBy || undefined,
-      },
-    };
-  } catch (error) {
-    logger.error('Error confirming upload', error);
-
-    if (error instanceof Error) {
-      return { success: false, error: error.message };
+    const parsed = confirmUploadSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    return { success: false, error: 'Failed to confirm upload' };
-  }
-};
+    const { tourId, ...upload } = parsed.data;
+    return afterWrite(
+      await tourImages.confirmUpload({ kind: 'tour', id: tourId }, upload, gate.session.user.id),
+      revalidateTour(tourId)
+    );
+  });
 
-/**
- * Delete an image from tour (removes from S3 and database)
- * Requires admin role
- */
+/** Delete one of a tour's images, object and row. Admin only. */
 export const deleteImageAction = async (
   request: DeleteImageRequest
-): Promise<TourImageActionResponse<void>> => {
-  try {
-    // Require admin authentication
+): Promise<TourImageActionResponse> =>
+  settle('Failed to delete image', async () => {
     const gate = await gateAction('admin');
     if (!gate.success) {
       return gate;
     }
-
-    // Validate request
-    const validated = deleteImageSchema.parse(request);
-
-    // Get image details
-    const image = await ImageRepository.findById(validated.imageId);
-
-    if (!image) {
-      return { success: false, error: 'Image not found' };
+    const parsed = deleteImageSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    // Verify image belongs to tour
-    if (image.tourId !== validated.tourId) {
-      return { success: false, error: 'Image does not belong to specified tour' };
-    }
+    const { tourId, imageId } = parsed.data;
+    return afterWrite(
+      await tourImages.delete({ kind: 'tour', id: tourId }, imageId),
+      revalidateTour(tourId)
+    );
+  });
 
-    // Delete from S3
-    const s3Result = await ImageUploadService.deleteFromS3(image.s3Key);
-    if (!s3Result.success) {
-      logger.error('Failed to delete from S3', s3Result.error);
-      // Continue with database deletion even if S3 delete fails
-    }
-
-    // Delete from database
-    await ImageRepository.delete(validated.imageId);
-
-    // Revalidate tour pages
-    revalidatePath(`/admin/tours/${validated.tourId}`);
-    revalidatePath(`/tours/${validated.tourId}`);
-    revalidatePath('/tours');
-
-    return { success: true };
-  } catch (error) {
-    logger.error('Error deleting image', error);
-
-    if (error instanceof Error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: false, error: 'Failed to delete image' };
-  }
-};
-
-/**
- * Reorder images for a tour
- * Requires admin role
- */
+/** Store a new order for a tour's images. Admin only. */
 export const reorderImagesAction = async (
   request: ImageReorder
-): Promise<TourImageActionResponse<void>> => {
-  try {
-    // Require admin authentication
+): Promise<TourImageActionResponse> =>
+  settle('Failed to reorder images', async () => {
     const gate = await gateAction('admin');
     if (!gate.success) {
       return gate;
     }
-
-    // Validate request
-    const validated = imageReorderSchema.parse(request);
-
-    // Verify all images belong to the tour
-    const images = await ImageRepository.findByTourId(validated.tourId);
-    const imageIds = new Set(images.map((img) => img.id));
-
-    for (const order of validated.imageOrders) {
-      if (!imageIds.has(order.id)) {
-        return {
-          success: false,
-          error: `Image ${order.id} does not belong to tour ${validated.tourId}`,
-        };
-      }
+    const parsed = imageReorderSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    // Reorder images in transaction
-    await ImageRepository.reorderImages(validated.imageOrders);
+    const { tourId, imageOrders } = parsed.data;
+    return afterWrite(
+      await tourImages.reorder({ kind: 'tour', id: tourId }, imageOrders),
+      revalidateTour(tourId)
+    );
+  });
 
-    // Revalidate tour pages
-    revalidatePath(`/admin/tours/${validated.tourId}`);
-    revalidatePath(`/tours/${validated.tourId}`);
-    revalidatePath('/tours');
-
-    return { success: true };
-  } catch (error) {
-    logger.error('Error reordering images', error);
-
-    if (error instanceof Error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: false, error: 'Failed to reorder images' };
-  }
-};
-
-/**
- * Update alt text for an image
- * Requires admin role
- */
+/** Set a tour image's alt text; blank clears it. Admin only. */
 export const updateImageAltTextAction = async (
   request: UpdateImageAltText
-): Promise<TourImageActionResponse<void>> => {
-  try {
-    // Require admin authentication
+): Promise<TourImageActionResponse<{ ownerId: string }>> =>
+  settle('Failed to update alt text', async () => {
     const gate = await gateAction('admin');
     if (!gate.success) {
       return gate;
     }
-
-    // Validate request
-    const validated = updateImageAltTextSchema.parse(request);
-
-    // Get image to find tour ID for revalidation
-    const image = await ImageRepository.findById(validated.imageId);
-
-    if (!image) {
-      return { success: false, error: 'Image not found' };
+    const parsed = updateImageAltTextSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    // Update alt text
-    await ImageRepository.updateAltText(validated.imageId, validated.altText || null);
+    const result = await tourImages.updateAltText('tour', parsed.data.imageId, parsed.data.altText);
+    if (result.success) {
+      revalidateTour(result.data.ownerId)();
+    }
+    return result;
+  });
 
-    // Revalidate tour pages
-    revalidatePath(`/admin/tours/${image.tourId}`);
-    revalidatePath(`/tours/${image.tourId}`);
-    revalidatePath('/tours');
-
-    return { success: true };
-  } catch (error) {
-    logger.error('Error updating alt text', error);
-
-    if (error instanceof Error) {
-      return { success: false, error: error.message };
+/** A presigned PUT for one more image of a tour date. Admin only. */
+export const generateTourDateUploadUrlAction = async (
+  request: TourDateImageUploadRequest
+): Promise<TourImageActionResponse<PresignedUrlResponse>> =>
+  settle('Failed to generate upload URL', async () => {
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const parsed = tourDateImageUploadRequestSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
     }
 
-    return { success: false, error: 'Failed to update alt text' };
-  }
-};
+    const { tourDateId, ...file } = parsed.data;
+    return tourImages.requestUpload({ kind: 'tourDate', id: tourDateId }, file);
+  });
+
+/** Record an image the browser put in the bucket as the tour date's last image. Admin only. */
+export const confirmTourDateUploadAction = async (
+  request: TourDateConfirmUploadRequest
+): Promise<TourImageActionResponse<ConfirmedTourImage<TourDateImageScalars>>> =>
+  settle('Failed to confirm upload', async () => {
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const parsed = tourDateConfirmUploadSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
+    }
+
+    const { tourDateId, ...upload } = parsed.data;
+    return afterWrite(
+      await tourImages.confirmUpload(
+        { kind: 'tourDate', id: tourDateId },
+        upload,
+        gate.session.user.id
+      ),
+      revalidateTourDates
+    );
+  });
+
+/** Delete one of a tour date's images, object and row. Admin only. */
+export const deleteTourDateImageAction = async (
+  request: TourDateDeleteImageRequest
+): Promise<TourImageActionResponse> =>
+  settle('Failed to delete image', async () => {
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const parsed = tourDateDeleteImageSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
+    }
+
+    const { tourDateId, imageId } = parsed.data;
+    return afterWrite(
+      await tourImages.delete({ kind: 'tourDate', id: tourDateId }, imageId),
+      revalidateTourDates
+    );
+  });
+
+/** Store a new order for a tour date's images. Admin only. */
+export const reorderTourDateImagesAction = async (
+  request: TourDateImageReorder
+): Promise<TourImageActionResponse> =>
+  settle('Failed to reorder images', async () => {
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const parsed = tourDateImageReorderSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
+    }
+
+    const { tourDateId, imageOrders } = parsed.data;
+    return afterWrite(
+      await tourImages.reorder({ kind: 'tourDate', id: tourDateId }, imageOrders),
+      revalidateTourDates
+    );
+  });
+
+/** Set a tour date image's alt text; blank clears it. Admin only. */
+export const updateTourDateImageAltTextAction = async (
+  request: TourDateUpdateImageAltText
+): Promise<TourImageActionResponse<{ ownerId: string }>> =>
+  settle('Failed to update alt text', async () => {
+    const gate = await gateAction('admin');
+    if (!gate.success) {
+      return gate;
+    }
+    const parsed = tourDateUpdateImageAltTextSchema.safeParse(request);
+    if (!parsed.success) {
+      return invalidRequest(parsed.error);
+    }
+
+    return afterWrite(
+      await tourImages.updateAltText('tourDate', parsed.data.imageId, parsed.data.altText),
+      revalidateTourDates
+    );
+  });
