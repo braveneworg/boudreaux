@@ -31,3 +31,8 @@ Rules:
 - Before claiming a production defect, check the deployed path when you
   can do so read-only: `aws cloudformation describe-stack-resources`, or
   the function's CloudWatch logs.
+- A repro below the entry point proves the mechanism, not the reach. The
+  same 2026-11-08 recheck found PR #932 calling an 11-image tour a proven
+  defect from an adapter-level Docker-Mongo spec, while the admin page
+  uploads one file at a time and its uploader stops at the cap. State the
+  path a user takes to trigger it, or call the change hardening.
