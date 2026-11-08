@@ -457,6 +457,38 @@ describe('generatePlaylistCoverUploadUrlsAction', () => {
     );
   });
 
+  // A picked file can have no extension at all (`cover`); its whole name is
+  // not an extension.
+  it('falls back to a .bin extension for a name with no dot', async () => {
+    vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
+
+    const result = await generatePlaylistCoverUploadUrlsAction({
+      playlistId: PLAYLIST_ID,
+      files: [{ fileName: 'cover', contentType: 'image/png', fileSize: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]?.key).toMatch(
+      new RegExp(`^media/playlists/${PLAYLIST_ID}/cover-\\d+-[a-z0-9]+\\.bin$`)
+    );
+  });
+
+  it('collapses runs of punctuation in the name to one dash', async () => {
+    vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
+
+    const result = await generatePlaylistCoverUploadUrlsAction({
+      playlistId: PLAYLIST_ID,
+      files: [{ fileName: '  Road -- Trip!!.png', contentType: 'image/png', fileSize: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]?.key).toMatch(
+      new RegExp(`^media/playlists/${PLAYLIST_ID}/road-trip-\\d+-[a-z0-9]+\\.png$`)
+    );
+  });
+
   it('lowercases a valid extension into the key', async () => {
     vi.mocked(PlaylistService.requireOwned).mockResolvedValue({} as never);
 

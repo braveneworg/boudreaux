@@ -45,14 +45,17 @@ const collectVideoS3Keys = ({ s3Key, posterUrl, posterCandidates }: Video): stri
 };
 
 export class VideoService {
-  /** Create a new video. */
+  /**
+   * Create a new video. A video's only unique field is its id, so a
+   * `DUPLICATE` is the pre-generated id already saved, never a title clash.
+   */
   static async createVideo(data: CreateVideoData): Promise<ServiceResponse<Video>> {
     try {
       const video = await VideoRepository.create(data);
       return { success: true, data: video };
     } catch (error) {
       return failFromError(error, {
-        DUPLICATE: 'Video with this title already exists',
+        DUPLICATE: 'A video with this id has already been saved',
         UNKNOWN: 'Failed to create video',
       });
     }
