@@ -15,8 +15,7 @@ import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { updateVideoReleaseDateAction } from '@/lib/actions/update-video-release-date-action';
 import type { VideoPosterCandidate } from '@/lib/types/domain/video';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { FormState } from '@/lib/types/form-state';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { useEntityMutation } from './use-entity-mutation';
@@ -44,17 +43,14 @@ const invalidateVideoQueries = (queryClient: QueryClient): Promise<unknown> =>
 /**
  * Mutation hook wrapping {@link createVideoAction} — the DB-confirm half of the
  * multipart upload flow. Accepts the validated video values plus the
- * pre-generated id and serializes them to `FormData` internally; the video
+ * pre-generated id and passes them to the action as they are; the video
  * caches are invalidated on a successful result.
  */
 export const useCreateVideoMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
     FormState,
     VideoFormData & { preGeneratedId?: string }
-  >(
-    (values) => createVideoAction(EMPTY_FORM_STATE, objectToFormData(values)),
-    invalidateVideoQueries
-  );
+  >((values) => createVideoAction(values), invalidateVideoQueries);
 
   return { createVideo: mutate, createVideoAsync: mutateAsync, isCreatingVideo: isPending };
 };
@@ -67,10 +63,7 @@ export const useUpdateVideoMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
     FormState,
     { id: string; values: VideoFormData }
-  >(
-    ({ id, values }) => updateVideoAction(id, EMPTY_FORM_STATE, objectToFormData(values)),
-    invalidateVideoQueries
-  );
+  >(({ id, values }) => updateVideoAction(id, values), invalidateVideoQueries);
 
   return { updateVideo: mutate, updateVideoAsync: mutateAsync, isUpdatingVideo: isPending };
 };
