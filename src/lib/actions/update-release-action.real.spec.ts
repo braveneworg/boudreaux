@@ -3,15 +3,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
-import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { ReleaseActionInput } from '@/lib/validation/create-release-schema';
 
 import { updateReleaseAction } from './update-release-action';
 
-// `update-release-action.spec.ts` mocks `getActionState`, so it never runs the
-// real schema against real FormData. This spec does: the payload is built the
-// way `useUpdateReleaseMutation` builds it (`objectToFormData`), and only the
-// service, Prisma, and framework boundaries are mocked (#790).
+// `update-release-action.spec.ts` mocks `readActionInput`, so it never runs the
+// real input reader and schema. This spec does, on the values
+// `useUpdateReleaseMutation` passes, and only the service, Prisma, and
+// framework boundaries are mocked (#790).
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
@@ -23,7 +22,7 @@ const RELEASE_ID = '507f1f77bcf86cd799439011';
 const ARTIST_ID = '507f1f77bcf86cd799439022';
 
 /** Release form values as `release-form.tsx` hands them to the mutation. */
-const buildValues = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+const buildValues = (overrides: Partial<ReleaseActionInput> = {}): ReleaseActionInput => ({
   title: 'Real Title',
   releasedOn: '2024-01-15',
   coverArt: 'https://example.com/cover.jpg',
@@ -46,11 +45,7 @@ describe('updateReleaseAction with the real schema', () => {
   });
 
   it('saves a release whose preloaded suggested price is "7.99"', async () => {
-    const result = await updateReleaseAction(
-      RELEASE_ID,
-      EMPTY_FORM_STATE,
-      objectToFormData(buildValues({ suggestedPrice: '7.99' }))
-    );
+    const result = await updateReleaseAction(RELEASE_ID, buildValues({ suggestedPrice: '7.99' }));
 
     expect(result.success).toBe(true);
     expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][1]).toMatchObject({
@@ -61,8 +56,7 @@ describe('updateReleaseAction with the real schema', () => {
   it('saves a numeric title and a zero-padded catalog number verbatim', async () => {
     const result = await updateReleaseAction(
       RELEASE_ID,
-      EMPTY_FORM_STATE,
-      objectToFormData(buildValues({ title: '1999', catalogNumber: '001' }))
+      buildValues({ title: '1999', catalogNumber: '001' })
     );
 
     expect(result.success).toBe(true);
@@ -72,13 +66,13 @@ describe('updateReleaseAction with the real schema', () => {
     });
   });
 
-  it('echoes the raw submitted strings back in formState.fields', async () => {
-    const result = await updateReleaseAction(
-      RELEASE_ID,
-      EMPTY_FORM_STATE,
-      objectToFormData(buildValues({ title: '1999', suggestedPrice: '7.99' }))
-    );
+  // The edit form sends a blank for a field the admin emptied (#759).
+  it('clears an emptied catalog number to null', async () => {
+    const result = await updateReleaseAction(RELEASE_ID, buildValues({ catalogNumber: '' }));
 
-    expect(result.fields).toMatchObject({ title: '1999', suggestedPrice: '7.99' });
+    expect(result.success).toBe(true);
+    expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][1]).toMatchObject({
+      catalogNumber: null,
+    });
   });
 });

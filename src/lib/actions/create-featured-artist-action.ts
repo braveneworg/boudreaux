@@ -7,15 +7,16 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { z } from 'zod';
-
 import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { cache } from '@/lib/utils/simple-cache';
-import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
+import {
+  type FeaturedArtistActionInput,
+  featuredArtistActionSchema,
+} from '@/lib/validation/create-featured-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -31,24 +32,10 @@ const PERMITTED_FIELD_NAMES = [
   'digitalFormatId',
   'releaseId',
   'featuredTrackNumber',
+  'artistIds',
 ] as const;
 
-// FormData sends all values as strings, so use z.coerce.number() for numeric fields
-// on the server side (the client schema uses z.number() for React Hook Form compatibility)
-const buildServerSchema = () =>
-  createFeaturedArtistSchema.omit({ position: true, featuredTrackNumber: true }).extend({
-    position: z.coerce
-      .number()
-      .int({ message: 'Position must be a whole number' })
-      .min(0, { message: 'Position must be 0 or greater' }),
-    featuredTrackNumber: z.coerce
-      .number()
-      .int({ message: 'Featured track number must be a whole number' })
-      .min(1, { message: 'Featured track number must be at least 1' })
-      .optional(),
-  });
-
-type ParsedData = ReturnType<ReturnType<typeof buildServerSchema>['parse']>;
+type ParsedData = FeaturedArtistActionInput;
 
 const buildCreateData = (data: ParsedData, artistIds: string[]) => ({
   displayName: data.displayName || undefined,
@@ -66,9 +53,13 @@ const buildCreateData = (data: ParsedData, artistIds: string[]) => ({
   ...(data.releaseId && { release: { connect: { id: data.releaseId } } }),
 });
 
+/**
+ * Server Action to create a featured artist from the form's values and the
+ * release's artists. Called only by `useCreateFeaturedArtistMutation`; the
+ * input is validated here, never trusted. Blanks are omitted.
+ */
 export const createFeaturedArtistAction = async (
-  _initialState: FormState,
-  payload: FormData
+  input: FeaturedArtistActionInput
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -76,13 +67,11 @@ export const createFeaturedArtistAction = async (
   }
   const { session } = gate;
 
-  const artistIds = payload.getAll('artistIds') as string[];
-  payload.delete('artistIds');
-
-  const { formState, parsed: baseParsed } = getActionState(
-    payload,
+  const { formState, parsed: baseParsed } = readActionInput(
+    input,
     PERMITTED_FIELD_NAMES,
-    buildServerSchema()
+    featuredArtistActionSchema,
+    { blankStrings: 'omit' }
   );
 
   if (!baseParsed.success) {
@@ -92,6 +81,7 @@ export const createFeaturedArtistAction = async (
   }
 
   try {
+    const { artistIds } = baseParsed.data;
     const createData = buildCreateData(baseParsed.data, artistIds);
     const response = await FeaturedArtistsService.createFeaturedArtist(createData);
 

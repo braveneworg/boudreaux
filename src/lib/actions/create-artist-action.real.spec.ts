@@ -3,14 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 
 import { createArtistAction } from './create-artist-action';
 
-// `create-artist-action.spec.ts` mocks `getActionState`; this spec runs the
-// real schema against FormData built the way `useCreateArtistMutation` builds
-// it, mocking only the service and framework boundaries (#790).
+// `create-artist-action.spec.ts` mocks `readActionInput`; this spec runs the
+// real input reader and schema against the values `useCreateArtistMutation`
+// passes, mocking only the service and framework boundaries (#790).
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
@@ -31,10 +29,7 @@ describe('createArtistAction with the real schema', () => {
   });
 
   it('creates an artist named "1349" with the slug "1349"', async () => {
-    const result = await createArtistAction(
-      EMPTY_FORM_STATE,
-      objectToFormData({ displayName: '1349', slug: '1349' })
-    );
+    const result = await createArtistAction({ displayName: '1349', slug: '1349' });
 
     expect(result.success).toBe(true);
     expect(vi.mocked(ArtistService.createArtist).mock.calls[0][0]).toMatchObject({

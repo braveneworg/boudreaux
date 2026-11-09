@@ -11,8 +11,9 @@ import { videoProducerSchema } from '@/lib/validation/video-producer-schema';
 
 /**
  * Whether a numeric-ish form field holds a positive whole number. `undefined`
- * and `''` are tolerated (optional fields). Accepts both the raw string the
- * action receives through `FormData` and a number set directly in the form.
+ * and `''` are tolerated (optional fields). Accepts a string or a number,
+ * because the form holds either: the upload stores `fileSize` as a string,
+ * and a probed duration is a number.
  */
 const isOptionalPositiveInteger = (value: string | number | undefined): boolean => {
   if (value === undefined || value === '') return true;
@@ -23,8 +24,9 @@ const isOptionalPositiveInteger = (value: string | number | undefined): boolean 
 /**
  * Base shape shared by the create-video form (Task 10's RHF form) and the create
  * Server Action. Mirrors `releaseBaseSchema`: required scalars, empty-string
- * tolerant optionals, and the numeric-ish `durationSeconds` / `fileSize` carried
- * as strings through `FormData` then coerced in the action.
+ * tolerant optionals, and the numeric-ish `durationSeconds` / `fileSize`, which
+ * the form may hold as strings and the action converts (`parseDurationSeconds`,
+ * `parseFileSize`).
  */
 export const videoFormSchema = z.object({
   title: z
@@ -78,10 +80,9 @@ export const videoFormSchema = z.object({
 /**
  * Action input for `createVideoAction`. Videos have no cross-field refinement
  * (unlike releases, which require at least one artist), so this is the base
- * shape unchanged. The pre-generated ObjectId is read raw from the payload by
- * the action rather than carried here.
+ * shape unchanged. The pre-generated ObjectId is not a form field; the action
+ * reads it from its input with `readPreGeneratedId`.
  */
 export const createVideoSchema = videoFormSchema;
 
-type schemaType = typeof createVideoSchema & Partial<FormData>;
-export type VideoFormData = z.infer<schemaType>;
+export type VideoFormData = z.infer<typeof createVideoSchema>;

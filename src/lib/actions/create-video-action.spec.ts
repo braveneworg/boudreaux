@@ -5,11 +5,11 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
-import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { verifyS3ObjectExists } from '@/lib/utils/s3-client';
+import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { createVideoAction } from './create-video-action';
 
@@ -18,7 +18,10 @@ vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/auth-utils');
-vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/forms/read-action-input', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  readActionInput: vi.fn(),
+}));
 vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
 
@@ -28,14 +31,19 @@ const mockSession = { user: { id: 'user-123', role: 'admin', email: 'admin@examp
 const videoId = '507f1f77bcf86cd799439011';
 const validS3Key = `media/videos/${videoId}/clip-abc.mp4`;
 
-const initialFormState: FormState = { fields: {}, success: false };
+type CreateVideoInput = VideoFormData & { preGeneratedId?: string };
 
-const buildFormData = (): FormData => {
-  const formData = new FormData();
-  formData.append('preGeneratedId', videoId);
-  formData.append('title', 'Live at the Venue');
-  return formData;
-};
+/** The create form's values; `readActionInput` is mocked, so only the id is read. */
+const buildInput = (): CreateVideoInput => ({
+  preGeneratedId: videoId,
+  title: 'Live at the Venue',
+  artist: 'The Band',
+  category: 'MUSIC',
+  releasedOn: '2024-01-15',
+  s3Key: validS3Key,
+  fileName: 'clip.mp4',
+  mimeType: 'video/mp4',
+});
 
 const parsedData = {
   title: 'Live at the Venue',
@@ -53,7 +61,7 @@ const parsedData = {
 };
 
 const mockParsedSuccess = (data: Record<string, unknown> = parsedData): void => {
-  vi.mocked(getActionState).mockReturnValue({
+  vi.mocked(readActionInput).mockReturnValue({
     formState: { fields: {}, success: false },
     parsed: { success: true, data },
   } as never);
@@ -75,7 +83,7 @@ describe('createVideoAction', () => {
     it('resolves the gate refusal as a form error without creating the video', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(VideoService.createVideo).not.toHaveBeenCalled();
@@ -86,10 +94,10 @@ describe('createVideoAction', () => {
     it('should validate form data with the permitted field names', async () => {
       mockParsedSuccess();
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
-      expect(getActionState).toHaveBeenCalledWith(
-        expect.any(FormData),
+      expect(readActionInput).toHaveBeenCalledWith(
+        buildInput(),
         [
           'title',
           'artist',
@@ -107,7 +115,8 @@ describe('createVideoAction', () => {
           'artistDetails',
           'producers',
         ],
-        expect.anything()
+        expect.anything(),
+        { blankStrings: 'omit' }
       );
     });
 
@@ -117,23 +126,23 @@ describe('createVideoAction', () => {
         success: false,
         errors: { title: ['Title is required'] },
       };
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: invalidFormState,
         parsed: { success: false, error: {} },
       } as never);
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result).toEqual(invalidFormState);
     });
 
     it('should not call the service when the body is invalid', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { title: ['Title is required'] } },
         parsed: { success: false, error: {} },
       } as never);
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).not.toHaveBeenCalled();
     });
@@ -143,7 +152,7 @@ describe('createVideoAction', () => {
     it('should reject an s3Key that is not under the video prefix', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: `media/videos/${'a'.repeat(24)}/other.mp4` });
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.success).toBe(false);
       expect(result.errors?.general?.[0]).toContain('Invalid S3 key');
@@ -152,17 +161,17 @@ describe('createVideoAction', () => {
     it('should not create a video when the s3Key prefix mismatches', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: 'releases/other/file.mp4' });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).not.toHaveBeenCalled();
     });
 
     it('should reject when the pre-generated id is missing or invalid', async () => {
       mockParsedSuccess();
-      const formData = new FormData();
-      formData.append('preGeneratedId', 'not-a-valid-object-id');
-
-      const result = await createVideoAction(initialFormState, formData);
+      const result = await createVideoAction({
+        ...buildInput(),
+        preGeneratedId: 'not-a-valid-object-id',
+      });
 
       expect(result.success).toBe(false);
       expect(VideoService.createVideo).not.toHaveBeenCalled();
@@ -172,7 +181,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.success).toBe(false);
       expect(result.errors?.general?.[0]).toContain('File not found');
@@ -182,7 +191,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).not.toHaveBeenCalled();
     });
@@ -192,7 +201,7 @@ describe('createVideoAction', () => {
     it('should create the video with the pre-generated id and parsed fields', async () => {
       mockParsedSuccess();
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -217,7 +226,7 @@ describe('createVideoAction', () => {
     it('should coerce a numeric durationSeconds delivered as a number', async () => {
       mockParsedSuccess({ ...parsedData, durationSeconds: 212, fileSize: 10485760 });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).toHaveBeenCalledWith(
         expect.objectContaining({ durationSeconds: 212, fileSize: BigInt(10485760) })
@@ -240,7 +249,7 @@ describe('createVideoAction', () => {
         publishedAt: '',
       });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -256,7 +265,7 @@ describe('createVideoAction', () => {
     it('should return the created video id in the form state on success', async () => {
       mockParsedSuccess();
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.success).toBe(true);
       expect(result.data?.videoId).toBe(videoId);
@@ -273,7 +282,7 @@ describe('createVideoAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.errors).toEqual({
         general: ['This video has already been saved. Reload the page to edit it.'],
@@ -281,7 +290,7 @@ describe('createVideoAction', () => {
     });
 
     it('should overwrite a pre-existing errors object on a generic failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { prior: ['stale'] } },
         parsed: { success: true, data: parsedData },
       } as never);
@@ -291,17 +300,14 @@ describe('createVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.errors).toEqual({ general: ['Failed to create video'] });
     });
 
     it('should reject when preGeneratedId is absent from the payload', async () => {
       mockParsedSuccess();
-      const formData = new FormData();
-      formData.append('title', 'Live at the Venue');
-
-      const result = await createVideoAction(initialFormState, formData);
+      const result = await createVideoAction({ ...buildInput(), preGeneratedId: undefined });
 
       expect(result.success).toBe(false);
       expect(VideoService.createVideo).not.toHaveBeenCalled();
@@ -315,7 +321,7 @@ describe('createVideoAction', () => {
         code: 'UNAVAILABLE',
       });
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Failed to create video']);
@@ -325,7 +331,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(VideoService.createVideo).mockRejectedValue(Error('boom'));
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(setUnknownError).toHaveBeenCalled();
     });
@@ -343,7 +349,7 @@ describe('createVideoAction', () => {
         mimeType: 'video/mp4',
       });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.video.created',
@@ -373,7 +379,7 @@ describe('createVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/videos');
       expect(revalidatePath).not.toHaveBeenCalledWith('/videos');
@@ -382,7 +388,7 @@ describe('createVideoAction', () => {
     it('should revalidate the public videos path on success', async () => {
       mockParsedSuccess();
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(revalidatePath).toHaveBeenCalledWith('/videos');
     });
@@ -392,7 +398,7 @@ describe('createVideoAction', () => {
     it('schedules the post-save work for the created video', async () => {
       mockParsedSuccess();
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(vi.mocked(VideoService.schedulePostSave).mock.calls).toEqual([
         [{ intent: 'create', videoId, next: parsedData, createdBy: 'user-123' }],
@@ -404,7 +410,7 @@ describe('createVideoAction', () => {
       const producers = [{ name: 'New Producer' }];
       mockParsedSuccess({ ...parsedData, artistDetails, producers });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual(
         expect.objectContaining({ artistDetails, producers })
@@ -419,7 +425,7 @@ describe('createVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -428,18 +434,18 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
     it('does not schedule post-save work when the body is invalid', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { title: ['Title is required'] } },
         parsed: { success: false, error: {} },
       } as never);
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -448,7 +454,7 @@ describe('createVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(VideoService.createVideo).mockRejectedValue(Error('boom'));
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -457,7 +463,7 @@ describe('createVideoAction', () => {
       const artistDetails = [{ sourceName: 'The Band' }];
       mockParsedSuccess({ ...parsedData, artistDetails });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
@@ -466,7 +472,7 @@ describe('createVideoAction', () => {
     it('does not include artistDetails in the repository payload when absent', async () => {
       mockParsedSuccess();
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'artistDetails')).toBe(false);
@@ -476,7 +482,7 @@ describe('createVideoAction', () => {
       const producers = [{ name: 'Studio Pro' }];
       mockParsedSuccess({ ...parsedData, producers });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'producers')).toBe(false);
@@ -504,7 +510,7 @@ describe('createVideoAction', () => {
       ];
       mockParsedSuccess({ ...parsedData, posterCandidates });
 
-      await createVideoAction(initialFormState, buildFormData());
+      await createVideoAction(buildInput());
 
       expect(VideoService.createVideo).toHaveBeenCalledWith(
         expect.objectContaining({ posterCandidates })
@@ -517,7 +523,7 @@ describe('createVideoAction', () => {
       ];
       mockParsedSuccess({ ...parsedData, posterCandidates });
 
-      const result = await createVideoAction(initialFormState, buildFormData());
+      const result = await createVideoAction(buildInput());
 
       const createCall = vi.mocked(VideoService.createVideo).mock.calls[0][0];
       expect(Object.prototype.hasOwnProperty.call(createCall, 'posterCandidates')).toBe(false);

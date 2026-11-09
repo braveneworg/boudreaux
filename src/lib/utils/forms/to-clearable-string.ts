@@ -19,8 +19,10 @@
  * `{ field: null }` filter does not match an ABSENT field, so any future query
  * for "no value" must use `OR: [{ field: null }, { field: { isSet: false } }]`.
  *
- * Update flows only: the client must send blanks for this to fire, so pair it
- * with `objectToFormData(values, { keepEmptyStrings: true })`.
+ * Update flows only: the blank must reach the action for this to fire, so
+ * read the input with `readActionInput(…, { blankStrings: 'keep' })` (or, for
+ * a `FormData` action, encode with `objectToFormData(values, { keepEmptyStrings:
+ * true })`).
  */
 export const toClearableString = (value: string | null | undefined): string | null | undefined => {
   if (value === undefined) return undefined;

@@ -44,9 +44,13 @@ const decodeFormValue = (val: ParsedFormValue): ParsedFormValue => {
 /**
  * Field names an action accepts from `FormData`. Anything not listed is
  * stripped before validation, so this is a deliberate policy allowlist, **not**
- * a restatement of the schema — several actions intentionally permit a subset
- * (release creation permits 10 of ~24 schema fields, and neither release action
- * permits `createdBy`, which must never be client-settable).
+ * a restatement of the schema — an action may permit a subset, and none
+ * permits a field like `createdBy`, which must never be client-settable.
+ *
+ * Only actions that receive `FormData` use this. An action called only from a
+ * mutation hook takes the form's values as an object instead and reads them
+ * with `readActionInput` (`@/lib/utils/forms/read-action-input`), which keeps
+ * the same allowlist without the string round trip.
  *
  * Typed as `keyof TForm` so a typo or a renamed schema field is a compile
  * error. It cannot catch an *omission*: leaving a field out is how the subset

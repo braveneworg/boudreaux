@@ -3,14 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import { EMPTY_FORM_STATE } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
 
 import { updateArtistAction } from './update-artist-action';
 
-// `update-artist-action.spec.ts` mocks `getActionState`; this spec runs the
-// real schema against FormData built the way `useUpdateArtistMutation` builds
-// it, mocking only the service and framework boundaries (#790).
+// `update-artist-action.spec.ts` mocks `readActionInput`; this spec runs the
+// real input reader and schema against the values `useUpdateArtistMutation`
+// passes, mocking only the service and framework boundaries (#790).
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
@@ -34,11 +32,11 @@ describe('updateArtistAction with the real schema', () => {
   });
 
   it('saves an artist named "1349" (and the band "311" as an AKA) verbatim', async () => {
-    const result = await updateArtistAction(
-      ARTIST_ID,
-      EMPTY_FORM_STATE,
-      objectToFormData({ displayName: '1349', akaNames: '311', slug: '1349' })
-    );
+    const result = await updateArtistAction(ARTIST_ID, {
+      displayName: '1349',
+      akaNames: '311',
+      slug: '1349',
+    });
 
     expect(result.success).toBe(true);
     expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1]).toMatchObject({
@@ -49,12 +47,27 @@ describe('updateArtistAction with the real schema', () => {
   });
 
   it('saves a numeric surname verbatim', async () => {
-    const result = await updateArtistAction(
-      ARTIST_ID,
-      EMPTY_FORM_STATE,
-      objectToFormData({ firstName: 'Ann', surname: '1999', slug: 'ann-1999' })
-    );
+    const result = await updateArtistAction(ARTIST_ID, {
+      firstName: 'Ann',
+      surname: '1999',
+      slug: 'ann-1999',
+    });
 
     expect(result.success).toBe(true);
+  });
+
+  // The edit form sends a blank for a field the admin emptied (#759).
+  it('clears an emptied display name to null', async () => {
+    const result = await updateArtistAction(ARTIST_ID, {
+      firstName: 'Ann',
+      surname: 'Lee',
+      displayName: '',
+      slug: 'ann-lee',
+    });
+
+    expect(result.success).toBe(true);
+    expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1]).toMatchObject({
+      displayName: null,
+    });
   });
 });

@@ -7,16 +7,18 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 
-import { z } from 'zod';
-
 import { gateAction } from '@/lib/auth/action-gate';
 import { FeaturedArtistsService } from '@/lib/services/featured-artists-service';
 import type { UpdateFeaturedArtistData } from '@/lib/types/domain/featured-artist';
 import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
+import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { cache } from '@/lib/utils/simple-cache';
-import { createFeaturedArtistSchema } from '@/lib/validation/create-featured-artist-schema';
+import {
+  type FeaturedArtistActionInput,
+  featuredArtistActionSchema,
+} from '@/lib/validation/create-featured-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -32,24 +34,10 @@ const PERMITTED_FIELD_NAMES = [
   'digitalFormatId',
   'releaseId',
   'featuredTrackNumber',
+  'artistIds',
 ] as const;
 
-// FormData sends every value as a string, so the numeric fields are coerced
-// server-side; the client schema keeps `z.number()` for React Hook Form.
-const buildServerSchema = () =>
-  createFeaturedArtistSchema.omit({ position: true, featuredTrackNumber: true }).extend({
-    position: z.coerce
-      .number()
-      .int({ message: 'Position must be a whole number' })
-      .min(0, { message: 'Position must be 0 or greater' }),
-    featuredTrackNumber: z.coerce
-      .number()
-      .int({ message: 'Featured track number must be a whole number' })
-      .min(1, { message: 'Featured track number must be at least 1' })
-      .optional(),
-  });
-
-type ParsedData = ReturnType<ReturnType<typeof buildServerSchema>['parse']>;
+type ParsedData = FeaturedArtistActionInput;
 
 /**
  * Projects the parsed form values onto the repository's update shape.
@@ -59,17 +47,26 @@ type ParsedData = ReturnType<ReturnType<typeof buildServerSchema>['parse']>;
  * feature window on every save), and `publishedOn` is never written at all
  * (which would publish a draft as a side effect of an unrelated edit).
  *
+ * A field the admin emptied is cleared, not kept: a blank `displayName`,
+ * `description` or `coverArt` becomes `null` (`toClearableString`), a blank
+ * `featuredUntil` (the date picker's Clear) becomes `null` (feature
+ * indefinitely), and a missing `featuredTrackNumber` becomes `null` (start
+ * at track 1), because picking another release resets it to nothing. This
+ * is the whole-entity edit save, so every field is always sent.
+ *
  * `artistIds` becomes a relation `set`, replacing the connected artists rather
  * than appending to them, and is omitted entirely when none were submitted.
  */
 const buildUpdateData = (data: ParsedData, artistIds: string[]): UpdateFeaturedArtistData => ({
-  displayName: data.displayName || undefined,
-  description: data.description || undefined,
-  coverArt: data.coverArt || undefined,
+  displayName: toClearableString(data.displayName),
+  description: toClearableString(data.description),
+  coverArt: toClearableString(data.coverArt),
   position: data.position,
-  featuredTrackNumber: data.featuredTrackNumber ?? undefined,
+  featuredTrackNumber: data.featuredTrackNumber ?? null,
   ...(data.featuredOn && { featuredOn: new Date(data.featuredOn) }),
-  ...(data.featuredUntil && { featuredUntil: new Date(data.featuredUntil) }),
+  ...(data.featuredUntil !== undefined && {
+    featuredUntil: data.featuredUntil ? new Date(data.featuredUntil) : null,
+  }),
   ...(artistIds.length > 0 && { artists: { set: artistIds.map((id) => ({ id })) } }),
   ...(data.digitalFormatId && { digitalFormat: { connect: { id: data.digitalFormatId } } }),
   ...(data.releaseId && { release: { connect: { id: data.releaseId } } }),
@@ -81,13 +78,13 @@ const buildUpdateData = (data: ParsedData, artistIds: string[]): UpdateFeaturedA
  * route the edit form used to call directly.
  *
  * @param featuredArtistId - The featured-artist row to update.
- * @param payload - The submitted form fields plus repeated `artistIds` entries.
+ * @param input - The form's values plus the release's `artistIds`; blanks are
+ *   kept, because a blank is how the admin clears a field.
  * @returns The form state carrying the updated id or the mapped errors.
  */
 export const updateFeaturedArtistAction = async (
   featuredArtistId: string,
-  _initialState: FormState,
-  payload: FormData
+  input: FeaturedArtistActionInput
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -95,16 +92,20 @@ export const updateFeaturedArtistAction = async (
   }
   const { session } = gate;
 
-  const artistIds = payload.getAll('artistIds') as string[];
-  payload.delete('artistIds');
-
-  const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, buildServerSchema());
+  const { formState, parsed } = readActionInput(
+    input,
+    PERMITTED_FIELD_NAMES,
+    featuredArtistActionSchema,
+    { blankStrings: 'keep' }
+  );
 
   if (!parsed.success) {
     formState.success = false;
     applyZodIssuesToFormState(formState, parsed.error);
     return formState;
   }
+
+  const { artistIds } = parsed.data;
 
   try {
     const response = await FeaturedArtistsService.updateFeaturedArtist(

@@ -683,15 +683,16 @@ describe('FeaturedArtistForm', () => {
       });
     });
 
-    it('carries the loaded artist ids through as repeated form entries', async () => {
+    it('carries the loaded artist ids through to the update action', async () => {
       render(<FeaturedArtistForm featuredArtistId={featuredArtistId} />);
 
       const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
       await save(user);
 
       await waitFor(() => {
-        const formData = vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[2] as FormData;
-        expect(formData.getAll('artistIds')).toEqual([artistId]);
+        expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[1].artistIds).toEqual([
+          artistId,
+        ]);
       });
     });
 

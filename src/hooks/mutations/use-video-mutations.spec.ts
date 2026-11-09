@@ -15,7 +15,7 @@ import { selectVideoPosterAction } from '@/lib/actions/select-video-poster-actio
 import { unpublishVideoAction } from '@/lib/actions/unpublish-video-action';
 import { updateVideoAction } from '@/lib/actions/update-video-action';
 import { updateVideoReleaseDateAction } from '@/lib/actions/update-video-release-date-action';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { FormState } from '@/lib/types/form-state';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import {
@@ -97,11 +97,10 @@ beforeEach(() => {
 });
 
 describe('useCreateVideoMutation', () => {
-  it('calls createVideoAction with the empty form state', async () => {
+  it('passes the video values and pre-generated id to createVideoAction as they are', async () => {
     vi.mocked(createVideoAction).mockResolvedValue(okState);
     const opts = getOptions<VideoFormData & { preGeneratedId?: string }>(useCreateVideoMutation);
-
-    await opts.mutationFn({
+    const values: VideoFormData & { preGeneratedId?: string } = {
       title: 'Clip',
       artist: 'Band',
       category: 'MUSIC',
@@ -109,28 +108,14 @@ describe('useCreateVideoMutation', () => {
       s3Key: 'media/videos/x/clip.mp4',
       fileName: 'clip.mp4',
       mimeType: 'video/mp4',
+      durationSeconds: 212,
+      artistDetails: [],
       preGeneratedId: 'p1',
-    });
+    };
 
-    expect(vi.mocked(createVideoAction).mock.calls[0]?.[0]).toBe(EMPTY_FORM_STATE);
-  });
+    await opts.mutationFn(values);
 
-  it('serializes the video title into the form data', async () => {
-    vi.mocked(createVideoAction).mockResolvedValue(okState);
-    const opts = getOptions<VideoFormData & { preGeneratedId?: string }>(useCreateVideoMutation);
-
-    await opts.mutationFn({
-      title: 'Clip',
-      artist: 'Band',
-      category: 'MUSIC',
-      releasedOn: '2026-01-01',
-      s3Key: 'media/videos/x/clip.mp4',
-      fileName: 'clip.mp4',
-      mimeType: 'video/mp4',
-      preGeneratedId: 'p1',
-    });
-
-    expect(vi.mocked(createVideoAction).mock.calls[0]?.[1].get('title')).toBe('Clip');
+    expect(vi.mocked(createVideoAction).mock.calls).toEqual([[values]]);
   });
 
   it('invalidates videos.detail and videos.list queries on success via predicate', async () => {
@@ -176,13 +161,14 @@ describe('useCreateVideoMutation', () => {
 });
 
 describe('useUpdateVideoMutation', () => {
-  it('calls updateVideoAction with the video id', async () => {
+  it('passes the video id and values to updateVideoAction as they are', async () => {
     vi.mocked(updateVideoAction).mockResolvedValue(okState);
     const opts = getOptions<{ id: string; values: VideoFormData }>(useUpdateVideoMutation);
+    const values = { title: 'Clip', description: '' } as VideoFormData;
 
-    await opts.mutationFn({ id: 'v1', values: { title: 'Clip' } as VideoFormData });
+    await opts.mutationFn({ id: 'v1', values });
 
-    expect(vi.mocked(updateVideoAction).mock.calls[0]?.[0]).toBe('v1');
+    expect(vi.mocked(updateVideoAction).mock.calls).toEqual([['v1', values]]);
   });
 
   it('invalidates the videos cache on success', async () => {

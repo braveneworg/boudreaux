@@ -13,14 +13,12 @@ import {
   type UpdateReleaseCoverArtResult,
 } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { FormState } from '@/lib/types/form-state';
 import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
-import {
-  objectToFormData,
-  type ObjectToFormDataOptions,
-} from '@/lib/utils/forms/object-to-form-data';
-import { CREDIT_DECISIONS_FIELD } from '@/lib/utils/forms/read-credit-decisions';
-import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
+import type {
+  CreateReleaseActionInput,
+  ReleaseFormData,
+} from '@/lib/validation/create-release-schema';
 
 import { useEntityMutation } from './use-entity-mutation';
 
@@ -38,35 +36,14 @@ const invalidateReleaseQueries = (queryClient: QueryClient): Promise<unknown> =>
   ]);
 
 /**
- * Serialize release form values, with the admin's credit decisions (ADR-0015)
- * beside them as JSON. The decisions come from the confirmation dialog, not
- * the form, so they travel in their own field.
- */
-const toReleaseFormData = (
-  values: Record<string, unknown>,
-  creditDecisions: CreditDecisions | undefined,
-  options?: ObjectToFormDataOptions
-): FormData => {
-  const formData = objectToFormData(values, options);
-  if (creditDecisions) {
-    formData.append(CREDIT_DECISIONS_FIELD, JSON.stringify(creditDecisions));
-  }
-  return formData;
-};
-
-/**
- * Mutation hook wrapping {@link createReleaseAction}. Accepts the validated
- * release values (plus the optional pre-generated id) and serializes them to
- * `FormData` internally; the release and artist caches are invalidated on a
- * successful result.
+ * Mutation hook wrapping {@link createReleaseAction}. Passes the validated
+ * release values, the optional pre-generated id and the admin's credit
+ * decisions (ADR-0015) to the action as they are; the release and artist
+ * caches are invalidated on a successful result.
  */
 export const useCreateReleaseMutation = () => {
-  const { mutate, mutateAsync, isPending } = useEntityMutation<
-    FormState,
-    ReleaseFormData & { preGeneratedId?: string; creditDecisions?: CreditDecisions }
-  >(
-    ({ creditDecisions, ...values }) =>
-      createReleaseAction(EMPTY_FORM_STATE, toReleaseFormData(values, creditDecisions)),
+  const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, CreateReleaseActionInput>(
+    (values) => createReleaseAction(values),
     invalidateReleaseQueries
   );
 
@@ -74,9 +51,9 @@ export const useCreateReleaseMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link updateReleaseAction}. Empty fields are KEPT in
- * the `FormData` (`keepEmptyStrings`): a blank is how the admin clears an
- * optional field, and the action maps it to `null` (#759). See
+ * Mutation hook wrapping {@link updateReleaseAction}. A blank field is sent as
+ * `''`, which is how the admin clears it; the action maps it to `null`
+ * (#759). The credit decisions travel beside the values. See
  * {@link useCreateReleaseMutation} for the result/invalidation contract.
  */
 export const useUpdateReleaseMutation = () => {
@@ -84,12 +61,7 @@ export const useUpdateReleaseMutation = () => {
     FormState,
     { id: string; values: ReleaseFormData; creditDecisions?: CreditDecisions }
   >(
-    ({ id, values, creditDecisions }) =>
-      updateReleaseAction(
-        id,
-        EMPTY_FORM_STATE,
-        toReleaseFormData(values, creditDecisions, { keepEmptyStrings: true })
-      ),
+    ({ id, values, creditDecisions }) => updateReleaseAction(id, { ...values, creditDecisions }),
     invalidateReleaseQueries
   );
 

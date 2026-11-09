@@ -10,18 +10,20 @@ import { revalidatePath } from 'next/cache';
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { createArtistSchema } from '@/lib/validation/create-artist-schema';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
+import { type ArtistFormData, createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
 import { ARTIST_WRITE_FAILURES } from './artist-action-failures';
 import { applyServiceFailure, refusedFormState } from './form-state-helpers';
 
-export const createArtistAction = async (
-  _initialState: FormState,
-  payload: FormData
-): Promise<FormState> => {
+/**
+ * Server Action to create an artist from the artist form's values. Called
+ * only by `useCreateArtistMutation`; the input is validated here, never
+ * trusted. Blanks are omitted: an empty optional field is not written.
+ */
+export const createArtistAction = async (input: ArtistFormData): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
     return refusedFormState(gate);
@@ -38,7 +40,9 @@ export const createArtistAction = async (
     'middleName',
     'formedOn',
   ] as const;
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, createArtistSchema);
+  const { formState, parsed } = readActionInput(input, permittedFieldNames, createArtistSchema, {
+    blankStrings: 'omit',
+  });
 
   if (parsed.success) {
     try {

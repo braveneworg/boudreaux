@@ -38,3 +38,15 @@ export const createFeaturedArtistSchema = z.object({
 });
 
 export type FeaturedArtistFormData = z.infer<typeof createFeaturedArtistSchema>;
+
+/**
+ * Input of the featured-artist create and update actions: the form's values
+ * plus the artists credited on the chosen release, which the form derives
+ * rather than edits. The same field rules as the form, so a value that passes
+ * the form passes the action without coercion.
+ */
+export const featuredArtistActionSchema = createFeaturedArtistSchema.extend({
+  artistIds: z.array(objectId),
+});
+
+export type FeaturedArtistActionInput = z.infer<typeof featuredArtistActionSchema>;
