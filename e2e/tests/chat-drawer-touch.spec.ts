@@ -45,6 +45,22 @@ test.describe('Chat drawer — touch-device scroll pinning', () => {
         return el.scrollHeight - el.scrollTop - el.clientHeight;
       });
 
+    // A late layout shift, like an avatar or the pinned strip arriving: grow
+    // the newest row and resolve once a rendering update has delivered the
+    // ResizeObserver report (observers run after layout, before the next
+    // frame's animation callbacks).
+    const shiftLayout = () =>
+      userPage.evaluate(async () => {
+        const row = document.querySelector<HTMLElement>(
+          '[data-testid="chat-message-list"] > ul > li:last-child'
+        );
+        if (row)
+          row.style.paddingBottom = `${(Number.parseFloat(row.style.paddingBottom) || 0) + 24}px`;
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+      });
+
     await userPage.getByLabel('Close chat').click();
     await expect(userPage.getByRole('img', { name: 'live chat' })).toBeHidden();
     await userPage.getByRole('button', { name: /open chat/i }).click();
@@ -60,12 +76,22 @@ test.describe('Chat drawer — touch-device scroll pinning', () => {
     });
     await expect.poll(distanceFromBottom, { timeout: 5_000 }).toBeLessThan(60);
 
-    // Real user input (wheel) scrolling up must unpin and stay put.
+    // Real user input (wheel) scrolling up must unpin, even when it lands
+    // right after a late layout shift. Every ResizeObserver report (its first
+    // one when the drawer opens, an avatar loading, the pinned strip popping
+    // in) re-pins the tail and opens the resize window; a wheel inside that
+    // window used to be read as a resize clamp and snapped back to the tail.
+    // CI hit that window by chance whenever hover settled within ~300 ms of
+    // the drawer opening, so open it on purpose instead.
     await userPage.getByTestId('chat-message-list').hover();
+    await shiftLayout();
     await userPage.mouse.wheel(0, -600);
-    // Wait past the momentum window so a wrongly-armed pin would have
-    // yanked the viewport back down by now.
-    await userPage.waitForTimeout(500);
-    expect(await distanceFromBottom()).toBeGreaterThan(100);
+    await expect.poll(distanceFromBottom, { timeout: 5_000 }).toBeGreaterThan(100);
+
+    // The viewer is reading history now: the next layout shift must not
+    // yank the list back down to the tail.
+    const readingAt = await distanceFromBottom();
+    await shiftLayout();
+    expect(await distanceFromBottom()).toBeGreaterThanOrEqual(readingAt);
   });
 });
