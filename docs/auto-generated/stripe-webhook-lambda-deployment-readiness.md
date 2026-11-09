@@ -317,7 +317,7 @@ aws lambda invoke \
 aws ssm get-parameter --name /fakefour/stripe/webhook-ip-ranges --query 'Parameter.Value' --output text
 ```
 
-The CloudWatch alarm `RefreshIpAllowlistErrorAlarm` fires if the refresh function errors for two consecutive days. By default it has no `AlarmActions` — wire it to an SNS topic (or remove the alarm) to actually get paged.
+The CloudWatch alarm `RefreshIpAllowlistErrorAlarm` fires if the refresh function errors for two consecutive days. It notifies the `fakefour-stripe-webhook-alarms` SNS topic when the stack is deployed with a non-empty `AlarmEmail` parameter; `deploy-stripe-webhook.yml` passes the `ALERT_EMAIL` secret, and the email subscription needs a one-time confirmation click. With an empty `AlarmEmail` the alarm has no actions.
 
 ---
 

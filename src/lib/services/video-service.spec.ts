@@ -102,16 +102,19 @@ describe('VideoService', () => {
       expect(VideoRepository.create).toHaveBeenCalledWith(createInput);
     });
 
-    it('maps a DataError to a failure response', async () => {
+    // A video's only unique field is its id (prisma/schema.prisma), so a
+    // DUPLICATE is the pre-generated id already saved, never a title clash.
+    it('reports a DUPLICATE as the video id already saved', async () => {
       vi.mocked(VideoRepository.create).mockRejectedValue(
         new DataError('DUPLICATE', 'Unique constraint failed')
       );
 
       const result = await VideoService.createVideo(createInput);
 
-      expect(result).toMatchObject({
+      expect(result).toEqual({
         success: false,
-        error: 'Video with this title already exists',
+        code: 'DUPLICATE',
+        error: 'A video with this id has already been saved',
       });
     });
 

@@ -10,6 +10,7 @@ import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
 import { GravatarAvatar } from '@/components/gravatar-avatar';
 import { cn } from '@/lib/utils';
 import { parseAdminMarkdown, type AdminMarkdownNode } from '@/lib/utils/admin-markdown';
+import { getApiBaseUrl } from '@/lib/utils/api-base-url';
 import { tokenizeMentions, type MentionToken } from '@/lib/utils/mention-parsing';
 
 import type { OptimisticChatMessage } from './_hooks/use-optimistic-chat';
@@ -39,21 +40,13 @@ interface ChatMessageRowProps {
 }
 
 /**
- * Hostname of this deployment, used to classify links in admin markdown
- * as internal vs. external. Read from `NEXT_PUBLIC_BASE_URL` so the
- * value is statically inlined at build time and stable between SSR and
- * client hydration. Unset → links are conservatively treated as
- * external.
+ * Host of the page the chat runs on, used to classify links in admin
+ * markdown as internal vs. external. The chat drawer renders client-side
+ * only (`ssr: false` in `chat-launcher.tsx`), so the page's own origin is
+ * always there; `NEXT_PUBLIC_BASE_URL` is not, because it is not a build
+ * value and production's client bundle never inlines it.
  */
-const SITE_HOST: string | undefined = (() => {
-  const raw = process.env.NEXT_PUBLIC_BASE_URL;
-  if (!raw) return undefined;
-  try {
-    return new URL(raw).host;
-  } catch {
-    return undefined;
-  }
-})();
+const pageHost = (): string => new URL(getApiBaseUrl()).host;
 
 const renderMentionTokens = (text: string, keyPrefix: string): React.ReactNode[] => {
   const tokens = tokenizeMentions(text);
@@ -255,7 +248,7 @@ export const ChatMessageRow = ({
   }, [message.createdAt]);
   const isAdminAuthor = message.user.role === 'admin';
   const adminNodes = useMemo<AdminMarkdownNode[] | null>(
-    () => (isAdminAuthor ? parseAdminMarkdown(message.body, { siteHost: SITE_HOST }) : null),
+    () => (isAdminAuthor ? parseAdminMarkdown(message.body, { siteHost: pageHost() }) : null),
     [isAdminAuthor, message.body]
   );
   const bodyTokens = useMemo(() => {

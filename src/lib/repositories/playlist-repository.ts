@@ -66,6 +66,12 @@ const toItemRecord = (
   itemType: row.itemType as PlaylistItemType,
 });
 
+/**
+ * What {@link PlaylistRepository.addItem} did: appended the item, or found the
+ * playlist already at its cap and wrote nothing.
+ */
+export type PlaylistItemAppend = { status: 'added'; item: PlaylistItemRecord } | { status: 'full' };
+
 /** Sum the durations across an item batch (seconds). */
 const sumDurations = (items: AddPlaylistItemData[]): number =>
   items.reduce((total, { duration }) => total + duration, 0);
@@ -181,10 +187,21 @@ export class PlaylistRepository {
 
   /**
    * Append an item to the tail of a playlist in one transaction: read the current
-   * `itemCount`, create the item at `sortOrder = itemCount`, then bump the
-   * denormalized counters. Throws `DataError('NOT_FOUND')` if the playlist is gone.
+   * `itemCount`, answer `full` when it has reached `maxItems`, otherwise create
+   * the item at `sortOrder = itemCount` and bump the denormalized counters.
+   *
+   * The cap is checked on the count this transaction read, not on one the
+   * caller loaded earlier: two adds from two tabs can both have loaded a
+   * playlist one under the cap, and only the transaction sees the other's
+   * commit. Two transactions that overlap both write the playlist row, so
+   * MongoDB aborts the later one with a write conflict instead.
+   * Throws `DataError('NOT_FOUND')` if the playlist is gone.
    */
-  static async addItem(playlistId: string, data: AddPlaylistItemData): Promise<PlaylistItemRecord> {
+  static async addItem(
+    playlistId: string,
+    data: AddPlaylistItemData,
+    { maxItems }: { maxItems: number }
+  ): Promise<PlaylistItemAppend> {
     const row = await runQuery(() =>
       prisma.$transaction(async (tx) => {
         const playlist = await tx.playlist.findUnique({
@@ -194,6 +211,7 @@ export class PlaylistRepository {
         if (!playlist) {
           throw new DataError('NOT_FOUND', 'Playlist not found');
         }
+        if (playlist.itemCount >= maxItems) return null;
         const created = await tx.playlistItem.create({
           data: { ...data, playlistId, sortOrder: playlist.itemCount },
         });
@@ -204,7 +222,7 @@ export class PlaylistRepository {
         return created;
       })
     );
-    return toItemRecord(row);
+    return row ? { status: 'added', item: toItemRecord(row) } : { status: 'full' };
   }
 
   /**
