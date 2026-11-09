@@ -6,10 +6,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
 import { expect, test } from '../fixtures/base.fixture';
-import { E2E_AUTH_SECRET } from '../helpers/auth-constants';
-import { createStorageState } from '../helpers/auth-helpers';
-import { routeCdn } from '../helpers/cdn-mock';
 import { openReleaseDeepLink } from '../helpers/release-deep-link';
+import { createStampedUser, newStampedUserContext } from '../helpers/stamped-user';
 
 import type { APIRequestContext, Browser, BrowserContext } from '@playwright/test';
 
@@ -48,29 +46,13 @@ const signInNewUser = async (
   browser: Browser,
   label: string
 ): Promise<{ userId: string; context: BrowserContext; request: APIRequestContext }> => {
-  const handle = `e2egate${label}${STAMP}`;
-  const { id: userId } = await prisma.user.create({
-    data: {
-      email: `${handle}@example.invalid`,
-      name: `E2E Gate ${label} ${STAMP}`,
-      username: handle,
-      role: 'user',
-      emailVerified: true,
-      banned: false,
-      termsAndConditions: true,
-      termsAcceptedAt: new Date(),
-    },
-    select: { id: true },
+  const user = await createStampedUser(prisma, {
+    handle: `e2egate${label}${STAMP}`,
+    name: `E2E Gate ${label} ${STAMP}`,
   });
-  userIds.push(userId);
-  const token = `e2e-gate-${label}-${STAMP}`;
-  await prisma.session.create({
-    data: { token, userId, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
-  });
-  const storageState = await createStorageState(token, E2E_AUTH_SECRET);
-  const context = await browser.newContext({ storageState });
-  await routeCdn(context);
-  return { userId, context, request: context.request };
+  userIds.push(user.id);
+  const context = await newStampedUserContext(browser, user);
+  return { userId: user.id, context, request: context.request };
 };
 
 const recordDraws = (userId: string, releaseId: string, mode: 'free' | 'purchased') =>
