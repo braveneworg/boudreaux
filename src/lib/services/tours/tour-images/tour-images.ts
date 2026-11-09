@@ -58,6 +58,20 @@ const policyOf = (kind: TourImageOwnerKind): OwnerPolicy =>
 
 const IMAGE_NOT_FOUND = 'Image not found';
 
+/**
+ * The one file name {@link buildMediaS3Key} gives an object inside an owner's
+ * namespace: lowercase letters, digits and dashes, then a dotted extension.
+ * No slash and no second dot, so the name can neither climb out of the
+ * namespace nor sit in a folder below it.
+ */
+const OWNED_FILE_NAME = /^[a-z0-9-]+\.[a-z0-9]{1,8}$/;
+
+/** Whether an object key sits directly in the owner's `media/<entity>/<id>/` namespace. */
+const isOwnersKey = ({ keyEntity }: OwnerPolicy, ownerId: string, s3Key: string): boolean => {
+  const namespace = `media/${keyEntity}/${ownerId}/`;
+  return s3Key.startsWith(namespace) && OWNED_FILE_NAME.test(s3Key.slice(namespace.length));
+};
+
 const capExceeded = ({ maxImages, label }: OwnerPolicy): ServiceResponse<never> => ({
   success: false,
   error: `Maximum of ${maxImages} images per ${label} exceeded`,
@@ -148,9 +162,12 @@ export class TourImages {
 
   /**
    * Record an uploaded object as the owner's last image, served from its
-   * public URL. A confirm that would pass the cap is refused and its object
-   * deleted. The count and the insert are separate reads, so two confirms
-   * racing at the same instant can still both pass.
+   * public URL. The object must sit in the owner's key namespace, where
+   * {@link requestUpload} signed it: any other key is refused and left alone,
+   * so a confirm can neither record nor delete another owner's object. A
+   * confirm that would pass the cap is refused and its object deleted. The
+   * cap is applied atomically per owner, so confirms racing at the same
+   * instant (two admins, or two tabs) store no more than the cap.
    */
   async confirmUpload<K extends TourImageOwnerKind>(
     { kind, id }: TourImageOwner<K>,
@@ -159,27 +176,35 @@ export class TourImages {
   ): Promise<ServiceResponse<ConfirmedTourImage<TourImageRowMap[K]>>> {
     const records = this.recordsOf(kind);
     const policy = policyOf(kind);
+    if (!isOwnersKey(policy, id, upload.s3Key)) {
+      return {
+        success: false,
+        error: `The uploaded object is not one of this ${policy.label}'s images`,
+        code: 'INVALID_INPUT',
+      };
+    }
     try {
-      const displayOrder = await records.count(id);
-      if (displayOrder >= policy.maxImages) {
+      const row = await records.createWithinCap(
+        {
+          ownerId: id,
+          s3Key: upload.s3Key,
+          s3Url: this.deps.store.publicUrl(upload.s3Key),
+          s3Bucket: upload.s3Bucket,
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          mimeType: upload.mimeType,
+          altText: upload.altText,
+          uploadedBy: userId,
+        },
+        policy.maxImages
+      );
+      if (row === null) {
         // Another upload filled the cap after this one's URL was issued:
         // refuse it and remove the object it left in the bucket.
         await this.deps.store.delete(upload.s3Key);
         return capExceeded(policy);
       }
 
-      const row = await records.create({
-        ownerId: id,
-        s3Key: upload.s3Key,
-        s3Url: this.deps.store.publicUrl(upload.s3Key),
-        s3Bucket: upload.s3Bucket,
-        fileName: upload.fileName,
-        fileSize: upload.fileSize,
-        mimeType: upload.mimeType,
-        displayOrder,
-        altText: upload.altText,
-        uploadedBy: userId,
-      });
       return { success: true, data: toConfirmed(row) };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to confirm upload' });
@@ -244,26 +269,6 @@ export class TourImages {
       return { success: true, data: undefined };
     } catch (error) {
       return failFromError(error, { UNKNOWN: 'Failed to reorder images' });
-    }
-  }
-
-  /** Set an image's alt text (blank clears it); resolves with the owner, for revalidation. */
-  async updateAltText<K extends TourImageOwnerKind>(
-    kind: K,
-    imageId: string,
-    altText: string | undefined
-  ): Promise<ServiceResponse<{ ownerId: string }>> {
-    const records = this.recordsOf(kind);
-    try {
-      const image = await records.findById(imageId);
-      if (!image) {
-        return { success: false, error: IMAGE_NOT_FOUND, code: 'NOT_FOUND' };
-      }
-
-      await records.updateAltText(imageId, altText || null);
-      return { success: true, data: { ownerId: records.ownerIdOf(image) } };
-    } catch (error) {
-      return failFromError(error, { UNKNOWN: 'Failed to update alt text' });
     }
   }
 }

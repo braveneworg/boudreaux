@@ -11,11 +11,11 @@ import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
 import type { UpdateArtistData } from '@/lib/types/domain/artist';
 import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { normalizeArtistLinks } from '@/lib/utils/sanitize-artist-links';
-import { createArtistSchema } from '@/lib/validation/create-artist-schema';
+import { type ArtistFormData, createArtistSchema } from '@/lib/validation/create-artist-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -94,10 +94,14 @@ const buildArtistUpdatePayload = (data: ParsedArtistData): UpdateArtistData => (
   ...toLinksPayload(data),
 });
 
+/**
+ * Server Action to save the artist edit form. Called only by
+ * `useUpdateArtistMutation`; the input is validated here, never trusted.
+ * Blanks are kept: an emptied optional field is cleared to `null` (#759).
+ */
 export const updateArtistAction = async (
   artistId: string,
-  _initialState: FormState,
-  payload: FormData
+  input: ArtistFormData
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -105,7 +109,9 @@ export const updateArtistAction = async (
   }
   const { session } = gate;
 
-  const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, createArtistSchema);
+  const { formState, parsed } = readActionInput(input, PERMITTED_FIELD_NAMES, createArtistSchema, {
+    blankStrings: 'keep',
+  });
 
   if (!parsed.success) {
     formState.success = false;

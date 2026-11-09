@@ -122,5 +122,4 @@ export const createArtistSchema = artistBaseSchema.superRefine((data, ctx) => {
   }
 });
 
-type schemaType = typeof createArtistSchema & Partial<FormData>;
-export type ArtistFormData = z.infer<schemaType>;
+export type ArtistFormData = z.infer<typeof createArtistSchema>;

@@ -16,8 +16,6 @@ import {
   generateUploadUrlAction,
   reorderImagesAction,
   reorderTourDateImagesAction,
-  updateImageAltTextAction,
-  updateTourDateImageAltTextAction,
 } from './tour-images';
 
 vi.mock('server-only', () => ({}));
@@ -29,7 +27,6 @@ vi.mock('@/lib/services/tours/tour-images/tour-images', () => ({
     confirmUpload: vi.fn(),
     delete: vi.fn(),
     reorder: vi.fn(),
-    updateAltText: vi.fn(),
   },
 }));
 
@@ -50,7 +47,6 @@ interface OwnerCase {
   confirm: (request: never) => ActionResult;
   remove: (request: never) => ActionResult;
   reorder: (request: never) => ActionResult;
-  updateAltText: (request: never) => ActionResult;
   revalidated: string[];
 }
 
@@ -63,7 +59,6 @@ const OWNERS: OwnerCase[] = [
     confirm: confirmUploadAction as never,
     remove: deleteImageAction as never,
     reorder: reorderImagesAction as never,
-    updateAltText: updateImageAltTextAction as never,
     revalidated: [`/admin/tours/${OWNER_ID}`, `/tours/${OWNER_ID}`, '/tours'],
   },
   {
@@ -74,7 +69,6 @@ const OWNERS: OwnerCase[] = [
     confirm: confirmTourDateUploadAction as never,
     remove: deleteTourDateImageAction as never,
     reorder: reorderTourDateImagesAction as never,
-    updateAltText: updateTourDateImageAltTextAction as never,
     revalidated: ['/admin/tours', '/tours'],
   },
 ];
@@ -237,42 +231,6 @@ describe.each(OWNERS)('$label image actions', (owner) => {
       expect(result).toEqual({
         success: false,
         error: 'Failed to reorder images',
-        code: 'UNKNOWN',
-      });
-    });
-  });
-
-  describe('update alt text', () => {
-    it("updates through the module and revalidates the image owner's surfaces", async () => {
-      vi.mocked(tourImages.updateAltText).mockResolvedValueOnce({
-        success: true,
-        data: { ownerId: OWNER_ID },
-      });
-
-      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
-
-      expect(vi.mocked(tourImages.updateAltText).mock.calls).toEqual([[owner.kind, IMAGE_ID, 'x']]);
-      expect(revalidatedPaths()).toEqual(owner.revalidated);
-      expect(result).toEqual({ success: true, data: { ownerId: OWNER_ID } });
-    });
-
-    it('hands a refusal back without revalidating', async () => {
-      vi.mocked(tourImages.updateAltText).mockResolvedValueOnce(FAILURE);
-
-      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
-
-      expect(revalidatePath).not.toHaveBeenCalled();
-      expect(result).toEqual(FAILURE);
-    });
-
-    it('answers a throw with generic copy', async () => {
-      vi.mocked(tourImages.updateAltText).mockRejectedValueOnce(new Error('raw'));
-
-      const result = await owner.updateAltText({ imageId: IMAGE_ID, altText: 'x' } as never);
-
-      expect(result).toEqual({
-        success: false,
-        error: 'Failed to update alt text',
         code: 'UNKNOWN',
       });
     });

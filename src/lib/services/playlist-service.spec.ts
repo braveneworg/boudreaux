@@ -964,9 +964,15 @@ describe('PlaylistService', () => {
     beforeEach(() => {
       trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([makeTrackFile()]);
       vi.mocked(PlaylistRepository.findDuplicateItem).mockResolvedValue(null);
-      vi.mocked(PlaylistRepository.addItem).mockResolvedValue(
-        makeItem({ id: 'item-new', title: 'Live Song', artistName: 'Killah Trakz', duration: 215 })
-      );
+      vi.mocked(PlaylistRepository.addItem).mockResolvedValue({
+        status: 'added',
+        item: makeItem({
+          id: 'item-new',
+          title: 'Live Song',
+          artistName: 'Killah Trakz',
+          duration: 215,
+        }),
+      });
     });
 
     it('throws NOT_FOUND for an unowned playlist', async () => {
@@ -1029,12 +1035,42 @@ describe('PlaylistService', () => {
       expect(vi.mocked(PlaylistRepository.findDuplicateItem)).not.toHaveBeenCalled();
     });
 
-    it('throws LIMIT_EXCEEDED when the playlist is full', async () => {
+    it('throws LIMIT_EXCEEDED when the repository finds the playlist full', async () => {
       mockOwnedPlaylist({ itemCount: MAX_PLAYLIST_ITEMS });
+      vi.mocked(PlaylistRepository.addItem).mockResolvedValueOnce({ status: 'full' });
 
       await expect(
         PlaylistService.addItem(OWNER_ID, { playlistId: PLAYLIST_ID, ref: trackRef, force: false })
-      ).rejects.toMatchObject({ name: 'DataError', code: 'LIMIT_EXCEEDED' });
+      ).rejects.toMatchObject({
+        name: 'DataError',
+        code: 'LIMIT_EXCEEDED',
+        message: `This playlist is full — playlists hold up to ${MAX_PLAYLIST_ITEMS} items.`,
+      });
+    });
+
+    // Two tabs: the playlist was loaded one under the cap, and another add
+    // filled it before this one's transaction ran.
+    it('refuses at the cap even when the loaded playlist is one under it', async () => {
+      mockOwnedPlaylist({ itemCount: MAX_PLAYLIST_ITEMS - 1 });
+      vi.mocked(PlaylistRepository.addItem).mockResolvedValueOnce({ status: 'full' });
+
+      await expect(
+        PlaylistService.addItem(OWNER_ID, { playlistId: PLAYLIST_ID, ref: trackRef, force: true })
+      ).rejects.toMatchObject({ code: 'LIMIT_EXCEEDED' });
+    });
+
+    it('hands the item cap to the repository transaction', async () => {
+      mockOwnedPlaylist();
+
+      await PlaylistService.addItem(OWNER_ID, {
+        playlistId: PLAYLIST_ID,
+        ref: trackRef,
+        force: false,
+      });
+
+      expect(vi.mocked(PlaylistRepository.addItem).mock.calls.map(([, , cap]) => cap)).toEqual([
+        { maxItems: MAX_PLAYLIST_ITEMS },
+      ]);
     });
 
     it('persists the snapshot built from the live source row', async () => {
@@ -1046,15 +1082,19 @@ describe('PlaylistService', () => {
         force: false,
       });
 
-      expect(vi.mocked(PlaylistRepository.addItem)).toHaveBeenCalledWith(PLAYLIST_ID, {
-        itemType: 'track',
-        trackFileId: 'file-1',
-        releaseId: 'release-1',
-        videoId: null,
-        title: 'Live Song',
-        artistName: 'Killah Trakz',
-        duration: 215,
-      });
+      expect(vi.mocked(PlaylistRepository.addItem)).toHaveBeenCalledWith(
+        PLAYLIST_ID,
+        {
+          itemType: 'track',
+          trackFileId: 'file-1',
+          releaseId: 'release-1',
+          videoId: null,
+          title: 'Live Song',
+          artistName: 'Killah Trakz',
+          duration: 215,
+        },
+        { maxItems: MAX_PLAYLIST_ITEMS }
+      );
     });
 
     it('returns the created item as an available payload with live cover art', async () => {

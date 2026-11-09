@@ -14,7 +14,8 @@ export type MediaEntityType =
   | 'featured-artists'
   | 'videos'
   | 'tours'
-  | 'tour-dates';
+  | 'tour-dates'
+  | 'playlists';
 
 interface BuildMediaS3KeyArgs {
   entityType: MediaEntityType;
@@ -40,9 +41,10 @@ const SAFE_EXTENSION = /^[a-z0-9]{1,8}$/;
  * Build a collision-resistant, namespaced S3 key for an uploaded media file.
  *
  * The single builder for every media upload path — artist images, tour images,
- * posters, cover art, and videos. It previously existed as four separate
- * copies of the same algorithm, of which only the video one allowlisted the
- * extension; the other three would echo an attacker-shaped suffix into the key.
+ * posters, cover art, videos, and playlist covers. It previously existed as
+ * four separate copies of the same algorithm, of which only the video one
+ * allowlisted the extension; the other three would echo an attacker-shaped
+ * suffix into the key. Playlist covers kept a fifth copy until 2026-11.
  *
  * @param args - Namespace, owning entity, untrusted file name, and fallback.
  * @returns `media/{entityType}/{entityId}/{name}-{timestamp}-{random}.{ext}`

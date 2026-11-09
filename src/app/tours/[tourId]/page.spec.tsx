@@ -36,8 +36,8 @@ vi.mock('@/lib/utils/get-internal-api-url', () => ({
 }));
 
 const mockFindById = vi.fn();
-vi.mock('@/lib/repositories/tours/tour-repository', () => ({
-  TourRepository: {
+vi.mock('@/lib/services/tours/tour-service', () => ({
+  TourService: {
     findPublicById: (...args: unknown[]) => mockFindById(...args),
   },
 }));
@@ -80,7 +80,7 @@ describe('TourPage', () => {
     mockFindById.mockResolvedValue(mockTour);
   });
 
-  it('should call TourRepository.findPublicById with tourId', async () => {
+  it('reads the tour through TourService.findPublicById', async () => {
     const Page = await TourPage({ params: defaultParams });
     render(Page);
 
@@ -117,7 +117,7 @@ describe('TourPage', () => {
     expect(mockSetQueryData).not.toHaveBeenCalled();
   });
 
-  it('should pass the tourId to the repository unchanged', async () => {
+  it('should pass the tourId to the service unchanged', async () => {
     const specialParams = Promise.resolve({ tourId: 'tour/special' });
 
     const Page = await TourPage({ params: specialParams });

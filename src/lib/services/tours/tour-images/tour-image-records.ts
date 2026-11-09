@@ -15,15 +15,13 @@ export const tourImageRecords: TourImageRecords<TourImageScalars> = {
   findByOwner: (tourId) => ImageRepository.findByTourId(tourId),
   count: (tourId) => ImageRepository.count(tourId),
   findById: (id) => ImageRepository.findById(id),
-  create: ({ ownerId, ...fields }) => ImageRepository.create({ tourId: ownerId, ...fields }),
+  createWithinCap: ({ ownerId, ...fields }, maxImages) =>
+    ImageRepository.createWithinCap({ tourId: ownerId, ...fields }, maxImages),
   delete: async (id) => {
     await ImageRepository.delete(id);
   },
   reorder: async (orders) => {
     await ImageRepository.reorderImages(orders);
-  },
-  updateAltText: async (id, altText) => {
-    await ImageRepository.updateAltText(id, altText);
   },
 };
 
@@ -33,15 +31,12 @@ export const tourDateImageRecords: TourImageRecords<TourDateImageScalars> = {
   findByOwner: (tourDateId) => TourDateImageRepository.findByTourDateId(tourDateId),
   count: (tourDateId) => TourDateImageRepository.count(tourDateId),
   findById: (id) => TourDateImageRepository.findById(id),
-  create: ({ ownerId, ...fields }) =>
-    TourDateImageRepository.create({ tourDateId: ownerId, ...fields }),
+  createWithinCap: ({ ownerId, ...fields }, maxImages) =>
+    TourDateImageRepository.createWithinCap({ tourDateId: ownerId, ...fields }, maxImages),
   delete: async (id) => {
     await TourDateImageRepository.delete(id);
   },
   reorder: async (orders) => {
     await TourDateImageRepository.reorderImages(orders);
-  },
-  updateAltText: async (id, altText) => {
-    await TourDateImageRepository.updateAltText(id, altText);
   },
 };

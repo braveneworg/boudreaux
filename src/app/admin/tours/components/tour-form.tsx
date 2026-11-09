@@ -43,24 +43,7 @@ import {
 } from '../_hooks/mutations/use-tour-mutations';
 import { useTourImagesQuery } from '../_hooks/use-tour-images-query';
 
-/**
- * Local interface matching Prisma TourImage model.
- * Client components do not import the generated Prisma client types directly.
- */
-interface TourImageFields {
-  id: string;
-  tourId: string;
-  s3Key: string;
-  s3Url: string;
-  s3Bucket: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  displayOrder: number;
-  altText: string | null;
-  createdAt: Date;
-  uploadedBy: string | null;
-}
+import type { StoredTourImage } from './tour-image-upload';
 
 interface TourFormProps {
   tourId?: string;
@@ -74,7 +57,7 @@ interface TourFormProps {
 }
 
 export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
-  const [tourImages, setTourImages] = useState<TourImageFields[]>([]);
+  const [tourImages, setTourImages] = useState<StoredTourImage[]>([]);
   const [isTourDateDialogOpen, setIsTourDateDialogOpen] = useState(false);
   const isEditMode = !!tourId;
   const tourIdOrEmpty = tourId ?? '';
@@ -91,9 +74,10 @@ export const TourForm = ({ tourId, initialTour = null }: TourFormProps) => {
   const { data: tourData, isPending: isTourPending } = useAdminTourQuery(tourIdOrEmpty, {
     enabled: isEditMode && !initialTour,
   });
-  const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(tourIdOrEmpty, {
-    enabled: isEditMode,
-  });
+  const { data: tourImagesData, refetch: refetchTourImages } = useTourImagesQuery(
+    { kind: 'tour', tourId: tourIdOrEmpty },
+    { enabled: isEditMode }
+  );
 
   // In edit mode the form renders only after its data has been applied
   // client-side (create mode is ready immediately). Starting `true` for any

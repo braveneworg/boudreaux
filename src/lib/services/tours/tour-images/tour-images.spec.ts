@@ -69,6 +69,8 @@ const createFakeStore = (log: string[]): FakeStore => {
 /** The in-memory records adapter for one model, storing rows under `ownerKey`. */
 interface FakeRecords extends TourImageRecords<FakeRow> {
   rows: Map<string, FakeRow>;
+  /** Store a row at a given display order, bypassing the cap (for seeding). */
+  insert: (record: NewTourImageRecord & { displayOrder: number }) => FakeRow;
 }
 
 const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
@@ -80,24 +82,35 @@ const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
       .filter((row) => owners.get(row.id) === ownerId)
       .toSorted((a, b) => a.displayOrder - b.displayOrder);
 
+  const insert = ({
+    ownerId,
+    altText,
+    uploadedBy,
+    ...rest
+  }: NewTourImageRecord & { displayOrder: number }): FakeRow => {
+    const row: FakeRow = {
+      ...rest,
+      id: `image-${nextId++}`,
+      [ownerKey]: ownerId,
+      altText: altText ?? null,
+      uploadedBy: uploadedBy ?? null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    rows.set(row.id, row);
+    owners.set(row.id, ownerId);
+    return row;
+  };
+
   return {
     rows,
+    insert,
     ownerIdOf: (row) => owners.get(row.id) ?? '',
     findByOwner: async (ownerId) => ownedBy(ownerId),
     count: async (ownerId) => ownedBy(ownerId).length,
     findById: async (id) => rows.get(id) ?? null,
-    create: async ({ ownerId, altText, uploadedBy, ...rest }: NewTourImageRecord) => {
-      const row: FakeRow = {
-        ...rest,
-        id: `image-${nextId++}`,
-        [ownerKey]: ownerId,
-        altText: altText ?? null,
-        uploadedBy: uploadedBy ?? null,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      };
-      rows.set(row.id, row);
-      owners.set(row.id, ownerId);
-      return row;
+    createWithinCap: async (record, maxImages) => {
+      const displayOrder = ownedBy(record.ownerId).length;
+      return displayOrder >= maxImages ? null : insert({ ...record, displayOrder });
     },
     delete: async (id) => {
       log.push(`records.delete ${id}`);
@@ -109,12 +122,6 @@ const createFakeRecords = (ownerKey: string, log: string[]): FakeRecords => {
         if (row) {
           rows.set(id, { ...row, displayOrder });
         }
-      }
-    },
-    updateAltText: async (id, altText) => {
-      const row = rows.get(id);
-      if (row) {
-        rows.set(id, { ...row, altText });
       }
     },
   };
@@ -154,7 +161,7 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
     const seeded: FakeRow[] = [];
     for (let index = 0; index < count; index++) {
       seeded.push(
-        await records.create({
+        records.insert({
           ownerId,
           s3Key: `media/seed-${ownerId}-${index}.jpg`,
           s3Url: `${CDN}/media/seed-${ownerId}-${index}.jpg`,
@@ -299,7 +306,31 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
   });
 
   describe('confirmUpload', () => {
-    const upload = { ...FILE, s3Key: 'media/new.jpg', s3Bucket: 'bucket', altText: 'A crowd' };
+    const newKey = `${keyPrefix}photo-1767225600000-ab12cd.jpg`;
+    const upload = { ...FILE, s3Key: newKey, s3Bucket: 'bucket', altText: 'A crowd' };
+
+    it.each([
+      ["another owner's object", keyPrefix.replace(OWNER_ID, OTHER_OWNER_ID) + 'photo-1-ab.jpg'],
+      ['a release cover', 'media/releases/release-1/cover-1-ab.jpg'],
+      ['an object outside media/', 'private/backup-1-ab.jpg'],
+      ['a key that climbs out of the namespace', `${keyPrefix}../${OTHER_OWNER_ID}/photo-1-ab.jpg`],
+      ['a key in a folder under the namespace', `${keyPrefix}nested/photo-1-ab.jpg`],
+      ['the bare namespace', keyPrefix],
+    ])('refuses %s, recording nothing and deleting nothing', async (_case, s3Key) => {
+      await seed(max);
+
+      const result = await images.confirmUpload(owner, { ...upload, s3Key }, 'admin-1');
+
+      expect({ result, log, rows: records.rows.size }).toEqual({
+        result: {
+          success: false,
+          error: `The uploaded object is not one of this ${label}'s images`,
+          code: 'INVALID_INPUT',
+        },
+        log: [],
+        rows: max,
+      });
+    });
 
     it('appends the image after the existing ones, served from the public URL', async () => {
       await seed(2);
@@ -311,8 +342,8 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
         data: {
           id: 'image-3',
           [ownerKey]: OWNER_ID,
-          s3Key: 'media/new.jpg',
-          s3Url: `${CDN}/media/new.jpg`,
+          s3Key: newKey,
+          s3Url: `${CDN}/${newKey}`,
           s3Bucket: 'bucket',
           fileName: 'photo.jpg',
           fileSize: 1024,
@@ -347,7 +378,7 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
         error: `Maximum of ${max} images per ${label} exceeded`,
         code: 'LIMIT_EXCEEDED',
       });
-      expect(log).toEqual(['store.delete media/new.jpg']);
+      expect(log).toEqual([`store.delete ${newKey}`]);
       expect(records.rows.size).toBe(max);
     });
 
@@ -360,7 +391,7 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
     });
 
     it('fails with generic copy when the write throws', async () => {
-      records.create = async () => {
+      records.createWithinCap = async () => {
         throw new Error('E11000 duplicate key');
       };
 
@@ -469,47 +500,6 @@ describe.each(OWNERS)('TourImages for a $label', ({ kind, ownerKey, label, max, 
       expect(result).toEqual({
         success: false,
         error: 'Failed to reorder images',
-        code: 'UNKNOWN',
-      });
-    });
-  });
-
-  describe('updateAltText', () => {
-    it('refuses an image that does not exist', async () => {
-      const result = await images.updateAltText(kind, 'missing', 'x');
-
-      expect(result).toEqual({ success: false, error: 'Image not found', code: 'NOT_FOUND' });
-    });
-
-    it('stores the alt text and names the owner', async () => {
-      const [image] = await seed(1);
-
-      const result = await images.updateAltText(kind, image.id, 'A crowd');
-
-      expect(result).toEqual({ success: true, data: { ownerId: OWNER_ID } });
-      expect(records.rows.get(image.id)?.altText).toBe('A crowd');
-    });
-
-    it('clears a blank alt text to null', async () => {
-      const [image] = await seed(1);
-      await records.updateAltText(image.id, 'old');
-
-      await images.updateAltText(kind, image.id, '');
-
-      expect(records.rows.get(image.id)?.altText).toBeNull();
-    });
-
-    it('fails with generic copy when the write throws', async () => {
-      const [image] = await seed(1);
-      records.updateAltText = async () => {
-        throw new Error('raw driver text');
-      };
-
-      const result = await images.updateAltText(kind, image.id, 'x');
-
-      expect(result).toEqual({
-        success: false,
-        error: 'Failed to update alt text',
         code: 'UNKNOWN',
       });
     });

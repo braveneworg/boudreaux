@@ -292,19 +292,22 @@ describe('rollback.yml — manual, two inputs, nothing rebuilt', () => {
   });
 });
 
+// deploy-remote.spec.ts drives the script itself through each failure with
+// ROLLBACK_RUN=true (CI's shell-scripts lane); this pin keeps the rule visible
+// in the default local run.
 describe('deploy-remote.sh — the health-failure reflex is off during a rollback', () => {
   it('documents ROLLBACK_RUN in the usage header', () => {
     expect(remoteScript).toMatch(/ROLLBACK_RUN\s+- 'true'/);
   });
 
   it('exits non-zero without re-pulling the previous digests when ROLLBACK_RUN is true', () => {
-    const start = remoteScript.indexOf('/api/health; then');
-    const failureBlock = remoteScript.slice(start, remoteScript.indexOf('Rollback successful'));
+    const start = remoteScript.indexOf('fail_deploy() {');
+    const failDeploy = remoteScript.slice(start, remoteScript.indexOf('\n}\n', start));
 
-    expect(failureBlock).toMatch(/if \[ "\$\{ROLLBACK_RUN:-false\}" = "true" \]; then/);
-    const rollbackBranch = failureBlock.slice(
-      failureBlock.indexOf('ROLLBACK_RUN'),
-      failureBlock.indexOf('PREV_WEBSITE_DIGEST')
+    expect(failDeploy).toMatch(/if \[ "\$\{ROLLBACK_RUN:-false\}" = "true" \]; then/);
+    const rollbackBranch = failDeploy.slice(
+      failDeploy.indexOf('ROLLBACK_RUN'),
+      failDeploy.indexOf('PREV_WEBSITE_DIGEST')
     );
     expect(rollbackBranch).toMatch(/exit 1/);
     expect(rollbackBranch).not.toMatch(/pull/);
