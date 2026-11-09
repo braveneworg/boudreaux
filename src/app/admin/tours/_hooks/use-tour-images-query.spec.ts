@@ -5,7 +5,7 @@
 
 import { renderHook } from '@testing-library/react';
 
-import { useTourImagesQuery } from './use-tour-images-query';
+import { useTourImagesQuery, type TourImagesOwner } from './use-tour-images-query';
 
 const mockUseQuery = vi.hoisted(() => vi.fn());
 
@@ -13,9 +13,9 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: unknown) => mockUseQuery(options),
 }));
 
-const tourImage = {
+/** One stored image row of either model, without its owner field. */
+const imageFields = {
   id: 'img-1',
-  tourId: 'tour-1',
   s3Key: 'key',
   s3Url: 'https://example.com/img.webp',
   s3Bucket: 'bucket',
@@ -28,66 +28,108 @@ const tourImage = {
   uploadedBy: null,
 };
 
-describe('useTourImagesQuery', () => {
-  beforeEach(() => {
-    mockUseQuery.mockReturnValue({
-      isPending: false,
-      error: undefined,
-      data: { images: [] },
-      refetch: vi.fn(),
+interface OwnerCase {
+  label: string;
+  owner: TourImagesOwner;
+  /** The same owner with each id it names blanked, one at a time. */
+  missingIds: TourImagesOwner[];
+  row: Record<string, unknown>;
+  queryKey: unknown[];
+  url: string;
+  failure: string;
+}
+
+const OWNERS: OwnerCase[] = [
+  {
+    label: 'tour',
+    owner: { kind: 'tour', tourId: 'tour-1' },
+    missingIds: [{ kind: 'tour', tourId: '' }],
+    row: { ...imageFields, tourId: 'tour-1' },
+    queryKey: ['tours', 'images', 'tour-1'],
+    url: '/api/tours/tour-1/images',
+    failure: 'Failed to fetch tour images',
+  },
+  {
+    label: 'tour date',
+    owner: { kind: 'tourDate', tourId: 'tour-1', tourDateId: 'date-1' },
+    missingIds: [
+      { kind: 'tourDate', tourId: '', tourDateId: 'date-1' },
+      { kind: 'tourDate', tourId: 'tour-1', tourDateId: '' },
+    ],
+    row: { ...imageFields, tourDateId: 'date-1' },
+    queryKey: ['tours', 'dateImages', 'tour-1', 'date-1'],
+    url: '/api/tours/tour-1/dates/date-1/images',
+    failure: 'Failed to fetch tour date images',
+  },
+];
+
+/** The options the hook last handed to `useQuery`. */
+const lastOptions = () =>
+  mockUseQuery.mock.calls.at(-1)?.[0] as {
+    enabled: boolean;
+    queryKey: unknown[];
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<{ images: unknown[] }>;
+  };
+
+describe.each(OWNERS)(
+  "useTourImagesQuery for a $label's images",
+  ({ owner, missingIds, row, queryKey, url, failure }) => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        isPending: false,
+        error: undefined,
+        data: { images: [] },
+        refetch: vi.fn(),
+      });
     });
-  });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
 
-  it('disables the query when no tour id is provided', () => {
-    renderHook(() => useTourImagesQuery(''));
+    it('disables the query while an id it needs is missing', () => {
+      const enabled = missingIds.map((missing) => {
+        renderHook(() => useTourImagesQuery(missing));
+        return lastOptions().enabled;
+      });
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { enabled: boolean };
+      expect(enabled).toEqual(missingIds.map(() => false));
+    });
 
-    expect(options.enabled).toBe(false);
-  });
+    it('keeps the query disabled when the caller disables it', () => {
+      renderHook(() => useTourImagesQuery(owner, { enabled: false }));
 
-  it('uses the tour images query key', () => {
-    renderHook(() => useTourImagesQuery('tour-1'));
+      expect(lastOptions().enabled).toBe(false);
+    });
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as { queryKey: unknown[] };
+    it("uses the owner's images query key", () => {
+      renderHook(() => useTourImagesQuery(owner));
 
-    expect(options.queryKey).toEqual(['tours', 'images', 'tour-1']);
-  });
+      expect(lastOptions().queryKey).toEqual(queryKey);
+    });
 
-  it('fetches and parses the tour images on a 200 response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ images: [tourImage] }) })
-    );
+    it("fetches and parses the owner's images on a 200 response", async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ images: [row] }) })
+      );
+      renderHook(() => useTourImagesQuery(owner));
+      const { signal } = new AbortController();
 
-    renderHook(() => useTourImagesQuery('tour-1'));
+      const result = await lastOptions().queryFn({ signal });
 
-    const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
-    };
+      expect({ images: result.images.length, calls: vi.mocked(fetch).mock.calls }).toEqual({
+        images: 1,
+        calls: [[url, { signal }]],
+      });
+    });
 
-    const { signal } = new AbortController();
-    const result = (await options.queryFn({ signal })) as { images: unknown[] };
+    it('throws when the response is not ok', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+      renderHook(() => useTourImagesQuery(owner));
+      const { signal } = new AbortController();
 
-    expect(result.images).toHaveLength(1);
-    expect(global.fetch).toHaveBeenCalledWith('/api/tours/tour-1/images', { signal });
-  });
-
-  it('throws when the response is not ok', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
-
-    renderHook(() => useTourImagesQuery('tour-1'));
-
-    const options = mockUseQuery.mock.calls[0]?.[0] as {
-      queryFn: (ctx: { signal: AbortSignal }) => Promise<unknown>;
-    };
-
-    const { signal } = new AbortController();
-
-    await expect(options.queryFn({ signal })).rejects.toThrow('Failed to fetch tour images');
-  });
-});
+      await expect(lastOptions().queryFn({ signal })).rejects.toThrow(failure);
+    });
+  }
+);

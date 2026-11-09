@@ -4,14 +4,14 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { NextRequest } from 'next/server';
 
-import { VenueRepository } from '@/lib/repositories/tours/venue-repository';
+import { VenueService } from '@/lib/services/tours/venue-service';
 
 import { GET } from './route';
 
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/lib/repositories/tours/venue-repository', () => ({
-  VenueRepository: {
+vi.mock('@/lib/services/tours/venue-service', () => ({
+  VenueService: {
     findById: vi.fn(),
   },
 }));
@@ -36,7 +36,7 @@ describe('GET /api/venues/[venueId]', () => {
     params: Promise.resolve({ venueId }),
   });
   it('should return a venue by ID', async () => {
-    vi.mocked(VenueRepository.findById).mockResolvedValue(mockVenue as never);
+    vi.mocked(VenueService.findById).mockResolvedValue(mockVenue as never);
 
     const request = new NextRequest('http://localhost:3000/api/venues/507f1f77bcf86cd799439011');
     const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
@@ -45,11 +45,11 @@ describe('GET /api/venues/[venueId]', () => {
     expect(response.status).toBe(200);
     expect(data.venue.id).toBe('507f1f77bcf86cd799439011');
     expect(data.venue.name).toBe('The Fillmore');
-    expect(VenueRepository.findById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
+    expect(VenueService.findById).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
   });
 
   it('should return 404 when venue not found', async () => {
-    vi.mocked(VenueRepository.findById).mockResolvedValue(null);
+    vi.mocked(VenueService.findById).mockResolvedValue(null);
 
     const request = new NextRequest('http://localhost:3000/api/venues/507f1f77bcf86cd799439012');
     const response = await GET(request, createParams('507f1f77bcf86cd799439012'));
@@ -60,7 +60,7 @@ describe('GET /api/venues/[venueId]', () => {
   });
 
   it('should return 500 when repository throws', async () => {
-    vi.mocked(VenueRepository.findById).mockRejectedValue(new Error('Database error'));
+    vi.mocked(VenueService.findById).mockRejectedValue(new Error('Database error'));
 
     const request = new NextRequest('http://localhost:3000/api/venues/507f1f77bcf86cd799439011');
     const response = await GET(request, createParams('507f1f77bcf86cd799439011'));
@@ -77,6 +77,6 @@ describe('GET /api/venues/[venueId]', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid venue ID');
-    expect(VenueRepository.findById).not.toHaveBeenCalled();
+    expect(VenueService.findById).not.toHaveBeenCalled();
   });
 });

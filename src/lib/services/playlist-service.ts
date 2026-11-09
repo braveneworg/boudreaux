@@ -809,24 +809,29 @@ export class PlaylistService {
   /**
    * Add one source to an owned playlist. Duplicate sources short-circuit to
    * `{ duplicate: true }` unless `force` is set (the confirm-retry path);
-   * the duplicate answer deliberately precedes the item-limit check.
+   * the duplicate answer deliberately precedes the item-limit check. The
+   * item limit is checked inside the repository's append transaction, so
+   * adds from two tabs cannot both pass it on a count loaded before the
+   * other committed.
    */
   static async addItem(
     userId: string,
     { playlistId, ref, force }: AddItemInput
   ): Promise<AddItemResult> {
-    const playlist = await PlaylistService.requireOwned(playlistId, userId);
+    await PlaylistService.requireOwned(playlistId, userId);
     const [resolved] = await PlaylistService.resolveSources([ref]);
     if (!resolved) throw new DataError('NOT_FOUND', SOURCE_GONE_MESSAGE);
     if (!force) {
       const existing = await PlaylistRepository.findDuplicateItem(playlistId, ref);
       if (existing) return { duplicate: true };
     }
-    if (playlist.itemCount >= MAX_PLAYLIST_ITEMS) {
+    const append = await PlaylistRepository.addItem(playlistId, resolved.data, {
+      maxItems: MAX_PLAYLIST_ITEMS,
+    });
+    if (append.status === 'full') {
       throw new DataError('LIMIT_EXCEEDED', PLAYLIST_FULL_MESSAGE);
     }
-    const record = await PlaylistRepository.addItem(playlistId, resolved.data);
-    return { duplicate: false, item: toAddedItemPayload(record, resolved) };
+    return { duplicate: false, item: toAddedItemPayload(append.item, resolved) };
   }
 
   /**

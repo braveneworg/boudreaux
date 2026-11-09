@@ -10,7 +10,6 @@ import userEvent from '@testing-library/user-event';
 import { toast, Toaster } from 'sonner';
 
 import { gateAction } from '@/lib/auth/action-gate';
-import { MAX_PLAYLIST_ITEMS } from '@/lib/constants/playlists';
 import { PlaylistRepository } from '@/lib/repositories/playlist-repository';
 import type { TrackFileWithRelease } from '@/lib/repositories/release-digital-format-file-repository';
 import type {
@@ -175,7 +174,7 @@ beforeEach(() => {
   });
   vi.mocked(PlaylistRepository.findById).mockResolvedValue(makePlaylist());
   vi.mocked(PlaylistRepository.findDuplicateItem).mockResolvedValue(null);
-  vi.mocked(PlaylistRepository.addItem).mockResolvedValue(ADDED_ITEM);
+  vi.mocked(PlaylistRepository.addItem).mockResolvedValue({ status: 'added', item: ADDED_ITEM });
   trackFileRepoMock.findManyByIdsWithRelease.mockResolvedValue([TRACK_FILE]);
 });
 
@@ -190,9 +189,7 @@ afterEach(() => {
 
 describe('Adding to a playlist from the panel', () => {
   it('tells the listener the playlist is full, in words', async () => {
-    vi.mocked(PlaylistRepository.findById).mockResolvedValue(
-      makePlaylist({ itemCount: MAX_PLAYLIST_ITEMS })
-    );
+    vi.mocked(PlaylistRepository.addItem).mockResolvedValueOnce({ status: 'full' });
     renderPanel();
 
     await pickRoadTrip();
@@ -201,9 +198,7 @@ describe('Adding to a playlist from the panel', () => {
   });
 
   it('never shows the full-playlist code', async () => {
-    vi.mocked(PlaylistRepository.findById).mockResolvedValue(
-      makePlaylist({ itemCount: MAX_PLAYLIST_ITEMS })
-    );
+    vi.mocked(PlaylistRepository.addItem).mockResolvedValueOnce({ status: 'full' });
     renderPanel();
 
     await pickRoadTrip();

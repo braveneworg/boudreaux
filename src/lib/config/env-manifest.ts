@@ -30,7 +30,7 @@
  *   deploy workflow's build args. Its value in the running container does
  *   not matter.
  * - `local` — never set in production: platform values (`NODE_ENV`), dev,
- *   test and E2E switches, and knobs production does not forward today.
+ *   test and E2E switches, and the legacy `S3_BUCKET` alias.
  *   Never written to the deploy env file.
  */
 export type EnvPhase = 'runtime' | 'build' | 'local';
@@ -172,19 +172,33 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
 
   // ── Optional runtime values with fallbacks ──────────────────────────────
   runtime('CDN_DOMAIN', 'optional', 'Media CDN host for server-side URL building.'),
+  // Despite the prefix these two are runtime values: Next.js inlines a name
+  // present at `next build` into server code as well, which would freeze the
+  // server reads below into the image. Client bundles never see them; their
+  // reads fall back to https://fakefourrecords.com, the production origin.
   runtime(
     'NEXT_PUBLIC_HOST_NAME',
     'optional',
-    'Public origin for share links. Not in the build env, so client reads use their fallback.'
+    'Public origin for audio metadata comments and server-built share links.'
   ),
   runtime(
     'NEXT_PUBLIC_BASE_URL',
     'optional',
-    'Public origin for emails and server links. Not in the build env, so client reads use their fallback.'
+    'Public origin for emails, SMS, job callbacks and internal API calls.'
   ),
   runtime('LOG_LEVEL', 'optional', 'Root winston level; defaults to info in production.'),
   runtime('SMS_PROVIDER', 'optional', "SMS transport: 'sns' or 'noop' (default)."),
   runtime('SNS_SMS_ORIGINATION_NUMBER', 'optional', 'SNS origination number.'),
+  // Operator knobs, each from a repository variable of the same name. Unset
+  // or empty behaves exactly as before they were forwarded.
+  runtime(
+    'AUTH_DISABLE_SIGNUP',
+    'optional',
+    "'true' pauses signups and overrides the /admin/settings toggle. Read at boot."
+  ),
+  runtime('CONTACT_EMAIL', 'optional', 'Contact-form recipient; falls back to EMAIL_FROM.'),
+  runtime('LOG_DEBUG_MODULES', 'optional', 'Comma list of logger modules forced to debug.'),
+  runtime('SLOW_QUERY_MS', 'optional', 'Prisma slow-query warning threshold; default 200 ms.'),
 
   // ── Build time: inlined into the bundles by `next build` ────────────────
   build('NEXT_PUBLIC_CLOUDFLARE_SITE_KEY', 'Turnstile widget site key.'),
@@ -211,10 +225,6 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
   local('NEXT_PUBLIC_DISABLE_QUERY_CACHE', 'Disables TanStack Query caching (E2E).'),
   local('NEXT_PUBLIC_DISABLE_BANNERS_CACHE', 'Disables the banners query cache (E2E).'),
   local('S3_BUCKET', 'Legacy bucket alias read after AWS_S3_BUCKET_NAME (CI E2E sets it).'),
-  local('AUTH_DISABLE_SIGNUP', 'Magic-link signup kill switch. Not forwarded to production.'),
-  local('CONTACT_EMAIL', 'Contact-form recipient; falls back to EMAIL_FROM. Not forwarded.'),
-  local('LOG_DEBUG_MODULES', 'Per-module debug logging. Not forwarded to production.'),
-  local('SLOW_QUERY_MS', 'Slow-query warning threshold. Not forwarded to production.'),
 ];
 
 /** Every member name of a feature group: `requires` plus every `oneOf` alternative. */

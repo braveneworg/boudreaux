@@ -30,9 +30,9 @@ vi.mock('@/lib/utils/get-query-client', () => ({
 }));
 
 const mockFindAll = vi.fn().mockResolvedValue([]);
-vi.mock('@/lib/repositories/tours/tour-repository', () => ({
-  TourRepository: {
-    findAllPublic: (...args: unknown[]) => mockFindAll(...args),
+vi.mock('@/lib/services/tours/tour-service', () => ({
+  TourService: {
+    findPublicPage: (...args: unknown[]) => mockFindAll(...args),
   },
 }));
 
@@ -90,7 +90,7 @@ describe('ToursPage', () => {
     );
   });
 
-  it('prefetches via the repository (no self-HTTP) returning the paginated shape', async () => {
+  it('prefetches via the tour service (no self-HTTP) returning the paginated shape', async () => {
     mockFindAll.mockResolvedValue([{ id: 'tour-1', title: 'E2E Tour' }]);
 
     const Page = await ToursPage();

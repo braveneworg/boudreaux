@@ -59,6 +59,7 @@ interface Seeded {
   soloReleaseId: string;
   tourId: string;
   hiddenTourId: string;
+  hiddenTourDateId: string;
   featuredId: string;
 }
 
@@ -170,6 +171,7 @@ const seed = async (): Promise<Seeded> => {
     soloReleaseId: solo.id,
     tourId: tour.id,
     hiddenTourId: hiddenTour.id,
+    hiddenTourDateId: hiddenTourDate.id,
     featuredId: featured.id,
   };
 };
@@ -340,6 +342,8 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
       `/api/featured-artists/${seeded.featuredId}`,
       `/api/tours/${seeded.tourId}?scope=admin`,
       `/api/tours/${seeded.tourId}/dates`,
+      `/api/tours/${seeded.hiddenTourId}/images`,
+      `/api/tours/${seeded.hiddenTourId}/dates/${seeded.hiddenTourDateId}/images`,
       `/api/releases/${seeded.releaseId}/credits`,
       `/api/artists/${seeded.hiddenId}/published-work`,
     ];
@@ -359,5 +363,21 @@ test.describe('A hidden artist’s name is never public (ADR-0015)', () => {
 
     expect(response.status()).toBe(200);
     expect(body).toContain(HIDDEN_NAME);
+  });
+
+  test("still serves an admin a hidden tour's images, for its edit screen", async ({
+    adminPage,
+  }) => {
+    const reads = [
+      `/api/tours/${seeded.hiddenTourId}/images`,
+      `/api/tours/${seeded.hiddenTourId}/dates/${seeded.hiddenTourDateId}/images`,
+    ];
+
+    const statuses = [];
+    for (const url of reads) {
+      statuses.push((await adminPage.request.get(url)).status());
+    }
+
+    expect(statuses).toEqual([200, 200]);
   });
 });
