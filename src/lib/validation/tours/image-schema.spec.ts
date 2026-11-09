@@ -13,8 +13,6 @@ import {
   tourDateDeleteImageSchema,
   tourDateImageReorderSchema,
   tourDateImageUploadRequestSchema,
-  tourDateUpdateImageAltTextSchema,
-  updateImageAltTextSchema,
 } from './image-schema';
 
 import type { z } from 'zod';
@@ -28,7 +26,6 @@ interface OwnerSchemas {
   confirm: z.ZodType;
   reorder: z.ZodType;
   remove: z.ZodType;
-  altText: z.ZodType;
 }
 
 const OWNERS: OwnerSchemas[] = [
@@ -41,7 +38,6 @@ const OWNERS: OwnerSchemas[] = [
     confirm: confirmUploadSchema,
     reorder: imageReorderSchema,
     remove: deleteImageSchema,
-    altText: updateImageAltTextSchema,
   },
   {
     label: 'tour date',
@@ -52,7 +48,6 @@ const OWNERS: OwnerSchemas[] = [
     confirm: tourDateConfirmUploadSchema,
     reorder: tourDateImageReorderSchema,
     remove: tourDateDeleteImageSchema,
-    altText: tourDateUpdateImageAltTextSchema,
   },
 ];
 
@@ -128,8 +123,8 @@ describe.each(OWNERS)('$label image schemas', (owner) => {
     expect(firstIssue(owner.remove, withOwner({ imageId: '' }))).toBe('Image ID is required');
   });
 
-  it('refuses alt text over 500 characters', () => {
-    expect(firstIssue(owner.altText, { imageId: 'i', altText: 'x'.repeat(501) })).toBe(
+  it('refuses a confirm with alt text over 500 characters', () => {
+    expect(firstIssue(owner.confirm, withOwner({ ...UPLOADED, altText: 'x'.repeat(501) }))).toBe(
       'Alt text too long'
     );
   });

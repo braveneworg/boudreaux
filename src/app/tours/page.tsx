@@ -8,7 +8,7 @@ import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { ImageHeading } from '@/components/ui/image-heading';
 import { queryKeys } from '@/lib/query-keys';
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { TourService } from '@/lib/services/tours/tour-service';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { serializeForResponse } from '@/lib/utils/serialize-for-response';
@@ -31,13 +31,13 @@ export default async function ToursPage() {
   await queryClient.prefetchInfiniteQuery({
     queryKey: queryKeys.tours.infinite(''),
     initialPageParam: 0,
-    // Read the repository directly instead of self-fetching /api/tours. The
+    // Read through the tour service instead of self-fetching /api/tours. The
     // internal HTTP roundtrip fails silently under load on the standalone
     // server (prefetch swallows the error), leaving the list un-hydrated so the
     // client must refetch — the source of the flaky "0 tour cards" E2E
     // failures. Mirror the route's JSON shape (Date → ISO string).
     queryFn: async () => {
-      const rows = await TourRepository.findAllPublic({ skip: 0, take: TOURS_PAGE_SIZE });
+      const rows = await TourService.findPublicPage({ skip: 0, take: TOURS_PAGE_SIZE });
       return serializeForResponse({
         rows,
         nextSkip: computeNextSkip(rows.length, 0, TOURS_PAGE_SIZE),
