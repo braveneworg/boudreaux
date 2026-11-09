@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.478.0] - 2026-11-09
+
+### Fixed
+
+- fix(chat): 🐛 let user scroll beat resize re-pin (#941)
+
 ## [4.477.0] - 2026-11-09
 
 ### Changed
