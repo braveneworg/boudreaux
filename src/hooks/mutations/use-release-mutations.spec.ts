@@ -11,8 +11,11 @@ import { publishReleaseAction } from '@/lib/actions/publish-release-action';
 import { updateReleaseAction } from '@/lib/actions/update-release-action';
 import { updateReleaseCoverArtAction } from '@/lib/actions/update-release-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
-import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
+import type { FormState } from '@/lib/types/form-state';
+import type {
+  CreateReleaseActionInput,
+  ReleaseFormData,
+} from '@/lib/validation/create-release-schema';
 
 import {
   useCreateReleaseMutation,
@@ -66,102 +69,41 @@ beforeEach(() => {
 });
 
 describe('useCreateReleaseMutation', () => {
-  it('calls createReleaseAction with the empty form state', async () => {
+  const createValues: CreateReleaseActionInput = {
+    title: 'Album',
+    releasedOn: '2026-01-01',
+    coverArt: 'https://x/y.png',
+    formats: ['DIGITAL'],
+    artistIds: ['a'.repeat(24)],
+    preGeneratedId: 'p1',
+  };
+
+  // Arrays stay arrays: no JSON encoding on the way to the action.
+  it('passes the release values and pre-generated id to createReleaseAction as they are', async () => {
     vi.mocked(createReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
-      useCreateReleaseMutation
-    );
+    const opts = getOptions<CreateReleaseActionInput>(useCreateReleaseMutation);
 
-    await opts.mutationFn({
-      title: 'Album',
-      releasedOn: '2026-01-01',
-      coverArt: 'https://x/y.png',
-      formats: ['DIGITAL'],
-      artistIds: ['a'.repeat(24)],
-      preGeneratedId: 'p1',
-    });
+    await opts.mutationFn(createValues);
 
-    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[0]).toBe(EMPTY_FORM_STATE);
+    expect(vi.mocked(createReleaseAction).mock.calls).toEqual([[createValues]]);
   });
 
-  it('serializes the release title into the form data', async () => {
-    vi.mocked(createReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
-      useCreateReleaseMutation
-    );
-
-    await opts.mutationFn({
-      title: 'Album',
-      releasedOn: '2026-01-01',
-      coverArt: 'https://x/y.png',
-      formats: ['DIGITAL'],
-      artistIds: ['a'.repeat(24)],
-      preGeneratedId: 'p1',
-    });
-
-    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[1].get('title')).toBe('Album');
-  });
-
-  it('json-encodes array fields in the form data', async () => {
-    vi.mocked(createReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<ReleaseFormData & { preGeneratedId?: string }>(
-      useCreateReleaseMutation
-    );
-
-    await opts.mutationFn({
-      title: 'Album',
-      releasedOn: '2026-01-01',
-      coverArt: 'https://x/y.png',
-      formats: ['DIGITAL'],
-      artistIds: ['a'.repeat(24)],
-      preGeneratedId: 'p1',
-    });
-
-    expect(vi.mocked(createReleaseAction).mock.calls[0]?.[1].get('formats')).toBe('["DIGITAL"]');
-  });
-
-  it("sends the admin's credit decisions as JSON, apart from the form fields", async () => {
+  it("passes the admin's credit decisions beside the form values", async () => {
     vi.mocked(createReleaseAction).mockResolvedValue(okState);
     const creditDecisions = { publishArtistIds: ['a'], keepHiddenArtistIds: [] };
-    const opts = getOptions<ReleaseFormData & { creditDecisions?: typeof creditDecisions }>(
-      useCreateReleaseMutation
-    );
+    const opts = getOptions<CreateReleaseActionInput>(useCreateReleaseMutation);
 
-    await opts.mutationFn({
-      title: 'Album',
-      releasedOn: '2026-01-01',
-      coverArt: 'https://x/y.png',
-      formats: ['DIGITAL'],
-      artistIds: ['a'.repeat(24)],
-      creditDecisions,
-    });
+    await opts.mutationFn({ ...createValues, creditDecisions });
 
-    expect(vi.mocked(createReleaseAction).mock.calls.at(-1)?.[1].get('creditDecisions')).toBe(
-      JSON.stringify(creditDecisions)
-    );
-  });
-
-  it('sends no credit decisions when the form made none', async () => {
-    vi.mocked(createReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<ReleaseFormData>(useCreateReleaseMutation);
-
-    await opts.mutationFn({
-      title: 'Album',
-      releasedOn: '2026-01-01',
-      coverArt: 'https://x/y.png',
-      formats: ['DIGITAL'],
-      artistIds: ['a'.repeat(24)],
-    });
-
-    expect(vi.mocked(createReleaseAction).mock.calls.at(-1)?.[1].has('creditDecisions')).toBe(
-      false
+    expect(vi.mocked(createReleaseAction).mock.calls.at(-1)?.[0].creditDecisions).toEqual(
+      creditDecisions
     );
   });
 
   it('invalidates release and artist caches on success', async () => {
     const opts = getOptions(useCreateReleaseMutation);
 
-    await opts.onSuccess(okState, { formState: failState, formData: new FormData() });
+    await opts.onSuccess(okState, {});
 
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.releases.all });
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: queryKeys.artists.all });
@@ -170,34 +112,24 @@ describe('useCreateReleaseMutation', () => {
   it('does not invalidate when the action reports failure', async () => {
     const opts = getOptions(useCreateReleaseMutation);
 
-    await opts.onSuccess(failState, { formState: failState, formData: new FormData() });
+    await opts.onSuccess(failState, {});
 
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });
 
 describe('useUpdateReleaseMutation', () => {
-  it('calls updateReleaseAction with the release id', async () => {
+  // The blanks reach the action, which clears those fields (#759).
+  it('passes the release id and values, blanks included, to updateReleaseAction', async () => {
     vi.mocked(updateReleaseAction).mockResolvedValue(okState);
     const opts = getOptions<{ id: string; values: ReleaseFormData }>(useUpdateReleaseMutation);
+    const values = { title: 'Album', catalogNumber: '', description: '' } as ReleaseFormData;
 
-    await opts.mutationFn({ id: 'r1', values: { title: 'Album' } as ReleaseFormData });
+    await opts.mutationFn({ id: 'r1', values });
 
-    expect(vi.mocked(updateReleaseAction).mock.calls[0]?.[0]).toBe('r1');
-  });
-
-  it('keeps emptied fields in the FormData so the action can clear them', async () => {
-    vi.mocked(updateReleaseAction).mockResolvedValue(okState);
-    const opts = getOptions<{ id: string; values: ReleaseFormData }>(useUpdateReleaseMutation);
-
-    await opts.mutationFn({
-      id: 'r1',
-      values: { title: 'Album', catalogNumber: '', description: '' } as ReleaseFormData,
-    });
-
-    const formData = vi.mocked(updateReleaseAction).mock.calls[0]?.[2];
-    expect(formData?.get('catalogNumber')).toBe('');
-    expect(formData?.get('description')).toBe('');
+    expect(vi.mocked(updateReleaseAction).mock.calls).toEqual([
+      ['r1', { ...values, creditDecisions: undefined }],
+    ]);
   });
 
   it('invalidates release and artist caches on success', async () => {
@@ -276,7 +208,7 @@ describe('useDeleteReleaseMutation', () => {
 });
 
 describe('useUpdateReleaseMutation credit decisions', () => {
-  it("sends the admin's credit decisions as JSON, apart from the form fields", async () => {
+  it("passes the admin's credit decisions beside the form values", async () => {
     vi.mocked(updateReleaseAction).mockResolvedValue(okState);
     const creditDecisions = { publishArtistIds: ['a'], keepHiddenArtistIds: [] };
     const opts = getOptions<{
@@ -297,8 +229,8 @@ describe('useUpdateReleaseMutation credit decisions', () => {
       creditDecisions,
     });
 
-    expect(vi.mocked(updateReleaseAction).mock.calls.at(-1)?.[2].get('creditDecisions')).toBe(
-      JSON.stringify(creditDecisions)
+    expect(vi.mocked(updateReleaseAction).mock.calls.at(-1)?.[1].creditDecisions).toEqual(
+      creditDecisions
     );
   });
 });

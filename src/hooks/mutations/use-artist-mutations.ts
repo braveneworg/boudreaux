@@ -11,8 +11,7 @@ import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import type { AdminActionResult } from '@/lib/actions/run-admin-entity-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
-import { objectToFormData } from '@/lib/utils/forms/object-to-form-data';
+import type { FormState } from '@/lib/types/form-state';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
 import { useEntityMutation } from './use-entity-mutation';
@@ -31,14 +30,14 @@ const invalidateArtistQueries = (queryClient: QueryClient): Promise<unknown> =>
   ]);
 
 /**
- * Mutation hook wrapping {@link createArtistAction}. Accepts the validated artist
- * values and serializes them to `FormData` internally; the returned helpers
- * resolve to the action's {@link FormState} and the artist/release caches are
- * invalidated on a successful result.
+ * Mutation hook wrapping {@link createArtistAction}. Passes the validated artist
+ * values to the action as they are; the returned helpers resolve to the
+ * action's {@link FormState} and the artist/release caches are invalidated on a
+ * successful result.
  */
 export const useCreateArtistMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<FormState, ArtistFormData>(
-    (values) => createArtistAction(EMPTY_FORM_STATE, objectToFormData(values)),
+    (values) => createArtistAction(values),
     invalidateArtistQueries
   );
 
@@ -46,24 +45,16 @@ export const useCreateArtistMutation = () => {
 };
 
 /**
- * Mutation hook wrapping {@link updateArtistAction}. Empty fields are KEPT in
- * the `FormData` (`keepEmptyStrings`): a blank is how the admin clears an
- * optional field, and the action maps it to `null` (#759). See
- * {@link useCreateArtistMutation} for the result/invalidation contract.
+ * Mutation hook wrapping {@link updateArtistAction}. A blank field is sent as
+ * `''`, which is how the admin clears it; the action maps it to `null`
+ * (#759). See {@link useCreateArtistMutation} for the result/invalidation
+ * contract.
  */
 export const useUpdateArtistMutation = () => {
   const { mutate, mutateAsync, isPending } = useEntityMutation<
     FormState,
     { id: string; values: ArtistFormData }
-  >(
-    ({ id, values }) =>
-      updateArtistAction(
-        id,
-        EMPTY_FORM_STATE,
-        objectToFormData(values, { keepEmptyStrings: true })
-      ),
-    invalidateArtistQueries
-  );
+  >(({ id, values }) => updateArtistAction(id, values), invalidateArtistQueries);
 
   return { updateArtist: mutate, updateArtistAsync: mutateAsync, isUpdatingArtist: isPending };
 };

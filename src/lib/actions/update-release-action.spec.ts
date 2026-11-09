@@ -6,8 +6,8 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { ReleaseService } from '@/lib/services/release-service';
-import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
+import type { ReleaseActionInput } from '@/lib/validation/create-release-schema';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -20,7 +20,7 @@ vi.mock('next/cache');
 vi.mock('../services/release-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/forms/read-action-input');
 vi.mock('@/lib/auth/action-gate');
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
@@ -36,18 +36,14 @@ describe('updateReleaseAction', () => {
     },
   };
 
-  const mockFormData = new FormData();
-  mockFormData.append('title', 'Updated Album');
-  mockFormData.append('releasedOn', '2024-01-15');
-  mockFormData.append('coverArt', 'https://example.com/cover.jpg');
-  mockFormData.append('formats', 'DIGITAL');
-  mockFormData.append('labels', 'Test Label');
-  mockFormData.append('catalogNumber', 'CAT-001');
-  mockFormData.append('description', 'Updated description');
-
-  const initialFormState: FormState = {
-    fields: {},
-    success: false,
+  const mockInput = {
+    title: 'Updated Album',
+    releasedOn: '2024-01-15',
+    coverArt: 'https://example.com/cover.jpg',
+    formats: ['DIGITAL'],
+    labels: 'Test Label',
+    catalogNumber: 'CAT-001',
+    description: 'Updated description',
   };
 
   beforeEach(() => {
@@ -65,16 +61,12 @@ describe('updateReleaseAction', () => {
       error: 'Choose to publish or keep hidden: Bea',
     };
 
-    const payloadWith = (creditDecisions?: string): FormData => {
-      const payload = new FormData();
-      if (creditDecisions !== undefined) {
-        payload.append('creditDecisions', creditDecisions);
-      }
-      return payload;
-    };
+    /** An input carrying `creditDecisions`; `readActionInput` is mocked, so only they are read. */
+    const inputWith = (creditDecisions?: unknown): ReleaseActionInput =>
+      (creditDecisions === undefined ? {} : { creditDecisions }) as ReleaseActionInput;
 
     const parsedWith = (data: Record<string, unknown>): void => {
-      vi.mocked(getActionState).mockReturnValueOnce({
+      vi.mocked(readActionInput).mockReturnValueOnce({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -102,11 +94,7 @@ describe('updateReleaseAction', () => {
     it("hands the service the admin's decisions and the artists the form credits", async () => {
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
 
-      await updateReleaseAction(
-        mockReleaseId,
-        initialFormState,
-        payloadWith(JSON.stringify(decisions))
-      );
+      await updateReleaseAction(mockReleaseId, inputWith(decisions));
 
       expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]).toEqual({
         decisions,
@@ -118,11 +106,7 @@ describe('updateReleaseAction', () => {
     it('saves the release, its credits and its artists in one service write', async () => {
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
 
-      const result = await updateReleaseAction(
-        mockReleaseId,
-        initialFormState,
-        payloadWith(JSON.stringify(decisions))
-      );
+      const result = await updateReleaseAction(mockReleaseId, inputWith(decisions));
 
       expect({
         success: result.success,
@@ -133,7 +117,7 @@ describe('updateReleaseAction', () => {
     it('leaves the stored credits alone when the form names no artist', async () => {
       parsedWith({ title: 'Album' });
 
-      await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
+      await updateReleaseAction(mockReleaseId, inputWith());
 
       expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]?.creditArtistIds).toBe(
         undefined
@@ -144,7 +128,7 @@ describe('updateReleaseAction', () => {
       vi.mocked(ReleaseService.updateRelease).mockResolvedValueOnce(undecided);
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z', artistIds: [artistA, artistB] });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, payloadWith());
+      const result = await updateReleaseAction(mockReleaseId, inputWith());
 
       expect({ success: result.success, errors: result.errors }).toEqual({
         success: false,
@@ -155,11 +139,7 @@ describe('updateReleaseAction', () => {
     it('rejects malformed decisions before it writes', async () => {
       parsedWith({ publishedAt: '2026-09-27T12:00:00.000Z' });
 
-      const result = await updateReleaseAction(
-        mockReleaseId,
-        initialFormState,
-        payloadWith('not json')
-      );
+      const result = await updateReleaseAction(mockReleaseId, inputWith('not json'));
 
       expect({
         success: result.success,
@@ -177,25 +157,25 @@ describe('updateReleaseAction', () => {
     it('resolves the gate refusal as a form error without updating the release', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(ReleaseService.updateRelease).not.toHaveBeenCalled();
     });
 
     it('should reject invalid releaseId format', async () => {
-      const result = await updateReleaseAction('invalid-id', initialFormState, mockFormData);
+      const result = await updateReleaseAction('invalid-id', mockInput);
 
       expect(result).toEqual({
         fields: {},
         success: false,
         errors: { general: ['Invalid release ID'] },
       });
-      expect(getActionState).not.toHaveBeenCalled();
+      expect(readActionInput).not.toHaveBeenCalled();
     });
 
     it('should allow admin users to update releases', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -213,7 +193,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(true);
     });
@@ -221,7 +201,7 @@ describe('updateReleaseAction', () => {
 
   describe('Validation', () => {
     it('should validate form data with all permitted fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -239,10 +219,10 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
-      expect(getActionState).toHaveBeenCalledWith(
-        mockFormData,
+      expect(readActionInput).toHaveBeenCalledWith(
+        mockInput,
         [
           'title',
           'releasedOn',
@@ -268,12 +248,13 @@ describe('updateReleaseAction', () => {
           'featuredDescription',
           'suggestedPrice',
         ],
-        expect.anything()
+        expect.anything(),
+        { blankStrings: 'keep' }
       );
     });
 
     it('should return validation errors when data is invalid', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -286,7 +267,7 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.title).toEqual(['Title is required']);
@@ -295,7 +276,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should initialize formState.errors when undefined on validation failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false }, // No errors property
         parsed: {
           success: false,
@@ -305,7 +286,7 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
@@ -314,7 +295,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should accumulate multiple errors for the same field', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: {} },
         parsed: {
           success: false,
@@ -327,7 +308,7 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.title).toEqual([
@@ -338,7 +319,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should assign root-level Zod errors without path to "general" field', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: {} },
         parsed: {
           success: false,
@@ -348,7 +329,7 @@ describe('updateReleaseAction', () => {
         },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Form-level validation error']);
@@ -358,7 +339,7 @@ describe('updateReleaseAction', () => {
 
   describe('Release Update', () => {
     it('should update release successfully with all fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -383,7 +364,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -422,7 +403,7 @@ describe('updateReleaseAction', () => {
       const CLEARABLE_FIELDS = ['catalogNumber', 'description', 'featuredDescription'] as const;
 
       const runWith = async (extra: Record<string, string>): Promise<Record<string, unknown>> => {
-        vi.mocked(getActionState).mockReturnValue({
+        vi.mocked(readActionInput).mockReturnValue({
           formState: { fields: {}, success: false },
           parsed: {
             success: true,
@@ -440,7 +421,7 @@ describe('updateReleaseAction', () => {
           data: { id: mockReleaseId },
         } as never);
 
-        await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+        await updateReleaseAction(mockReleaseId, mockInput);
 
         expect(vi.mocked(ReleaseService.updateRelease).mock.calls).toHaveLength(1);
         return vi.mocked(ReleaseService.updateRelease).mock.calls[0][1] as Record<string, unknown>;
@@ -475,7 +456,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should keep a comma-bearing note as a single paragraph', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -494,7 +475,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -506,7 +487,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should drop blank lines between note paragraphs', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -525,7 +506,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -535,7 +516,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should convert suggestedPrice to cents when a non-empty value is provided', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -554,7 +535,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -566,7 +547,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should default formats to ["DIGITAL"] when formats is undefined', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -584,7 +565,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -596,7 +577,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should parse comma-separated credits fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -617,7 +598,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -631,7 +612,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should handle empty credits fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -651,7 +632,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -664,7 +645,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should handle featured dates', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -685,7 +666,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(ReleaseService.updateRelease).toHaveBeenCalledWith(
         mockReleaseId,
@@ -699,7 +680,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should handle release update failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -718,14 +699,14 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
     it('marks the title field for a DUPLICATE whatever the copy says', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -744,7 +725,7 @@ describe('updateReleaseAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toEqual({
@@ -753,7 +734,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('keeps a non-DUPLICATE failure off the title field even when its copy names the title', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -772,13 +753,13 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.errors).toEqual({ general: ['Failed to update release'] });
     });
 
     it('should preserve existing errors on failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { existingField: ['Existing error'] } },
         parsed: {
           success: true,
@@ -797,14 +778,14 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Failed to update release']);
     });
 
     it('should initialize errors when undefined on failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false }, // No errors property
         parsed: {
           success: true,
@@ -823,7 +804,7 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
@@ -831,7 +812,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('reports NOT_FOUND as a missing release whatever the copy says', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -850,14 +831,14 @@ describe('updateReleaseAction', () => {
         code: 'NOT_FOUND',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toEqual({ general: ['Release not found'] });
     });
 
     it('does not read "not found" in the copy of a failure with another code', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -876,7 +857,7 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      const result = await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(result.errors).toEqual({ general: ['Failed to update release'] });
     });
@@ -884,7 +865,7 @@ describe('updateReleaseAction', () => {
 
   describe('Security Logging', () => {
     it('should log successful release update', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -903,7 +884,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.release.updated',
@@ -917,7 +898,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should log failed release update', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -936,7 +917,7 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.release.updated',
@@ -952,7 +933,7 @@ describe('updateReleaseAction', () => {
 
   describe('Cache Revalidation', () => {
     it('should revalidate release page on success', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -970,13 +951,13 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith(`/admin/releases/${mockReleaseId}`);
     });
 
     it('should revalidate public surfaces on success', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -994,7 +975,7 @@ describe('updateReleaseAction', () => {
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/releases');
       expect(revalidatePath).not.toHaveBeenCalledWith(`/releases/${mockReleaseId}`);
@@ -1002,7 +983,7 @@ describe('updateReleaseAction', () => {
     });
 
     it('should not revalidate public surfaces on failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -1021,7 +1002,7 @@ describe('updateReleaseAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
     });
@@ -1029,7 +1010,7 @@ describe('updateReleaseAction', () => {
 
   describe('Error Handling', () => {
     it('should handle unexpected errors gracefully', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -1044,7 +1025,7 @@ describe('updateReleaseAction', () => {
 
       vi.mocked(ReleaseService.updateRelease).mockRejectedValue(Error('Unexpected error'));
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(setUnknownError).toHaveBeenCalled();
     });
@@ -1067,13 +1048,13 @@ describe('updateReleaseAction', () => {
       }) as never;
 
     it('hands the service the submitted artist ids to store with the release', async () => {
-      vi.mocked(getActionState).mockReturnValue(parsedWithArtists(['artist-2', 'artist-3']));
+      vi.mocked(readActionInput).mockReturnValue(parsedWithArtists(['artist-2', 'artist-3']));
       vi.mocked(ReleaseService.updateRelease).mockResolvedValue({
         success: true,
         data: { id: mockReleaseId },
       } as never);
 
-      await updateReleaseAction(mockReleaseId, initialFormState, mockFormData);
+      await updateReleaseAction(mockReleaseId, mockInput);
 
       expect(vi.mocked(ReleaseService.updateRelease).mock.calls[0][2]?.creditArtistIds).toEqual([
         'artist-2',

@@ -313,12 +313,14 @@ describe('PlaylistRepository', () => {
   });
 
   describe('addItem', () => {
+    const CAP = { maxItems: 200 };
+
     it('runs the append in a single transaction', async () => {
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue({ itemCount: 3 } as never);
       vi.mocked(prisma.playlistItem.create).mockResolvedValue({ id: ITEM_ID } as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
 
-      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem);
+      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
@@ -328,7 +330,7 @@ describe('PlaylistRepository', () => {
       vi.mocked(prisma.playlistItem.create).mockResolvedValue({ id: ITEM_ID } as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
 
-      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem);
+      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
 
       expect(prisma.playlist.findUnique).toHaveBeenCalledWith({
         where: { id: PLAYLIST_ID },
@@ -341,7 +343,7 @@ describe('PlaylistRepository', () => {
       vi.mocked(prisma.playlistItem.create).mockResolvedValue({ id: ITEM_ID } as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
 
-      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem);
+      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
 
       expect(prisma.playlistItem.create).toHaveBeenCalledWith({
         data: { ...trackItem, playlistId: PLAYLIST_ID, sortOrder: 3 },
@@ -353,7 +355,7 @@ describe('PlaylistRepository', () => {
       vi.mocked(prisma.playlistItem.create).mockResolvedValue({ id: ITEM_ID } as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
 
-      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem);
+      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
 
       expect(prisma.playlist.update).toHaveBeenCalledWith({
         where: { id: PLAYLIST_ID },
@@ -364,7 +366,7 @@ describe('PlaylistRepository', () => {
     it('throws NOT_FOUND when the playlist is missing', async () => {
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(null);
 
-      const rejection = PlaylistRepository.addItem('missing', trackItem);
+      const rejection = PlaylistRepository.addItem('missing', trackItem, CAP);
 
       await expect(rejection).rejects.toBeInstanceOf(DataError);
       await expect(rejection).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -376,9 +378,38 @@ describe('PlaylistRepository', () => {
       vi.mocked(prisma.playlistItem.create).mockResolvedValue(created as never);
       vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
 
-      const result = await PlaylistRepository.addItem(PLAYLIST_ID, trackItem);
+      const result = await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
 
-      expect(result).toEqual(created);
+      expect(result).toEqual({ status: 'added', item: created });
+    });
+
+    it('appends when the playlist sits one under the cap', async () => {
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue({ itemCount: 199 } as never);
+      vi.mocked(prisma.playlistItem.create).mockResolvedValue({ id: ITEM_ID } as never);
+      vi.mocked(prisma.playlist.update).mockResolvedValue(mockPlaylist as never);
+
+      const result = await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
+
+      expect(result).toMatchObject({ status: 'added' });
+    });
+
+    it('answers full, inside the transaction, when the playlist holds maxItems', async () => {
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue({ itemCount: 200 } as never);
+
+      const result = await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
+
+      expect(result).toEqual({ status: 'full' });
+    });
+
+    it('writes nothing when the playlist is full', async () => {
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue({ itemCount: 200 } as never);
+
+      await PlaylistRepository.addItem(PLAYLIST_ID, trackItem, CAP);
+
+      expect([
+        vi.mocked(prisma.playlistItem.create).mock.calls,
+        vi.mocked(prisma.playlist.update).mock.calls,
+      ]).toEqual([[], []]);
     });
   });
 

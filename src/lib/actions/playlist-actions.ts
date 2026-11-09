@@ -24,6 +24,7 @@ import type {
 } from '@/lib/types/domain/playlist';
 import { buildCdnUrl } from '@/lib/utils/cdn-url';
 import { getS3BucketName, getS3Client } from '@/lib/utils/s3-client';
+import { buildMediaS3Key } from '@/lib/utils/s3-key-utils';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import {
   createPlaylistInputSchema,
@@ -47,27 +48,6 @@ const deletePlaylistInputSchema = z.object({
 });
 
 /**
- * Build the S3 object key for one playlist cover upload:
- * `media/playlists/{playlistId}/{sanitized}-{ts}-{rand}.{ext}`
- * (same sanitize/key pattern as the admin presigned-upload action).
- */
-const buildCoverObjectKey = (playlistId: string, fileName: string): string => {
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  // Only trust a short alphanumeric tail as the extension; anything else
-  // (query-string leftovers, embedded dots/slashes, an over-long tail) falls
-  // back to `.bin` so nothing unsanitized reaches the S3 key.
-  const rawExtension = fileName.split('.').pop()?.toLowerCase() ?? '';
-  const extension = /^[a-z0-9]{1,8}$/.test(rawExtension) ? rawExtension : 'bin';
-  const sanitizedName = fileName
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .substring(0, 50);
-  return `media/playlists/${playlistId}/${sanitizedName}-${timestamp}-${randomSuffix}.${extension}`;
-};
-
-/**
  * Mint one presigned PUT (content type and length reflected into the
  * signature) plus the CDN public URL for a single cover file.
  */
@@ -75,7 +55,12 @@ const buildCoverUploadTarget = async (
   playlistId: string,
   { fileName, contentType, fileSize }: CoverUploadFile
 ): Promise<PlaylistCoverUploadTarget> => {
-  const key = buildCoverObjectKey(playlistId, fileName);
+  const key = buildMediaS3Key({
+    entityType: 'playlists',
+    entityId: playlistId,
+    fileName,
+    fallbackExtension: 'bin',
+  });
   const command = new PutObjectCommand({
     Bucket: getS3BucketName(),
     Key: key,

@@ -6,8 +6,7 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -20,7 +19,7 @@ vi.mock('next/cache');
 vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/forms/read-action-input');
 vi.mock('@/lib/auth/action-gate');
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
@@ -36,17 +35,13 @@ describe('updateArtistAction', () => {
 
   const mockArtistId = 'artist-123';
 
-  const mockFormData = new FormData();
-  mockFormData.append('firstName', 'John');
-  mockFormData.append('surname', 'Doe');
-  mockFormData.append('slug', 'john-doe');
-  mockFormData.append('middleName', 'M');
-  mockFormData.append('displayName', 'Johnny Doe');
-  mockFormData.append('bio', 'A talented artist');
-
-  const initialFormState: FormState = {
-    fields: {},
-    success: false,
+  const mockInput = {
+    firstName: 'John',
+    surname: 'Doe',
+    slug: 'john-doe',
+    middleName: 'M',
+    displayName: 'Johnny Doe',
+    bio: 'A talented artist',
   };
 
   beforeEach(() => {
@@ -58,7 +53,7 @@ describe('updateArtistAction', () => {
     it('resolves the gate refusal as a form error without updating the artist', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(ArtistService.updateArtist).not.toHaveBeenCalled();
@@ -67,8 +62,8 @@ describe('updateArtistAction', () => {
 
   describe('Validation', () => {
     it('should validate form data with all permitted fields', async () => {
-      const mockGetActionState = vi.mocked(getActionState);
-      mockGetActionState.mockReturnValue({
+      const mockReadActionInput = vi.mocked(readActionInput);
+      mockReadActionInput.mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -85,10 +80,10 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
-      expect(getActionState).toHaveBeenCalledWith(
-        mockFormData,
+      expect(readActionInput).toHaveBeenCalledWith(
+        mockInput,
         [
           'firstName',
           'surname',
@@ -111,12 +106,13 @@ describe('updateArtistAction', () => {
           'socialLinks',
           'contactLinkGroups',
         ],
-        expect.anything()
+        expect.anything(),
+        { blankStrings: 'keep' }
       );
     });
 
     it('should return validation errors when schema validation fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -129,7 +125,7 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.firstName).toEqual(['First name is required']);
@@ -138,7 +134,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should handle validation errors with empty path', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -148,14 +144,14 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['General validation error']);
     });
 
     it('should accumulate multiple errors for the same field', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -168,7 +164,7 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.firstName).toEqual([
@@ -180,7 +176,7 @@ describe('updateArtistAction', () => {
 
   describe('Artist Update', () => {
     it('should update artist successfully with all fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -210,7 +206,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -241,7 +237,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should update artist with minimal required fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -258,7 +254,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -287,7 +283,7 @@ describe('updateArtistAction', () => {
     });
 
     it('writes null for genres when the field is submitted empty', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -299,13 +295,13 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].genres).toBeNull();
     });
 
     it('writes null for tags when the field is submitted empty', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -317,13 +313,13 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].tags).toBeNull();
     });
 
     it('keeps a non-empty genres value as written', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -335,7 +331,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1].genres).toBe('indie-rock');
     });
@@ -353,7 +349,7 @@ describe('updateArtistAction', () => {
       ] as const;
 
       const runWith = async (extra: Record<string, string>): Promise<Record<string, unknown>> => {
-        vi.mocked(getActionState).mockReturnValue({
+        vi.mocked(readActionInput).mockReturnValue({
           formState: { fields: {}, success: false },
           parsed: {
             success: true,
@@ -365,7 +361,7 @@ describe('updateArtistAction', () => {
           data: { id: 'artist-123' },
         } as never);
 
-        await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+        await updateArtistAction(mockArtistId, mockInput);
 
         expect(vi.mocked(ArtistService.updateArtist).mock.calls).toHaveLength(1);
         return vi.mocked(ArtistService.updateArtist).mock.calls[0][1] as Record<string, unknown>;
@@ -400,7 +396,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should handle artist update failure from service', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -418,7 +414,7 @@ describe('updateArtistAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.slug).toEqual([
@@ -427,7 +423,7 @@ describe('updateArtistAction', () => {
     });
 
     it('marks the slug field for a DUPLICATE whatever the copy says', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -445,7 +441,7 @@ describe('updateArtistAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toEqual({
@@ -454,7 +450,7 @@ describe('updateArtistAction', () => {
     });
 
     it('keeps a non-DUPLICATE failure off the slug field even when its copy names the slug', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -472,13 +468,13 @@ describe('updateArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.errors).toEqual({ general: ['Duplicate slug detected'] });
     });
 
     it('should handle service returning generic error', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -496,14 +492,14 @@ describe('updateArtistAction', () => {
         code: 'UNAVAILABLE',
       });
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Database connection failed']);
     });
 
     it('should pass empty string when firstName is falsy', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -520,7 +516,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -530,7 +526,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should pass empty string when surname is falsy', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -547,7 +543,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -557,7 +553,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should convert formedOn to Date when provided', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -575,7 +571,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -585,7 +581,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should preserve existing errors object on service failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { existing: ['prior error'] } },
         parsed: {
           success: true,
@@ -603,14 +599,14 @@ describe('updateArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Some generic error']);
     });
 
     it('should handle exception during update', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -624,7 +620,7 @@ describe('updateArtistAction', () => {
 
       vi.mocked(ArtistService.updateArtist).mockRejectedValue(new Error('Network error'));
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalledWith(result);
@@ -633,7 +629,7 @@ describe('updateArtistAction', () => {
 
   describe('Security Logging', () => {
     it('should log successful artist update', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -652,7 +648,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.updated',
@@ -666,7 +662,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should log failed artist update attempt', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -684,7 +680,7 @@ describe('updateArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.updated',
@@ -698,7 +694,7 @@ describe('updateArtistAction', () => {
     });
 
     it('should filter out undefined fields in security log', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -717,7 +713,7 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.updated',
@@ -733,7 +729,7 @@ describe('updateArtistAction', () => {
 
   describe('Cache Revalidation', () => {
     it('should revalidate artists page and individual artist page on success', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -750,14 +746,14 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
       expect(revalidatePath).toHaveBeenCalledWith('/artists/john-doe');
     });
 
     it('should revalidate the public releases listing on success', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -774,13 +770,13 @@ describe('updateArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/releases');
     });
 
     it('should not revalidate the public releases listing when the update fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -798,13 +794,13 @@ describe('updateArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(revalidatePath).not.toHaveBeenCalledWith('/releases');
     });
 
     it('should revalidate paths even on failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -822,7 +818,7 @@ describe('updateArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/artists');
       expect(revalidatePath).toHaveBeenCalledWith('/artists/john-doe');
@@ -831,7 +827,7 @@ describe('updateArtistAction', () => {
 
   describe('FormState handling', () => {
     it('should preserve existing errors object structure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: {} },
         parsed: {
           success: false,
@@ -841,13 +837,13 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.errors?.firstName).toEqual(['First name is required']);
     });
 
     it('should initialize errors object when not present in formState', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -857,7 +853,7 @@ describe('updateArtistAction', () => {
         },
       } as never);
 
-      const result = await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      const result = await updateArtistAction(mockArtistId, mockInput);
 
       expect(result.errors).toBeDefined();
       expect(result.errors?.firstName).toEqual(['First name is required']);
@@ -869,7 +865,7 @@ describe('updateArtistAction', () => {
     const parsedBase = { firstName: 'John', surname: 'Doe', slug: 'john-doe' };
 
     const stubParsed = (data: Record<string, unknown>): void => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: { success: true, data },
       } as never);
@@ -896,7 +892,7 @@ describe('updateArtistAction', () => {
         ],
       });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -926,7 +922,7 @@ describe('updateArtistAction', () => {
     it('sends a null composite when every array is empty', async () => {
       stubParsed({ ...parsedBase, websiteLinks: [], socialLinks: [], contactLinkGroups: [] });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -941,7 +937,7 @@ describe('updateArtistAction', () => {
     it('composes the links when only some of the arrays arrive, the rest as empty', async () => {
       stubParsed({ ...parsedBase, websiteLinks: [{ label: '', url: 'https://example.com' }] });
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(ArtistService.updateArtist).toHaveBeenCalledWith(
         mockArtistId,
@@ -959,7 +955,7 @@ describe('updateArtistAction', () => {
     it('leaves the links alone when the form did not send the arrays', async () => {
       stubParsed(parsedBase);
 
-      await updateArtistAction(mockArtistId, initialFormState, mockFormData);
+      await updateArtistAction(mockArtistId, mockInput);
 
       expect(vi.mocked(ArtistService.updateArtist).mock.calls[0][1]).not.toHaveProperty('links');
     });

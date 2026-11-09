@@ -8,19 +8,21 @@ import { tourImages } from '@/lib/services/tours/tour-images/tour-images';
 
 import { GET } from './route';
 
-// Mock rate limiting to pass through
-vi.mock('@/lib/decorators/with-rate-limit', () => ({
-  withRateLimit:
-    (_limiter: unknown, _limit: number) =>
-    (handler: (...args: unknown[]) => unknown) =>
-    (req: unknown, ctx: unknown) =>
-      handler(req, ctx),
-  extractClientIp: () => '127.0.0.1',
-}));
-vi.mock('@/lib/config/rate-limit-tiers', () => ({
-  publicLimiter: {},
-  PUBLIC_LIMIT: 100,
-}));
+vi.mock('server-only', () => ({}));
+
+// Model withAdmin: pass through for an admin, 401 otherwise.
+const authState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/lib/decorators/with-auth', async () => {
+  const { NextResponse: Response } = await import('next/server');
+  return {
+    withAdmin:
+      (handler: (...args: unknown[]) => unknown) =>
+      (...args: unknown[]) =>
+        authState.isAdmin
+          ? handler(...args)
+          : Response.json({ error: 'Authentication required' }, { status: 401 }),
+  };
+});
 
 vi.mock('@/lib/services/tours/tour-images/tour-images', () => ({
   tourImages: { list: vi.fn() },
@@ -31,6 +33,35 @@ describe('Tour Images API Route', () => {
     params: Promise.resolve({ tourId }),
   });
   describe('GET /api/tours/[tourId]/images', () => {
+    afterEach(() => {
+      authState.isAdmin = true;
+    });
+
+    it("refuses an anonymous visitor and reads nothing: a hidden tour's images are not public", async () => {
+      authState.isAdmin = false;
+
+      const response = await GET(
+        new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011/images'),
+        createParams('507f1f77bcf86cd799439011')
+      );
+
+      expect({ status: response.status, reads: vi.mocked(tourImages.list).mock.calls }).toEqual({
+        status: 401,
+        reads: [],
+      });
+    });
+
+    it('answers an admin privately, never from a shared cache', async () => {
+      vi.mocked(tourImages.list).mockResolvedValueOnce({ success: true, data: [] });
+
+      const response = await GET(
+        new NextRequest('http://localhost:3000/api/tours/507f1f77bcf86cd799439011/images'),
+        createParams('507f1f77bcf86cd799439011')
+      );
+
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    });
+
     it('should return empty images array for invalid tour ID format', async () => {
       const request = new NextRequest('http://localhost:3000/api/tours/not-valid/images');
       const response = await GET(request, createParams('not-valid'));

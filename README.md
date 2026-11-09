@@ -349,38 +349,45 @@ See [docs/auto-generated/CACHING_INFRASTRUCTURE_CHECKLIST.md](docs/auto-generate
 
 See [docs/auto-generated/stripe-webhook-lambda-deployment-readiness.md](docs/auto-generated/stripe-webhook-lambda-deployment-readiness.md)
 
-## Stripe Webhook IP Allowlist Refresh
+## Stripe Webhook IP Allowlist
 
-The webhook Lambda only accepts requests from Stripe's published source IPs (`STRIPE_WEBHOOK_IP_RANGES`). Because the value is injected at deploy time from a GitHub repository secret, it must be re-synced whenever Stripe rotates IPs.
+Production Stripe webhooks go to the `fakefour-stripe-webhook` Lambda
+(`stripe-webhook/template.yaml`, API Gateway `POST /webhooks/stripe`), not to
+the website. The Next.js route `src/app/api/stripe/webhook/route.ts` returns
+404 in production; it exists for local `stripe listen` testing only.
 
-This is automated by [`.github/workflows/refresh-stripe-webhook-ips.yml`](.github/workflows/refresh-stripe-webhook-ips.yml), which runs on a daily schedule (`17 6 * * *` UTC) and can also be triggered manually via `workflow_dispatch`.
+The Lambda keeps its own source-IP allowlist, and nothing in GitHub feeds it:
 
-What it does each run:
+1. On every invocation the webhook Lambda reads the comma-separated CIDRs from
+   the SSM parameter `/fakefour/stripe/webhook-ip-ranges` and rejects any
+   request whose API Gateway `sourceIp` (the TCP peer, which a client cannot
+   spoof) is outside them. An empty list answers 500.
+2. `RefreshIpAllowlistFunction`, in the same stack, runs once a day
+   (`rate(1 day)`). It fetches `https://stripe.com/files/ips/ips_webhooks.json`,
+   sorts the list, and rewrites the parameter only when it changed. A failed
+   fetch or an empty list throws and leaves the parameter as it was.
+3. `RefreshIpAllowlistErrorAlarm` fires when the refresh errors on two
+   consecutive days. It emails the `AlarmEmail` stack parameter, which
+   `deploy-stripe-webhook.yml` sets from the `ALERT_EMAIL` secret.
 
-1. Fetches `https://stripe.com/files/ips/ips_webhooks.json`, sorts the list, and computes a SHA-256 fingerprint.
-2. Compares the fingerprint against the `STRIPE_WEBHOOK_IP_RANGES_FINGERPRINT` repository variable. If unchanged, the job exits with no further action.
-3. On change: updates the `STRIPE_WEBHOOK_IP_RANGES` repository secret, writes the new fingerprint to the repository variable, and dispatches `deploy-stripe-webhook.yml` so the Lambda picks up the new value.
+`deploy-stripe-webhook.yml` deploys the stack on pushes to `main` that touch
+`stripe-webhook/` or `prisma/`; it does not pass any IP ranges.
 
-### Required repository configuration
+### Seeding and checking the parameter
 
-| Name                                   | Type     | Purpose                                                                                                                                                                                                       |
-| -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SECRETS_ADMIN_PAT`                    | Secret   | Fine-grained PAT scoped to this repo with **Actions: read/write**, **Secrets: read/write**, **Variables: read/write**. Used by the refresh workflow because the default `GITHUB_TOKEN` cannot update secrets. |
-| `STRIPE_WEBHOOK_IP_RANGES`             | Secret   | Comma-separated IPs/CIDRs consumed by `deploy-stripe-webhook.yml`. Managed by the refresh workflow after initial seed.                                                                                        |
-| `STRIPE_WEBHOOK_IP_RANGES_FINGERPRINT` | Variable | SHA-256 of the last-applied IP list. Stored as a variable (not a secret) because the value is derived from public data.                                                                                       |
-
-### Manual trigger
+`scripts/setup-ssm-params.sh` seeds the parameter with the rest of the
+Lambda's SSM values. After a first deploy, invoke the refresh once instead of
+waiting for the schedule, then read the parameter back (both steps are in
+[Step 10 of the deployment readiness guide](docs/auto-generated/stripe-webhook-lambda-deployment-readiness.md#step-10-bootstrap-the-stripe-ip-allowlist-refresh-lambda)):
 
 ```bash
-gh workflow run refresh-stripe-webhook-ips.yml
+aws ssm get-parameter --name /fakefour/stripe/webhook-ip-ranges \
+  --query 'Parameter.Value' --output text
 ```
 
-### Initial seed
+### Local development
 
-Before the first scheduled run, seed `STRIPE_WEBHOOK_IP_RANGES` with the current list so the deploy workflow has a value to read:
-
-```bash
-curl -fsSL https://stripe.com/files/ips/ips_webhooks.json \
-  | jq -r '.WEBHOOKS | sort | join(",")' \
-  | gh secret set STRIPE_WEBHOOK_IP_RANGES
-```
+The container route reads `STRIPE_WEBHOOK_IP_RANGES` (a `local` name in
+`src/lib/config/env-manifest.ts`, never forwarded to production) and takes
+the source IP from `X-Real-IP` only. Set `SKIP_STRIPE_IP_CHECK=true` to bypass
+the check when forwarding with `stripe listen`.

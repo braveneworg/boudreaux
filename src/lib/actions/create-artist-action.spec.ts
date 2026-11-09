@@ -6,8 +6,7 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { ArtistService } from '@/lib/services/artist-service';
-import type { FormState } from '@/lib/types/form-state';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { logSecurityEvent } from '@/utils/audit-log';
 import { setUnknownError } from '@/utils/auth/auth-utils';
 
@@ -20,7 +19,7 @@ vi.mock('next/cache');
 vi.mock('../services/artist-service');
 vi.mock('../utils/audit-log');
 vi.mock('../utils/auth/auth-utils');
-vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/forms/read-action-input');
 vi.mock('@/lib/auth/action-gate');
 
 const REFUSAL = { success: false as const, error: 'Unauthorized', code: 'FORBIDDEN' as const };
@@ -34,16 +33,12 @@ describe('createArtistAction', () => {
     },
   };
 
-  const mockFormData = new FormData();
-  mockFormData.append('firstName', 'John');
-  mockFormData.append('surname', 'Doe');
-  mockFormData.append('slug', 'john-doe');
-  mockFormData.append('middleName', 'M');
-  mockFormData.append('displayName', 'Johnny Doe');
-
-  const initialFormState: FormState = {
-    fields: {},
-    success: false,
+  const mockInput = {
+    firstName: 'John',
+    surname: 'Doe',
+    slug: 'john-doe',
+    middleName: 'M',
+    displayName: 'Johnny Doe',
   };
 
   beforeEach(() => {
@@ -53,8 +48,8 @@ describe('createArtistAction', () => {
     vi.mocked(gateAction).mockResolvedValue({ success: true, session: mockSession as never });
     vi.mocked(revalidatePath).mockImplementation(() => {});
 
-    // Default mock for getActionState - required for tests that depend on parsing
-    vi.mocked(getActionState).mockReturnValue({
+    // Default mock for readActionInput - required for tests that depend on parsing
+    vi.mocked(readActionInput).mockReturnValue({
       formState: { fields: {}, success: false },
       parsed: {
         success: true,
@@ -79,7 +74,7 @@ describe('createArtistAction', () => {
     it('resolves the gate refusal as a form error without creating the artist', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(ArtistService.createArtist).not.toHaveBeenCalled();
@@ -88,8 +83,8 @@ describe('createArtistAction', () => {
 
   describe('Validation', () => {
     it('should validate form data with permitted fields only', async () => {
-      const mockGetActionState = vi.mocked(getActionState);
-      mockGetActionState.mockReturnValue({
+      const mockReadActionInput = vi.mocked(readActionInput);
+      mockReadActionInput.mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -103,12 +98,13 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
-      expect(getActionState).toHaveBeenCalledWith(
-        mockFormData,
+      expect(readActionInput).toHaveBeenCalledWith(
+        mockInput,
         ['firstName', 'surname', 'slug', 'displayName', 'middleName', 'formedOn'],
-        expect.anything()
+        expect.anything(),
+        { blankStrings: 'omit' }
       );
     });
 
@@ -119,12 +115,12 @@ describe('createArtistAction', () => {
         errors: { firstName: ['First name is required'] },
       };
 
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: mockFormState,
         parsed: { success: false, error: {} },
       } as never);
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result).toEqual(mockFormState);
       expect(ArtistService.createArtist).not.toHaveBeenCalled();
@@ -133,7 +129,7 @@ describe('createArtistAction', () => {
 
   describe('Artist Creation', () => {
     it('should create artist successfully with all fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -152,7 +148,7 @@ describe('createArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith({
         firstName: 'John',
@@ -167,7 +163,7 @@ describe('createArtistAction', () => {
     });
 
     it('should create artist with minimal required fields', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -184,7 +180,7 @@ describe('createArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith({
         firstName: 'John',
@@ -196,7 +192,7 @@ describe('createArtistAction', () => {
     });
 
     it('should handle artist creation failure from service', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -214,7 +210,7 @@ describe('createArtistAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.slug).toEqual([
@@ -223,7 +219,7 @@ describe('createArtistAction', () => {
     });
 
     it('should preserve existing errors object when service fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false, errors: { someField: ['prior error'] } },
         parsed: {
           success: true,
@@ -241,7 +237,7 @@ describe('createArtistAction', () => {
         code: 'UNAVAILABLE',
       });
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Database connection failed']);
@@ -250,7 +246,7 @@ describe('createArtistAction', () => {
 
   describe('Security Logging', () => {
     it('should log successful artist creation', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -269,7 +265,7 @@ describe('createArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.created',
@@ -282,7 +278,7 @@ describe('createArtistAction', () => {
     });
 
     it('should log failed artist creation attempt', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -300,7 +296,7 @@ describe('createArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.created',
@@ -313,7 +309,7 @@ describe('createArtistAction', () => {
     });
 
     it('should filter out undefined fields in security log', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -332,7 +328,7 @@ describe('createArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith({
         event: 'media.artist.created',
@@ -347,7 +343,7 @@ describe('createArtistAction', () => {
 
   describe('Cache Revalidation', () => {
     it('should revalidate artist creation page on success', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -364,13 +360,13 @@ describe('createArtistAction', () => {
         data: { id: 'artist-123' },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/artist/new');
     });
 
     it('should revalidate even on failure', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -388,7 +384,7 @@ describe('createArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/artist/new');
     });
@@ -396,7 +392,7 @@ describe('createArtistAction', () => {
 
   describe('Error Handling', () => {
     it('should handle unexpected errors during artist creation', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -410,14 +406,14 @@ describe('createArtistAction', () => {
 
       vi.mocked(ArtistService.createArtist).mockRejectedValue(Error('Unexpected database error'));
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
     });
 
     it('should handle errors during security logging', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -438,7 +434,7 @@ describe('createArtistAction', () => {
         throw Error('Logging failed');
       });
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.success).toBe(false);
       expect(setUnknownError).toHaveBeenCalled();
@@ -447,7 +443,7 @@ describe('createArtistAction', () => {
 
   describe('slug uniqueness error handling', () => {
     it('marks the slug field for a DUPLICATE whatever the copy says', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -465,7 +461,7 @@ describe('createArtistAction', () => {
         code: 'DUPLICATE',
       });
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors).toEqual({
@@ -474,7 +470,7 @@ describe('createArtistAction', () => {
     });
 
     it('keeps a non-DUPLICATE failure off the slug field even when its copy names the slug', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -492,7 +488,7 @@ describe('createArtistAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await createArtistAction(initialFormState, mockFormData);
+      const result = await createArtistAction(mockInput);
 
       expect(result.errors).toEqual({ general: ['Slug already exists in the database'] });
     });
@@ -500,7 +496,7 @@ describe('createArtistAction', () => {
 
   describe('field fallback branches', () => {
     it('should pass empty string for firstName when it is falsy', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -512,7 +508,7 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
         expect.objectContaining({ firstName: '', surname: 'Doe' })
@@ -520,7 +516,7 @@ describe('createArtistAction', () => {
     });
 
     it('should pass empty string for surname when it is falsy', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -532,7 +528,7 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
         expect.objectContaining({ firstName: 'John', surname: '' })
@@ -540,7 +536,7 @@ describe('createArtistAction', () => {
     });
 
     it('never forwards a publish date to the service', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -553,7 +549,7 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       // ADR-0019: an artist is created unpublished; the create action never
       // forwards a publish date, whatever the request carries.
@@ -563,7 +559,7 @@ describe('createArtistAction', () => {
     });
 
     it('should convert formedOn string to Date when provided', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: true,
@@ -576,7 +572,7 @@ describe('createArtistAction', () => {
         },
       } as never);
 
-      await createArtistAction(initialFormState, mockFormData);
+      await createArtistAction(mockInput);
 
       expect(ArtistService.createArtist).toHaveBeenCalledWith(
         expect.objectContaining({ formedOn: new Date('2020-03-15') })

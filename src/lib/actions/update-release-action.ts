@@ -14,13 +14,16 @@ import type { FormState } from '@/lib/types/form-state';
 import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
 import { toClearableString } from '@/lib/utils/forms/to-clearable-string';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
-import { createReleaseSchema } from '@/lib/validation/create-release-schema';
+import {
+  createReleaseSchema,
+  type ReleaseActionInput,
+} from '@/lib/validation/create-release-schema';
 
 import {
   applyServiceFailure,
@@ -196,10 +199,15 @@ const applyWriteResult = (
   revalidatePath('/artists/[slug]', 'page');
 };
 
+/**
+ * Server Action to save the release edit form with the admin's credit
+ * decisions. Called only by `useUpdateReleaseMutation`; the input is
+ * validated here, never trusted. Blanks are kept: an emptied optional field
+ * is cleared (#759).
+ */
 export const updateReleaseAction = async (
   releaseId: string,
-  _initialState: FormState,
-  payload: FormData
+  input: ReleaseActionInput
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -215,7 +223,9 @@ export const updateReleaseAction = async (
     };
   }
 
-  const { formState, parsed } = getActionState(payload, PERMITTED_FIELD_NAMES, createReleaseSchema);
+  const { formState, parsed } = readActionInput(input, PERMITTED_FIELD_NAMES, createReleaseSchema, {
+    blankStrings: 'keep',
+  });
 
   if (!parsed.success) {
     formState.success = false;
@@ -223,7 +233,7 @@ export const updateReleaseAction = async (
     return formState;
   }
 
-  const credit = readCreditDecisions(payload);
+  const credit = readCreditDecisions(input);
   if (!credit.ok) {
     applyCreditFailure(formState, 'Invalid artist decisions');
     return formState;

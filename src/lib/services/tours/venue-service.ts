@@ -27,6 +27,12 @@ export interface PaginatedVenuesResponse {
   limit: number;
 }
 
+/** How many recent venues the picker offers before anything is typed. */
+const PICKER_RECENT = 5;
+
+/** How many matches the picker offers for a search. */
+const PICKER_MATCHES = 50;
+
 /**
  * Service for venue business logic.
  * Provides validation, data transformation, and orchestration of venue operations.
@@ -50,6 +56,16 @@ export class VenueService {
       page,
       limit,
     };
+  }
+
+  /**
+   * The venues the admin venue picker offers: the five most recently added
+   * while nothing is typed, else up to fifty matching the search.
+   */
+  static async findForPicker(search?: string): Promise<VenueScalars[]> {
+    return search
+      ? VenueRepository.findAll({ search, limit: PICKER_MATCHES })
+      : VenueRepository.findRecent(PICKER_RECENT);
   }
 
   /**
