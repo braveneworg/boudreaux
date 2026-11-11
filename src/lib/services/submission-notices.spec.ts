@@ -158,6 +158,17 @@ describe('notifyApproversOfSubmission', () => {
     expect(smsSend).not.toHaveBeenCalled();
   });
 
+  it('texts nobody under E2E, where a worktree may carry a live SMS provider', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ allowSmsNotifications: true, phone: '+15550001234' }),
+    ]);
+
+    await notifyApproversOfSubmission(submission());
+
+    expect(smsSend).not.toHaveBeenCalled();
+  });
+
   it('still emails the others when one approver’s email fails', async () => {
     vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
       approver(),

@@ -85,6 +85,14 @@ describe('sendSubmissionEmail', () => {
     expect(mockSesClientSend).not.toHaveBeenCalled();
   });
 
+  it('sends nothing under E2E, where a worktree may carry live mail credentials', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+
+    await expect(sendSubmissionEmail(email)).resolves.toBe(false);
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockSesClientSend).not.toHaveBeenCalled();
+  });
+
   it('rejects with the SES failure, for the caller to log per recipient', async () => {
     const outage = new Error('SES down');
     mockSesClientSend.mockRejectedValue(outage);

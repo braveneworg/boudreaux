@@ -47,8 +47,9 @@ const emailOne = async (toEmail: string, message: SubmissionEmailMessage): Promi
 };
 
 const textOne = async ({ id, phone }: UserAdminRecord, body: string): Promise<void> => {
-  // Truthy-guard narrows `phone` to a non-null string for `send`.
-  if (!phone) {
+  // Truthy-guard narrows `phone` to a non-null string for `send`. And never
+  // text from an E2E run: a worktree's env files may name a live SMS provider.
+  if (!phone || process.env.E2E_MODE === 'true') {
     return;
   }
 

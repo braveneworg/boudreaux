@@ -18,8 +18,9 @@ interface SendSubmissionEmailInput {
 
 /**
  * Send one laid-out submission notice through SES. Returns `true` on success
- * and `false` when `EMAIL_FROM` is not configured. An SES failure rejects, so
- * a fan-out caller can log it per recipient and carry on with the rest.
+ * and `false` when nothing was sent: `EMAIL_FROM` is not configured, or this
+ * is an E2E run. An SES failure rejects, so a fan-out caller can log it per
+ * recipient and carry on with the rest.
  */
 export const sendSubmissionEmail = async ({
   toEmail,
@@ -27,6 +28,14 @@ export const sendSubmissionEmail = async ({
   text,
   html,
 }: SendSubmissionEmailInput): Promise<boolean> => {
+  // An E2E run has no mailbox to deliver to, and a worktree's copied env files
+  // may hold live mail credentials: never send from one. Safe because
+  // `auth.ts` refuses to start with `E2E_MODE` enabled in production.
+  if (process.env.E2E_MODE === 'true') {
+    loggers.notifications.info(`[sendSubmissionEmail] Skipping "${subject}" (E2E mode)`);
+    return false;
+  }
+
   const fromAddress = process.env.EMAIL_FROM;
   if (!fromAddress) {
     loggers.notifications.error('[sendSubmissionEmail] EMAIL_FROM is not configured');
