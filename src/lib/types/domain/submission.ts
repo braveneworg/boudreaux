@@ -98,6 +98,55 @@ export interface SubmissionQueuePage {
   total: number;
 }
 
+/** Who is acting on or reading a submission: the session's user, or nobody. */
+export interface SubmissionActor {
+  id: string;
+  role: string | null;
+}
+
+/** The owner as a save needs them: who they are and which agreement they hold. */
+export interface SubmissionOwnerActor {
+  id: string;
+  uploadAgreementVersion: number | null;
+}
+
+/** How a reader stands to the submission they opened. */
+export type SubmissionViewerKind = 'owner' | 'approver' | 'public';
+
+/**
+ * What a submission's page shows. Built for one reader: it exists only when
+ * that reader may open the submission, and it never carries the owner's email.
+ */
+export interface SubmissionView extends SubmissionContent {
+  id: string;
+  ownerId: string;
+  listed: boolean;
+  status: SubmissionStatus;
+  rejectionReason: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+  owner: { username: string | null; gravatarHash: string };
+  viewer: SubmissionViewerKind;
+  /** Whether the public may open it right now: approved, owner not banned. */
+  isPublic: boolean;
+  /** How many are ahead of it in the queue; set for its owner while it awaits approval. */
+  queuePosition: number | null;
+}
+
+/** One row of an approver's queue. */
+export interface SubmissionQueueRow {
+  id: string;
+  title: string;
+  category: SubmissionCategory;
+  listed: boolean;
+  status: SubmissionStatus;
+  ownerUsername: string | null;
+  publishedAt: Date | null;
+  approvedAt: Date | null;
+  rejectedAt: Date | null;
+  updatedAt: Date;
+}
+
 /** The codes a submission Server Action can fail with. */
 export type SubmissionActionCode = DataErrorCode | 'UNAUTHENTICATED' | 'BANNED' | 'FORBIDDEN';
 

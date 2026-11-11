@@ -5,7 +5,7 @@ import 'server-only';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
-import { CONSTANTS } from '@/lib/constants';
+import { isAdminRole, isApproverRole } from '@/lib/utils/roles';
 
 /**
  * Who may cross the gate: any signed-in, unbanned user; an approver (an admin
@@ -13,23 +13,13 @@ import { CONSTANTS } from '@/lib/constants';
  */
 export type ActionAccess = 'signed-in' | 'approver' | 'admin';
 
-/** The roles `'approver'` access admits: an admin is always an approver too. */
-const APPROVER_ROLES: ReadonlySet<string> = new Set([
-  CONSTANTS.ROLES.ADMIN,
-  CONSTANTS.ROLES.MANAGER,
-]);
-
 /** Whether a role is admitted at an access level. `'signed-in'` admits every role. */
 const holdsRoleFor = (access: ActionAccess, role: string | null | undefined): boolean => {
   if (access === 'signed-in') {
     return true;
   }
 
-  if (access === 'admin') {
-    return role === CONSTANTS.ROLES.ADMIN;
-  }
-
-  return typeof role === 'string' && APPROVER_ROLES.has(role);
+  return access === 'admin' ? isAdminRole(role) : isApproverRole(role);
 };
 
 /**
