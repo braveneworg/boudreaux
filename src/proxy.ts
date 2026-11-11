@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server';
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
 import { legacyReleaseId, legacyReleaseResponse } from '@/lib/legacy-release-url';
+import { isApproverRole } from '@/lib/utils/roles';
 
 // Must match `advanced.cookiePrefix` in src/lib/auth.ts.
 const COOKIE_PREFIX = 'boudreaux';
@@ -85,6 +86,12 @@ const resolveCachedRole = async (request: NextRequest): Promise<string | undefin
   return typeof role === 'string' ? role : undefined;
 };
 
+const APPROVER_SECTION = '/admin/community';
+
+/** Whether a path is the approver section or a page under it, and not a sibling that shares its prefix. */
+const isApproverSection = (pathname: string): boolean =>
+  pathname === APPROVER_SECTION || pathname.startsWith(`${APPROVER_SECTION}/`);
+
 /**
  * Role-based authorization for `/admin` routes. Returns a response when the
  * request must be short-circuited (403), or `null` to allow it. Assumes a
@@ -94,7 +101,9 @@ const resolveCachedRole = async (request: NextRequest): Promise<string | undefin
  * definitive non-admin role. On a cache miss (`undefined` — cache expired,
  * absent, or unreadable) it falls through and lets the authoritative
  * server-side `withAdmin` check decide, so a valid admin is never hard-denied at
- * the edge just because the cache wasn't populated.
+ * the edge just because the cache wasn't populated. A cached manager role is
+ * let through to the approver section alone; everywhere else under `/admin` it
+ * is a non-admin role like any other.
  */
 const handleAdminAuthorization = async (
   request: NextRequest,
@@ -103,6 +112,13 @@ const handleAdminAuthorization = async (
   const userRole = await resolveCachedRole(request);
   // Admin via cache, or cache miss → allow through (authoritative check follows).
   if (userRole === 'admin' || userRole === undefined) {
+    return null;
+  }
+
+  // The approver section is the one part of the admin area a manager reaches
+  // (ADR-0025). Its pages make the authoritative check, the managers screen
+  // for admin access included.
+  if (isApproverSection(pathname) && isApproverRole(userRole)) {
     return null;
   }
 
