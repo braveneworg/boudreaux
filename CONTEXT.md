@@ -380,7 +380,9 @@ _Avoid_: release datetime, upload date.
 
 **draft** — a Video row that has not been published, created the moment its
 upload completes so that later work has a row to attach to. A draft may lack a
-release date and a description.
+release date and a description. The word also names a **submission** its
+owner has saved and not yet published (a **draft submission**): only its
+owner sees it.
 
 **go-live moment** — the instant a published Video becomes visible to the
 public, recorded when an admin publishes it. It is distinct from the
@@ -555,6 +557,124 @@ the Tour it may see; an owner's image list is an admin read, so a hidden
 Tour's images are not served either. No public page shows tour date images.
 _Defined in_ `src/lib/services/tours/tour-images/`.
 _Avoid_: tour photo, `Image` (the release image table), bio image.
+
+**submission** — one titled piece of user submitted content: a user's title
+and category over an ordered list of zero or more **attachments**. It is the
+unit a card shows, a view counts and an admin approves. No part of it reaches
+the public, by a listing or by its link, until an admin has approved it. A
+submission is never a **Video**, whatever its category: it is not in the
+label's catalog and no catalog surface shows it.
+_Avoid_: content, post, upload (the act), Video (the label's catalog).
+
+**attachment** — one file a user uploaded to a **submission**: a video, an
+audio file or an image, kept in the order uploaded. The category belongs to
+the submission, never to an attachment, so one submission may mix kinds. A
+submission holds at most ten.
+_Avoid_: upload, media, asset, file (any stored object).
+
+**re-encoded copy** — the fresh file written from an **attachment**'s decoded
+picture and sound, carrying nothing else from the upload. It is the only form
+of an attachment an admin reviews or anyone is served; the uploaded original
+is never given out, and a submission cannot be published while any of its
+attachments lacks one. The size limits a user meets are on the upload (a
+photo up to 20 MB, audio up to 50 MB, a video up to 500 MB and ten minutes);
+what is kept is smaller by construction: a photo at most 2560 px on its long
+side at quality 70, a video at 720p.
+_Avoid_: transcode, sanitized file, scan (nothing is scanned).
+
+**about** — the owner's note on a **submission**, in bold and italic only:
+what its page shows beside the work, and the only body text a search reads.
+_Avoid_: description (a Video's prose), blurb (a Release's listing copy),
+caption.
+
+**writing** — the work itself in a writings **submission**, when it is typed
+rather than photographed: headings, bold, italic and links. Only the writings
+category has one; its links count toward the submission's ten outbound links,
+and no search reads it. A writings submission may be published with a writing
+or an attachment; every other submission needs an attachment.
+_Avoid_: body, text, content.
+
+**upload agreement** — a user's recorded promise, given before their first
+upload, to post nothing harmful and only what is theirs to share or shared
+with its owner's explicit permission. It is held on the account with its date
+and the version of the wording agreed to, and is asked again only when that
+wording changes.
+_Avoid_: terms (the signup terms and conditions), consent, attestation.
+
+**card picture** — the one picture that stands for a **submission** wherever
+it appears as a card or a shared-link preview: its first image attachment,
+else a frame from its first video attachment, else a tile naming its
+category. It is derived, never chosen by the owner.
+_Avoid_: cover (a Release's art), poster (a Video's chosen frame), thumbnail.
+
+**unapproved submission** — a **submission** no admin has approved in its
+present form: a draft, one **awaiting approval**, or a **rejected** one. A
+user may hold at most five at once; approved submissions are not counted.
+
+**awaiting approval** — a **submission** its owner has published and no admin
+has yet approved in its present form: open to its owner and to admins, and to
+no one else, by a listing or by its link. Publishing a submission asks for
+approval; it never makes the submission public by itself.
+_Avoid_: pending (an async job state), in review, published (as a synonym for
+public).
+
+**approved submission** — a **submission** an admin approved in its present
+form; it is either **listed** or **unlisted**. Approval covers the content the
+admin saw: any edit to that content returns the submission to **awaiting
+approval** and takes it offline until it is approved again. Switching between
+listed and unlisted is not such an edit.
+
+**public submission** — a **submission** the public may open: approved, with
+an owner who is not banned. A ban takes every submission its owner holds
+offline without changing any of them, and they return when the ban ends.
+Only a public submission is ever **listed** or reachable as **unlisted**.
+_Avoid_: live (a Video state), visible, published.
+
+**rejected submission** — a **submission** an admin refused, before or after
+approval, with a written reason its owner can read: offline, seen only by its
+owner and admins. Its owner may edit and publish it again, which returns it
+to **awaiting approval**, or delete it. An admin's refusal is always a
+rejection, never a silent delete.
+_Avoid_: declined, removed, taken down (refusing an approved submission is
+still a rejection), banned (an account state).
+
+**submission report** — a complaint anyone, signed in or not, files against a
+**submission**: a reason (harmful, not theirs to post, other) with an
+optional note and contact. It informs admins and changes nothing by itself;
+only an admin's rejection takes a submission offline.
+_Avoid_: abuse report (filed against a chat user), flag, takedown.
+
+**listed submission** — an approved **submission** its owner chose to show:
+it appears on the User Submitted Content page, in that page's search and on
+its owner's public list. The owner's choice decides where an approved
+submission appears, never whether it is reachable.
+
+**community page** — `/community`, the public page headed "User Submitted
+Content" that the menu calls Community: its search, both **submission rows**
+and the full list of **listed submissions**. A submission's own page is
+`/community/<id>`: an id, never its title or its owner's username, so no
+edit or rename breaks a shared link.
+_Avoid_: USC page, feed, gallery.
+
+**submission row** — one of the two fixed sets the **community page**
+leads with, **Most Recent** and **Trending**: at most twelve **listed
+submissions** each, looping rather than fetching more. A row takes nothing
+out of the full list beneath it, which holds every listed submission, newest
+first; a row with nothing in it is not shown. Most Recent orders by first
+approval, so neither an old upload date nor a re-approval moves a submission;
+Trending orders by **views** over the last thirty days, newer first on a tie.
+_Avoid_: feed, carousel (the banner's), featured (a release credit).
+
+**view** — one viewer opening a **submission**'s own page, counted at most
+once per viewer, per submission, per day. The viewer is a signed-in user or a
+guest, identified as a guest **download subject** is. The owner's and admins'
+openings are never counted, and a card shown in a row, a list or a search is
+not a view.
+_Avoid_: play, hit, impression.
+
+**unlisted submission** — an approved **submission** its owner chose not to
+show: on no listing and in no search, but open to anyone who holds its link.
+_Avoid_: private (a stranger with the link can open it), hidden.
 
 ## Shipping vocabulary
 
