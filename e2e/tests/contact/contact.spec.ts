@@ -36,18 +36,22 @@ test.describe('Contact Page', () => {
 
     test('should display label manager info', async ({ page }) => {
       await expect(page.getByText(/label manager/i)).toBeVisible();
-      await expect(page.getByText('dylanowenmusic@gmail.com')).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Email Label Manager, nikianarchy@gmail.com' })
+      ).toBeVisible();
     });
 
     test('should display distribution info', async ({ page }) => {
       await expect(page.getByText(/distribution/i).first()).toBeVisible();
-      await expect(page.getByText(/jeep ward at redeye worldwide/i)).toBeVisible();
-      await expect(page.getByText('jeephalo@gmail.com')).toBeVisible();
+      await expect(page.getByText(/nina at redeye worldwide/i)).toBeVisible();
+      await expect(page.getByText('nina@redeyeworldwide.com')).toBeVisible();
     });
 
     test('should display media and fan support info', async ({ page }) => {
       await expect(page.getByText(/media and fan support/i)).toBeVisible();
-      await expect(page.getByText('nikianarchy@gmail.com')).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Email Media and Fan Support, nikianarchy@gmail.com' })
+      ).toBeVisible();
     });
 
     test('should display customer service info', async ({ page }) => {
