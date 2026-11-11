@@ -181,21 +181,33 @@ describe('ContactPage', () => {
 
     it('should render label manager info', async () => {
       await importAndRender();
-      expect(screen.getByText(/label manager/i)).toBeInTheDocument();
-      expect(screen.getByText('dylanowenmusic@gmail.com')).toBeInTheDocument();
+      const role = screen.getByText(/label manager/i);
+      expect(role.closest('p')).toHaveTextContent('Label Manager: Niki');
+      expect(
+        screen.getByRole('link', { name: 'Email Label Manager, nikianarchy@gmail.com' })
+      ).toHaveTextContent('nikianarchy@gmail.com');
     });
 
     it('should render distribution info', async () => {
       await importAndRender();
       expect(screen.getByText(/distribution/i)).toBeInTheDocument();
-      expect(screen.getByText(/jeep ward at redeye worldwide/i)).toBeInTheDocument();
-      expect(screen.getByText('jeephalo@gmail.com')).toBeInTheDocument();
+      expect(screen.getByText(/nina at redeye worldwide/i)).toBeInTheDocument();
+      expect(screen.getByText('nina@redeyeworldwide.com')).toBeInTheDocument();
     });
 
     it('should render media and fan support info', async () => {
       await importAndRender();
-      expect(screen.getByText(/media and fan support/i)).toBeInTheDocument();
-      expect(screen.getByText('nikianarchy@gmail.com')).toBeInTheDocument();
+      const role = screen.getByText(/media and fan support/i);
+      expect(role.closest('p')).toHaveTextContent('Media and Fan Support: Niki');
+      expect(
+        screen.getByRole('link', { name: 'Email Media and Fan Support, nikianarchy@gmail.com' })
+      ).toHaveTextContent('nikianarchy@gmail.com');
+    });
+
+    it('should not render the former label manager or distribution contacts', async () => {
+      await importAndRender();
+      expect(screen.queryByText(/dylan/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/jeep/i)).not.toBeInTheDocument();
     });
 
     it('should render customer service info', async () => {
@@ -207,14 +219,14 @@ describe('ContactPage', () => {
 
   describe('email contact links', () => {
     const emailLinks = [
-      { name: /email label manager/i, href: 'mailto:dylanowenmusic@gmail.com' },
-      { name: /email distribution/i, href: 'mailto:jeephalo@gmail.com' },
+      { name: /email label manager/i, href: 'mailto:nikianarchy@gmail.com' },
+      { name: /email distribution/i, href: 'mailto:nina@redeyeworldwide.com' },
       { name: /email media and fan support/i, href: 'mailto:nikianarchy@gmail.com' },
       { name: /email customer service/i, href: 'mailto:djmoniklz@gmail.com' },
     ];
 
     it.each(emailLinks)(
-      'should render an accessible mailto link to $href',
+      'should render an accessible mailto link for $name to $href',
       async ({ name, href }) => {
         await importAndRender();
         const link = screen.getByRole('link', { name });
