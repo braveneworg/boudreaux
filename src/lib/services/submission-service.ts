@@ -465,8 +465,6 @@ export class SubmissionService {
     }
 
     const { owner, publishedAt, status } = submission;
-    const awaitsOwnApproval =
-      kind === 'owner' && status === 'AWAITING_APPROVAL' && publishedAt !== null;
 
     return {
       id: submission.id,
@@ -484,9 +482,8 @@ export class SubmissionService {
       owner: { username: owner.username, gravatarHash: gravatarHash(owner.email) },
       viewer: kind,
       isPublic: isPublicSubmission(submission),
-      queuePosition: awaitsOwnApproval
-        ? await SubmissionRepository.countAwaitingBefore(publishedAt)
-        : null,
+      // An approver reads the queue itself; the position is for the owner.
+      queuePosition: kind === 'owner' ? await SubmissionService.queuePositionOf(submission) : null,
     };
   }
 
@@ -522,5 +519,19 @@ export class SubmissionService {
   /** How many submissions are awaiting approval. */
   static async countAwaiting(): Promise<number> {
     return SubmissionRepository.countAwaiting();
+  }
+
+  /**
+   * A submission's queue position: how many submissions awaiting approval
+   * were published before it. `null` when it is not in the queue. A count,
+   * never a promise of order.
+   */
+  static async queuePositionOf({
+    status,
+    publishedAt,
+  }: Pick<SubmissionRecord, 'status' | 'publishedAt'>): Promise<number | null> {
+    return status === 'AWAITING_APPROVAL' && publishedAt !== null
+      ? SubmissionRepository.countAwaitingBefore(publishedAt)
+      : null;
   }
 }

@@ -249,16 +249,29 @@ describe('this repository', () => {
         'changeUsernameAction',
         'createPlaylistAction',
         'deletePlaylistAction',
+        'deleteSubmissionAction',
         'generatePlaylistCoverUploadUrlsAction',
         'getCollectionAction',
+        'publishSubmissionAction',
         'removePlaylistItemAction',
         'reorderPlaylistItemsAction',
+        'saveSubmissionDraftAction',
         'sendChatMessageAction',
+        'setSubmissionListedAction',
         'submitAbuseReportAction',
         'toggleChatReactionAction',
         'updatePlaylistAction',
         'updateProfileAction',
       ].sort()
     );
+  });
+
+  it('gates exactly these exports as approver', () => {
+    const approver = report.exports
+      .filter(({ access }) => access === 'approver')
+      .map(({ name }) => name)
+      .sort();
+
+    expect(approver).toEqual(['approveSubmissionAction', 'rejectSubmissionAction']);
   });
 });

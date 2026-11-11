@@ -147,6 +147,15 @@ export interface SubmissionQueueRow {
   updatedAt: Date;
 }
 
+/** What a save or a decision hands back to the screen that asked for it. */
+export interface SavedSubmission {
+  id: string;
+  status: SubmissionStatus;
+  listed: boolean;
+  /** How many are ahead of it in the queue, when the write left it awaiting approval. */
+  queuePosition: number | null;
+}
+
 /** The codes a submission Server Action can fail with. */
 export type SubmissionActionCode = DataErrorCode | 'UNAUTHENTICATED' | 'BANNED' | 'FORBIDDEN';
 

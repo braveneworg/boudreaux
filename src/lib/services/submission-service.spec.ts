@@ -943,3 +943,26 @@ describe('SubmissionService.countAwaiting', () => {
     await expect(SubmissionService.countAwaiting()).resolves.toBe(4);
   });
 });
+
+describe('SubmissionService.queuePositionOf', () => {
+  it('counts the submissions awaiting approval that were published earlier', async () => {
+    vi.mocked(SubmissionRepository.countAwaitingBefore).mockResolvedValueOnce(2);
+
+    await expect(
+      SubmissionService.queuePositionOf(
+        record({ status: 'AWAITING_APPROVAL', publishedAt: EARLIER })
+      )
+    ).resolves.toBe(2);
+    expect(vi.mocked(SubmissionRepository.countAwaitingBefore).mock.calls).toEqual([[EARLIER]]);
+  });
+
+  it.each(['DRAFT', 'APPROVED', 'REJECTED'] as const)(
+    'is null for a %s submission, which is not in the queue',
+    async (status) => {
+      await expect(
+        SubmissionService.queuePositionOf(record({ status, publishedAt: EARLIER }))
+      ).resolves.toBeNull();
+      expect(SubmissionRepository.countAwaitingBefore).not.toHaveBeenCalled();
+    }
+  );
+});
