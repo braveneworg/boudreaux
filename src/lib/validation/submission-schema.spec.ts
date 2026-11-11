@@ -14,6 +14,7 @@ import {
   rejectSubmissionInputSchema,
   saveSubmissionInputSchema,
   setSubmissionListedInputSchema,
+  submissionFormSchema,
   submissionIdInputSchema,
 } from './submission-schema';
 
@@ -122,6 +123,48 @@ describe('saveSubmissionInputSchema', () => {
     const result = saveSubmissionInputSchema.safeParse({ ...validSave, status: 'APPROVED' });
 
     expect(result.success && 'status' in result.data).toBe(false);
+  });
+});
+
+describe('submissionFormSchema', () => {
+  const validForm = {
+    title: 'Bus poem',
+    category: 'WRITING',
+    aboutHtml: '',
+    writingHtml: '<p>A poem.</p>',
+    links: [{ url: 'https://example.com/zine' }],
+    listed: false,
+    acceptAgreement: false,
+  };
+
+  it('accepts the form as the client holds it, links as rows', () => {
+    expect(submissionFormSchema.safeParse(validForm).success).toBe(true);
+  });
+
+  it('puts a bad link on that row’s address', () => {
+    const result = submissionFormSchema.safeParse({
+      ...validForm,
+      links: [{ url: 'https://example.com' }, { url: 'not a link' }],
+    });
+
+    expect(issuePaths(result)).toEqual(['links.1.url']);
+  });
+
+  it('refuses more rows than the limit', () => {
+    const links = Array.from({ length: MAX_SUBMISSION_LINKS + 1 }, (_, index) => ({
+      url: `https://example.com/${index}`,
+    }));
+
+    expect(issuePaths(submissionFormSchema.safeParse({ ...validForm, links }))).toEqual(['links']);
+  });
+
+  it('refuses a title past the limit', () => {
+    const result = submissionFormSchema.safeParse({
+      ...validForm,
+      title: 'a'.repeat(SUBMISSION_TITLE_MAX + 1),
+    });
+
+    expect(issuePaths(result)).toEqual(['title']);
   });
 });
 

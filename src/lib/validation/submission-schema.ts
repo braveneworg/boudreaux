@@ -58,6 +58,23 @@ export const saveSubmissionInputSchema = z.object({
 
 export type SaveSubmissionInput = z.infer<typeof saveSubmissionInputSchema>;
 
+/**
+ * What the submission form holds on the client. It is the save input without
+ * the fields the form does not own (the id and the verification token), and
+ * with each link as a row, which is the shape a field array needs. A broken
+ * rule lands on its own row. The server validates again with
+ * {@link saveSubmissionInputSchema}.
+ */
+export const submissionFormSchema = saveSubmissionInputSchema
+  .omit({ submissionId: true, turnstileToken: true, links: true })
+  .extend({
+    links: z
+      .array(z.object({ url: link }))
+      .max(MAX_SUBMISSION_LINKS, `Add at most ${MAX_SUBMISSION_LINKS} links`),
+  });
+
+export type SubmissionFormValues = z.infer<typeof submissionFormSchema>;
+
 /** Switch an approved submission between listed and unlisted. */
 export const setSubmissionListedInputSchema = z.object({
   submissionId: objectId,
