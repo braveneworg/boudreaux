@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { OVERDUE_BUSINESS_DAYS } from '@/lib/constants/submissions';
 import { sendSubmissionEmail } from '@/lib/email/send-submission-email';
 import { buildSubmissionEmail, type SubmissionEmailMessage } from '@/lib/email/submission-email';
 import { UserRepository } from '@/lib/repositories/user-repository';
@@ -92,6 +93,33 @@ export const notifyApproversOfSubmission = async (submission: SubmissionRecord):
         approver.allowSmsNotifications ? textOne(approver, smsBody) : Promise.resolve(),
       ]);
     })
+  );
+};
+
+/**
+ * Remind every approver that submissions have waited longer than an owner is
+ * told to expect. An email only: a daily reminder is not worth a text.
+ *
+ * @param overdue - How many submissions have waited too long; at least one.
+ */
+export const remindApproversOfOverdue = async (overdue: number): Promise<void> => {
+  const approvers = await UserRepository.findApprovers();
+  const counted = overdue === 1 ? '1 submission has waited' : `${overdue} submissions have waited`;
+  const subject = `${counted} more than ${OVERDUE_BUSINESS_DAYS} business days`;
+
+  await Promise.allSettled(
+    approvers.map((approver) =>
+      emailOne(approver.email, {
+        subject,
+        kicker: KICKER,
+        greetingName: greetingFor(approver),
+        paragraphs: [
+          `${counted} for approval for more than ${OVERDUE_BUSINESS_DAYS} business days. Each owner was told to expect a reply in 2 to 5.`,
+          'The queue lists the oldest first.',
+        ],
+        action: { label: 'Open the queue', url: signedInLink(QUEUE_PATH) },
+      })
+    )
   );
 };
 

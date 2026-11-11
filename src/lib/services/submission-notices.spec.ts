@@ -6,7 +6,11 @@ import { UserRepository } from '@/lib/repositories/user-repository';
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
 import type { UserAdminRecord } from '@/lib/types/domain/user';
 
-import { notifyApproversOfSubmission, notifyOwnerOfDecision } from './submission-notices';
+import {
+  notifyApproversOfSubmission,
+  notifyOwnerOfDecision,
+  remindApproversOfOverdue,
+} from './submission-notices';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/repositories/user-repository', () => ({
@@ -184,6 +188,53 @@ describe('notifyApproversOfSubmission', () => {
     vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([]);
 
     await notifyApproversOfSubmission(submission());
+
+    expect(sendSubmissionEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('remindApproversOfOverdue', () => {
+  it('emails every approver how many have waited, with a link to the queue', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver(),
+      approver({ id: 'e'.repeat(24), email: 'admin@example.com' }),
+    ]);
+
+    await remindApproversOfOverdue(3);
+
+    expect(sentTo()).toEqual([
+      ['mgr@example.com', '3 submissions have waited more than 5 business days'],
+      ['admin@example.com', '3 submissions have waited more than 5 business days'],
+    ]);
+    expect(firstBody()).toContain(
+      `${BASE}/signin?callbackUrl=${encodeURIComponent('/admin/community')}`
+    );
+  });
+
+  it('writes one overdue submission in the singular', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver()]);
+
+    await remindApproversOfOverdue(1);
+
+    expect(sentTo()).toEqual([
+      ['mgr@example.com', '1 submission has waited more than 5 business days'],
+    ]);
+  });
+
+  it('texts nobody: a daily reminder is not worth a text', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ allowSmsNotifications: true, phone: '+15550001234' }),
+    ]);
+
+    await remindApproversOfOverdue(2);
+
+    expect(smsSend).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when there are no approvers', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([]);
+
+    await remindApproversOfOverdue(2);
 
     expect(sendSubmissionEmail).not.toHaveBeenCalled();
   });
