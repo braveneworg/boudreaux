@@ -2,7 +2,7 @@
 
 - **Date**: 2026-11-11
 - **Branch**: `feat/user-submitted-content` (off main `a7d92f58`, v4.479.0)
-- **Status**: Approved design, ready for implementation planning
+- **Status**: Implemented on the branch; see "As built" at the end
 - **Vocabulary**: `CONTEXT.md` (submission, attachment, awaiting approval,
   approved / rejected / public / listed / unlisted submission, about,
   writing, upload agreement, community page)
@@ -458,11 +458,77 @@ its own action and needs no token and no confirm.
 - An owner should expect a reply in two to five business days and is shown a
   queue position. Approvers are reminded daily of anything waiting longer.
 
-## Open for implementation planning
+## As built (2026-11-11)
 
-- **What runs the daily reminder.** The app has no scheduler for daily work
-  of its own. An in-process timer (the Apple secret expiry monitor is one
-  precedent) and a scheduled Lambda are the candidates.
-- **How quickly a role change reaches a live session.** Criterion 20 needs a
-  removed manager refused on the next request; check how the session carries
-  `role` before choosing where the approver check reads it.
+Stage 1 is implemented on `feat/user-submitted-content`. Where the build
+differs from the design above, the build is what the code does and this
+section says why. The acceptance criteria were not changed.
+
+### Planning questions, answered
+
+- **What runs the daily reminder.** An hourly in-process check, started from
+  `src/instrumentation.ts` in real production only
+  (`submission-overdue-reminder.ts`). The day is claimed on a site setting
+  (`SiteSettingsRepository.claimValue`) before anything is sent, so instances
+  that check in the same hour send one reminder between them. It sends on
+  business days only, by email only.
+- **How quickly a role change reaches a live session.** The session's user is
+  read from the database on every request, so pages and actions see a role
+  change at once. The proxy's optimistic gate reads the role from the session
+  cookie cache, which can lag: a removed manager may get past the proxy for a
+  short while, and is then refused by the page, which is the authoritative
+  check.
+
+### Differences from the design
+
+- **Section 3, visibility rule.** `publicSubmission` is not in
+  `_internal/visibility.ts`: that kit declares fields as set or unset, and
+  this rule needs a status value. It is `submissionWhere.public` with the
+  predicate `isPublicSubmission`, in `_internal/submission-where.ts`, proved
+  on Docker Mongo for every way `banned` is stored. It reads the `banned` flag
+  as the action gate does. better-auth clears that flag when a ban expires, so
+  no expiry date is read here.
+- **Section 3, service failures.** `SubmissionService` and `ManagerService`
+  throw a `DataError` carrying the code, as `PlaylistService` does, and the
+  actions map it. A rule that belongs on a form field is a
+  `SubmissionRuleError` naming the field.
+- **Section 9, form protocol.** The form calls its actions with a plain
+  object and reads `fieldErrors` from the result, the playlist pattern, not
+  `useEntitySubmit` with a `FailureFieldTable`. ADR-0003's protocol is built
+  around admin entity forms that create-or-update through `FormData`; this
+  form has two intents (save, publish) and a result that carries a queue
+  position.
+- **Section 9, the agreement control.** A switch, not a checkbox:
+  `src/app/AGENTS.md` rules out checkboxes in this app's forms.
+- **Section 9, buttons.** A submission that is awaiting approval or approved
+  offers one button, "Save changes", in place of "Save draft" and "Publish".
+  There is no draft to save once it has been published, and for an approved
+  submission saving a content edit is what sends it for approval.
+- **Section 10, where the approver section lives.** In its own route group,
+  `src/app/(approver)/admin/community/`, at the same URLs. A layout does not
+  render again on a client-side navigation between its pages, so letting a
+  manager into the admin layout for one section would leave nothing to stop
+  them at the next. Each page there also asks for its own access.
+- **The proxy.** Not in the design at all. `src/proxy.ts` refuses every
+  non-admin role under `/admin` before a page renders, so it had to learn the
+  approver section too. See
+  `docs/lessons/react-nextjs/the-proxy-gates-admin-routes-before-any-page.md`.
+- **Section 11, notices under E2E.** The submission email sender sends
+  nothing, and no approver is texted, when `E2E_MODE` is on: an E2E run
+  publishes for real and a worktree may hold live mail credentials.
+
+### Known gaps, to close before stage 4
+
+- **Not found is the themed page with a 200.** `/community/<id>` sits under
+  the root `loading.tsx`, so `notFound()` there renders the not-found page
+  after the 200 has streamed. A real 404 status has to come from the proxy
+  (`docs/lessons/react-nextjs/a-real-status-under-a-loading-boundary-comes-from-the-proxy.md`).
+  It does not matter while only approvers reach these pages; it will for
+  search engines once the public does.
+- **No production-build E2E run.** The E2E spec passed on the dev server, 4
+  times across 4 workers. CI runs it on the production build.
+- **The public rule is proved below the page.** Before launch a signed-out
+  visitor gets not found everywhere, so "an approved submission opens for a
+  signed-out visitor" (criterion 5) is proved by the service and contract
+  specs, not by the E2E spec. Stage 4 should add that E2E case when it lifts
+  the gate.
