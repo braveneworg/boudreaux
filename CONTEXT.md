@@ -78,10 +78,11 @@ _In_ `src/app/api/`.
 _In_ `src/lib/decorators/`.
 
 **action gate** — the one access check a **Server Action** crosses:
-`gateAction('signed-in' | 'admin')`, or `runAdminEntityAction`, which crosses
-it as `'admin'`. In order, it refuses a request with no session or no user id
-(`UNAUTHENTICATED`), a banned account (`BANNED`), and a non-admin asking for
-`'admin'` access (`FORBIDDEN`). A refusal resolves as
+`gateAction('signed-in' | 'approver' | 'admin')`, or `runAdminEntityAction`,
+which crosses it as `'admin'`. In order, it refuses a request with no session
+or no user id (`UNAUTHENTICATED`), a banned account (`BANNED`), and a role the
+access asked for does not admit (`FORBIDDEN`): `'admin'` admits an admin,
+`'approver'` an admin or a **manager**. A refusal resolves as
 `{ success: false, error, code }`, never a throw, and each action returns it in
 its own result type. The route **decorators** apply the same rule
 (`refusalFor`) and answer with their HTTP responses. A `'use server'` module

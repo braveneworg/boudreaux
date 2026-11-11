@@ -14,6 +14,7 @@ const sessionFor = (user: Partial<ServerSession['user']>): ServerSession =>
 
 const admin = sessionFor({ id: 'admin-1', role: 'admin', banned: false });
 const member = sessionFor({ id: 'user-1', role: 'user', banned: false });
+const manager = sessionFor({ id: 'manager-1', role: 'manager', banned: false });
 
 describe('gateAction', () => {
   it('refuses a request with no session as UNAUTHENTICATED', async () => {
@@ -80,6 +81,56 @@ describe('gateAction', () => {
     await expect(gateAction('signed-in')).resolves.toEqual({ success: true, session: member });
   });
 
+  it('passes a manager for approver access', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(manager);
+
+    await expect(gateAction('approver')).resolves.toEqual({ success: true, session: manager });
+  });
+
+  it('passes an admin for approver access', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(admin);
+
+    await expect(gateAction('approver')).resolves.toEqual({ success: true, session: admin });
+  });
+
+  it('refuses a user without an approver role as FORBIDDEN', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(member);
+
+    await expect(gateAction('approver')).resolves.toEqual({
+      success: false,
+      error: 'Unauthorized',
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('refuses a manager for admin access as FORBIDDEN', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(manager);
+
+    await expect(gateAction('admin')).resolves.toEqual({
+      success: false,
+      error: 'Unauthorized',
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('refuses a banned manager as BANNED, not FORBIDDEN', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(
+      sessionFor({ id: 'manager-1', role: 'manager', banned: true })
+    );
+
+    await expect(gateAction('approver')).resolves.toEqual({
+      success: false,
+      error: 'Account suspended',
+      code: 'BANNED',
+    });
+  });
+
+  it('passes a manager for signed-in access', async () => {
+    vi.mocked(auth).mockResolvedValueOnce(manager);
+
+    await expect(gateAction('signed-in')).resolves.toEqual({ success: true, session: manager });
+  });
+
   it('rejects with the error auth() rejects with', async () => {
     const outage = new Error('Database unavailable');
     vi.mocked(auth).mockRejectedValueOnce(outage);
@@ -91,6 +142,14 @@ describe('gateAction', () => {
 describe('refusalFor', () => {
   it('refuses a role of null for admin access as FORBIDDEN', () => {
     expect(refusalFor(sessionFor({ id: 'user-1', role: null }), 'admin')).toBe('FORBIDDEN');
+  });
+
+  it('refuses a role of null for approver access as FORBIDDEN', () => {
+    expect(refusalFor(sessionFor({ id: 'user-1', role: null }), 'approver')).toBe('FORBIDDEN');
+  });
+
+  it.each(['admin', 'manager'])('passes the %s role for approver access', (role) => {
+    expect(refusalFor(sessionFor({ id: 'approver-1', role }), 'approver')).toBeNull();
   });
 
   it.each([false, null])('passes an admin whose banned flag is %s', (banned) => {
