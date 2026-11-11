@@ -115,6 +115,14 @@ export interface UserContactRecord {
   email: string | null;
 }
 
+/** Role projection: who a role may be granted to or removed from. */
+export interface UserRoleRecord {
+  id: string;
+  username: string | null;
+  role: string | null;
+  banned: boolean | null;
+}
+
 /** Admin notification fan-out projection. */
 export interface UserAdminRecord {
   id: string;
