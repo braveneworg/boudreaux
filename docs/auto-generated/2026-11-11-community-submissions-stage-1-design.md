@@ -15,7 +15,7 @@
 
 The site has no way for a fan to contribute anything. The agreed feature lets
 a signed-in user post a **submission** that the public sees only after an
-admin approves it. It is delivered in five stages. This is the first: the
+approver approves it. It is delivered in five stages. This is the first: the
 whole approval loop, end to end, with no file handling at all.
 
 | Stage | Ships                                                       |
@@ -30,18 +30,19 @@ whole approval loop, end to end, with no file handling at all.
 
 Stage 1 ships a submission that is text only: a title, the writings category,
 an **about**, a **writing** and up to ten outbound links. It can be saved as
-a draft, published for approval, approved or rejected by an admin, edited,
-switched between listed and unlisted, and deleted. Nothing in it is reachable
-by anyone but admins until stage 4 opens it.
+a draft, published for approval, approved or rejected by an **approver** (an
+admin or a manager), edited, switched between listed and unlisted, and
+deleted. Nothing in it is reachable by anyone but approvers until stage 4
+opens it.
 
 ## Design
 
 ### 1. Who can reach it before launch
 
 Every `/community/*` route and every submission Server Action is open to
-admins only until stage 4. One module answers "may this session use the
-community feature" (`src/lib/community/community-access.ts`); stage 4 changes
-that one answer. A non-admin gets the themed not-found page from a route and
+approvers (admins and managers) only until stage 4. One module answers "may
+this session use the community feature"
+(`src/lib/community/community-access.ts`); stage 4 changes that one answer. Anyone else gets the themed not-found page from a route and
 a `FORBIDDEN` refusal from an action. No environment variable is added.
 
 ### 2. Data model — `prisma/schema.prisma`
@@ -113,6 +114,12 @@ model Submission {
   the owner is not banned, readable as a `where` fragment and as a predicate
   like the two rules there today. It must read "banned" the same way the
   action gate does (`refusalFor`); a ban that has expired is not a ban.
+- **Action gate** `src/lib/auth/action-gate.ts`: `ActionAccess` gains
+  `'approver'`, crossed by the `admin` and `manager` roles. `'admin'` is
+  unchanged, so a manager is refused `FORBIDDEN` by every existing admin
+  action. `refusalFor` is shared with the route decorators, which gain the
+  level with it. `manager` is a new value of the `User.role` string; the
+  schema does not change.
 - **Service** `src/lib/services/submission-service.ts`: every rule in
   sections 4 to 7. Returns `ServiceResponse` with a `DataErrorCode`.
 - **Server Actions** `src/lib/actions/submissions/`: mutations only, each
@@ -123,28 +130,31 @@ model Submission {
 
 ### 4. States and transitions
 
-| From              | Action                                 | By    | To                | Notes                               |
-| ----------------- | -------------------------------------- | ----- | ----------------- | ----------------------------------- |
-| (none)            | Save draft                             | owner | DRAFT             |                                     |
-| DRAFT             | Save draft                             | owner | DRAFT             |                                     |
-| DRAFT             | Publish                                | owner | AWAITING_APPROVAL | Sets `publishedAt`; notifies admins |
-| AWAITING_APPROVAL | Edit content                           | owner | AWAITING_APPROVAL | No second admin notice              |
-| AWAITING_APPROVAL | Approve                                | admin | APPROVED          | Sets `firstApprovedAt` once         |
-| AWAITING_APPROVAL | Reject (reason required)               | admin | REJECTED          | Owner emailed the reason            |
-| APPROVED          | Switch listed / unlisted               | owner | APPROVED          | Not a content edit                  |
-| APPROVED          | Edit content, after the offline notice | owner | AWAITING_APPROVAL | Offline at once; notifies admins    |
-| APPROVED          | Reject (reason required)               | admin | REJECTED          | Owner emailed the reason            |
-| REJECTED          | Edit content                           | owner | REJECTED          | Still offline                       |
-| REJECTED          | Publish                                | owner | AWAITING_APPROVAL | Clears nothing; reason kept on file |
-| any               | Delete                                 | owner | (gone)            | An admin never deletes              |
+| From              | Action                                 | By       | To                | Notes                                  |
+| ----------------- | -------------------------------------- | -------- | ----------------- | -------------------------------------- |
+| (none)            | Save draft                             | owner    | DRAFT             |                                        |
+| DRAFT             | Save draft                             | owner    | DRAFT             |                                        |
+| DRAFT             | Publish                                | owner    | AWAITING_APPROVAL | Sets `publishedAt`; notifies approvers |
+| AWAITING_APPROVAL | Edit content                           | owner    | AWAITING_APPROVAL | No second notice                       |
+| AWAITING_APPROVAL | Approve                                | approver | APPROVED          | Sets `firstApprovedAt` once            |
+| AWAITING_APPROVAL | Reject (reason required)               | approver | REJECTED          | Owner emailed the reason               |
+| APPROVED          | Switch listed / unlisted               | owner    | APPROVED          | Not a content edit                     |
+| APPROVED          | Edit content, after the offline notice | owner    | AWAITING_APPROVAL | Offline at once; notifies approvers    |
+| APPROVED          | Reject (reason required)               | approver | REJECTED          | Owner emailed the reason               |
+| REJECTED          | Edit content                           | owner    | REJECTED          | Still offline                          |
+| REJECTED          | Publish                                | owner    | AWAITING_APPROVAL | Clears nothing; reason kept on file    |
+| any               | Delete                                 | owner    | (gone)            | An approver never deletes              |
 
 - "Content" is the title, category, about, writing and links. `listed` is
   not content.
-- An admin action on a submission in any other state than the table allows
-  answers `INVALID_INPUT`.
+- An approver's action on a submission in any other state than the table
+  allows answers `INVALID_INPUT`.
+- A manager can neither approve nor reject their own submission
+  (`INVALID_INPUT`); it waits for another approver. An admin may do both, so
+  a label with one admin is not stuck.
 - Approve and reject are compare-and-swap on `status` and `updatedAt`, so an
-  admin never approves content the owner changed after the admin loaded it.
-  The losing write answers `DUPLICATE` and the admin screen reloads.
+  approver never approves content the owner changed after it was loaded. The
+  losing write answers `DUPLICATE` and the approver's screen reloads.
 
 ### 5. Limits
 
@@ -209,31 +219,33 @@ version, and every user is asked again:
 
 All under `src/app/community/`. Server Components by default.
 
-| Route                  | Who                 | What                                                           |
-| ---------------------- | ------------------- | -------------------------------------------------------------- |
-| `/community/submit`    | signed in           | The form, empty                                                |
-| `/community/<id>/edit` | owner               | The form, loaded                                               |
-| `/community/mine`      | signed in           | The owner's submissions in every state, with rejection reasons |
-| `/community/<id>`      | see the table below | One submission                                                 |
-| `/admin/community`     | admin               | Awaiting approval, approved, rejected                          |
+| Route                       | Who                 | What                                                           |
+| --------------------------- | ------------------- | -------------------------------------------------------------- |
+| `/community/submit`         | signed in           | The form, empty                                                |
+| `/community/<id>/edit`      | owner               | The form, loaded                                               |
+| `/community/mine`           | signed in           | The owner's submissions in every state, with rejection reasons |
+| `/community/<id>`           | see the table below | One submission                                                 |
+| `/admin/community`          | approver            | Awaiting approval, approved, rejected                          |
+| `/admin/community/managers` | admin               | Grant and remove the manager role                              |
 
 `/community` itself is stage 4.
 
-Who can open `/community/<id>` (after the stage 1 admin-only gate of
-section 1 is lifted; under it, only admins reach any of this):
+Who can open `/community/<id>` (after the stage 1 approver-only gate of
+section 1 is lifted; under it, only approvers reach any of this):
 
-| State                      | Owner | Admin | Anyone else |
-| -------------------------- | ----- | ----- | ----------- |
-| Draft                      | yes   | no    | not found   |
-| Awaiting approval          | yes   | yes   | not found   |
-| Rejected                   | yes   | yes   | not found   |
-| Approved, owner not banned | yes   | yes   | yes         |
-| Approved, owner banned     | no    | yes   | not found   |
+| State                      | Owner | Approver | Anyone else |
+| -------------------------- | ----- | -------- | ----------- |
+| Draft                      | yes   | no       | not found   |
+| Awaiting approval          | yes   | yes      | not found   |
+| Rejected                   | yes   | yes      | not found   |
+| Approved, owner not banned | yes   | yes      | yes         |
+| Approved, owner banned     | no    | yes      | not found   |
 
 - A refusal is always the themed not-found page, never "forbidden", so a
   link does not reveal that a submission exists.
-- The owner and admins see a status strip above an unapproved submission
-  naming its state and, when rejected, the reason.
+- The owner and approvers see a status strip above an unapproved submission
+  naming its state and, when rejected, the reason. While it awaits approval
+  the owner's strip also shows its queue position (section 11).
 - An unlisted submission's page sends `noindex`: it is open to
   anyone with the link, and a search engine is not someone with the link.
 - The page shows the title, the owner's avatar (`GravatarAvatar`, by
@@ -266,37 +278,60 @@ Copy, as agreed:
 - Beside the buttons: "Saving keeps a draft only you can see. Publishing
   sends it to our team for approval; nobody else can open it until it is
   approved."
-- After publishing: "Sent for approval. We'll email you when it's live or if
-  we need changes."
+- After publishing: "Sent for approval.", then the queue position line of
+  section 11, then "We'll email you when it's live or if we need changes."
 - Before saving a content edit to an approved submission, a confirm dialog:
-  "Editing takes this offline until an admin approves it again."
+  "Editing takes this offline until it is approved again."
 
 Save and Publish verify the Turnstile token on the server with the existing
 `verifyTurnstile`. The listed toggle on an approved submission saves through
 its own action and needs no token and no confirm.
 
-### 10. The admin section — `/admin/community`
+### 10. The approver section — `/admin/community`
 
 - A "Community" entry in `admin-nav-items.ts`.
+- `AdminLayout` gates every admin route as `'admin'` today. It must let a
+  manager into `/admin/community` and nowhere else: a manager who opens any
+  other admin route gets the refusal a signed-in user gets, and `AdminNav`
+  shows a manager the Community entry only.
 - Three tabs: Awaiting approval (oldest `publishedAt` first), Approved,
   Rejected. Each row: title, owner username, category, listed or unlisted,
   the relevant date.
 - Opening a row shows the submission exactly as the public would see it,
   with Approve and Reject. Reject opens a dialog whose reason is required.
 - An approved row offers Reject only.
-- The dashboard at `/admin` shows the awaiting-approval count.
+- The dashboard at `/admin` (admins only) shows the awaiting-approval count.
+- **Managers** (`/admin/community/managers`, admins only): the current
+  managers, a control to grant the role by username, and one to remove it.
+  Granting refuses an unknown username, a banned account and an account that
+  is already an admin. A removed manager is refused at the approver section
+  on their next request, without having to sign out.
 
 ### 11. Notices
 
-- **To admins, on every transition into awaiting approval from a draft, a
-  rejection or an approved edit**: an email to every admin and a text to
-  admins who opted in to SMS, following
-  `src/lib/services/abuse-report-notifications.ts`. The fan-out is awaited
-  and one admin's failure never blocks another's or fails the publish.
+- **To approvers, on every transition into awaiting approval from a draft, a
+  rejection or an approved edit**: an email to every approver and a text to
+  those who opted in to SMS, following
+  `src/lib/services/abuse-report-notifications.ts`, with a repository read of
+  approvers beside `findAdmins`. The fan-out is awaited and one approver's
+  failure never blocks another's or fails the publish.
 - **To the owner, on approval and on rejection**: an email
   (`src/lib/email/`), the rejection carrying the reason and a link to edit.
-  A failed email is logged and never fails the admin's action.
+  A failed email is logged and never fails the approver's action.
 - No notice carries the about or the writing, only the title and a link.
+- **Queue position, to the owner**: the number of submissions awaiting
+  approval with an earlier `publishedAt`, computed when the page is read and
+  never stored. Shown after publishing and on the status strip:
+  - none ahead: "You're next in line for approval. We usually reply within 2
+    to 5 business days."
+  - one ahead: "1 submission is ahead of yours. We usually reply within 2 to
+    5 business days."
+  - several ahead: "N submissions are ahead of yours. We usually reply within
+    2 to 5 business days."
+- **Overdue reminder, to approvers**: once a day, while any submission has
+  awaited approval for more than five business days, each approver gets one
+  reminder naming how many are overdue. Business days are weekdays counted in
+  UTC, with no holiday calendar; five is a named constant.
 
 ### 12. Edge cases
 
@@ -304,25 +339,28 @@ its own action and needs no token and no confirm.
   content. Last write wins on drafts; on an approved submission the confirm
   dialog is shown per save.
 - The owner is banned while a submission awaits approval: it stays in the
-  admin list, and the action gate already refuses the owner's every action.
+  approvers' list, and the action gate already refuses the owner's every
+  action.
 - The owner changes username: nothing stored on a submission changes; the
   page reads the current username.
 - A deleted submission's `/community/<id>` is not found for everyone.
 - An admin is also an owner: their own submission still needs approval, and
   they may approve it. Refusing self-approval was rejected: it blocks a
-  label with one admin.
+  label with one admin. A manager may not (section 4).
+- A manager is removed while holding the queue open: their next approve or
+  reject is refused, and nothing they approved earlier changes.
 
 ### 13. Acceptance criteria
 
-1. A signed-in admin without a current upload agreement cannot save or
+1. A signed-in approver without a current upload agreement cannot save or
    publish until the checkbox is ticked; ticking it records the date and
    version on the account, and the checkbox is not shown again.
 2. Save draft creates a submission only its owner can open; a signed-out
    visitor and another signed-in user both get not found.
-3. Publish moves it to awaiting approval, shows the agreed message, and
-   sends each admin one notice.
+3. Publish moves it to awaiting approval, shows the agreed message with the
+   queue position, and sends each approver one notice.
 4. The submission's link returns not found for a signed-out visitor until an
-   admin approves it, whether listed or unlisted.
+   approver approves it, whether listed or unlisted.
 5. After approval the link opens for a signed-out visitor, the page shows the
    share widget, and the owner receives an email.
 6. Switching listed to unlisted on an approved submission keeps it approved
@@ -343,12 +381,26 @@ its own action and needs no token and no confirm.
 13. Every rendered outbound link has `rel="nofollow noopener noreferrer"`.
 14. A banned owner's approved submission returns not found for a signed-out
     visitor and opens again once the ban is lifted, with no change to its row.
-15. A non-admin gets not found from every `/community/*` route and a refusal
-    from every submission action (the pre-launch gate).
-16. An admin's approve of content that changed since the admin loaded it is
-    refused, and the admin screen shows the current content.
+15. Anyone who is not an approver gets not found from every `/community/*`
+    route and a refusal from every submission action (the pre-launch gate).
+16. An approve of content that changed since the approver loaded it is
+    refused, and the approver's screen shows the current content.
 17. The owner can delete a submission in any state; its link is then not
     found for everyone.
+18. A manager can open the approver section and approve and reject. Every
+    other admin route refuses them, and every admin-only action answers
+    `FORBIDDEN`.
+19. A manager's approve or reject of their own submission is refused; an
+    admin's approve of their own is accepted.
+20. An admin can grant the manager role by username and remove it; a manager
+    cannot. After removal, the former manager's next request to the approver
+    section is refused.
+21. The queue position reads "You're next in line for approval" with none
+    ahead, "1 submission is ahead of yours" with one, and "N submissions are
+    ahead of yours" otherwise, each followed by the usual reply time.
+22. With a submission awaiting approval for more than five business days,
+    each approver receives exactly one reminder that day; with none overdue,
+    none is sent. A weekend does not count toward the five.
 
 ### 14. Testing (TDD, per repo rules)
 
@@ -359,17 +411,19 @@ its own action and needs no token and no confirm.
 - A contract spec for `publicSubmission` covering a banned owner, an owner
   whose ban expired, and an absent `banned` field.
 - Sanitizer specs from a table of hostile inputs.
+- Action gate specs for the `'approver'` level: a user, a manager, an admin
+  and a banned manager, at each of the three access levels.
 - `scripts/check-server-action-gates.spec.ts` must pass with no
   `action-gate: public` exemption added.
 - One E2E spec on the isolated Mongo (`e2e/AGENTS.md`): publish, see not
-  found signed out, approve as admin, see it signed out, edit, see not found
-  again. Turnstile through `e2e/helpers/turnstile-mock.ts`.
+  found signed out, approve as a manager, see it signed out, edit, see not
+  found again. Turnstile through `e2e/helpers/turnstile-mock.ts`.
 
 ### 15. Out of scope
 
 - Attachments, uploads, the re-encode Lambda, the card picture, the cap of
   ten attachments, and every category but Writings (stage 2).
-- The report control and its admin view (stage 3).
+- The report control and the approvers' view of reports (stage 3).
 - `/community`, its search, both submission rows, the per-user filter, and
   the public menu entry (stage 4).
 - Views and Trending (stage 5).
@@ -395,12 +449,20 @@ its own action and needs no token and no confirm.
 
 ## Settled after the first draft (2026-11-11)
 
-The owner accepted the upload agreement wording (section 7), the field
-lengths (section 5), `noindex` on unlisted pages (section 8) and admin
-self-approval (section 12) as written.
+- The owner accepted the upload agreement wording (section 7), the field
+  lengths (section 5), `noindex` on unlisted pages (section 8) and admin
+  self-approval (section 12) as written.
+- Approvers are admins and managers. A manager's access is the submissions
+  queue and nothing else; an admin grants and removes the role; a manager
+  cannot approve or reject their own submission.
+- An owner should expect a reply in two to five business days and is shown a
+  queue position. Approvers are reminded daily of anything waiting longer.
 
-## Open item for the owner
+## Open for implementation planning
 
-Who answers the approval queue, and how quickly. Not decided in design, and
-no recommendation was made; every publish, edit and rejection waits on it.
-It does not block building stage 1, which is admin-only.
+- **What runs the daily reminder.** The app has no scheduler for daily work
+  of its own. An in-process timer (the Apple secret expiry monitor is one
+  precedent) and a scheduled Lambda are the candidates.
+- **How quickly a role change reaches a live session.** Criterion 20 needs a
+  removed manager refused on the next request; check how the session carries
+  `role` before choosing where the approver check reads it.

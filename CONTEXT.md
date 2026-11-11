@@ -560,8 +560,8 @@ _Avoid_: tour photo, `Image` (the release image table), bio image.
 
 **submission** — one titled piece of user submitted content: a user's title
 and category over an ordered list of zero or more **attachments**. It is the
-unit a card shows, a view counts and an admin approves. No part of it reaches
-the public, by a listing or by its link, until an admin has approved it. A
+unit a card shows, a view counts and an **approver** approves. No part of it
+reaches the public, by a listing or by its link, until one has approved it. A
 submission is never a **Video**, whatever its category: it is not in the
 label's catalog and no catalog surface shows it.
 _Avoid_: content, post, upload (the act), Video (the label's catalog).
@@ -574,7 +574,7 @@ _Avoid_: upload, media, asset, file (any stored object).
 
 **re-encoded copy** — the fresh file written from an **attachment**'s decoded
 picture and sound, carrying nothing else from the upload. It is the only form
-of an attachment an admin reviews or anyone is served; the uploaded original
+of an attachment an approver reviews or anyone is served; the uploaded original
 is never given out, and a submission cannot be published while any of its
 attachments lacks one. The size limits a user meets are on the upload (a
 photo up to 20 MB, audio up to 50 MB, a video up to 500 MB and ten minutes);
@@ -607,20 +607,36 @@ else a frame from its first video attachment, else a tile naming its
 category. It is derived, never chosen by the owner.
 _Avoid_: cover (a Release's art), poster (a Video's chosen frame), thumbnail.
 
-**unapproved submission** — a **submission** no admin has approved in its
+**unapproved submission** — a **submission** no approver has approved in its
 present form: a draft, one **awaiting approval**, or a **rejected** one. A
 user may hold at most five at once; approved submissions are not counted.
 
-**awaiting approval** — a **submission** its owner has published and no admin
-has yet approved in its present form: open to its owner and to admins, and to
+**awaiting approval** — a **submission** its owner has published and no
+approver has yet approved in its present form: open to its owner and to
+approvers, and to
 no one else, by a listing or by its link. Publishing a submission asks for
 approval; it never makes the submission public by itself.
 _Avoid_: pending (an async job state), in review, published (as a synonym for
 public).
 
-**approved submission** — a **submission** an admin approved in its present
+**approver** — a user who may approve or reject **submissions**: an admin or
+a **manager**.
+
+**manager** — a user an admin has made an **approver** and nothing more: the
+submissions queue is all of the admin area a manager reaches. An admin
+grants and removes the role. A manager cannot approve or reject a submission
+of their own; an admin can.
+_Avoid_: moderator, staff, editor.
+
+**queue position** — how many **submissions** **awaiting approval** were
+published before a given one. Its owner sees it as a count ahead, or as next
+in line at zero, beside the usual reply time of two to five business days.
+It is a count, never a promise of order.
+_Avoid_: requests (they are submissions), ticket number, ETA.
+
+**approved submission** — a **submission** an approver approved in its present
 form; it is either **listed** or **unlisted**. Approval covers the content the
-admin saw: any edit to that content returns the submission to **awaiting
+approver saw: any edit to that content returns the submission to **awaiting
 approval** and takes it offline until it is approved again. Switching between
 listed and unlisted is not such an edit.
 
@@ -630,18 +646,18 @@ offline without changing any of them, and they return when the ban ends.
 Only a public submission is ever **listed** or reachable as **unlisted**.
 _Avoid_: live (a Video state), visible, published.
 
-**rejected submission** — a **submission** an admin refused, before or after
-approval, with a written reason its owner can read: offline, seen only by its
-owner and admins. Its owner may edit and publish it again, which returns it
-to **awaiting approval**, or delete it. An admin's refusal is always a
-rejection, never a silent delete.
+**rejected submission** — a **submission** an approver refused, before or
+after approval, with a written reason its owner can read: offline, seen only
+by its owner and approvers. Its owner may edit and publish it again, which
+returns it to **awaiting approval**, or delete it. An approver's refusal is
+always a rejection, never a silent delete.
 _Avoid_: declined, removed, taken down (refusing an approved submission is
 still a rejection), banned (an account state).
 
 **submission report** — a complaint anyone, signed in or not, files against a
 **submission**: a reason (harmful, not theirs to post, other) with an
-optional note and contact. It informs admins and changes nothing by itself;
-only an admin's rejection takes a submission offline.
+optional note and contact. It informs approvers and changes nothing by
+itself; only an approver's rejection takes a submission offline.
 _Avoid_: abuse report (filed against a chat user), flag, takedown.
 
 **listed submission** — an approved **submission** its owner chose to show:
@@ -667,7 +683,7 @@ _Avoid_: feed, carousel (the banner's), featured (a release credit).
 
 **view** — one viewer opening a **submission**'s own page, counted at most
 once per viewer, per submission, per day. The viewer is a signed-in user or a
-guest, identified as a guest **download subject** is. The owner's and admins'
+guest, identified as a guest **download subject** is. The owner's and approvers'
 openings are never counted, and a card shown in a row, a list or a search is
 not a view.
 _Avoid_: play, hit, impression.
