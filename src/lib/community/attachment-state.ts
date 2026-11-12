@@ -90,17 +90,31 @@ export const attachmentStateOf = ({
 };
 
 /**
- * Why a submission's attachments keep it from being published or approved,
- * or `null` when every one has its re-encoded copy.
+ * What keeps a submission's attachments from being published or approved:
+ * one failed, one still processing, or `null` when every one has its
+ * re-encoded copy. A failure is named first, because waiting will not fix it.
  */
-export const unreadyAttachmentsMessage = (attachments: AttachmentStateSource[]): string | null => {
+export const unreadyAttachmentState = (
+  attachments: AttachmentStateSource[]
+): Exclude<AttachmentState, 'ready'> | null => {
   const states = attachments.map((attachment) => attachmentStateOf(attachment).state);
 
   if (states.includes('failed')) {
-    return FAILED_MESSAGE;
+    return 'failed';
   }
 
-  return states.includes('processing') ? PROCESSING_MESSAGE : null;
+  return states.includes('processing') ? 'processing' : null;
+};
+
+/** {@link unreadyAttachmentState} as the owner is told it; `null` when all are ready. */
+export const unreadyAttachmentsMessage = (attachments: AttachmentStateSource[]): string | null => {
+  const unready = unreadyAttachmentState(attachments);
+
+  if (unready === null) {
+    return null;
+  }
+
+  return unready === 'failed' ? FAILED_MESSAGE : PROCESSING_MESSAGE;
 };
 
 /**

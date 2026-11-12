@@ -74,6 +74,7 @@ const view = (overrides: Partial<SubmissionView> = {}): SubmissionView => ({
   viewer: 'owner',
   isPublic: true,
   queuePosition: null,
+  attachments: [],
   ...overrides,
 });
 
