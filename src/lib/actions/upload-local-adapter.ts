@@ -15,8 +15,12 @@ import { LOCAL_UPLOAD_SINK_PATH } from '@/lib/utils/local-upload-sink';
  * 404s.
  */
 
-/** Only object keys the presign action builds (`media/<entity>/<id>/…`). */
-const isMediaKey = (key: string): boolean => key.startsWith('media/') && !key.includes('..');
+/**
+ * Only object keys the app builds: a media key (`media/<entity>/<id>/…`) or a
+ * submission upload (`uploads/<submissionId>/…`, ADR-0027).
+ */
+const isMediaKey = (key: string): boolean =>
+  (key.startsWith('media/') || key.startsWith('uploads/')) && !key.includes('..');
 
 interface LocalObject {
   body: ArrayBuffer;
