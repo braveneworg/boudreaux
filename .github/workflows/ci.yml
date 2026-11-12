@@ -61,11 +61,11 @@ jobs:
       - name: Run nginx -t inside the production nginx image
         run: bash scripts/ci/nginx-config-test.sh .
 
-  # ── Lambda quality (bio-generator + stripe-webhook) ───────────────────────
+  # ── Lambda quality (bio-generator + submission-reencoder + stripe-webhook) ─
   # The lambdas are standalone pnpm projects excluded from the root tsconfig,
   # so the quality job above never typechecks them, and their vitest suites
-  # otherwise run only at deploy time (bio-generator) or not at all
-  # (stripe-webhook). Gate both on every push/PR here.
+  # otherwise run only at deploy time (bio-generator, submission-reencoder) or
+  # not at all (stripe-webhook). Gate all three on every push/PR here.
   lambda-quality:
     name: Lambda Type Check & Tests
     runs-on: ubuntu-latest
@@ -88,6 +88,20 @@ jobs:
 
       - name: Run tests (bio-generator)
         working-directory: bio-generator
+        run: pnpm run test:run
+
+      - name: Install dependencies (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm run typecheck
+
+      # The specs that run the real ffmpeg and ffprobe skip themselves when
+      # the runner has neither on its PATH; everything else needs no binary.
+      - name: Run tests (submission-reencoder)
+        working-directory: submission-reencoder
         run: pnpm run test:run
 
       - name: Install dependencies (stripe-webhook)

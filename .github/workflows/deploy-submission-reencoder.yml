@@ -1,0 +1,117 @@
+name: Deploy Submission Reencoder
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "submission-reencoder/**"
+      # The Lambda bundles the shared wire contract, so a change to it must
+      # redeploy the Lambda — otherwise the web app ships the new contract and
+      # the Lambda keeps the old one, silently splitting it at runtime.
+      - "packages/job-contract/**"
+      - ".github/workflows/deploy-submission-reencoder.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Node and pnpm versions both come from the repo-root mise.toml — the
+      # single source of truth for the toolchain. Do not pin either here.
+      - name: Set up Node.js + pnpm via mise
+        uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        working-directory: submission-reencoder
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: submission-reencoder
+        run: pnpm run typecheck
+
+      - name: Run tests
+        working-directory: submission-reencoder
+        run: pnpm run test:run
+
+      # Writes dist/: the bundled handler the image is built from. The image's
+      # build context is submission-reencoder/, which cannot see
+      # packages/job-contract, so the bundle has to exist before `sam build`.
+      - name: Bundle the handler
+        working-directory: submission-reencoder
+        run: pnpm run build
+
+      # The function is arm64 and this runner is x86-64: the image's RUN steps
+      # execute arm64 binaries, which needs emulation.
+      - name: Set up QEMU for arm64 image builds
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: SAM build
+        working-directory: submission-reencoder
+        run: sam build
+
+      - name: Ensure SAM artifact bucket exists
+        run: |
+          BUCKET="fakefour-sam-artifacts-us-east-1"
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3 mb "s3://$BUCKET" --region us-east-1
+          fi
+
+      # --resolve-image-repos has SAM create and manage the ECR repository the
+      # image is pushed to. Both optional parameters are always passed, quoted,
+      # so an unset value reaches CloudFormation as an empty string: a bare
+      # `Key=` is rejected by SAM, and a parameter left out keeps whatever the
+      # stack was last deployed with.
+      - name: SAM deploy
+        working-directory: submission-reencoder
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          APP_PRINCIPAL_ARN: ${{ vars.APP_AWS_PRINCIPAL_ARN }}
+        run: |
+          sam deploy \
+            --resolve-image-repos \
+            --s3-bucket fakefour-sam-artifacts-us-east-1 \
+            --s3-prefix fakefour-submission-reencoder \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --stack-name fakefour-submission-reencoder \
+            --region us-east-1 \
+            --parameter-overrides \
+              Environment=production \
+              "AlarmEmail=\"${ALERT_EMAIL}\"" \
+              "AppPrincipalArn=\"${APP_PRINCIPAL_ARN}\""
+
+      - name: Print stack outputs
+        run: |
+          output() {
+            aws cloudformation describe-stacks \
+              --stack-name fakefour-submission-reencoder \
+              --region us-east-1 \
+              --query "Stacks[0].Outputs[?OutputKey==\`$1\`].OutputValue" \
+              --output text
+          }
+          echo "Set SUBMISSION_REENCODER_LAMBDA_NAME in the web app environment to:"
+          output FunctionName
+          echo "Set SUBMISSION_UPLOADS_BUCKET in the web app environment to:"
+          output UploadsBucketName
