@@ -44,6 +44,26 @@ vi.mock('./submission-text-editor', () => ({
   ),
 }));
 
+// The attachments section has its own spec; here it only shows what it was given.
+vi.mock('./submission-attachments', () => ({
+  SubmissionAttachments: ({
+    submissionId,
+    status,
+    initialAttachments,
+  }: {
+    submissionId: string;
+    status: string;
+    initialAttachments: unknown[];
+  }) => (
+    <div
+      data-testid="attachments"
+      data-submission={submissionId}
+      data-status={status}
+      data-count={initialAttachments.length}
+    />
+  ),
+}));
+
 // A widget the test passes by hand, so "not verified yet" can be observed.
 vi.mock('@/app/components/ui/turnstile-widget', () => ({
   TurnstileWidget: ({
@@ -84,6 +104,8 @@ const approved: SubmissionFormProps['submission'] = {
   links: ['https://example.com/zine'],
   listed: false,
   status: 'APPROVED',
+  updatedAt: '2026-11-11T12:00:00.000Z',
+  attachments: [],
 };
 
 const renderForm = (props: Partial<SubmissionFormProps> = {}) =>
@@ -113,17 +135,43 @@ const publish = async (): Promise<void> => {
 
 describe('SubmissionForm', () => {
   describe('what it shows', () => {
-    it('starts empty, unlisted, in the writings category', () => {
+    it('starts empty, unlisted, as a video', () => {
       renderForm();
 
       expect(screen.getByLabelText('Title')).toHaveValue('');
-      expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent(
-        'Writings (lyrics, poetry, prose, and blurbs)'
-      );
+      expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Video');
       expect(
         screen.getByRole('switch', { name: 'Show on the User Submitted Content page' })
       ).not.toBeChecked();
       expect(screen.getByText('Off: only people with the link can open it.')).toBeInTheDocument();
+    });
+
+    it('offers the writing only on a writings submission', () => {
+      renderForm({ submission: { ...approved, status: 'DRAFT' } });
+
+      expect(screen.getByLabelText('Writing')).toBeInTheDocument();
+    });
+
+    it('offers no writing on any other category', () => {
+      renderForm();
+
+      expect(screen.queryByLabelText('Writing')).not.toBeInTheDocument();
+    });
+
+    it('tells the owner of a new submission to save before attaching', () => {
+      renderForm();
+
+      expect(
+        screen.getByText('Save a draft first. Then you can add photos, audio and video to it here.')
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('attachments')).not.toBeInTheDocument();
+    });
+
+    it('shows the attachments of a saved submission', () => {
+      renderForm({ submission: approved });
+
+      expect(screen.getByTestId('attachments')).toHaveAttribute('data-submission', ID);
+      expect(screen.getByTestId('attachments')).toHaveAttribute('data-status', 'APPROVED');
     });
 
     it('says what saving and publishing each do, beside the buttons', () => {
@@ -215,7 +263,7 @@ describe('SubmissionForm', () => {
       renderForm({ needsAgreement: true });
       await verify();
       await fillTitle('Bus poem');
-      await userEvent.type(screen.getByLabelText('Writing'), '<p>A poem.</p>');
+      await userEvent.type(screen.getByLabelText('About'), '<p>On the bus.</p>');
       await userEvent.click(screen.getByRole('switch', { name: UPLOAD_AGREEMENT_WORDING }));
       await userEvent.click(screen.getByRole('button', { name: 'Add a link' }));
       await userEvent.type(screen.getByLabelText('Link 1'), 'https://example.com/zine');
@@ -227,9 +275,9 @@ describe('SubmissionForm', () => {
           [
             {
               title: 'Bus poem',
-              category: 'WRITING',
-              aboutHtml: '',
-              writingHtml: '<p>A poem.</p>',
+              category: 'VIDEO',
+              aboutHtml: '<p>On the bus.</p>',
+              writingHtml: '',
               links: ['https://example.com/zine'],
               listed: false,
               acceptAgreement: true,

@@ -49,7 +49,6 @@ import {
 import { queuePositionMessage } from '@/lib/community/queue-position-message';
 import {
   MAX_SUBMISSION_LINKS,
-  OPEN_SUBMISSION_CATEGORIES,
   PUBLISH_REMINDER,
   SUBMISSION_CATEGORY_OPTIONS,
   submissionCategoryLabel,
@@ -57,9 +56,11 @@ import {
 } from '@/lib/constants/submissions';
 import type { SubmissionCategory, SubmissionStatus } from '@/lib/constants/submissions';
 import type { SavedSubmission, SubmissionFieldErrors } from '@/lib/types/domain/submission';
+import type { AttachmentView } from '@/lib/types/domain/submission-attachment';
 import { submissionFormSchema } from '@/lib/validation/submission-schema';
 import type { SubmissionFormValues } from '@/lib/validation/submission-schema';
 
+import { SubmissionAttachments } from './submission-attachments';
 import { LISTED_HELP, LISTED_LABEL } from './submission-owner-controls';
 import { SubmissionTextEditor } from './submission-text-editor';
 
@@ -76,6 +77,9 @@ export interface SubmissionFormProps {
     links: string[];
     listed: boolean;
     status: SubmissionStatus;
+    /** When the page read it, as an ISO string. */
+    updatedAt: string;
+    attachments: AttachmentView[];
   };
   /** Whether this account must accept the upload agreement before it can save. */
   needsAgreement: boolean;
@@ -88,11 +92,8 @@ const EDIT_NOTE =
 const OFFLINE_WARNING = 'Editing takes this offline until it is approved again.';
 const LINKS_HELP =
   'Official websites; social media post link; or something you think the Fake Four Inc. community should know about!';
-
-/** The categories the dropdown offers today, with their labels. */
-const CATEGORY_OPTIONS = SUBMISSION_CATEGORY_OPTIONS.filter(({ value }) =>
-  OPEN_SUBMISSION_CATEGORIES.some((open) => open === value)
-);
+const ATTACH_AFTER_SAVING_NOTE =
+  'Save a draft first. Then you can add photos, audio and video to it here.';
 
 /** The form fields a server rule can name directly. */
 const NAMED_FIELDS: ReadonlySet<string> = new Set([
@@ -137,10 +138,10 @@ const fieldPathFor = (key: string): FieldPath<SubmissionFormValues> | null => {
   return NAMED_FIELDS.has(key) ? (key as FieldPath<SubmissionFormValues>) : null;
 };
 
-/** A new submission: empty, unlisted, in the first category that is open. */
+/** A new submission: empty, unlisted, a video unless its owner says otherwise. */
 const NEW_SUBMISSION_VALUES: SubmissionFormValues = {
   title: '',
-  category: OPEN_SUBMISSION_CATEGORIES[0],
+  category: 'VIDEO',
   aboutHtml: '',
   writingHtml: '',
   links: [],
@@ -335,7 +336,7 @@ const AgreementField = ({ control, error }: AgreementFieldProps) => (
   </div>
 );
 
-/** The category dropdown, offering the categories that are open today. */
+/** The category dropdown. */
 const CategoryField = ({ control }: { control: Control<SubmissionFormValues> }) => (
   <FormField
     control={control}
@@ -350,7 +351,7 @@ const CategoryField = ({ control }: { control: Control<SubmissionFormValues> }) 
             </SelectTrigger>
           </FormControl>
           <SelectContent>
-            {CATEGORY_OPTIONS.map(({ value, label }) => (
+            {SUBMISSION_CATEGORY_OPTIONS.map(({ value, label }) => (
               <SelectItem key={value} value={value}>
                 {label}
               </SelectItem>
@@ -522,6 +523,17 @@ const useSubmissionSave = (
   return { run, isSubmitting, formError, sent };
 };
 
+/**
+ * Where the attachments will go on a submission that is not saved yet: an
+ * attachment needs a submission to belong to.
+ */
+const AttachAfterSaving = () => (
+  <div className="space-y-1">
+    <span className="text-sm font-medium">Attachments</span>
+    <p className="text-muted-foreground text-sm">{ATTACH_AFTER_SAVING_NOTE}</p>
+  </div>
+);
+
 /** A failure that belongs on no one field, shown above the buttons. */
 const FormError = ({ message }: { message: string }) =>
   message === '' ? null : (
@@ -532,7 +544,8 @@ const FormError = ({ message }: { message: string }) =>
 
 /**
  * The submission form: an upload agreement the first time, then a title, a
- * category, the writing, the listed choice, an about and up to ten links.
+ * category, the attachments (once it is saved), the writing for a writings
+ * submission, the listed choice, an about and up to ten links.
  *
  * A new, draft or rejected submission offers Save draft and Publish. One that
  * is awaiting approval or approved offers Save changes: a content edit to an
@@ -585,6 +598,16 @@ export const SubmissionForm = ({ submission, needsAgreement }: SubmissionFormPro
           placeholder="What is it called?"
         />
         <CategoryField control={form.control} />
+        {submission ? (
+          <SubmissionAttachments
+            submissionId={submission.id}
+            status={submission.status}
+            updatedAt={submission.updatedAt}
+            initialAttachments={submission.attachments}
+          />
+        ) : (
+          <AttachAfterSaving />
+        )}
         <TextFields control={form.control} />
         <div>
           <SwitchField

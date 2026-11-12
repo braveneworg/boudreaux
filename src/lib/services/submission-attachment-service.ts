@@ -16,7 +16,13 @@ import {
 import { isLocalUpload } from '@/lib/actions/upload-local-adapter';
 import { attachmentFileKeys, attachmentStateOf } from '@/lib/community/attachment-state';
 import { getSubmissionReencoderLambdaName } from '@/lib/config/runtime-config';
-import { MAX_SUBMISSION_ATTACHMENTS, UPLOAD_AGREEMENT_VERSION } from '@/lib/constants/submissions';
+import {
+  ATTACHMENT_TYPE_MESSAGE,
+  attachmentLimitMessage,
+  ATTACHMENTS_FULL_MESSAGE,
+  MAX_SUBMISSION_ATTACHMENTS,
+  UPLOAD_AGREEMENT_VERSION,
+} from '@/lib/constants/submissions';
 import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
 import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { jobRunner } from '@/lib/services/job-runner/job-runner';
@@ -52,30 +58,12 @@ const NOT_FOUND_MESSAGE = 'Submission not found.';
 const ATTACHMENT_NOT_FOUND_MESSAGE = 'Attachment not found.';
 const NOT_SET_UP_MESSAGE = 'Uploads are not set up yet.';
 const AGREEMENT_MESSAGE = 'Accept the upload agreement to continue.';
-const TYPE_MESSAGE = 'That kind of file is not accepted. Add a photo, an audio file or a video.';
-const FULL_MESSAGE = `A submission can have ${MAX_SUBMISSION_ATTACHMENTS} attachments. Remove one to add another.`;
 const WRONG_KEY_MESSAGE = 'That upload does not belong to this submission.';
 const NOT_UPLOADED_MESSAGE = 'That upload did not arrive. Try the file again.';
 const STILL_PROCESSING_MESSAGE =
   'This attachment is still processing. Remove it once it has finished.';
 const LAST_ATTACHMENT_MESSAGE =
   'A published submission needs something to show. Add another attachment first, or delete the submission.';
-
-const BYTES_PER_MEGABYTE = 1024 * 1024;
-
-/** What an owner is told a kind's limit is. */
-const limitMessageFor = (kind: AttachmentKind): string => {
-  const megabytes = attachmentUploadLimitBytes(kind) / BYTES_PER_MEGABYTE;
-
-  switch (kind) {
-    case 'IMAGE':
-      return `A photo can be up to ${megabytes} MB.`;
-    case 'AUDIO':
-      return `An audio file can be up to ${megabytes} MB.`;
-    default:
-      return `A video can be up to ${megabytes} MB.`;
-  }
-};
 
 /** A content type without its parameters, lower-cased: what is signed, and what the browser must send. */
 const bareType = (contentType: string): string =>
@@ -88,11 +76,11 @@ const bareType = (contentType: string): string =>
 const acceptedKindOf = (contentType: string, bytes: number): AttachmentKind => {
   const kind = attachmentKindForType(contentType);
   if (kind === null) {
-    throw new SubmissionRuleError('VALIDATION', TYPE_MESSAGE);
+    throw new SubmissionRuleError('VALIDATION', ATTACHMENT_TYPE_MESSAGE);
   }
 
   if (bytes > attachmentUploadLimitBytes(kind)) {
-    throw new SubmissionRuleError('VALIDATION', limitMessageFor(kind));
+    throw new SubmissionRuleError('VALIDATION', attachmentLimitMessage(kind));
   }
 
   return kind;
@@ -337,7 +325,7 @@ export class SubmissionAttachmentService {
     // A courtesy before the upload; the cap itself is held when the row is made.
     const held = await SubmissionAttachmentRepository.listBySubmission(submissionId);
     if (held.length >= MAX_SUBMISSION_ATTACHMENTS) {
-      throw new SubmissionRuleError('LIMIT_EXCEEDED', FULL_MESSAGE);
+      throw new SubmissionRuleError('LIMIT_EXCEEDED', ATTACHMENTS_FULL_MESSAGE);
     }
 
     const uploadKey = `${attachmentUploadPrefix(submissionId)}${randomUUID()}`;
@@ -388,7 +376,7 @@ export class SubmissionAttachmentService {
         MAX_SUBMISSION_ATTACHMENTS
       );
       if (created.status === 'full') {
-        throw new SubmissionRuleError('LIMIT_EXCEEDED', FULL_MESSAGE);
+        throw new SubmissionRuleError('LIMIT_EXCEEDED', ATTACHMENTS_FULL_MESSAGE);
       }
 
       await jobRunner.trigger(submissionReencodeJob, created.attachment.id);
