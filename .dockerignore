@@ -80,6 +80,7 @@ COVERAGE_METRICS.md
 # Scripts not needed in container
 scripts
 stripe-webhook
+submission-reencoder
 
 # TypeScript build caches — these grow to GB-scale and change on every build
 tsconfig.*.json

@@ -108,6 +108,7 @@ export default defineConfig((): ViteUserConfig => {
             exclude: [
               '**/node_modules/**',
               'bio-generator/**',
+              'submission-reencoder/**',
               'stripe-webhook/**',
               ...NATIVE_ADDON_SPECS,
               ...SHELL_SCRIPT_SPECS,
@@ -124,6 +125,7 @@ export default defineConfig((): ViteUserConfig => {
             exclude: [
               '**/node_modules/**',
               'bio-generator/**',
+              'submission-reencoder/**',
               'stripe-webhook/**',
               ...HTML_PARSER_SPECS,
               ...SHELL_SCRIPT_SPECS,
@@ -144,6 +146,7 @@ export default defineConfig((): ViteUserConfig => {
             exclude: [
               '**/node_modules/**',
               'bio-generator/**',
+              'submission-reencoder/**',
               'stripe-webhook/**',
               ...SHELL_SCRIPT_SPECS,
               ...DB_CONTRACT_SPECS,
@@ -162,6 +165,7 @@ export default defineConfig((): ViteUserConfig => {
             exclude: [
               '**/node_modules/**',
               'bio-generator/**',
+              'submission-reencoder/**',
               'stripe-webhook/**',
               ...SHELL_SCRIPT_SPECS,
               ...DB_CONTRACT_SPECS,
@@ -181,6 +185,7 @@ export default defineConfig((): ViteUserConfig => {
                   exclude: [
                     '**/node_modules/**',
                     'bio-generator/**',
+                    'submission-reencoder/**',
                     'stripe-webhook/**',
                     ...DB_CONTRACT_SPECS,
                   ],
@@ -201,7 +206,12 @@ export default defineConfig((): ViteUserConfig => {
                   environment: 'node',
                   pool: 'forks',
                   include: DB_CONTRACT_SPECS,
-                  exclude: ['**/node_modules/**', 'bio-generator/**', 'stripe-webhook/**'],
+                  exclude: [
+                    '**/node_modules/**',
+                    'bio-generator/**',
+                    'submission-reencoder/**',
+                    'stripe-webhook/**',
+                  ],
                   setupFiles: ['./setupTests.db.ts'],
                 },
               },
