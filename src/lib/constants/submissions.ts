@@ -74,6 +74,9 @@ export const UNAPPROVED_SUBMISSION_STATUSES = [
 /** Most unapproved submissions one user may hold at once. Approved ones are not counted. */
 export const MAX_UNAPPROVED_SUBMISSIONS = 5;
 
+/** Most attachments one submission may hold. */
+export const MAX_SUBMISSION_ATTACHMENTS = 10;
+
 /** Most outbound links on one submission: the links field and the writing's links together. */
 export const MAX_SUBMISSION_LINKS = 10;
 
