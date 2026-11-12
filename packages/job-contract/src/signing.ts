@@ -23,8 +23,11 @@ export const JOB_SIGNATURE_HEADER = 'x-job-signature';
 /** How far a signature's timestamp may sit from the verifier's clock, either side. */
 export const JOB_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
-/** The async jobs the bio-generator Lambda runs; part of the key derivation input. */
-export type JobKind = 'bio-generation' | 'image-links' | 'video-enrichment';
+/**
+ * The async jobs the job runner dispatches; part of the key derivation input.
+ * The bio-generator Lambda runs the first three, the re-encode Lambda the last.
+ */
+export type JobKind = 'bio-generation' | 'image-links' | 'video-enrichment' | 'submission-reencode';
 
 /** The identity a per-job signing key is derived from. */
 export interface JobSigningIdentity {
