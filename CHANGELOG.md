@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.480.0] - 2026-11-11
+
+### Fixed
+
+- fix(contact): 🐛 update label manager and distribution contacts (#944)
+
+## [4.479.0] - 2026-11-09
+
+### Changed
+
+- test(e2e): ✅ give chat moderation its own user (#942)
+
+## [4.478.0] - 2026-11-09
+
+### Fixed
+
+- fix(chat): 🐛 let user scroll beat resize re-pin (#941)
+
+## [4.477.0] - 2026-11-09
+
+### Changed
+
+- refactor(forms): ♻️ typed input for entity actions (#940)
+
+## [4.476.0] - 2026-11-09
+
+### Fixed
+
+- fix(tours): 🐛 #932 follow-ups: image cap, keys, services (#939)
+
+## [4.475.0] - 2026-11-08
+
+### Fixed
+
+- fix(playlists): item cap in the add transaction + follow-ups (#938)
+
 ## [4.474.0] - 2026-11-08
 
 ### Fixed

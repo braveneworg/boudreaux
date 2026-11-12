@@ -10,7 +10,7 @@ import { PageContainer } from '@/app/components/ui/page-container';
 import { TourDetailContent } from '@/app/tours/components/tour-detail-content';
 import type { TourWithRelations } from '@/hooks/queries/use-tour-query';
 import { queryKeys } from '@/lib/query-keys';
-import { TourRepository } from '@/lib/repositories/tours/tour-repository';
+import { TourService } from '@/lib/services/tours/tour-service';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 
 export interface TourPageProps {
@@ -27,7 +27,7 @@ export default async function TourPage({ params }: TourPageProps) {
   const { tourId } = await params;
   const queryClient = getQueryClient();
 
-  const tour = await TourRepository.findPublicById(tourId);
+  const tour = await TourService.findPublicById(tourId);
 
   if (!tour) {
     notFound();

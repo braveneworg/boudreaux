@@ -2,6 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
+import {
+  createEditableFeaturedArtist,
+  deleteFeaturedArtist,
+  readFeaturedArtistText,
+} from '../helpers/e2e-db';
 
 /**
  * E2E coverage for the /admin/featured-artists/new create view. The form's
@@ -65,5 +70,38 @@ test.describe('Admin featured artist edit form', () => {
     await expect(
       adminPage.getByRole('button', { name: 'Save Changes', exact: true })
     ).toBeVisible();
+  });
+});
+
+test.describe('Admin featured artist edit save', () => {
+  // Saving the edit page used to keep a field the admin emptied: the update
+  // hook dropped blanks and the action mapped them to `undefined`.
+  test('clears the display name and description the admin empties', async ({ adminPage }) => {
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = await createEditableFeaturedArtist({
+      displayName: `E2E Clearable ${stamp}`,
+      description: `Clearable blurb ${stamp}`,
+    });
+
+    try {
+      await adminPage.goto(`/admin/featured-artists/${id}`);
+
+      const displayName = adminPage.locator('[name="displayName"]');
+      await expect(displayName).toHaveValue(`E2E Clearable ${stamp}`, { timeout: 15_000 });
+      // The track picker renders once the release's MP3 format has loaded and
+      // been written back to the form, which a save needs.
+      await expect(adminPage.getByText('Featured Track (Optional)')).toBeVisible({
+        timeout: 15_000,
+      });
+
+      await displayName.fill('');
+      await adminPage.getByRole('textbox', { name: 'Description (Optional)' }).fill('');
+      await adminPage.getByRole('button', { name: 'Save Changes', exact: true }).click();
+
+      await expect(adminPage).toHaveURL(/\/admin\?entity=featuredArtist$/, { timeout: 15_000 });
+      expect(await readFeaturedArtistText(id)).toEqual({ displayName: null, description: null });
+    } finally {
+      await deleteFeaturedArtist(id);
+    }
   });
 });

@@ -5,21 +5,22 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import { VideoService } from '@/lib/services/video-service';
-import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { deleteS3Object, verifyS3ObjectExists } from '@/lib/utils/s3-client';
 import { extractS3KeyFromUrl } from '@/lib/utils/s3-key-utils';
+import type { VideoFormData } from '@/lib/validation/create-video-schema';
 
 import { updateVideoAction } from './update-video-action';
+import { VIDEO_PERMITTED_FIELD_NAMES } from './video-action-helpers';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache');
 vi.mock('@/lib/services/video-service');
 vi.mock('@/lib/utils/audit-log');
 vi.mock('@/lib/utils/auth/auth-utils');
-vi.mock('@/lib/utils/auth/get-action-state');
+vi.mock('@/lib/utils/forms/read-action-input');
 vi.mock('@/lib/auth/action-gate');
 vi.mock('@/lib/utils/s3-client');
 vi.mock('@/lib/utils/s3-key-utils');
@@ -53,8 +54,8 @@ const currentVideo = {
   updatedAt: new Date('2024-01-01'),
 };
 
-const mockFormData = new FormData();
-const initialFormState: FormState = { fields: {}, success: false };
+/** The edit form's values; `readActionInput` is mocked, so they only travel. */
+const mockInput = { title: 'New Title' } as VideoFormData;
 
 const parsedData = {
   title: 'New Title',
@@ -72,7 +73,7 @@ const parsedData = {
 };
 
 const mockParsedSuccess = (data: Record<string, unknown> = parsedData): void => {
-  vi.mocked(getActionState).mockReturnValue({
+  vi.mocked(readActionInput).mockReturnValue({
     formState: { fields: {}, success: false },
     parsed: { success: true, data },
   } as never);
@@ -101,7 +102,7 @@ describe('updateVideoAction', () => {
     it('resolves the gate refusal as a form error without updating the video', async () => {
       vi.mocked(gateAction).mockResolvedValueOnce(REFUSAL);
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result).toEqual({ fields: {}, success: false, errors: { general: ['Unauthorized'] } });
       expect(VideoService.getVideoById).not.toHaveBeenCalled();
@@ -109,7 +110,7 @@ describe('updateVideoAction', () => {
     });
 
     it('should reject an invalid video id', async () => {
-      const result = await updateVideoAction('invalid-id', initialFormState, mockFormData);
+      const result = await updateVideoAction('invalid-id', mockInput);
 
       expect(result).toEqual({
         fields: {},
@@ -119,15 +120,27 @@ describe('updateVideoAction', () => {
     });
 
     it('should not validate the body when the id is invalid', async () => {
-      await updateVideoAction('invalid-id', initialFormState, mockFormData);
+      await updateVideoAction('invalid-id', mockInput);
 
-      expect(getActionState).not.toHaveBeenCalled();
+      expect(readActionInput).not.toHaveBeenCalled();
     });
   });
 
   describe('Validation', () => {
+    // The video form encoded its update without keeping blanks, so a blank
+    // optional field is left unwritten; the action keeps that.
+    it('reads the permitted video fields with blanks omitted', async () => {
+      mockParsedSuccess();
+
+      await updateVideoAction(videoId, mockInput);
+
+      expect(vi.mocked(readActionInput).mock.calls).toEqual([
+        [mockInput, VIDEO_PERMITTED_FIELD_NAMES, expect.anything(), { blankStrings: 'omit' }],
+      ]);
+    });
+
     it('should apply zod issues to the form state and not update', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -135,13 +148,13 @@ describe('updateVideoAction', () => {
         },
       } as never);
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.errors?.title).toEqual(['Title is required']);
     });
 
     it('should not call the service when validation fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: {
           success: false,
@@ -149,7 +162,7 @@ describe('updateVideoAction', () => {
         },
       } as never);
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).not.toHaveBeenCalled();
     });
@@ -164,7 +177,7 @@ describe('updateVideoAction', () => {
         code: 'NOT_FOUND',
       });
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.success).toBe(false);
       expect(result.errors?.general).toEqual(['Video not found']);
@@ -178,7 +191,7 @@ describe('updateVideoAction', () => {
         code: 'NOT_FOUND',
       });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).not.toHaveBeenCalled();
     });
@@ -188,7 +201,7 @@ describe('updateVideoAction', () => {
     it('should update the video stamping updatedBy', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -205,7 +218,7 @@ describe('updateVideoAction', () => {
     it('should not confirm S3 when the s3Key is unchanged', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(verifyS3ObjectExists).not.toHaveBeenCalled();
     });
@@ -213,7 +226,7 @@ describe('updateVideoAction', () => {
     it('should not delete any S3 object when nothing was replaced', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(deleteS3Object).not.toHaveBeenCalled();
     });
@@ -221,7 +234,7 @@ describe('updateVideoAction', () => {
     it('should return the video id in the form state on success', async () => {
       mockParsedSuccess();
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.success).toBe(true);
       expect(result.data?.videoId).toBe(videoId);
@@ -232,7 +245,7 @@ describe('updateVideoAction', () => {
     it('should confirm the replacement key before updating', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(verifyS3ObjectExists).toHaveBeenCalledWith(replacementS3Key);
     });
@@ -240,7 +253,7 @@ describe('updateVideoAction', () => {
     it('should delete the old video key after a successful update', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(deleteS3Object).toHaveBeenCalledWith(currentS3Key);
     });
@@ -249,7 +262,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.success).toBe(false);
       expect(VideoService.updateVideo).not.toHaveBeenCalled();
@@ -259,7 +272,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
       vi.mocked(deleteS3Object).mockRejectedValue(new Error('S3 down'));
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.success).toBe(true);
     });
@@ -269,7 +282,7 @@ describe('updateVideoAction', () => {
     it('should delete the old poster key when the poster changed', async () => {
       mockParsedSuccess({ ...parsedData, posterUrl: 'https://cdn.example.com/new-poster.jpg' });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(deleteS3Object).toHaveBeenCalledWith('media/videos/old-poster-key.jpg');
     });
@@ -277,7 +290,7 @@ describe('updateVideoAction', () => {
     it('should not delete a poster key when the poster is unchanged', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(deleteS3Object).not.toHaveBeenCalled();
     });
@@ -292,7 +305,7 @@ describe('updateVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.errors?.general).toEqual(['Failed to update video']);
     });
@@ -305,7 +318,7 @@ describe('updateVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(deleteS3Object).not.toHaveBeenCalled();
     });
@@ -318,7 +331,7 @@ describe('updateVideoAction', () => {
         code: 'NOT_FOUND',
       });
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.errors).toEqual({ general: ['Video not found'] });
     });
@@ -331,7 +344,7 @@ describe('updateVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      const result = await updateVideoAction(videoId, initialFormState, mockFormData);
+      const result = await updateVideoAction(videoId, mockInput);
 
       expect(result.errors).toEqual({ general: ['Failed to update video'] });
     });
@@ -340,7 +353,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(VideoService.updateVideo).mockRejectedValue(Error('boom'));
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(setUnknownError).toHaveBeenCalled();
     });
@@ -350,7 +363,7 @@ describe('updateVideoAction', () => {
     it('should log the update event', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(logSecurityEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'media.video.updated', userId: 'user-123' })
@@ -360,7 +373,7 @@ describe('updateVideoAction', () => {
     it('should revalidate the admin and public video paths on success', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(revalidatePath).toHaveBeenCalledWith('/admin/videos');
       expect(revalidatePath).toHaveBeenCalledWith('/videos');
@@ -371,7 +384,7 @@ describe('updateVideoAction', () => {
     it('schedules the post-save work against the row as it was before the update', async () => {
       mockParsedSuccess();
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(vi.mocked(VideoService.schedulePostSave).mock.calls).toEqual([
         [
@@ -391,7 +404,7 @@ describe('updateVideoAction', () => {
       const producers = [{ name: 'Studio Pro' }];
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, artistDetails, producers });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(vi.mocked(VideoService.schedulePostSave).mock.calls[0]?.[0].next).toEqual(
         expect.objectContaining({ s3Key: replacementS3Key, artistDetails, producers })
@@ -406,7 +419,7 @@ describe('updateVideoAction', () => {
         code: 'UNKNOWN',
       });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -419,7 +432,7 @@ describe('updateVideoAction', () => {
         code: 'NOT_FOUND',
       });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -428,18 +441,18 @@ describe('updateVideoAction', () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key });
       vi.mocked(verifyS3ObjectExists).mockResolvedValue(false);
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
 
     it('does not schedule post-save work when validation fails', async () => {
-      vi.mocked(getActionState).mockReturnValue({
+      vi.mocked(readActionInput).mockReturnValue({
         formState: { fields: {}, success: false },
         parsed: { success: false, error: { issues: [] } },
       } as never);
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -448,7 +461,7 @@ describe('updateVideoAction', () => {
       mockParsedSuccess();
       vi.mocked(VideoService.updateVideo).mockRejectedValue(Error('boom'));
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.schedulePostSave).not.toHaveBeenCalled();
     });
@@ -457,7 +470,7 @@ describe('updateVideoAction', () => {
       const artistDetails = [{ sourceName: 'The Band' }];
       mockParsedSuccess({ ...parsedData, artistDetails });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'artistDetails')).toBe(false);
@@ -467,7 +480,7 @@ describe('updateVideoAction', () => {
       const producers = [{ name: 'Studio Pro' }];
       mockParsedSuccess({ ...parsedData, producers });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'producers')).toBe(false);
@@ -488,7 +501,7 @@ describe('updateVideoAction', () => {
     it('includes candidates in the update payload when the file was replaced', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterCandidates });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -499,7 +512,7 @@ describe('updateVideoAction', () => {
     it('omits candidates from the update payload when the s3Key is unchanged', async () => {
       mockParsedSuccess({ ...parsedData, posterCandidates });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       const updateCall = vi.mocked(VideoService.updateVideo).mock.calls[0][1];
       expect(Object.prototype.hasOwnProperty.call(updateCall, 'posterCandidates')).toBe(false);
@@ -515,7 +528,7 @@ describe('updateVideoAction', () => {
     it('clears the outgoing candidates when a replacement brings none', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: '' });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -526,7 +539,7 @@ describe('updateVideoAction', () => {
     it('clears the outgoing poster when a replacement brings none', async () => {
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: '' });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -538,7 +551,7 @@ describe('updateVideoAction', () => {
       const manual = 'https://cdn.example.com/manual-poster.jpg';
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterUrl: manual });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -549,7 +562,7 @@ describe('updateVideoAction', () => {
     it('never clears the poster on a save that does not replace the file', async () => {
       mockParsedSuccess({ ...parsedData, posterUrl: '' });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,
@@ -561,7 +574,7 @@ describe('updateVideoAction', () => {
       vi.mocked(extractS3KeyFromUrl).mockReturnValue('media/videos/other-video/candidate.jpg');
       mockParsedSuccess({ ...parsedData, s3Key: replacementS3Key, posterCandidates });
 
-      await updateVideoAction(videoId, initialFormState, mockFormData);
+      await updateVideoAction(videoId, mockInput);
 
       expect(VideoService.updateVideo).toHaveBeenCalledWith(
         videoId,

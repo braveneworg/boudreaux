@@ -2,12 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { expect, test } from '../fixtures/auth.fixture';
+import { sendChatMessage } from '../helpers/send-chat-message';
 
 /**
  * E2E coverage for the /admin/chat/users/[userId] detail view. Tests run serial
  * because the user must first send a message so the detail view has a message
  * with a per-message hide control to render. That control is a toggle switch on
  * every viewport (the desktop checkbox was removed).
+ *
+ * The first test waits for the message to be stored, not just shown: the
+ * drawer shows it optimistically, and a test that ends there closes the page
+ * with the send still in flight, so the detail view sometimes had nothing.
  */
 
 // Deterministic seeded regular-user id (see e2e/helpers/seed-test-db.ts).
@@ -20,11 +25,7 @@ test.describe('Admin chat user detail', () => {
     await userPage.goto('/');
     await userPage.getByRole('button', { name: /open chat/i }).click();
 
-    const composer = userPage.getByLabel('Chat message');
-    await composer.fill('detail view seed message');
-    await composer.press('Enter');
-
-    await expect(userPage.getByText('detail view seed message')).toBeVisible({ timeout: 10_000 });
+    await sendChatMessage(userPage, 'detail view seed message');
   });
 
   test('renders the user detail view with a chat-access toggle', async ({ adminPage }) => {

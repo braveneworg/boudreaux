@@ -81,3 +81,72 @@ export const deleteUnlinkedArtistByDisplayName = async (displayName: string): Pr
     await prisma.$disconnect();
   }
 };
+
+/** The text fields of a featured artist the edit form can clear. */
+export interface FeaturedArtistText {
+  displayName: string | null;
+  description: string | null;
+}
+
+/**
+ * Create an unpublished featured artist on the seeded E2E Album One (and its
+ * MP3 format, so the edit form can save), for a spec that edits it. It sorts
+ * after the seeded spotlight (`position` 999) and is never published, so the
+ * admin list's first row and the home grid stay the seeded ones while it
+ * exists. It credits no artists, so deleting it leaves no id behind on a
+ * seeded artist. Delete it by the returned id with {@link deleteFeaturedArtist}.
+ */
+export const createEditableFeaturedArtist = async ({
+  displayName,
+  description,
+}: {
+  displayName: string;
+  description: string;
+}): Promise<string> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    const release = await prisma.release.findFirstOrThrow({ where: { title: 'E2E Album One' } });
+    const format = await prisma.releaseDigitalFormat.findFirstOrThrow({
+      where: { releaseId: release.id, formatType: 'MP3_320KBPS' },
+    });
+    const created = await prisma.featuredArtist.create({
+      data: {
+        displayName,
+        description,
+        position: 999,
+        featuredOn: new Date('2020-01-01T00:00:00.000Z'),
+        release: { connect: { id: release.id } },
+        digitalFormat: { connect: { id: format.id } },
+      },
+    });
+    return created.id;
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/** Read the clearable text fields of one featured artist, or `null` when it is gone. */
+export const readFeaturedArtistText = async (id: string): Promise<FeaturedArtistText | null> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    return await prisma.featuredArtist.findUnique({
+      where: { id },
+      select: { displayName: true, description: true },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+/**
+ * Hard-delete one spec-created featured artist by id. `deleteMany`, so a test
+ * that bailed before the row existed does not mask its real failure.
+ */
+export const deleteFeaturedArtist = async (id: string): Promise<void> => {
+  const prisma = new PrismaClient({ datasourceUrl: E2E_DATABASE_URL });
+  try {
+    await prisma.featuredArtist.deleteMany({ where: { id } });
+  } finally {
+    await prisma.$disconnect();
+  }
+};

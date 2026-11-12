@@ -14,8 +14,8 @@ import type { Video } from '@/lib/types/domain/video';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import { applyZodIssuesToFormState } from '@/lib/utils/form-state-helpers';
+import { readActionInput } from '@/lib/utils/forms/read-action-input';
 import { OBJECT_ID_REGEX } from '@/lib/utils/validation/object-id';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
@@ -124,8 +124,7 @@ const runVideoUpdate = async (
  */
 export const updateVideoAction = async (
   videoId: string,
-  _initialState: FormState,
-  payload: FormData
+  input: VideoFormData
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -141,10 +140,13 @@ export const updateVideoAction = async (
     };
   }
 
-  const { formState, parsed } = getActionState(
-    payload,
+  // Blanks are omitted, as the FormData encoding did: a blank optional field
+  // is left unwritten rather than cleared.
+  const { formState, parsed } = readActionInput(
+    input,
     VIDEO_PERMITTED_FIELD_NAMES,
-    createVideoSchema
+    createVideoSchema,
+    { blankStrings: 'omit' }
   );
 
   if (!parsed.success) {

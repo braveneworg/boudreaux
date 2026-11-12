@@ -12,7 +12,7 @@ import { publishArtistAction } from '@/lib/actions/publish-artist-action';
 import { restoreArtistAction } from '@/lib/actions/restore-artist-action';
 import { updateArtistAction } from '@/lib/actions/update-artist-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
+import type { FormState } from '@/lib/types/form-state';
 import type { ArtistFormData } from '@/lib/validation/create-artist-schema';
 
 import {
@@ -67,31 +67,15 @@ beforeEach(() => {
 });
 
 describe('useCreateArtistMutation', () => {
-  it('calls createArtistAction with the empty form state', async () => {
-    vi.mocked(createArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
-
-    await opts.mutationFn({ slug: 'john-doe', displayName: 'John' });
-
-    expect(createArtistAction).toHaveBeenCalledWith(EMPTY_FORM_STATE, expect.any(FormData));
-  });
-
-  it('serializes the artist values to FormData', async () => {
-    vi.mocked(createArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
-
-    await opts.mutationFn({ slug: 'john-doe', displayName: 'John' });
-
-    expect(vi.mocked(createArtistAction).mock.calls[0][1].get('slug')).toBe('john-doe');
-  });
-
-  it('omits empty fields from the FormData (create has nothing to clear)', async () => {
+  it('passes the artist values to createArtistAction as they are', async () => {
     vi.mocked(createArtistAction).mockResolvedValue(okState);
     const opts = getOptions<ArtistFormData>(useCreateArtistMutation);
 
     await opts.mutationFn({ slug: 'john-doe', displayName: 'John', bio: '' });
 
-    expect(vi.mocked(createArtistAction).mock.calls[0][1].has('bio')).toBe(false);
+    expect(vi.mocked(createArtistAction).mock.calls).toEqual([
+      [{ slug: 'john-doe', displayName: 'John', bio: '' }],
+    ]);
   });
 
   it('invalidates artist and release caches on success', async () => {
@@ -113,33 +97,16 @@ describe('useCreateArtistMutation', () => {
 });
 
 describe('useUpdateArtistMutation', () => {
-  it('calls updateArtistAction with the artist id', async () => {
-    vi.mocked(updateArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
-
-    await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe' } });
-
-    expect(updateArtistAction).toHaveBeenCalledWith('a1', EMPTY_FORM_STATE, expect.any(FormData));
-  });
-
-  it('serializes the artist values to FormData', async () => {
-    vi.mocked(updateArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
-
-    await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe' } });
-
-    expect(vi.mocked(updateArtistAction).mock.calls[0][2].get('slug')).toBe('john-doe');
-  });
-
-  it('keeps emptied fields in the FormData so the action can clear them', async () => {
+  // The blanks reach the action, which clears those fields (#759).
+  it('passes the artist id and values, blanks included, to updateArtistAction', async () => {
     vi.mocked(updateArtistAction).mockResolvedValue(okState);
     const opts = getOptions<{ id: string; values: ArtistFormData }>(useUpdateArtistMutation);
 
     await opts.mutationFn({ id: 'a1', values: { slug: 'john-doe', displayName: '', bio: '' } });
 
-    const formData = vi.mocked(updateArtistAction).mock.calls[0][2];
-    expect(formData.get('displayName')).toBe('');
-    expect(formData.get('bio')).toBe('');
+    expect(vi.mocked(updateArtistAction).mock.calls).toEqual([
+      ['a1', { slug: 'john-doe', displayName: '', bio: '' }],
+    ]);
   });
 
   it('invalidates artist and release caches on success', async () => {

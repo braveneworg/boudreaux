@@ -14,8 +14,7 @@ import type { CreateVideoData, Video } from '@/lib/types/domain/video';
 import type { FormState } from '@/lib/types/form-state';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
-import { isValidObjectId } from '@/lib/utils/validation/object-id';
+import { readActionInput, readPreGeneratedId } from '@/lib/utils/forms/read-action-input';
 import type { VideoFormData } from '@/lib/validation/create-video-schema';
 import { createVideoSchema } from '@/lib/validation/create-video-schema';
 
@@ -127,8 +126,7 @@ const runVideoCreate = async (
  * persists it with the client-pre-generated ObjectId as the document id.
  */
 export const createVideoAction = async (
-  _initialState: FormState,
-  payload: FormData
+  input: VideoFormData & { preGeneratedId?: string }
 ): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
@@ -136,18 +134,13 @@ export const createVideoAction = async (
   }
   const { session } = gate;
 
-  // Read the pre-generated ObjectId before getActionState, which strips
-  // non-permitted fields.
-  const rawPreGeneratedId = payload.get('preGeneratedId');
-  const preGeneratedId =
-    typeof rawPreGeneratedId === 'string' && isValidObjectId(rawPreGeneratedId)
-      ? rawPreGeneratedId
-      : undefined;
+  const preGeneratedId = readPreGeneratedId(input);
 
-  const { formState, parsed } = getActionState(
-    payload,
+  const { formState, parsed } = readActionInput(
+    input,
     VIDEO_PERMITTED_FIELD_NAMES,
-    createVideoSchema
+    createVideoSchema,
+    { blankStrings: 'omit' }
   );
 
   if (parsed.success) {

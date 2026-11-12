@@ -219,12 +219,26 @@ export const ChatMessageList = ({
     const el = containerRef.current;
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_BOTTOM_THRESHOLD_PX;
+    const now = Date.now();
+
+    // Recent touch/wheel input makes this scroll the viewer's, on both pointer
+    // kinds, and it is checked before the resize window below. The resize
+    // window opens on every ResizeObserver report, including the observer's
+    // first one when the list mounts, so a viewer who starts scrolling within
+    // RESIZE_REPIN_WINDOW_MS of opening the drawer or of a late layout shift
+    // (an avatar, the pinned strip) would otherwise be snapped back to the tail.
+    // Each user-classified scroll refreshes the window so momentum stays user's.
+    if (now - lastUserInputTsRef.current < USER_SCROLL_WINDOW_MS) {
+      lastUserInputTsRef.current = now;
+      isPinnedRef.current = atBottom;
+      return;
+    }
 
     // A viewport resize just clamped the container and fired this scroll — it is
     // not user intent. While pinned, re-pin the tail instead of letting the
     // synthetic scroll flip the pin off (which would skip the ResizeObserver's
     // re-pin and leave the list drifted). Applies to both pointer kinds.
-    if (Date.now() - lastResizeTsRef.current < RESIZE_REPIN_WINDOW_MS && isPinnedRef.current) {
+    if (now - lastResizeTsRef.current < RESIZE_REPIN_WINDOW_MS && isPinnedRef.current) {
       if (!atBottom) el.scrollTop = el.scrollHeight;
       return;
     }
@@ -238,15 +252,9 @@ export const ChatMessageList = ({
 
     // Coarse pointers (iOS/Android): the browser itself fires scroll
     // events — WebKit resets scrollTop inside transformed containers when
-    // the drawer transition ends, and clamps it on viewport changes. Only
-    // recent touch/wheel input may unpin; anything else while pinned is a
-    // displacement to undo.
-    const now = Date.now();
-    if (now - lastUserInputTsRef.current < USER_SCROLL_WINDOW_MS) {
-      lastUserInputTsRef.current = now;
-      isPinnedRef.current = atBottom;
-      return;
-    }
+    // the drawer transition ends, and clamps it on viewport changes. Without
+    // recent touch/wheel input, a scroll away from the bottom while pinned
+    // is a displacement to undo.
     if (atBottom) {
       isPinnedRef.current = true;
       return;

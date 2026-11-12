@@ -198,3 +198,30 @@ that for a form that needs more.
 
 The protocol keeps six members: `entity`, `form`, `create`, `update`,
 `onSuccess` and `onFailure`.
+
+## Amendment (2026-11-08): Entity actions take the form's values, not `FormData`
+
+The release, artist, featured-artist and video create and update actions
+were called only by their mutation hooks; no `<form action>` and no
+`useActionState` posts to them. They still took `FormData`. The hooks
+encoded the RHF values with `objectToFormData` (arrays as JSON, a
+`repeatKeys` option for `FormData.getAll`, a `keepEmptyStrings` option
+for updates), and `getActionState` decoded them. The featured-artist
+actions rebuilt their schema with `z.coerce.number()` because `FormData`
+sends strings. That split had a cost: the featured-artist update hook
+never set `keepEmptyStrings`, so its emptied fields were dropped before
+the action saw them and could not be cleared.
+
+These eight actions now take the form's values as an object, typed by
+the form's own schema, and read them with `readActionInput`
+(`src/lib/utils/forms/read-action-input.ts`). It keeps the permitted
+field allowlist (policy, not a copy of the schema) and drops unsent
+fields. Each action states its blank policy: `blankStrings: 'omit'` on
+create, `'keep'` on update (video update keeps `'omit'`, as its
+encoding did). Nothing is decoded or coerced; the schema decides.
+
+Progressive enhancement is unaffected. `profile-form` still posts
+`FormData` through `useActionState`, and so its actions keep
+`getActionState`. So do the hook-called tour, venue and banner actions,
+which were not part of this change. An action a real form posts to
+must keep reading `FormData`.

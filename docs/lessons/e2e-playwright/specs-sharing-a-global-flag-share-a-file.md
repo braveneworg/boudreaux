@@ -57,3 +57,32 @@ the second test every time.
 
 A row that more than one test of a file writes is a value of its own. Set
 `test.describe.configure({ mode: 'default' })` on that describe.
+
+## The same holds for a flag on a shared seeded user
+
+A flag on one user's row is global to every spec that signs in as that
+user. `admin-chat.spec.ts` disabled chat for the first row of the
+moderation table, which was always the seeded `testuser`, for the
+length of three serial tests. `chat-drawer.spec.ts`,
+`chat-drawer-touch.spec.ts` and `admin-chat-user-detail.spec.ts` sign in
+as `testuser` too. Whenever one of them opened the drawer inside that
+window, it found "You have been reported for abuse" where the composer
+should be, and timed out on `getByLabel('Chat message')`. On 2026-11-08
+it failed `chat-drawer.spec.ts` on a local production build with
+`--repeat-each=3`. In CI, `admin-chat` and `admin-chat-user-detail` share
+shard 1, so the race was already live there.
+
+Here the readers don't need to share the flag, so moving them into one
+file is the wrong fix. The writer needs its own row. The moderation spec
+now creates a user for its run with `createStampedUser`
+(`e2e/helpers/stamped-user.ts`), finds that user's switch by its
+accessible name (`Disable chat for <handle>`), and deletes the user's
+rows by id in `afterAll`.
+
+- A spec that changes a user's state (chat access, a ban, a quota, a
+  profile field) uses a stamped user, never a seeded one that other
+  files sign in as.
+- `.first()` on a list of users is a choice made by sort order. Find the
+  row by the name of the user the test created.
+- Merge specs into one file only when they all need the same value.
+  When only the writer needs it, give the writer its own row.

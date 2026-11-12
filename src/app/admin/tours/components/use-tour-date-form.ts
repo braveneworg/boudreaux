@@ -22,7 +22,9 @@ import {
   useCreateTourDateMutation,
   useUpdateTourDateMutation,
 } from '../_hooks/mutations/use-tour-date-mutations';
-import { useTourDateImagesQuery } from '../_hooks/use-tour-date-images-query';
+import { useTourImagesQuery } from '../_hooks/use-tour-images-query';
+
+import type { StoredTourImage } from './tour-image-upload';
 
 /**
  * Local interfaces matching Prisma model shapes.
@@ -53,21 +55,6 @@ export interface TourDateFields {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface TourDateImageFields {
-  id: string;
-  tourDateId: string;
-  s3Key: string;
-  s3Url: string;
-  s3Bucket: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  displayOrder: number;
-  altText: string | null;
-  createdAt: Date;
-  uploadedBy: string | null;
 }
 
 export type TourDateWithHeadliners = TourDateFields & {
@@ -252,7 +239,7 @@ interface UseTourDateImagesStateParams {
 }
 
 interface UseTourDateImagesStateReturn {
-  tourDateImages: TourDateImageFields[];
+  tourDateImages: StoredTourImage[];
   handleImageUploadComplete: () => void;
 }
 
@@ -262,14 +249,13 @@ const useTourDateImagesState = ({
   open,
   isEditMode,
 }: UseTourDateImagesStateParams): UseTourDateImagesStateReturn => {
-  const [tourDateImages, setTourDateImages] = useState<TourDateImageFields[]>([]);
+  const [tourDateImages, setTourDateImages] = useState<StoredTourImage[]>([]);
 
   // The gated query owns the request (only while the dialog is open for an
   // existing tour date); the effect projects its result into local state, and
   // `refetch` re-pulls after an upload completes.
-  const { data: tourDateImagesData, refetch: refetchTourDateImages } = useTourDateImagesQuery(
-    tourId,
-    tourDate?.id ?? '',
+  const { data: tourDateImagesData, refetch: refetchTourDateImages } = useTourImagesQuery(
+    { kind: 'tourDate', tourId, tourDateId: tourDate?.id ?? '' },
     { enabled: isEditMode && open && !!tourDate?.id }
   );
 

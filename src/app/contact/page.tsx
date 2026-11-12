@@ -29,8 +29,8 @@ interface ContactEntry {
 
 const CONTACTS: readonly ContactEntry[] = [
   { role: 'Co-founders/owners', name: 'Ceschi Ramos and David Ramos' },
-  { role: 'Label Manager', name: 'Dylan', email: 'dylanowenmusic@gmail.com' },
-  { role: 'Distribution', name: 'Jeep Ward at Redeye Worldwide', email: 'jeephalo@gmail.com' },
+  { role: 'Label Manager', name: 'Niki', email: 'nikianarchy@gmail.com' },
+  { role: 'Distribution', name: 'Nina at Redeye Worldwide', email: 'nina@redeyeworldwide.com' },
   { role: 'Media and Fan Support', name: 'Niki', email: 'nikianarchy@gmail.com' },
   { role: 'Customer Service', name: 'Mo Niklz', email: 'djmoniklz@gmail.com' },
 ];

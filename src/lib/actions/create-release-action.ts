@@ -16,12 +16,14 @@ import type { FormState } from '@/lib/types/form-state';
 import type { Format } from '@/lib/types/media-models';
 import { logSecurityEvent } from '@/lib/utils/audit-log';
 import { setUnknownError } from '@/lib/utils/auth/auth-utils';
-import { getActionState } from '@/lib/utils/auth/get-action-state';
 import type { CreditDecisions } from '@/lib/utils/credit-confirmation';
+import { readActionInput, readPreGeneratedId } from '@/lib/utils/forms/read-action-input';
 import { readCreditDecisions } from '@/lib/utils/forms/read-credit-decisions';
-import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import { createReleaseSchema } from '@/lib/validation/create-release-schema';
-import type { ReleaseFormData } from '@/lib/validation/create-release-schema';
+import type {
+  CreateReleaseActionInput,
+  ReleaseFormData,
+} from '@/lib/validation/create-release-schema';
 
 import {
   applyServiceFailure,
@@ -144,25 +146,21 @@ const createAndPublish = async ({
   return published.success ? { response } : { response, creditFailure: published.error };
 };
 
-/** The ObjectId the client pre-generated for the new release, when it is a valid one. */
-const readPreGeneratedId = (payload: FormData): string | undefined => {
-  const raw = payload.get('preGeneratedId');
-  return typeof raw === 'string' && isValidObjectId(raw) ? raw : undefined;
-};
-
-export const createReleaseAction = async (
-  _initialState: FormState,
-  payload: FormData
-): Promise<FormState> => {
+/**
+ * Server Action to create a release from the release form's values, the
+ * pre-generated id and the admin's credit decisions. Called only by
+ * `useCreateReleaseMutation`; the input is validated here, never trusted.
+ * Blanks are omitted: an empty optional field is not written.
+ */
+export const createReleaseAction = async (input: CreateReleaseActionInput): Promise<FormState> => {
   const gate = await gateAction('admin');
   if (!gate.success) {
     return refusedFormState(gate);
   }
   const { session } = gate;
 
-  // Read the pre-generated ObjectId set by the client before calling getActionState,
-  // since getActionState strips fields not in permittedFieldNames.
-  const preGeneratedId = readPreGeneratedId(payload);
+  // Not a form field, so `readActionInput` drops it; read it on its own.
+  const preGeneratedId = readPreGeneratedId(input);
 
   const permittedFieldNames = [
     'title',
@@ -176,10 +174,12 @@ export const createReleaseAction = async (
     'publishedAt',
     'suggestedPrice',
   ] as const;
-  const { formState, parsed } = getActionState(payload, permittedFieldNames, createReleaseSchema);
+  const { formState, parsed } = readActionInput(input, permittedFieldNames, createReleaseSchema, {
+    blankStrings: 'omit',
+  });
 
   if (parsed.success) {
-    const credit = readCreditDecisions(payload);
+    const credit = readCreditDecisions(input);
     if (!credit.ok) {
       applyCreditFailure(formState, 'Invalid artist decisions');
       return formState;

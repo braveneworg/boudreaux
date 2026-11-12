@@ -12,8 +12,8 @@ import { publishFeaturedArtistsToSiteAction } from '@/lib/actions/publish-featur
 import { updateFeaturedArtistAction } from '@/lib/actions/update-featured-artist-action';
 import { updateFeaturedArtistCoverArtAction } from '@/lib/actions/update-featured-artist-cover-art-action';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_FORM_STATE, type FormState } from '@/lib/types/form-state';
-import type { FeaturedArtistFormData } from '@/lib/validation/create-featured-artist-schema';
+import type { FormState } from '@/lib/types/form-state';
+import type { FeaturedArtistActionInput } from '@/lib/validation/create-featured-artist-schema';
 
 import {
   useCreateFeaturedArtistMutation,
@@ -27,7 +27,7 @@ import {
 /** Variables accepted by the whole-entity featured-artist update mutation. */
 type UpdateVariables = {
   featuredArtistId: string;
-  values: FeaturedArtistFormData & { artistIds: string[] };
+  values: FeaturedArtistActionInput;
 };
 
 const useMutationMock = vi.hoisted(() => vi.fn());
@@ -85,34 +85,20 @@ beforeEach(() => {
 });
 
 describe('useCreateFeaturedArtistMutation', () => {
-  const createValues: FeaturedArtistFormData & { artistIds: string[] } = {
+  const createValues: FeaturedArtistActionInput = {
     position: 0,
     digitalFormatId: 'a'.repeat(24),
     releaseId: 'b'.repeat(24),
     artistIds: ['x', 'y'],
   };
 
-  it('calls createFeaturedArtistAction with the empty form state', async () => {
+  it('passes the values, artistIds included, to createFeaturedArtistAction as they are', async () => {
     vi.mocked(createFeaturedArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<FeaturedArtistFormData & { artistIds: string[] }>(
-      useCreateFeaturedArtistMutation
-    );
+    const opts = getOptions<FeaturedArtistActionInput>(useCreateFeaturedArtistMutation);
 
     await opts.mutationFn(createValues);
 
-    expect(vi.mocked(createFeaturedArtistAction).mock.calls[0]?.[0]).toBe(EMPTY_FORM_STATE);
-  });
-
-  it('appends artistIds individually to the form data', async () => {
-    vi.mocked(createFeaturedArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<FeaturedArtistFormData & { artistIds: string[] }>(
-      useCreateFeaturedArtistMutation
-    );
-
-    await opts.mutationFn(createValues);
-
-    const formData = vi.mocked(createFeaturedArtistAction).mock.calls[0]?.[1] as FormData;
-    expect(formData.getAll('artistIds')).toEqual(['x', 'y']);
+    expect(vi.mocked(createFeaturedArtistAction).mock.calls).toEqual([[createValues]]);
   });
 
   it('invalidates the featured-artist cache on success', async () => {
@@ -133,39 +119,22 @@ describe('useCreateFeaturedArtistMutation', () => {
 });
 
 describe('useUpdateFeaturedArtistMutation', () => {
-  const updateValues: FeaturedArtistFormData & { artistIds: string[] } = {
+  const updateValues: FeaturedArtistActionInput = {
     position: 2,
     digitalFormatId: 'a'.repeat(24),
     releaseId: 'b'.repeat(24),
     artistIds: ['x', 'y'],
   };
 
-  it('addresses the update action with the featured artist id', async () => {
+  // Blanks reach the action, which clears those fields.
+  it('passes the featured artist id and values, blanks included, to the update action', async () => {
     vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
     const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
+    const values = { ...updateValues, displayName: '' };
 
-    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
+    await opts.mutationFn({ featuredArtistId: 'fa-1', values });
 
-    expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[0]).toBe('fa-1');
-  });
-
-  it('calls the update action with the empty form state', async () => {
-    vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
-
-    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
-
-    expect(vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[1]).toBe(EMPTY_FORM_STATE);
-  });
-
-  it('appends artistIds individually to the form data', async () => {
-    vi.mocked(updateFeaturedArtistAction).mockResolvedValue(okState);
-    const opts = getOptions<UpdateVariables>(useUpdateFeaturedArtistMutation);
-
-    await opts.mutationFn({ featuredArtistId: 'fa-1', values: updateValues });
-
-    const formData = vi.mocked(updateFeaturedArtistAction).mock.calls[0]?.[2] as FormData;
-    expect(formData.getAll('artistIds')).toEqual(['x', 'y']);
+    expect(vi.mocked(updateFeaturedArtistAction).mock.calls).toEqual([['fa-1', values]]);
   });
 
   it('invalidates the featured-artist cache on success', async () => {

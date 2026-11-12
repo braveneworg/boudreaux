@@ -22,8 +22,6 @@ import {
   tourDateDeleteImageSchema,
   tourDateImageReorderSchema,
   tourDateImageUploadRequestSchema,
-  tourDateUpdateImageAltTextSchema,
-  updateImageAltTextSchema,
   type ConfirmUploadRequest,
   type DeleteImageRequest,
   type ImageReorder,
@@ -33,8 +31,6 @@ import {
   type TourDateDeleteImageRequest,
   type TourDateImageReorder,
   type TourDateImageUploadRequest,
-  type TourDateUpdateImageAltText,
-  type UpdateImageAltText,
 } from '@/lib/validation/tours/image-schema';
 
 import type { z } from 'zod';
@@ -172,27 +168,6 @@ export const reorderImagesAction = async (
     );
   });
 
-/** Set a tour image's alt text; blank clears it. Admin only. */
-export const updateImageAltTextAction = async (
-  request: UpdateImageAltText
-): Promise<TourImageActionResponse<{ ownerId: string }>> =>
-  settle('Failed to update alt text', async () => {
-    const gate = await gateAction('admin');
-    if (!gate.success) {
-      return gate;
-    }
-    const parsed = updateImageAltTextSchema.safeParse(request);
-    if (!parsed.success) {
-      return invalidRequest(parsed.error);
-    }
-
-    const result = await tourImages.updateAltText('tour', parsed.data.imageId, parsed.data.altText);
-    if (result.success) {
-      revalidateTour(result.data.ownerId)();
-    }
-    return result;
-  });
-
 /** A presigned PUT for one more image of a tour date. Admin only. */
 export const generateTourDateUploadUrlAction = async (
   request: TourDateImageUploadRequest
@@ -274,26 +249,6 @@ export const reorderTourDateImagesAction = async (
     const { tourDateId, imageOrders } = parsed.data;
     return afterWrite(
       await tourImages.reorder({ kind: 'tourDate', id: tourDateId }, imageOrders),
-      revalidateTourDates
-    );
-  });
-
-/** Set a tour date image's alt text; blank clears it. Admin only. */
-export const updateTourDateImageAltTextAction = async (
-  request: TourDateUpdateImageAltText
-): Promise<TourImageActionResponse<{ ownerId: string }>> =>
-  settle('Failed to update alt text', async () => {
-    const gate = await gateAction('admin');
-    if (!gate.success) {
-      return gate;
-    }
-    const parsed = tourDateUpdateImageAltTextSchema.safeParse(request);
-    if (!parsed.success) {
-      return invalidRequest(parsed.error);
-    }
-
-    return afterWrite(
-      await tourImages.updateAltText('tourDate', parsed.data.imageId, parsed.data.altText),
       revalidateTourDates
     );
   });

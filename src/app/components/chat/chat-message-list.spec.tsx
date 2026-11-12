@@ -206,6 +206,20 @@ describe('ChatMessageList', () => {
       expect(list.scrollTop).toBe(500);
     });
 
+    it('lets a wheel scroll unpin even right after a resize re-pinned the tail', () => {
+      const { list, observer } = renderWithGeometry(400);
+      // A late layout shift (the observer's first report on mount, an avatar
+      // loading, the pinned strip popping in) re-pins and opens the resize
+      // window. The viewer's wheel lands inside it.
+      observer?.trigger();
+      fireEvent.wheel(list);
+      list.scrollTop = 0;
+      list.dispatchEvent(new Event('scroll'));
+
+      // Real input is intent: the scroll must not be read as a resize clamp.
+      expect(list.scrollTop).toBe(0);
+    });
+
     it('also observes the message stream so late-loading rows keep the tail visible', () => {
       const { container } = render(<ChatMessageList {...baseProps} messages={[makeMsg('a')]} />);
       const list = container.querySelector('[data-testid="chat-message-list"]') as HTMLElement;
@@ -284,6 +298,31 @@ describe('ChatMessageList', () => {
         list.dispatchEvent(new Event('scroll'));
         expect(list.scrollTop).toBe(0);
 
+        observer?.trigger();
+        expect(list.scrollTop).toBe(0);
+      });
+
+      it('lets a touch scroll unpin even right after a resize re-pinned the tail', () => {
+        stubCoarsePointer();
+        const { list, observer } = renderWithGeometry(400);
+        observer?.trigger();
+        fireEvent.touchMove(list);
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event('scroll'));
+
+        expect(list.scrollTop).toBe(0);
+      });
+
+      it('keeps a resize-window touch scroll unpinned through the next resize', () => {
+        stubCoarsePointer();
+        const { list, observer } = renderWithGeometry(400);
+        observer?.trigger();
+        fireEvent.touchMove(list);
+        list.scrollTop = 0;
+        list.dispatchEvent(new Event('scroll'));
+
+        // The viewer is reading history now: a later layout shift must not
+        // yank the list back to the tail.
         observer?.trigger();
         expect(list.scrollTop).toBe(0);
       });
