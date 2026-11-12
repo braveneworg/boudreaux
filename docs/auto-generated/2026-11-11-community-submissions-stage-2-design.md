@@ -2,7 +2,7 @@
 
 - **Date**: 2026-11-11
 - **Branch**: `feat/submission-attachments` (off main `2f8fff03`, v4.481.0)
-- **Status**: Design
+- **Status**: Implemented on the branch; see "As built" at the end
 - **Builds on**:
   [stage 1](2026-11-11-community-submissions-stage-1-design.md)
 - **Vocabulary**: `CONTEXT.md` (attachment, re-encoded copy, card picture,
@@ -276,9 +276,101 @@ shared-link preview of a public submission.
 
 The code deploys without these and uploads stay off until they are done.
 
-1. The first run of the Lambda's deploy workflow needs the deploy role to be
-   able to create an ECR repository and push to it.
-2. Give that workflow the app's AWS principal (`APP_AWS_PRINCIPAL_ARN`), so
-   the bucket's policy lets the app sign uploads and read copies.
-3. Set `SUBMISSION_UPLOADS_BUCKET` and `SUBMISSION_REENCODER_LAMBDA_NAME`
-   for the app from the stack's outputs, and deploy the app again.
+1. The first run of the Lambda's deploy workflow
+   (`deploy-submission-reencoder.yml`, on merge) needs the deploy role to be
+   able to create an ECR repository and push to it, create and configure an
+   S3 bucket, and set a function's event-invoke config, beyond what the bio
+   generator's deploy uses. Until it can, that workflow fails; the app's own
+   deploy is a separate workflow and is not affected.
+2. Set the repository variable `APP_AWS_PRINCIPAL_ARN` to the ARN the app
+   runs as, and run that workflow again. The stack then lets the app sign
+   uploads, read copies and invoke the function. A principal that does not
+   exist fails the deploy.
+3. Set the repository variables `SUBMISSION_UPLOADS_BUCKET` and
+   `SUBMISSION_REENCODER_LAMBDA_NAME` from the two values the workflow
+   prints, and deploy the app again.
+4. If `ALERT_EMAIL` is set, confirm the alarm's subscription email.
+
+## As built (2026-11-11)
+
+Stage 2 is implemented on `feat/submission-attachments`. Where the build
+differs from the design above, the build is what the code does and this
+section says why. The acceptance criteria were not changed.
+
+### Differences from the design
+
+- **Section 8, the first file on a new submission.** Dropping a file does
+  not save a draft by itself. A submission that is not saved yet shows
+  "Save a draft first. Then you can add photos, audio and video to it here."
+  in place of the drop target, and the drop target appears on the edit page
+  the save lands on. Saving silently on a drop would have had to spend the
+  form's single-use verification and swap the address under an upload in
+  flight (`docs/lessons/react-nextjs/replacestate-route-swap-remounts-the-page.md`).
+- **Section 8, the players.** A video uses the site's `VideoPlayer` behind
+  its poster. Audio uses the browser's own `<audio>` element: the site's
+  audio player is built around a release. The caption lint rule is off for
+  that one file, since a user's upload has no caption track.
+- **Section 4, packaging.** The handler is bundled before the image is
+  built, so the image's build context is `submission-reencoder/` alone. The
+  ffmpeg image is pinned by digest (`mwader/static-ffmpeg:8.1.1`); the
+  Lambda base image is left on its tag so each deploy takes AWS's patches.
+- **Section 4, what the Lambda adds.** Lambda's own retries of a failed
+  invoke are off, so a file that crashes a decoder is not decoded twice
+  more. ffmpeg and ffprobe are run with `PATH` only, so the role's
+  credentials are not in a decoder's environment. An encode is capped a
+  little past its limit and the written copy is measured again, so a file
+  that hides its length is still refused. Transparency in a photo is
+  flattened onto white. sharp's loaders are limited to the accepted image
+  formats.
+- **Section 4, the stack.** It also grants the app's principal
+  `lambda:InvokeFunction`, and the bucket refuses plain HTTP.
+- **Section 6, removing.** A removal from a published submission is checked
+  against the attachments that are ready, so a failed attachment is never a
+  reason another one cannot be removed.
+- **Stage 1's rule, tightened.** A save to a submission that is awaiting
+  approval or approved is held to the publish rules, whichever button sent
+  it. Before, such a save could empty the writing in place.
+- **The card picture in lists.** An approved submission's card picture comes
+  from the CDN even while its owner is banned: hiding a submission does not
+  remove its files (ADR-0027).
+
+### How it was checked
+
+- **Unit**: 17,909 tests with typecheck, lint and format; the coverage check
+  passes (branches 95.13% against a 95% floor).
+- **Real database**: the cap of ten, the submission's `updatedAt` moving on
+  a creation, the job's begin gate, and a deleted submission's attachments
+  going with it, on Docker Mongo. The cap spec was run with the serialising
+  write removed and fails every time; see
+  `docs/lessons/testing/a-race-spec-is-proved-by-removing-the-lock.md`.
+- **Real ffmpeg**: the Lambda's 28 integration specs ran against ffmpeg and
+  ffprobe 8.1.1, including a playlist and a concat script that are refused.
+  The image was built for arm64 and the bundled handler was run inside it
+  with no network: a video, an audio file and a photo came out as H.264 and
+  AAC in MP4, MP3, and JPEG.
+- **End to end**: a photo is attached, re-encoded through the real signed
+  callback route by the fake Lambda, published and approved; it passed three
+  times across four workers on the dev server.
+
+### Known gaps
+
+- **Nothing here has run on AWS.** The deploy workflow, the arm64 build on
+  an x86 runner, the bucket's CORS against a real browser upload, the
+  presigned URL refusing a wrong length, the copy on approval and the
+  invalidation on unpublish are all untested until the stack exists.
+- **Encode time is not measured.** A ten-minute video on 3008 MB has not
+  been timed against the 11-minute budget.
+- **The E2E attaches a photo only.** Audio and video go through the same
+  routes with a different fake result; the real encodes are covered by the
+  Lambda's integration specs, not end to end.
+- **No production-build E2E run.** CI runs it on the production build.
+- **A deleted account's files are not removed.** Deleting a user cascades
+  to their submissions and attachments in the database; nothing deletes the
+  files.
+- **A file left by a re-encode whose attachment was removed.** Removal is
+  refused while a job is in flight, but a job past the stale window can be
+  removed and may still write a copy afterwards. Nothing points at it.
+- **HDR video is not tone-mapped**, and a video-typed upload that turns out
+  to be audio is held to the video size limit.
+- **Stage 1's gaps still stand**: not found is the themed page with a 200,
+  and no E2E covers a signed-out visitor.
