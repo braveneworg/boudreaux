@@ -69,6 +69,11 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     primary: `${stats.chat.flaggedUsers}`,
     secondary: `${stats.chat.flaggedUsers} flagged · ${stats.chat.disabledUsers} disabled`,
   },
+  '/admin/community': {
+    href: '/admin/community',
+    primary: `${stats.submissions.awaiting}`,
+    secondary: 'awaiting approval',
+  },
   '/admin/tours': {
     href: '/admin/tours',
     primary: `${stats.tours.total}`,

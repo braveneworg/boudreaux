@@ -45,6 +45,10 @@ export type UserScalars = {
   country: string | null;
   allowSmsNotifications: boolean | null;
   allowEmailNotifications: boolean | null;
+  // The upload agreement (ADR-0025): when it was last accepted and at which
+  // version of the wording. Both null until the first acceptance.
+  uploadAgreementAt: Date | null;
+  uploadAgreementVersion: number | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -109,6 +113,14 @@ export interface UserContactRecord {
   id: string;
   username: string | null;
   email: string | null;
+}
+
+/** Role projection: who a role may be granted to or removed from. */
+export interface UserRoleRecord {
+  id: string;
+  username: string | null;
+  role: string | null;
+  banned: boolean | null;
 }
 
 /** Admin notification fan-out projection. */

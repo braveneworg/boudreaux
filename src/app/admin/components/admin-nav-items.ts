@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Clapperboard,
   Disc,
+  Inbox,
   MessageSquare,
   MessageSquareText,
   ScrollText,
@@ -71,6 +72,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: '/admin/chat',
     icon: MessageSquare,
     help: 'Moderate chat: review flagged users, hide messages, and disable access.',
+  },
+  {
+    label: 'Community',
+    href: '/admin/community',
+    icon: Inbox,
+    help: 'Approve or reject user submitted content, and choose who else may.',
   },
   {
     label: 'Tours',

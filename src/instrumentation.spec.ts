@@ -9,6 +9,11 @@ const runBootCheckMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/config/boot-check', () => ({ runBootCheck: runBootCheckMock }));
 
+const startMonitorMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/services/submission-overdue-reminder', () => ({
+  startOverdueReminderMonitor: startMonitorMock,
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   createLogger: vi.fn(() => ({ error: errorMock })),
 }));
@@ -100,6 +105,50 @@ describe('register', () => {
     await register();
 
     expect(runBootCheckMock).not.toHaveBeenCalled();
+  });
+
+  it('starts the overdue reminder on the production nodejs runtime', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_MODE', '');
+
+    await register();
+
+    expect(startMonitorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['in development', 'development', ''],
+    ['under test', 'test', ''],
+    ['in an E2E production build', 'production', 'true'],
+  ])('does not start the overdue reminder %s', async (_name, nodeEnv, e2eMode) => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+    vi.stubEnv('NODE_ENV', nodeEnv);
+    vi.stubEnv('E2E_MODE', e2eMode);
+
+    await register();
+
+    expect(startMonitorMock).not.toHaveBeenCalled();
+  });
+
+  it('does not start the overdue reminder on the edge runtime', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'edge');
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await register();
+
+    expect(startMonitorMock).not.toHaveBeenCalled();
+  });
+
+  it('does not start the overdue reminder when the boot check fails', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs');
+    vi.stubEnv('NODE_ENV', 'production');
+    runBootCheckMock.mockImplementationOnce(() => {
+      throw new Error('Missing required environment variables: AUTH_URL');
+    });
+
+    await expect(register()).rejects.toThrow();
+    expect(startMonitorMock).not.toHaveBeenCalled();
   });
 
   it('lets a failed boot check fail registration', async () => {

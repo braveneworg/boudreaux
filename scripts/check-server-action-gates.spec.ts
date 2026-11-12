@@ -177,6 +177,22 @@ describe('checkServerActionGates', () => {
     ]);
   });
 
+  it('classifies an export that crosses the gate as an approver', () => {
+    writeFile(
+      'src/lib/actions/approve-thing-action.ts',
+      serverModule("export const approveThingAction = async () => gateAction('approver');\n")
+    );
+
+    const { exports, violations } = checkServerActionGates(root);
+
+    expect(exports).toContainEqual({
+      file: 'src/lib/actions/approve-thing-action.ts',
+      name: 'approveThingAction',
+      access: 'approver',
+    });
+    expect(violations).toEqual([]);
+  });
+
   it('flags a gate call whose access is not a string literal', () => {
     writeFile(
       'src/lib/actions/dynamic-action.ts',
@@ -187,7 +203,7 @@ describe('checkServerActionGates', () => {
     );
 
     expect(checkServerActionGates(root).violations).toEqual([
-      "src/lib/actions/dynamic-action.ts: dynamicAction must call gateAction with 'admin' or 'signed-in' as a string literal",
+      "src/lib/actions/dynamic-action.ts: dynamicAction must call gateAction with 'admin', 'approver' or 'signed-in' as a string literal",
     ]);
   });
 });
@@ -233,16 +249,29 @@ describe('this repository', () => {
         'changeUsernameAction',
         'createPlaylistAction',
         'deletePlaylistAction',
+        'deleteSubmissionAction',
         'generatePlaylistCoverUploadUrlsAction',
         'getCollectionAction',
+        'publishSubmissionAction',
         'removePlaylistItemAction',
         'reorderPlaylistItemsAction',
+        'saveSubmissionDraftAction',
         'sendChatMessageAction',
+        'setSubmissionListedAction',
         'submitAbuseReportAction',
         'toggleChatReactionAction',
         'updatePlaylistAction',
         'updateProfileAction',
       ].sort()
     );
+  });
+
+  it('gates exactly these exports as approver', () => {
+    const approver = report.exports
+      .filter(({ access }) => access === 'approver')
+      .map(({ name }) => name)
+      .sort();
+
+    expect(approver).toEqual(['approveSubmissionAction', 'rejectSubmissionAction']);
   });
 });

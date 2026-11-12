@@ -61,6 +61,13 @@ model User {
   // Playlists feature (011-playlists)
   playlists Playlist[]
 
+  // Community submissions (ADR-0025)
+  submissions            Submission[]
+  // The upload agreement: when this user last accepted it, and which version
+  // of the wording. Absent until the first acceptance.
+  uploadAgreementAt      DateTime?
+  uploadAgreementVersion Int?
+
   // Live chat feature (009-live-chat)
   chatMessages ChatMessage[]
   chatUsers    ChatUser[]
@@ -1220,4 +1227,50 @@ model PlaylistItem {
   @@index([trackFileId])
   @@index([videoId])
   @@index([releaseId])
+}
+
+// Community submissions (ADR-0025): a user's titled piece of user submitted
+// content. Public only while APPROVED and its owner is not banned.
+enum SubmissionCategory {
+  VIDEO
+  COVER_SONG
+  ORIGINAL_SONG
+  INFORMATIONAL_VIDEO
+  WRITING
+  MUSIC_OR_LYRIC_VIDEO
+  LIVE_PERFORMANCE
+  PHOTO
+}
+
+enum SubmissionStatus {
+  DRAFT
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model Submission {
+  id              String             @id @default(auto()) @map("_id") @db.ObjectId
+  ownerId         String             @db.ObjectId
+  owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title           String
+  category        SubmissionCategory @default(VIDEO)
+  aboutHtml       String             @default("") // sanitized: bold and italic only
+  writingHtml     String             @default("") // sanitized: headings, bold, italic, links
+  links           String[] // http(s) URLs; at most ten with the writing's links
+  listed          Boolean            @default(false) // where an approved one appears, never whether
+  status          SubmissionStatus   @default(DRAFT)
+  publishedAt     DateTime? // last time the owner pressed Publish; orders the queue
+  firstApprovedAt DateTime? // set once; a re-approval never moves it
+  approvedAt      DateTime?
+  approvedBy      String?            @db.ObjectId
+  rejectedAt      DateTime?
+  rejectedBy      String?            @db.ObjectId
+  rejectionReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([ownerId, status])
+  @@index([status, publishedAt])
+  @@index([status, listed, firstApprovedAt])
 }
