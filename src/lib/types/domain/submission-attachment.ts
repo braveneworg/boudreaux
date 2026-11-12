@@ -76,6 +76,19 @@ export interface ReencodedAttachmentData {
   durationSeconds: number | null;
 }
 
+/** Where to upload one file, and the key to confirm it with. */
+export interface AttachmentUploadTarget {
+  uploadUrl: string;
+  uploadKey: string;
+}
+
+/** A confirmed attachment, and the state its submission is now in. */
+export interface ConfirmedAttachment {
+  attachmentId: string;
+  /** An approved submission is awaiting approval again once it gains an attachment. */
+  status: SubmissionStatus;
+}
+
 /** Where an attachment stands, as a screen shows it. */
 export type AttachmentState = 'processing' | 'ready' | 'failed';
 
