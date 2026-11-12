@@ -118,6 +118,26 @@ describe('SubmissionAttachmentGallery', () => {
     expect(player).toHaveAttribute('preload', 'none');
   });
 
+  it('lays a photo out at a default size when its re-encode recorded none', () => {
+    renderGallery([attachment({ width: null, height: null })]);
+
+    const photo = screen.getByRole('img');
+    expect(photo).toHaveAttribute('width', '1200');
+    expect(photo).toHaveAttribute('height', '800');
+  });
+
+  it('shows nothing for a ready attachment that has no address', () => {
+    renderGallery([attachment({ url: null })]);
+
+    expect(screen.getByRole('listitem')).toBeEmptyDOMElement();
+  });
+
+  it('names a failed attachment even when no reason was recorded', () => {
+    renderGallery([attachment({ state: 'failed', url: null, cardUrl: null, error: null })]);
+
+    expect(screen.getByText('show.jpg:')).toBeInTheDocument();
+  });
+
   it('says an attachment is still processing, by its file name', () => {
     renderGallery([attachment({ state: 'processing', url: null, cardUrl: null })]);
 

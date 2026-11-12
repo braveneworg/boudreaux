@@ -394,6 +394,18 @@ describe('SubmissionAttachmentService.confirmUpload', () => {
     ).toBe('..secretshow.jpg');
   });
 
+  it('names a file whose name was nothing but separators', async () => {
+    owns();
+    uploaded();
+    created();
+
+    await SubmissionAttachmentService.confirmUpload(OWNER_ID, confirm({ fileName: '/\\/' }));
+
+    expect(
+      vi.mocked(SubmissionAttachmentRepository.createWithinCap).mock.calls[0]?.[0].fileName
+    ).toBe('file');
+  });
+
   it('refuses a key under another submission’s prefix', async () => {
     const uploadKey = `uploads/${'d'.repeat(24)}/3f0c9a52-6a1d-4d1e-9a51-0c1d2e3f4a5b`;
 
@@ -551,6 +563,15 @@ describe('SubmissionAttachmentService.remove', () => {
   it('still succeeds when its files cannot be deleted', async () => {
     found();
     vi.mocked(attachmentStore.deletePrivate).mockRejectedValueOnce(new Error('AccessDenied'));
+
+    await expect(
+      SubmissionAttachmentService.remove(OWNER_ID, ATTACHMENT_ID)
+    ).resolves.toBeDefined();
+  });
+
+  it('still succeeds when the store rejects with something that is not an error', async () => {
+    found();
+    vi.mocked(attachmentStore.deletePrivate).mockRejectedValueOnce('throttled');
 
     await expect(
       SubmissionAttachmentService.remove(OWNER_ID, ATTACHMENT_ID)

@@ -222,6 +222,12 @@ describe('confirmAttachmentUploadAction', () => {
     await expect(confirmAttachmentUploadAction(confirm)).resolves.toEqual(FORBIDDEN);
   });
 
+  it('answers the gate’s refusal', async () => {
+    vi.mocked(gateAction).mockResolvedValue(REFUSAL);
+
+    await expect(confirmAttachmentUploadAction(confirm)).resolves.toEqual(REFUSAL);
+  });
+
   it('refuses a key the app did not make', async () => {
     await expect(
       confirmAttachmentUploadAction({ ...confirm, uploadKey: 'media/videos/x.mp4' })
@@ -296,6 +302,12 @@ describe('removeAttachmentAction', () => {
     signIn('user');
 
     await expect(removeAttachmentAction(remove)).resolves.toEqual(FORBIDDEN);
+  });
+
+  it('answers the gate’s refusal', async () => {
+    vi.mocked(gateAction).mockResolvedValue(REFUSAL);
+
+    await expect(removeAttachmentAction(remove)).resolves.toEqual(REFUSAL);
   });
 
   it('refuses input that is not an attachment id', async () => {

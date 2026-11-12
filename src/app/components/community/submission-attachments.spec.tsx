@@ -149,6 +149,31 @@ describe('SubmissionAttachments', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Processing: re-encoding, 40%');
   });
 
+  it('shows a stage that reports no percentage without one', () => {
+    renderSection([
+      attachment({
+        state: 'processing',
+        url: null,
+        cardUrl: null,
+        progress: { stage: 'probing', at: UPDATED },
+      }),
+    ]);
+
+    expect(screen.getByRole('status')).toHaveTextContent(/^Processing: checking the file$/);
+  });
+
+  it.each([
+    ['IMAGE', 'photo.heic'],
+    ['AUDIO', 'take.wav'],
+    ['VIDEO', 'clip.mov'],
+  ] as const)('lists a %s attachment that has no picture yet', (kind, fileName) => {
+    renderSection([attachment({ kind, fileName, state: 'failed', cardUrl: null, error: 'No.' })]);
+
+    const row = screen.getByRole('listitem');
+    expect(within(row).getByText(fileName)).toBeInTheDocument();
+    expect(within(row).queryByRole('presentation')).not.toBeInTheDocument();
+  });
+
   it('says a processing attachment is waiting before its first checkpoint', () => {
     renderSection([attachment({ state: 'processing', url: null, cardUrl: null })]);
 
@@ -198,6 +223,23 @@ describe('SubmissionAttachments', () => {
     await waitFor(() =>
       expect(mockToast.error.mock.calls).toEqual([
         ['A published submission needs something to show.'],
+      ])
+    );
+  });
+
+  it('says a removal failed when the server gave no reason', async () => {
+    vi.mocked(removeAttachmentAction).mockResolvedValueOnce({
+      success: false,
+      error: '',
+      code: 'UNKNOWN',
+    });
+    renderSection([attachment()]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove show.jpg' }));
+
+    await waitFor(() =>
+      expect(mockToast.error.mock.calls).toEqual([
+        ['We could not remove that attachment. Please try again.'],
       ])
     );
   });

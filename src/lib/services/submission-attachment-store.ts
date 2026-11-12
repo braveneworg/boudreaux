@@ -83,11 +83,8 @@ const privateBucket = (): string => {
   return bucket;
 };
 
+/** Delete `keys` from `bucket`. Every caller has already ruled out an empty list. */
 const deleteFrom = async (bucket: string, keys: string[]): Promise<void> => {
-  if (keys.length === 0) {
-    return;
-  }
-
   await getS3Client().send(
     new DeleteObjectsCommand({
       Bucket: bucket,

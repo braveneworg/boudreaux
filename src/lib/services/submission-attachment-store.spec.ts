@@ -167,6 +167,15 @@ describe('attachmentStore on S3', () => {
 
       await expect(attachmentStore.headUpload(UPLOAD_KEY)).resolves.toBeNull();
     });
+
+    it('reads an object stored with no type as untyped bytes, which no kind accepts', async () => {
+      mockSend.mockResolvedValueOnce({ ContentLength: 1234 });
+
+      await expect(attachmentStore.headUpload(UPLOAD_KEY)).resolves.toEqual({
+        bytes: 1234,
+        contentType: 'application/octet-stream',
+      });
+    });
   });
 
   describe('previewUrl', () => {
@@ -301,6 +310,12 @@ describe('attachmentStore on S3', () => {
   describe('bucket', () => {
     it('names the private bucket', () => {
       expect(attachmentStore.bucket()).toBe('private-bucket');
+    });
+
+    it('refuses to name a bucket that is not configured', () => {
+      vi.stubEnv('SUBMISSION_UPLOADS_BUCKET', '');
+
+      expect(() => attachmentStore.bucket()).toThrow('SUBMISSION_UPLOADS_BUCKET');
     });
   });
 });

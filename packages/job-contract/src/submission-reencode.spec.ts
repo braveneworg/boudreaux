@@ -9,7 +9,9 @@ import {
   attachmentCopyPrefix,
   attachmentKindForType,
   attachmentTypeForFileName,
+  attachmentUploadLimitBytes,
   attachmentUploadPrefix,
+  bareContentType,
   publishedAttachmentKey,
   submissionReencodeCallbackSchema,
   submissionReencodeDataSchema,
@@ -64,6 +66,30 @@ describe('upload limits', () => {
 
   it('allows audio up to three hours', () => {
     expect(ATTACHMENT_MAX_AUDIO_SECONDS).toBe(10_800);
+  });
+});
+
+describe('attachmentUploadLimitBytes', () => {
+  it.each([
+    ['IMAGE', 20],
+    ['AUDIO', 50],
+    ['VIDEO', 500],
+  ] as const)('answers the limit for %s', (kind, megabytes) => {
+    expect(attachmentUploadLimitBytes(kind)).toBe(megabytes * 1024 * 1024);
+  });
+});
+
+describe('bareContentType', () => {
+  it('drops parameters and case', () => {
+    expect(bareContentType(' Image/JPEG; charset=binary; q=1 ')).toBe('image/jpeg');
+  });
+
+  it('leaves a bare type as it is', () => {
+    expect(bareContentType('video/mp4')).toBe('video/mp4');
+  });
+
+  it('answers an empty string for no type', () => {
+    expect(bareContentType('')).toBe('');
   });
 });
 

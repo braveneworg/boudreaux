@@ -130,6 +130,14 @@ describe('attachmentViewsFor', () => {
     expect(view?.progress).toEqual({ stage: 'encoding', percent: 40, at: NOW.toISOString() });
   });
 
+  it('carries no checkpoint when the stored one cannot be read', async () => {
+    const unreadable = { ...processing(), reencodeProgress: { stage: 'thinking' } };
+
+    const [view] = await attachmentViewsFor([unreadable], owner);
+
+    expect(view?.progress).toBeNull();
+  });
+
   it('carries no checkpoint once the attachment is ready', async () => {
     const stale = record({ reencodeProgress: { stage: 'storing', at: NOW.toISOString() } });
 

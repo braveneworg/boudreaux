@@ -207,6 +207,37 @@ describe('useAttachmentUploads', () => {
     expect(confirmAttachmentUploadAction).not.toHaveBeenCalled();
   });
 
+  it('explains an upload that failed with something that is not an error', async () => {
+    vi.mocked(putWithProgress).mockRejectedValueOnce('offline');
+    const { result } = render();
+
+    act(() => result.current.add([photo()]));
+
+    await waitFor(() =>
+      expect(result.current.uploads).toMatchObject([
+        { error: 'The upload did not finish. Please try again.' },
+      ])
+    );
+  });
+
+  it('leaves the other files alone when one of them fails', async () => {
+    const { result } = render();
+
+    act(() =>
+      result.current.add([
+        fileOf('zine.pdf', 'application/pdf'),
+        fileOf('huge.jpg', 'image/jpeg', 20 * MEGABYTE + 1),
+      ])
+    );
+
+    await waitFor(() =>
+      expect(result.current.uploads.map(({ error }) => error)).toEqual([
+        'That kind of file is not accepted. Add a photo, an audio file or a video.',
+        'A photo can be up to 20 MB.',
+      ])
+    );
+  });
+
   it('shows a refused confirm on the file', async () => {
     vi.mocked(confirmAttachmentUploadAction).mockResolvedValueOnce({
       success: false,

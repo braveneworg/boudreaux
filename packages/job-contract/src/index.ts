@@ -84,6 +84,7 @@ export {
   attachmentUploadKey,
   attachmentUploadLimitBytes,
   attachmentUploadPrefix,
+  bareContentType,
   publishedAttachmentKey,
   submissionCopiesPrefix,
   submissionPublishedPrefix,

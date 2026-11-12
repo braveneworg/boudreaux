@@ -107,13 +107,16 @@ export const ATTACHMENT_ACCEPTED_TYPES: readonly string[] = UPLOAD_TYPES.flatMap
   ({ types }) => types
 );
 
-/** A content type without its parameters, lower-cased. */
-const bareType = (contentType: string): string =>
-  (contentType.split(';').at(0) ?? '').trim().toLowerCase();
+/**
+ * A content type without its parameters, lower-cased: the form an upload's
+ * type is compared, signed and stored in.
+ */
+export const bareContentType = (contentType: string): string =>
+  contentType.replace(/;.*/s, '').trim().toLowerCase();
 
 /** The kind an upload's declared type stands for, or `null` when it is not accepted. */
 export const attachmentKindForType = (contentType: string): AttachmentKind | null => {
-  const type = bareType(contentType);
+  const type = bareContentType(contentType);
 
   return UPLOAD_TYPES.find(({ types }) => types.includes(type))?.kind ?? null;
 };
@@ -166,7 +169,7 @@ export const attachmentTypeForFileName = (fileName: string): string | null => {
  * is signed into the upload, so the browser must send exactly this string.
  */
 export const acceptedAttachmentType = (reportedType: string, fileName: string): string | null => {
-  const reported = bareType(reportedType);
+  const reported = bareContentType(reportedType);
 
   return attachmentKindForType(reported) === null ? attachmentTypeForFileName(fileName) : reported;
 };

@@ -10,6 +10,7 @@ import {
   attachmentKindForType,
   attachmentUploadLimitBytes,
   attachmentUploadPrefix,
+  bareContentType,
   SUBMISSION_REENCODE_TASK,
 } from '@fakefour/job-contract';
 
@@ -64,10 +65,6 @@ const STILL_PROCESSING_MESSAGE =
   'This attachment is still processing. Remove it once it has finished.';
 const LAST_ATTACHMENT_MESSAGE =
   'A published submission needs something to show. Add another attachment first, or delete the submission.';
-
-/** A content type without its parameters, lower-cased: what is signed, and what the browser must send. */
-const bareType = (contentType: string): string =>
-  (contentType.split(';').at(0) ?? '').trim().toLowerCase();
 
 /**
  * The kind an upload of this type and size is accepted as. Throws the rule it
@@ -331,7 +328,7 @@ export class SubmissionAttachmentService {
     const uploadKey = `${attachmentUploadPrefix(submissionId)}${randomUUID()}`;
     const uploadUrl = await attachmentStore.presignUpload({
       key: uploadKey,
-      contentType: bareType(contentType),
+      contentType: bareContentType(contentType),
       contentLength: fileSize,
     });
 
@@ -371,7 +368,7 @@ export class SubmissionAttachmentService {
           fileName: plainFileName(fileName),
           uploadKey,
           uploadBytes: upload.bytes,
-          uploadType: bareType(upload.contentType),
+          uploadType: bareContentType(upload.contentType),
         },
         MAX_SUBMISSION_ATTACHMENTS
       );

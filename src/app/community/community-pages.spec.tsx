@@ -219,6 +219,10 @@ describe('SubmissionPage', () => {
       await expect(metadataFor(view())).resolves.toEqual({ title: 'Bus poem' });
     });
 
+    it('titles a submission that has no title yet as untitled', async () => {
+      await expect(metadataFor(view({ title: '' }))).resolves.toEqual({ title: 'Untitled' });
+    });
+
     it.each([
       ['an unlisted submission', view({ listed: false })],
       ['a submission that is not public', view({ status: 'DRAFT', isPublic: false })],
