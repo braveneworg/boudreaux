@@ -48,6 +48,22 @@ export const SUBMISSION_CATEGORY_OPTIONS: ReadonlyArray<{
   },
 ];
 
+/** Each category in a word or two, for the tile that stands in for a card picture. */
+const SUBMISSION_CATEGORY_SHORT_LABELS: ReadonlyMap<SubmissionCategory, string> = new Map([
+  ['VIDEO', 'Video'],
+  ['COVER_SONG', 'Cover song'],
+  ['ORIGINAL_SONG', 'Original song'],
+  ['INFORMATIONAL_VIDEO', 'Info video'],
+  ['WRITING', 'Writing'],
+  ['MUSIC_OR_LYRIC_VIDEO', 'Music video'],
+  ['LIVE_PERFORMANCE', 'Live'],
+  ['PHOTO', 'Photo'],
+]);
+
+/** A category in a word or two. */
+export const submissionCategoryShortLabel = (category: SubmissionCategory): string =>
+  SUBMISSION_CATEGORY_SHORT_LABELS.get(category) ?? category;
+
 /** The label a category's dropdown option shows. */
 export const submissionCategoryLabel = (category: SubmissionCategory): string =>
   SUBMISSION_CATEGORY_OPTIONS.find(({ value }) => value === category)?.label ?? category;

@@ -9,6 +9,7 @@
  */
 import Link from 'next/link';
 
+import { SubmissionCardPicture } from '@/app/components/community/submission-card-picture';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -44,12 +45,19 @@ const stateLabel = ({ status, listed }: SubmissionRecord): string => {
   return listed ? 'Approved, listed' : 'Approved, unlisted';
 };
 
-const SubmissionRow = ({ submission }: { submission: SubmissionRecord }) => {
+interface SubmissionRowProps {
+  submission: SubmissionRecord;
+  /** Its card picture's address, when it has one. */
+  cardPictureUrl: string | undefined;
+}
+
+const SubmissionRow = ({ submission, cardPictureUrl }: SubmissionRowProps) => {
   const title = submission.title === '' ? 'Untitled' : submission.title;
 
   return (
-    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
-      <div className="min-w-0">
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
+      <SubmissionCardPicture url={cardPictureUrl} category={submission.category} />
+      <div className="min-w-0 flex-1">
         <Link
           href={`/community/${submission.id}`}
           className="font-semibold underline underline-offset-4"
@@ -68,6 +76,7 @@ const SubmissionRow = ({ submission }: { submission: SubmissionRecord }) => {
 export default async function MySubmissionsPage() {
   const user = await requireCommunityUser('/community/mine');
   const submissions = await SubmissionService.listMine(user.id);
+  const cardPictures = await SubmissionService.cardPictures(submissions);
 
   return (
     <PageContainer>
@@ -79,7 +88,11 @@ export default async function MySubmissionsPage() {
           ) : (
             <ul aria-label="Your submissions" className="divide-y border-y">
               {submissions.map((submission) => (
-                <SubmissionRow key={submission.id} submission={submission} />
+                <SubmissionRow
+                  key={submission.id}
+                  submission={submission}
+                  cardPictureUrl={cardPictures.get(submission.id)}
+                />
               ))}
             </ul>
           )}

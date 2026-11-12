@@ -24,7 +24,12 @@ vi.mock('@/lib/community/community-session', () => ({
   requireCommunityUser: vi.fn(),
 }));
 vi.mock('@/lib/services/submission-service', () => ({
-  SubmissionService: { getForViewer: vi.fn(), listMine: vi.fn() },
+  SubmissionService: {
+    getForViewer: vi.fn(),
+    listMine: vi.fn(),
+    // No submission has a card picture unless a test hands it one.
+    cardPictures: vi.fn(async () => new Map<string, string>()),
+  },
 }));
 vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
   BreadcrumbMenu: () => <nav data-testid="breadcrumb" />,
@@ -224,6 +229,57 @@ describe('SubmissionPage', () => {
       });
     });
 
+    const photo = {
+      id: 'e'.repeat(24),
+      kind: 'IMAGE' as const,
+      fileName: '',
+      state: 'ready' as const,
+      error: null,
+      progress: null,
+      url: 'https://cdn.example/media/submissions/s/a/copy.jpg',
+      cardUrl: 'https://cdn.example/media/submissions/s/a/card.webp',
+      posterUrl: null,
+      width: 1200,
+      height: 800,
+      durationSeconds: null,
+    };
+    const clip = {
+      ...photo,
+      id: '1'.repeat(24),
+      kind: 'VIDEO' as const,
+      url: 'https://cdn.example/media/submissions/s/v/copy.mp4',
+      posterUrl: 'https://cdn.example/media/submissions/s/v/poster.jpg',
+    };
+
+    it('previews a shared link with the first photo of a public submission', async () => {
+      await expect(metadataFor(view({ attachments: [clip, photo] }))).resolves.toMatchObject({
+        openGraph: { title: 'Bus poem', images: [photo.url] },
+      });
+    });
+
+    it('previews with a frame of the first video when there is no photo', async () => {
+      await expect(metadataFor(view({ attachments: [clip] }))).resolves.toMatchObject({
+        openGraph: { images: [clip.posterUrl] },
+      });
+    });
+
+    it('previews an unlisted public submission too, and still keeps it out of search', async () => {
+      await expect(
+        metadataFor(view({ listed: false, attachments: [photo] }))
+      ).resolves.toMatchObject({
+        openGraph: { images: [photo.url] },
+        robots: { index: false, follow: false },
+      });
+    });
+
+    it('puts no picture in the head of a submission that is not public', async () => {
+      const metadata = await metadataFor(
+        view({ status: 'DRAFT', isPublic: false, attachments: [photo] })
+      );
+
+      expect(metadata.openGraph).toBeUndefined();
+    });
+
     it('says nothing about a submission this reader may not open', async () => {
       await expect(metadataFor(null)).resolves.toEqual({
         title: 'Not found',
@@ -257,6 +313,29 @@ describe('MySubmissionsPage', () => {
       `/community/${ID}`
     );
     expect(vi.mocked(SubmissionService.listMine).mock.calls).toEqual([[USER_ID]]);
+  });
+
+  it('shows each submission’s card picture, or a tile naming its category', async () => {
+    const draftId = 'd'.repeat(24);
+    const submissions = [
+      record({ status: 'APPROVED', category: 'PHOTO' }),
+      record({ id: draftId, status: 'DRAFT', category: 'ORIGINAL_SONG' }),
+    ];
+    vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
+    vi.mocked(SubmissionService.listMine).mockResolvedValueOnce(submissions);
+    vi.mocked(SubmissionService.cardPictures).mockResolvedValueOnce(
+      new Map([[ID, 'https://cdn.example/media/submissions/s/a/card.webp']])
+    );
+
+    render(await MySubmissionsPage());
+
+    const [pictured, tiled] = screen.getAllByRole('listitem');
+    expect(within(pictured as HTMLElement).getByRole('presentation')).toHaveAttribute(
+      'src',
+      'https://cdn.example/media/submissions/s/a/card.webp'
+    );
+    expect(tiled).toHaveTextContent('Original song');
+    expect(vi.mocked(SubmissionService.cardPictures).mock.calls).toEqual([[submissions]]);
   });
 
   it('shows why a rejected submission was rejected', async () => {
