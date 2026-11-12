@@ -5,6 +5,7 @@ import {
   ATTACHMENT_MAX_AUDIO_SECONDS,
   ATTACHMENT_MAX_VIDEO_SECONDS,
   ATTACHMENT_UPLOAD_LIMIT_BYTES,
+  acceptedAttachmentType,
   attachmentCopyPrefix,
   attachmentKindForType,
   attachmentTypeForFileName,
@@ -109,6 +110,24 @@ describe('attachmentTypeForFileName', () => {
 
   it('names no type for an extension that is not accepted', () => {
     expect(attachmentTypeForFileName('playlist.m3u8')).toBeNull();
+  });
+});
+
+describe('acceptedAttachmentType', () => {
+  it('is the reported type, bare and lower-cased, when that is accepted', () => {
+    expect(acceptedAttachmentType('Audio/OGG; codecs=opus', 'take.ogg')).toBe('audio/ogg');
+  });
+
+  it('falls back to the name when the browser reported nothing', () => {
+    expect(acceptedAttachmentType('', 'set.mkv')).toBe('video/x-matroska');
+  });
+
+  it('falls back to the name when the reported type is not accepted', () => {
+    expect(acceptedAttachmentType('application/octet-stream', 'demo.flac')).toBe('audio/flac');
+  });
+
+  it('is null when neither the type nor the name is accepted', () => {
+    expect(acceptedAttachmentType('application/pdf', 'zine.pdf')).toBeNull();
   });
 });
 

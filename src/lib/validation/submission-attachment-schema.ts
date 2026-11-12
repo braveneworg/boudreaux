@@ -2,12 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import {
+  ATTACHMENT_KINDS,
   attachmentUploadKey,
   REENCODE_PROGRESS_STAGES,
   submissionReencodeCallbackSchema,
   submissionReencodeProgressPostSchema,
 } from '@fakefour/job-contract';
 import { z } from 'zod';
+
+import { SUBMISSION_STATUSES } from '@/lib/constants/submissions';
 
 import { objectId } from './primitives';
 
@@ -52,3 +55,30 @@ export const attachmentProgressSchema = z.object({
   percent: z.number().int().min(0).max(100).optional(),
   at: z.string(),
 });
+
+const nullableDimension = z.number().int().nullable();
+
+/** One attachment as the polled list carries it (`AttachmentView`). */
+export const attachmentViewSchema = z.object({
+  id: objectId,
+  kind: z.enum(ATTACHMENT_KINDS),
+  fileName: z.string(),
+  state: z.enum(['processing', 'ready', 'failed']),
+  error: z.string().nullable(),
+  progress: attachmentProgressSchema.nullable(),
+  url: z.string().nullable(),
+  cardUrl: z.string().nullable(),
+  posterUrl: z.string().nullable(),
+  width: nullableDimension,
+  height: nullableDimension,
+  durationSeconds: nullableDimension,
+});
+
+/** What `GET /api/community/submissions/[id]/attachments` answers. */
+export const submissionAttachmentsResponseSchema = z.object({
+  status: z.enum(SUBMISSION_STATUSES),
+  updatedAt: z.string(),
+  attachments: z.array(attachmentViewSchema),
+});
+
+export type SubmissionAttachmentsResponse = z.infer<typeof submissionAttachmentsResponseSchema>;

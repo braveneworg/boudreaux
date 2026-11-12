@@ -160,6 +160,17 @@ export const attachmentTypeForFileName = (fileName: string): string | null => {
   return TYPE_BY_EXTENSION.get(fileName.slice(dot + 1).toLowerCase()) ?? null;
 };
 
+/**
+ * The accepted type a file is uploaded as, or `null` when it is not accepted:
+ * what its browser reported, else what its name says. This is the type that
+ * is signed into the upload, so the browser must send exactly this string.
+ */
+export const acceptedAttachmentType = (reportedType: string, fileName: string): string | null => {
+  const reported = bareType(reportedType);
+
+  return attachmentKindForType(reported) === null ? attachmentTypeForFileName(fileName) : reported;
+};
+
 /** The stages a re-encode checkpoints through, in order. */
 export const REENCODE_PROGRESS_STAGES = ['downloading', 'probing', 'encoding', 'storing'] as const;
 

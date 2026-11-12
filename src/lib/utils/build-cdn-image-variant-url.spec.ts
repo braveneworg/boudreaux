@@ -75,6 +75,15 @@ describe('buildCdnImageVariantUrl', () => {
     expect(buildCdnImageVariantUrl(posterUrl, 1200)).toBe(posterUrl);
   });
 
+  it('returns a submission attachment picture byte-identical regardless of requested width', () => {
+    // The re-encode writes one card and one copy per attachment (ADR-0026);
+    // nothing makes `_w{width}` variants of them.
+    const cardUrl =
+      'https://cdn.fakefourrecords.com/media/submissions/6a562cf7da08ad30064e147c/6a562cf7da08ad30064e147d/card.webp';
+
+    expect(buildCdnImageVariantUrl(cardUrl, 640)).toBe(cardUrl);
+  });
+
   it('returns a relative video poster path unchanged apart from the CDN prefix', () => {
     expect(buildCdnImageVariantUrl('/media/videos/abc123/poster-1.png', 640)).toBe(
       'https://cdn.fakefourrecords.com/media/videos/abc123/poster-1.png'

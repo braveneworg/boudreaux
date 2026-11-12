@@ -77,6 +77,7 @@ export {
   REENCODE_FAILURES,
   REENCODE_PROGRESS_STAGES,
   SUBMISSION_REENCODE_TASK,
+  acceptedAttachmentType,
   attachmentCopyPrefix,
   attachmentKindForType,
   attachmentTypeForFileName,

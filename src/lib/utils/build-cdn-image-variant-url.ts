@@ -24,8 +24,14 @@ const SKIP_WIDTH_SUFFIX_EXTENSIONS = new Set(['.svg', '.gif', '.ico']);
  * - `/bio/thumbs/`: generation-time bio thumbnails (one webp each).
  * - `/media/videos/`: video poster frames (`poster-*.jpg|png`, captured at
  *   upload); only cover-art and bio uploads run the variant generator.
+ * - `/media/submissions/`: a submission attachment's card, poster and copy,
+ *   each written once by the re-encode (ADR-0026).
  */
-const SINGLE_VARIANT_PATH_MARKERS = ['/bio/thumbs/', '/media/videos/'] as const;
+const SINGLE_VARIANT_PATH_MARKERS = [
+  '/bio/thumbs/',
+  '/media/videos/',
+  '/media/submissions/',
+] as const;
 
 const isSingleVariantPath = (pathname: string): boolean =>
   SINGLE_VARIANT_PATH_MARKERS.some((marker) => pathname.includes(marker));
