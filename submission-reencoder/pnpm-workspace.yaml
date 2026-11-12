@@ -1,0 +1,12 @@
+packages:
+  - '.'
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+allowBuilds:
+  esbuild: true
+  sharp: true
+overrides:
+  esbuild@<0.28.1: ^0.28.1
+  postcss@>=8.0.0 <8.5.23: ^8.5.23
+  source-map-js@<1.2.2: ^1.2.2

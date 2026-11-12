@@ -1,0 +1,9 @@
+# The image is built from what `pnpm run build` wrote to dist/ and the files
+# pnpm needs to install `sharp`. Nothing else enters the build context.
+*
+!dist/handler.cjs
+!dist/pnpm-version
+!dist/job-contract
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml

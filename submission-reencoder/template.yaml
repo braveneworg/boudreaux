@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Fake Four Records - submission attachment re-encoder and its private uploads bucket
+
+# ADR-0026: a user's file is decoded only here. ADR-0027: uploads and
+# re-encoded copies live in a private bucket the CDN cannot read; this stack
+# creates that bucket and is the only place its access is granted.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging]
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: Email for Lambda error alarm notifications (empty disables them)
+  BucketName:
+    Type: String
+    Default: ''
+    Description: >-
+      Name of the private uploads bucket. Empty names it
+      fakefour-submission-uploads-<account id>.
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Default: 'https://fakefourrecords.com,https://www.fakefourrecords.com'
+    Description: Site origins whose pages may upload to and preview from the bucket
+  AppPrincipalArn:
+    Type: String
+    Default: ''
+    Description: >-
+      ARN of the IAM user or role the web app runs as. Empty grants the app
+      nothing, and uploads stay off.
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+  HasBucketName: !Not [!Equals [!Ref BucketName, '']]
+  HasAppPrincipal: !Not [!Equals [!Ref AppPrincipalArn, '']]
+
+Resources:
+  # uploads/ takes the browser's upload, copies/ holds each attachment's
+  # re-encoded files. Nothing in it is ever public: a copy reaches the CDN only
+  # when the web app copies it to the media bucket on approval.
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    # The copies are the only ones kept (the public ones are made from them),
+    # so the bucket outlives the stack.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !If
+        - HasBucketName
+        - !Ref BucketName
+        - !Sub 'fakefour-submission-uploads-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # The browser PUTs straight to a presigned URL, and reads a signed
+      # preview before approval. Both are cross-origin requests from the site.
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins: !Ref AllowedOrigins
+            AllowedHeaders:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3600
+      LifecycleConfiguration:
+        Rules:
+          # The Lambda deletes an upload when its run ends. This catches the
+          # ones it never saw: an upload nobody confirmed, a run that crashed.
+          - Id: ExpireUploads
+            Prefix: uploads/
+            Status: Enabled
+            ExpirationInDays: 1
+          # There is no multipart path; this only cleans up after a stray one.
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  UploadsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt UploadsBucket.Arn
+              - !Sub '${UploadsBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          # The web app signs uploads, reads both prefixes (to confirm an
+          # upload, to sign a preview, to publish a copy) and deletes from both
+          # (a removed attachment). It never writes a copy: only the Lambda does.
+          - !If
+            - HasAppPrincipal
+            - Sid: AppUploads
+              Effect: Allow
+              Principal:
+                AWS: !Ref AppPrincipalArn
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub '${UploadsBucket.Arn}/uploads/*'
+            - !Ref AWS::NoValue
+          - !If
+            - HasAppPrincipal
+            - Sid: AppCopies
+              Effect: Allow
+              Principal:
+                AWS: !Ref AppPrincipalArn
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub '${UploadsBucket.Arn}/copies/*'
+            - !Ref AWS::NoValue
+          - !If
+            - HasAppPrincipal
+            - Sid: AppList
+              Effect: Allow
+              Principal:
+                AWS: !Ref AppPrincipalArn
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt UploadsBucket.Arn
+            - !Ref AWS::NoValue
+
+  ReencoderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: fakefour-submission-reencoder
+      Description: Re-encodes one submission attachment (image, audio or video) into a clean copy
+      PackageType: Image
+      Architectures:
+        - arm64
+      # Lambda's hard ceiling (15 minutes). A ten-minute video is transcoded
+      # inside it; the handler stops its own work at 11 minutes so it can still
+      # report a failure. Invoked directly by the web app's job runner.
+      Timeout: 900
+      # 3008 MB buys the two vCPUs the H.264 encode needs, and room for a
+      # 100-megapixel photo decoded in memory.
+      MemorySize: 3008
+      # /tmp holds the upload (up to 500 MB) beside the copy written from it.
+      EphemeralStorage:
+        Size: 2048
+      # The job runner invokes asynchronously, and Lambda retries a failed
+      # async invoke twice by default. The handler reports every failure it
+      # can itself; what is left is a crash or a timeout, and a file that
+      # crashed a decoder must not be handed to it twice more.
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Environment:
+        Variables:
+          NODE_ENV: !Ref Environment
+      # Read one upload, write one copy, delete the upload. No secret, no
+      # parameter store, no other bucket, no VPC. SAM adds the basic logging
+      # policy on its own.
+      Policies:
+        - Statement:
+            - Sid: ReadAndDeleteUploads
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub '${UploadsBucket.Arn}/uploads/*'
+            - Sid: WriteCopies
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub '${UploadsBucket.Arn}/copies/*'
+    Metadata:
+      # `pnpm run build` must have written dist/ first: the image is built
+      # from the bundled handler (see the Dockerfile).
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: latest
+
+  # The web app's job runner invokes the function directly. In the same
+  # account a resource-based grant is enough on its own, so the app's own
+  # policy does not have to name this function.
+  AppInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasAppPrincipal
+    Properties:
+      FunctionName: !Ref ReencoderFunction
+      Action: lambda:InvokeFunction
+      Principal: !Ref AppPrincipalArn
+
+  # A re-encode fails loudly to its owner through the callback, so an Errors
+  # data point here means the function itself crashed or timed out. Fire on
+  # the first one in any 15 minutes.
+  ReencoderErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Submission re-encoder Lambda is crashing or timing out
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ReencoderFunction
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], []]
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      TopicName: fakefour-submission-reencoder-alarms
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+Outputs:
+  FunctionName:
+    Description: Set this as SUBMISSION_REENCODER_LAMBDA_NAME in the web app environment
+    Value: !Ref ReencoderFunction
+  UploadsBucketName:
+    Description: Set this as SUBMISSION_UPLOADS_BUCKET in the web app environment
+    Value: !Ref UploadsBucket
