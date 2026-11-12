@@ -8,6 +8,8 @@ import {
   getCloudFrontDistributionId,
   getOAuthClient,
   getStripeWebhookIpRanges,
+  getSubmissionReencoderLambdaName,
+  getSubmissionUploadsBucket,
   isFeatureEnabled,
   resolveS3BucketName,
 } from './runtime-config';
@@ -39,6 +41,8 @@ describe('runtime-config getters', () => {
       'S3_BUCKET',
       'CLOUDFRONT_DISTRIBUTION_ID',
       'STRIPE_WEBHOOK_IP_RANGES',
+      'SUBMISSION_UPLOADS_BUCKET',
+      'SUBMISSION_REENCODER_LAMBDA_NAME',
     ]) {
       vi.stubEnv(name, '');
     }
@@ -84,6 +88,30 @@ describe('runtime-config getters', () => {
 
     it('returns undefined when unset', () => {
       expect(getCloudFrontDistributionId()).toBeUndefined();
+    });
+  });
+
+  describe('getSubmissionUploadsBucket', () => {
+    it('returns the private bucket when set', () => {
+      vi.stubEnv('SUBMISSION_UPLOADS_BUCKET', ' fakefour-submission-uploads ');
+
+      expect(getSubmissionUploadsBucket()).toBe('fakefour-submission-uploads');
+    });
+
+    it('returns undefined when unset', () => {
+      expect(getSubmissionUploadsBucket()).toBeUndefined();
+    });
+  });
+
+  describe('getSubmissionReencoderLambdaName', () => {
+    it('returns the function name when set', () => {
+      vi.stubEnv('SUBMISSION_REENCODER_LAMBDA_NAME', 'fakefour-submission-reencoder');
+
+      expect(getSubmissionReencoderLambdaName()).toBe('fakefour-submission-reencoder');
+    });
+
+    it('returns undefined when unset', () => {
+      expect(getSubmissionReencoderLambdaName()).toBeUndefined();
     });
   });
 
@@ -142,6 +170,19 @@ describe('runtime-config getters', () => {
       vi.stubEnv('CLOUDFRONT_DISTRIBUTION_ID', 'E123ABC');
 
       expect(isFeatureEnabled('cloudfrontInvalidation')).toBe(true);
+    });
+
+    it('keeps attachments off with the bucket set and the Lambda unset', () => {
+      vi.stubEnv('SUBMISSION_UPLOADS_BUCKET', 'fakefour-submission-uploads');
+
+      expect(isFeatureEnabled('submissionUploads')).toBe(false);
+    });
+
+    it('turns attachments on with the bucket and the Lambda both set', () => {
+      vi.stubEnv('SUBMISSION_UPLOADS_BUCKET', 'fakefour-submission-uploads');
+      vi.stubEnv('SUBMISSION_REENCODER_LAMBDA_NAME', 'fakefour-submission-reencoder');
+
+      expect(isFeatureEnabled('submissionUploads')).toBe(true);
     });
 
     it('is false for a half-set group', () => {

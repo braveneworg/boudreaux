@@ -62,6 +62,17 @@ export const resolveS3BucketName = (): string | undefined =>
 export const getCloudFrontDistributionId = (): string | undefined =>
   valueOf(process.env.CLOUDFRONT_DISTRIBUTION_ID);
 
+/**
+ * The private bucket that holds submission uploads and their re-encoded
+ * copies (ADR-0027); undefined switches attachments off.
+ */
+export const getSubmissionUploadsBucket = (): string | undefined =>
+  valueOf(process.env.SUBMISSION_UPLOADS_BUCKET);
+
+/** The re-encode Lambda's function name (ADR-0026); undefined switches attachments off. */
+export const getSubmissionReencoderLambdaName = (): string | undefined =>
+  valueOf(process.env.SUBMISSION_REENCODER_LAMBDA_NAME);
+
 /** The Stripe webhook source CIDRs; empty switches the IP allowlist off. */
 export const getStripeWebhookIpRanges = (): string[] =>
   (process.env.STRIPE_WEBHOOK_IP_RANGES ?? '')

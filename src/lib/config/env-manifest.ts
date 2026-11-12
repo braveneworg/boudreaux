@@ -54,7 +54,13 @@ export interface EnvVarSpec {
 }
 
 export type FeatureGroupId =
-  'google' | 'facebook' | 'twitter' | 'apple' | 'cloudfrontSignedUrls' | 'cloudfrontInvalidation';
+  | 'google'
+  | 'facebook'
+  | 'twitter'
+  | 'apple'
+  | 'cloudfrontSignedUrls'
+  | 'cloudfrontInvalidation'
+  | 'submissionUploads';
 
 /**
  * A feature group: optional values that only work together. The feature is
@@ -103,6 +109,11 @@ export const FEATURE_GROUPS: readonly FeatureGroupSpec[] = [
     id: 'cloudfrontInvalidation',
     feature: 'CloudFront cache invalidation after cover-art and media changes',
     requires: ['CLOUDFRONT_DISTRIBUTION_ID'],
+  },
+  {
+    id: 'submissionUploads',
+    feature: 'Attachments on community submissions (uploads are refused)',
+    requires: ['SUBMISSION_UPLOADS_BUCKET', 'SUBMISSION_REENCODER_LAMBDA_NAME'],
   },
 ];
 
@@ -169,6 +180,16 @@ export const ENV_MANIFEST: readonly EnvVarSpec[] = [
   runtime('CLOUDFRONT_KEY_PAIR_ID', 'optional', 'CloudFront URL signing key pair.'),
   runtime('CLOUDFRONT_PRIVATE_KEY_BASE64', 'optional', 'CloudFront URL signing private key.'),
   runtime('CLOUDFRONT_DISTRIBUTION_ID', 'optional', 'CloudFront distribution to invalidate.'),
+  runtime(
+    'SUBMISSION_UPLOADS_BUCKET',
+    'optional',
+    'Private bucket for submission uploads and their re-encoded copies (ADR-0027).'
+  ),
+  runtime(
+    'SUBMISSION_REENCODER_LAMBDA_NAME',
+    'optional',
+    'Re-encode Lambda function name (ADR-0026).'
+  ),
 
   // ── Optional runtime values with fallbacks ──────────────────────────────
   runtime('CDN_DOMAIN', 'optional', 'Media CDN host for server-side URL building.'),
