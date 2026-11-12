@@ -151,6 +151,23 @@ describe('lambdaJobInvoker', () => {
     });
   });
 
+  it('invokes the function a kind names for itself', async () => {
+    const job = { ...testJob(), functionName: () => 'fakefour-submission-reencoder' };
+
+    await lambdaJobInvoker.invoke(job, payload);
+
+    expect(sentCommand().input.FunctionName).toBe('fakefour-submission-reencoder');
+  });
+
+  it('never falls back to the bio generator when a kind names no function', async () => {
+    const job = { ...testJob(), functionName: () => undefined };
+
+    const ack = await lambdaJobInvoker.invoke(job, payload);
+
+    expect(ack).toEqual({ ok: false, error: COPY.notConfigured });
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it('acks the kind copy and logs when the send fails', async () => {
     const error = new Error('throttled');
     sendMock.mockRejectedValueOnce(error);
