@@ -26,6 +26,14 @@ const tallyOf = (reports: SubmissionReportView[]): string => {
 };
 
 /**
+ * A mail link to an address a stranger typed. A valid address may hold `?`,
+ * `&` and `=` before its `@`, which a mail link reads as extra fields (a
+ * copy to someone else, a subject), so everything but the `@` is encoded.
+ */
+const mailLinkFor = (address: string): string =>
+  `mailto:${address.split('@').map(encodeURIComponent).join('@')}`;
+
+/**
  * What a reader learns of a report's contact email: the address for an
  * admin, that one was left for a manager, nothing when none is held.
  */
@@ -39,7 +47,7 @@ const ReportContact = ({ hasContact, contactEmail }: SubmissionReportView) => {
   ) : (
     <p className="min-w-0 truncate text-sm">
       Contact:{' '}
-      <a href={`mailto:${contactEmail}`} className="underline underline-offset-4">
+      <a href={mailLinkFor(contactEmail)} className="underline underline-offset-4">
         {contactEmail}
       </a>
     </p>

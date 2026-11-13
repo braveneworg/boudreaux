@@ -102,6 +102,17 @@ describe('SubmissionReportList', () => {
     );
   });
 
+  it('keeps an address from adding fields to the admin’s mail draft', () => {
+    // A valid address may hold `?`, `&` and `=` before its `@`.
+    const contactEmail = 'x?cc=a&subject=s@example.com';
+    render(<SubmissionReportList reports={[report({ hasContact: true, contactEmail })]} />);
+
+    expect(screen.getByRole('link', { name: contactEmail })).toHaveAttribute(
+      'href',
+      'mailto:x%3Fcc%3Da%26subject%3Ds@example.com'
+    );
+  });
+
   it('tells a manager a contact was left, without the address', () => {
     render(<SubmissionReportList reports={[report({ hasContact: true, contactEmail: null })]} />);
 
