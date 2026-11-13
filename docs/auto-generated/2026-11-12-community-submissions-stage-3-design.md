@@ -395,7 +395,8 @@ why. The acceptance criteria were not changed.
 
 ### How it was checked
 
-- **Unit**: 18,128 tests in 1,088 files, with typecheck, lint and format.
+- **Unit**: 18,129 tests in 1,088 files, with typecheck, lint and format;
+  the coverage check passes (branches 95.17% against a 95% floor).
 - **Real database**: 38 contract files on Docker Mongo. Two are new: the
   fragments, with a row for each way a contact email is stored and a
   submission's delete taking its reports with it; and the Reported tab's
@@ -410,7 +411,21 @@ why. The acceptance criteria were not changed.
   state and `updatedAt` never change. It passed 3 times across 4 workers on
   the dev server and once on a local production build.
 
+- **Security review**: an independent read of the whole branch, the public
+  action first, found nothing it would raise. It traced who can call each
+  action and reach each read, where the note and the contact email can
+  travel, what a client can shape in a query, and what each answer reveals
+  about an id. One thing below its bar was closed anyway: a contact address
+  with `?` or `&` before its `@` could have added fields to an admin's mail
+  draft, so the mail link now encodes it.
+
 ### Known gaps
+
+- **One older unit spec failed once in four full runs** and passed alone and
+  on every rerun: `use-attachment-uploads.spec.ts`, "leaves the other files
+  alone when one of them fails". This branch does not touch it or the hook.
+  The failed run showed both files carrying the second file's message. Not
+  investigated further.
 
 - **No signed-out reporter has been through it.** The action's anonymous
   path is covered by its unit spec with the community opened by a mock.
