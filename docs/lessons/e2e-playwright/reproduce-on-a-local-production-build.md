@@ -29,7 +29,19 @@ CI=true E2E_DATABASE_URL='mongodb://localhost:27018/boudreaux-e2e?replicaSet=rs0
 - `env -i` drops the shell's PATH, so `pnpm` and `node` must be named by
   their mise install directories (`which pnpm node` beforehand).
 - macOS `cp` has no `-T`; `cp -R src/. dest/` merges the same way.
-- Build in a worktree without `.env*` files, or the build reads them.
+- Build in a worktree without `.env*` files, or the build reads them. Every
+  worktree has them (root `AGENTS.md`) and they are never deleted, so in
+  practice: put each `NEXT_PUBLIC_*` value the app builds an address from on
+  the build command, pointing at the E2E server
+  (`NEXT_PUBLIC_BASE_URL=http://127.0.0.1:3000
+NEXT_PUBLIC_HOST_NAME=http://127.0.0.1:3000`). Next.js inlines
+  `NEXT_PUBLIC_*` at build time, in server code too, so the value the web
+  server is started with arrives too late. On 2026-11-12 a build without
+  them took the production host from the copied `.env`: the attachment
+  spec's upload to the local sink was addressed to the live site, the page's
+  `connect-src` refused it, and the spec failed with "The upload did not
+  finish" on the production build only. The trace's `*.network` log showed
+  the host. CI's build has no env files, so CI never sees this.
 - `--repeat-each` with several workers runs copies of one test at once.
   A spec that edits one seeded row (`admin-video-artist-review.spec.ts`)
   then collides with itself; that failure is the stress, not the bug (see
