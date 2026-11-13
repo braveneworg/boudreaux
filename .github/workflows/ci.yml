@@ -127,6 +127,38 @@ jobs:
         working-directory: stripe-webhook
         run: pnpm run test:run
 
+  # ── Re-encode Lambda image ─────────────────────────────────────────────────
+  # deploy-submission-reencoder.yml runs only on main, so without this job the
+  # arm64 image is first built on this x86-64 runner after a merge. It builds
+  # the image the way the deploy does, and pushes nothing. Pull requests only:
+  # on main the deploy builds it, and a registry outage here must not hold up
+  # the app.
+  reencoder-image:
+    name: Re-encoder image build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-tools
+
+      - name: Install dependencies (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm install --frozen-lockfile
+
+      # The deploy runs its tests first, which pulls the pinned ffmpeg image
+      # for this runner's architecture. Done here too, so the build starts
+      # from the same local images as the deploy's.
+      - name: Install ffmpeg + ffprobe
+        uses: ./.github/actions/setup-media-tools
+
+      - name: Build the image
+        uses: ./.github/actions/build-reencoder-image
+
   # ── Unit tests (sharded) ───────────────────────────────────────────────────
   # The 310-file suite is split into two parallel jobs. Each shard runs with
   # the vmThreads pool (≈3× faster than forks) and stores its results plus

@@ -11,6 +11,9 @@ on:
       # the Lambda keeps the old one, silently splitting it at runtime.
       - "packages/job-contract/**"
       - ".github/workflows/deploy-submission-reencoder.yml"
+      # The two actions this workflow builds and tests the image with.
+      - ".github/actions/build-reencoder-image/**"
+      - ".github/actions/setup-media-tools/**"
   workflow_dispatch:
 
 jobs:
@@ -48,34 +51,16 @@ jobs:
           REQUIRE_MEDIA_TOOLS: '1'
         run: pnpm run test:run
 
-      # Writes dist/: the bundled handler the image is built from. The image's
-      # build context is submission-reencoder/, which cannot see
-      # packages/job-contract, so the bundle has to exist before `sam build`.
-      - name: Bundle the handler
-        working-directory: submission-reencoder
-        run: pnpm run build
-
-      # The function is arm64 and this runner is x86-64: the image's RUN steps
-      # execute arm64 binaries, which needs emulation.
-      - name: Set up QEMU for arm64 image builds
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
+      # Bundles the handler and builds the arm64 image. CI runs the same
+      # action on every pull request, so a broken build is seen before main.
+      - name: Build the image
+        uses: ./.github/actions/build-reencoder-image
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
-
-      - name: Set up SAM CLI
-        uses: aws-actions/setup-sam@v2
-        with:
-          use-installer: true
-
-      - name: SAM build
-        working-directory: submission-reencoder
-        run: sam build
 
       - name: Ensure SAM artifact bucket exists
         run: |

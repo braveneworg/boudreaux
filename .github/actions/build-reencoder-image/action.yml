@@ -1,0 +1,58 @@
+name: 'Build the re-encode Lambda image'
+description: 'Bundle the handler and build the arm64 container image with SAM, then check what was built. Expects dependencies installed in submission-reencoder/.'
+
+# One action for the deploy and for the pull-request check, so the image a
+# pull request proves it can build is built the way the deploy builds it.
+runs:
+  using: 'composite'
+  steps:
+    # Writes dist/: the bundled handler the image is built from. The image's
+    # build context is submission-reencoder/, which cannot see
+    # packages/job-contract, so the bundle has to exist before `sam build`.
+    - name: Bundle the handler
+      shell: bash
+      working-directory: submission-reencoder
+      run: pnpm run build
+
+    # The function is arm64 and the runner is x86-64: the image's RUN steps
+    # execute arm64 binaries, which needs emulation.
+    - name: Set up QEMU for arm64 image builds
+      uses: docker/setup-qemu-action@v4
+      with:
+        platforms: arm64
+
+    - name: Set up SAM CLI
+      uses: aws-actions/setup-sam@v2
+      with:
+        use-installer: true
+
+    # --use-buildkit: without it SAM builds through Docker's classic builder,
+    # which on a runner whose Docker uses the containerd image store cannot
+    # finish a multi-stage build for another architecture. It fails on
+    # `COPY --from` looking for the base image's x86-64 manifest, which an
+    # arm64 pull never fetched. BuildKit resolves every stage for the
+    # platform asked for. SAM passes --provenance=false with it, so the image
+    # stays a single manifest, the only kind Lambda accepts.
+    - name: SAM build
+      shell: bash
+      working-directory: submission-reencoder
+      run: sam build --use-buildkit
+
+    # A build that succeeds can still hold the wrong binaries: the runner's
+    # own architecture, or a sharp without its arm64 library.
+    - name: Check the built image
+      shell: bash
+      run: |
+        set -euo pipefail
+        image="reencoderfunction:latest"
+        arch="$(docker image inspect "$image" --format '{{.Architecture}}')"
+        if [ "$arch" != "arm64" ]; then
+          echo "::error::The image was built for $arch, and the function is arm64"
+          exit 1
+        fi
+        run_in_image() {
+          docker run --rm --platform linux/arm64 --workdir /var/task --entrypoint "$1" "$image" "${@:2}"
+        }
+        run_in_image /usr/local/bin/ffmpeg -version > /dev/null
+        run_in_image /usr/local/bin/ffprobe -version > /dev/null
+        run_in_image /var/lang/bin/node -e "require('sharp')"
