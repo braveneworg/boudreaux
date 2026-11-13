@@ -276,20 +276,89 @@ shared-link preview of a public submission.
 
 The code deploys without these and uploads stay off until they are done.
 
-1. The first run of the Lambda's deploy workflow
-   (`deploy-submission-reencoder.yml`, on merge) needs the deploy role to be
-   able to create an ECR repository and push to it, create and configure an
-   S3 bucket, and set a function's event-invoke config, beyond what the bio
-   generator's deploy uses. Until it can, that workflow fails; the app's own
-   deploy is a separate workflow and is not affected.
+1. Give the deploy role (`GitHubActionsDeployRole`) what the Lambda's deploy
+   workflow (`deploy-submission-reencoder.yml`) needs beyond the other two
+   Lambdas' deploys: the policy under "The deploy role's policy" below. Until
+   it has it, that workflow fails at `sam deploy`; the app's own deploy is a
+   separate workflow and is not affected.
 2. Set the repository variable `APP_AWS_PRINCIPAL_ARN` to the ARN the app
-   runs as, and run that workflow again. The stack then lets the app sign
-   uploads, read copies and invoke the function. A principal that does not
-   exist fails the deploy.
-3. Set the repository variables `SUBMISSION_UPLOADS_BUCKET` and
-   `SUBMISSION_REENCODER_LAMBDA_NAME` from the two values the workflow
-   prints, and deploy the app again.
-4. If `ALERT_EMAIL` is set, confirm the alarm's subscription email.
+   runs as: the IAM user that owns the app's `AWS_ACCESS_KEY_ID`. The stack
+   then lets the app sign uploads, read copies and invoke the function. A
+   principal that does not exist fails the deploy.
+3. Run the workflow (`gh workflow run deploy-submission-reencoder.yml`). If
+   an earlier run failed, first delete the stack it left in
+   `ROLLBACK_COMPLETE`, named
+   `fakefour-submission-reencoder-5500c98a-CompanionStack`: SAM tries to
+   update it, and CloudFormation refuses to update a stack in that state.
+4. Set the repository variables `SUBMISSION_REENCODER_LAMBDA_NAME`
+   (`fakefour-submission-reencoder`) and `SUBMISSION_UPLOADS_BUCKET`
+   (`fakefour-submission-uploads-<ACCOUNT_ID>`). Both names are fixed by the
+   template, and the workflow prints them. Set them only once the stack
+   exists: with them set the app offers uploads.
+5. Deploy the app again. Its deploy has no manual trigger, so this is the
+   next merge to main. Do not re-run a finished
+   `CI/CD - Build, Publish, Deploy` run to do it: that runs its version bump
+   again and cuts a second release for the same pull request.
+6. If `ALERT_EMAIL` is set, confirm the alarm's subscription email.
+
+### The deploy role's policy
+
+Attach it as an inline policy
+(`aws iam put-role-policy --role-name GitHubActionsDeployRole --policy-name SubmissionReencoderDeploy --policy-document file://policy.json`).
+The Lambda actions the stack needs are already in the role's
+`AWSLambda_FullAccess`. The repository name is the one SAM derives from the
+stack's name for `--resolve-image-repos`, and does not change while the
+stack keeps its name.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReencoderImageRepository",
+      "Effect": "Allow",
+      "Action": "ecr:*",
+      "Resource": "arn:aws:ecr:us-east-1:<ACCOUNT_ID>:repository/fakefoursubmissionreencoder5500c98a/*"
+    },
+    {
+      "Sid": "SubmissionUploadsBucket",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::fakefour-submission-uploads-<ACCOUNT_ID>"
+    },
+    {
+      "Sid": "ReencoderAlarmTopic",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:DeleteTopic",
+        "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes",
+        "sns:Subscribe",
+        "sns:Unsubscribe",
+        "sns:ListSubscriptionsByTopic",
+        "sns:TagResource",
+        "sns:UntagResource",
+        "sns:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:sns:us-east-1:<ACCOUNT_ID>:fakefour-submission-reencoder-alarms",
+        "arn:aws:sns:us-east-1:<ACCOUNT_ID>:fakefour-submission-reencoder-alarms:*"
+      ]
+    }
+  ]
+}
+```
+
+`ecr:*` and `s3:*` are scoped to the one repository and the one bucket. The
+bucket statement names the bucket and not its objects, so the role can
+configure the bucket and cannot read what is in it.
 
 ## As built (2026-11-11)
 
@@ -354,10 +423,11 @@ section says why. The acceptance criteria were not changed.
 
 ### Known gaps
 
-- **Nothing here has run on AWS.** The deploy workflow, the arm64 build on
-  an x86 runner, the bucket's CORS against a real browser upload, the
-  presigned URL refusing a wrong length, the copy on approval and the
-  invalidation on unpublish are all untested until the stack exists.
+- **No file has gone through it on AWS.** The stack was first deployed on
+  2026-11-12 (see "First deploy" below), and what it created was read back.
+  A real browser upload against the bucket's CORS, the presigned URL
+  refusing a wrong length, a re-encode in the deployed function, the copy on
+  approval and the invalidation on unpublish are still untested.
 - **Encode time is not measured.** A ten-minute video on 3008 MB has not
   been timed against the 11-minute budget.
 - **The E2E attaches a photo only.** Audio and video go through the same
@@ -374,3 +444,25 @@ section says why. The acceptance criteria were not changed.
   to be audio is held to the video size limit.
 - **Stage 1's gaps still stand**: not found is the themed page with a 200,
   and no E2E covers a signed-out visitor.
+
+### First deploy (2026-11-12)
+
+The stack took three runs of the deploy workflow to create.
+
+1. **`sam build` failed** on the first run on main. SAM's default builder
+   cannot build the arm64 image on the x86-64 runner. #947 builds with
+   BuildKit and builds the image on every pull request; see
+   `docs/lessons/tooling/a-main-only-workflow-is-first-tested-after-the-merge.md`.
+2. **`sam deploy` failed** on the second: the deploy role had no ECR
+   permissions. It also lacked the uploads bucket and the alarm topic, which
+   would have failed next. The operator steps above first listed the wrong
+   permissions, written without reading the role; see
+   `docs/lessons/ops/read-the-role-before-listing-what-it-lacks.md`.
+3. **The third succeeded**, after the policy above was attached and the
+   failed companion stack deleted.
+
+Read back from AWS afterwards: the stack is `CREATE_COMPLETE`; the function
+is active, arm64, 3008 MB, 900 s; its invoke permission and the bucket's
+policy name the app's IAM user; the bucket blocks all public access, has the
+CORS rule for the two site origins and both expiry rules; the alarm's email
+subscription is pending confirmation.
