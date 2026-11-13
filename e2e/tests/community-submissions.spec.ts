@@ -35,6 +35,13 @@ const POEM = `Written on the bus, run ${STAMP}.`;
 
 const PHOTO_TITLE = `E2E show photo ${STAMP}`;
 
+const REPORTED_TITLE = `E2E reported poem ${STAMP}`;
+const REPORT_NOTE = `That is my poem, not theirs. Run ${STAMP}.`;
+const REPORT_CONTACT = `wronged-${STAMP}@example.invalid`;
+// A fixed day in the past: a row this spec seeds never sorts ahead of one a
+// page lists by date, however long the run has been going.
+const APPROVED_LONG_AGO = new Date('2001-01-01T00:00:00.000Z');
+
 /** The smallest valid PNG: one transparent pixel. */
 const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -302,5 +309,172 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
 
     const row = ownerPage.getByRole('listitem').filter({ hasText: PHOTO_TITLE });
     await expect(row.getByRole('presentation')).toHaveAttribute('src', PUBLISHED_CARD);
+  });
+});
+
+/**
+ * A submission report, end to end (ADR-0025, ADR-0028): a reader reports an
+ * approved submission from its page, an approver finds it under Reported and
+ * marks it handled, and at no point does the submission change.
+ *
+ * Until the community page launches only approvers can open a submission's
+ * page, so the reporter here is a manager too. A signed-out reporter is the
+ * launch's case to add. The submission is seeded approved: the approval loop
+ * has its own test above.
+ */
+test('a report reaches the approvers, is marked handled, and takes nothing down', async ({
+  browser,
+  adminPage,
+}) => {
+  test.setTimeout(120_000);
+  if (!owner || !approver) {
+    throw new Error('The stamped users were not created');
+  }
+  const reported = await prisma.submission.create({
+    data: {
+      ownerId: owner.id,
+      title: REPORTED_TITLE,
+      category: 'WRITING',
+      writingHtml: `<p>${POEM}</p>`,
+      status: 'APPROVED',
+      publishedAt: APPROVED_LONG_AGO,
+      firstApprovedAt: APPROVED_LONG_AGO,
+      approvedAt: APPROVED_LONG_AGO,
+    },
+    select: { id: true, updatedAt: true },
+  });
+  const submissionPath = `/community/${reported.id}`;
+  const reviewPath = `/admin/community/${reported.id}`;
+  const reporterPage = await openPageAs(browser, photographer);
+  const approverPage = await openPageAs(browser, approver);
+  const ownerPage = await openPageAs(browser, owner);
+
+  await test.step('a reader reports it from its page', async () => {
+    await reporterPage.goto(submissionPath);
+    // The button is disabled until the page has hydrated, so this click waits.
+    await reporterPage.getByRole('button', { name: 'Report' }).click();
+
+    const dialog = reporterPage.getByRole('dialog', { name: `Report “${REPORTED_TITLE}”` });
+    // Enabled means the dialog has loaded and verification has passed.
+    await expect(dialog.getByRole('button', { name: 'Send report' })).toBeEnabled();
+    await dialog.getByRole('radio', { name: /^It isn't theirs to post/ }).click();
+    await dialog.getByLabel('What should we know?').fill(REPORT_NOTE);
+    await dialog.getByLabel('Email (optional)').fill(REPORT_CONTACT);
+    await dialog.getByRole('button', { name: 'Send report' }).click();
+
+    // Shown only once the server has answered.
+    await expect(dialog.getByText('Thanks. Our team has your report.')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(dialog).toBeHidden();
+  });
+
+  await test.step('the report is stored open, with nothing about who filed it', async () => {
+    const stored = await prisma.submissionReport.findMany({
+      where: { submissionId: reported.id },
+    });
+
+    expect(stored).toHaveLength(1);
+    expect(stored.at(0)).toMatchObject({
+      reason: 'NOT_THEIRS',
+      note: REPORT_NOTE,
+      contactEmail: REPORT_CONTACT,
+      handled: false,
+      handledBy: null,
+    });
+    // Every stored field, so a reporter id added later would have to be added here.
+    expect(Object.keys(stored.at(0) ?? {}).sort()).toEqual([
+      'contactEmail',
+      'createdAt',
+      'handled',
+      'handledAt',
+      'handledBy',
+      'id',
+      'note',
+      'reason',
+      'submissionId',
+    ]);
+  });
+
+  await test.step('the submission is as it was, and still opens', async () => {
+    const after = await prisma.submission.findUnique({
+      where: { id: reported.id },
+      select: { status: true, updatedAt: true },
+    });
+    expect(after).toEqual({ status: 'APPROVED', updatedAt: reported.updatedAt });
+
+    await reporterPage.goto(submissionPath);
+    await expect(
+      reporterPage.getByRole('heading', { level: 1, name: REPORTED_TITLE })
+    ).toBeVisible();
+    await expect(reporterPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
+  });
+
+  await test.step('its owner, a manager, is kept from the reports against it', async () => {
+    await ownerPage.goto('/admin/community?status=reported');
+    await expect(ownerPage.getByRole('navigation', { name: 'Queues' })).toBeVisible();
+    await expect(ownerPage.getByRole('link', { name: REPORTED_TITLE, exact: true })).toHaveCount(0);
+
+    await ownerPage.goto(reviewPath);
+    await expect(ownerPage.getByRole('heading', { level: 1, name: REPORTED_TITLE })).toBeVisible();
+    await expect(ownerPage.getByRole('heading', { name: 'Reports' })).toHaveCount(0);
+
+    // And their own page offers them no way to report it.
+    await ownerPage.goto(submissionPath);
+    await expect(ownerPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    await expect(ownerPage.getByRole('button', { name: 'Report' })).toHaveCount(0);
+  });
+
+  await test.step('another approver finds it under Reported and reads the report', async () => {
+    await approverPage.goto('/admin/community');
+    await approverPage.getByRole('link', { name: /^Reported \(\d+\)$/ }).click();
+
+    const row = approverPage.getByRole('row').filter({ hasText: REPORTED_TITLE });
+    await expect(row).toContainText('Approved');
+    await row.getByRole('link', { name: REPORTED_TITLE, exact: true }).click();
+
+    const reports = approverPage.getByRole('list', { name: 'Reports' });
+    await expect(reports).toContainText('Reported as not theirs to post');
+    await expect(reports).toContainText(REPORT_NOTE);
+    // A manager learns that a contact was left, never the address.
+    await expect(reports).toContainText('A contact email was left. Ask an admin to reply.');
+    await expect(approverPage.getByText(REPORT_CONTACT)).toHaveCount(0);
+  });
+
+  await test.step('an admin can read the contact email', async () => {
+    await adminPage.goto(reviewPath);
+
+    await expect(adminPage.getByRole('link', { name: REPORT_CONTACT })).toHaveAttribute(
+      'href',
+      `mailto:${REPORT_CONTACT}`
+    );
+  });
+
+  await test.step('marking it handled clears it from Reported', async () => {
+    await approverPage.getByRole('button', { name: 'Mark handled' }).click();
+
+    await expect(approverPage.getByRole('list', { name: 'Reports' })).toContainText(
+      `by ${approver?.username ?? ''}`
+    );
+    await expect(approverPage.getByRole('button', { name: 'Mark handled' })).toHaveCount(0);
+
+    await approverPage.goto('/admin/community?status=reported');
+    await expect(approverPage.getByRole('navigation', { name: 'Queues' })).toBeVisible();
+    await expect(approverPage.getByRole('link', { name: REPORTED_TITLE, exact: true })).toHaveCount(
+      0
+    );
+  });
+
+  await test.step('handling changed the report and nothing else', async () => {
+    const handled = await prisma.submissionReport.findFirst({
+      where: { submissionId: reported.id },
+      select: { handled: true, handledBy: true },
+    });
+    expect(handled).toEqual({ handled: true, handledBy: approver?.id });
+
+    const after = await prisma.submission.findUnique({
+      where: { id: reported.id },
+      select: { status: true, updatedAt: true },
+    });
+    expect(after).toEqual({ status: 'APPROVED', updatedAt: reported.updatedAt });
   });
 });
