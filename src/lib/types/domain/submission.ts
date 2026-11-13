@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import type { SubmissionCategory, SubmissionStatus } from '@/lib/constants/submissions';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
+import type { AttachmentView } from '@/lib/types/domain/submission-attachment';
 
 /**
  * Domain types for community submissions (ADR-0025). The record types are the
@@ -131,6 +132,8 @@ export interface SubmissionView extends SubmissionContent {
   isPublic: boolean;
   /** How many are ahead of it in the queue; set for its owner while it awaits approval. */
   queuePosition: number | null;
+  /** Its attachments, in upload order, with the addresses this reader may use. */
+  attachments: AttachmentView[];
 }
 
 /** One row of an approver's queue. */

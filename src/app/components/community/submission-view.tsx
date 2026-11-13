@@ -9,6 +9,7 @@ import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { submissionCategoryLabel } from '@/lib/constants/submissions';
 import type { SubmissionView } from '@/lib/types/domain/submission';
 
+import { SubmissionAttachmentGallery } from './submission-attachment-gallery';
 import { SubmissionHtml } from './submission-html';
 import { SubmissionOwnerControls } from './submission-owner-controls';
 import { SubmissionShare } from './submission-share';
@@ -44,7 +45,7 @@ interface SubmissionViewContentProps {
 
 /**
  * The body of a submission's page: its title, who posted it, its category,
- * the about, the writing and the outbound links. Its owner and approvers also
+ * its attachments, the about, the writing and the outbound links. Its owner and approvers also
  * get the status strip and their controls. Sharing is offered only on a public
  * submission, since nobody else could open the link.
  */
@@ -69,6 +70,7 @@ export const SubmissionViewContent = ({ view }: SubmissionViewContentProps) => {
           <p className="text-muted-foreground text-sm">{submissionCategoryLabel(view.category)}</p>
         </div>
       </div>
+      <SubmissionAttachmentGallery attachments={view.attachments} title={title} />
       <SubmissionHtml html={view.aboutHtml} className="mt-6" />
       <SubmissionHtml html={view.writingHtml} className="mt-6" />
       <SubmissionLinks links={view.links} />

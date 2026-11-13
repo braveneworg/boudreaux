@@ -11,6 +11,7 @@ import Link from 'next/link';
 
 import { Inbox } from 'lucide-react';
 
+import { SubmissionCardPicture } from '@/app/components/community/submission-card-picture';
 import { SectionHeader } from '@/app/components/ui/section-header';
 import {
   Table,
@@ -114,10 +115,20 @@ const datedAt = (tab: QueueTab, row: SubmissionQueueRow): Date | null => {
   return tab.status === 'REJECTED' ? row.rejectedAt : row.publishedAt;
 };
 
-const QueueTable = ({ tab, rows }: { tab: QueueTab; rows: SubmissionQueueRow[] }) => (
+interface QueueTableProps {
+  tab: QueueTab;
+  rows: SubmissionQueueRow[];
+  /** Each row's card picture, by submission id; a row without one has no entry. */
+  cardPictures: Map<string, string>;
+}
+
+const QueueTable = ({ tab, rows, cardPictures }: QueueTableProps) => (
   <Table>
     <TableHeader>
       <TableRow>
+        <TableHead>
+          <span className="sr-only">Picture</span>
+        </TableHead>
         <TableHead>Title</TableHead>
         <TableHead>Owner</TableHead>
         <TableHead>Category</TableHead>
@@ -131,6 +142,9 @@ const QueueTable = ({ tab, rows }: { tab: QueueTab; rows: SubmissionQueueRow[] }
 
         return (
           <TableRow key={row.id}>
+            <TableCell>
+              <SubmissionCardPicture url={cardPictures.get(row.id)} category={row.category} />
+            </TableCell>
             <TableCell>
               <Link
                 href={`${QUEUE_PATH}/${row.id}`}
@@ -163,6 +177,7 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
   });
+  const cardPictures = await SubmissionService.cardPictures(rows);
   const hasNext = page * PAGE_SIZE < total;
 
   return (
@@ -199,7 +214,11 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
         )}
       </nav>
 
-      {rows.length === 0 ? <p>{tab.empty}</p> : <QueueTable tab={tab} rows={rows} />}
+      {rows.length === 0 ? (
+        <p>{tab.empty}</p>
+      ) : (
+        <QueueTable tab={tab} rows={rows} cardPictures={cardPictures} />
+      )}
 
       {(page > 1 || hasNext) && (
         <nav aria-label="Pages" className="flex items-center gap-4">

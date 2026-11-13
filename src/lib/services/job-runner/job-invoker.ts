@@ -15,13 +15,18 @@ import type { JobInvoker } from './types';
 const LOCAL_DISPATCH_FAILED = 'Local job dispatch failed';
 
 /**
- * The production adapter: a fire-and-forget `Event` invoke of the
- * bio-generator Lambda. The Lambda answers 202 at once and POSTs its result
- * to the callback URL, so there is no response body to read. Never throws.
+ * The production adapter: a fire-and-forget `Event` invoke of the kind's
+ * Lambda, which is the bio generator unless the kind names its own. The
+ * Lambda answers 202 at once and POSTs its result to the callback URL, so
+ * there is no response body to read. Never throws.
  */
 export const lambdaJobInvoker: JobInvoker = {
   invoke: async (job, payload) => {
-    const functionName = process.env.BIO_GENERATOR_LAMBDA_NAME;
+    // A kind that names its own function never falls back to another's: an
+    // unset name is "not configured", not an invoke of the wrong Lambda.
+    const functionName = job.functionName
+      ? job.functionName()
+      : process.env.BIO_GENERATOR_LAMBDA_NAME;
     if (!functionName) {
       loggers.media.error('job_invoke_unconfigured', undefined, { kind: job.kind });
       return { ok: false, error: job.copy.notConfigured };

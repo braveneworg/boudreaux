@@ -97,6 +97,11 @@ export default defineConfig({
       CLOUDFRONT_KEY_PAIR_ID: '',
       CLOUDFRONT_PRIVATE_KEY_BASE64: '',
       CLOUDFRONT_DISTRIBUTION_ID: '',
+      // Submission attachments use the local upload sink and the fake
+      // re-encode under E2E. Blanked for the same reason: an env file that
+      // one day names the real bucket or Lambda must not reach this server.
+      SUBMISSION_UPLOADS_BUCKET: '',
+      SUBMISSION_REENCODER_LAMBDA_NAME: '',
       // The sign-in and profile pages render a button only for a provider
       // the server registered (enabledSocialProviders), so the E2E server
       // registers all four with dummy, non-secret credentials. No spec

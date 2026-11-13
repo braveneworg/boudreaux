@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { attachmentUploadLimitBytes } from '@fakefour/job-contract';
+
+import type { AttachmentKind } from '@fakefour/job-contract';
+
 /**
  * Client-safe constants for community submissions (ADR-0025): the categories
  * and states, every limit, the upload agreement and the reply-time promise.
@@ -22,14 +26,6 @@ export const SUBMISSION_CATEGORIES = [
 ] as const;
 
 export type SubmissionCategory = (typeof SUBMISSION_CATEGORIES)[number];
-
-/**
- * The categories a submission may be saved with today. Stage 1 has no
- * attachments, so only a writing can be published; stage 2 opens the rest.
- */
-export const OPEN_SUBMISSION_CATEGORIES = [
-  'WRITING',
-] as const satisfies readonly SubmissionCategory[];
 
 /** Each category with the label its dropdown option shows, in display order. */
 export const SUBMISSION_CATEGORY_OPTIONS: ReadonlyArray<{
@@ -52,6 +48,22 @@ export const SUBMISSION_CATEGORY_OPTIONS: ReadonlyArray<{
   },
 ];
 
+/** Each category in a word or two, for the tile that stands in for a card picture. */
+const SUBMISSION_CATEGORY_SHORT_LABELS: ReadonlyMap<SubmissionCategory, string> = new Map([
+  ['VIDEO', 'Video'],
+  ['COVER_SONG', 'Cover song'],
+  ['ORIGINAL_SONG', 'Original song'],
+  ['INFORMATIONAL_VIDEO', 'Info video'],
+  ['WRITING', 'Writing'],
+  ['MUSIC_OR_LYRIC_VIDEO', 'Music video'],
+  ['LIVE_PERFORMANCE', 'Live'],
+  ['PHOTO', 'Photo'],
+]);
+
+/** A category in a word or two. */
+export const submissionCategoryShortLabel = (category: SubmissionCategory): string =>
+  SUBMISSION_CATEGORY_SHORT_LABELS.get(category) ?? category;
+
 /** The label a category's dropdown option shows. */
 export const submissionCategoryLabel = (category: SubmissionCategory): string =>
   SUBMISSION_CATEGORY_OPTIONS.find(({ value }) => value === category)?.label ?? category;
@@ -73,6 +85,32 @@ export const UNAPPROVED_SUBMISSION_STATUSES = [
 
 /** Most unapproved submissions one user may hold at once. Approved ones are not counted. */
 export const MAX_UNAPPROVED_SUBMISSIONS = 5;
+
+/** Most attachments one submission may hold. */
+export const MAX_SUBMISSION_ATTACHMENTS = 10;
+
+/** What an owner is told when a submission already holds the most attachments. */
+export const ATTACHMENTS_FULL_MESSAGE = `A submission can have ${MAX_SUBMISSION_ATTACHMENTS} attachments. Remove one to add another.`;
+
+/** What an owner is told about a file of a type that is not accepted. */
+export const ATTACHMENT_TYPE_MESSAGE =
+  'That kind of file is not accepted. Add a photo, an audio file or a video.';
+
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+
+/** What an owner is told a kind's upload limit is. */
+export const attachmentLimitMessage = (kind: AttachmentKind): string => {
+  const megabytes = attachmentUploadLimitBytes(kind) / BYTES_PER_MEGABYTE;
+
+  switch (kind) {
+    case 'IMAGE':
+      return `A photo can be up to ${megabytes} MB.`;
+    case 'AUDIO':
+      return `An audio file can be up to ${megabytes} MB.`;
+    default:
+      return `A video can be up to ${megabytes} MB.`;
+  }
+};
 
 /** Most outbound links on one submission: the links field and the writing's links together. */
 export const MAX_SUBMISSION_LINKS = 10;

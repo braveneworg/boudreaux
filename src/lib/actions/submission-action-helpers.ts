@@ -32,7 +32,9 @@ type ZodIssues = Parameters<typeof fieldErrorsFromZodIssues>[0];
 
 /**
  * Codes whose service-authored message is written for the user and may be
- * shown as is: every rule the submission and manager services raise.
+ * shown as is: every rule the submission, attachment and manager services
+ * raise. `UNAVAILABLE` is theirs too ("Uploads are not set up yet."); a
+ * repository's `UNAVAILABLE` carries a cause and is collapsed below.
  */
 const USER_FACING_CODES: ReadonlySet<DataErrorCode> = new Set([
   'NOT_FOUND',
@@ -40,6 +42,7 @@ const USER_FACING_CODES: ReadonlySet<DataErrorCode> = new Set([
   'LIMIT_EXCEEDED',
   'VALIDATION',
   'DUPLICATE',
+  'UNAVAILABLE',
 ]);
 
 /** Map a failed Zod parse into the field-errors failure shape. */

@@ -19,6 +19,7 @@ import { ZinePanel } from '@/app/components/ui/zine-panel';
 import { communityViewer } from '@/lib/community/community-session';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type { SubmissionView } from '@/lib/types/domain/submission';
+import type { AttachmentView } from '@/lib/types/domain/submission-attachment';
 import { isValidObjectId } from '@/lib/utils/validation/object-id';
 
 import type { Metadata } from 'next';
@@ -40,6 +41,17 @@ const loadView = cache(async (id: string): Promise<SubmissionView | null> => {
 });
 
 /**
+ * The picture a shared link previews with: the first photo, else a frame of
+ * the first video (the card picture's rule, at full size).
+ */
+const previewImageOf = (attachments: AttachmentView[]): string | null => {
+  const photo = attachments.find(({ kind }) => kind === 'IMAGE');
+  const video = attachments.find(({ kind }) => kind === 'VIDEO');
+
+  return photo?.url ?? video?.posterUrl ?? null;
+};
+
+/**
  * Only a listed, public submission may be indexed. An unlisted one is open to
  * anyone who holds its link, and a search engine is not someone who holds it.
  */
@@ -52,8 +64,13 @@ export const generateMetadata = async ({ params }: SubmissionPageProps): Promise
   }
 
   const title = view.title === '' ? 'Untitled' : view.title;
+  // Only a public submission's files are on the CDN; anything else would put
+  // a signed link to a private copy into the page's head.
+  const image = view.isPublic ? previewImageOf(view.attachments) : null;
+  const metadata: Metadata =
+    image === null ? { title } : { title, openGraph: { title, images: [image] } };
 
-  return view.isPublic && view.listed ? { title } : { title, robots: NOT_INDEXED };
+  return view.isPublic && view.listed ? metadata : { ...metadata, robots: NOT_INDEXED };
 };
 
 export default async function SubmissionPage({ params }: SubmissionPageProps) {

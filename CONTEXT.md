@@ -477,7 +477,9 @@ runner owns the rest once: the trigger (not found, refused, in-flight echo,
 status view, the single-use claim, progress checkpoints and the completion.
 The Lambda invoke is a port with a production adapter and one local adapter
 shared by every job (`BIO_GENERATOR_FAKE=true`), which POSTs signed
-checkpoints and callbacks to the real routes.
+checkpoints and callbacks to the real routes. A job runs on the bio-generator
+Lambda unless its adapter names its own, as the re-encode of an
+**attachment** does.
 _Defined in_ `src/lib/services/job-runner/`.
 
 **signed callback** — a Lambda → app callback or progress POST whose raw body

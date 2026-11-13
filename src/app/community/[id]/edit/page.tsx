@@ -72,6 +72,8 @@ export default async function EditSubmissionPage({ params }: EditSubmissionPageP
               links: view.links,
               listed: view.listed,
               status: view.status,
+              updatedAt: view.updatedAt.toISOString(),
+              attachments: view.attachments,
             }}
           />
         </ZinePanel>

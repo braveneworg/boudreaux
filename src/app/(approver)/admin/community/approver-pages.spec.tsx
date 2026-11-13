@@ -21,7 +21,12 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/community/community-session', () => ({ requireApprover: vi.fn() }));
 vi.mock('@/lib/services/submission-service', () => ({
-  SubmissionService: { getForViewer: vi.fn(), listQueue: vi.fn() },
+  SubmissionService: {
+    getForViewer: vi.fn(),
+    listQueue: vi.fn(),
+    // No row has a card picture unless a test hands it one.
+    cardPictures: vi.fn(async () => new Map<string, string>()),
+  },
 }));
 vi.mock('@/lib/services/manager-service', () => ({ ManagerService: { list: vi.fn() } }));
 vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
@@ -98,6 +103,7 @@ const view = (overrides: Partial<SubmissionView> = {}): SubmissionView => ({
   viewer: 'approver',
   isPublic: false,
   queuePosition: null,
+  attachments: [],
   ...overrides,
 });
 

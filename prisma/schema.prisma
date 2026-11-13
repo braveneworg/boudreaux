@@ -1269,8 +1269,43 @@ model Submission {
   rejectionReason String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+  attachments     SubmissionAttachment[]
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
   @@index([status, listed, firstApprovedAt])
+}
+
+enum SubmissionAttachmentKind {
+  IMAGE
+  AUDIO
+  VIDEO
+}
+
+// One file a user uploaded to a submission (ADR-0026, ADR-0027). Each row is
+// also one re-encode job: the `reencode*` columns are the async job lifecycle's.
+model SubmissionAttachment {
+  id                String                   @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId      String                   @db.ObjectId
+  submission        Submission               @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  kind              SubmissionAttachmentKind // the upload's type until the re-encode says what it is
+  fileName          String // as uploaded; shown to the owner and approvers only
+  uploadKey         String                   @unique // the original, in the private bucket
+  uploadBytes       Int
+  uploadType        String
+  copyKey           String? // the re-encoded copy, in the private bucket
+  cardKey           String? // a small picture of an image or a video
+  posterKey         String? // a video's frame at full size
+  copyBytes         Int?
+  width             Int?
+  height            Int?
+  durationSeconds   Int?
+  reencodeStatus    String? // pending | processing | succeeded | failed
+  reencodeError     String?
+  reencodeStartedAt DateTime?
+  reencodeJobToken  String?
+  reencodeProgress  Json?
+  createdAt         DateTime                 @default(now())
+
+  @@index([submissionId, createdAt])
 }

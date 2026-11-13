@@ -1,0 +1,8 @@
+{
+  "task": "submission-reencode",
+  "attachmentId": "65f0c0000000000000000002",
+  "kind": "VIDEO",
+  "bucket": "fakefour-submission-uploads-123456789012",
+  "uploadKey": "uploads/65f0c0000000000000000001/3f1c2c5e-0000-4000-8000-000000000001",
+  "copyPrefix": "copies/65f0c0000000000000000001/65f0c0000000000000000002/"
+}

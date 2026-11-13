@@ -8,13 +8,16 @@ import {
   SUBMISSION_WRITING_MAX,
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
+import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
 import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
+import { attachmentStore } from '@/lib/services/submission-attachment-store';
 import {
   notifyApproversOfSubmission,
   notifyOwnerOfDecision,
 } from '@/lib/services/submission-notices';
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
+import type { SubmissionAttachmentRecord } from '@/lib/types/domain/submission-attachment';
 import { gravatarHash } from '@/lib/utils/gravatar-hash';
 
 import { SubmissionService, type SaveSubmissionData } from './submission-service';
@@ -39,6 +42,22 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
 }));
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: { acceptUploadAgreement: vi.fn() },
+}));
+// A submission has no attachments unless a test hands it some.
+vi.mock('@/lib/repositories/submission-attachment-repository', () => ({
+  SubmissionAttachmentRepository: {
+    listBySubmission: vi.fn(async () => []),
+    listBySubmissions: vi.fn(async () => []),
+  },
+}));
+vi.mock('@/lib/services/submission-attachment-store', () => ({
+  attachmentStore: {
+    publish: vi.fn(async () => undefined),
+    unpublish: vi.fn(async () => undefined),
+    deletePrivate: vi.fn(async () => undefined),
+    previewUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
+    publicUrl: vi.fn((key: string) => `https://cdn.example/${key}`),
+  },
 }));
 vi.mock('@/lib/services/submission-notices', () => ({
   notifyApproversOfSubmission: vi.fn(),
@@ -99,6 +118,49 @@ const withOwner = (
   ...record(overrides),
   owner: { id: OWNER_ID, username: 'fan', email: 'Fan@Example.com', banned: false, ...owner },
 });
+
+const ATTACHMENT_ID = 'e'.repeat(24);
+const COPY_PREFIX = `copies/${SUBMISSION_ID}/${ATTACHMENT_ID}/`;
+const UPLOAD_KEY = `uploads/${SUBMISSION_ID}/3f0c9a52-6a1d-4d1e-9a51-0c1d2e3f4a5b`;
+const FILE_KEYS = [`${COPY_PREFIX}copy.jpg`, `${COPY_PREFIX}card.webp`];
+
+/** A ready image attachment, unless overridden. */
+const attachment = (
+  overrides: Partial<SubmissionAttachmentRecord> = {}
+): SubmissionAttachmentRecord => ({
+  id: ATTACHMENT_ID,
+  submissionId: SUBMISSION_ID,
+  kind: 'IMAGE',
+  fileName: 'show.jpg',
+  uploadKey: UPLOAD_KEY,
+  uploadBytes: 1000,
+  uploadType: 'image/jpeg',
+  copyKey: `${COPY_PREFIX}copy.jpg`,
+  cardKey: `${COPY_PREFIX}card.webp`,
+  posterKey: null,
+  copyBytes: 500,
+  width: 1200,
+  height: 800,
+  durationSeconds: null,
+  reencodeStatus: 'succeeded',
+  reencodeError: null,
+  reencodeStartedAt: new Date(NOW.getTime() - 60_000),
+  reencodeJobToken: null,
+  reencodeProgress: null,
+  createdAt: EARLIER,
+  ...overrides,
+});
+
+const processingAttachment = (): SubmissionAttachmentRecord =>
+  attachment({ copyKey: null, cardKey: null, reencodeStatus: 'processing' });
+
+const failedAttachment = (): SubmissionAttachmentRecord =>
+  attachment({ copyKey: null, cardKey: null, reencodeStatus: 'failed', reencodeError: 'too-long' });
+
+/** Hand the next read of a submission's attachments these. */
+const holding = (...attachments: SubmissionAttachmentRecord[]): void => {
+  vi.mocked(SubmissionAttachmentRepository.listBySubmission).mockResolvedValueOnce(attachments);
+};
 
 const written = (overrides: Partial<SubmissionRecord> = {}) => ({
   status: 'written' as const,
@@ -168,8 +230,8 @@ describe('SubmissionService.save', () => {
 
     it('does not record it when the content is refused', async () => {
       await failureOf(
-        SubmissionService.save(notAgreed, form({ acceptAgreement: true, category: 'VIDEO' }), {
-          publish: false,
+        SubmissionService.save(notAgreed, form({ acceptAgreement: true, title: '' }), {
+          publish: true,
         })
       );
 
@@ -178,10 +240,15 @@ describe('SubmissionService.save', () => {
   });
 
   describe('the content rules', () => {
-    it('refuses a category that is not open yet', async () => {
-      await expect(
-        failureOf(SubmissionService.save(agreed, form({ category: 'VIDEO' }), { publish: false }))
-      ).resolves.toMatchObject({ code: 'VALIDATION', field: 'category' });
+    it('stores no writing for a category that has none', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(agreed, form({ category: 'VIDEO' }), { publish: false });
+
+      expect(vi.mocked(SubmissionRepository.createWithinCap).mock.calls[0]?.[0]).toMatchObject({
+        category: 'VIDEO',
+        writingHtml: '',
+      });
     });
 
     it('stores the sanitized about and writing, never what was sent', async () => {
@@ -563,6 +630,7 @@ describe('SubmissionService.setListed', () => {
 
 describe('SubmissionService.delete', () => {
   it('deletes the owner’s submission', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
     vi.mocked(SubmissionRepository.deleteOwned).mockResolvedValueOnce(true);
 
     await expect(SubmissionService.delete(OWNER_ID, SUBMISSION_ID)).resolves.toBeUndefined();
@@ -571,12 +639,486 @@ describe('SubmissionService.delete', () => {
     ]);
   });
 
-  it('is not found when nothing of theirs matched', async () => {
+  it('is not found when it does not exist', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(null);
+
+    await expect(
+      failureOf(SubmissionService.delete(OWNER_ID, SUBMISSION_ID))
+    ).resolves.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('is not found, and deletes nothing, when it is someone else’s', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ ownerId: OTHER_ID }));
+
+    await expect(
+      failureOf(SubmissionService.delete(OWNER_ID, SUBMISSION_ID))
+    ).resolves.toMatchObject({ code: 'NOT_FOUND' });
+    expect(SubmissionRepository.deleteOwned).not.toHaveBeenCalled();
+  });
+
+  it('is not found when the row went between the read and the delete', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
     vi.mocked(SubmissionRepository.deleteOwned).mockResolvedValueOnce(false);
 
     await expect(
       failureOf(SubmissionService.delete(OWNER_ID, SUBMISSION_ID))
     ).resolves.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('refuses while an attachment is processing, and deletes nothing', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    holding(processingAttachment());
+
+    await expect(
+      failureOf(SubmissionService.delete(OWNER_ID, SUBMISSION_ID))
+    ).resolves.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(SubmissionRepository.deleteOwned).not.toHaveBeenCalled();
+  });
+
+  it('takes its files off the CDN', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    vi.mocked(SubmissionRepository.deleteOwned).mockResolvedValueOnce(true);
+    holding(attachment());
+
+    await SubmissionService.delete(OWNER_ID, SUBMISSION_ID);
+
+    expect(vi.mocked(attachmentStore.unpublish).mock.calls).toEqual([[FILE_KEYS]]);
+  });
+
+  it('deletes its private files, the upload included', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    vi.mocked(SubmissionRepository.deleteOwned).mockResolvedValueOnce(true);
+    holding(attachment());
+
+    await SubmissionService.delete(OWNER_ID, SUBMISSION_ID);
+
+    expect(vi.mocked(attachmentStore.deletePrivate).mock.calls).toEqual([
+      [[...FILE_KEYS, UPLOAD_KEY]],
+    ]);
+  });
+
+  it('still succeeds when its files cannot be removed', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    vi.mocked(SubmissionRepository.deleteOwned).mockResolvedValueOnce(true);
+    vi.mocked(attachmentStore.deletePrivate).mockRejectedValueOnce(new Error('AccessDenied'));
+    holding(attachment());
+
+    await expect(SubmissionService.delete(OWNER_ID, SUBMISSION_ID)).resolves.toBeUndefined();
+  });
+});
+
+describe('attachments and the publish rules', () => {
+  const edit = (overrides: Partial<SaveSubmissionData> = {}): SaveSubmissionData =>
+    form({ submissionId: SUBMISSION_ID, ...overrides });
+  const video = { category: 'VIDEO', writingHtml: '' } as const;
+
+  it('refuses to publish a submission of another category with no attachment', async () => {
+    await expect(
+      failureOf(SubmissionService.save(agreed, form(video), { publish: true }))
+    ).resolves.toMatchObject({
+      code: 'VALIDATION',
+      field: 'attachments',
+      message: 'Add at least one attachment before publishing.',
+    });
+  });
+
+  it('publishes a submission of another category that has a ready attachment', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record(video));
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    holding(attachment());
+
+    await expect(
+      SubmissionService.save(agreed, edit(video), { publish: true })
+    ).resolves.toMatchObject({ status: 'AWAITING_APPROVAL' });
+  });
+
+  it('publishes a writings submission with an attachment and no writing', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    holding(attachment());
+
+    await expect(
+      SubmissionService.save(agreed, edit({ writingHtml: '' }), { publish: true })
+    ).resolves.toBeDefined();
+  });
+
+  it('asks a writings submission with neither for a writing or an attachment', async () => {
+    await expect(
+      failureOf(SubmissionService.save(agreed, form({ writingHtml: '' }), { publish: true }))
+    ).resolves.toMatchObject({
+      field: 'writingHtml',
+      message: 'Add your writing or an attachment before publishing.',
+    });
+  });
+
+  it('refuses to publish while an attachment is processing', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    holding(attachment(), processingAttachment());
+
+    await expect(
+      failureOf(SubmissionService.save(agreed, edit(), { publish: true }))
+    ).resolves.toEqual({
+      code: 'VALIDATION',
+      field: 'attachments',
+      message: 'Wait until every attachment has finished processing.',
+    });
+  });
+
+  it('refuses to publish while an attachment has failed', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    holding(failedAttachment());
+
+    await expect(
+      failureOf(SubmissionService.save(agreed, edit(), { publish: true }))
+    ).resolves.toEqual({
+      code: 'VALIDATION',
+      field: 'attachments',
+      message: 'Remove the attachment that failed, or upload it again.',
+    });
+  });
+
+  it('lets a draft be saved while an attachment is processing', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(written());
+
+    await expect(SubmissionService.save(agreed, edit(), { publish: false })).resolves.toBeDefined();
+    expect(SubmissionAttachmentRepository.listBySubmission).not.toHaveBeenCalled();
+  });
+
+  it('holds an edit to a submission awaiting approval to the publish rules', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(
+      record({ status: 'AWAITING_APPROVAL' })
+    );
+
+    await expect(
+      failureOf(SubmissionService.save(agreed, edit({ writingHtml: '' }), { publish: false }))
+    ).resolves.toMatchObject({ code: 'VALIDATION', field: 'writingHtml' });
+  });
+
+  it('holds an edit to an approved submission to the publish rules', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+
+    await expect(
+      failureOf(SubmissionService.save(agreed, edit({ title: '' }), { publish: false }))
+    ).resolves.toMatchObject({ code: 'VALIDATION', field: 'title' });
+  });
+
+  it('takes an approved submission’s files off the CDN when its content changes', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    // Once for the publish rules, once for the files to remove.
+    holding(attachment());
+    holding(attachment());
+
+    await SubmissionService.save(agreed, edit({ title: 'Typo fixed' }), { publish: false });
+
+    expect(vi.mocked(attachmentStore.unpublish).mock.calls).toEqual([[FILE_KEYS]]);
+  });
+
+  it('leaves the CDN alone when only the listed choice changed', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    vi.mocked(SubmissionRepository.setListed).mockResolvedValueOnce(
+      record({ status: 'APPROVED', listed: true })
+    );
+    holding(attachment());
+
+    await SubmissionService.save(agreed, edit({ listed: true }), { publish: false });
+
+    expect(attachmentStore.unpublish).not.toHaveBeenCalled();
+  });
+
+  it('still saves when the files cannot be taken off the CDN', async () => {
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    vi.mocked(attachmentStore.unpublish).mockRejectedValueOnce(new Error('AccessDenied'));
+    holding(attachment());
+    holding(attachment());
+
+    await expect(
+      SubmissionService.save(agreed, edit({ title: 'Typo fixed' }), { publish: false })
+    ).resolves.toMatchObject({ status: 'AWAITING_APPROVAL' });
+  });
+});
+
+describe('SubmissionService.takeOfflineForAttachmentChange', () => {
+  const approved = record({ status: 'APPROVED', firstApprovedAt: EARLIER, approvedAt: EARLIER });
+
+  it.each(['DRAFT', 'AWAITING_APPROVAL', 'REJECTED'] as const)(
+    'leaves a %s submission as it is',
+    async (status) => {
+      const stored = record({ status });
+
+      await expect(SubmissionService.takeOfflineForAttachmentChange(stored)).resolves.toBe(stored);
+      expect(SubmissionRepository.updateOwned).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns an approved submission to awaiting approval, within the cap', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+
+    await SubmissionService.takeOfflineForAttachmentChange(approved);
+
+    expect(vi.mocked(SubmissionRepository.updateOwned).mock.calls).toEqual([
+      [
+        { id: SUBMISSION_ID, ownerId: OWNER_ID, expected: 'APPROVED' },
+        {
+          title: approved.title,
+          category: approved.category,
+          aboutHtml: approved.aboutHtml,
+          writingHtml: approved.writingHtml,
+          links: approved.links,
+          listed: approved.listed,
+          status: 'AWAITING_APPROVAL',
+          publishedAt: NOW,
+        },
+        MAX_UNAPPROVED_SUBMISSIONS,
+      ],
+    ]);
+  });
+
+  it('answers the submission as it now stands', async () => {
+    const saved = written({ status: 'AWAITING_APPROVAL' });
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(saved);
+
+    await expect(SubmissionService.takeOfflineForAttachmentChange(approved)).resolves.toBe(
+      saved.submission
+    );
+  });
+
+  it('takes its files off the CDN', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    holding(attachment());
+
+    await SubmissionService.takeOfflineForAttachmentChange(approved);
+
+    expect(vi.mocked(attachmentStore.unpublish).mock.calls).toEqual([[FILE_KEYS]]);
+  });
+
+  it('tells approvers it is back in the queue', async () => {
+    const saved = written({ status: 'AWAITING_APPROVAL' });
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(saved);
+
+    await SubmissionService.takeOfflineForAttachmentChange(approved);
+
+    expect(vi.mocked(notifyApproversOfSubmission).mock.calls).toEqual([[saved.submission]]);
+  });
+
+  it('is refused with LIMIT_EXCEEDED when the owner is at the cap', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce({ status: 'full' });
+
+    await expect(
+      failureOf(SubmissionService.takeOfflineForAttachmentChange(approved))
+    ).resolves.toMatchObject({ code: 'LIMIT_EXCEEDED' });
+  });
+
+  it('touches no file when it is refused', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce({ status: 'full' });
+
+    await failureOf(SubmissionService.takeOfflineForAttachmentChange(approved));
+
+    expect(attachmentStore.unpublish).not.toHaveBeenCalled();
+  });
+});
+
+describe('attachments and a decision', () => {
+  const input = { submissionId: SUBMISSION_ID, loadedUpdatedAt: LOADED };
+  const awaiting = (): SubmissionWithOwnerRecord => withOwner({ status: 'AWAITING_APPROVAL' });
+
+  it('publishes every attachment file before it writes the approval', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    holding(attachment());
+
+    await SubmissionService.approve(admin, input);
+
+    expect(vi.mocked(attachmentStore.publish).mock.calls).toEqual([[FILE_KEYS]]);
+    expect(vi.mocked(attachmentStore.publish).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(SubmissionRepository.decide).mock.invocationCallOrder[0] ?? -1
+    );
+  });
+
+  it('refuses to approve while an attachment is processing', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    holding(processingAttachment());
+
+    await expect(failureOf(SubmissionService.approve(admin, input))).resolves.toEqual({
+      code: 'INVALID_INPUT',
+      field: undefined,
+      message: 'An attachment is still processing. Try again when it has finished.',
+    });
+  });
+
+  it('refuses to approve while an attachment has failed', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    holding(failedAttachment());
+
+    await expect(failureOf(SubmissionService.approve(admin, input))).resolves.toMatchObject({
+      code: 'INVALID_INPUT',
+      message: 'An attachment failed to process. Its owner has to remove it first.',
+    });
+  });
+
+  it('publishes nothing and decides nothing for an attachment that is not ready', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    holding(processingAttachment());
+
+    await failureOf(SubmissionService.approve(admin, input));
+
+    expect(attachmentStore.publish).not.toHaveBeenCalled();
+    expect(SubmissionRepository.decide).not.toHaveBeenCalled();
+  });
+
+  it('leaves the submission awaiting approval when a file cannot be published', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    vi.mocked(attachmentStore.publish).mockRejectedValueOnce(new Error('AccessDenied'));
+    holding(attachment());
+
+    await expect(failureOf(SubmissionService.approve(admin, input))).resolves.toMatchObject({
+      code: 'UNAVAILABLE',
+    });
+    expect(SubmissionRepository.decide).not.toHaveBeenCalled();
+  });
+
+  it('takes the files off again when the approval lost its race', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(
+      record({ status: 'AWAITING_APPROVAL' })
+    );
+    holding(attachment());
+
+    await failureOf(SubmissionService.approve(admin, input));
+
+    expect(vi.mocked(attachmentStore.unpublish).mock.calls).toEqual([[FILE_KEYS]]);
+  });
+
+  it('leaves the files up when another approver won the same approval', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+    holding(attachment());
+
+    await failureOf(SubmissionService.approve(admin, input));
+
+    expect(attachmentStore.unpublish).not.toHaveBeenCalled();
+  });
+
+  it('takes an approved submission’s files off the CDN when it is rejected', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'APPROVED' })
+    );
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(record({ status: 'REJECTED' }));
+    holding(attachment());
+
+    await SubmissionService.reject(admin, { ...input, reason: 'Not yours to share.' });
+
+    expect(vi.mocked(attachmentStore.unpublish).mock.calls).toEqual([[FILE_KEYS]]);
+  });
+
+  it('leaves the CDN alone when a submission awaiting approval is rejected', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(awaiting());
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(record({ status: 'REJECTED' }));
+
+    await SubmissionService.reject(admin, { ...input, reason: 'Not yours to share.' });
+
+    expect(attachmentStore.unpublish).not.toHaveBeenCalled();
+  });
+});
+
+describe('attachments as a reader sees them', () => {
+  it('gives the owner of a draft signed links and the file names', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(withOwner());
+    holding(attachment());
+
+    const view = await SubmissionService.getForViewer(SUBMISSION_ID, { id: OWNER_ID, role: null });
+
+    expect(view?.attachments).toMatchObject([
+      {
+        id: ATTACHMENT_ID,
+        fileName: 'show.jpg',
+        state: 'ready',
+        url: `https://signed.example/${COPY_PREFIX}copy.jpg`,
+      },
+    ]);
+  });
+
+  it('gives a visitor to an approved submission CDN addresses and no file names', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'APPROVED' })
+    );
+    holding(attachment());
+
+    const view = await SubmissionService.getForViewer(SUBMISSION_ID, null);
+
+    expect(view?.attachments).toMatchObject([
+      { fileName: '', url: `https://cdn.example/${COPY_PREFIX}copy.jpg` },
+    ]);
+  });
+
+  it('reads no attachments for a reader who may not open the submission', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(withOwner());
+
+    await SubmissionService.getForViewer(SUBMISSION_ID, null);
+
+    expect(SubmissionAttachmentRepository.listBySubmission).not.toHaveBeenCalled();
+  });
+});
+
+describe('SubmissionService.cardPictures', () => {
+  const other = 'f'.repeat(24);
+
+  it('gives each submission its card picture, signed unless it is public', async () => {
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([
+      attachment(),
+      attachment({
+        id: '1'.repeat(24),
+        submissionId: other,
+        cardKey: `copies/${other}/x/card.webp`,
+      }),
+    ]);
+
+    const pictures = await SubmissionService.cardPictures([
+      { id: SUBMISSION_ID, status: 'DRAFT' },
+      { id: other, status: 'APPROVED' },
+    ]);
+
+    expect(Object.fromEntries(pictures)).toEqual({
+      [SUBMISSION_ID]: `https://signed.example/${COPY_PREFIX}card.webp`,
+      [other]: `https://cdn.example/copies/${other}/x/card.webp`,
+    });
+  });
+
+  it('has no entry for a submission without a picture', async () => {
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([]);
+
+    const pictures = await SubmissionService.cardPictures([{ id: SUBMISSION_ID, status: 'DRAFT' }]);
+
+    expect(pictures.size).toBe(0);
+  });
+
+  it('asks for every listed submission at once', async () => {
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([]);
+
+    await SubmissionService.cardPictures([
+      { id: SUBMISSION_ID, status: 'DRAFT' },
+      { id: other, status: 'APPROVED' },
+    ]);
+
+    expect(vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mock.calls).toEqual([
+      [[SUBMISSION_ID, other]],
+    ]);
   });
 });
 

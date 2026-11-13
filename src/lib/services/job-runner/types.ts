@@ -70,7 +70,7 @@ export interface JobCopy {
   notFound: string;
   /** `NEXT_PUBLIC_BASE_URL` is unset, so no callback URL can be built. */
   noCallbackUrl: string;
-  /** `BIO_GENERATOR_LAMBDA_NAME` is unset. */
+  /** The kind's Lambda function name is unset. */
   notConfigured: string;
   /** The Lambda invoke failed. */
   unreachable: string;
@@ -101,6 +101,11 @@ export interface JobFake<T extends JobTypes> {
 export interface JobAdapter<T extends JobTypes> {
   kind: JobKind;
   copy: JobCopy;
+  /**
+   * The Lambda this kind runs on, read at invoke time; `undefined` when it is
+   * not configured. A kind without this runs on the bio generator.
+   */
+  functionName?: () => string | undefined;
   callbackPath: (id: string) => string;
   progress?: JobProgressChannel<T>;
   fake: JobFake<T>;
