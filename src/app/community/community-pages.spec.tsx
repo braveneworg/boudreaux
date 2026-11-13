@@ -50,8 +50,13 @@ vi.mock('@/app/components/community/submission-form', () => ({
   ),
 }));
 vi.mock('@/app/components/community/submission-view', () => ({
-  SubmissionViewContent: ({ view }: { view: SubmissionView }) => (
-    <div data-testid="view" data-viewer={view.viewer} data-title={view.title} />
+  SubmissionViewContent: ({ view, reportable }: { view: SubmissionView; reportable?: boolean }) => (
+    <div
+      data-testid="view"
+      data-viewer={view.viewer}
+      data-title={view.title}
+      data-reportable={String(reportable === true)}
+    />
   ),
 }));
 
@@ -192,6 +197,15 @@ describe('SubmissionPage', () => {
     expect(vi.mocked(SubmissionService.getForViewer).mock.calls).toEqual([
       [ID, { id: USER_ID, role: 'manager' }],
     ]);
+  });
+
+  it('is the page a submission can be reported from', async () => {
+    vi.mocked(communityViewer).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'public' }));
+
+    render(await SubmissionPage(params()));
+
+    expect(screen.getByTestId('view')).toHaveAttribute('data-reportable', 'true');
   });
 
   it('answers not found when this reader may not open it', async () => {

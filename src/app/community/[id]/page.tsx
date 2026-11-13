@@ -85,7 +85,7 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
     <PageContainer>
       <ContentContainer>
         <ZinePanel accent="kraft">
-          <SubmissionViewContent view={view} />
+          <SubmissionViewContent view={view} reportable />
         </ZinePanel>
       </ContentContainer>
     </PageContainer>

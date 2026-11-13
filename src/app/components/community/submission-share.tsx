@@ -47,11 +47,7 @@ export const SubmissionShare = ({ submissionId, title }: SubmissionShareProps) =
   };
 
   return (
-    <div
-      role="group"
-      aria-label={`Share ${title}`}
-      className="mt-8 flex flex-wrap items-center gap-3"
-    >
+    <div role="group" aria-label={`Share ${title}`} className="flex flex-wrap items-center gap-3">
       <Button type="button" variant="outline" size="sm" onClick={copyLink}>
         <Link2 aria-hidden="true" />
         Copy link
