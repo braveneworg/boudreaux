@@ -26,10 +26,17 @@ runs:
       with:
         use-installer: true
 
+    # --use-buildkit: without it SAM builds through Docker's classic builder,
+    # which on a runner whose Docker uses the containerd image store cannot
+    # finish a multi-stage build for another architecture. It fails on
+    # `COPY --from` looking for the base image's x86-64 manifest, which an
+    # arm64 pull never fetched. BuildKit resolves every stage for the
+    # platform asked for. SAM passes --provenance=false with it, so the image
+    # stays a single manifest, the only kind Lambda accepts.
     - name: SAM build
       shell: bash
       working-directory: submission-reencoder
-      run: sam build
+      run: sam build --use-buildkit
 
     # A build that succeeds can still hold the wrong binaries: the runner's
     # own architecture, or a sharp without its arm64 library.

@@ -2,7 +2,8 @@
 # a static ffmpeg + ffprobe.
 #
 # Build context: this directory, after `pnpm run build` has written `dist/`.
-# `sam build` runs this with `--platform linux/arm64` (see template.yaml).
+# `sam build --use-buildkit` runs this with `--platform linux/arm64` (see
+# template.yaml, and .github/actions/build-reencoder-image for why BuildKit).
 
 # Static ffmpeg and ffprobe, pinned by digest: a tag can be moved, a digest
 # cannot. This is the multi-arch index of mwader/static-ffmpeg:8.1.1, resolved
