@@ -211,6 +211,23 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('findUsernamesByIds', () => {
+    it('reads only the id and username of the named users', async () => {
+      const rows = [{ id: 'u1', username: 'alice' }];
+      findManyMock.mockResolvedValueOnce(rows);
+
+      await expect(UserRepository.findUsernamesByIds(['u1', 'u2'])).resolves.toBe(rows);
+      expect(findManyMock.mock.calls).toEqual([
+        [{ where: { id: { in: ['u1', 'u2'] } }, select: { id: true, username: true } }],
+      ]);
+    });
+
+    it('asks the database nothing when no user is named', async () => {
+      await expect(UserRepository.findUsernamesByIds([])).resolves.toEqual([]);
+      expect(findManyMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findAdmins', () => {
     it('queries all admin users with notification fields', async () => {
       const rows = [
@@ -263,8 +280,10 @@ describe('UserRepository', () => {
   });
 
   describe('findApprovers', () => {
-    it('queries every admin and manager with the notification fields', async () => {
-      const rows = [{ id: 'm1', email: 'm1@x.com', username: 'manager1', phone: null }];
+    it('queries every admin and manager with the notification fields and the role', async () => {
+      const rows = [
+        { id: 'm1', email: 'm1@x.com', username: 'manager1', phone: null, role: 'manager' },
+      ];
       findManyMock.mockResolvedValue(rows);
 
       await expect(UserRepository.findApprovers()).resolves.toBe(rows);
@@ -278,6 +297,7 @@ describe('UserRepository', () => {
               username: true,
               phone: true,
               allowSmsNotifications: true,
+              role: true,
             },
           },
         ],

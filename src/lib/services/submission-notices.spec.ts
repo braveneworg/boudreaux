@@ -4,9 +4,10 @@
 import { sendSubmissionEmail } from '@/lib/email/send-submission-email';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
-import type { UserAdminRecord } from '@/lib/types/domain/user';
+import type { UserApproverRecord } from '@/lib/types/domain/user';
 
 import {
+  notifyApproversOfReport,
   notifyApproversOfSubmission,
   notifyOwnerOfDecision,
   remindApproversOfOverdue,
@@ -55,12 +56,13 @@ const withOwner = (overrides: Partial<SubmissionRecord> = {}): SubmissionWithOwn
   owner: { id: OWNER_ID, username: 'fan', email: 'fan@example.com', banned: false },
 });
 
-const approver = (overrides: Partial<UserAdminRecord> = {}): UserAdminRecord => ({
+const approver = (overrides: Partial<UserApproverRecord> = {}): UserApproverRecord => ({
   id: 'd'.repeat(24),
   email: 'mgr@example.com',
   username: 'manager1',
   phone: null,
   allowSmsNotifications: false,
+  role: 'manager',
   ...overrides,
 });
 
@@ -190,6 +192,137 @@ describe('notifyApproversOfSubmission', () => {
     await notifyApproversOfSubmission(submission());
 
     expect(sendSubmissionEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('notifyApproversOfReport', () => {
+  const reported = (): SubmissionRecord => submission({ status: 'APPROVED' });
+
+  it('emails every approver once, naming the title', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver(),
+      approver({ id: 'e'.repeat(24), email: 'admin@example.com', role: 'admin' }),
+    ]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(sentTo()).toEqual([
+      ['mgr@example.com', 'Reported: Bus poem'],
+      ['admin@example.com', 'Reported: Bus poem'],
+    ]);
+  });
+
+  it.each([
+    ['HARMFUL', 'reported as harmful'],
+    ['NOT_THEIRS', 'reported as not theirs to post'],
+    ['OTHER', 'reported as something else'],
+  ] as const)('says the reason %s in the label’s own words', async (reason, phrase) => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver()]);
+
+    await notifyApproversOfReport(reported(), reason);
+
+    expect(firstBody()).toContain(phrase);
+  });
+
+  it('says a report takes nothing down by itself', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver()]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(firstBody()).toContain('It stays up unless an approver rejects it.');
+  });
+
+  it('links each approver to the submission’s review page, through sign-in', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver()]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(firstBody()).toContain(
+      `${BASE}/signin?callbackUrl=${encodeURIComponent(`/admin/community/${SUBMISSION_ID}`)}`
+    );
+  });
+
+  it('carries neither the about nor the writing', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver()]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(firstBody()).not.toContain('SECRET');
+  });
+
+  it('takes nothing a reporter typed, so it has none of it to send', () => {
+    // The submission and a reason from a closed list: no note, no contact.
+    expect(notifyApproversOfReport).toHaveLength(2);
+  });
+
+  it('does not tell a manager about a report on their own submission', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ id: OWNER_ID, email: 'owner-manager@example.com', role: 'manager' }),
+      approver(),
+    ]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(sentTo()).toEqual([['mgr@example.com', 'Reported: Bus poem']]);
+  });
+
+  it('tells an admin about a report on their own submission', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ id: OWNER_ID, email: 'owner-admin@example.com', role: 'admin' }),
+    ]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(sentTo()).toEqual([['owner-admin@example.com', 'Reported: Bus poem']]);
+  });
+
+  it('texts an approver who opted in and has a phone, with the Reported tab’s link', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ allowSmsNotifications: true, phone: '+15550001234' }),
+    ]);
+
+    await notifyApproversOfReport(reported(), 'NOT_THEIRS');
+
+    expect(smsSend.mock.calls).toEqual([
+      [
+        '+15550001234',
+        `[boudreaux] A submission was reported as not theirs to post: "Bus poem". Review: ${BASE}/admin/community?status=reported`,
+        { transactional: true },
+      ],
+    ]);
+  });
+
+  it.each([
+    ['who did not opt in', { allowSmsNotifications: false, phone: '+15550001234' }],
+    ['with no phone', { allowSmsNotifications: true, phone: null }],
+  ])('does not text an approver %s', async (_name, overrides) => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([approver(overrides)]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(smsSend).not.toHaveBeenCalled();
+  });
+
+  it('texts nobody under E2E', async () => {
+    vi.stubEnv('E2E_MODE', 'true');
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver({ allowSmsNotifications: true, phone: '+15550001234' }),
+    ]);
+
+    await notifyApproversOfReport(reported(), 'HARMFUL');
+
+    expect(smsSend).not.toHaveBeenCalled();
+  });
+
+  it('still emails the others when one approver’s email fails', async () => {
+    vi.mocked(UserRepository.findApprovers).mockResolvedValueOnce([
+      approver(),
+      approver({ id: 'e'.repeat(24), email: 'admin@example.com', role: 'admin' }),
+    ]);
+    vi.mocked(sendSubmissionEmail).mockRejectedValueOnce(new Error('SES down'));
+
+    await expect(notifyApproversOfReport(reported(), 'HARMFUL')).resolves.toBeUndefined();
+    expect(sentTo().map(([toEmail]) => toEmail)).toEqual(['mgr@example.com', 'admin@example.com']);
   });
 });
 
