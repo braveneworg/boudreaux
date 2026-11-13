@@ -228,6 +228,7 @@ describe('this repository', () => {
       'src/lib/actions/contact-action.ts',
       'src/lib/actions/create-purchase-checkout-session-action.ts',
       'src/lib/actions/create-purchase-session-action.ts',
+      'src/lib/actions/file-submission-report-action.ts',
       'src/lib/actions/get-featured-artists.ts',
       'src/lib/actions/signin-action.ts',
       'src/lib/actions/signup-action.ts',
@@ -275,6 +276,10 @@ describe('this repository', () => {
       .map(({ name }) => name)
       .sort();
 
-    expect(approver).toEqual(['approveSubmissionAction', 'rejectSubmissionAction']);
+    expect(approver).toEqual([
+      'approveSubmissionAction',
+      'markSubmissionReportHandledAction',
+      'rejectSubmissionAction',
+    ]);
   });
 });
