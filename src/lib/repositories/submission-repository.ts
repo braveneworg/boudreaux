@@ -131,6 +131,18 @@ export class SubmissionRepository {
     return prisma.submission.findUnique({ where: { id }, include: ownerInclude });
   }
 
+  /**
+   * The named submissions with their owners, in no promised order: the rows
+   * behind a list that was ordered by something else, such as open reports.
+   */
+  static async findManyWithOwnerByIds(ids: string[]): Promise<SubmissionWithOwnerRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.submission.findMany({ where: { id: { in: ids } }, include: ownerInclude });
+  }
+
   /** Every submission an owner holds, in any state, most recently changed first. */
   static async findByOwner(ownerId: string): Promise<SubmissionRecord[]> {
     return prisma.submission.findMany({ where: { ownerId }, orderBy: { updatedAt: 'desc' } });

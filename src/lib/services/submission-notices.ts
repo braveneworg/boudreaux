@@ -3,21 +3,24 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { OVERDUE_BUSINESS_DAYS } from '@/lib/constants/submissions';
+import { OVERDUE_BUSINESS_DAYS, submissionReportReasonPhrase } from '@/lib/constants/submissions';
+import type { SubmissionReportReason } from '@/lib/constants/submissions';
 import { sendSubmissionEmail } from '@/lib/email/send-submission-email';
 import { buildSubmissionEmail, type SubmissionEmailMessage } from '@/lib/email/submission-email';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { getSmsService } from '@/lib/services/get-sms-service';
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
-import type { UserAdminRecord } from '@/lib/types/domain/user';
+import type { UserAdminRecord, UserApproverRecord } from '@/lib/types/domain/user';
 import { loggers } from '@/lib/utils/logger';
+import { isAdminRole } from '@/lib/utils/roles';
 
 /**
  * The notices a submission's life sends (ADR-0025): to every approver when
- * one awaits approval, and to its owner when it is approved or rejected. A
- * notice names the title and links to the page; it never carries the about or
- * the writing. One recipient's failure never stops another's, and the callers
- * never let a failed notice fail the write it follows.
+ * one awaits approval or is reported, and to its owner when it is approved or
+ * rejected. A notice names the title and links to the page; it never carries
+ * the about or the writing, nor anything a reporter typed (ADR-0028). One
+ * recipient's failure never stops another's, and the callers never let a
+ * failed notice fail the write it follows.
  */
 
 const logger = loggers.notifications;
@@ -26,6 +29,9 @@ const KICKER = 'Community submissions';
 
 /** The approver section, where the queue is reviewed. */
 const QUEUE_PATH = '/admin/community';
+
+/** The approver section's tab of submissions that hold an open report. */
+const REPORTED_PATH = `${QUEUE_PATH}?status=reported`;
 
 const baseUrl = (): string => process.env.NEXT_PUBLIC_BASE_URL ?? 'https://fakefourrecords.com';
 
@@ -64,36 +70,85 @@ const textOne = async ({ id, phone }: UserAdminRecord, body: string): Promise<vo
   }
 };
 
+/** What every approver is told at once: the email, and the text for those who opted in. */
+interface ApproverNotice extends Omit<SubmissionEmailMessage, 'kicker' | 'greetingName'> {
+  smsBody: string;
+}
+
+/**
+ * Email each approver and text those who opted in to SMS. The whole fan-out
+ * is awaited, so a Server Action's runtime is not torn down mid-dispatch.
+ */
+const tellApprovers = async (
+  approvers: UserApproverRecord[],
+  { smsBody, ...message }: ApproverNotice
+): Promise<void> => {
+  await Promise.allSettled(
+    approvers.map(async (approver) => {
+      await Promise.all([
+        emailOne(approver.email, {
+          ...message,
+          kicker: KICKER,
+          greetingName: greetingFor(approver),
+        }),
+        approver.allowSmsNotifications ? textOne(approver, smsBody) : Promise.resolve(),
+      ]);
+    })
+  );
+};
+
 /**
  * Tell every approver a submission is awaiting approval: an email to each,
  * and a text to those who opted in to SMS. The owner is left out when they
- * are an approver themselves. The whole fan-out is awaited, so a Server
- * Action's runtime is not torn down mid-dispatch.
+ * are an approver themselves.
  */
 export const notifyApproversOfSubmission = async (submission: SubmissionRecord): Promise<void> => {
   const approvers = (await UserRepository.findApprovers()).filter(
     ({ id }) => id !== submission.ownerId
   );
   const title = titleOf(submission);
-  const smsBody = `[boudreaux] A submission is awaiting approval: "${title}". Review: ${baseUrl()}${QUEUE_PATH}`;
 
-  await Promise.allSettled(
-    approvers.map(async (approver) => {
-      await Promise.all([
-        emailOne(approver.email, {
-          subject: `Awaiting approval: ${title}`,
-          kicker: KICKER,
-          greetingName: greetingFor(approver),
-          paragraphs: [
-            'A submission is awaiting approval. Nobody else can open it until an approver has looked.',
-          ],
-          detail: { label: 'Title', value: title },
-          action: { label: 'Review it', url: signedInLink(`${QUEUE_PATH}/${submission.id}`) },
-        }),
-        approver.allowSmsNotifications ? textOne(approver, smsBody) : Promise.resolve(),
-      ]);
-    })
+  await tellApprovers(approvers, {
+    subject: `Awaiting approval: ${title}`,
+    paragraphs: [
+      'A submission is awaiting approval. Nobody else can open it until an approver has looked.',
+    ],
+    detail: { label: 'Title', value: title },
+    action: { label: 'Review it', url: signedInLink(`${QUEUE_PATH}/${submission.id}`) },
+    smsBody: `[boudreaux] A submission is awaiting approval: "${title}". Review: ${baseUrl()}${QUEUE_PATH}`,
+  });
+};
+
+/**
+ * Tell every approver a submission was reported: an email to each, and a text
+ * to those who opted in to SMS. It takes the submission and a reason from the
+ * closed list and nothing else, so no note and no contact email can be mailed
+ * or texted to anyone (ADR-0028).
+ *
+ * A manager who owns the submission is left out: they cannot decide on it and
+ * are not shown its reports. An admin who owns it is told, so a label with
+ * one admin still hears.
+ */
+export const notifyApproversOfReport = async (
+  submission: SubmissionRecord,
+  reason: SubmissionReportReason
+): Promise<void> => {
+  const approvers = (await UserRepository.findApprovers()).filter(
+    ({ id, role }) => id !== submission.ownerId || isAdminRole(role)
   );
+  const title = titleOf(submission);
+  const reportedAs = `reported as ${submissionReportReasonPhrase(reason)}`;
+
+  await tellApprovers(approvers, {
+    subject: `Reported: ${title}`,
+    paragraphs: [
+      `A submission was ${reportedAs}. It stays up unless an approver rejects it.`,
+      'The report is on its review page. Mark it handled once you have looked.',
+    ],
+    detail: { label: 'Title', value: title },
+    action: { label: 'Review it', url: signedInLink(`${QUEUE_PATH}/${submission.id}`) },
+    smsBody: `[boudreaux] A submission was ${reportedAs}: "${title}". Review: ${baseUrl()}${REPORTED_PATH}`,
+  });
 };
 
 /**

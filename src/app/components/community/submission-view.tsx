@@ -12,6 +12,7 @@ import type { SubmissionView } from '@/lib/types/domain/submission';
 import { SubmissionAttachmentGallery } from './submission-attachment-gallery';
 import { SubmissionHtml } from './submission-html';
 import { SubmissionOwnerControls } from './submission-owner-controls';
+import { SubmissionReportControl } from './submission-report-control';
 import { SubmissionShare } from './submission-share';
 import { SubmissionStatusStrip } from './submission-status-strip';
 
@@ -41,16 +42,23 @@ const SubmissionLinks = ({ links }: { links: string[] }) =>
 interface SubmissionViewContentProps {
   /** What this reader sees; it exists only because they may open the submission. */
   view: SubmissionView;
+  /**
+   * Whether this page offers the Report control: the submission's own page
+   * does, and the approver's review page, where the decision is, does not.
+   */
+  reportable?: boolean;
 }
 
 /**
  * The body of a submission's page: its title, who posted it, its category,
  * its attachments, the about, the writing and the outbound links. Its owner and approvers also
  * get the status strip and their controls. Sharing is offered only on a public
- * submission, since nobody else could open the link.
+ * submission, since nobody else could open the link, and so is reporting: to
+ * every reader but the owner, an approver included.
  */
-export const SubmissionViewContent = ({ view }: SubmissionViewContentProps) => {
+export const SubmissionViewContent = ({ view, reportable = false }: SubmissionViewContentProps) => {
   const title = view.title === '' ? 'Untitled' : view.title;
+  const canReport = reportable && view.viewer !== 'owner';
 
   return (
     <article>
@@ -74,7 +82,12 @@ export const SubmissionViewContent = ({ view }: SubmissionViewContentProps) => {
       <SubmissionHtml html={view.aboutHtml} className="mt-6" />
       <SubmissionHtml html={view.writingHtml} className="mt-6" />
       <SubmissionLinks links={view.links} />
-      {view.isPublic && <SubmissionShare submissionId={view.id} title={title} />}
+      {view.isPublic && (
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <SubmissionShare submissionId={view.id} title={title} />
+          {canReport && <SubmissionReportControl submissionId={view.id} title={title} />}
+        </div>
+      )}
       {view.viewer === 'owner' && (
         <SubmissionOwnerControls submissionId={view.id} status={view.status} listed={view.listed} />
       )}

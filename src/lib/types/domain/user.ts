@@ -132,6 +132,11 @@ export interface UserAdminRecord {
   allowSmsNotifications: boolean | null;
 }
 
+/** An approver as a notice reads them: the fan-out fields, and which kind of approver. */
+export interface UserApproverRecord extends UserAdminRecord {
+  role: string | null;
+}
+
 /** SMS blast recipient projection. */
 export interface UserSmsRecipientRecord {
   id: string;

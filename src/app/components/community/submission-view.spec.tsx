@@ -12,6 +12,11 @@ vi.mock('./submission-share', () => ({
     <div data-testid="share" data-id={submissionId} data-title={title} />
   ),
 }));
+vi.mock('./submission-report-control', () => ({
+  SubmissionReportControl: ({ submissionId, title }: { submissionId: string; title: string }) => (
+    <div data-testid="report" data-id={submissionId} data-title={title} />
+  ),
+}));
 vi.mock('./submission-owner-controls', () => ({
   SubmissionOwnerControls: ({ submissionId }: { submissionId: string }) => (
     <div data-testid="owner-controls" data-id={submissionId} />
@@ -104,6 +109,45 @@ describe('SubmissionViewContent', () => {
       expect(screen.queryByTestId('share')).not.toBeInTheDocument();
     }
   );
+
+  it('offers a reader of a public submission’s page a way to report it', () => {
+    render(<SubmissionViewContent view={view()} reportable />);
+
+    expect(screen.getByTestId('report')).toHaveAttribute('data-id', ID);
+    expect(screen.getByTestId('report')).toHaveAttribute('data-title', 'Bus poem');
+  });
+
+  it('offers an approver reading the page the same way to report it', () => {
+    render(<SubmissionViewContent view={view({ viewer: 'approver' })} reportable />);
+
+    expect(screen.getByTestId('report')).toBeInTheDocument();
+  });
+
+  it('offers the owner no way to report their own submission', () => {
+    render(<SubmissionViewContent view={view({ viewer: 'owner' })} reportable />);
+
+    expect(screen.queryByTestId('report')).not.toBeInTheDocument();
+  });
+
+  it.each(['AWAITING_APPROVAL', 'REJECTED'] as const)(
+    'offers no way to report a %s submission, which nobody else can open',
+    (status) => {
+      render(
+        <SubmissionViewContent
+          view={view({ status, viewer: 'approver', isPublic: false })}
+          reportable
+        />
+      );
+
+      expect(screen.queryByTestId('report')).not.toBeInTheDocument();
+    }
+  );
+
+  it('offers no way to report where the page did not ask for one', () => {
+    render(<SubmissionViewContent view={view({ viewer: 'approver' })} />);
+
+    expect(screen.queryByTestId('report')).not.toBeInTheDocument();
+  });
 
   it('shows a member of the public no status and no controls', () => {
     render(<SubmissionViewContent view={view()} />);

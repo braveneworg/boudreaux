@@ -73,6 +73,17 @@ const buildTiles = (stats: AdminStats): Record<string, StatTile> => ({
     href: '/admin/community',
     primary: `${stats.submissions.awaiting}`,
     secondary: 'awaiting approval',
+    // A report takes nothing down by itself (ADR-0025), so an open one must
+    // not sit unseen: the tile names how many there are.
+    ...(stats.submissions.openReports > 0 && {
+      warning: {
+        href: '/admin/community?status=reported',
+        text:
+          stats.submissions.openReports === 1
+            ? '1 open report'
+            : `${stats.submissions.openReports} open reports`,
+      },
+    }),
   },
   '/admin/tours': {
     href: '/admin/tours',

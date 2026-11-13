@@ -10,6 +10,7 @@ import type {
   UpdateUserProfileData,
   User,
   UserAdminRecord,
+  UserApproverRecord,
   UserContactRecord,
   UserEmailRecord,
   UserIdRecord,
@@ -174,6 +175,18 @@ export class UserRepository {
     });
   }
 
+  /** The username of each named user, for a list that holds only their ids. */
+  static async findUsernamesByIds(ids: string[]): Promise<UserUsernameRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, username: true },
+    });
+  }
+
   /** Fetch every admin user with the fields needed for notification fan-out. */
   static async findAdmins(): Promise<UserAdminRecord[]> {
     return prisma.user.findMany({
@@ -210,9 +223,11 @@ export class UserRepository {
 
   /**
    * Fetch every approver (an admin or a manager) with the fields needed for
-   * notification fan-out: who is told when a submission awaits approval.
+   * notification fan-out: who is told when a submission awaits approval or is
+   * reported. The role says which of the two an approver is, for a notice a
+   * manager must not get about their own submission.
    */
-  static async findApprovers(): Promise<UserAdminRecord[]> {
+  static async findApprovers(): Promise<UserApproverRecord[]> {
     return prisma.user.findMany({
       where: { role: { in: [CONSTANTS.ROLES.ADMIN, CONSTANTS.ROLES.MANAGER] } },
       select: {
@@ -221,6 +236,7 @@ export class UserRepository {
         username: true,
         phone: true,
         allowSmsNotifications: true,
+        role: true,
       },
     });
   }

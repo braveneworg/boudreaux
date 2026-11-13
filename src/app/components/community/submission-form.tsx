@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -63,7 +63,9 @@ import type { SubmissionFormValues } from '@/lib/validation/submission-schema';
 import { SubmissionAttachments } from './submission-attachments';
 import { LISTED_HELP, LISTED_LABEL } from './submission-owner-controls';
 import { SubmissionTextEditor } from './submission-text-editor';
+import { useVerification } from './use-verification';
 
+import type { Verification } from './use-verification';
 import type { Control, FieldPath, UseFormReturn } from 'react-hook-form';
 
 export interface SubmissionFormProps {
@@ -425,23 +427,6 @@ const OfflineWarning = ({ open, onCancel, onConfirm }: OfflineWarningProps) => (
   </AlertDialog>
 );
 
-/** The Turnstile round the form is on: its token, and a key that remounts the widget. */
-const useVerification = () => {
-  const [isVerified, setIsVerified] = useState(false);
-  const [token, setToken] = useState('');
-  const [round, setRound] = useState(0);
-  const handleToken = useCallback((next: string): void => setToken(next), []);
-
-  /** The token is single use: after a round trip, ask again. */
-  const spend = useCallback((): void => {
-    setIsVerified(false);
-    setToken('');
-    setRound((current) => current + 1);
-  }, []);
-
-  return { isVerified, setIsVerified, token, handleToken, round, spend };
-};
-
 /** Awaiting approval or approved: there is no draft to save, only changes. */
 const isSettledStatus = (status: SubmissionStatus | undefined): boolean =>
   status === 'AWAITING_APPROVAL' || status === 'APPROVED';
@@ -454,8 +439,6 @@ const linksErrorOf = (
 /** What the form shows after a successful save that did not enter the queue. */
 const savedToast = (isSettled: boolean): string =>
   isSettled ? 'Changes saved.' : 'Draft saved. Only you can see it.';
-
-type Verification = ReturnType<typeof useVerification>;
 
 interface SubmissionSave {
   /** Send the form: as a draft or an edit, or published for approval. */

@@ -5,8 +5,13 @@ import { render, screen, within } from '@testing-library/react';
 
 import { requireApprover } from '@/lib/community/community-session';
 import { ManagerService } from '@/lib/services/manager-service';
+import { SubmissionReportService } from '@/lib/services/submission-report-service';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type { SubmissionQueueRow, SubmissionView } from '@/lib/types/domain/submission';
+import type {
+  ReportedSubmissionRow,
+  SubmissionReportView,
+} from '@/lib/types/domain/submission-report';
 
 import ReviewSubmissionPage from './[id]/page';
 import ApproverLayout from './layout';
@@ -28,6 +33,14 @@ vi.mock('@/lib/services/submission-service', () => ({
     cardPictures: vi.fn(async () => new Map<string, string>()),
   },
 }));
+// No submission is reported unless a test says so.
+vi.mock('@/lib/services/submission-report-service', () => ({
+  SubmissionReportService: {
+    listForSubmission: vi.fn(async () => []),
+    listReported: vi.fn(async () => ({ rows: [], total: 0 })),
+    countReported: vi.fn(async () => 0),
+  },
+}));
 vi.mock('@/lib/services/manager-service', () => ({ ManagerService: { list: vi.fn() } }));
 vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
   BreadcrumbMenu: () => <nav data-testid="breadcrumb" />,
@@ -38,8 +51,13 @@ vi.mock('@/app/admin/components/admin-nav', () => ({
   ),
 }));
 vi.mock('@/app/components/community/submission-view', () => ({
-  SubmissionViewContent: ({ view }: { view: SubmissionView }) => (
-    <div data-testid="view" data-title={view.title} />
+  SubmissionViewContent: ({ view, reportable }: { view: SubmissionView; reportable?: boolean }) => (
+    <div data-testid="view" data-title={view.title} data-reportable={String(reportable === true)} />
+  ),
+}));
+vi.mock('@/app/components/community/submission-report-list', () => ({
+  SubmissionReportList: ({ reports }: { reports: SubmissionReportView[] }) => (
+    <div data-testid="reports" data-notes={reports.map(({ note }) => note).join('|')} />
   ),
 }));
 vi.mock('@/app/components/community/submission-decision-panel', () => ({
@@ -104,6 +122,30 @@ const view = (overrides: Partial<SubmissionView> = {}): SubmissionView => ({
   isPublic: false,
   queuePosition: null,
   attachments: [],
+  ...overrides,
+});
+
+const reportedRow = (overrides: Partial<ReportedSubmissionRow> = {}): ReportedSubmissionRow => ({
+  id: ID,
+  title: 'Bus poem',
+  category: 'WRITING',
+  status: 'APPROVED',
+  ownerUsername: 'fan',
+  openReports: 2,
+  oldestReportAt: WHEN,
+  ...overrides,
+});
+
+const reportView = (overrides: Partial<SubmissionReportView> = {}): SubmissionReportView => ({
+  id: 'e'.repeat(24),
+  reason: 'HARMFUL',
+  note: 'Threats in the about.',
+  createdAt: WHEN,
+  handled: false,
+  handledAt: null,
+  handledByUsername: null,
+  hasContact: false,
+  contactEmail: null,
   ...overrides,
 });
 
@@ -264,6 +306,123 @@ describe('QueuePage', () => {
 
     expect(screen.queryByRole('link', { name: 'Managers' })).not.toBeInTheDocument();
   });
+
+  describe('the Reported tab', () => {
+    it('is a tab beside the queues', async () => {
+      vi.mocked(SubmissionService.listQueue).mockResolvedValueOnce({ rows: [], total: 0 });
+
+      await open();
+
+      expect(screen.getByRole('link', { name: 'Reported' })).toHaveAttribute(
+        'href',
+        '/admin/community?status=reported&page=1'
+      );
+    });
+
+    it('carries how many submissions this approver has to look at, when there are any', async () => {
+      vi.mocked(SubmissionService.listQueue).mockResolvedValueOnce({ rows: [], total: 0 });
+      vi.mocked(SubmissionReportService.countReported).mockResolvedValueOnce(3);
+
+      await open({}, 'manager');
+
+      expect(screen.getByRole('link', { name: 'Reported (3)' })).toBeInTheDocument();
+      expect(vi.mocked(SubmissionReportService.countReported).mock.calls).toEqual([
+        [{ id: USER_ID, role: 'manager' }],
+      ]);
+    });
+
+    it('reads ?status=reported as the reported submissions, for this approver', async () => {
+      vi.mocked(SubmissionReportService.listReported).mockResolvedValueOnce({
+        rows: [reportedRow()],
+        total: 1,
+      });
+
+      await open({ status: 'reported', page: '2' }, 'manager');
+
+      expect(vi.mocked(SubmissionReportService.listReported).mock.calls).toEqual([
+        [
+          { id: USER_ID, role: 'manager' },
+          { skip: 25, take: 25 },
+        ],
+      ]);
+      expect(SubmissionService.listQueue).not.toHaveBeenCalled();
+      expect(screen.getByRole('link', { name: 'Reported (1)' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    });
+
+    it('takes its count from the page it read, without counting twice', async () => {
+      vi.mocked(SubmissionReportService.listReported).mockResolvedValueOnce({
+        rows: [reportedRow()],
+        total: 1,
+      });
+
+      await open({ status: 'reported' });
+
+      expect(SubmissionReportService.countReported).not.toHaveBeenCalled();
+    });
+
+    it('lists each reported submission with its state, open reports and oldest report', async () => {
+      vi.mocked(SubmissionReportService.listReported).mockResolvedValueOnce({
+        rows: [
+          reportedRow(),
+          reportedRow({
+            id: 'd'.repeat(24),
+            title: '',
+            ownerUsername: null,
+            status: 'AWAITING_APPROVAL',
+            openReports: 1,
+          }),
+        ],
+        total: 2,
+      });
+
+      await open({ status: 'reported' });
+
+      const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+      expect(
+        within(rows[0] as HTMLElement).getByRole('link', { name: 'Bus poem' })
+      ).toHaveAttribute('href', `/admin/community/${ID}`);
+      expect(
+        within(rows[0] as HTMLElement)
+          .getAllByRole('cell')
+          .slice(2)
+          .map((cell) => cell.textContent)
+      ).toEqual(['fan', 'Approved', '2', 'Nov 2, 2026']);
+      expect(
+        within(rows[1] as HTMLElement)
+          .getAllByRole('cell')
+          .slice(1)
+          .map((cell) => cell.textContent)
+      ).toEqual(['Untitled', 'No username', 'Awaiting approval', '1', 'Nov 2, 2026']);
+    });
+
+    it('says so when no submission has an open report', async () => {
+      await open({ status: 'reported' });
+
+      expect(screen.getByText('No submission has an open report.')).toBeInTheDocument();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Reported' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+    });
+
+    it('pages through the reported submissions, keeping the tab', async () => {
+      vi.mocked(SubmissionReportService.listReported).mockResolvedValueOnce({
+        rows: [reportedRow()],
+        total: 60,
+      });
+
+      await open({ status: 'reported', page: '2' });
+
+      expect(screen.getByRole('link', { name: 'Next page' })).toHaveAttribute(
+        'href',
+        '/admin/community?status=reported&page=3'
+      );
+    });
+  });
 });
 
 describe('ReviewSubmissionPage', () => {
@@ -282,6 +441,52 @@ describe('ReviewSubmissionPage', () => {
       [ID, { id: USER_ID, role: 'manager' }],
     ]);
     expect(vi.mocked(requireApprover).mock.calls).toEqual([['approver']]);
+  });
+
+  it('offers no Report control: the decision is right there', async () => {
+    vi.mocked(requireApprover).mockResolvedValueOnce(approver('manager'));
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(
+      view({ status: 'APPROVED', isPublic: true })
+    );
+
+    render(await ReviewSubmissionPage(params()));
+
+    expect(screen.getByTestId('view')).toHaveAttribute('data-reportable', 'false');
+  });
+
+  it('lists the reports this approver may read, under the decision', async () => {
+    vi.mocked(requireApprover).mockResolvedValueOnce(approver('manager'));
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view());
+    vi.mocked(SubmissionReportService.listForSubmission).mockResolvedValueOnce([
+      reportView(),
+      reportView({ id: 'f'.repeat(24), note: 'That is my photo.' }),
+    ]);
+
+    render(await ReviewSubmissionPage(params()));
+
+    expect(screen.getByTestId('reports')).toHaveAttribute(
+      'data-notes',
+      'Threats in the about.|That is my photo.'
+    );
+    expect(vi.mocked(SubmissionReportService.listForSubmission).mock.calls).toEqual([
+      [
+        { id: ID, ownerId: 'b'.repeat(24) },
+        { id: USER_ID, role: 'manager' },
+      ],
+    ]);
+  });
+
+  it.each([
+    ['a submission nobody has reported', []],
+    ['a manager on their own submission, who is kept from its reports', null],
+  ])('shows no reports for %s', async (_name, reports) => {
+    vi.mocked(requireApprover).mockResolvedValueOnce(approver('manager'));
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view());
+    vi.mocked(SubmissionReportService.listForSubmission).mockResolvedValueOnce(reports);
+
+    render(await ReviewSubmissionPage(params()));
+
+    expect(screen.queryByTestId('reports')).not.toBeInTheDocument();
   });
 
   it.each([

@@ -658,10 +658,19 @@ _Avoid_: declined, removed, taken down (refusing an approved submission is
 still a rejection), banned (an account state).
 
 **submission report** — a complaint anyone, signed in or not, files against a
-**submission**: a reason (harmful, not theirs to post, other) with an
-optional note and contact. It informs approvers and changes nothing by
-itself; only an approver's rejection takes a submission offline.
+**public submission**: a reason (harmful, not theirs to post, other) with an
+optional note and contact email. It informs approvers and changes nothing by
+itself; only an approver's rejection takes a submission offline. It records
+what was said and never who said it: the contact email, when one is left, is
+read by admins only and erased after 90 days.
 _Avoid_: abuse report (filed against a chat user), flag, takedown.
+
+**open report** — a **submission report** no approver has marked handled.
+Marking one handled records who and when and changes nothing else; rejecting
+a submission handles every open report on it. The approver section's Reported
+tab lists the submissions that hold one. A **manager** is never shown the
+reports against a submission of their own.
+_Avoid_: pending (an async job state), unresolved, ticket.
 
 **listed submission** — an approved **submission** its owner chose to show:
 it appears on the User Submitted Content page, in that page's search and on
