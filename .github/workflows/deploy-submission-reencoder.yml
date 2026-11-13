@@ -37,8 +37,15 @@ jobs:
         working-directory: submission-reencoder
         run: pnpm run typecheck
 
+      # Without the binaries the real-ffmpeg specs skip themselves;
+      # REQUIRE_MEDIA_TOOLS makes a missing one fail the deploy instead.
+      - name: Install ffmpeg + ffprobe
+        uses: ./.github/actions/setup-media-tools
+
       - name: Run tests
         working-directory: submission-reencoder
+        env:
+          REQUIRE_MEDIA_TOOLS: '1'
         run: pnpm run test:run
 
       # Writes dist/: the bundled handler the image is built from. The image's

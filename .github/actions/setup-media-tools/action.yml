@@ -1,0 +1,28 @@
+name: 'Install the pinned ffmpeg + ffprobe'
+description: 'Put the ffmpeg and ffprobe the re-encode Lambda ships with on PATH, so its real-ffmpeg specs run instead of skipping.'
+
+runs:
+  using: 'composite'
+  steps:
+    # The image and its digest are read from the Lambda's Dockerfile, the one
+    # place they are pinned: the specs then run the same ffmpeg the function
+    # does, and moving the pin there moves it here. The runner is x86_64 and
+    # the function arm64, so it is the same release, not the same binary.
+    - name: Copy ffmpeg and ffprobe out of the pinned image
+      shell: bash
+      run: |
+        set -euo pipefail
+        image="$(awk '$1 == "FROM" && $2 ~ /static-ffmpeg/ { print $2; exit }' submission-reencoder/Dockerfile)"
+        if [ -z "$image" ]; then
+          echo "::error::submission-reencoder/Dockerfile names no static-ffmpeg image"
+          exit 1
+        fi
+        tools="$RUNNER_TEMP/media-tools"
+        mkdir -p "$tools"
+        container="$(docker create "$image")"
+        docker cp "$container:/ffmpeg" "$tools/ffmpeg"
+        docker cp "$container:/ffprobe" "$tools/ffprobe"
+        docker rm "$container" > /dev/null
+        "$tools/ffmpeg" -version > /dev/null
+        "$tools/ffprobe" -version > /dev/null
+        echo "$tools" >> "$GITHUB_PATH"

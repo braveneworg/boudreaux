@@ -99,9 +99,16 @@ jobs:
         run: pnpm run typecheck
 
       # The specs that run the real ffmpeg and ffprobe skip themselves when
-      # the runner has neither on its PATH; everything else needs no binary.
+      # neither is on PATH. They prove the refusal of a playlist and a concat
+      # script, so here the binaries are installed and REQUIRE_MEDIA_TOOLS
+      # turns a missing one into a failure.
+      - name: Install ffmpeg + ffprobe (submission-reencoder)
+        uses: ./.github/actions/setup-media-tools
+
       - name: Run tests (submission-reencoder)
         working-directory: submission-reencoder
+        env:
+          REQUIRE_MEDIA_TOOLS: '1'
         run: pnpm run test:run
 
       - name: Install dependencies (stripe-webhook)

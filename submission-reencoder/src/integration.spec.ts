@@ -21,11 +21,25 @@ import type { AttachmentKind, SubmissionReencodeResult } from './types.js';
 /**
  * The audio and video paths end to end with the real ffmpeg and ffprobe, the
  * real process runner and the real argument vectors. Only S3 and the network
- * are faked. Skipped where the two binaries are not on PATH.
+ * are faked. Skipped where the two binaries are not on PATH, so the suite
+ * still runs on a machine without them.
  */
 const hasMediaTools = ['ffmpeg', 'ffprobe'].every(
   (binary) => spawnSync(binary, ['-version'], { stdio: 'ignore' }).status === 0
 );
+
+/**
+ * CI and the deploy workflow install both binaries and set this, so a missing
+ * binary fails the run there instead of skipping the refusals this file
+ * proves (a playlist, a concat script).
+ */
+const mediaToolsRequired = process.env.REQUIRE_MEDIA_TOOLS === '1';
+
+describe.runIf(mediaToolsRequired)('the media tools this suite needs', () => {
+  it('are on PATH where they are required', () => {
+    expect(hasMediaTools).toBe(true);
+  });
+});
 
 interface ProbedStream {
   codec_type: string;
