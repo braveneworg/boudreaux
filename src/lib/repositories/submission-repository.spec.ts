@@ -331,6 +331,25 @@ describe('SubmissionRepository', () => {
     );
   });
 
+  describe('findManyWithOwnerByIds', () => {
+    it('reads the named submissions with their owners', async () => {
+      const rows = [{ ...stored, owner: { id: OWNER_ID, username: 'ada' } }];
+      vi.mocked(prisma.submission.findMany).mockResolvedValueOnce(rows as never);
+
+      await expect(SubmissionRepository.findManyWithOwnerByIds([SUBMISSION_ID])).resolves.toBe(
+        rows
+      );
+      expect(vi.mocked(prisma.submission.findMany).mock.calls).toEqual([
+        [{ where: { id: { in: [SUBMISSION_ID] } }, include: OWNER_INCLUDE }],
+      ]);
+    });
+
+    it('asks the database nothing when no submission is named', async () => {
+      await expect(SubmissionRepository.findManyWithOwnerByIds([])).resolves.toEqual([]);
+      expect(prisma.submission.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('countAwaitingBefore', () => {
     it('counts the submissions awaiting approval that were published earlier', async () => {
       vi.mocked(prisma.submission.count).mockResolvedValueOnce(3);

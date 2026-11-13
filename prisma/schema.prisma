@@ -1270,10 +1270,38 @@ model Submission {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   attachments     SubmissionAttachment[]
+  reports         SubmissionReport[]
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
   @@index([status, listed, firstApprovedAt])
+}
+
+enum SubmissionReportReason {
+  HARMFUL
+  NOT_THEIRS
+  OTHER
+}
+
+// A complaint anyone, signed in or not, files against a public submission
+// (ADR-0025, ADR-0028). It records what was said and never who said it: there
+// is no reporter id and no fingerprint here, by decision. `contactEmail` is
+// the one piece of personal data, left by choice, read by admins only and
+// erased 90 days after filing.
+model SubmissionReport {
+  id           String                 @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId String                 @db.ObjectId
+  submission   Submission             @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reason       SubmissionReportReason
+  note         String                 @default("") // plain text, never HTML
+  contactEmail String? // admins only; erased 90 days after filing
+  handled      Boolean                @default(false) // open until an approver marks it
+  handledAt    DateTime?
+  handledBy    String?                @db.ObjectId
+  createdAt    DateTime               @default(now())
+
+  @@index([submissionId, createdAt])
+  @@index([handled, createdAt])
 }
 
 enum SubmissionAttachmentKind {

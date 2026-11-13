@@ -128,6 +128,55 @@ export const SUBMISSION_WRITING_MAX = 20_000;
 export const REJECTION_REASON_MIN = 10;
 export const REJECTION_REASON_MAX = 1000;
 
+/** Every reason a submission report can give, mirroring the Prisma enum. */
+export const SUBMISSION_REPORT_REASONS = ['HARMFUL', 'NOT_THEIRS', 'OTHER'] as const;
+
+export type SubmissionReportReason = (typeof SUBMISSION_REPORT_REASONS)[number];
+
+/** Each reason as the report dialog offers it, in display order. */
+export const SUBMISSION_REPORT_REASON_OPTIONS: ReadonlyArray<{
+  value: SubmissionReportReason;
+  label: string;
+  help: string;
+}> = [
+  { value: 'HARMFUL', label: "It's harmful", help: 'Hate, harassment, threats or worse.' },
+  {
+    value: 'NOT_THEIRS',
+    label: "It isn't theirs to post",
+    help: 'It is mine, or it shows me, and I did not agree.',
+  },
+  { value: 'OTHER', label: 'Something else', help: 'Tell us what is wrong below.' },
+];
+
+/** Each reason as an approver reads it, completing "Reported as …". */
+const SUBMISSION_REPORT_REASON_PHRASES: ReadonlyMap<SubmissionReportReason, string> = new Map([
+  ['HARMFUL', 'harmful'],
+  ['NOT_THEIRS', 'not theirs to post'],
+  ['OTHER', 'something else'],
+]);
+
+/** A reason in a few words, completing "Reported as …". */
+export const submissionReportReasonPhrase = (reason: SubmissionReportReason): string =>
+  SUBMISSION_REPORT_REASON_PHRASES.get(reason) ?? reason;
+
+/** Longest note a submission report may carry, in characters. */
+export const REPORT_NOTE_MAX = 1000;
+
+/** Shortest note for the reason "other": without one there is nothing to act on. */
+export const REPORT_OTHER_NOTE_MIN = 10;
+
+/** Longest contact email a submission report may carry: the longest address there is. */
+export const REPORT_CONTACT_EMAIL_MAX = 254;
+
+/** How many days a report's contact email is kept before it is erased (ADR-0028). */
+export const REPORT_CONTACT_RETENTION_DAYS = 90;
+
+/**
+ * Most open reports one submission may hold. Past it a report is accepted in
+ * appearance and not stored: approvers already hold this many reasons to look.
+ */
+export const MAX_OPEN_REPORTS_PER_SUBMISSION = 50;
+
 /**
  * The version of {@link UPLOAD_AGREEMENT_WORDING}. Any change to the wording
  * is a new version, and every user is asked to accept it again.
