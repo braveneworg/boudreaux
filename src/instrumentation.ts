@@ -8,8 +8,8 @@ import type { Instrumentation } from 'next';
  * configuration against the manifest (`src/lib/config/boot-check.ts`): in
  * production a missing required value throws here, and Next.js exits rather
  * than serve with the feature silently off. Then, in production, starts the
- * hourly check for the submissions overdue reminder. Not called during
- * `next build`.
+ * two hourly checks: the submissions overdue reminder and the erasure of
+ * report contact emails. Not called during `next build`.
  */
 export const register = async (): Promise<void> => {
   // The boot check reads secrets and loads winston: Node.js runtime only.
@@ -20,13 +20,18 @@ export const register = async (): Promise<void> => {
   const { runBootCheck } = await import('@/lib/config/boot-check');
   runBootCheck();
 
-  // The daily reminder that submissions have waited too long (ADR-0025). Real
-  // production only: a dev server, a test run and the E2E build must never
-  // email anyone.
+  // The daily reminder that submissions have waited too long (ADR-0025), and
+  // the erasure of report contact emails that have been kept long enough
+  // (ADR-0028). Real production only: a dev server, a test run and the E2E
+  // build must never email anyone, and none of them holds reports to erase.
   if (process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true') {
     const { startOverdueReminderMonitor } =
       await import('@/lib/services/submission-overdue-reminder');
     startOverdueReminderMonitor();
+
+    const { startReportContactErasureMonitor } =
+      await import('@/lib/services/submission-report-contact-erasure');
+    startReportContactErasureMonitor();
   }
 };
 
