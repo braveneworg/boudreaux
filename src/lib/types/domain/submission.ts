@@ -18,6 +18,8 @@ export interface SubmissionRecord {
   title: string;
   category: SubmissionCategory;
   aboutHtml: string;
+  /** The about as plain text, for the search; `null` on a row saved before it was kept. */
+  aboutText: string | null;
   writingHtml: string;
   links: string[];
   listed: boolean;
@@ -58,8 +60,16 @@ export interface SubmissionContent {
   links: string[];
 }
 
+/**
+ * The content as a write stores it: with the about's plain text beside its
+ * HTML, derived by the service and never sent by a client.
+ */
+export interface StoredSubmissionContent extends SubmissionContent {
+  aboutText: string;
+}
+
 /** What the repository needs to create a submission. */
-export interface CreateSubmissionData extends SubmissionContent {
+export interface CreateSubmissionData extends StoredSubmissionContent {
   ownerId: string;
   listed: boolean;
   status: Extract<SubmissionStatus, 'DRAFT' | 'AWAITING_APPROVAL'>;
@@ -67,7 +77,7 @@ export interface CreateSubmissionData extends SubmissionContent {
 }
 
 /** What an owner's save may write on an existing submission. */
-export interface UpdateSubmissionData extends SubmissionContent {
+export interface UpdateSubmissionData extends StoredSubmissionContent {
   listed: boolean;
   status: Extract<SubmissionStatus, 'DRAFT' | 'AWAITING_APPROVAL' | 'REJECTED'>;
   /** Set when the save publishes; left alone otherwise. */

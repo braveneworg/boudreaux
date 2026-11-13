@@ -84,6 +84,7 @@ const submission = (overrides: Partial<SubmissionRecord> = {}): SubmissionRecord
   title: 'The show',
   category: 'PHOTO',
   aboutHtml: '',
+  aboutText: '',
   writingHtml: '',
   links: [],
   listed: false,

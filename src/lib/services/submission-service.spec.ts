@@ -100,6 +100,7 @@ const record = (overrides: Partial<SubmissionRecord> = {}): SubmissionRecord => 
   title: 'Bus poem',
   category: 'WRITING',
   aboutHtml: '<p>Written on the bus.</p>',
+  aboutText: 'Written on the bus.',
   writingHtml: '<p>A poem.</p>',
   links: ['https://example.com/zine'],
   listed: false,
@@ -276,6 +277,20 @@ describe('SubmissionService.save', () => {
       });
     });
 
+    it('stores the about as plain text too, for the search to read', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(
+        agreed,
+        form({ aboutHtml: '<p>Recorded <strong>live</strong> &amp; loud</p><p>in a basement</p>' }),
+        { publish: false }
+      );
+
+      expect(vi.mocked(SubmissionRepository.createWithinCap).mock.calls[0]?.[0]).toMatchObject({
+        aboutText: 'Recorded live & loud in a basement',
+      });
+    });
+
     it('refuses an about whose text is past the limit', async () => {
       const aboutHtml = `<p>${'a'.repeat(SUBMISSION_ABOUT_MAX + 1)}</p>`;
 
@@ -362,6 +377,7 @@ describe('SubmissionService.save', () => {
             title: 'Bus poem',
             category: 'WRITING',
             aboutHtml: '<p>Written on the bus.</p>',
+            aboutText: 'Written on the bus.',
             writingHtml: '<p>A poem.</p>',
             links: ['https://example.com/zine'],
             listed: true,
@@ -487,6 +503,20 @@ describe('SubmissionService.save', () => {
       expect(vi.mocked(SubmissionRepository.updateOwned).mock.calls[0]?.[1].publishedAt).toEqual(
         NOW
       );
+    });
+
+    it('stores the edited about as plain text too', async () => {
+      vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+      vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(agreed, edit({ aboutHtml: '<p>Taped <em>at home</em></p>' }), {
+        publish: false,
+      });
+
+      expect(vi.mocked(SubmissionRepository.updateOwned).mock.calls[0]?.[1]).toMatchObject({
+        aboutHtml: '<p>Taped <em>at home</em></p>',
+        aboutText: 'Taped at home',
+      });
     });
 
     it('keeps its place in the queue when edited while awaiting approval', async () => {
@@ -880,6 +910,7 @@ describe('SubmissionService.takeOfflineForAttachmentChange', () => {
           title: approved.title,
           category: approved.category,
           aboutHtml: approved.aboutHtml,
+          aboutText: 'Written on the bus.',
           writingHtml: approved.writingHtml,
           links: approved.links,
           listed: approved.listed,

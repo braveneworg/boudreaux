@@ -47,6 +47,7 @@ const content = {
   title: 'Bus poem',
   category: 'WRITING',
   aboutHtml: '<p>about</p>',
+  aboutText: 'about',
   writingHtml: '<p>poem</p>',
   links: ['https://example.com'],
 } as const;

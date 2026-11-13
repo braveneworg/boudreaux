@@ -31,6 +31,7 @@ import { DataError } from '@/lib/types/domain/errors';
 import type {
   SubmissionActor,
   SubmissionContent,
+  StoredSubmissionContent,
   SubmissionDecisionData,
   SubmissionOwnerActor,
   SubmissionQueueRow,
@@ -47,6 +48,7 @@ import { isAdminRole, isApproverRole } from '@/lib/utils/roles';
 import {
   sanitizeSubmissionAbout,
   sanitizeSubmissionWriting,
+  submissionText,
   submissionTextLength,
   submissionWritingLinks,
 } from '@/lib/utils/sanitize-submission-html';
@@ -163,6 +165,15 @@ const contentFrom = ({
 
   return content;
 };
+
+/**
+ * The content as a write stores it: every write of the about also writes its
+ * plain text, which is all the community page's search reads of it.
+ */
+const storedContent = (content: SubmissionContent): StoredSubmissionContent => ({
+  ...content,
+  aboutText: submissionText(content.aboutHtml),
+});
 
 /**
  * What a submission needs before an approver sees it: a title, something to
@@ -361,7 +372,7 @@ export class SubmissionService {
     const write = await SubmissionRepository.createWithinCap(
       {
         ownerId,
-        ...content,
+        ...storedContent(content),
         listed,
         status: publish ? 'AWAITING_APPROVAL' : 'DRAFT',
         publishedAt: publish ? new Date() : null,
@@ -389,7 +400,12 @@ export class SubmissionService {
       { id, ownerId, expected: stored.status },
       // An edit while awaiting approval keeps its publish moment, and so its
       // place in the queue.
-      { ...content, listed, status, ...(entersQueue && { publishedAt: new Date() }) }
+      {
+        ...storedContent(content),
+        listed,
+        status,
+        ...(entersQueue && { publishedAt: new Date() }),
+      }
     );
 
     return { submission: recordFrom(write), enteredQueue: entersQueue };
@@ -430,7 +446,12 @@ export class SubmissionService {
   ): Promise<SubmissionRecord> {
     const write = await SubmissionRepository.updateOwned(
       { id, ownerId, expected: 'APPROVED' },
-      { ...content, listed, status: 'AWAITING_APPROVAL', publishedAt: new Date() },
+      {
+        ...storedContent(content),
+        listed,
+        status: 'AWAITING_APPROVAL',
+        publishedAt: new Date(),
+      },
       MAX_UNAPPROVED_SUBMISSIONS
     );
     const submission = recordFrom(write);

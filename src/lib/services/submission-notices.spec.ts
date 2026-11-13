@@ -35,6 +35,7 @@ const submission = (overrides: Partial<SubmissionRecord> = {}): SubmissionRecord
   title: 'Bus poem',
   category: 'WRITING',
   aboutHtml: '<p>SECRET-ABOUT</p>',
+  aboutText: 'SECRET-ABOUT',
   writingHtml: '<p>SECRET-WRITING</p>',
   links: [],
   listed: false,

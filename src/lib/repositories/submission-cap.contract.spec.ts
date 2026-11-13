@@ -42,6 +42,7 @@ const draft = (ownerId: string, name: string): CreateSubmissionData => ({
   title: `${prefix}${name}`,
   category: 'WRITING',
   aboutHtml: '',
+  aboutText: '',
   writingHtml: '<p>poem</p>',
   links: [],
   listed: false,
