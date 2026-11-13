@@ -18,6 +18,7 @@ import {
 } from '@/lib/constants/submissions';
 import type { SubmissionStatus } from '@/lib/constants/submissions';
 import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
+import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
 import { isPublicSubmission, SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { attachmentStore } from '@/lib/services/submission-attachment-store';
@@ -587,7 +588,8 @@ export class SubmissionService {
 
   /**
    * Reject a submission, before or after approval, with the reason its owner
-   * reads. It goes offline at once.
+   * reads. It goes offline at once, and every open report on it is handled:
+   * a rejection is the answer to them.
    */
   static async reject(
     approver: SubmissionActor,
@@ -602,21 +604,25 @@ export class SubmissionService {
       from: REJECTABLE_STATUSES,
       refusal: NOT_REJECTABLE_MESSAGE,
     });
+    const rejectedAt = new Date();
     const rejected = await SubmissionService.writeDecision(
       stored,
       { from: REJECTABLE_STATUSES, loadedUpdatedAt },
-      {
-        status: 'REJECTED',
-        rejectedAt: new Date(),
-        rejectedBy: approver.id,
-        rejectionReason: reason,
-      }
+      { status: 'REJECTED', rejectedAt, rejectedBy: approver.id, rejectionReason: reason }
     );
 
     // It was public until this moment; its files go with it.
     if (stored.status === 'APPROVED') {
       await SubmissionService.unpublishFiles(submissionId);
     }
+
+    // The rejection stands whether or not its reports could be marked.
+    await afterWrite(async () => {
+      await SubmissionReportRepository.markAllHandledFor(submissionId, {
+        by: approver.id,
+        at: rejectedAt,
+      });
+    }, 'marking reports handled');
 
     return rejected;
   }

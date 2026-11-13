@@ -9,6 +9,7 @@ import {
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
 import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
+import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
 import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { attachmentStore } from '@/lib/services/submission-attachment-store';
@@ -42,6 +43,10 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
 }));
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: { acceptUploadAgreement: vi.fn() },
+}));
+// A submission has no open reports unless a test says so.
+vi.mock('@/lib/repositories/submission-report-repository', () => ({
+  SubmissionReportRepository: { markAllHandledFor: vi.fn(async () => 0) },
 }));
 // A submission has no attachments unless a test hands it some.
 vi.mock('@/lib/repositories/submission-attachment-repository', () => ({
@@ -1142,6 +1147,17 @@ describe('SubmissionService.approve', () => {
     ]);
   });
 
+  it('leaves its open reports open: approving is not an answer to them', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'AWAITING_APPROVAL' })
+    );
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(record({ status: 'APPROVED' }));
+
+    await SubmissionService.approve(manager, input);
+
+    expect(SubmissionReportRepository.markAllHandledFor).not.toHaveBeenCalled();
+  });
+
   it('leaves the first approval moment alone on a re-approval', async () => {
     vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
       withOwner({ status: 'AWAITING_APPROVAL', firstApprovedAt: EARLIER })
@@ -1284,6 +1300,43 @@ describe('SubmissionService.reject', () => {
     expect(vi.mocked(notifyOwnerOfDecision).mock.calls).toEqual([
       [{ ...rejected, owner: loaded.owner }],
     ]);
+  });
+
+  it('marks every open report on it handled, by the approver who rejected it', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'APPROVED' })
+    );
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(record({ status: 'REJECTED' }));
+
+    await SubmissionService.reject(manager, input);
+
+    expect(vi.mocked(SubmissionReportRepository.markAllHandledFor).mock.calls).toEqual([
+      [SUBMISSION_ID, { by: OTHER_ID, at: NOW }],
+    ]);
+  });
+
+  it('keeps the rejection when its reports cannot be marked handled', async () => {
+    const rejected = record({ status: 'REJECTED' });
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'APPROVED' })
+    );
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(rejected);
+    vi.mocked(SubmissionReportRepository.markAllHandledFor).mockRejectedValueOnce(
+      new Error('database away')
+    );
+
+    await expect(SubmissionService.reject(admin, input)).resolves.toBe(rejected);
+  });
+
+  it('leaves the reports open when the rejection is refused', async () => {
+    vi.mocked(SubmissionRepository.findByIdWithOwner).mockResolvedValueOnce(
+      withOwner({ status: 'APPROVED' })
+    );
+    vi.mocked(SubmissionRepository.decide).mockResolvedValueOnce(null);
+
+    await failureOf(SubmissionService.reject(admin, input));
+
+    expect(SubmissionReportRepository.markAllHandledFor).not.toHaveBeenCalled();
   });
 
   it.each(['DRAFT', 'REJECTED'] as const)(
