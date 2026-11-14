@@ -109,6 +109,31 @@ test.describe('Desktop header — primary navigation', () => {
       userPage.getByRole('banner').getByRole('link', { name: 'My Collection' })
     ).toBeVisible({ timeout: 10_000 });
   });
+
+  // A signed-in visitor has the most entries: Home, Music, Label, Community,
+  // My Collection, Contact Us. A row that wraps hangs below the header, over
+  // the page, and takes the clicks meant for whatever it covers. 1280px is
+  // the narrowest width the desktop menu shows at.
+  for (const width of [1280, 1440]) {
+    test(`keeps every entry on one row for a signed-in visitor at ${width}px`, async ({
+      userPage,
+    }) => {
+      await userPage.setViewportSize({ width, height: 800 });
+      await userPage.goto('/');
+      const banner = userPage.getByRole('banner');
+      await expect(banner.getByRole('link', { name: 'My Collection' })).toBeVisible({
+        timeout: 10_000,
+      });
+
+      // The first and the last entry, read in one frame.
+      const tops = await banner
+        .getByRole('link', { name: /^(Home|Contact Us)$/ })
+        .evaluateAll((links) => links.map((link) => Math.round(link.getBoundingClientRect().top)));
+
+      expect(tops).toHaveLength(2);
+      expect(tops.at(1)).toBe(tops.at(0));
+    });
+  }
 });
 
 test.describe('Desktop header — auth menu', () => {

@@ -31,6 +31,12 @@ const Bullet = () => (
  * Community · [My Collection] · Contact Us at full cutout scale. Symmetric `px-38` (152px)
  * insets keep true centering while making logo/"Home" overlap geometrically
  * impossible at every xl viewport — the row wraps instead of colliding.
+ *
+ * A wrapped row hangs below the header, over the page, and takes the clicks
+ * meant for what it covers. The insets leave 976px, and the six entries a
+ * signed-in visitor has need 950px at this gap (`gap-x-4`); at `gap-x-5`
+ * they needed 990px and wrapped. `desktop-header.spec.ts` keeps them on one
+ * row. A seventh entry, or a longer name, has to earn that room first.
  */
 export const DesktopMenu = () => {
   const pathname = usePathname();
@@ -42,7 +48,7 @@ export const DesktopMenu = () => {
       delayDuration={150}
       className="font-fake-four-cutout absolute inset-x-0 top-21 z-50 max-w-none justify-center px-38 text-2xl"
     >
-      <NavigationMenuList className="flex-wrap justify-center gap-x-5 gap-y-4">
+      <NavigationMenuList className="flex-wrap justify-center gap-x-4 gap-y-4">
         {entries.map((entry, index) => (
           <Fragment key={entry.kind === 'link' ? entry.item.name : entry.group.label}>
             {entry.kind === 'link' ? (
