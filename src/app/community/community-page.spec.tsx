@@ -18,7 +18,12 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/community/community-session', () => ({ communityViewer: vi.fn() }));
 vi.mock('@/lib/services/submission-service', () => ({
-  SubmissionService: { listCards: vi.fn(), ownerNamed: vi.fn() },
+  SubmissionService: {
+    listCards: vi.fn(),
+    ownerNamed: vi.fn(),
+    // Nothing is trending unless a test says so.
+    listTrendingCards: vi.fn(async () => []),
+  },
 }));
 
 const setQueryData = vi.hoisted(() => vi.fn());
@@ -204,6 +209,84 @@ describe('CommunityPage', () => {
           { pages: [{ rows, nextSkip: COMMUNITY_PAGE_SIZE }], pageParams: [0] },
         ],
       ]);
+    });
+
+    describe('Trending', () => {
+      const rowHeadings = (): Array<string | null> =>
+        screen.getAllByTestId('row').map((row) => row.getAttribute('data-heading'));
+
+      it('sits under Most Recent and above the “view all” link', async () => {
+        signedOut();
+        listed(cards(3));
+        vi.mocked(SubmissionService.listTrendingCards).mockResolvedValueOnce([card(2)]);
+
+        await open();
+
+        const [, trending] = screen.getAllByTestId('row');
+        const link = screen.getByRole('link', { name: 'View all user submitted content' });
+        expect(rowHeadings()).toEqual(['Most Recent', 'Trending']);
+        expect(
+          (trending?.compareDocumentPosition(link) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).not.toBe(0);
+      });
+
+      it('holds the cards the service chose, in its order', async () => {
+        signedOut();
+        listed(cards(3));
+        vi.mocked(SubmissionService.listTrendingCards).mockResolvedValueOnce([card(3), card(1)]);
+
+        await open();
+
+        expect(screen.getAllByTestId('row')[1]).toHaveAttribute(
+          'data-cards',
+          `${card(3).id},${card(1).id}`
+        );
+      });
+
+      it('is not rendered when no submission has the views for it', async () => {
+        signedOut();
+        listed(cards(3));
+
+        await open();
+
+        expect(rowHeadings()).toEqual(['Most Recent']);
+      });
+
+      it('is left out, and the page still renders, when its read fails', async () => {
+        signedOut();
+        listed(cards(3));
+        vi.mocked(SubmissionService.listTrendingCards).mockRejectedValueOnce(
+          new Error('mongo: boom')
+        );
+
+        await open();
+
+        expect(rowHeadings()).toEqual(['Most Recent']);
+        expect(screen.getByTestId('list')).toBeInTheDocument();
+      });
+
+      it('still shows, with the “view all” link, when the newest could not be read', async () => {
+        signedOut();
+        vi.mocked(SubmissionService.listCards).mockRejectedValueOnce(new Error('mongo: boom'));
+        vi.mocked(SubmissionService.listTrendingCards).mockResolvedValueOnce([card(1)]);
+
+        await open();
+
+        expect(rowHeadings()).toEqual(['Trending']);
+        expect(
+          screen.getByRole('link', { name: 'View all user submitted content' })
+        ).toBeInTheDocument();
+      });
+
+      it('is not read for one user’s list, which shows no rows', async () => {
+        ownerIs('ada');
+        signedOut();
+        listed(cards(3));
+
+        await open({ user: 'ada' });
+
+        expect(vi.mocked(SubmissionService.listTrendingCards).mock.calls).toEqual([]);
+      });
     });
 
     it('shows no row, no link and no list heading when nothing is listed', async () => {
