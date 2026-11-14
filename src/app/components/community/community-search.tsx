@@ -21,6 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { useSubmissionSearchQuery } from '@/hooks/queries/use-submission-search-query';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { submissionPath } from '@/lib/community/community-paths';
 import { NAMELESS_OWNER } from '@/lib/constants/submissions';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ export interface CommunitySearchProps {
  */
 export const CommunitySearch = ({ className }: CommunitySearchProps) => {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [open, setOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, DEBOUNCE_MS).trim();
@@ -69,6 +71,9 @@ export const CommunitySearch = ({ className }: CommunitySearchProps) => {
         <SearchComboboxTrigger
           aria-expanded={open}
           aria-label={SEARCH_LABEL}
+          // "false" in the server markup, "true" once the click handler is
+          // attached: an E2E click must wait for it or the click is lost.
+          data-hydrated={hydrated}
           label={hasQuery ? searchInput : SEARCH_PLACEHOLDER}
           className={className}
         />

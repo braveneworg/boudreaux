@@ -55,6 +55,17 @@ describe('CommunitySearch', () => {
     expect(vi.mocked(useSubmissionSearchQuery).mock.calls.at(-1)).toEqual(['', { enabled: false }]);
   });
 
+  it('says when it has hydrated, so a click before then is not lost unseen', () => {
+    searchReturns(undefined);
+
+    render(<CommunitySearch />);
+
+    expect(screen.getByRole('button', { name: 'Search submissions' })).toHaveAttribute(
+      'data-hydrated',
+      'true'
+    );
+  });
+
   it('shows each match with its owner’s avatar, its title and the username', async () => {
     searchReturns([card()]);
 

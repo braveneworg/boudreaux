@@ -13,6 +13,7 @@ import {
   CarouselPrevious,
 } from '@/app/components/ui/carousel';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
+import { useHydrated } from '@/hooks/use-hydrated';
 import type { SubmissionCard } from '@/lib/types/domain/submission';
 
 import { CommunityCard } from './community-card';
@@ -47,6 +48,7 @@ export interface SubmissionRowProps {
  */
 export const SubmissionRow = ({ heading, cards }: SubmissionRowProps) => {
   const headingId = useId();
+  const hydrated = useHydrated();
 
   if (cards.length === 0) {
     return null;
@@ -55,6 +57,9 @@ export const SubmissionRow = ({ heading, cards }: SubmissionRowProps) => {
   return (
     <Carousel
       aria-labelledby={headingId}
+      // "false" in the server markup, "true" once its buttons have their
+      // handlers: an E2E press must wait for it or the press is lost.
+      data-hydrated={hydrated}
       opts={{ loop: cards.length > CARDS_ACROSS, align: 'start', breakpoints: REDUCED_MOTION }}
     >
       <div className="flex items-end justify-between gap-3">

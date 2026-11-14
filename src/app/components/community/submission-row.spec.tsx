@@ -65,6 +65,15 @@ describe('SubmissionRow', () => {
     expect(screen.getByRole('region', { name: 'Most Recent' })).toBeInTheDocument();
   });
 
+  it('says when it has hydrated, so a press before then is not lost unseen', () => {
+    render(<SubmissionRow heading="Most Recent" cards={cards(5)} />);
+
+    expect(screen.getByRole('region', { name: 'Most Recent' })).toHaveAttribute(
+      'data-hydrated',
+      'true'
+    );
+  });
+
   it('renders nothing when it has no cards', () => {
     const { container } = render(<SubmissionRow heading="Most Recent" cards={[]} />);
 
