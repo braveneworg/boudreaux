@@ -1272,6 +1272,7 @@ model Submission {
   updatedAt       DateTime           @updatedAt
   attachments     SubmissionAttachment[]
   reports         SubmissionReport[]
+  viewEvents      SubmissionViewEvent[]
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
@@ -1309,6 +1310,21 @@ enum SubmissionAttachmentKind {
   IMAGE
   AUDIO
   VIDEO
+}
+
+// One counted view of a submission (ADR-0029): a viewer opened its page, at
+// most once per viewer per UTC day. `viewKey` is a SHA-256 of the submission,
+// the viewer and the day, and its unique index is that rule. Nothing here
+// names the viewer, by decision. A row is deleted once it is thirty days old.
+model SubmissionViewEvent {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId String     @db.ObjectId
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  viewKey      String     @unique
+  viewedAt     DateTime   @default(now())
+
+  @@index([submissionId])
+  @@index([viewedAt])
 }
 
 // One file a user uploaded to a submission (ADR-0026, ADR-0027). Each row is
