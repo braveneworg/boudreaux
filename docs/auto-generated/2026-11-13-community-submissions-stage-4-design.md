@@ -2,7 +2,7 @@
 
 - **Date**: 2026-11-13
 - **Branch**: `feat/community-page` (off main `39625ef1`, v4.485.0)
-- **Status**: Design; not built yet
+- **Status**: Implemented on the branch; see "As built" at the end
 - **Vocabulary**: `CONTEXT.md` (listed submission, community page, submission
   row, public submission, card picture, about)
 - **Decisions**:
@@ -425,3 +425,178 @@ has to be real.
 - The schema change is additive and optional, so the deploy's `schema-push`
   job applies it (ADR-0012) and a one-step rollback stays safe (ADR-0021).
 - Rate limits are skipped under `E2E_MODE`, so no E2E case proves them.
+
+## As built (2026-11-13)
+
+Stage 4 is implemented on `feat/community-page`. Where the build differs
+from the design above, the build is what the code does and this section says
+why. Acceptance criterion 24 was wrong as written and is corrected below;
+the others were not changed.
+
+### Decisions made while building, not yet confirmed by the owner
+
+- **The gate was removed, not left as a switch** (section 1). Left in place
+  as a function that always answers yes, each caller's refusal branch could
+  only be reached by mocking it, and the specs for those branches would have
+  tested the mock. `community-access.ts` and every check on it are gone.
+  Closing the community again is a revert of the commit "open the community
+  to all"; there is no switch short of a deploy.
+- **Two daily allowances per account**, added after the security review
+  (below). Approvers are emailed and texted about at most **5** of one
+  owner's submissions entering the queue in 24 hours; past that a publish
+  still succeeds and the submission is in the queue. One account may upload
+  at most **100** files in 24 hours. Both numbers are mine.
+- **The anonymous report action counts attempts by address**: 10 a minute,
+  before anything is verified. Also mine.
+- **The menu entry's colour** is `menu-item-pink-200`, not the green of
+  section 9: green would have sat beside My Collection's green.
+- **The search offers no rows while a term is being typed or fetched**
+  (section 6 said only that it reads "Searching…"). Rows appear once they
+  answer what is typed.
+- **A card's submission link is not prefetched.** Every prefetch of a
+  submission's page is a database read in the proxy, and a page shows a
+  dozen cards at a time.
+- The seven "decisions made while drafting" above stand as built, except
+  the access module, covered by the first point here.
+
+### Differences from the design
+
+- **Section 2, the plain-text about.** As designed. One consequence the
+  design understated: an _approved_ submission saved before this stage gets
+  its `aboutText` only from a content edit, which sends it back for
+  approval. A save that changes nothing writes nothing.
+- **Section 3, the search term.** `matching` escapes the term. On MongoDB a
+  case-insensitive `contains` is run as a regular expression and Prisma does
+  not escape it: unescaped, `.*` matched every row and `(` failed the query
+  (`docs/lessons/prisma-mongo/insensitive-contains-is-a-regex.md`). The
+  escape is `containsText` in the where kit. **The site's other searches
+  still pass their term through unescaped**; see "Found outside this
+  stage".
+- **Section 3, the two owner filters.** `listed` and `matching` both filter
+  the `owner` relation and work together on MongoDB as written; the
+  fallback to a lookup of owner ids was not needed.
+- **Section 5, an empty page.** With nothing listed, the row, the "view all"
+  link and the "All submissions" heading are all left out, so the empty
+  message does not sit under a heading.
+- **Section 5, the per-user heading.** The username is set in the body
+  face inside the heading. The cutout face has no digits and prints
+  capitals only; a username is neither.
+- **Section 5, a `?user=` value longer than a username can be** names no
+  account and is not found, without a lookup.
+- **Section 7, the row's readiness.** The row says when its carousel has
+  started (`data-ready`), which is later than hydration: a press before
+  then does nothing.
+- **Section 7, the row's width.** The row is 8px wider than its cards on
+  each side and each card is inset by as much, so the clipped track leaves
+  room for a card's shadow, hover growth and focus ring at both ends.
+- **Section 7, the avatar.** Decorative avatars are hidden from assistive
+  technology whole. With only an empty alt, the fallback "?" was read out
+  until the image loaded.
+- **Section 8, a failed later page.** The list stops loading on scroll,
+  says "Unable to load more submissions." and offers "Try again". Left as
+  designed it asked for the failed page again for as long as the end of the
+  list stayed in view.
+- **Section 10 and the actions.** Every write that can change whether a
+  submission is listed also revalidates `/community`.
+- **Section 11, a failed lookup in the proxy** goes on to the page, so the
+  proxy cannot take a public page down. A spec reads
+  `src/app/community/` and fails if a static one-segment page there is not
+  let through for a signed-out visitor.
+- **Criterion 24, corrected.** It said a listed submission's page sends no
+  `noindex`. The page sets none of its own, but the root layout sets
+  `noindex, nofollow` for the whole site, and a page that sets no `robots`
+  inherits it. Every page on the site is served `noindex` today, a listed
+  submission's included
+  (`docs/lessons/react-nextjs/a-page-inherits-the-root-layouts-robots.md`).
+  Stage 1's "a listed public one may be indexed" was never true of the
+  rendered page.
+
+### How it was checked
+
+- **Unit**: the four-command gate passes on the finished tree; the test
+  count and coverage are in the pull request, which reports what ran there.
+  The coverage check passes above the 95% branch floor.
+- **Real database**: the contract suite on Docker Mongo, with two new or
+  extended files. The fragments: `listed`, `matching`, the two together
+  with a banned owner whose username matches, an absent and a null
+  `aboutText`, and four terms made of pattern syntax. The repository read:
+  its order, its tie-break by id, paging without a repeat or a gap, the
+  owner filter with a search term, and `isPublic` for each state.
+- **End to end**, in `community-submissions.spec.ts`, on the dev server and
+  on a local production build, with no retries:
+  - the approval loop with a plain user as owner; a signed-out visitor is
+    answered `404` before approval, `200` after it, and `404` again after
+    an edit, each read from the response;
+  - a signed-out visitor files a report; the stored row holds nothing about
+    who filed it;
+  - the community page for a signed-out visitor: the menu entry, Most
+    Recent, the full list arriving with the page (no request to the listing
+    route), the row moving with its buttons and an arrow key and wrapping
+    at its start, "view all", the search finding a listed submission by a
+    word of its about and offering neither a listed one without the word
+    nor an unlisted one with it, the per-user list, an unknown username,
+    and the form sending a signed-out visitor to sign in.
+- **By eye**: the page at 1440, 768 and 375 pixels wide, the search open,
+  the per-user list, and the row's first and last visible cards hovered and
+  focused.
+- **Security review**: an independent read of the branch with the gate
+  open. It found no way for an unapproved, rejected, unlisted or
+  banned-owner submission, or an owner's email, to reach anyone but its
+  owner and approvers. It found what the removed gate had been holding
+  back: nothing limited how often one account could notify every approver
+  or run a re-encode, and the report action had no limit ahead of its
+  verification call. The two allowances and the attempt limit above are the
+  answer. It also asked whether the search term was escaped, which is how
+  the regular-expression defect was found.
+- **Code review**: an independent read for defects. Fixed from it: the
+  search could open the newest submission when Enter was pressed before a
+  typed term's results arrived; the failed-page loop; the clipped card at
+  the row's right edge; the avatar's fallback; the unbounded `?user=`; a
+  `500` from the listing route without `no-store`; and an E2E step that
+  could pass with the about search broken.
+
+### Known gaps
+
+- **Whether the site should be indexed at all is undecided.** See criterion 24. Nothing here changes the root layout.
+- **A signed-in reader's refusal is still a `200`** with the not-found page
+  (section 11), by design.
+- **An unlisted submission is protected by its id being hard to guess, and
+  the proxy answers `200` or `404` for an id without a rate limit.** Ids
+  are MongoDB ObjectIds: a timestamp, a per-process value and a counter,
+  and every listed card publishes one. The security review rated guessing
+  an unlisted approved submission's id low to medium and did not measure
+  it. nginx sets no request limit on page paths.
+- **The limits on an anonymous reporter can be stepped around** by changing
+  the browser's user agent, which is part of the visitor fingerprint. What
+  still binds: one verification per report, 50 open reports per submission,
+  3 notices per submission per day, and now 10 attempts a minute per
+  address. ADR-0028 chose not to trace reporters.
+- **A card carries a hash of its owner's email** (the avatar's address).
+  Anyone can test a guessed address against a username. That is how
+  Gravatar works and was already true of a submission's page; the listing
+  makes it possible in bulk.
+- **The page's own reads are not rate limited**, as no page on this site
+  is. The listing route is.
+- **An attachment can land on a submission in the instant it is approved**
+  and stay there without sending it back for approval. The window is one
+  storage check wide and was in stage 2; its file is never published.
+- **Rate limits and allowances are not exercised end to end.** They are
+  skipped under `E2E_MODE`.
+- **No E2E covers a second page of the list**: twelve cards are the first
+  page, and the run seeds fewer. Paging is proved by the contract spec and
+  the list's component spec.
+- **The gaps of stages 1 to 3 that launch does not change** still stand: a
+  deleted account's files, the copy a late re-encode can leave behind, and
+  timing a ten-minute video on AWS.
+
+### Found outside this stage
+
+- **Every other search on the site runs its term as a regular
+  expression**: releases, videos, artists, tours, venues, producers,
+  playlists and the username lookups (`grep -rn "mode: 'insensitive'"
+src/lib`). Typing `(` into one is a failed query. Not fixed here; each
+  needs `containsText` and a contract case.
+- **A hydration mismatch on `/collection`** appears now and then in the dev
+  server's log during the collection spec: a purchase's title differs
+  between the server render and the client. The spec passes. Not
+  investigated.

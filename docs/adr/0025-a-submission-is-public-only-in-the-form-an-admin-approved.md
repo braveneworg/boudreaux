@@ -59,7 +59,9 @@ approver saw.**
   an approver takes to look. This is deliberate; revisit with pending
   revisions if it proves common.
 - Approver response time is now part of the product. Each publish and each
-  report notifies every approver. An owner is shown a queue position and a
+  report notifies every approver, up to five publishes per owner and three
+  reports per submission in a day; past that the queue still shows them and
+  only the email and the text stop. An owner is shown a queue position and a
   usual reply time of two to five business days, and approvers are reminded
   daily of anything that has waited longer.
 - The access check gains a third level, between signed-in and admin, in the

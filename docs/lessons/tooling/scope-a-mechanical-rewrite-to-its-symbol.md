@@ -23,3 +23,18 @@ Rules:
   missed. Both, before the first test run.
 - Under a dozen sites, the Edit tool per site (or `replace_all` on one
   exact string) is faster than a regex and cannot over-match.
+
+## The same holds for an edit placed by line number
+
+On 2026-11-13 a new field, `aboutText`, had to be added to nine spec
+builders of a submission record. A script inserted it after each line a
+`grep -n aboutHtml` had listed. Two of the eleven lines were not record
+builders: one was a form payload and one a view object, which have an
+`aboutHtml` and must not have an `aboutText`. Typecheck caught one and two
+failing action specs the other.
+
+- A `grep -n` hit names a line, not the object the line is in. Before a
+  scripted insert, read what each hit belongs to (the enclosing `const` or
+  call), or anchor the insert on the builder's own name.
+- Run `tsc` and the touched specs straight after such a script, before any
+  other edit, so its mistakes are not mixed with the next change's.
