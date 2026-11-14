@@ -37,6 +37,20 @@ describe('next.config headers', () => {
       ])
     );
   });
+
+  // `interest-cohort` was the FLoC opt-out. FLoC was retired in 2022 and
+  // Chrome no longer knows the token, so every page load logged
+  // "Error with Permissions-Policy header: Unrecognized feature". The Topics
+  // API replaced FLoC and is opted out of with `browsing-topics`.
+  it('opts out of the Topics API with a feature name browsers still recognize', async () => {
+    const catchAll = (await headerRules()).find(({ source }) => source === '/(.*)');
+    const permissionsPolicy = catchAll?.headers.find(
+      ({ key }) => key === 'Permissions-Policy'
+    )?.value;
+
+    expect(permissionsPolicy).toContain('browsing-topics=()');
+    expect(permissionsPolicy).not.toContain('interest-cohort');
+  });
 });
 
 describe('next.config CSS delivery', () => {

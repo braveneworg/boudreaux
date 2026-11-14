@@ -261,6 +261,18 @@ describe('nginx.conf Stripe webhook client IP', () => {
   });
 });
 
+describe('nginx.conf security headers', () => {
+  // Mirrors the next.config.ts check: `interest-cohort` (FLoC) is a retired
+  // token Chrome reports as an unrecognized feature; `browsing-topics` is the
+  // Topics API opt-out that replaced it.
+  it('opts out of the Topics API with a feature name browsers still recognize', () => {
+    const permissionsPolicy = /add_header Permissions-Policy "([^"]*)"/.exec(CONFIG)?.[1];
+
+    expect(permissionsPolicy).toContain('browsing-topics=()');
+    expect(permissionsPolicy).not.toContain('interest-cohort');
+  });
+});
+
 describe('nginx.conf location resolver (parser sanity)', () => {
   it('sees the exact-match Stripe webhook location', () => {
     const location = resolveLocation(appLocations, '/api/stripe/webhook');
