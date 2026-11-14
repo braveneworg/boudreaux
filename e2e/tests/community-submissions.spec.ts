@@ -50,6 +50,7 @@ const REPORT_CONTACT = `wronged-${STAMP}@example.invalid`;
 // A fixed day in the past: a row this spec seeds never sorts ahead of one a
 // page lists by date, however long the run has been going.
 const APPROVED_LONG_AGO = new Date('2001-01-01T00:00:00.000Z');
+const APPROVED_A_DAY_LATER = new Date('2001-01-02T00:00:00.000Z');
 
 /** The smallest valid PNG: one transparent pixel. */
 const ONE_PIXEL_PNG = Buffer.from(
@@ -542,7 +543,9 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     approvedAt: APPROVED_LONG_AGO,
   } as const;
   const listed = await prisma.submission.create({
-    data: { ...approved, title: LISTED_TITLE, listed: true },
+    // A day newer than the fillers, so it leads them in Most Recent however
+    // many of them a run holds.
+    data: { ...approved, title: LISTED_TITLE, listed: true, firstApprovedAt: APPROVED_A_DAY_LATER },
     select: { id: true },
   });
   await prisma.submission.create({ data: { ...approved, title: UNLISTED_TITLE, listed: false } });
