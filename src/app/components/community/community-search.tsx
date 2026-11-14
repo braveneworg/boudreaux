@@ -35,6 +35,15 @@ const DEBOUNCE_MS = 300;
 /** The avatar's edge in pixels, asked of Gravatar at twice its drawn size. */
 const AVATAR_PIXELS = 64;
 
+/** What the dropdown says when it has no rows to offer. */
+const emptyMessage = (isSettled: boolean, isError: boolean): string => {
+  if (!isSettled) {
+    return 'Searching…';
+  }
+
+  return isError ? 'Search is unavailable. Try again in a moment.' : 'No results yet.';
+};
+
 export interface CommunitySearchProps {
   className?: string;
 }
@@ -47,7 +56,9 @@ export interface CommunitySearchProps {
  * title and the username; choosing one opens that submission's page.
  *
  * It is a jump to one submission and does not filter the page beneath it.
- * Nothing is fetched until it is first opened. The server provides the
+ * While a term is being typed or fetched it offers no rows and says it is
+ * searching, so a choice is always a match for what is typed. Nothing is
+ * fetched until it is first opened. The server provides the
  * matches, so cmdk's own filtering is off.
  */
 export const CommunitySearch = ({ className }: CommunitySearchProps) => {
@@ -56,9 +67,13 @@ export const CommunitySearch = ({ className }: CommunitySearchProps) => {
   const [open, setOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, DEBOUNCE_MS).trim();
-  const { data, isFetching } = useSubmissionSearchQuery(search, { enabled: open });
-  const matches = data ?? [];
+  const { data, isFetching, isError } = useSubmissionSearchQuery(search, { enabled: open });
   const hasQuery = searchInput.trim().length > 0;
+  // Rows are offered only when they answer what is typed now. During the
+  // pause before a term is searched, and while it is in flight, there is
+  // nothing to choose: Enter must never open another term's first match.
+  const isSettled = searchInput.trim() === search && !isFetching;
+  const matches = isSettled ? (data ?? []) : [];
 
   const handleSelect = (id: string): void => {
     setOpen(false);
@@ -88,7 +103,7 @@ export const CommunitySearch = ({ className }: CommunitySearchProps) => {
             aria-label={SEARCH_LABEL}
           />
           <CommandList>
-            <CommandEmpty>{isFetching ? 'Searching…' : 'No results yet.'}</CommandEmpty>
+            <CommandEmpty>{emptyMessage(isSettled, isError)}</CommandEmpty>
             <CommandGroup>
               {matches.map(({ id, title, owner }) => (
                 <CommandItem

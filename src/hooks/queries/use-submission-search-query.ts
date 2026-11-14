@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import type { QueryOptionsOverride } from '@/hooks/query-options';
 import { COMMUNITY_SEARCH_RESULTS } from '@/lib/constants/submissions';
@@ -40,8 +40,9 @@ const fetchSubmissionMatches = async (
  * submissions whose title, about or owner's username holds the term.
  *
  * The term is trimmed and is part of the query key, so each term is cached.
- * `keepPreviousData` keeps the last results on screen while the next term
- * loads. Pass a debounced term.
+ * It keeps no earlier term's results while the next one loads: the search
+ * opens whatever is chosen, and a stale row would open the wrong page. Pass a
+ * debounced term.
  *
  * @param search - The debounced search term (empty suggests the newest).
  * @param options - Caller overrides spread into the `useQuery` call (e.g.
@@ -57,7 +58,6 @@ export const useSubmissionSearchQuery = (
   return useQuery({
     queryKey: queryKeys.submissions.search(term),
     queryFn: ({ signal }) => fetchSubmissionMatches(term, signal),
-    placeholderData: keepPreviousData,
     ...options,
   });
 };

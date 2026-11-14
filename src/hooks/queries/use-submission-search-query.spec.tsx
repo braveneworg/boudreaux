@@ -12,10 +12,8 @@ import type { SubmissionCard } from '@/lib/types/domain/submission';
 import { useSubmissionSearchQuery } from './use-submission-search-query';
 
 const useQueryMock = vi.hoisted(() => vi.fn());
-const KEEP_PREVIOUS = vi.hoisted(() => Symbol('keepPreviousData'));
 
 vi.mock('@tanstack/react-query', () => ({
-  keepPreviousData: KEEP_PREVIOUS,
   useQuery: (options: unknown) => useQueryMock(options),
 }));
 
@@ -88,8 +86,9 @@ describe('useSubmissionSearchQuery', () => {
     );
   });
 
-  it('keeps the last results on screen while the next term loads', () => {
-    expect(getOptions('bus').placeholderData).toBe(KEEP_PREVIOUS);
+  it('shows no other term’s results while the next term loads', () => {
+    // The search opens what is chosen; a stale row would open the wrong page.
+    expect(getOptions('bus').placeholderData).toBeUndefined();
   });
 
   it('throws when the route fails', async () => {

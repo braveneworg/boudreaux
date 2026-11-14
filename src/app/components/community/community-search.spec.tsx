@@ -15,8 +15,10 @@ vi.mock('@/hooks/queries/use-submission-search-query', () => ({
   useSubmissionSearchQuery: vi.fn(),
 }));
 
-// The debounce is the hook's own business; here the term arrives at once.
-vi.mock('@/hooks/use-debounce', () => ({ useDebounce: (value: string) => value }));
+// The debounce is the hook's own business. Here the term arrives at once,
+// unless a test holds it back to stand in the pause.
+const debounced = vi.hoisted(() => vi.fn((value: string): string => value));
+vi.mock('@/hooks/use-debounce', () => ({ useDebounce: (value: string) => debounced(value) }));
 
 vi.mock('@/app/components/gravatar-avatar', () => ({
   GravatarAvatar: ({ hash }: { hash: string }) => <span data-testid="avatar" data-hash={hash} />,
@@ -35,8 +37,15 @@ const card = (overrides: Partial<SubmissionCard> = {}): SubmissionCard => ({
 
 type QueryResult = ReturnType<typeof useSubmissionSearchQuery>;
 
-const searchReturns = (data: SubmissionCard[] | undefined, isFetching = false): void => {
-  vi.mocked(useSubmissionSearchQuery).mockReturnValue({ data, isFetching } as QueryResult);
+const searchReturns = (
+  data: SubmissionCard[] | undefined,
+  { isFetching = false, isError = false }: { isFetching?: boolean; isError?: boolean } = {}
+): void => {
+  vi.mocked(useSubmissionSearchQuery).mockReturnValue({
+    data,
+    isFetching,
+    isError,
+  } as QueryResult);
 };
 
 const open = async (): Promise<ReturnType<typeof userEvent.setup>> => {
@@ -45,6 +54,10 @@ const open = async (): Promise<ReturnType<typeof userEvent.setup>> => {
   await user.click(screen.getByRole('button', { name: 'Search submissions' }));
   return user;
 };
+
+beforeEach(() => {
+  debounced.mockImplementation((value: string) => value);
+});
 
 describe('CommunitySearch', () => {
   it('does not ask for anything until it is opened', () => {
@@ -126,10 +139,40 @@ describe('CommunitySearch', () => {
   });
 
   it('says it is searching while a term is in flight', async () => {
-    searchReturns([], true);
+    searchReturns([], { isFetching: true });
 
     await open();
 
     expect(screen.getByText('Searching…')).toBeInTheDocument();
+  });
+
+  it('offers nothing to choose while a term is in flight: the rows would be the last term’s', async () => {
+    searchReturns([card()], { isFetching: true });
+
+    await open();
+
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+  });
+
+  it('offers nothing to choose until typing has paused and its term is searched', async () => {
+    // The pause: the typed term has not reached the query yet.
+    debounced.mockImplementation(() => '');
+    searchReturns([card()]);
+
+    const user = await open();
+    await user.type(screen.getByPlaceholderText('Search by title, about or username'), 'tape');
+
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+  });
+
+  it('says the search failed, not that nothing matched, when it could not be run', async () => {
+    searchReturns(undefined, { isError: true });
+
+    await open();
+
+    expect(screen.getByText('Search is unavailable. Try again in a moment.')).toBeInTheDocument();
+    expect(screen.queryByText('No results yet.')).not.toBeInTheDocument();
   });
 });
