@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 
 import { gateAction } from '@/lib/auth/action-gate';
+import { COMMUNITY_PATH } from '@/lib/community/community-paths';
 import { ATTACHMENT_UPLOAD_LIMIT, attachmentUploadLimiter } from '@/lib/config/rate-limit-tiers';
 import type { SubmissionStatus } from '@/lib/constants/submissions';
 import { SubmissionAttachmentService } from '@/lib/services/submission-attachment-service';
@@ -24,7 +25,6 @@ import {
 } from '@/lib/validation/submission-attachment-schema';
 
 import {
-  communityClosedRefusal,
   COMMUNITY_MINE_PATH,
   COMMUNITY_QUEUE_PATH,
   failureFromError,
@@ -34,10 +34,8 @@ import {
 
 /**
  * Server Actions for a submission's attachments (ADR-0026, ADR-0027). Each
- * one crosses the action gate as `'signed-in'` in its own body and, until the
- * community page launches, is refused to anyone who is not an approver. They
- * validate the wire shape and map a failure; every rule is the attachment
- * service's.
+ * one crosses the action gate as `'signed-in'` in its own body, validates
+ * the wire shape and maps a failure; every rule is the attachment service's.
  *
  * An upload is three steps: ask for somewhere to put the file, `PUT` it there
  * from the browser, then confirm it. No file ever passes through the app.
@@ -48,11 +46,16 @@ const CONFIRM_FAILED = 'We could not add that file. Please try again.';
 const REMOVE_FAILED = 'We could not remove that attachment. Please try again.';
 const RATE_LIMITED_MESSAGE = 'That is a lot of uploads at once. Wait a minute and try again.';
 
-/** Every page a change to one submission's attachments may have changed. */
+/**
+ * Every page a change to one submission's attachments may have changed. The
+ * community page is among them: an attachment added to or removed from an
+ * approved submission takes it offline.
+ */
 const revalidateSubmission = (id: string): void => {
   revalidatePath(COMMUNITY_MINE_PATH);
   revalidatePath(submissionPath(id));
   revalidatePath(COMMUNITY_QUEUE_PATH);
+  revalidatePath(COMMUNITY_PATH);
 };
 
 /**
@@ -67,8 +70,6 @@ export const requestAttachmentUploadAction = async (
   if (!gate.success) return gate;
 
   const { user } = gate.session;
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
 
   const parsed = requestAttachmentUploadSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
@@ -103,8 +104,6 @@ export const confirmAttachmentUploadAction = async (
   if (!gate.success) return gate;
 
   const { user } = gate.session;
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
 
   const parsed = confirmAttachmentUploadSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
@@ -135,8 +134,6 @@ export const removeAttachmentAction = async (
   if (!gate.success) return gate;
 
   const { user } = gate.session;
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
 
   const parsed = removeAttachmentSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);

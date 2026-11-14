@@ -35,20 +35,17 @@ describe('requireCommunityUser', () => {
     );
   });
 
-  it.each(['admin', 'manager'])('returns a signed-in %s', async (role) => {
-    signedInAs(role);
+  it.each(['admin', 'manager', 'user', null])(
+    'returns a signed-in user whatever their role (%s)',
+    async (role) => {
+      signedInAs(role);
 
-    await expect(requireCommunityUser('/community/mine')).resolves.toMatchObject({
-      id: USER_ID,
-      role,
-    });
-  });
-
-  it('answers not found for a signed-in user the feature is not open to yet', async () => {
-    signedInAs('user');
-
-    await expect(requireCommunityUser('/community/mine')).rejects.toThrow('NOT_FOUND');
-  });
+      await expect(requireCommunityUser('/community/mine')).resolves.toMatchObject({
+        id: USER_ID,
+        role,
+      });
+    }
+  );
 
   it('answers not found for a banned account, whatever its role', async () => {
     signedInAs('admin', true);
@@ -58,26 +55,23 @@ describe('requireCommunityUser', () => {
 });
 
 describe('communityViewer', () => {
-  it.each(['admin', 'manager'])('names a signed-in %s as the viewer', async (role) => {
-    signedInAs(role);
+  it.each(['admin', 'manager', 'user', null])(
+    'names a signed-in user as the viewer, whatever their role (%s)',
+    async (role) => {
+      signedInAs(role);
 
-    await expect(communityViewer()).resolves.toEqual({ id: USER_ID, role });
-  });
+      await expect(communityViewer()).resolves.toEqual({ id: USER_ID, role });
+    }
+  );
 
-  it('answers not found for a signed-out visitor, before launch', async () => {
+  it('is nobody for a signed-out visitor: a reader like any other', async () => {
     signedOut();
 
-    await expect(communityViewer()).rejects.toThrow('NOT_FOUND');
+    await expect(communityViewer()).resolves.toBeNull();
   });
 
-  it('answers not found for a signed-in user the feature is not open to yet', async () => {
-    signedInAs('user');
-
-    await expect(communityViewer()).rejects.toThrow('NOT_FOUND');
-  });
-
-  it('answers not found for a banned approver', async () => {
-    signedInAs('manager', true);
+  it.each(['manager', 'user'])('answers not found for a banned %s', async (role) => {
+    signedInAs(role, true);
 
     await expect(communityViewer()).rejects.toThrow('NOT_FOUND');
   });

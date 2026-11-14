@@ -16,11 +16,11 @@ import type { Browser, Page } from '@playwright/test';
  * writing, a second approver approves it, and an edit takes it back out for
  * approval.
  *
- * Until the community page launches, only approvers may use the feature, so
- * both the owner and the approver here are managers. They are stamped users
- * of this run: a manager's role is state other specs must not see on a seeded
- * user. A manager cannot approve their own submission, which is why there are
- * two.
+ * The community is open to everyone: the owners here are plain signed-in
+ * users, the approver is a manager, and the reader of an approved submission
+ * is a signed-out visitor. Every user is a stamped user of this run: a role,
+ * an upload agreement and a submission are state other specs must not see on
+ * a seeded user.
  */
 
 const E2E_DATABASE_URL =
@@ -34,6 +34,11 @@ const EDITED_TITLE = `${TITLE} fixed`;
 const POEM = `Written on the bus, run ${STAMP}.`;
 
 const PHOTO_TITLE = `E2E show photo ${STAMP}`;
+
+const LISTED_TITLE = `E2E listed zine ${STAMP}`;
+const UNLISTED_TITLE = `E2E unlisted zine ${STAMP}`;
+// A word only this run's about holds, so the search finds this run's rows alone.
+const ABOUT_WORD = `basement${STAMP}`;
 
 const REPORTED_TITLE = `E2E reported poem ${STAMP}`;
 const REPORT_NOTE = `That is my poem, not theirs. Run ${STAMP}.`;
@@ -57,6 +62,9 @@ let approver: StampedUser | undefined;
 // The photo's owner is a third user, so they always still owe the upload
 // agreement whichever order the tests run in.
 let photographer: StampedUser | undefined;
+// A second manager, who owns the reported submission: a manager is kept from
+// the reports against their own.
+let managerOwner: StampedUser | undefined;
 
 const openPageAs = async (browser: Browser, user: StampedUser | undefined): Promise<Page> => {
   if (!user) {
@@ -79,8 +87,13 @@ test.beforeAll(async () => {
     handle: `e2ephoto${STAMP}`,
     name: 'E2E Photographer',
   });
+  managerOwner = await createStampedUser(prisma, {
+    handle: `e2emgr${STAMP}`,
+    name: 'E2E Manager Owner',
+  });
+  // The owner and the photographer stay plain users: anyone signed in may submit.
   await prisma.user.updateMany({
-    where: { id: { in: [owner.id, approver.id, photographer.id] } },
+    where: { id: { in: [approver.id, managerOwner.id] } },
     data: { role: 'manager' },
   });
 });
@@ -88,7 +101,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   // By the ids this worker created, never by a prefix another worker shares.
   // Deleting a submission through Prisma takes its attachments with it.
-  const ids = [owner?.id, approver?.id, photographer?.id].filter(
+  const ids = [owner?.id, approver?.id, photographer?.id, managerOwner?.id].filter(
     (id): id is string => id !== undefined
   );
   if (ids.length > 0) {
@@ -101,6 +114,7 @@ test.afterAll(async () => {
 
 test('a writing is published, approved by another approver, and goes back out when edited', async ({
   browser,
+  page,
   userPage,
   adminPage,
 }) => {
@@ -135,9 +149,15 @@ test('a writing is published, approved by another approver, and goes back out wh
     submissionPath = href ?? '';
   });
 
-  await test.step('nobody the feature is not open to can open its link', async () => {
-    await userPage.goto(submissionPath);
+  await test.step('nobody but its owner and approvers can open it before approval', async () => {
+    // A signed-out visitor is answered a real 404, by the proxy.
+    const refused = await page.goto(submissionPath);
+    expect(refused?.status()).toBe(404);
+    await expect(page.getByRole('img', { name: 'page not found' })).toBeVisible();
+    await expect(page.getByText(TITLE)).toHaveCount(0);
 
+    // Another signed-in user gets the same page.
+    await userPage.goto(submissionPath);
     await expect(userPage.getByRole('img', { name: 'page not found' })).toBeVisible();
     await expect(userPage.getByText(TITLE)).toHaveCount(0);
   });
@@ -178,13 +198,23 @@ test('a writing is published, approved by another approver, and goes back out wh
     await expect(approverPage.getByRole('link', { name: TITLE, exact: true })).toHaveCount(0);
   });
 
-  await test.step('once approved it opens, unlisted, with sharing', async () => {
+  await test.step('once approved it opens for a signed-out visitor, with sharing', async () => {
+    const opened = await page.goto(submissionPath);
+    expect(opened?.status()).toBe(200);
+
+    await expect(page.getByRole('heading', { level: 1, name: TITLE })).toBeVisible();
+    await expect(page.getByText(POEM)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Report' })).toBeVisible();
+    // Where it stands is for its owner and approvers, not for a visitor.
+    await expect(page.getByText('Approved and unlisted')).toHaveCount(0);
+  });
+
+  await test.step('an approver is shown where it stands', async () => {
     await adminPage.goto(submissionPath);
 
     await expect(adminPage.getByRole('heading', { level: 1, name: TITLE })).toBeVisible();
-    await expect(adminPage.getByText(POEM)).toBeVisible();
     await expect(adminPage.getByRole('status')).toContainText('Approved and unlisted');
-    await expect(adminPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
   });
 
   await test.step('the owner’s edit is warned about, then takes it offline', async () => {
@@ -206,6 +236,11 @@ test('a writing is published, approved by another approver, and goes back out wh
     await expect(adminPage.getByRole('heading', { level: 1, name: EDITED_TITLE })).toBeVisible();
     await expect(adminPage.getByRole('status')).toContainText('Awaiting approval.');
     await expect(adminPage.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
+
+    // And the visitor who could open it a moment ago gets the 404 again.
+    const refused = await page.goto(submissionPath);
+    expect(refused?.status()).toBe(404);
+    await expect(page.getByText(EDITED_TITLE)).toHaveCount(0);
 
     // The stored row, not only what a page rendered.
     const stored = await prisma.submission.findFirst({
@@ -317,22 +352,23 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
  * approved submission from its page, an approver finds it under Reported and
  * marks it handled, and at no point does the submission change.
  *
- * Until the community page launches only approvers can open a submission's
- * page, so the reporter here is a manager too. A signed-out reporter is the
- * launch's case to add. The submission is seeded approved: the approval loop
- * has its own test above.
+ * The reporter is a signed-out visitor: the person wronged by a submission
+ * may have no account (ADR-0028). Its owner is a manager, to prove a manager
+ * is kept from the reports against their own. The submission is seeded
+ * approved: the approval loop has its own test above.
  */
-test('a report reaches the approvers, is marked handled, and takes nothing down', async ({
+test('a signed-out visitor’s report reaches the approvers, is marked handled, and takes nothing down', async ({
   browser,
+  page: reporterPage,
   adminPage,
 }) => {
   test.setTimeout(120_000);
-  if (!owner || !approver) {
+  if (!managerOwner || !approver) {
     throw new Error('The stamped users were not created');
   }
   const reported = await prisma.submission.create({
     data: {
-      ownerId: owner.id,
+      ownerId: managerOwner.id,
       title: REPORTED_TITLE,
       category: 'WRITING',
       writingHtml: `<p>${POEM}</p>`,
@@ -345,11 +381,10 @@ test('a report reaches the approvers, is marked handled, and takes nothing down'
   });
   const submissionPath = `/community/${reported.id}`;
   const reviewPath = `/admin/community/${reported.id}`;
-  const reporterPage = await openPageAs(browser, photographer);
   const approverPage = await openPageAs(browser, approver);
-  const ownerPage = await openPageAs(browser, owner);
+  const ownerPage = await openPageAs(browser, managerOwner);
 
-  await test.step('a reader reports it from its page', async () => {
+  await test.step('a signed-out visitor reports it from its page', async () => {
     await reporterPage.goto(submissionPath);
     // The button is disabled until the page has hydrated, so this click waits.
     await reporterPage.getByRole('button', { name: 'Report' }).click();
@@ -476,5 +511,118 @@ test('a report reaches the approvers, is marked handled, and takes nothing down'
       select: { status: true, updatedAt: true },
     });
     expect(after).toEqual({ status: 'APPROVED', updatedAt: reported.updatedAt });
+  });
+});
+
+/**
+ * The community page, end to end: a signed-out visitor finds a listed
+ * submission in Most Recent, in the full list, by a word of its about in the
+ * search, and under its owner's username; an unlisted one is in none of them.
+ * Both are seeded approved, and long ago, so a later page of the list is the
+ * only place a growing run could push them.
+ */
+test('the community page lists what is listed, to anyone', async ({ page }) => {
+  test.setTimeout(120_000);
+  if (!owner) {
+    throw new Error('The stamped users were not created');
+  }
+  const approved = {
+    ownerId: owner.id,
+    category: 'WRITING',
+    writingHtml: `<p>${POEM}</p>`,
+    aboutHtml: `<p>Taped in a <strong>${ABOUT_WORD}</strong>.</p>`,
+    aboutText: `Taped in a ${ABOUT_WORD}.`,
+    status: 'APPROVED',
+    publishedAt: APPROVED_LONG_AGO,
+    firstApprovedAt: APPROVED_LONG_AGO,
+    approvedAt: APPROVED_LONG_AGO,
+  } as const;
+  const listed = await prisma.submission.create({
+    data: { ...approved, title: LISTED_TITLE, listed: true },
+    select: { id: true },
+  });
+  await prisma.submission.create({ data: { ...approved, title: UNLISTED_TITLE, listed: false } });
+  const username = owner.username;
+
+  await test.step('the menu leads there', async () => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+
+    await page.getByRole('banner').getByRole('link', { name: 'Community', exact: true }).click();
+
+    await page.waitForURL(/\/community$/);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'User Submitted Content' })
+    ).toBeVisible();
+    await expect(page.getByText(/Everything here was sent in by a fan/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Submit something' })).toHaveAttribute(
+      'href',
+      '/community/submit'
+    );
+  });
+
+  await test.step('Most Recent and the full list hold the listed one, never the unlisted', async () => {
+    const recent = page.getByRole('region', { name: 'Most Recent' });
+    await expect(recent.getByRole('link', { name: LISTED_TITLE, exact: true })).toHaveAttribute(
+      'href',
+      `/community/${listed.id}`
+    );
+
+    const all = page.getByRole('list').filter({ has: page.getByRole('article') });
+    await expect(all.getByRole('link', { name: LISTED_TITLE, exact: true })).toBeVisible();
+    await expect(page.getByText(UNLISTED_TITLE)).toHaveCount(0);
+  });
+
+  await test.step('“view all” moves to the full list', async () => {
+    await page.getByRole('link', { name: 'View all user submitted content' }).click();
+
+    await expect(page.getByRole('heading', { level: 2, name: 'All submissions' })).toBeInViewport();
+  });
+
+  await test.step('the search finds it by a word of its about, and opens it', async () => {
+    const trigger = page.getByRole('button', { name: 'Search submissions' });
+    // A click before hydration is lost without a trace.
+    await expect(trigger).toHaveAttribute('data-hydrated', 'true');
+    await trigger.click();
+    await page.getByPlaceholder('Search by title, about or username').fill(ABOUT_WORD);
+
+    const match = page.getByRole('option').filter({ hasText: LISTED_TITLE });
+    await expect(match).toContainText(username);
+    await expect(page.getByRole('option').filter({ hasText: UNLISTED_TITLE })).toHaveCount(0);
+    await match.click();
+
+    await page.waitForURL(({ pathname }) => pathname === `/community/${listed.id}`);
+    await expect(page.getByRole('heading', { level: 1, name: LISTED_TITLE })).toBeVisible();
+  });
+
+  await test.step('its owner’s username leads to their listed submissions alone', async () => {
+    await page.getByRole('link', { name: username, exact: true }).click();
+
+    await page.waitForURL(
+      ({ pathname, searchParams }) =>
+        pathname === '/community' && searchParams.get('user') === username
+    );
+    await expect(
+      page.getByRole('heading', { level: 2, name: `Submissions by ${username}` })
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: LISTED_TITLE, exact: true })).toBeVisible();
+    await expect(page.getByText(UNLISTED_TITLE)).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Most Recent' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'View everyone’s submissions' })).toHaveAttribute(
+      'href',
+      '/community'
+    );
+  });
+
+  await test.step('a username that names no account is not found', async () => {
+    await page.goto(`/community?user=nobody-${STAMP}`);
+
+    await expect(page.getByRole('img', { name: 'page not found' })).toBeVisible();
+  });
+
+  await test.step('a signed-out visitor who wants to submit is sent to sign in', async () => {
+    await page.goto('/community/submit');
+
+    await page.waitForURL(/\/signin\?callbackUrl=%2Fcommunity%2Fsubmit/);
   });
 });

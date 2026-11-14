@@ -65,7 +65,6 @@ const REFUSAL = {
   error: 'Unauthorized',
   code: 'UNAUTHENTICATED' as const,
 };
-const FORBIDDEN = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
 
 const signIn = (role: string, uploadAgreementVersion: number | null = 1): void => {
   vi.mocked(gateAction).mockResolvedValue({
@@ -115,10 +114,12 @@ describe('requestAttachmentUploadAction', () => {
     await expect(requestAttachmentUploadAction(request)).resolves.toEqual(REFUSAL);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
 
-    await expect(requestAttachmentUploadAction(request)).resolves.toEqual(FORBIDDEN);
+    await requestAttachmentUploadAction(request);
+
+    expect(SubmissionAttachmentService.requestUpload).toHaveBeenCalledTimes(1);
   });
 
   it('refuses input that is not an upload request', async () => {
@@ -216,10 +217,11 @@ describe('confirmAttachmentUploadAction', () => {
     expect(vi.mocked(gateAction).mock.calls).toEqual([['signed-in']]);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    confirmed();
 
-    await expect(confirmAttachmentUploadAction(confirm)).resolves.toEqual(FORBIDDEN);
+    await expect(confirmAttachmentUploadAction(confirm)).resolves.toMatchObject({ success: true });
   });
 
   it('answers the gate’s refusal', async () => {
@@ -273,6 +275,7 @@ describe('confirmAttachmentUploadAction', () => {
       '/community/mine',
       `/community/${SUBMISSION_ID}`,
       '/admin/community',
+      '/community',
     ]);
   });
 
@@ -298,10 +301,11 @@ describe('removeAttachmentAction', () => {
     expect(vi.mocked(gateAction).mock.calls).toEqual([['signed-in']]);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    vi.mocked(SubmissionAttachmentService.remove).mockResolvedValueOnce(submission);
 
-    await expect(removeAttachmentAction(remove)).resolves.toEqual(FORBIDDEN);
+    await expect(removeAttachmentAction(remove)).resolves.toMatchObject({ success: true });
   });
 
   it('answers the gate’s refusal', async () => {
@@ -338,6 +342,7 @@ describe('removeAttachmentAction', () => {
       '/community/mine',
       `/community/${SUBMISSION_ID}`,
       '/admin/community',
+      '/community',
     ]);
   });
 

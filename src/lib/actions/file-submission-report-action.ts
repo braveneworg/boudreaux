@@ -16,7 +16,6 @@ import { computeFingerprintHash } from '@/lib/utils/visitor-fingerprint';
 import { fileSubmissionReportInputSchema } from '@/lib/validation/submission-report-schema';
 
 import {
-  communityClosedRefusal,
   failureFromError,
   invalidInputFailure,
   turnstileRefusal,
@@ -37,19 +36,13 @@ type Caller =
 
 /**
  * The caller of an action that takes no session. A signed-out visitor is a
- * caller like any other; a banned account is refused, and so is anyone the
- * community is not open to yet, signed out or not.
+ * caller like any other; only a banned account is refused.
  */
 const identifyCaller = async (): Promise<Caller> => {
   const session = await auth();
   const user = session?.user?.id ? session.user : null;
-  if (user?.banned === true) {
-    return { refusal: BANNED };
-  }
 
-  const closed = communityClosedRefusal(user?.role);
-
-  return closed ? { refusal: closed } : { refusal: null, userId: user?.id };
+  return user?.banned === true ? { refusal: BANNED } : { refusal: null, userId: user?.id };
 };
 
 /**
@@ -74,12 +67,8 @@ const reporterKeyFor = async (userId: string | undefined): Promise<string> => {
 /**
  * File a submission report (ADR-0025, ADR-0028). The one submission action
  * that takes no session: the person wronged may not be a user of the site.
- * What guards it instead, in order: the community being open to the caller,
- * the wire schema, a Turnstile token, then the service's rate limits.
- *
- * Until the community page launches, `mayUseCommunity` refuses everyone but
- * approvers, signed out or not, so this cannot be called by the public before
- * a submission's page can be opened by them.
+ * What guards it instead, in order: the caller not being banned, the wire
+ * schema, a Turnstile token, then the service's rate limits.
  *
  * The answer is the same whether or not a report was stored: one filed
  * against anything that is not a public submission is dropped, and the caller

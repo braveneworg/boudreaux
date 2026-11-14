@@ -73,7 +73,6 @@ const REFUSAL = {
   error: 'Unauthorized',
   code: 'UNAUTHENTICATED' as const,
 };
-const FORBIDDEN = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
 
 const signIn = (role: string, uploadAgreementVersion: number | null = 1): void => {
   vi.mocked(gateAction).mockResolvedValue({
@@ -143,12 +142,12 @@ describe.each([
     expect(SubmissionService.save).not.toHaveBeenCalled();
   });
 
-  it('refuses a signed-in user who is not an approver, before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    vi.mocked(SubmissionService.save).mockResolvedValueOnce(record());
 
-    await expect(action(form)).resolves.toEqual(FORBIDDEN);
-    expect(SubmissionService.save).not.toHaveBeenCalled();
-    expect(verifyTurnstile).not.toHaveBeenCalled();
+    await expect(action(form)).resolves.toMatchObject({ success: true });
+    expect(SubmissionService.save).toHaveBeenCalledTimes(1);
   });
 
   it('refuses input that fails validation, on its field', async () => {
@@ -220,6 +219,7 @@ describe.each([
       ['/community/mine'],
       [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
+      ['/community'],
     ]);
   });
 
@@ -297,11 +297,11 @@ describe('setSubmissionListedAction', () => {
     expect(verifyTurnstile).not.toHaveBeenCalled();
   });
 
-  it('refuses a signed-in user who is not an approver, before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    vi.mocked(SubmissionService.setListed).mockResolvedValueOnce(record({ status: 'APPROVED' }));
 
-    await expect(setSubmissionListedAction(input)).resolves.toEqual(FORBIDDEN);
-    expect(SubmissionService.setListed).not.toHaveBeenCalled();
+    await expect(setSubmissionListedAction(input)).resolves.toMatchObject({ success: true });
   });
 
   it('refuses a malformed id', async () => {
@@ -338,14 +338,15 @@ describe('deleteSubmissionAction', () => {
       ['/community/mine'],
       [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
+      ['/community'],
     ]);
   });
 
-  it('refuses a signed-in user who is not an approver, before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    vi.mocked(SubmissionService.delete).mockResolvedValueOnce(undefined);
 
-    await expect(deleteSubmissionAction(input)).resolves.toEqual(FORBIDDEN);
-    expect(SubmissionService.delete).not.toHaveBeenCalled();
+    await expect(deleteSubmissionAction(input)).resolves.toMatchObject({ success: true });
   });
 
   it('answers the gate’s refusal', async () => {
@@ -418,6 +419,7 @@ describe('approveSubmissionAction', () => {
       ['/community/mine'],
       [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
+      ['/community'],
     ]);
   });
 });

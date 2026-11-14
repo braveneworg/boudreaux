@@ -98,11 +98,15 @@ describe('GET /api/community/submissions/[id]/attachments', () => {
     expect(response.status).toBe(404);
   });
 
-  it('is not found, and reads nothing, for anyone but an approver before launch', async () => {
+  it('answers an owner who is not an approver', async () => {
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view('owner'));
+
     const response = await getAs('user');
 
-    expect(response.status).toBe(404);
-    expect(SubmissionService.getForViewer).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(vi.mocked(SubmissionService.getForViewer).mock.calls).toEqual([
+      [SUBMISSION_ID, { id: USER_ID, role: 'user' }],
+    ]);
   });
 
   it('is not found, and reads nothing, for an id that is not an id', async () => {
