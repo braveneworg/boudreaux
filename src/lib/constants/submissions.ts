@@ -224,6 +224,14 @@ export const VIEW_WINDOW_DAYS = 30;
 /** The fewest views in that time a listed submission needs to be in Trending. */
 export const TRENDING_MINIMUM_VIEWS = 5;
 
+/**
+ * How many of the most viewed submissions Trending reads before it keeps the
+ * listed ones: it bounds the read however many submissions have views. Far
+ * more than a row holds, because an unlisted submission is counted too and
+ * takes a place here that it can never take in the row.
+ */
+export const TRENDING_CANDIDATES = 100;
+
 /** What a card and a page print for an owner whose account has no username. */
 export const NAMELESS_OWNER = 'A community member';
 

@@ -16,6 +16,7 @@ import {
   SUBMISSION_ABOUT_MAX,
   SUBMISSION_ROW_SIZE,
   SUBMISSION_WRITING_MAX,
+  TRENDING_CANDIDATES,
   TRENDING_MINIMUM_VIEWS,
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
@@ -828,11 +829,16 @@ export class SubmissionService {
    * it, and neither is one that is not listed, whatever its views: the counts
    * only choose among what the listing would show anyway. A card carries no
    * count.
+   *
+   * Only the hundred most viewed are considered, so the second read stays
+   * small however many submissions have views. The row would come up short
+   * only if most of those hundred were unlisted.
    */
   static async listTrendingCards(): Promise<SubmissionCard[]> {
     const counts = await SubmissionViewEventRepository.countsSince(
       viewWindowStart(new Date()),
-      TRENDING_MINIMUM_VIEWS
+      TRENDING_MINIMUM_VIEWS,
+      TRENDING_CANDIDATES
     );
     if (counts.length === 0) {
       return [];

@@ -25,6 +25,9 @@ const at = (minute: number): Date => new Date(Date.UTC(2001, 0, 1, 0, minute));
 /** How many writers race for one key. */
 const RACERS = 8;
 
+/** A limit no case here reaches: every submission at the minimum is read. */
+const EVERY = 1000;
+
 interface Seeded {
   owner: string;
   three: string;
@@ -37,6 +40,7 @@ interface Seeded {
 let seeded: Seeded | undefined;
 let counts: SubmissionViewCount[] = [];
 let countsFromOne: SubmissionViewCount[] = [];
+let topTwo: SubmissionViewCount[] = [];
 let firstWrite: boolean | undefined;
 let secondWrite: boolean | undefined;
 let raceWrites: boolean[] = [];
@@ -119,8 +123,9 @@ beforeAll(async () => {
   knownKey = await SubmissionViewEventRepository.exists(`${prefix}two-a`);
   unknownKey = await SubmissionViewEventRepository.exists(`${prefix}never-written`);
 
-  counts = await SubmissionViewEventRepository.countsSince(at(10), 2);
-  countsFromOne = await SubmissionViewEventRepository.countsSince(at(10), 1);
+  counts = await SubmissionViewEventRepository.countsSince(at(10), 2, EVERY);
+  countsFromOne = await SubmissionViewEventRepository.countsSince(at(10), 1, EVERY);
+  topTwo = await SubmissionViewEventRepository.countsSince(at(10), 1, 2);
 
   await SubmissionRepository.deleteOwned(deleted, owner);
   rowsOfDeleted = await prisma.submissionViewEvent.count({ where: { submissionId: deleted } });
@@ -188,6 +193,17 @@ describe('SubmissionViewEventRepository (Docker Mongo contract)', () => {
     const { three, two } = ids();
 
     expect(mine(counts)).toEqual([
+      { submissionId: three, views: 3 },
+      { submissionId: two, views: 2 },
+    ]);
+  });
+
+  it('reads the most viewed first and stops at the limit', () => {
+    // Only this file stores view events dated 2001, so the two most viewed
+    // since the cutoff are this file's.
+    const { three, two } = ids();
+
+    expect(topTwo).toEqual([
       { submissionId: three, views: 3 },
       { submissionId: two, views: 2 },
     ]);

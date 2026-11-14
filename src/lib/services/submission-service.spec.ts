@@ -7,6 +7,7 @@ import {
   SUBMISSION_ABOUT_MAX,
   SUBMISSION_ROW_SIZE,
   SUBMISSION_WRITING_MAX,
+  TRENDING_CANDIDATES,
   TRENDING_MINIMUM_VIEWS,
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
@@ -1280,14 +1281,18 @@ describe('SubmissionService.listTrendingCards', () => {
   const trendingIds = async (): Promise<string[]> =>
     (await SubmissionService.listTrendingCards()).map(({ id }) => id);
 
-  it('counts the views of the last thirty days, at the minimum', async () => {
+  it('counts the views of the last thirty days, at the minimum, of the most viewed', async () => {
     vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([]);
 
     await SubmissionService.listTrendingCards();
 
     expect(vi.mocked(SubmissionViewEventRepository.countsSince).mock.calls).toEqual([
-      [new Date('2026-10-12T12:00:00.000Z'), TRENDING_MINIMUM_VIEWS],
+      [new Date('2026-10-12T12:00:00.000Z'), TRENDING_MINIMUM_VIEWS, TRENDING_CANDIDATES],
     ]);
+  });
+
+  it('considers many more candidates than a row holds, so unlisted ones cannot crowd it out', () => {
+    expect(TRENDING_CANDIDATES).toBeGreaterThanOrEqual(SUBMISSION_ROW_SIZE * 8);
   });
 
   it('is empty, without a second read, when nothing is at the minimum', async () => {

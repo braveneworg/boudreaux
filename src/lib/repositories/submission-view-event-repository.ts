@@ -49,15 +49,24 @@ export class SubmissionViewEventRepository {
 
   /**
    * How many view events each submission holds from `cutoff` on, for the
-   * submissions that hold at least `minimum`. In no promised order, and of
-   * any submission, listed or not: what may be shown is the caller's rule.
+   * submissions that hold at least `minimum`: the most viewed first, and no
+   * more than `limit` of them, so the caller's next read is bounded however
+   * many submissions have been viewed. The id breaks a tie, so the cut is
+   * the same on every read. Of any submission, listed or not: what may be
+   * shown is the caller's rule.
    */
-  static async countsSince(cutoff: Date, minimum: number): Promise<SubmissionViewCount[]> {
+  static async countsSince(
+    cutoff: Date,
+    minimum: number,
+    limit: number
+  ): Promise<SubmissionViewCount[]> {
     const groups = await prisma.submissionViewEvent.groupBy({
       by: ['submissionId'],
       where: { viewedAt: { gte: cutoff } },
       _count: { _all: true },
       having: { submissionId: { _count: { gte: minimum } } },
+      orderBy: [{ _count: { submissionId: 'desc' } }, { submissionId: 'asc' }],
+      take: limit,
     });
 
     return groups.map(({ submissionId, _count }) => ({ submissionId, views: _count._all }));

@@ -113,18 +113,25 @@ describe('SubmissionViewEventRepository', () => {
     it('groups the rows from the cutoff on by submission, keeping those at the minimum', async () => {
       events.groupBy.mockResolvedValueOnce([] as never);
 
-      await SubmissionViewEventRepository.countsSince(CUTOFF, 5);
+      await SubmissionViewEventRepository.countsSince(CUTOFF, 5, 100);
 
-      expect(events.groupBy.mock.calls).toEqual([
-        [
-          {
-            by: ['submissionId'],
-            where: { viewedAt: { gte: CUTOFF } },
-            _count: { _all: true },
-            having: { submissionId: { _count: { gte: 5 } } },
-          },
-        ],
-      ]);
+      expect(events.groupBy.mock.calls[0]?.[0]).toMatchObject({
+        by: ['submissionId'],
+        where: { viewedAt: { gte: CUTOFF } },
+        _count: { _all: true },
+        having: { submissionId: { _count: { gte: 5 } } },
+      });
+    });
+
+    it('reads the most viewed first, the id breaking a tie, and no more than the limit', async () => {
+      events.groupBy.mockResolvedValueOnce([] as never);
+
+      await SubmissionViewEventRepository.countsSince(CUTOFF, 5, 100);
+
+      expect(events.groupBy.mock.calls[0]?.[0]).toMatchObject({
+        orderBy: [{ _count: { submissionId: 'desc' } }, { submissionId: 'asc' }],
+        take: 100,
+      });
     });
 
     it('returns each submission with its count', async () => {
@@ -133,7 +140,7 @@ describe('SubmissionViewEventRepository', () => {
         { submissionId: OTHER_ID, _count: { _all: 5 } },
       ] as never);
 
-      await expect(SubmissionViewEventRepository.countsSince(CUTOFF, 5)).resolves.toEqual([
+      await expect(SubmissionViewEventRepository.countsSince(CUTOFF, 5, 100)).resolves.toEqual([
         { submissionId: SUBMISSION_ID, views: 7 },
         { submissionId: OTHER_ID, views: 5 },
       ]);
