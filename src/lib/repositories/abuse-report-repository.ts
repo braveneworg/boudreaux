@@ -5,6 +5,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 
+import { containsText } from './_internal/where-kit';
+
 import type { Prisma } from '@prisma/client';
 
 interface CreateAbuseReportData {
@@ -103,10 +105,7 @@ export class AbuseReportRepository {
     const term = search?.trim();
     if (term) {
       where.reportedUser = {
-        OR: [
-          { username: { contains: term, mode: 'insensitive' } },
-          { email: { contains: term, mode: 'insensitive' } },
-        ],
+        OR: [{ username: containsText(term) }, { email: containsText(term) }],
       };
     }
 

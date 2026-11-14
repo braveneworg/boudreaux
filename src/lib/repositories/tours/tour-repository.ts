@@ -16,6 +16,7 @@ import {
   visibleTourWhere,
 } from '../_internal/tour-where';
 import { publicArtist } from '../_internal/visibility';
+import { containsText } from '../_internal/where-kit';
 
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -113,7 +114,7 @@ export type { TourWithRelations };
 const buildSearchWhere = (search?: string): Prisma.TourWhereInput | undefined => {
   if (!search) return undefined;
 
-  const contains = { contains: search, mode: 'insensitive' as const };
+  const contains = containsText(search);
 
   return {
     OR: [
@@ -159,7 +160,7 @@ const buildSearchWhere = (search?: string): Prisma.TourWhereInput | undefined =>
  * `tourDates: { some }`.
  */
 const buildPublicSearchWhere = (search: string): Prisma.TourWhereInput => {
-  const contains = { contains: search, mode: 'insensitive' as const };
+  const contains = containsText(search);
 
   return {
     OR: [

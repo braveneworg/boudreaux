@@ -15,6 +15,7 @@ import type {
 import { bioImageWhere } from './_internal/bio-media-where';
 import { featuredArtistWhere, featuredWindowAt } from './_internal/featured-artist-where';
 import { publicArtist } from './_internal/visibility';
+import { containsText } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -118,8 +119,6 @@ const toPrismaUpdate = (data: UpdateFeaturedArtistData): Prisma.FeaturedArtistUp
 // Where builders (domain filters -> Prisma where; owned by the repository)
 // =============================================================================
 
-const containsInsensitive = (value: string) => ({ contains: value, mode: 'insensitive' as const });
-
 /**
  * Build the admin-listing `where` from domain filters. The model has no
  * `deletedOn` field, so the `deleted` filter applies no constraint. The search
@@ -137,10 +136,7 @@ const buildListWhere = (filters: FeaturedArtistListFilters): Prisma.FeaturedArti
   }
   if (search) {
     and.push({
-      OR: [
-        { displayName: containsInsensitive(search) },
-        { description: containsInsensitive(search) },
-      ],
+      OR: [{ displayName: containsText(search) }, { description: containsText(search) }],
     });
   }
 

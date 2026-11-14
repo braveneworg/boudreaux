@@ -39,7 +39,7 @@ import { playableFormats, playableFormatWhere } from './_internal/playable-forma
 import { renumberCredits } from './_internal/release-credits';
 import { publicVideoWhere } from './_internal/video-where';
 import { listedRelease, publicArtist } from './_internal/visibility';
-import { isUnsetOr } from './_internal/where-kit';
+import { containsText, equalsText, isUnsetOr } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -562,12 +562,6 @@ const toPrismaUpdate = (data: UpdateArtistData): Prisma.ArtistUpdateInput => {
   };
 };
 
-/** Case-insensitive substring filter for one search token. */
-const containsToken = (token: string) => ({ contains: token, mode: 'insensitive' as const });
-
-/** Case-insensitive equality filter for one name field. */
-const equalsIgnoringCase = (value: string) => ({ equals: value, mode: 'insensitive' as const });
-
 /**
  * The name lookup's `where`s, in the order they are tried: the slug (unique,
  * most reliable), then the display name, then first name + surname, the last
@@ -580,14 +574,11 @@ const nameKeyWheres = ({
   surname = '',
 }: ArtistNameKeys): Prisma.ArtistWhereInput[] => [
   ...(slug ? [{ slug }] : []),
-  ...(displayName ? [{ displayName: equalsIgnoringCase(displayName) }] : []),
+  ...(displayName ? [{ displayName: equalsText(displayName) }] : []),
   ...(firstName
     ? [
         {
-          AND: [
-            { firstName: equalsIgnoringCase(firstName) },
-            { surname: equalsIgnoringCase(surname) },
-          ],
+          AND: [{ firstName: equalsText(firstName) }, { surname: equalsText(surname) }],
         },
       ]
     : []),
@@ -599,13 +590,13 @@ const nameKeyWheres = ({
  * typed (or picked) as it is displayed always finds its artist.
  */
 const nameFieldClauses = (token: string): Prisma.ArtistWhereInput[] => [
-  { firstName: containsToken(token) },
-  { middleName: containsToken(token) },
-  { surname: containsToken(token) },
-  { displayName: containsToken(token) },
-  { title: containsToken(token) },
-  { suffix: containsToken(token) },
-  { slug: containsToken(token) },
+  { firstName: containsText(token) },
+  { middleName: containsText(token) },
+  { surname: containsText(token) },
+  { displayName: containsText(token) },
+  { title: containsText(token) },
+  { suffix: containsText(token) },
+  { slug: containsText(token) },
 ];
 
 /**
@@ -677,9 +668,9 @@ const readVocabularyColumn = (
  */
 const publicArtistTokenClauses = (token: string): Prisma.ArtistWhereInput[] => [
   ...nameFieldClauses(token),
-  { akaNames: containsToken(token) },
-  { genres: containsToken(token) },
-  { releases: { some: { release: { title: containsToken(token), ...listedRelease.where } } } },
+  { akaNames: containsText(token) },
+  { genres: containsText(token) },
+  { releases: { some: { release: { title: containsText(token), ...listedRelease.where } } } },
 ];
 
 /**
@@ -725,7 +716,7 @@ const buildReleaseOrVideoWhere = (
     ? buildTokenSearch(search, (token) => [
         ...publicArtistTokenClauses(token),
         {
-          videoArtists: { some: { video: { is: { title: containsToken(token), ...liveVideo } } } },
+          videoArtists: { some: { video: { is: { title: containsText(token), ...liveVideo } } } },
         },
       ])
     : [];

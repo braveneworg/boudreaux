@@ -10,6 +10,8 @@ import type {
   UpsertBannerNotificationData,
 } from '@/lib/types/domain/banner-notification';
 
+import { containsText } from './_internal/where-kit';
+
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -23,7 +25,7 @@ const _bannerNotificationDrift: _BannerNotificationDrift = true;
 
 /** Build the search `where` from an optional query (case-insensitive contains). */
 const buildSearchWhere = (query: string): Prisma.BannerNotificationWhereInput =>
-  query ? { content: { contains: query, mode: 'insensitive' } } : { content: { not: null } };
+  query ? { content: containsText(query) } : { content: { not: null } };
 
 /**
  * Data-access layer for `BannerNotification` records. The only layer that touches

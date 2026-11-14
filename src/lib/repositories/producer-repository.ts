@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import type { CreateProducerData, ProducerSummary } from '@/lib/types/domain/producer';
 
 import { runQuery } from './_internal/map-prisma-error';
+import { containsText, equalsText } from './_internal/where-kit';
 
 const producerSummarySelect = { id: true, name: true } as const;
 
@@ -22,7 +23,7 @@ export class ProducerRepository {
    */
   static async search(q: string, take: number): Promise<ProducerSummary[]> {
     return prisma.producer.findMany({
-      where: { name: { contains: q, mode: 'insensitive' } },
+      where: { name: containsText(q) },
       orderBy: { name: 'asc' },
       take,
       select: producerSummarySelect,
@@ -36,7 +37,7 @@ export class ProducerRepository {
   static async findOrCreateByName(name: string, createdBy?: string): Promise<ProducerSummary> {
     const trimmed = name.trim();
     const existing = await prisma.producer.findFirst({
-      where: { name: { equals: trimmed, mode: 'insensitive' } },
+      where: { name: equalsText(trimmed) },
       select: producerSummarySelect,
     });
     if (existing) return existing;
@@ -47,7 +48,7 @@ export class ProducerRepository {
     } catch {
       // Unique-name race: another request created the same name first — re-find.
       const recovered = await prisma.producer.findFirst({
-        where: { name: { equals: trimmed, mode: 'insensitive' } },
+        where: { name: equalsText(trimmed) },
         select: producerSummarySelect,
       });
       if (recovered) return recovered;
