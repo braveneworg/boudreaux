@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useRef } from 'react';
+import { useRef, type RefObject } from 'react';
 
 import { Loader2 } from 'lucide-react';
 
@@ -54,6 +54,56 @@ const ListSkeleton = () => (
   </div>
 );
 
+/** A later page failed: say so and offer another try, in place of loading on scroll. */
+const LoadMoreFailed = ({ onRetry }: { onRetry: () => void }) => (
+  <div role="alert" className="flex flex-wrap items-center gap-4 pt-6">
+    <p className="text-zinc-950">Unable to load more submissions.</p>
+    <Button variant="outline" onClick={onRetry}>
+      Try again
+    </Button>
+  </div>
+);
+
+interface ListFooterProps {
+  /** The element whose coming into view loads the next page. */
+  sentinelRef: RefObject<HTMLDivElement | null>;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  /** Whether the last attempt at a later page failed. */
+  hasFailed: boolean;
+  onRetry: () => void;
+}
+
+/**
+ * The end of the list: the sentinel that loads the next page as it nears the
+ * viewport, a spinner while one loads, and the retry when one failed.
+ */
+const ListFooter = ({
+  sentinelRef,
+  hasNextPage,
+  isFetchingNextPage,
+  hasFailed,
+  onRetry,
+}: ListFooterProps) => (
+  <>
+    {hasFailed && !isFetchingNextPage && <LoadMoreFailed onRetry={onRetry} />}
+    <div
+      ref={sentinelRef}
+      className="flex min-h-12 items-center justify-center py-2"
+      aria-hidden={!hasNextPage}
+    >
+      {isFetchingNextPage ? (
+        <>
+          <Loader2 className="size-6 animate-spin text-zinc-950" aria-hidden="true" />
+          <span role="status" className="sr-only">
+            Loading more submissions…
+          </span>
+        </>
+      ) : null}
+    </div>
+  </>
+);
+
 export interface CommunityListProps {
   /** A username from `/community?user=`: only that user's listed submissions. */
   user?: string;
@@ -67,15 +117,31 @@ export interface CommunityListProps {
  * first page comes hydrated from the server's prefetch. With a `user` it
  * holds only that user's.
  *
- * A failed first read offers another try; a failed later page leaves the
- * cards already shown in place.
+ * A failed first read offers another try. A failed later page leaves the
+ * cards already shown in place, stops loading on scroll, and offers another
+ * try of its own.
  */
 export const CommunityList = ({ user = '', emptyMessage }: CommunityListProps) => {
-  const { data, isPending, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteListedSubmissionsQuery(user);
+  const {
+    data,
+    isPending,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+  } = useInfiniteListedSubmissionsQuery(user);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
-  useInfiniteScroll(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
+  // A page that failed is not asked for again by the scroll: the sentinel is
+  // still in view, so it would be requested without end. The button retries.
+  useInfiniteScroll(sentinelRef, {
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    enabled: !isFetchNextPageError,
+  });
 
   if (isPending) {
     return <ListSkeleton />;
@@ -107,20 +173,13 @@ export const CommunityList = ({ user = '', emptyMessage }: CommunityListProps) =
           </li>
         ))}
       </ul>
-      <div
-        ref={sentinelRef}
-        className="flex min-h-12 items-center justify-center py-2"
-        aria-hidden={!hasNextPage}
-      >
-        {isFetchingNextPage ? (
-          <>
-            <Loader2 className="size-6 animate-spin text-zinc-950" aria-hidden="true" />
-            <span role="status" className="sr-only">
-              Loading more submissions…
-            </span>
-          </>
-        ) : null}
-      </div>
+      <ListFooter
+        sentinelRef={sentinelRef}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        hasFailed={isFetchNextPageError}
+        onRetry={() => fetchNextPage()}
+      />
     </>
   );
 };

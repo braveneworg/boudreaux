@@ -46,6 +46,35 @@ const pagesOf = (...pages: SubmissionCard[][]): { pages: Array<{ rows: Submissio
 
 const EMPTY = 'Nothing here yet.';
 
+/** Each observer the list attached, with a way to bring its target into view. */
+const observers: Array<{ enter: () => void }> = [];
+
+beforeEach(() => {
+  observers.length = 0;
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(private readonly callback: IntersectionObserverCallback) {
+        observers.push({
+          enter: () =>
+            this.callback(
+              [{ isIntersecting: true, intersectionRatio: 1 } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver
+            ),
+        });
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
+    }
+  );
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
 describe('CommunityList', () => {
   it('says it is loading until the first page arrives', () => {
     queryReturns({ isPending: true });
@@ -103,13 +132,54 @@ describe('CommunityList', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the cards it has when a later page fails', () => {
-    queryReturns({ data: pagesOf([card(1)]), error: new Error('boom') });
+  it('keeps the cards it has when a later page fails, and offers another try', async () => {
+    const fetchNextPage = vi.fn();
+    queryReturns({
+      data: pagesOf([card(1)]),
+      error: new Error('boom'),
+      isFetchNextPageError: true,
+      hasNextPage: true,
+      fetchNextPage,
+    });
+    const user = userEvent.setup({ delay: null });
 
     render(<CommunityList emptyMessage={EMPTY} />);
-
     expect(screen.getByRole('link', { name: 'Submission 1' })).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Unable to load more submissions.');
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not keep asking for a page that failed: only the button tries again', () => {
+    const fetchNextPage = vi.fn();
+    queryReturns({
+      data: pagesOf([card(1)]),
+      error: new Error('boom'),
+      isFetchNextPageError: true,
+      hasNextPage: true,
+      fetchNextPage,
+    });
+
+    render(<CommunityList emptyMessage={EMPTY} />);
+    // The sentinel is in view: with the scroll trigger live this would fetch.
+    for (const observer of observers) {
+      observer.enter();
+    }
+
+    expect(fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('asks for the next page when the end of the list comes into view', () => {
+    const fetchNextPage = vi.fn();
+    queryReturns({ data: pagesOf([card(1)]), hasNextPage: true, fetchNextPage });
+
+    render(<CommunityList emptyMessage={EMPTY} />);
+    for (const observer of observers) {
+      observer.enter();
+    }
+
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
   it('says more are loading while the next page is fetched', () => {
