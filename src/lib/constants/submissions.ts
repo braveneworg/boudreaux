@@ -199,3 +199,25 @@ export const USUAL_REPLY_TIME = 'We usually reply within 2 to 5 business days.';
  * reminded of it daily. Business days are weekdays, counted in UTC.
  */
 export const OVERDUE_BUSINESS_DAYS = 5;
+
+/** How many cards one page of the community page's full list holds. */
+export const COMMUNITY_PAGE_SIZE = 12;
+
+/** The most cards one request to the listing route may ask for. */
+export const COMMUNITY_LIST_MAX_TAKE = 24;
+
+/** The most listed submissions a submission row holds; it loops, it never fetches more. */
+export const SUBMISSION_ROW_SIZE = 12;
+
+/** How many matches the community page's search suggests. */
+export const COMMUNITY_SEARCH_RESULTS = 8;
+
+/** The longest search term the listing route reads. */
+export const COMMUNITY_SEARCH_MAX = 100;
+
+/** What a card and a page print for an owner whose account has no username. */
+export const NAMELESS_OWNER = 'A community member';
+
+/** The community page's short description, as agreed with the owner. */
+export const COMMUNITY_DESCRIPTION =
+  'Videos, songs, photos and writing from the Fake Four Inc. community. Everything here was sent in by a fan and approved by our team.';

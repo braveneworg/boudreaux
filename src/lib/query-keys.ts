@@ -208,6 +208,12 @@ export const queryKeys = {
     all: ['submissions'] as const,
     /** A submission's attachments, polled while any is still processing. */
     attachments: (id: string) => [...queryKeys.submissions.all, 'attachments', id] as const,
+    /** The community page's full list, by the `?user=` username it is narrowed to. */
+    listedInfinite: (user = '') =>
+      [...queryKeys.submissions.all, 'listedInfinite', user.trim()] as const,
+    /** The community page's search, by normalised term. */
+    search: (term: string) =>
+      [...queryKeys.submissions.all, 'search', term.trim().toLowerCase()] as const,
   },
   playlists: {
     all: ['playlists'] as const,
