@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { guestIdentityService } from '@/lib/services/guest-identity-service';
 import { readGuestVisitorId, setGuestVisitorIdCookie } from '@/lib/utils/guest-visitor-id';
 
-import { resolveDownloadSubject } from './resolve-download-subject';
+import { resolveDownloadSubject, resolveGuestSubject } from './resolve-download-subject';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/services/guest-identity-service', () => ({
@@ -65,5 +65,23 @@ describe('resolveDownloadSubject', () => {
 
     expect(subject).toEqual({ kind: 'guest', visitorId: 'minted', visitorIds: ['minted'] });
     expect(vi.mocked(setGuestVisitorIdCookie).mock.calls).toEqual([['minted']]);
+  });
+});
+
+describe('resolveGuestSubject', () => {
+  it('resolves the guest of a request, as a download with no account does', async () => {
+    vi.mocked(readGuestVisitorId).mockResolvedValueOnce(null);
+    vi.mocked(guestIdentityService.resolveVisitorIdentity).mockResolvedValueOnce({
+      primaryVisitorId: 'recovered',
+      allVisitorIds: ['recovered'],
+      cookieReissue: true,
+    });
+
+    await expect(resolveGuestSubject(request)).resolves.toEqual({
+      kind: 'guest',
+      visitorId: 'recovered',
+      visitorIds: ['recovered'],
+    });
+    expect(vi.mocked(setGuestVisitorIdCookie).mock.calls).toEqual([['recovered']]);
   });
 });
