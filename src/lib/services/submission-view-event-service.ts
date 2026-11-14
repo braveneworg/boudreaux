@@ -3,7 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { guestAddressKey, viewKeyFor } from '@/lib/community/view-key';
+import {
+  guestAddressKey,
+  resolveViewKeySecret,
+  viewKeyFor,
+  type ViewerRef,
+} from '@/lib/community/view-key';
 import { utcDayOf, viewWindowStart } from '@/lib/community/view-window';
 import { isPublicSubmission, SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { SubmissionViewEventRepository } from '@/lib/repositories/submission-view-event-repository';
@@ -57,18 +62,19 @@ export class SubmissionViewEventService {
       return false;
     }
 
-    const day = utcDayOf(now);
+    // Read before a guest is identified: with no secret nothing is stored,
+    // not even a guest identity.
+    const secret = resolveViewKeySecret();
+    const keyFor = (counted: ViewerRef): string =>
+      viewKeyFor({ submissionId, viewer: counted, day: utcDayOf(now), secret });
+
     if (viewer) {
-      const viewKey = viewKeyFor({ submissionId, viewer: { kind: 'user', id: viewer.id }, day });
+      const viewKey = keyFor({ kind: 'user', id: viewer.id });
 
       return SubmissionViewEventRepository.record({ submissionId, viewKey, viewedAt: now });
     }
 
-    const viewKey = viewKeyFor({
-      submissionId,
-      viewer: { kind: 'guest', id: await resolveGuest() },
-      day,
-    });
+    const viewKey = keyFor({ kind: 'guest', id: await resolveGuest() });
     if (await SubmissionViewEventRepository.exists(viewKey)) {
       return false;
     }

@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { viewKeyFor } from '@/lib/community/view-key';
+import type * as SubmissionWhere from '@/lib/repositories/_internal/submission-where';
 import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { SubmissionViewEventRepository } from '@/lib/repositories/submission-view-event-repository';
 import type { SubmissionStandingRecord } from '@/lib/types/domain/submission';
@@ -10,11 +11,15 @@ import { allowGuestView } from '@/lib/utils/submission-view-allowance';
 import { SubmissionViewEventService, type ViewAttempt } from './submission-view-event-service';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/repositories/submission-repository', () => ({
-  SubmissionRepository: { findStanding: vi.fn() },
-  isPublicSubmission: ({ status, owner }: { status: string; owner: { banned?: boolean | null } }) =>
-    status === 'APPROVED' && owner.banned !== true,
-}));
+// The repository is stubbed; the rule for "public" is the real one, so a
+// change to it reaches these cases.
+vi.mock('@/lib/repositories/submission-repository', async () => {
+  const { isPublicSubmission } = await vi.importActual<typeof SubmissionWhere>(
+    '@/lib/repositories/_internal/submission-where'
+  );
+
+  return { SubmissionRepository: { findStanding: vi.fn() }, isPublicSubmission };
+});
 vi.mock('@/lib/repositories/submission-view-event-repository', () => ({
   SubmissionViewEventRepository: { record: vi.fn(), exists: vi.fn(), deleteBefore: vi.fn() },
 }));
@@ -40,15 +45,20 @@ const approved: SubmissionStandingRecord = {
   owner: { banned: null },
 };
 
+// Clearly fake, and as long as the real secret's floor.
+const SECRET = 'view-service-spec-secret-not-a-secret-00';
+
 const userKey = viewKeyFor({
   submissionId: SUBMISSION_ID,
   viewer: { kind: 'user', id: READER_ID },
   day: DAY,
+  secret: SECRET,
 });
 const guestKey = viewKeyFor({
   submissionId: SUBMISSION_ID,
   viewer: { kind: 'guest', id: VISITOR_ID },
   day: DAY,
+  secret: SECRET,
 });
 
 const attempt = (overrides: Partial<ViewAttempt> = {}): ViewAttempt => ({
@@ -64,6 +74,7 @@ const reader = { id: READER_ID, role: 'user' };
 
 // A queued answer a case never reached must not answer the next one.
 beforeEach(() => {
+  vi.stubEnv('AUTH_SECRET', SECRET);
   standing.mockReset();
   record.mockReset();
   exists.mockReset();
@@ -157,8 +168,19 @@ describe('SubmissionViewEventService.record', () => {
           submissionId: SUBMISSION_ID,
           viewer: { kind: 'user', id: READER_ID },
           day: '2026-11-15',
+          secret: SECRET,
         })
       );
+    });
+
+    it('fails, and stores nothing, when the server has no secret to key the view under', async () => {
+      vi.stubEnv('AUTH_SECRET', '');
+      standing.mockResolvedValueOnce(approved);
+
+      await expect(SubmissionViewEventService.record(attempt({ viewer: reader }))).rejects.toThrow(
+        'AUTH_SECRET'
+      );
+      expect(record.mock.calls).toEqual([]);
     });
 
     it('is not asked for a guest identity and spends no address allowance', async () => {
@@ -184,6 +206,14 @@ describe('SubmissionViewEventService.record', () => {
       expect(record.mock.calls).toEqual([
         [{ submissionId: SUBMISSION_ID, viewKey: guestKey, viewedAt: NOW }],
       ]);
+    });
+
+    it('is not identified, and nothing is stored, when the server has no secret', async () => {
+      vi.stubEnv('AUTH_SECRET', '');
+      standing.mockResolvedValueOnce(approved);
+
+      await expect(SubmissionViewEventService.record(attempt())).rejects.toThrow('AUTH_SECRET');
+      expect(resolveGuest.mock.calls).toEqual([]);
     });
 
     it('spends the address’s allowance for that submission', async () => {
