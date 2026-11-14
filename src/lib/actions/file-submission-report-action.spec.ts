@@ -4,6 +4,7 @@
 import { headers } from 'next/headers';
 
 import { auth } from '@/auth';
+import { submissionReportAttemptLimiter } from '@/lib/config/rate-limit-tiers';
 import { SubmissionReportService } from '@/lib/services/submission-report-service';
 import { SubmissionRuleError } from '@/lib/services/submission-service';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
@@ -16,6 +17,10 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: vi.fn() }));
 vi.mock('@/lib/utils/verify-turnstile', () => ({ verifyTurnstile: vi.fn() }));
+vi.mock('@/lib/config/rate-limit-tiers', () => ({
+  submissionReportAttemptLimiter: { check: vi.fn(async () => undefined) },
+  SUBMISSION_REPORT_ATTEMPT_LIMIT: 10,
+}));
 vi.mock('@/lib/utils/logger', () => ({
   loggers: { media: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } },
 }));
@@ -87,6 +92,7 @@ const verified = (): void => {
 };
 
 beforeEach(() => {
+  vi.stubEnv('E2E_MODE', '');
   vi.mocked(auth).mockReset();
   vi.mocked(verifyTurnstile).mockReset();
   vi.mocked(SubmissionReportService.file).mockReset();
@@ -122,6 +128,52 @@ describe('fileSubmissionReportAction', () => {
       });
       expect(verifyTurnstile).not.toHaveBeenCalled();
       expect(SubmissionReportService.file).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('how often an address may try', () => {
+    it('counts each attempt against the caller’s address, before verifying anything', async () => {
+      signedOut();
+      verified();
+      vi.mocked(SubmissionReportService.file).mockResolvedValueOnce({ stored: false });
+
+      await fileSubmissionReportAction(form);
+
+      expect(vi.mocked(submissionReportAttemptLimiter.check).mock.calls).toEqual([
+        [10, '203.0.113.9'],
+      ]);
+    });
+
+    it('refuses an address past the rate, verifying and filing nothing', async () => {
+      signedOut();
+      vi.mocked(submissionReportAttemptLimiter.check).mockRejectedValueOnce(new Error('limit'));
+
+      await expect(fileSubmissionReportAction(form)).resolves.toEqual({
+        success: false,
+        error: 'That is a lot of reports at once. Wait a minute and try again.',
+        code: 'LIMIT_EXCEEDED',
+      });
+      expect(verifyTurnstile).not.toHaveBeenCalled();
+      expect(SubmissionReportService.file).not.toHaveBeenCalled();
+    });
+
+    it('counts a malformed attempt too: junk is what the rate is for', async () => {
+      signedOut();
+
+      await fileSubmissionReportAction({ ...form, reason: 'SPAM' });
+
+      expect(submissionReportAttemptLimiter.check).toHaveBeenCalledTimes(1);
+    });
+
+    it('never limits a Playwright run', async () => {
+      vi.stubEnv('E2E_MODE', 'true');
+      signedOut();
+      verified();
+      vi.mocked(SubmissionReportService.file).mockResolvedValueOnce({ stored: false });
+
+      await fileSubmissionReportAction(form);
+
+      expect(submissionReportAttemptLimiter.check).not.toHaveBeenCalled();
     });
   });
 

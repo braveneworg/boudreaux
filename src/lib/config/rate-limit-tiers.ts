@@ -96,6 +96,18 @@ export const attachmentUploadLimiter = rateLimit({
 export const ATTACHMENT_UPLOAD_LIMIT = 60;
 
 /**
+ * Address-keyed attempts to file a submission report — 10 requests per
+ * minute. The action needs no account, and each attempt costs a session read
+ * and a verification call; this stands in front of both. The limits on what
+ * a reporter may file are the report service's.
+ */
+export const submissionReportAttemptLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const SUBMISSION_REPORT_ATTEMPT_LIMIT = 10;
+
+/**
  * Attachment re-encode completion callback (server-to-server) — 60 requests
  * per minute. One POST per attachment plus Lambda retries; ten attachments
  * can finish together, and their Lambdas may share an egress address.
