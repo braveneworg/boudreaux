@@ -26,9 +26,12 @@ on `globalThis` outside production, so it is built once, by the first route
 the dev server compiles. Its extension raises `DataError` from that route's
 copy of `errors.ts`. A repository compiled into another route holds another
 copy of the class. `map-prisma-error.ts` already works around the same thing
-one layer down, for Prisma's own error class under Turbopack. Whether the
-production build can split the class this way was not measured; the E2E
-suite passes there with the fix.
+one layer down, for Prisma's own error class under Turbopack.
+
+The production build does not do this. Built with the `instanceof` check
+put back, the same E2E case passed there: a repeat view answered `204`. So
+this is the dev server's behaviour, which is where every local E2E run and
+every hand check happens.
 
 Vitest loads every module once, so no unit or contract spec can see it.
 
@@ -51,5 +54,6 @@ reads the name and the code. It does not use `instanceof`.
 - Twenty-four other places still test `instanceof DataError`, most of them
   to act on a code: the Stripe webhook's duplicate purchase, the signup and
   username actions, `site-settings-repository.ts`, the artist and user
-  services. None was probed. Where the check misses, the code takes its
-  generic failure path instead of the one written for that code.
+  services. None was probed. On the dev server, where the check misses, the
+  code takes its generic failure path instead of the one written for that
+  code; the production build is not affected.
