@@ -12,6 +12,7 @@ import type {
   SubmissionDecisionData,
   SubmissionQueuePage,
   SubmissionRecord,
+  SubmissionStandingRecord,
   SubmissionWithOwnerRecord,
   SubmissionWrite,
   UpdateSubmissionData,
@@ -61,6 +62,19 @@ type _ListedDrift = AssertExact<
   Prisma.SubmissionGetPayload<{ select: typeof listedSelect }>
 >;
 const _listedDrift: _ListedDrift = true;
+
+/** What counting a view reads: whose the submission is and whether it is public. */
+const standingSelect = {
+  ownerId: true,
+  status: true,
+  owner: { select: { banned: true } },
+} as const satisfies Prisma.SubmissionSelect;
+
+type _StandingDrift = AssertExact<
+  SubmissionStandingRecord,
+  Prisma.SubmissionGetPayload<{ select: typeof standingSelect }>
+>;
+const _standingDrift: _StandingDrift = true;
 
 /**
  * Newest first by first approval, so neither an old upload nor a re-approval
@@ -155,6 +169,14 @@ export class SubmissionRepository {
   /** Find a submission by id with its owner. Returns `null` when not found. */
   static async findByIdWithOwner(id: string): Promise<SubmissionWithOwnerRecord | null> {
     return prisma.submission.findUnique({ where: { id }, include: ownerInclude });
+  }
+
+  /**
+   * Whose a submission is and whether the public may open it, without its
+   * content or its owner's email. Returns `null` when not found.
+   */
+  static async findStanding(id: string): Promise<SubmissionStandingRecord | null> {
+    return prisma.submission.findUnique({ where: { id }, select: standingSelect });
   }
 
   /**
@@ -299,6 +321,24 @@ export class SubmissionRepository {
       orderBy: newestFirst,
       skip,
       take,
+    });
+  }
+
+  /**
+   * The listed submissions among the named ones, newest first: the rows
+   * behind a row that was chosen by something else, such as views. An id
+   * that is not a listed submission's is left out, so nothing unlisted,
+   * unapproved or of a banned owner can be shown by being named.
+   */
+  static async listListedAmong(ids: string[]): Promise<ListedSubmissionRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.submission.findMany({
+      where: { AND: [submissionWhere.listed, { id: { in: ids } }] },
+      select: listedSelect,
+      orderBy: newestFirst,
     });
   }
 

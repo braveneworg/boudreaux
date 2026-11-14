@@ -215,6 +215,15 @@ export const COMMUNITY_SEARCH_RESULTS = 8;
 /** The longest search term the listing route reads. */
 export const COMMUNITY_SEARCH_MAX = 100;
 
+/**
+ * How many days a view counts for (ADR-0029): Trending reads the views of
+ * this many days, and a view older than that is deleted.
+ */
+export const VIEW_WINDOW_DAYS = 30;
+
+/** The fewest views in that time a listed submission needs to be in Trending. */
+export const TRENDING_MINIMUM_VIEWS = 5;
+
 /** What a card and a page print for an owner whose account has no username. */
 export const NAMELESS_OWNER = 'A community member';
 

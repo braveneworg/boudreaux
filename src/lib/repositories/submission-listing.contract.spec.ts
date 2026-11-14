@@ -181,6 +181,47 @@ describe('SubmissionRepository.listListed (Docker Mongo contract)', () => {
   });
 });
 
+describe('SubmissionRepository.listListedAmong (Docker Mongo contract)', () => {
+  const among = async (submissionIds: string[]): Promise<string[]> => {
+    const rows = await SubmissionRepository.listListedAmong(submissionIds);
+    return rows.map(({ id }) => id);
+  };
+
+  it('lists the named listed submissions, newest first, the later id first on a tie', async () => {
+    const { oldest, tieOne, tieTwo, newest } = ids();
+    const tie = [tieOne, tieTwo].sort().reverse();
+
+    expect(await among([oldest, tieOne, newest, tieTwo])).toEqual([newest, ...tie, oldest]);
+  });
+
+  it('leaves out a listed submission that was not named', async () => {
+    const { oldest, newest } = ids();
+
+    expect(await among([oldest, newest])).toEqual([newest, oldest]);
+  });
+
+  it('leaves out an unlisted one, a draft and a banned owner’s, though named', async () => {
+    const { unlisted, draft, bannedOwners, byOwnerB } = ids();
+
+    expect(await among([unlisted, draft, bannedOwners, byOwnerB])).toEqual([byOwnerB]);
+  });
+
+  it('reads nothing for no ids', async () => {
+    expect(await among([])).toEqual([]);
+  });
+
+  it('carries what a card needs, as the listing does', async () => {
+    const [row] = await SubmissionRepository.listListedAmong([ids().byOwnerB]);
+
+    expect(row).toEqual({
+      id: ids().byOwnerB,
+      title: `${prefix}by-b ${needle}`,
+      category: 'WRITING',
+      owner: { username: `${prefix}owner-b`, email: `${prefix}owner-b@example.com` },
+    });
+  });
+});
+
 describe('SubmissionRepository.isPublic (Docker Mongo contract)', () => {
   it('is true for an approved submission that is listed', async () => {
     expect(await SubmissionRepository.isPublic(ids().newest)).toBe(true);

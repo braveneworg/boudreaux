@@ -5,12 +5,15 @@ import {
   MAX_SUBMISSION_LINKS,
   MAX_UNAPPROVED_SUBMISSIONS,
   SUBMISSION_ABOUT_MAX,
+  SUBMISSION_ROW_SIZE,
   SUBMISSION_WRITING_MAX,
+  TRENDING_MINIMUM_VIEWS,
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
 import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
 import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
 import { SubmissionRepository } from '@/lib/repositories/submission-repository';
+import { SubmissionViewEventRepository } from '@/lib/repositories/submission-view-event-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { attachmentStore } from '@/lib/services/submission-attachment-store';
 import {
@@ -37,6 +40,7 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     deleteOwned: vi.fn(),
     listByStatus: vi.fn(),
     listListed: vi.fn(),
+    listListedAmong: vi.fn(),
     isPublic: vi.fn(),
     countAwaitingBefore: vi.fn(),
     countAwaiting: vi.fn(),
@@ -46,6 +50,9 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
 }));
 vi.mock('@/lib/repositories/user-repository', () => ({
   UserRepository: { acceptUploadAgreement: vi.fn(), findByUsername: vi.fn() },
+}));
+vi.mock('@/lib/repositories/submission-view-event-repository', () => ({
+  SubmissionViewEventRepository: { countsSince: vi.fn() },
 }));
 // A submission has no open reports unless a test says so.
 vi.mock('@/lib/repositories/submission-report-repository', () => ({
@@ -1259,6 +1266,130 @@ describe('SubmissionService.listCards', () => {
     const cards = await SubmissionService.listCards({ skip: 0, take: 12 });
 
     expect(JSON.stringify(cards)).not.toMatch(/example\.com/i);
+  });
+});
+
+describe('SubmissionService.listTrendingCards', () => {
+  const idOf = (letter: string): string => letter.repeat(24);
+  const listed = (id: string) => ({
+    id,
+    title: `Title ${id.slice(0, 1)}`,
+    category: 'WRITING' as const,
+    owner: { username: 'ada', email: 'Ada@Example.com ' },
+  });
+  const trendingIds = async (): Promise<string[]> =>
+    (await SubmissionService.listTrendingCards()).map(({ id }) => id);
+
+  it('counts the views of the last thirty days, at the minimum', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([]);
+
+    await SubmissionService.listTrendingCards();
+
+    expect(vi.mocked(SubmissionViewEventRepository.countsSince).mock.calls).toEqual([
+      [new Date('2026-10-12T12:00:00.000Z'), TRENDING_MINIMUM_VIEWS],
+    ]);
+  });
+
+  it('is empty, without a second read, when nothing is at the minimum', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([]);
+
+    await expect(SubmissionService.listTrendingCards()).resolves.toEqual([]);
+    expect(vi.mocked(SubmissionRepository.listListedAmong).mock.calls).toEqual([]);
+  });
+
+  it('reads the listed submissions among the counted ones', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([
+      { submissionId: idOf('1'), views: 6 },
+      { submissionId: idOf('2'), views: 9 },
+    ]);
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce([]);
+
+    await SubmissionService.listTrendingCards();
+
+    expect(vi.mocked(SubmissionRepository.listListedAmong).mock.calls).toEqual([
+      [[idOf('1'), idOf('2')]],
+    ]);
+  });
+
+  it('orders by views, most first, and keeps newest first on a tie', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([
+      { submissionId: idOf('1'), views: 6 },
+      { submissionId: idOf('2'), views: 9 },
+      { submissionId: idOf('3'), views: 6 },
+      { submissionId: idOf('4'), views: 7 },
+    ]);
+    // Newest first, as the repository reads them.
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce([
+      listed(idOf('3')),
+      listed(idOf('1')),
+      listed(idOf('4')),
+      listed(idOf('2')),
+    ]);
+
+    await expect(trendingIds()).resolves.toEqual([idOf('2'), idOf('4'), idOf('3'), idOf('1')]);
+  });
+
+  it('leaves out a counted submission that is not listed', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([
+      { submissionId: idOf('1'), views: 50 },
+      { submissionId: idOf('2'), views: 5 },
+    ]);
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce([listed(idOf('2'))]);
+
+    await expect(trendingIds()).resolves.toEqual([idOf('2')]);
+  });
+
+  it('holds at most a row’s worth, the most viewed', async () => {
+    const hex = [...'0123456789abcdef'];
+    const counts = hex.map((letter, index) => ({ submissionId: idOf(letter), views: 5 + index }));
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce(counts);
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce(
+      hex.map((letter) => listed(idOf(letter)))
+    );
+
+    await expect(trendingIds()).resolves.toEqual(
+      hex
+        .toReversed()
+        .slice(0, SUBMISSION_ROW_SIZE)
+        .map((letter) => idOf(letter))
+    );
+  });
+
+  it('makes each one a card, as the listing does', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([
+      { submissionId: SUBMISSION_ID, views: 5 },
+    ]);
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce([listed(SUBMISSION_ID)]);
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([
+      attachment(),
+    ]);
+
+    await expect(SubmissionService.listTrendingCards()).resolves.toEqual([
+      {
+        id: SUBMISSION_ID,
+        title: `Title ${SUBMISSION_ID.slice(0, 1)}`,
+        category: 'WRITING',
+        cardPictureUrl: `https://cdn.example/${COPY_PREFIX}card.webp`,
+        owner: { username: 'ada', gravatarHash: gravatarHash('ada@example.com') },
+      },
+    ]);
+  });
+
+  it('never carries a view count', async () => {
+    vi.mocked(SubmissionViewEventRepository.countsSince).mockResolvedValueOnce([
+      { submissionId: SUBMISSION_ID, views: 5 },
+    ]);
+    vi.mocked(SubmissionRepository.listListedAmong).mockResolvedValueOnce([listed(SUBMISSION_ID)]);
+
+    const [card] = await SubmissionService.listTrendingCards();
+
+    expect(Object.keys(card ?? {}).toSorted()).toEqual([
+      'cardPictureUrl',
+      'category',
+      'id',
+      'owner',
+      'title',
+    ]);
   });
 });
 

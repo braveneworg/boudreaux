@@ -9,17 +9,21 @@ import {
   unreadyAttachmentsMessage,
   unreadyAttachmentState,
 } from '@/lib/community/attachment-state';
+import { viewWindowStart } from '@/lib/community/view-window';
 import {
   MAX_SUBMISSION_LINKS,
   MAX_UNAPPROVED_SUBMISSIONS,
   SUBMISSION_ABOUT_MAX,
+  SUBMISSION_ROW_SIZE,
   SUBMISSION_WRITING_MAX,
+  TRENDING_MINIMUM_VIEWS,
   UPLOAD_AGREEMENT_VERSION,
 } from '@/lib/constants/submissions';
 import type { SubmissionStatus } from '@/lib/constants/submissions';
 import { SubmissionAttachmentRepository } from '@/lib/repositories/submission-attachment-repository';
 import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
 import { isPublicSubmission, SubmissionRepository } from '@/lib/repositories/submission-repository';
+import { SubmissionViewEventRepository } from '@/lib/repositories/submission-view-event-repository';
 import { UserRepository } from '@/lib/repositories/user-repository';
 import { attachmentStore } from '@/lib/services/submission-attachment-store';
 import { attachmentViewsFor, cardPictureUrlFor } from '@/lib/services/submission-attachment-views';
@@ -30,6 +34,7 @@ import {
 import { DataError } from '@/lib/types/domain/errors';
 import type {
   SubmissionActor,
+  ListedSubmissionRecord,
   ListedSubmissionsQuery,
   SubmissionCard,
   SubmissionContent,
@@ -798,7 +803,11 @@ export class SubmissionService {
    * each picture is the CDN's and the answer is the same for any reader.
    */
   static async listCards(query: ListedSubmissionsQuery): Promise<SubmissionCard[]> {
-    const listed = await SubmissionRepository.listListed(query);
+    return SubmissionService.cardsFor(await SubmissionRepository.listListed(query));
+  }
+
+  /** Listed submissions as cards, in the order given. */
+  private static async cardsFor(listed: ListedSubmissionRecord[]): Promise<SubmissionCard[]> {
     const pictures = await SubmissionService.cardPictures(
       listed.map(({ id }) => ({ id, status: 'APPROVED' }))
     );
@@ -810,6 +819,33 @@ export class SubmissionService {
       cardPictureUrl: pictures.get(id) ?? null,
       owner: { username: owner.username, gravatarHash: gravatarHash(owner.email) },
     }));
+  }
+
+  /**
+   * The Trending submission row (ADR-0029): the listed submissions with the
+   * most views over the last thirty days, most viewed first and newer first
+   * on a tie, at most a row's worth. A submission under the minimum is not in
+   * it, and neither is one that is not listed, whatever its views: the counts
+   * only choose among what the listing would show anyway. A card carries no
+   * count.
+   */
+  static async listTrendingCards(): Promise<SubmissionCard[]> {
+    const counts = await SubmissionViewEventRepository.countsSince(
+      viewWindowStart(new Date()),
+      TRENDING_MINIMUM_VIEWS
+    );
+    if (counts.length === 0) {
+      return [];
+    }
+
+    const viewsOf = new Map(counts.map(({ submissionId, views }) => [submissionId, views]));
+    // Read newest first; the sort is stable, so a tie keeps that order.
+    const listed = await SubmissionRepository.listListedAmong([...viewsOf.keys()]);
+    const mostViewed = listed
+      .toSorted((a, b) => (viewsOf.get(b.id) ?? 0) - (viewsOf.get(a.id) ?? 0))
+      .slice(0, SUBMISSION_ROW_SIZE);
+
+    return SubmissionService.cardsFor(mostViewed);
   }
 
   /** Whether an id names a public submission: one anybody may open. */

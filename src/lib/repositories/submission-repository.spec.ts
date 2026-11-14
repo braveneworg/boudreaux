@@ -147,6 +147,29 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('findStanding', () => {
+    it('reads only whose the submission is and whether it is public', async () => {
+      const standing = { ownerId: OWNER_ID, status: 'APPROVED', owner: { banned: null } };
+      vi.mocked(prisma.submission.findUnique).mockResolvedValueOnce(standing as never);
+
+      await expect(SubmissionRepository.findStanding(SUBMISSION_ID)).resolves.toBe(standing);
+      expect(vi.mocked(prisma.submission.findUnique).mock.calls).toEqual([
+        [
+          {
+            where: { id: SUBMISSION_ID },
+            select: { ownerId: true, status: true, owner: { select: { banned: true } } },
+          },
+        ],
+      ]);
+    });
+
+    it('is null for an id that names nothing', async () => {
+      vi.mocked(prisma.submission.findUnique).mockResolvedValueOnce(null);
+
+      await expect(SubmissionRepository.findStanding(SUBMISSION_ID)).resolves.toBeNull();
+    });
+  });
+
   describe('findByOwner', () => {
     it("lists the owner's submissions, most recently changed first", async () => {
       vi.mocked(prisma.submission.findMany).mockResolvedValueOnce([stored] as never);
@@ -367,6 +390,34 @@ describe('SubmissionRepository', () => {
       expect(vi.mocked(prisma.submission.findMany).mock.calls[0]?.[0]?.where).toEqual({
         AND: [submissionWhere.listed, submissionMatching('bus'), { ownerId: OWNER_ID }],
       });
+    });
+  });
+
+  describe('listListedAmong', () => {
+    it('reads the listed submissions among the ids, newest first by first approval', async () => {
+      const rows = [{ id: SUBMISSION_ID, title: 'Bus poem', category: 'WRITING' }];
+      vi.mocked(prisma.submission.findMany).mockResolvedValueOnce(rows as never);
+
+      await expect(SubmissionRepository.listListedAmong([SUBMISSION_ID])).resolves.toBe(rows);
+      expect(vi.mocked(prisma.submission.findMany).mock.calls).toEqual([
+        [
+          {
+            where: { AND: [submissionWhere.listed, { id: { in: [SUBMISSION_ID] } }] },
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              owner: { select: { username: true, email: true } },
+            },
+            orderBy: [{ firstApprovedAt: 'desc' }, { id: 'desc' }],
+          },
+        ],
+      ]);
+    });
+
+    it('reads nothing when no id is named', async () => {
+      await expect(SubmissionRepository.listListedAmong([])).resolves.toEqual([]);
+      expect(vi.mocked(prisma.submission.findMany).mock.calls).toEqual([]);
     });
   });
 
