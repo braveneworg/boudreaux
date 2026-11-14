@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { isPublicSubmission, submissionMatching, submissionWhere } from './submission-where';
-import { isUnsetOr } from './where-kit';
+import { containsText, isUnsetOr } from './where-kit';
 
 describe('submissionWhere', () => {
   it('unapproved is a draft, one awaiting approval, or a rejected one', () => {
@@ -28,6 +28,16 @@ describe('submissionWhere', () => {
 });
 
 describe('submissionMatching', () => {
+  it('reads the term as text, never as a pattern', () => {
+    expect(submissionMatching('.*(')).toEqual({
+      OR: [
+        { title: containsText('.*(') },
+        { aboutText: containsText('.*(') },
+        { owner: { is: { username: containsText('.*(') } } },
+      ],
+    });
+  });
+
   it('reads the title, the about text and the owner’s username, whatever the case', () => {
     const contains = { contains: 'bus', mode: 'insensitive' };
 

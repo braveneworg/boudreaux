@@ -49,6 +49,7 @@ const isBanned = (ban: Ban): boolean => ban === 'true';
 const listingPrefix = `__contract:${randomUUID()}:`;
 const needle = `ndl${randomUUID().slice(0, 8)}`;
 const listingTitle = (name: string): string => `${listingPrefix}${name}`;
+const META_TITLE = 'meta .*(x';
 
 const findListingTitles = async (where: Prisma.SubmissionWhereInput): Promise<string[]> => {
   const rows = await prisma.submission.findMany({
@@ -112,6 +113,8 @@ const seedListingRows = async (): Promise<void> => {
       writingHtml: `<p>${needle}</p>`,
     },
     { ...approved, ownerId: namedOwnerId, title: listingTitle('by-named') },
+    // Characters a regular expression would read as syntax.
+    { ...approved, ownerId: plain, title: listingTitle(META_TITLE) },
   ];
   for (const data of rows) {
     await prisma.submission.create({ data });
@@ -195,6 +198,7 @@ describe('the community page’s fragments (Docker Mongo contract)', () => {
         'about-null',
         'by-named',
         'listed',
+        META_TITLE,
         NEEDLE_TITLE,
         'writing',
       ].sort()
@@ -213,6 +217,16 @@ describe('the community page’s fragments (Docker Mongo contract)', () => {
     expect(
       await findListingTitles({ AND: [submissionWhere.listed, submissionMatching(needle)] })
     ).toEqual(['about', 'by-named', NEEDLE_TITLE].sort());
+  });
+
+  // A term is text, never a pattern: `.*` unescaped would match every row,
+  // and `(` unescaped would not compile.
+  it.each(['.*', '(', '.*(x'])('matching reads %s as the characters themselves', async (term) => {
+    expect(await findListingTitles(submissionMatching(term))).toEqual([META_TITLE]);
+  });
+
+  it('matching finds nothing, without failing, for a lone backslash', async () => {
+    expect(await findListingTitles(submissionMatching('\\'))).toEqual([]);
   });
 
   it('an owner narrows the two together', async () => {

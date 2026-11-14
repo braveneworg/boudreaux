@@ -58,3 +58,20 @@ export const isPresent = <F extends string>(field: F): PresentClause<F> =>
  * sit inside their own `AND` member.
  */
 export const allOf = <C extends object[]>(...clauses: C): { AND: C } => ({ AND: clauses });
+
+/** Every character a regular expression reads as syntax. */
+const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * "Contains this text, whatever the case", for a term a visitor typed.
+ *
+ * On this stack `{ contains, mode: 'insensitive' }` is sent to MongoDB as a
+ * regular expression, and Prisma does not escape the term: `.*` matches every
+ * row, `(` fails the query with "Invalid Regex", and a crafted pattern can
+ * make the database backtrack. So the term is escaped here and read as the
+ * characters themselves. Proved by `submission-where.contract.spec.ts`.
+ */
+export const containsText = (term: string): { contains: string; mode: 'insensitive' } => ({
+  contains: term.replace(REGEX_SYNTAX, '\\$&'),
+  mode: 'insensitive',
+});

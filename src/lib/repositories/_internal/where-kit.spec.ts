@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { allOf, isPresent, isUnset, isUnsetOr } from './where-kit';
+import { allOf, containsText, isPresent, isUnset, isUnsetOr } from './where-kit';
 
 describe('where-kit', () => {
   describe('isUnset', () => {
@@ -23,6 +23,22 @@ describe('where-kit', () => {
   describe('isPresent', () => {
     it('uses the `not: null` shape, which already excludes absent fields', () => {
       expect(isPresent('publishedAt')).toEqual({ publishedAt: { not: null } });
+    });
+  });
+
+  describe('containsText', () => {
+    it('matches a plain term as it is, whatever the case', () => {
+      expect(containsText('bus')).toEqual({ contains: 'bus', mode: 'insensitive' });
+    });
+
+    it('escapes what a regular expression would read as syntax', () => {
+      expect(containsText('a.*b(c)[d]{e}+?^$|\\').contains).toBe(
+        'a\\.\\*b\\(c\\)\\[d\\]\\{e\\}\\+\\?\\^\\$\\|\\\\'
+      );
+    });
+
+    it('leaves spaces, hyphens and other ordinary punctuation alone', () => {
+      expect(containsText('lo-fi tape, no. 2!').contains).toBe('lo-fi tape, no\\. 2!');
     });
   });
 

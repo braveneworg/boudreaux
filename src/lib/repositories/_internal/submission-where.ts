@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { UNAPPROVED_SUBMISSION_STATUSES } from '@/lib/constants/submissions';
 
-import { isUnsetOr } from './where-kit';
+import { containsText, isUnsetOr } from './where-kit';
 
 import type { Prisma } from '@prisma/client';
 
@@ -48,7 +48,7 @@ export const submissionWhere = {
  * relation share a join on MongoDB; the contract spec proves the pair.
  */
 export const submissionMatching = (term: string): Prisma.SubmissionWhereInput => {
-  const contains = { contains: term, mode: 'insensitive' as const };
+  const contains = containsText(term);
 
   return {
     OR: [{ title: contains }, { aboutText: contains }, { owner: { is: { username: contains } } }],
