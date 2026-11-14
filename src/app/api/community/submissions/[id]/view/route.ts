@@ -21,8 +21,13 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' } as const;
 
 /**
  * The one answer to every well-formed request: counted or not, a submission
- * or not. A caller cannot learn from it that a submission exists, that it is
- * public, or that their view was counted.
+ * or not. Its status and body never say whether a view was counted.
+ *
+ * It is not a secret that a submission is public. A guest with no visitor
+ * cookie is sent one only when the id names a public submission, since a
+ * guest is identified only then; the submission's own page already answers
+ * `200` or `404` for the same question. An id that names nothing and one
+ * that is not public are answered alike.
  */
 const answered = (): NextResponse => new NextResponse(null, { status: 204, headers: NO_STORE });
 

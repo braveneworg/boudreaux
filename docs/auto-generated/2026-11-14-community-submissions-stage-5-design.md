@@ -2,7 +2,7 @@
 
 - **Date**: 2026-11-14
 - **Branch**: `feat/community-views-trending` (off main `9df47d3e`, v4.487.0)
-- **Status**: Design; "As built" is added at the end when the branch is done
+- **Status**: Implemented on the branch; see "As built" at the end
 - **Vocabulary**: `CONTEXT.md` (view, submission row, listed submission,
   public submission, download subject)
 - **Decisions**:
@@ -279,3 +279,153 @@ existing hourly checks, in production only and never under `E2E_MODE`.
   proves them.
 - The proxy is not reloaded reliably by the dev server; nothing here changes
   it.
+
+## As built (2026-11-14)
+
+Stage 5 is implemented on `feat/community-views-trending`. Where the build
+differs from the design above, the build is what the code does and this
+section says why. No acceptance criterion was changed.
+
+### Decisions made while building, not yet confirmed by the owner
+
+- **The three numbers stand as drafted**: five views for Trending, five
+  guest views per address per submission per day, ten requests a minute to
+  the route. One consequence was not seen when they were chosen: the
+  minimum equals what one address may add in a day, so one person who
+  clears their cookies five times can put a listed submission in Trending
+  alone (ADR-0029, Consequences).
+- **A guest with no visitor cookie is recognised by fingerprint**, as a
+  download's guest is. That is the settled rule, and it has a cost the
+  settled wording does not show: two people with the same phone and
+  language on one network are one guest, and their openings of one
+  submission on one day count once. The code review recommends that a view
+  identify a guest by the cookie alone and let the address bound do the
+  rest. It was not changed, because it changes a rule the owner settled.
+  It is the first thing to decide.
+- **The view key is keyed with the server's signing secret**
+  (`AUTH_SECRET`, as the Turnstile gate already reuses it). Section 11 put
+  a keyed hash out of scope; the security review showed the plain hash
+  could be rebuilt for every account, submission and day in about a minute.
+- **Trending considers the hundred most viewed submissions**
+  (`TRENDING_CANDIDATES`), then keeps the listed ones.
+- **The route's limit** is its own tier, not the public one.
+
+### Differences from the design
+
+- **Section 1, the key.** An HMAC-SHA-256 under the signing secret, of
+  `submission-view|<submission>|<viewer>|<UTC day>`. A view is refused, with
+  nothing stored and no guest identified, when the server has no secret.
+- **Section 2, the answer.** The status and body are the same for every
+  well-formed request. One thing differs: a guest with no visitor cookie is
+  sent one only when the id names a public submission, since a guest is
+  identified only then. The submission's own page already answers `200` or
+  `404` for the same question.
+- **Section 2, the caller.** The route's handler was one branch over the
+  linter's complexity cap; who is calling is worked out in a helper.
+- **Section 3, the beacon.** One mount posts once, also in development.
+  React replays a mounted effect there, and two requests at once from a
+  guest with no cookie yet resolved to two visitors: one opening was
+  counted under both. A ref outlives the replay. A real remount posts again
+  and the server counts it once.
+- **Section 4, the count.** `countsSince(cutoff, minimum, limit)` returns
+  the most viewed first, the id breaking a tie, and no more than `limit`.
+- **Section 4, the slim read.** Counting a view reads only whose the
+  submission is and whether it is public (`findStanding`), never its
+  content or its owner's email.
+- **Section 7, the constants.** `GUEST_VIEWS_PER_ADDRESS_PER_SUBMISSION` is
+  in a module of its own, `utils/submission-view-allowance.ts`: the
+  existing allowances module holds what one owner may cost, keyed by
+  account, and this is keyed by address. `TRENDING_CANDIDATES` (100) is new.
+- **A duplicate key is told by name.** On the dev server a duplicate key
+  reached the repository as a `DataError` that failed `instanceof`, and
+  every repeat view answered `500`. The catch reads the name and the code
+  (`isDataErrorWithCode`). The production build is not affected; that was
+  measured (`docs/lessons/prisma-mongo/a-data-error-is-told-by-its-name.md`).
+- **The E2E database gets one unique index.** Nothing pushes the schema
+  there, so it holds none of the schema's unique indexes. The seed now
+  creates the view key's, and a spec fails if it is missing.
+
+### How it was checked
+
+- **Unit**: the four-command gate passes on the finished tree. The counts
+  are in the pull request, which reports what ran there.
+- **Real database**: the contract suite on Docker Mongo. For views: a key
+  is stored once and refused the second time; eight writers racing for one
+  key store one row, and eight rows with the index dropped, which was run
+  to prove the case can fail; the count reads from the cutoff's own
+  instant, drops a submission under the minimum, orders by views and stops
+  at its limit; the prune deletes exactly the rows before its cutoff;
+  deleting a submission deletes its views. `listListedAmong` reads only the
+  listed ones among the ids it is given, newest first.
+- **End to end**, in `community-submissions.spec.ts`, on the dev server and
+  on a local production build, with no retries: a signed-out visitor's
+  opening stores one view and a reload stores none; the stored row holds
+  four fields and a 64-character key; the owner's page sends no request,
+  and neither the owner nor an approver is counted when the route is asked
+  directly; another signed-in user is counted once in two requests; a
+  cross-site request is answered `204` and counts nothing; five views put
+  a listed submission in the Trending row, while six views from forty days
+  ago and eight views on an unlisted submission do not; the headings read
+  Most Recent, Trending, All submissions; one user's list shows no
+  Trending row.
+- **By eye**: `/community` with both rows at 1440 and 375 pixels wide.
+- **Security review**: an independent read of the branch. It found no way
+  for an unapproved, rejected, unlisted or banned owner's submission to
+  reach Trending, found the same-site check sound for a browser, and found
+  nothing that names a viewer stored with a view or logged by the route.
+  Acted on: the unkeyed hash, the unbounded second read of Trending, and
+  two statements that were not true (the address "lives in the limiter and
+  nowhere else"; the answer "never says a submission is public").
+- **Code review**: an independent read for defects. It found no blocking
+  defect. Acted on: a beacon case that could not fail, a spec that copied
+  the rule it depended on, an inaccurate comment, and an E2E case that
+  would miscount across 00:00 UTC.
+
+### Known gaps
+
+- **Guest views are undercounted where like devices share a network**, and
+  **one address can reach the Trending minimum alone**. Both are above.
+- **The limits are not exercised end to end.** Rate limits and allowances
+  are skipped under `E2E_MODE`.
+- **A guest identity is created for any caller the route lets through.**
+  One address can create up to ten a minute here, as it can through the
+  free-download status route, which creates one for any well-formed id.
+  The two limits add up. Nothing prunes `VisitorIdentity`.
+- **The route's limit and nginx key on the full address; only the guest
+  bound uses an IPv6 `/64`.** A caller with a whole `/64` is rate limited
+  per address, not per network.
+- **Two openings at one instant by one guest** spend two of the address's
+  five and store one view.
+- **When the rate limiter's store is down**, the guest bound is held in
+  each server process's memory.
+- **The Trending count is not cached** and reads every view of the last
+  thirty days on each load of `/community`. No page on the site is rate
+  limited by nginx.
+- **The views test skips in the two minutes before 00:00 UTC**, since the
+  key changes with the day.
+- **No E2E covers the thirty-day prune.** It runs in production only; the
+  service, the monitor and the repository's delete are covered by unit and
+  contract specs.
+
+### Found outside this stage
+
+- **An IPv6 client may be able to choose its own address** (unproven; from
+  the security review). nginx trusts `X-Forwarded-For` from
+  `172.16.0.0/12`, the Docker bridge range. If the host accepts IPv6 and
+  Docker carries it through its userland proxy, nginx sees the bridge as
+  the peer and takes the client's own header as the address. That would
+  defeat every per-address limit on the site, this stage's included.
+  Whether the host has a public IPv6 address was not checked.
+- **Twenty-four places test `instanceof DataError`.** On the dev server
+  the check can miss and the code takes its generic failure path. The
+  production build is not affected. None was changed.
+- **Two free-download E2E specs race.** `free-download-cap.spec.ts` seeds a
+  capped visitor with a made-up fingerprint; its first request rewrites
+  that to the real Pixel 7 fingerprint. `free-digital-downloads.spec.ts`
+  opens the same release with the same device and no cookie, is recognised
+  as the capped visitor, and finds no format to pick. It failed 1 run in 8
+  on the production build with this stage's spec left out of the run. It
+  is the fingerprint rule above, seen between two specs.
+- **`use-attachment-uploads.spec.ts` "leaves the other files alone when one
+  of them fails"** failed once in a full unit run, at its one-second wait,
+  and passed alone three times and in the next full run. Not investigated.

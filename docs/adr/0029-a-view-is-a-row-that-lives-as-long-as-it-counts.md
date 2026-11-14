@@ -30,23 +30,29 @@ then deleted. Trending counts the rows on read. Nothing else holds a view
 count.**
 
 - **The row holds the submission, the time and one unique key.** The key is
-  a SHA-256 of the submission, the viewer and the UTC day. The unique index
-  on it is what makes a second opening on the same day not count, also when
-  two requests arrive together.
+  an HMAC-SHA-256 of the submission, the viewer and the UTC day, under the
+  server's signing secret. The unique index on it is what makes a second
+  opening on the same day not count, also when two requests arrive together.
 - **The row does not hold the viewer.** No account id, no visitor id, no
-  address and no fingerprint is stored on it.
+  address and no fingerprint is stored on it. Every input to the key but the
+  secret sits in the database, so a plain hash could be rebuilt for every
+  account, submission and day in about a minute; the secret is what makes
+  the row say nothing to someone who holds only the database.
 - **A view is counted by the page in the browser, not by the render.** The
   page posts to a rate-limited route once it has mounted. A link preview, a
   crawler or a prefetch renders the page and counts nothing.
 - **The route counts only what a reader of this site sent.** A request
   another site made a browser send is ignored.
 - **A guest's views are bounded per address.** One address adds at most five
-  guest views to one submission in 24 hours. The address lives in the rate
-  limiter for that window and nowhere else.
+  guest views to one submission in 24 hours. The address is never stored
+  with a view. The rate limiter holds it, with the submission's id, for up
+  to two days; the web server's access log records the request as it
+  records every page.
 - **Trending is read in two steps.** Count the rows of the last thirty days
-  by submission and keep those at or over the minimum; then load those ids
-  through the `listed` fragment. An unlisted, unapproved or banned owner's
-  submission cannot reach the row whatever its count.
+  by submission, keep those at or over the minimum, and take the hundred
+  most viewed; then load those ids through the `listed` fragment. An
+  unlisted, unapproved or banned owner's submission cannot reach the row
+  whatever its count.
 - **A row is deleted when it stops counting.** An hourly check deletes rows
   older than thirty days. If it never ran, Trending would still be right,
   because the read applies the same thirty days; only storage would grow.
@@ -75,9 +81,23 @@ count.**
 
 ## Consequences
 
-- The key is not a secret. Someone who holds the database and the users
-  table can test whether one account viewed one submission on one day. What
-  the hash removes is the table that lists it.
+- Someone who holds the database and the signing secret can rebuild who
+  viewed what for the last thirty days. Someone who holds only the database
+  cannot.
+- Rotating the signing secret changes every key from then on. A viewer
+  already counted that day can be counted once more; nothing else changes.
+- A guest is identified as a download's guest is, and that includes being
+  recognised by fingerprint when they hold no visitor cookie: the browser,
+  its language and the address's network. Two people with the same phone
+  and language on one network, neither with a cookie yet, are one guest,
+  and the second is given the first's cookie. Their openings of one
+  submission on one day count once. Most first-time readers hold no cookie,
+  so guest views are undercounted wherever many like devices share a
+  network.
+- The minimum for Trending is the same number one address may add in a day.
+  One person who clears their cookies five times can put a listed
+  submission in Trending alone. The minimum keeps noise out of the row; it
+  does not keep a determined person out.
 - The day is the UTC day. A viewer who opens a submission at 6 pm and again
   at 9 pm US Eastern is counted twice, on two UTC days.
 - A viewer who blocks scripts is never counted.
@@ -90,6 +110,13 @@ count.**
 - A shared address (a venue, a campus) adds at most five guest views to one
   submission in a day, however many people there open it. Signed-in viewers
   are not bounded this way.
-- Trending's read grows with the views of the last thirty days. Past a few
-  hundred thousand rows it wants the counter this decision rejected.
+- Two openings at the same instant by one guest (two tabs) spend two of the
+  address's five and store one view.
+- When the rate limiter's store is down, the address bound is held in each
+  server process's memory and starts again when the process does.
+- Trending's count grows with the views of the last thirty days. Past a few
+  hundred thousand rows it wants the counter this decision rejected. Its
+  second read is bounded at a hundred submissions.
+- If more than eighty-eight of the hundred most viewed submissions were
+  unlisted, Trending would hold fewer than twelve.
 - Deleting a submission deletes its views.
