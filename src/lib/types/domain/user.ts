@@ -45,6 +45,10 @@ export type UserScalars = {
   country: string | null;
   allowSmsNotifications: boolean | null;
   allowEmailNotifications: boolean | null;
+  // The upload agreement (ADR-0025): when it was last accepted and at which
+  // version of the wording. Both null until the first acceptance.
+  uploadAgreementAt: Date | null;
+  uploadAgreementVersion: number | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -111,6 +115,14 @@ export interface UserContactRecord {
   email: string | null;
 }
 
+/** Role projection: who a role may be granted to or removed from. */
+export interface UserRoleRecord {
+  id: string;
+  username: string | null;
+  role: string | null;
+  banned: boolean | null;
+}
+
 /** Admin notification fan-out projection. */
 export interface UserAdminRecord {
   id: string;
@@ -118,6 +130,11 @@ export interface UserAdminRecord {
   username: string | null;
   phone: string | null;
   allowSmsNotifications: boolean | null;
+}
+
+/** An approver as a notice reads them: the fan-out fields, and which kind of approver. */
+export interface UserApproverRecord extends UserAdminRecord {
+  role: string | null;
 }
 
 /** SMS blast recipient projection. */

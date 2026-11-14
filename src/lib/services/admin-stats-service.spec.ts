@@ -6,6 +6,8 @@ import { BannerNotificationRepository } from '@/lib/repositories/banner-notifica
 import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
+import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
@@ -38,6 +40,12 @@ vi.mock('@/lib/repositories/tours/tour-date-repository', () => ({
 vi.mock('@/lib/repositories/video-repository', () => ({
   VideoRepository: { count: vi.fn() },
 }));
+vi.mock('@/lib/repositories/submission-repository', () => ({
+  SubmissionRepository: { countAwaiting: vi.fn() },
+}));
+vi.mock('@/lib/repositories/submission-report-repository', () => ({
+  SubmissionReportRepository: { countOpen: vi.fn() },
+}));
 
 describe('AdminStatsService.getStats', () => {
   beforeEach(() => {
@@ -52,6 +60,8 @@ describe('AdminStatsService.getStats', () => {
     vi.mocked(ChatUserRepository.countDisabled).mockResolvedValue(1);
     vi.mocked(TourRepository.count).mockResolvedValue(5);
     vi.mocked(TourDateRepository.countUpcoming).mockResolvedValue(8);
+    vi.mocked(SubmissionRepository.countAwaiting).mockResolvedValue(9);
+    vi.mocked(SubmissionReportRepository.countOpen).mockResolvedValue(2);
     // VideoRepository.count: first call = total, second = published
     vi.mocked(VideoRepository.count).mockResolvedValueOnce(6).mockResolvedValueOnce(4);
   });
@@ -84,6 +94,12 @@ describe('AdminStatsService.getStats', () => {
     const stats = await AdminStatsService.getStats();
 
     expect(stats.chat).toEqual({ flaggedUsers: 4, disabledUsers: 1 });
+  });
+
+  it('reports the submissions awaiting approval and the open reports', async () => {
+    const stats = await AdminStatsService.getStats();
+
+    expect(stats.submissions).toEqual({ awaiting: 9, openReports: 2 });
   });
 
   it('reports tour totals and upcoming dates', async () => {

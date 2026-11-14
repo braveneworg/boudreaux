@@ -548,6 +548,16 @@
       }
     },
     {
+      // A submission's audio attachment is a file a user uploaded; no caption
+      // track exists for it, and an empty `<track>` would claim one. The rule
+      // cannot be met truthfully for this one player, so it is off for this
+      // file alone. Every other player on the site is built by video.js.
+      "files": ["src/app/components/community/submission-attachment-gallery.tsx"],
+      "rules": {
+        "jsx-a11y/media-has-caption": "off"
+      }
+    },
+    {
       // ── Scoped rule exceptions (the only two) ──────────────────────────────
       // The project forbids inline disable comments. `detect-non-literal-fs-filename`
       // is purely syntactic (it flags any non-literal path argument with no
@@ -564,6 +574,9 @@
         "src/lib/services/format-upload/*.ts",
         "src/lib/audio-metadata/ffmpeg.ts",
         "bio-generator/src/template.spec.ts",
+        // The re-encode Lambda's one file-I/O module: every path is a name it
+        // chose inside its own temp dir (ADR-0026).
+        "submission-reencoder/src/lib/files.ts",
         "src/test-utils/lazy-lucide-react.ts",
         "vitest.config.spec.ts",
         "src/test-utils/repository-sources.ts",

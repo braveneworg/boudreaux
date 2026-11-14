@@ -38,6 +38,7 @@ const stats: AdminStats = {
   chat: { flaggedUsers: 4, disabledUsers: 1 },
   tours: { total: 5, upcomingDates: 8 },
   videos: { total: 6, published: 4, draft: 2 },
+  submissions: { awaiting: 9, openReports: 0 },
 };
 
 describe('AdminDashboardPage', () => {
@@ -49,6 +50,18 @@ describe('AdminDashboardPage', () => {
     render(await AdminDashboardPage());
 
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  });
+
+  it('shows how many submissions are awaiting approval on the Community tile', async () => {
+    render(await AdminDashboardPage());
+
+    const tile = screen.getByRole('link', { name: 'Community' }).closest('li');
+    expect(screen.getByRole('link', { name: 'Community' })).toHaveAttribute(
+      'href',
+      '/admin/community'
+    );
+    expect(tile).toHaveTextContent('9');
+    expect(tile).toHaveTextContent('awaiting approval');
   });
 
   it('renders a tile link for every admin section', async () => {
@@ -65,6 +78,36 @@ describe('AdminDashboardPage', () => {
     render(await AdminDashboardPage());
 
     expect(screen.getByText('7 published · 3 draft')).toBeInTheDocument();
+  });
+
+  it('warns about open submission reports, linking to the Reported tab', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      ...stats,
+      submissions: { awaiting: 9, openReports: 3 },
+    });
+
+    render(await AdminDashboardPage());
+
+    expect(screen.getByRole('link', { name: '3 open reports' }).getAttribute('href')).toBe(
+      '/admin/community?status=reported'
+    );
+  });
+
+  it('counts a single open report in the singular', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      ...stats,
+      submissions: { awaiting: 9, openReports: 1 },
+    });
+
+    render(await AdminDashboardPage());
+
+    expect(screen.getByRole('link', { name: '1 open report' })).toBeInTheDocument();
+  });
+
+  it('shows no report warning when no report is open', async () => {
+    render(await AdminDashboardPage());
+
+    expect(screen.queryByRole('link', { name: /open report/ })).toBeNull();
   });
 
   // A published release whose album artist is hidden shows no byline

@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { prisma } from '@/lib/prisma';
+import { DataError } from '@/lib/types/domain/errors';
 
 import { SiteSettingsRepository } from './site-settings-repository';
 
@@ -13,6 +14,8 @@ vi.mock('@/lib/prisma', () => ({
     siteSettings: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
+      updateMany: vi.fn(),
+      create: vi.fn(),
     },
   },
 }));
@@ -62,6 +65,48 @@ describe('SiteSettingsRepository', () => {
         update: { value: '10' },
         create: { key: 'carousel-rotation-interval', value: '10' },
       });
+    });
+  });
+
+  describe('claimValue', () => {
+    const KEY = 'submission-overdue-reminder-day';
+    const TODAY = '2026-11-11';
+
+    it('claims a key that holds another value, by writing the new one', async () => {
+      vi.mocked(prisma.siteSettings.updateMany).mockResolvedValueOnce({ count: 1 });
+
+      await expect(SiteSettingsRepository.claimValue(KEY, TODAY)).resolves.toBe(true);
+      expect(vi.mocked(prisma.siteSettings.updateMany).mock.calls).toEqual([
+        [{ where: { key: KEY, value: { not: TODAY } }, data: { value: TODAY } }],
+      ]);
+      expect(prisma.siteSettings.create).not.toHaveBeenCalled();
+    });
+
+    it('claims a key nobody has written yet, by creating it', async () => {
+      vi.mocked(prisma.siteSettings.updateMany).mockResolvedValueOnce({ count: 0 });
+      vi.mocked(prisma.siteSettings.create).mockResolvedValueOnce(mockSetting);
+
+      await expect(SiteSettingsRepository.claimValue(KEY, TODAY)).resolves.toBe(true);
+      expect(vi.mocked(prisma.siteSettings.create).mock.calls).toEqual([
+        [{ data: { key: KEY, value: TODAY } }],
+      ]);
+    });
+
+    it('does not claim a key that already holds the value', async () => {
+      vi.mocked(prisma.siteSettings.updateMany).mockResolvedValueOnce({ count: 0 });
+      vi.mocked(prisma.siteSettings.create).mockRejectedValueOnce(
+        new DataError('DUPLICATE', 'Unique constraint failed on the fields: (`key`)')
+      );
+
+      await expect(SiteSettingsRepository.claimValue(KEY, TODAY)).resolves.toBe(false);
+    });
+
+    it('rejects with any other failure of the create', async () => {
+      const outage = new DataError('UNAVAILABLE', 'Database unavailable');
+      vi.mocked(prisma.siteSettings.updateMany).mockResolvedValueOnce({ count: 0 });
+      vi.mocked(prisma.siteSettings.create).mockRejectedValueOnce(outage);
+
+      await expect(SiteSettingsRepository.claimValue(KEY, TODAY)).rejects.toBe(outage);
     });
   });
 });

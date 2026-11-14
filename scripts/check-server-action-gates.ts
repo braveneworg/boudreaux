@@ -4,7 +4,8 @@
 /**
  * Proves that every Server Action crosses the action gate or says it is
  * public. Each export of every `'use server'` module under `<root>/src` must
- * call `gateAction('admin' | 'signed-in')` or `runAdminEntityAction(...)` in
+ * call `gateAction('admin' | 'approver' | 'signed-in')` or
+ * `runAdminEntityAction(...)` in
  * its own body (a call inside a module-private helper does not count), unless
  * the line directly after `'use server';` is
  * `// action-gate: public: <reason>`. The adjacent spec fails the gate on any
@@ -15,7 +16,7 @@ import { join } from 'path';
 
 import ts from 'typescript';
 
-export type ServerActionAccess = 'admin' | 'signed-in' | 'public' | 'ungated';
+export type ServerActionAccess = 'admin' | 'approver' | 'signed-in' | 'public' | 'ungated';
 
 export interface ServerActionExport {
   file: string;
@@ -31,7 +32,11 @@ export interface ServerActionGateReport {
 const SOURCE_FILE = /\.tsx?$/;
 const SPEC_FILE = /\.spec\.tsx?$/;
 const PUBLIC_MARKER = '// action-gate: public';
-const GATE_ACCESS = new Set<string>(['admin', 'signed-in']);
+/** The access literals `gateAction` takes, mirroring `ActionAccess`. */
+type GateAccess = 'admin' | 'approver' | 'signed-in';
+
+const isGateAccess = (value: string): value is GateAccess =>
+  value === 'admin' || value === 'approver' || value === 'signed-in';
 
 /** What one export's own body reveals about its gate. */
 interface GateCalls {
@@ -78,9 +83,9 @@ const gateCallsIn = (node: ts.Node): GateCalls => {
         if (
           argument !== undefined &&
           ts.isStringLiteralLike(argument) &&
-          GATE_ACCESS.has(argument.text)
+          isGateAccess(argument.text)
         ) {
-          calls.access.add(argument.text === 'admin' ? 'admin' : 'signed-in');
+          calls.access.add(argument.text);
         } else {
           calls.dynamic = true;
         }
@@ -152,7 +157,7 @@ const checkModule = (path: string, source: string, report: ServerActionGateRepor
 
     if (dynamic) {
       report.violations.push(
-        `${path}: ${name} must call gateAction with 'admin' or 'signed-in' as a string literal`
+        `${path}: ${name} must call gateAction with 'admin', 'approver' or 'signed-in' as a string literal`
       );
     } else if (access.size === 0) {
       report.violations.push(
@@ -172,7 +177,8 @@ const checkModule = (path: string, source: string, report: ServerActionGateRepor
 
 /**
  * Classify every export of every `'use server'` module under `<root>/src` as
- * `admin`, `signed-in`, `public` or `ungated`, and list what breaks the rule.
+ * `admin`, `approver`, `signed-in`, `public` or `ungated`, and list what breaks
+ * the rule.
  */
 export const checkServerActionGates = (root: string): ServerActionGateReport => {
   const report: ServerActionGateReport = { exports: [], violations: [] };

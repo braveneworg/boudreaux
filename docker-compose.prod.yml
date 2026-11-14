@@ -87,6 +87,12 @@ services:
       # App-only secret the per-job callback signing keys derive from
       # (ADR-0014). Required by env-manifest.ts in production.
       JOB_CALLBACK_SECRET: ${JOB_CALLBACK_SECRET}
+      # Attachments on community submissions (ADR-0026, ADR-0027): the private
+      # bucket and the re-encode Lambda, both outputs of the
+      # fakefour-submission-reencoder stack. Optional: with either unset the
+      # app boots and refuses uploads.
+      SUBMISSION_UPLOADS_BUCKET: ${SUBMISSION_UPLOADS_BUCKET:-}
+      SUBMISSION_REENCODER_LAMBDA_NAME: ${SUBMISSION_REENCODER_LAMBDA_NAME:-}
       # Structured logging (winston → stdout JSON → Alloy → Loki)
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # SMS (admin announcements blasts + abuse-report alerts). 'noop' logs

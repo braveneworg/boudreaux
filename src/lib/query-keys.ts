@@ -204,6 +204,11 @@ export const queryKeys = {
     dateImages: (tourId: string, tourDateId: string) =>
       [...queryKeys.tours.all, 'dateImages', tourId, tourDateId] as const,
   },
+  submissions: {
+    all: ['submissions'] as const,
+    /** A submission's attachments, polled while any is still processing. */
+    attachments: (id: string) => [...queryKeys.submissions.all, 'attachments', id] as const,
+  },
   playlists: {
     all: ['playlists'] as const,
     mine: () => [...queryKeys.playlists.all, 'mine'] as const,

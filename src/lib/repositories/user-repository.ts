@@ -3,15 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { CONSTANTS } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import type {
   CreateUserData,
   UpdateUserProfileData,
   User,
   UserAdminRecord,
+  UserApproverRecord,
   UserContactRecord,
   UserEmailRecord,
   UserIdRecord,
+  UserRoleRecord,
   UserSmsRecipientRecord,
   UserUsernameRecord,
 } from '@/lib/types/domain/user';
@@ -172,6 +175,18 @@ export class UserRepository {
     });
   }
 
+  /** The username of each named user, for a list that holds only their ids. */
+  static async findUsernamesByIds(ids: string[]): Promise<UserUsernameRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, username: true },
+    });
+  }
+
   /** Fetch every admin user with the fields needed for notification fan-out. */
   static async findAdmins(): Promise<UserAdminRecord[]> {
     return prisma.user.findMany({
@@ -204,5 +219,56 @@ export class UserRepository {
    */
   static async countSmsOptedIn(): Promise<number> {
     return prisma.user.count({ where: userWhere.smsReachable });
+  }
+
+  /**
+   * Fetch every approver (an admin or a manager) with the fields needed for
+   * notification fan-out: who is told when a submission awaits approval or is
+   * reported. The role says which of the two an approver is, for a notice a
+   * manager must not get about their own submission.
+   */
+  static async findApprovers(): Promise<UserApproverRecord[]> {
+    return prisma.user.findMany({
+      where: { role: { in: [CONSTANTS.ROLES.ADMIN, CONSTANTS.ROLES.MANAGER] } },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        phone: true,
+        allowSmsNotifications: true,
+        role: true,
+      },
+    });
+  }
+
+  /** Every manager, by username: the list an admin grants and removes from. */
+  static async findManagers(): Promise<UserContactRecord[]> {
+    return prisma.user.findMany({
+      where: { role: CONSTANTS.ROLES.MANAGER },
+      select: { id: true, username: true, email: true },
+      orderBy: { username: 'asc' },
+    });
+  }
+
+  /** The role and ban flag of the user with a username, or `null` when none has it. */
+  static async findRoleByUsername(username: string): Promise<UserRoleRecord | null> {
+    return prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, role: true, banned: true },
+    });
+  }
+
+  /** Write a user's role. The caller decides which roles may be granted. */
+  static async setRole(id: string, role: string): Promise<void> {
+    await prisma.user.update({ where: { id }, data: { role }, select: { id: true } });
+  }
+
+  /** Record that a user accepted the upload agreement at a version of its wording. */
+  static async acceptUploadAgreement(id: string, version: number, at: Date): Promise<void> {
+    await prisma.user.update({
+      where: { id },
+      data: { uploadAgreementVersion: version, uploadAgreementAt: at },
+      select: { id: true },
+    });
   }
 }

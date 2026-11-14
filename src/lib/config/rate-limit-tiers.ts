@@ -85,6 +85,40 @@ export const playlistCoverUploadLimiter = rateLimit({
 export const PLAYLIST_COVER_UPLOAD_LIMIT = 10;
 
 /**
+ * User-keyed presigned-URL minting for submission attachments — 60 requests
+ * per minute. One request per file, and a submission holds at most ten, so
+ * this is several submissions' worth of files a minute.
+ */
+export const attachmentUploadLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const ATTACHMENT_UPLOAD_LIMIT = 60;
+
+/**
+ * Attachment re-encode completion callback (server-to-server) — 60 requests
+ * per minute. One POST per attachment plus Lambda retries; ten attachments
+ * can finish together, and their Lambdas may share an egress address.
+ */
+export const reencodeCallbackLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const REENCODE_CALLBACK_LIMIT = 60;
+
+/**
+ * Attachment re-encode progress channel (server-to-server) — 300 requests per
+ * minute. A run POSTs at most one checkpoint every three seconds, so ten
+ * concurrent runs behind one address stay under it. Verify-only — it never
+ * claims the job token.
+ */
+export const reencodeProgressLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const REENCODE_PROGRESS_LIMIT = 300;
+
+/**
  * Video-enrichment completion callback (server-to-server) — 20 requests per
  * minute. One legitimate POST per dispatched job; the modest cap absorbs
  * Lambda retries while blunting a flood of forged completion callbacks.

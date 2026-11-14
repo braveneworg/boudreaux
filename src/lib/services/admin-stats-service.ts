@@ -8,6 +8,8 @@ import { BannerNotificationRepository } from '@/lib/repositories/banner-notifica
 import { ChatUserRepository } from '@/lib/repositories/chat-user-repository';
 import { FeaturedArtistRepository } from '@/lib/repositories/featured-artist-repository';
 import { ReleaseRepository } from '@/lib/repositories/release-repository';
+import { SubmissionReportRepository } from '@/lib/repositories/submission-report-repository';
+import { SubmissionRepository } from '@/lib/repositories/submission-repository';
 import { TourDateRepository } from '@/lib/repositories/tours/tour-date-repository';
 import { TourRepository } from '@/lib/repositories/tours/tour-repository';
 import { VideoRepository } from '@/lib/repositories/video-repository';
@@ -27,6 +29,11 @@ export interface AdminStats {
   chat: { flaggedUsers: number; disabledUsers: number };
   tours: { total: number; upcomingDates: number };
   videos: { total: number; published: number; draft: number };
+  /**
+   * Community submissions an approver has yet to decide on, and the
+   * submission reports no approver has marked handled.
+   */
+  submissions: { awaiting: number; openReports: number };
 }
 
 /**
@@ -51,6 +58,8 @@ export class AdminStatsService {
       videosTotal,
       videosPublished,
       releasesWithoutByline,
+      submissionsAwaiting,
+      openReports,
     ] = await Promise.all([
       ReleaseRepository.count(),
       ReleaseRepository.count({ published: true }),
@@ -65,6 +74,8 @@ export class AdminStatsService {
       VideoRepository.count(),
       VideoRepository.count({ published: true }),
       ReleaseRepository.findIdsWithoutByline(),
+      SubmissionRepository.countAwaiting(),
+      SubmissionReportRepository.countOpen(),
     ]);
 
     return {
@@ -84,6 +95,7 @@ export class AdminStatsService {
         published: videosPublished,
         draft: videosTotal - videosPublished,
       },
+      submissions: { awaiting: submissionsAwaiting, openReports },
     };
   }
 }

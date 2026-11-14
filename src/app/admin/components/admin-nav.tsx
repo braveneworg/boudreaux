@@ -19,6 +19,15 @@ import { ADMIN_NAV_ITEMS } from './admin-nav-items';
 /** How far each arrow tap nudges the menu, in pixels. */
 const SCROLL_STEP = 200;
 
+interface AdminNavProps {
+  /**
+   * The sections this reader reaches, by href; every section when omitted.
+   * A manager reaches the Community section alone. Hrefs, not items: an item
+   * carries its icon component, which a Server Component cannot pass here.
+   */
+  hrefs?: readonly string[];
+}
+
 /**
  * Persistent admin navigation: a horizontal, importance-ordered list of section
  * links rendered in the cutout display font with vertical separators between
@@ -26,8 +35,11 @@ const SCROLL_STEP = 200;
  * subpage. On narrow viewports the row scrolls horizontally (swipe) and shows
  * light left/right arrow overlays that nudge it when there is more to reveal.
  */
-export const AdminNav = () => {
+export const AdminNav = ({ hrefs }: AdminNavProps) => {
   const pathname = usePathname();
+  const items = hrefs
+    ? ADMIN_NAV_ITEMS.filter(({ href }) => hrefs.includes(href))
+    : ADMIN_NAV_ITEMS;
   const scrollRef = React.useRef<HTMLUListElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);
   const [canScrollRight, setCanScrollRight] = React.useState(false);
@@ -80,7 +92,7 @@ export const AdminNav = () => {
         onScroll={updateScrollState}
         className="flex [scrollbar-width:none] items-center gap-3 overflow-x-auto py-3 [&::-webkit-scrollbar]:hidden"
       >
-        {ADMIN_NAV_ITEMS.map((item, index) => (
+        {items.map((item, index) => (
           <li key={item.href} className="flex items-center gap-3">
             {index > 0 && (
               <Separator orientation="vertical" className="h-4" decorative aria-hidden />

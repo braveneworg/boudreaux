@@ -6,6 +6,8 @@ export const APP_VERSION = '0.5.1';
 export const CONSTANTS = {
   ROLES: {
     ADMIN: 'admin',
+    /** An approver and nothing more: reaches the submissions queue only. */
+    MANAGER: 'manager',
   },
   AUTHENTICATION: {
     STATUS: {

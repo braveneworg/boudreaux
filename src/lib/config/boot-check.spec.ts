@@ -156,7 +156,7 @@ describe('checkRuntimeConfig', () => {
       checkRuntimeConfig({ env: completeEnv(), logger, isProduction: true });
 
       const disabled = messages(logger.warn).filter((line) => line.startsWith('Feature disabled'));
-      expect(disabled).toHaveLength(6);
+      expect(disabled).toHaveLength(7);
       expect(disabled).toContainEqual(expect.stringContaining('CLOUDFRONT_DISTRIBUTION_ID'));
     });
 

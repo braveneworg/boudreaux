@@ -61,11 +61,11 @@ jobs:
       - name: Run nginx -t inside the production nginx image
         run: bash scripts/ci/nginx-config-test.sh .
 
-  # ── Lambda quality (bio-generator + stripe-webhook) ───────────────────────
+  # ── Lambda quality (bio-generator + submission-reencoder + stripe-webhook) ─
   # The lambdas are standalone pnpm projects excluded from the root tsconfig,
   # so the quality job above never typechecks them, and their vitest suites
-  # otherwise run only at deploy time (bio-generator) or not at all
-  # (stripe-webhook). Gate both on every push/PR here.
+  # otherwise run only at deploy time (bio-generator, submission-reencoder) or
+  # not at all (stripe-webhook). Gate all three on every push/PR here.
   lambda-quality:
     name: Lambda Type Check & Tests
     runs-on: ubuntu-latest
@@ -90,6 +90,27 @@ jobs:
         working-directory: bio-generator
         run: pnpm run test:run
 
+      - name: Install dependencies (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm run typecheck
+
+      # The specs that run the real ffmpeg and ffprobe skip themselves when
+      # neither is on PATH. They prove the refusal of a playlist and a concat
+      # script, so here the binaries are installed and REQUIRE_MEDIA_TOOLS
+      # turns a missing one into a failure.
+      - name: Install ffmpeg + ffprobe (submission-reencoder)
+        uses: ./.github/actions/setup-media-tools
+
+      - name: Run tests (submission-reencoder)
+        working-directory: submission-reencoder
+        env:
+          REQUIRE_MEDIA_TOOLS: '1'
+        run: pnpm run test:run
+
       - name: Install dependencies (stripe-webhook)
         working-directory: stripe-webhook
         run: pnpm install --frozen-lockfile
@@ -105,6 +126,38 @@ jobs:
       - name: Run tests (stripe-webhook)
         working-directory: stripe-webhook
         run: pnpm run test:run
+
+  # ── Re-encode Lambda image ─────────────────────────────────────────────────
+  # deploy-submission-reencoder.yml runs only on main, so without this job the
+  # arm64 image is first built on this x86-64 runner after a merge. It builds
+  # the image the way the deploy does, and pushes nothing. Pull requests only:
+  # on main the deploy builds it, and a registry outage here must not hold up
+  # the app.
+  reencoder-image:
+    name: Re-encoder image build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-tools
+
+      - name: Install dependencies (submission-reencoder)
+        working-directory: submission-reencoder
+        run: pnpm install --frozen-lockfile
+
+      # The deploy runs its tests first, which pulls the pinned ffmpeg image
+      # for this runner's architecture. Done here too, so the build starts
+      # from the same local images as the deploy's.
+      - name: Install ffmpeg + ffprobe
+        uses: ./.github/actions/setup-media-tools
+
+      - name: Build the image
+        uses: ./.github/actions/build-reencoder-image
 
   # ── Unit tests (sharded) ───────────────────────────────────────────────────
   # The 310-file suite is split into two parallel jobs. Each shard runs with

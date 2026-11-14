@@ -45,6 +45,15 @@ describe('playwright.config web server env', () => {
       expect(env).toHaveProperty(key, '');
     });
 
+    // Attachments run on the local upload sink and the fake re-encode; a real
+    // bucket or Lambda named in an env file must never reach this server.
+    it.each(['SUBMISSION_UPLOADS_BUCKET', 'SUBMISSION_REENCODER_LAMBDA_NAME'])(
+      'blanks %s with an empty string',
+      async (key) => {
+        expect(await webServerEnv()).toHaveProperty(key, '');
+      }
+    );
+
     // The pages render a button only for a registered provider, and the
     // auth E2E specs click every one of them.
     it('registers every social provider so every button renders', async () => {

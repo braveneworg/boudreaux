@@ -40,6 +40,23 @@ describe('AdminNav', () => {
     });
   });
 
+  it('links the Community section to the approver section', () => {
+    mockPathname = '/admin';
+    render(<AdminNav />);
+
+    expect(screen.getByRole('link', { name: 'Community' })).toHaveAttribute(
+      'href',
+      '/admin/community'
+    );
+  });
+
+  it('renders only the sections it is given, for a reader who reaches fewer', () => {
+    mockPathname = '/admin/community';
+    render(<AdminNav hrefs={['/admin/releases']} />);
+
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Releases']);
+  });
+
   it('renders the links in importance order, releases first', () => {
     mockPathname = '/admin';
     render(<AdminNav />);

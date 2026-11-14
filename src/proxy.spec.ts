@@ -417,6 +417,42 @@ describe('proxy middleware', () => {
       expect(result).toEqual({ type: 'next' });
     });
 
+    it.each(['/admin/community', '/admin/community/507f1f77bcf86cd799439011'])(
+      'allows a manager into the approver section at %s',
+      async (path) => {
+        signedIn();
+        withCachedRole('manager');
+        const request = createMockRequest(path);
+
+        const result = await middleware(request as unknown as NextRequest);
+
+        expect(result).toEqual({ type: 'next' });
+      }
+    );
+
+    it.each(['/admin', '/admin/releases', '/admin/community-archive'])(
+      'returns 403 for a manager at %s, outside the approver section',
+      async (path) => {
+        signedIn();
+        withCachedRole('manager');
+        const request = createMockRequest(path);
+
+        const result = await middleware(request as unknown as NextRequest);
+
+        expect(result).toMatchObject({ type: 'json', status: 403 });
+      }
+    );
+
+    it('returns 403 for a plain user at the approver section', async () => {
+      signedIn();
+      withCachedRole('user');
+      const request = createMockRequest('/admin/community');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(result).toMatchObject({ type: 'json', status: 403 });
+    });
+
     it('allows admin users to access admin sub-routes', async () => {
       signedIn();
       withCachedRole('admin');

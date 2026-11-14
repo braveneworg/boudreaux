@@ -5,9 +5,22 @@ import 'server-only';
 
 import { auth } from '@/auth';
 import type { ServerSession } from '@/lib/auth/get-server-session';
+import { isAdminRole, isApproverRole } from '@/lib/utils/roles';
 
-/** Who may cross the gate: any signed-in, unbanned user, or only an admin. */
-export type ActionAccess = 'signed-in' | 'admin';
+/**
+ * Who may cross the gate: any signed-in, unbanned user; an approver (an admin
+ * or a manager); or only an admin.
+ */
+export type ActionAccess = 'signed-in' | 'approver' | 'admin';
+
+/** Whether a role is admitted at an access level. `'signed-in'` admits every role. */
+const holdsRoleFor = (access: ActionAccess, role: string | null | undefined): boolean => {
+  if (access === 'signed-in') {
+    return true;
+  }
+
+  return access === 'admin' ? isAdminRole(role) : isApproverRole(role);
+};
 
 /**
  * Why the gate refused. A closed union of its own, not part of
@@ -30,8 +43,9 @@ const refusalCopyFor = (code: ActionGateCode): string =>
 /**
  * The access rule, in order: no session or no user id → `UNAUTHENTICATED`; a
  * banned user → `BANNED` (before the role check, so a banned admin is
- * suspended, not forbidden); `'admin'` access without the admin role →
- * `FORBIDDEN`. A session that passes is returned narrowed.
+ * suspended, not forbidden); `'admin'` access without the admin role, or
+ * `'approver'` access without the admin or manager role → `FORBIDDEN`. A
+ * session that passes is returned narrowed.
  *
  * The ban check is defense-in-depth on top of better-auth's own enforcement: a
  * just-banned user can still present a session cookie within the cookie-cache
@@ -49,7 +63,7 @@ const decide = (
     return 'BANNED';
   }
 
-  if (access === 'admin' && session.user.role !== 'admin') {
+  if (!holdsRoleFor(access, session.user.role)) {
     return 'FORBIDDEN';
   }
 

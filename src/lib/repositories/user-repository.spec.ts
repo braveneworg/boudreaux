@@ -211,6 +211,23 @@ describe('UserRepository', () => {
     });
   });
 
+  describe('findUsernamesByIds', () => {
+    it('reads only the id and username of the named users', async () => {
+      const rows = [{ id: 'u1', username: 'alice' }];
+      findManyMock.mockResolvedValueOnce(rows);
+
+      await expect(UserRepository.findUsernamesByIds(['u1', 'u2'])).resolves.toBe(rows);
+      expect(findManyMock.mock.calls).toEqual([
+        [{ where: { id: { in: ['u1', 'u2'] } }, select: { id: true, username: true } }],
+      ]);
+    });
+
+    it('asks the database nothing when no user is named', async () => {
+      await expect(UserRepository.findUsernamesByIds([])).resolves.toEqual([]);
+      expect(findManyMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findAdmins', () => {
     it('queries all admin users with notification fields', async () => {
       const rows = [
@@ -259,6 +276,96 @@ describe('UserRepository', () => {
       expect(countMock).toHaveBeenCalledWith({
         where: userWhere.smsReachable,
       });
+    });
+  });
+
+  describe('findApprovers', () => {
+    it('queries every admin and manager with the notification fields and the role', async () => {
+      const rows = [
+        { id: 'm1', email: 'm1@x.com', username: 'manager1', phone: null, role: 'manager' },
+      ];
+      findManyMock.mockResolvedValue(rows);
+
+      await expect(UserRepository.findApprovers()).resolves.toBe(rows);
+      expect(findManyMock.mock.calls).toEqual([
+        [
+          {
+            where: { role: { in: ['admin', 'manager'] } },
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              phone: true,
+              allowSmsNotifications: true,
+              role: true,
+            },
+          },
+        ],
+      ]);
+    });
+  });
+
+  describe('findManagers', () => {
+    it('lists the managers by username', async () => {
+      const rows = [{ id: 'm1', username: 'manager1', email: 'm1@x.com' }];
+      findManyMock.mockResolvedValue(rows);
+
+      await expect(UserRepository.findManagers()).resolves.toBe(rows);
+      expect(findManyMock.mock.calls).toEqual([
+        [
+          {
+            where: { role: 'manager' },
+            select: { id: true, username: true, email: true },
+            orderBy: { username: 'asc' },
+          },
+        ],
+      ]);
+    });
+  });
+
+  describe('findRoleByUsername', () => {
+    it('reads the role and ban flag of the user with that username', async () => {
+      const row = { id: 'u1', username: 'fan', role: 'user', banned: false };
+      findUniqueMock.mockResolvedValue(row);
+
+      await expect(UserRepository.findRoleByUsername('fan')).resolves.toBe(row);
+      expect(findUniqueMock.mock.calls).toEqual([
+        [
+          {
+            where: { username: 'fan' },
+            select: { id: true, username: true, role: true, banned: true },
+          },
+        ],
+      ]);
+    });
+  });
+
+  describe('setRole', () => {
+    it('writes the role on that user', async () => {
+      updateMock.mockResolvedValue({ id: 'u1' });
+
+      await expect(UserRepository.setRole('u1', 'manager')).resolves.toBeUndefined();
+      expect(updateMock.mock.calls).toEqual([
+        [{ where: { id: 'u1' }, data: { role: 'manager' }, select: { id: true } }],
+      ]);
+    });
+  });
+
+  describe('acceptUploadAgreement', () => {
+    it('records the version accepted and when', async () => {
+      const at = new Date('2026-11-11T12:00:00.000Z');
+      updateMock.mockResolvedValue({ id: 'u1' });
+
+      await expect(UserRepository.acceptUploadAgreement('u1', 1, at)).resolves.toBeUndefined();
+      expect(updateMock.mock.calls).toEqual([
+        [
+          {
+            where: { id: 'u1' },
+            data: { uploadAgreementVersion: 1, uploadAgreementAt: at },
+            select: { id: true },
+          },
+        ],
+      ]);
     });
   });
 });
