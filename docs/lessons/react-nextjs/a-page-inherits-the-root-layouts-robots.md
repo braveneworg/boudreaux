@@ -36,6 +36,6 @@ Rules:
   itself. To learn what a page inherits, read every `layout.tsx` above it.
 - An assertion that a page _has_ `noindex` proves nothing here: every page
   has it. Do not add one to an E2E spec as evidence of a page-level rule.
-- Whether the whole site should stay out of search engines is the owner's
-  decision, not a page's. Do not change the root layout's `robots` as part
-  of another change.
+- The site is kept out of search engines on purpose: the owner confirmed
+  on 2026-11-13 that the root layout's `noindex, nofollow` stays as it is.
+  Do not change it, and do not raise it again as a finding.

@@ -465,13 +465,13 @@ the others were not changed.
   design understated: an _approved_ submission saved before this stage gets
   its `aboutText` only from a content edit, which sends it back for
   approval. A save that changes nothing writes nothing.
-- **Section 3, the search term.** `matching` escapes the term. On MongoDB a
-  case-insensitive `contains` is run as a regular expression and Prisma does
-  not escape it: unescaped, `.*` matched every row and `(` failed the query
-  (`docs/lessons/prisma-mongo/insensitive-contains-is-a-regex.md`). The
-  escape is `containsText` in the where kit. **The site's other searches
-  still pass their term through unescaped**; see "Found outside this
-  stage".
+- **Section 3, the search term.** `matching` escapes the term. On MongoDB
+  most text filters are run as a regular expression and Prisma does not
+  escape the value: unescaped, `.*` matched every row and `(` failed the
+  query (`docs/lessons/prisma-mongo/a-text-filter-is-a-regex.md`).
+  The escape is `containsText` in the where kit. Every other search on the
+  site had the same defect and is fixed on this branch too; see "Found
+  outside this stage".
 - **Section 3, the two owner filters.** `listed` and `matching` both filter
   the `owner` relation and work together on MongoDB as written; the
   fallback to a lookup of owner ids was not needed.
@@ -557,7 +557,9 @@ the others were not changed.
 
 ### Known gaps
 
-- **Whether the site should be indexed at all is undecided.** See criterion 24. Nothing here changes the root layout.
+- **The site is not indexed, on purpose.** The root layout's
+  `noindex, nofollow` stays as it is: the owner confirmed it on 2026-11-13.
+  See criterion 24.
 - **A signed-in reader's refusal is still a `200`** with the not-found page
   (section 11), by design.
 - **An unlisted submission is protected by its id being hard to guess, and
@@ -591,11 +593,25 @@ the others were not changed.
 
 ### Found outside this stage
 
-- **Every other search on the site runs its term as a regular
-  expression**: releases, videos, artists, tours, venues, producers,
-  playlists and the username lookups (`grep -rn "mode: 'insensitive'"
-src/lib`). Typing `(` into one is a failed query. Not fixed here; each
-  needs `containsText` and a contract case.
+- **Every other search on the site ran its term as a regular expression.**
+  Fixed on this branch, at the owner's request (2026-11-13). A probe on
+  Docker Mongo showed the defect was wider than a case-insensitive
+  `contains`: `startsWith` and `endsWith` in either mode, and `equals` and
+  `in` when case-insensitive, are all run as patterns. Typing `(` into any
+  search failed the query, and a duplicate check by name could match a
+  different record (`a.c` matched "abc").
+  - The where kit gained `startsWithText`, `equalsText` and `inTexts` beside
+    `containsText`. All twelve repositories that wrote a text filter by hand
+    now build it from them: releases, videos, artists, featured artists,
+    tours, venues, producers, playlists, banner notifications, abuse
+    reports, digital format files and the username lookups.
+  - `text-filter-seam.spec.ts` scans every repository and fails on a text
+    filter written by hand, so a new search cannot bring it back.
+  - On Docker Mongo, `where-kit.contract.spec.ts` proves each helper and
+    `text-search.contract.spec.ts` calls the real reads (videos, releases,
+    the home page's artist search, tours, playlists, producers, usernames
+    and the name lookups) with seven terms made of pattern syntax. With the
+    escape removed, 34 of the 59 cases fail; with it, none.
 - **A hydration mismatch on `/collection`** appears now and then in the dev
   server's log during the collection spec: a purchase's title differs
   between the server render and the client. The spec passes. Not
