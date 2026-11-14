@@ -4,7 +4,7 @@
 import { prisma } from '@/lib/prisma';
 import type { CreateSubmissionData, UpdateSubmissionData } from '@/lib/types/domain/submission';
 
-import { submissionWhere } from './_internal/submission-where';
+import { submissionMatching, submissionWhere } from './_internal/submission-where';
 import { SubmissionRepository } from './submission-repository';
 
 vi.mock('server-only', () => ({}));
@@ -330,6 +330,61 @@ describe('SubmissionRepository', () => {
         expect(vi.mocked(prisma.submission.count).mock.calls).toEqual([[{ where: { status } }]]);
       }
     );
+  });
+
+  describe('listListed', () => {
+    const LISTED_SELECT = {
+      id: true,
+      title: true,
+      category: true,
+      owner: { select: { username: true, email: true } },
+    };
+    const NEWEST_FIRST = [{ firstApprovedAt: 'desc' }, { id: 'desc' }];
+
+    it('reads one page of listed submissions, newest first by first approval', async () => {
+      const rows = [{ id: SUBMISSION_ID, title: 'Bus poem', category: 'WRITING' }];
+      vi.mocked(prisma.submission.findMany).mockResolvedValueOnce(rows as never);
+
+      await expect(SubmissionRepository.listListed({ skip: 12, take: 12 })).resolves.toBe(rows);
+      expect(vi.mocked(prisma.submission.findMany).mock.calls).toEqual([
+        [
+          {
+            where: { AND: [submissionWhere.listed] },
+            select: LISTED_SELECT,
+            orderBy: NEWEST_FIRST,
+            skip: 12,
+            take: 12,
+          },
+        ],
+      ]);
+    });
+
+    it('narrows by a search term and by an owner', async () => {
+      vi.mocked(prisma.submission.findMany).mockResolvedValueOnce([]);
+
+      await SubmissionRepository.listListed({ skip: 0, take: 8, search: 'bus', ownerId: OWNER_ID });
+
+      expect(vi.mocked(prisma.submission.findMany).mock.calls[0]?.[0]?.where).toEqual({
+        AND: [submissionWhere.listed, submissionMatching('bus'), { ownerId: OWNER_ID }],
+      });
+    });
+  });
+
+  describe('isPublic', () => {
+    it('counts the public submissions with that id', async () => {
+      vi.mocked(prisma.submission.count).mockResolvedValueOnce(1);
+
+      await expect(SubmissionRepository.isPublic(SUBMISSION_ID)).resolves.toBe(true);
+      expect(vi.mocked(prisma.submission.count).mock.calls).toEqual([
+        [{ where: { id: SUBMISSION_ID, AND: [submissionWhere.public] } }],
+      ]);
+    });
+
+    it('is false when none matched', async () => {
+      vi.mocked(prisma.submission.count).mockResolvedValueOnce(0);
+
+      await expect(SubmissionRepository.isPublic(SUBMISSION_ID)).resolves.toBe(false);
+    });
   });
 
   describe('findManyWithOwnerByIds', () => {

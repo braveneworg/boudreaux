@@ -7,6 +7,8 @@ import type { SubmissionStatus } from '@/lib/constants/submissions';
 import { prisma } from '@/lib/prisma';
 import type {
   CreateSubmissionData,
+  ListedSubmissionRecord,
+  ListedSubmissionsQuery,
   SubmissionDecisionData,
   SubmissionQueuePage,
   SubmissionRecord,
@@ -16,7 +18,7 @@ import type {
 } from '@/lib/types/domain/submission';
 
 import { runQuery } from './_internal/map-prisma-error';
-import { submissionWhere } from './_internal/submission-where';
+import { submissionMatching, submissionWhere } from './_internal/submission-where';
 import { retryOnWriteConflict } from './_internal/write-conflict';
 
 import type { AssertExact } from './_internal/drift';
@@ -45,6 +47,30 @@ type _WithOwnerDrift = AssertExact<
   Prisma.SubmissionGetPayload<{ include: typeof ownerInclude }>
 >;
 const _withOwnerDrift: _WithOwnerDrift = true;
+
+/** What the community page reads of a listed submission and its owner. */
+const listedSelect = {
+  id: true,
+  title: true,
+  category: true,
+  owner: { select: { username: true, email: true } },
+} as const satisfies Prisma.SubmissionSelect;
+
+type _ListedDrift = AssertExact<
+  ListedSubmissionRecord,
+  Prisma.SubmissionGetPayload<{ select: typeof listedSelect }>
+>;
+const _listedDrift: _ListedDrift = true;
+
+/**
+ * Newest first by first approval, so neither an old upload nor a re-approval
+ * moves a submission. The id breaks a tie, so paging never repeats or drops
+ * one.
+ */
+const newestFirst: Prisma.SubmissionOrderByWithRelationInput[] = [
+  { firstApprovedAt: 'desc' },
+  { id: 'desc' },
+];
 
 /**
  * How many writers may race for one owner's cap before the last is refused
@@ -248,6 +274,41 @@ export class SubmissionRepository {
     ]);
 
     return { submissions, total };
+  }
+
+  /**
+   * One page of listed submissions, newest first: the community page's rows,
+   * its full list, its search and one user's public list. Only a listed
+   * submission is ever returned, whoever asks.
+   */
+  static async listListed({
+    skip,
+    take,
+    search,
+    ownerId,
+  }: ListedSubmissionsQuery): Promise<ListedSubmissionRecord[]> {
+    return prisma.submission.findMany({
+      where: {
+        AND: [
+          submissionWhere.listed,
+          ...(search ? [submissionMatching(search)] : []),
+          ...(ownerId ? [{ ownerId }] : []),
+        ],
+      },
+      select: listedSelect,
+      orderBy: newestFirst,
+      skip,
+      take,
+    });
+  }
+
+  /** Whether an id names a public submission: one anybody may open. */
+  static async isPublic(id: string): Promise<boolean> {
+    const matched = await prisma.submission.count({
+      where: { id, AND: [submissionWhere.public] },
+    });
+
+    return matched > 0;
   }
 
   /**

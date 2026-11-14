@@ -30,7 +30,10 @@ import {
 import { DataError } from '@/lib/types/domain/errors';
 import type {
   SubmissionActor,
+  ListedSubmissionsQuery,
+  SubmissionCard,
   SubmissionContent,
+  SubmissionOwnerName,
   StoredSubmissionContent,
   SubmissionDecisionData,
   SubmissionOwnerActor,
@@ -774,6 +777,45 @@ export class SubmissionService {
     return new Map(
       pictures.flatMap(({ id, url }): Array<[string, string]> => (url === null ? [] : [[id, url]]))
     );
+  }
+
+  /**
+   * One page of listed submissions as cards, newest first: what the community
+   * page, its search and a user's public list show. Every one is public, so
+   * each picture is the CDN's and the answer is the same for any reader.
+   */
+  static async listCards(query: ListedSubmissionsQuery): Promise<SubmissionCard[]> {
+    const listed = await SubmissionRepository.listListed(query);
+    const pictures = await SubmissionService.cardPictures(
+      listed.map(({ id }) => ({ id, status: 'APPROVED' }))
+    );
+
+    return listed.map(({ id, title, category, owner }) => ({
+      id,
+      title,
+      category,
+      cardPictureUrl: pictures.get(id) ?? null,
+      owner: { username: owner.username, gravatarHash: gravatarHash(owner.email) },
+    }));
+  }
+
+  /** Whether an id names a public submission: one anybody may open. */
+  static async isPublic(submissionId: string): Promise<boolean> {
+    return SubmissionRepository.isPublic(submissionId);
+  }
+
+  /**
+   * The account that holds a username, for a per-user list, or `null` when
+   * none does. The match is exact: a card links to the username as stored.
+   */
+  static async ownerNamed(username: string): Promise<SubmissionOwnerName | null> {
+    if (username === '') {
+      return null;
+    }
+
+    const owner = await UserRepository.findByUsername(username);
+
+    return owner ? { id: owner.id, username: owner.username ?? username } : null;
   }
 
   /** Every submission an owner holds, in any state. */

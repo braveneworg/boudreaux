@@ -35,6 +35,8 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     decide: vi.fn(),
     deleteOwned: vi.fn(),
     listByStatus: vi.fn(),
+    listListed: vi.fn(),
+    isPublic: vi.fn(),
     countAwaitingBefore: vi.fn(),
     countAwaiting: vi.fn(),
   },
@@ -42,7 +44,7 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     status === 'APPROVED' && owner.banned !== true,
 }));
 vi.mock('@/lib/repositories/user-repository', () => ({
-  UserRepository: { acceptUploadAgreement: vi.fn() },
+  UserRepository: { acceptUploadAgreement: vi.fn(), findByUsername: vi.fn() },
 }));
 // A submission has no open reports unless a test says so.
 vi.mock('@/lib/repositories/submission-report-repository', () => ({
@@ -1155,6 +1157,98 @@ describe('SubmissionService.cardPictures', () => {
     expect(vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mock.calls).toEqual([
       [[SUBMISSION_ID, other]],
     ]);
+  });
+});
+
+describe('SubmissionService.listCards', () => {
+  const other = 'f'.repeat(24);
+  const listed = (id: string, username: string | null) => ({
+    id,
+    title: 'Bus poem',
+    category: 'WRITING' as const,
+    owner: { username, email: 'Ada@Example.com ' },
+  });
+
+  it('reads the page it was asked for and nothing wider', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([]);
+    const query = { skip: 12, take: 12, search: 'bus', ownerId: OWNER_ID };
+
+    await expect(SubmissionService.listCards(query)).resolves.toEqual([]);
+    expect(vi.mocked(SubmissionRepository.listListed).mock.calls).toEqual([[query]]);
+  });
+
+  it('makes each listed submission a card, in the order it was read', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([
+      listed(SUBMISSION_ID, 'ada'),
+      listed(other, null),
+    ]);
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([
+      attachment(),
+    ]);
+
+    await expect(SubmissionService.listCards({ skip: 0, take: 12 })).resolves.toEqual([
+      {
+        id: SUBMISSION_ID,
+        title: 'Bus poem',
+        category: 'WRITING',
+        // A listed submission is public, so its picture is the CDN's.
+        cardPictureUrl: `https://cdn.example/${COPY_PREFIX}card.webp`,
+        owner: { username: 'ada', gravatarHash: gravatarHash('ada@example.com') },
+      },
+      {
+        id: other,
+        title: 'Bus poem',
+        category: 'WRITING',
+        cardPictureUrl: null,
+        owner: { username: null, gravatarHash: gravatarHash('ada@example.com') },
+      },
+    ]);
+  });
+
+  it('never carries the owner’s email', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([
+      listed(SUBMISSION_ID, 'ada'),
+    ]);
+
+    const cards = await SubmissionService.listCards({ skip: 0, take: 12 });
+
+    expect(JSON.stringify(cards)).not.toMatch(/example\.com/i);
+  });
+});
+
+describe('SubmissionService.isPublic', () => {
+  it.each([true, false])('answers %s as the repository does', async (answer) => {
+    vi.mocked(SubmissionRepository.isPublic).mockResolvedValueOnce(answer);
+
+    await expect(SubmissionService.isPublic(SUBMISSION_ID)).resolves.toBe(answer);
+    expect(vi.mocked(SubmissionRepository.isPublic).mock.calls).toEqual([[SUBMISSION_ID]]);
+  });
+});
+
+describe('SubmissionService.ownerNamed', () => {
+  it('names the account that holds a username, without its email', async () => {
+    vi.mocked(UserRepository.findByUsername).mockResolvedValueOnce({
+      id: OWNER_ID,
+      username: 'ada',
+      email: 'ada@example.com',
+    });
+
+    await expect(SubmissionService.ownerNamed('ada')).resolves.toEqual({
+      id: OWNER_ID,
+      username: 'ada',
+    });
+    expect(vi.mocked(UserRepository.findByUsername).mock.calls).toEqual([['ada']]);
+  });
+
+  it('is null when no account holds it', async () => {
+    vi.mocked(UserRepository.findByUsername).mockResolvedValueOnce(null);
+
+    await expect(SubmissionService.ownerNamed('nobody')).resolves.toBeNull();
+  });
+
+  it('asks nothing for an empty username', async () => {
+    await expect(SubmissionService.ownerNamed('')).resolves.toBeNull();
+    expect(UserRepository.findByUsername).not.toHaveBeenCalled();
   });
 });
 
