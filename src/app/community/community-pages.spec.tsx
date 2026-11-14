@@ -53,6 +53,11 @@ vi.mock('@/app/components/community/submission-form', () => ({
     />
   ),
 }));
+vi.mock('@/app/components/community/submission-view-beacon', () => ({
+  SubmissionViewBeacon: ({ submissionId }: { submissionId: string }) => (
+    <div data-testid="view-beacon" data-submission={submissionId} />
+  ),
+}));
 vi.mock('@/app/components/community/submission-view', () => ({
   SubmissionViewContent: ({ view, reportable }: { view: SubmissionView; reportable?: boolean }) => (
     <div
@@ -243,6 +248,38 @@ describe('SubmissionPage', () => {
     render(await SubmissionPage(params()));
 
     expect(screen.getByTestId('view')).toHaveAttribute('data-reportable', 'true');
+  });
+
+  it('asks for a public reader’s opening to be counted as a view', async () => {
+    vi.mocked(communityViewer).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'public' }));
+
+    render(await SubmissionPage(params()));
+
+    expect(screen.getByTestId('view-beacon')).toHaveAttribute('data-submission', ID);
+  });
+
+  it.each(['owner', 'approver'] as const)(
+    'does not ask for the %s’s opening to be counted',
+    async (viewer) => {
+      vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'admin' });
+      vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer }));
+
+      render(await SubmissionPage(params()));
+
+      expect(screen.queryByTestId('view-beacon')).not.toBeInTheDocument();
+    }
+  );
+
+  it('does not ask for an opening of a submission that is not public to be counted', async () => {
+    vi.mocked(communityViewer).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(
+      view({ viewer: 'public', isPublic: false })
+    );
+
+    render(await SubmissionPage(params()));
+
+    expect(screen.queryByTestId('view-beacon')).not.toBeInTheDocument();
   });
 
   it('answers not found when this reader may not open it', async () => {

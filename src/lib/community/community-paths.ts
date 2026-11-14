@@ -21,6 +21,13 @@ export const ALL_SUBMISSIONS_ID = 'all-submissions';
 export const submissionPath = (id: string): string => `${COMMUNITY_PATH}/${id}`;
 
 /**
+ * The route a submission's page posts to once it has opened in a browser,
+ * to ask for the opening to be counted as a view (ADR-0029). Under `/api`,
+ * where the guest's visitor cookie is sent.
+ */
+export const submissionViewPath = (id: string): string => `/api/community/submissions/${id}/view`;
+
+/**
  * One user's listed submissions: a filter on the community page, by their
  * current username. It breaks when they rename; a submission's own link
  * never does.
