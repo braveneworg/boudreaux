@@ -59,6 +59,19 @@ describe('SubmissionViewEventRepository', () => {
       await expect(SubmissionViewEventRepository.record(data)).resolves.toBe(false);
     });
 
+    it('says so too when the duplicate was raised by another copy of the error class', async () => {
+      // On the dev server the Prisma client can be built by another route's
+      // copy of the module, and its errors are then no instance of ours.
+      events.create.mockRejectedValueOnce(
+        Object.assign(new Error('Unique constraint failed'), {
+          name: 'DataError',
+          code: 'DUPLICATE',
+        })
+      );
+
+      await expect(SubmissionViewEventRepository.record(data)).resolves.toBe(false);
+    });
+
     it('passes on any other failure', async () => {
       const down = new DataError('UNAVAILABLE', 'Database is down');
       events.create.mockRejectedValueOnce(down);

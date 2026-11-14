@@ -40,6 +40,23 @@ export class DataError extends Error {
 }
 
 /**
+ * Whether a thrown value is a {@link DataError} with this code, told by its
+ * name and code and not by `instanceof`.
+ *
+ * A caught data error is not always an instance of the class the catching
+ * module holds. On the dev server the Prisma client is kept on `globalThis`
+ * and built once, by whichever route loaded first, so the errors its
+ * extension raises come from that route's copy of this module. To a
+ * repository compiled into another route they are a `DataError` in every
+ * field and still fail `instanceof`
+ * (`docs/lessons/prisma-mongo/a-data-error-is-told-by-its-name.md`). A catch
+ * that decides something on a code, such as "a duplicate is not a failure",
+ * asks here.
+ */
+export const isDataErrorWithCode = (error: unknown, code: DataErrorCode): boolean =>
+  error instanceof Error && error.name === 'DataError' && 'code' in error && error.code === code;
+
+/**
  * A write refused because an admin's decisions do not cover the credits
  * awaiting confirmation (ADR-0015). Raised inside the write's transaction, so
  * nothing it would have written is kept. Its message names the artists that

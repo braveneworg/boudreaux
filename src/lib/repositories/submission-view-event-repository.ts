@@ -4,7 +4,7 @@
 import 'server-only';
 
 import { prisma } from '@/lib/prisma';
-import { DataError } from '@/lib/types/domain/errors';
+import { isDataErrorWithCode } from '@/lib/types/domain/errors';
 import type {
   RecordViewEventData,
   SubmissionViewCount,
@@ -29,7 +29,10 @@ export class SubmissionViewEventRepository {
 
       return true;
     } catch (error) {
-      if (error instanceof DataError && error.code === 'DUPLICATE') {
+      // By name and code, never `instanceof`: on the dev server this error
+      // can come from another copy of the class, and a repeat view would
+      // then be a failure instead of nothing.
+      if (isDataErrorWithCode(error, 'DUPLICATE')) {
         return false;
       }
 
