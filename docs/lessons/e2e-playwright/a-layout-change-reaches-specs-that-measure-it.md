@@ -39,3 +39,31 @@ Rules:
 - `computed-style.spec.ts` pins shipped design decisions by number. A
   failure there means the change revisits that decision. Say so in the PR,
   and update the assertion to the new design rather than loosening it.
+
+## A shared element is checked in its fullest state, and where nothing measures it
+
+On 2026-11-14 (PR #950) the desktop menu gained a sixth top-level entry,
+"Community". It was looked at signed out, at 1440px, where five entries fit
+with room to spare, and the header specs passed on both servers. CI then
+failed shard 1 on `admin-nav.spec.ts`, a spec about a different nav: its
+click on "Notifications" was taken by the header's "Contact Us" link.
+
+A signed-in visitor also has "My Collection". Six entries needed 990px of
+the 976px the menu's insets leave, at every desktop width, so the row
+wrapped and its second line hung below the header over the page. No spec
+measured the menu's row count. The local run of `admin-nav.spec.ts` passed
+with the row wrapped; where the wrapped link landed against the admin nav
+differed by a few pixels between the two machines.
+
+- Before adding to a shared element (the header, the footer, a toolbar),
+  list the states that add to it too (signed in, admin, a long name, the
+  narrowest width it shows at) and look at the fullest one. Signed out at a
+  comfortable width is the emptiest.
+- When an element can wrap or overflow and nothing measures it, add the
+  measurement with the change: `desktop-header.spec.ts` now reads the first
+  and last entries' tops in one frame, signed in, at 1280px and 1440px.
+- A click that another element intercepts ("<a …> intercepts pointer
+  events" in the call log) is an overlap. Read which element took it before
+  suspecting the spec: here the call log named the header's link.
+- A spec that fails only in CI on an overlap is not a flake. The layout was
+  wrong on both machines and one of them got lucky.

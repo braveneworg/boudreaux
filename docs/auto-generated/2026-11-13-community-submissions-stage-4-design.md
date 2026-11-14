@@ -496,6 +496,12 @@ the others were not changed.
   says "Unable to load more submissions." and offers "Try again". Left as
   designed it asked for the failed page again for as long as the end of the
   list stayed in view.
+- **Section 9, the menu row.** With "Community" a signed-in visitor has six
+  top-level entries, which needed 990px of the 976px the menu's insets
+  leave. The row wrapped and its second line took clicks meant for the page
+  beneath; CI caught it on the admin nav spec. The gap between entries went
+  from 20px to 16px, which needs 950px, and an E2E case keeps the row on one
+  line for a signed-in visitor at 1280px and 1440px.
 - **Section 10 and the actions.** Every write that can change whether a
   submission is listed also revalidates `/community`.
 - **Section 11, a failed lookup in the proxy** goes on to the page, so the
