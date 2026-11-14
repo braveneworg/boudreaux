@@ -22,11 +22,14 @@ const mockApi = vi.hoisted(() => ({
 
 // The real shared carousel runs; only the engine under it is stubbed, and it
 // records the options the row asked for.
+// Whether the engine has started: it hands back no api until it has.
+const engine = vi.hoisted(() => ({ started: true }));
+
 vi.mock('embla-carousel-react', () => ({
   __esModule: true,
   default: (options: unknown) => {
     emblaOptions(options);
-    return [vi.fn(), mockApi];
+    return [vi.fn(), engine.started ? mockApi : undefined];
   },
 }));
 
@@ -45,6 +48,10 @@ const cards = (count: number): SubmissionCard[] =>
 
 const lastOptions = (): { loop?: boolean; breakpoints?: Record<string, { duration?: number }> } =>
   emblaOptions.mock.calls.at(-1)?.[0] ?? {};
+
+beforeEach(() => {
+  engine.started = true;
+});
 
 describe('SubmissionRow', () => {
   it('heads its cards with the row’s name', () => {
@@ -65,12 +72,23 @@ describe('SubmissionRow', () => {
     expect(screen.getByRole('region', { name: 'Most Recent' })).toBeInTheDocument();
   });
 
-  it('says when it has hydrated, so a press before then is not lost unseen', () => {
+  it('says when its buttons will act, so a press before then is not lost unseen', () => {
     render(<SubmissionRow heading="Most Recent" cards={cards(5)} />);
 
     expect(screen.getByRole('region', { name: 'Most Recent' })).toHaveAttribute(
-      'data-hydrated',
+      'data-ready',
       'true'
+    );
+  });
+
+  it('is not ready until the carousel engine has started', () => {
+    engine.started = false;
+
+    render(<SubmissionRow heading="Most Recent" cards={cards(5)} />);
+
+    expect(screen.getByRole('region', { name: 'Most Recent' })).toHaveAttribute(
+      'data-ready',
+      'false'
     );
   });
 
@@ -80,7 +98,7 @@ describe('SubmissionRow', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('loops in both directions when it holds more cards than fit across', () => {
+  it('loops in both directions when it holds more than four cards', () => {
     render(<SubmissionRow heading="Most Recent" cards={cards(5)} />);
 
     expect(lastOptions().loop).toBe(true);

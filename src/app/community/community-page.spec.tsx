@@ -212,7 +212,7 @@ describe('CommunityPage', () => {
 
       await open();
 
-      expect(screen.getByTestId('row')).toHaveAttribute('data-cards', '');
+      expect(screen.queryByTestId('row')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /View all/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
       expect(screen.getByTestId('list')).toHaveAttribute(
@@ -316,6 +316,11 @@ describe('CommunityPage', () => {
 
       await expect(open({ user: 'nobody' })).rejects.toThrow('NOT_FOUND');
       expect(SubmissionService.listCards).not.toHaveBeenCalled();
+    });
+
+    it('answers not found for a username longer than one can be, without a lookup', async () => {
+      await expect(open({ user: 'a'.repeat(101) })).rejects.toThrow('NOT_FOUND');
+      expect(SubmissionService.ownerNamed).not.toHaveBeenCalled();
     });
 
     it('adds the user to the breadcrumbs', async () => {

@@ -50,7 +50,10 @@ import type { SubmissionOwnerName } from '@/lib/types/domain/submission';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { loggers } from '@/lib/utils/logger';
-import type { SubmissionCardPage } from '@/lib/validation/submission-listing-schema';
+import {
+  submissionListingQuerySchema,
+  type SubmissionCardPage,
+} from '@/lib/validation/submission-listing-schema';
 
 import type { Metadata } from 'next';
 
@@ -61,18 +64,24 @@ interface CommunityPageProps {
 const PAGE_TITLE = 'User Submitted Content';
 const NOT_INDEXED = { index: false, follow: false };
 
-/** The `?user=` username: the first value when repeated, `''` when missing or blank. */
+/** The `?user=` value as it arrived: the first when repeated, `''` when missing. */
 const readUsername = (value: string | string[] | undefined): string =>
-  (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
+  (Array.isArray(value) ? value[0] : value) ?? '';
+
+/** The listing route's own rule for a username: trimmed, and no longer than one can be. */
+const usernameSchema = submissionListingQuerySchema.shape.user;
 
 /**
  * The account a `?user=` filter names, or `null` when none holds that
  * username. Cached for the request, so the metadata and the page share one
  * read.
  */
-const loadOwner = cache(async (username: string): Promise<SubmissionOwnerName | null> =>
-  SubmissionService.ownerNamed(username)
-);
+const loadOwner = cache(async (raw: string): Promise<SubmissionOwnerName | null> => {
+  const username = usernameSchema.safeParse(raw);
+
+  // A value no username can be names no account; nothing is looked up.
+  return username.success ? SubmissionService.ownerNamed(username.data) : null;
+});
 
 /**
  * The newest listed submissions, everyone's or one owner's: the first page
@@ -97,7 +106,7 @@ const loadFirstPage = async (ownerId: string | undefined): Promise<SubmissionCar
 
 export async function generateMetadata({ searchParams }: CommunityPageProps): Promise<Metadata> {
   const username = readUsername((await searchParams).user);
-  if (username === '') {
+  if (username.trim() === '') {
     return { title: PAGE_TITLE, description: COMMUNITY_DESCRIPTION };
   }
 
@@ -125,13 +134,15 @@ const EveryonesSubmissions = ({ firstPage }: ListSectionProps) => {
 
   return (
     <>
-      <div className="mt-10">
-        <SubmissionRow heading="Most Recent" cards={recent} />
-      </div>
       {recent.length > 0 && (
-        <p className="mt-2">
-          <ViewAllLink />
-        </p>
+        <>
+          <div className="mt-10">
+            <SubmissionRow heading="Most Recent" cards={recent} />
+          </div>
+          <p className="mt-2">
+            <ViewAllLink />
+          </p>
+        </>
       )}
       <section className="mt-10">
         {!isEmpty && (
@@ -154,7 +165,11 @@ const EveryonesSubmissions = ({ firstPage }: ListSectionProps) => {
 /** One user's listed submissions, under their username and a link back to everyone's. */
 const UsersSubmissions = ({ username }: { username: string }) => (
   <section className="mt-10">
-    <ZineHeading level={2}>Submissions by {username}</ZineHeading>
+    <ZineHeading level={2}>
+      {/* The username is set in the body face, in its own case: the cutout
+          face has no digits and would print every username in capitals. */}
+      Submissions by <span className="font-sans tracking-normal normal-case">{username}</span>
+    </ZineHeading>
     <p className="mb-6 text-sm">
       <Link
         href={COMMUNITY_PATH}
@@ -173,7 +188,7 @@ const UsersSubmissions = ({ username }: { username: string }) => (
  * that names no account is a 404, as an unknown `/videos?artist=` is.
  */
 const readOwner = async (username: string): Promise<SubmissionOwnerName | null> => {
-  if (username === '') {
+  if (username.trim() === '') {
     return null;
   }
 

@@ -56,7 +56,12 @@ export const GravatarAvatar = ({
         : '?';
 
   return (
-    <Avatar className={cn('size-13 border border-zinc-50', className)}>
+    <Avatar
+      className={cn('size-13 border border-zinc-50', className)}
+      // Decoration is hidden whole: the fallback's "?" would otherwise be
+      // read out while the image loads, and for good without JavaScript.
+      aria-hidden={alt === '' ? true : undefined}
+    >
       <AvatarImage src={gravatarUrl} alt={alt} />
       <AvatarFallback>{fallbackInitials}</AvatarFallback>
     </Avatar>

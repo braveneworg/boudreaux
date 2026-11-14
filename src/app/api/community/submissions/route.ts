@@ -64,6 +64,9 @@ export const GET = withRateLimit(
     return pageResponse({ rows, nextSkip: computeNextSkip(rows.length, skip, take) });
   } catch (error) {
     loggers.media.error('Listed submissions read error', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: NO_STORE }
+    );
   }
 });

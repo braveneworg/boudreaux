@@ -15,6 +15,26 @@ vi.mock('@/app/components/gravatar-avatar', () => ({
   ),
 }));
 
+// Surfaces the link's prefetch posture, which is Link behaviour and not a
+// DOM attribute.
+vi.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    prefetch,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+    prefetch?: boolean;
+  }) => (
+    <a href={href} data-prefetch={prefetch === undefined ? 'default' : String(prefetch)} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 const ID = 'c'.repeat(24);
 const PICTURE = 'https://cdn.example/media/submissions/s/a/card.webp';
 
@@ -34,6 +54,15 @@ describe('CommunityCard', () => {
     expect(screen.getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
       'href',
       `/community/${ID}`
+    );
+  });
+
+  it('does not prefetch the submission: a page of cards would cost a lookup each', () => {
+    render(<CommunityCard card={card()} />);
+
+    expect(screen.getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
+      'data-prefetch',
+      'false'
     );
   });
 

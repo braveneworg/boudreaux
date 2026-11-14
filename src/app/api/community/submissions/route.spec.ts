@@ -121,6 +121,7 @@ describe('GET /api/community/submissions', () => {
     const response = await call();
 
     expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     await expect(response.json()).resolves.toEqual({ error: 'Internal server error' });
   });
 

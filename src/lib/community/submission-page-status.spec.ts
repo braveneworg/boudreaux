@@ -2,6 +2,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
+
 import type { NextRequest } from 'next/server';
 
 import { communityPageSegment, submissionPageResponse } from './submission-page-status';
@@ -47,6 +50,27 @@ describe('communityPageSegment', () => {
     '/videos',
   ])('is null for a path that is not one community segment (%s)', (pathname) => {
     expect(communityPageSegment(pathname)).toBeNull();
+  });
+});
+
+describe('the one-segment community pages that are not a submission’s', () => {
+  // A static page added under /community is a 404 to every signed-out
+  // visitor until the proxy knows it is not a submission id.
+  const staticPages = readdirSync(path.join(process.cwd(), 'src/app/community'), {
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('['))
+    .map(({ name }) => name);
+
+  it('finds the form and the owner’s list on disk', () => {
+    expect(staticPages).toEqual(expect.arrayContaining(['mine', 'submit']));
+  });
+
+  it.each(staticPages)('lets a signed-out visitor through to /community/%s', async (segment) => {
+    const response = await visit(segment, false);
+
+    expect(response.status).toBe(200);
+    expect(isPublic).not.toHaveBeenCalled();
   });
 });
 

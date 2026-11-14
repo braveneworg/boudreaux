@@ -11,8 +11,15 @@ vi.mock('@/hooks/use-gravatar-hash', () => ({
 }));
 
 vi.mock('@/components/ui/avatar', () => ({
-  Avatar: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="avatar" className={className}>
+  Avatar: ({
+    children,
+    className,
+    ...props
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="avatar" className={className} {...props}>
       {children}
     </div>
   ),
@@ -67,6 +74,18 @@ describe('GravatarAvatar', () => {
     render(<GravatarAvatar hash="server-hash" alt="" />);
 
     expect(screen.getByTestId('avatar-image')).toHaveAttribute('data-alt', '');
+  });
+
+  it('is hidden from assistive technology when it is decoration, fallback included', () => {
+    render(<GravatarAvatar hash="server-hash" alt="" />);
+
+    expect(screen.getByTestId('avatar')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('is announced when it carries a name', () => {
+    render(<GravatarAvatar hash="server-hash" />);
+
+    expect(screen.getByTestId('avatar')).not.toHaveAttribute('aria-hidden');
   });
 
   it('renders an empty-hash URL while the client hash is still resolving', () => {

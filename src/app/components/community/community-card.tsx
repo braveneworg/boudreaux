@@ -69,6 +69,9 @@ export const CommunityCard = ({ card }: CommunityCardProps) => {
         <p className="line-clamp-2 font-semibold">
           <Link
             href={submissionPath(id)}
+            // Not prefetched: every prefetch of a submission's page is a
+            // lookup in the proxy, and a page shows a dozen cards at a time.
+            prefetch={false}
             // Stretched over the whole card: the picture is part of this link.
             className="underline underline-offset-4 after:absolute after:inset-0 hover:no-underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-black focus-visible:after:ring-offset-2"
           >

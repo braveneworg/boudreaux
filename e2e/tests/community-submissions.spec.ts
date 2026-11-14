@@ -37,6 +37,10 @@ const PHOTO_TITLE = `E2E show photo ${STAMP}`;
 
 const LISTED_TITLE = `E2E listed zine ${STAMP}`;
 const UNLISTED_TITLE = `E2E unlisted zine ${STAMP}`;
+// Listed too, with an about that lacks the word: the search must drop it.
+const OTHER_LISTED_TITLE = `E2E other zine ${STAMP}`;
+// Enough listed rows that Most Recent holds more than fit across, and loops.
+const FILLER_TITLES = [1, 2, 3, 4].map((n) => `E2E filler zine ${n} ${STAMP}`);
 // A word only this run's about holds, so the search finds this run's rows alone.
 const ABOUT_WORD = `basement${STAMP}`;
 
@@ -542,7 +546,20 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     select: { id: true },
   });
   await prisma.submission.create({ data: { ...approved, title: UNLISTED_TITLE, listed: false } });
+  const withoutTheWord = { ...approved, aboutHtml: '', aboutText: '', listed: true };
+  // Serial creates: concurrent first writes race the read-back.
+  for (const title of [OTHER_LISTED_TITLE, ...FILLER_TITLES]) {
+    await prisma.submission.create({ data: { ...withoutTheWord, title } });
+  }
   const username = owner.username;
+  // Every request the page makes to the listing route, to tell a list that
+  // arrived with the page from one fetched after it.
+  const listingRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/community/submissions')) {
+      listingRequests.push(request.url());
+    }
+  });
 
   await test.step('the menu leads there', async () => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -571,6 +588,27 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     const all = page.getByRole('list').filter({ has: page.getByRole('article') });
     await expect(all.getByRole('link', { name: LISTED_TITLE, exact: true })).toBeVisible();
     await expect(page.getByText(UNLISTED_TITLE)).toHaveCount(0);
+    // The first page came with the page: the list asked the route for nothing.
+    expect(listingRequests).toEqual([]);
+  });
+
+  await test.step('the row moves with its buttons and the arrow keys, and loops', async () => {
+    const recent = page.getByRole('region', { name: 'Most Recent' });
+    // A press before the carousel has started is lost without a trace.
+    await expect(recent).toHaveAttribute('data-ready', 'true');
+    const firstSlide = recent.getByRole('group').first();
+    await expect(firstSlide).toBeInViewport();
+
+    await recent.getByRole('button', { name: 'Next in Most Recent' }).click();
+    await expect(firstSlide).not.toBeInViewport();
+
+    // Focus is on the button, inside the row, so the arrow keys move it.
+    await page.keyboard.press('ArrowLeft');
+    await expect(firstSlide).toBeInViewport();
+
+    // Back from the first card wraps around to the last.
+    await recent.getByRole('button', { name: 'Previous in Most Recent' }).click();
+    await expect(recent.getByRole('group').last()).toBeInViewport();
   });
 
   await test.step('“view all” moves to the full list', async () => {
@@ -586,9 +624,13 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     await trigger.click();
     await page.getByPlaceholder('Search by title, about or username').fill(ABOUT_WORD);
 
+    // Rows are offered only once they answer what was typed, so these are
+    // the search's own: the listed one whose about holds the word, and
+    // neither the listed one without it nor the unlisted one with it.
     const match = page.getByRole('option').filter({ hasText: LISTED_TITLE });
     await expect(match).toContainText(username);
-    await expect(page.getByRole('option').filter({ hasText: UNLISTED_TITLE })).toHaveCount(0);
+    await expect(page.getByRole('option')).toHaveCount(1);
+    expect(listingRequests.some((url) => url.includes(`search=${ABOUT_WORD}`))).toBe(true);
     await match.click();
 
     await page.waitForURL(({ pathname }) => pathname === `/community/${listed.id}`);

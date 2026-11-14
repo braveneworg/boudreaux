@@ -46,6 +46,19 @@ describe('ViewAllLink', () => {
     );
   });
 
+  it('leaves the link to the browser when the list is not on the page', async () => {
+    prefersReducedMotion(false);
+    render(<ViewAllLink />);
+    const followed = vi.fn((event: Event) => event.defaultPrevented);
+    document.addEventListener('click', followed);
+
+    await userEvent.setup({ delay: null }).click(screen.getByRole('link'));
+    document.removeEventListener('click', followed);
+
+    expect(followed.mock.results.map(({ value }) => value)).toEqual([false]);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('scrolls smoothly to the full list', async () => {
     prefersReducedMotion(false);
     renderWithTarget();
