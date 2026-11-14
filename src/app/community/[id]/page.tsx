@@ -13,6 +13,7 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 
 import { SubmissionViewContent } from '@/app/components/community/submission-view';
+import { SubmissionViewBeacon } from '@/app/components/community/submission-view-beacon';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
@@ -91,6 +92,11 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
     },
   ];
 
+  // Only an opening that can be a view asks to be counted: a public
+  // submission, read by someone who is neither its owner nor an approver.
+  // The route holds the same rule; this only saves the request.
+  const isCountable = view.isPublic && view.viewer === 'public';
+
   return (
     <PageContainer>
       <ContentContainer>
@@ -98,6 +104,7 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
           <SubmissionViewContent view={view} reportable />
         </ZinePanel>
       </ContentContainer>
+      {isCountable && <SubmissionViewBeacon submissionId={view.id} />}
     </PageContainer>
   );
 }

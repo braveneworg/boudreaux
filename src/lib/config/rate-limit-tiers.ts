@@ -108,6 +108,19 @@ export const submissionReportAttemptLimiter = rateLimit({
 export const SUBMISSION_REPORT_ATTEMPT_LIMIT = 10;
 
 /**
+ * Address-keyed view beacons of a submission's page — 10 requests per
+ * minute, the download routes' number. The route takes no account, and each
+ * call can resolve a guest identity as a download does; this stands in front
+ * of that. A reader opens far fewer submissions a minute than this, and one
+ * past it loses a count, never a page.
+ */
+export const submissionViewLimiter = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+});
+export const SUBMISSION_VIEW_LIMIT = 10;
+
+/**
  * Attachment re-encode completion callback (server-to-server) — 60 requests
  * per minute. One POST per attachment plus Lambda retries; ten attachments
  * can finish together, and their Lambdas may share an egress address.

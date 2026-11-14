@@ -44,6 +44,18 @@ const FILLER_TITLES = [1, 2, 3, 4].map((n) => `E2E filler zine ${n} ${STAMP}`);
 // A word only this run's about holds, so the search finds this run's rows alone.
 const ABOUT_WORD = `basement${STAMP}`;
 
+// Listed, and viewed enough in this run to trend.
+const TRENDING_TITLE = `E2E trending zine ${STAMP}`;
+// Listed, with enough views, all of them older than Trending reads.
+const STALE_TITLE = `E2E stale zine ${STAMP}`;
+// Viewed more than either, and unlisted: views never list a submission.
+const UNLISTED_VIEWED_TITLE = `E2E unlisted viewed zine ${STAMP}`;
+const DAY_MS = 86_400_000;
+// Longer than the views test takes: it never straddles 00:00 UTC.
+const UTC_MIDNIGHT_MARGIN_MS = 120_000;
+// What a browser sends with a request a page of this site made.
+const FROM_THIS_SITE = { 'sec-fetch-site': 'same-origin' };
+
 const REPORTED_TITLE = `E2E reported poem ${STAMP}`;
 const REPORT_NOTE = `That is my poem, not theirs. Run ${STAMP}.`;
 const REPORT_CONTACT = `wronged-${STAMP}@example.invalid`;
@@ -669,5 +681,188 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     await page.goto('/community/submit');
 
     await page.waitForURL(/\/signin\?callbackUrl=%2Fcommunity%2Fsubmit/);
+  });
+});
+
+/**
+ * Views and Trending (ADR-0029). Opening a submission's page in a browser is
+ * a view, once per viewer per day; its owner's and an approver's openings
+ * never are. A listed submission with five views in the last thirty days is
+ * in the Trending row. Every submission here is approved long ago, so none
+ * leads Most Recent. Other tests open a public submission in a browser and
+ * so store a view each; none stores the five that would put another row in
+ * Trending.
+ *
+ * A view is keyed on the UTC day, read from the server's clock. A run that
+ * crossed 00:00 UTC between two openings would count the second, so the
+ * test does not start in the two minutes before it.
+ */
+test('an opening is a view once a day, and five views make a listed submission trend', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  test.skip(
+    DAY_MS - (Date.now() % DAY_MS) < UTC_MIDNIGHT_MARGIN_MS,
+    'a view is keyed on the UTC day, which is about to change'
+  );
+  if (!owner) {
+    throw new Error('The stamped users were not created');
+  }
+  const approved = {
+    ownerId: owner.id,
+    category: 'WRITING',
+    writingHtml: `<p>${POEM}</p>`,
+    status: 'APPROVED',
+    publishedAt: APPROVED_LONG_AGO,
+    firstApprovedAt: APPROVED_LONG_AGO,
+    approvedAt: APPROVED_LONG_AGO,
+  } as const;
+  // Serial creates: concurrent first writes race the read-back.
+  const trending = await prisma.submission.create({
+    data: { ...approved, title: TRENDING_TITLE, listed: true },
+    select: { id: true },
+  });
+  const stale = await prisma.submission.create({
+    data: { ...approved, title: STALE_TITLE, listed: true },
+    select: { id: true },
+  });
+  const unlisted = await prisma.submission.create({
+    data: { ...approved, title: UNLISTED_VIEWED_TITLE, listed: false },
+    select: { id: true },
+  });
+
+  const viewPathOf = (submissionId: string): string =>
+    `/api/community/submissions/${submissionId}/view`;
+  const viewsOf = (submissionId: string): Promise<number> =>
+    prisma.submissionViewEvent.count({ where: { submissionId } });
+  /** Views of a submission that some other viewer made at `viewedAt`. */
+  const seedViews = async (submissionId: string, count: number, viewedAt: Date): Promise<void> => {
+    await prisma.submissionViewEvent.createMany({
+      data: Array.from({ length: count }, () => ({
+        submissionId,
+        viewKey: `e2e-${randomUUID()}`,
+        viewedAt,
+      })),
+    });
+  };
+  /** The page's own request for its opening to be counted. */
+  const beaconOf = (target: Page, submissionId: string) =>
+    target.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === viewPathOf(submissionId)
+    );
+
+  await test.step('a signed-out visitor’s opening is counted', async () => {
+    const counted = beaconOf(page, trending.id);
+    await page.goto(`/community/${trending.id}`);
+
+    expect((await counted).status()).toBe(204);
+    await expect.poll(() => viewsOf(trending.id)).toBe(1);
+  });
+
+  await test.step('opening it again the same day adds nothing', async () => {
+    const asked = beaconOf(page, trending.id);
+    await page.reload();
+
+    expect((await asked).status()).toBe(204);
+    expect(await viewsOf(trending.id)).toBe(1);
+  });
+
+  await test.step('the stored view holds nothing that names the viewer', async () => {
+    const [view] = await prisma.submissionViewEvent.findMany({
+      where: { submissionId: trending.id },
+    });
+
+    expect(Object.keys(view ?? {}).toSorted()).toEqual([
+      'id',
+      'submissionId',
+      'viewKey',
+      'viewedAt',
+    ]);
+    expect(view?.viewKey).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  await test.step('the owner’s page does not ask, and neither they nor an approver are counted', async () => {
+    const ownerPage = await openPageAs(browser, owner);
+    const asked: string[] = [];
+    ownerPage.on('request', (request) => {
+      if (new URL(request.url()).pathname === viewPathOf(trending.id)) {
+        asked.push(request.url());
+      }
+    });
+    await ownerPage.goto(`/community/${trending.id}`);
+    await expect(ownerPage.getByRole('heading', { level: 1, name: TRENDING_TITLE })).toBeVisible();
+    await ownerPage.waitForLoadState('networkidle');
+
+    // Asked directly, with each one's session, the route counts neither.
+    const approverPage = await openPageAs(browser, approver);
+    for (const signedIn of [ownerPage, approverPage]) {
+      const response = await signedIn.request.post(viewPathOf(trending.id), {
+        headers: FROM_THIS_SITE,
+      });
+      expect(response.status()).toBe(204);
+    }
+
+    expect(asked).toEqual([]);
+    expect(await viewsOf(trending.id)).toBe(1);
+    await ownerPage.context().close();
+    await approverPage.context().close();
+  });
+
+  await test.step('another signed-in user is counted once, by account', async () => {
+    const readerPage = await openPageAs(browser, photographer);
+    for (const _attempt of [1, 2]) {
+      const response = await readerPage.request.post(viewPathOf(trending.id), {
+        headers: FROM_THIS_SITE,
+      });
+      expect(response.status()).toBe(204);
+    }
+
+    expect(await viewsOf(trending.id)).toBe(2);
+    await readerPage.context().close();
+  });
+
+  await test.step('a request another site made is answered the same and counts nothing', async () => {
+    const response = await page.request.post(viewPathOf(unlisted.id), {
+      headers: { 'sec-fetch-site': 'cross-site' },
+    });
+
+    expect(response.status()).toBe(204);
+    expect(await viewsOf(unlisted.id)).toBe(0);
+  });
+
+  await test.step('five views trend; old views and an unlisted submission do not', async () => {
+    const now = new Date();
+    // Two are stored above; three more make the minimum.
+    await seedViews(trending.id, 3, now);
+    // Enough of them, all from before the thirty days Trending reads.
+    await seedViews(stale.id, 6, new Date(now.getTime() - 40 * DAY_MS));
+    // More views than either, on a submission its owner did not list.
+    await seedViews(unlisted.id, 8, now);
+
+    await page.goto('/community');
+
+    const row = page.getByRole('region', { name: 'Trending' });
+    await expect(row.getByRole('link', { name: TRENDING_TITLE, exact: true })).toHaveAttribute(
+      'href',
+      `/community/${trending.id}`
+    );
+    await expect(row.getByText(STALE_TITLE)).toHaveCount(0);
+    await expect(row.getByText(UNLISTED_VIEWED_TITLE)).toHaveCount(0);
+    // Under Most Recent, above the full list.
+    await expect(
+      page.getByRole('heading', { level: 2, name: /^(Most Recent|Trending|All submissions)$/ })
+    ).toHaveText(['Most Recent', 'Trending', 'All submissions']);
+  });
+
+  await test.step('one user’s list shows no Trending row', async () => {
+    await page.goto(`/community?user=${owner?.username ?? ''}`);
+
+    await expect(
+      page.getByRole('heading', { level: 2, name: `Submissions by ${owner?.username ?? ''}` })
+    ).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Trending' })).toHaveCount(0);
   });
 });

@@ -5,6 +5,7 @@ import {
   ALL_SUBMISSIONS_ID,
   COMMUNITY_PATH,
   submissionPath,
+  submissionViewPath,
   userSubmissionsPath,
 } from './community-paths';
 
@@ -23,6 +24,12 @@ describe('community paths', () => {
 
   it('encodes a username that would break the address', () => {
     expect(userSubmissionsPath('a&b c/d?e')).toBe('/community?user=a%26b%20c%2Fd%3Fe');
+  });
+
+  it('addresses the route that counts a view of a submission', () => {
+    expect(submissionViewPath('c'.repeat(24))).toBe(
+      `/api/community/submissions/${'c'.repeat(24)}/view`
+    );
   });
 
   it('names the full list’s anchor', () => {

@@ -8,8 +8,9 @@ import type { Instrumentation } from 'next';
  * configuration against the manifest (`src/lib/config/boot-check.ts`): in
  * production a missing required value throws here, and Next.js exits rather
  * than serve with the feature silently off. Then, in production, starts the
- * two hourly checks: the submissions overdue reminder and the erasure of
- * report contact emails. Not called during `next build`.
+ * three hourly checks: the submissions overdue reminder, the erasure of
+ * report contact emails, and the deletion of views older than thirty days.
+ * Not called during `next build`.
  */
 export const register = async (): Promise<void> => {
   // The boot check reads secrets and loads winston: Node.js runtime only.
@@ -20,10 +21,12 @@ export const register = async (): Promise<void> => {
   const { runBootCheck } = await import('@/lib/config/boot-check');
   runBootCheck();
 
-  // The daily reminder that submissions have waited too long (ADR-0025), and
-  // the erasure of report contact emails that have been kept long enough
-  // (ADR-0028). Real production only: a dev server, a test run and the E2E
-  // build must never email anyone, and none of them holds reports to erase.
+  // The daily reminder that submissions have waited too long (ADR-0025), the
+  // erasure of report contact emails that have been kept long enough
+  // (ADR-0028), and the deletion of views that no longer count (ADR-0029).
+  // Real production only: a dev server, a test run and the E2E build must
+  // never email anyone, and none of them holds reports to erase or views a
+  // spec did not put there itself.
   if (process.env.NODE_ENV === 'production' && process.env.E2E_MODE !== 'true') {
     const { startOverdueReminderMonitor } =
       await import('@/lib/services/submission-overdue-reminder');
@@ -32,6 +35,9 @@ export const register = async (): Promise<void> => {
     const { startReportContactErasureMonitor } =
       await import('@/lib/services/submission-report-contact-erasure');
     startReportContactErasureMonitor();
+
+    const { startViewPruneMonitor } = await import('@/lib/services/submission-view-prune');
+    startViewPruneMonitor();
   }
 };
 

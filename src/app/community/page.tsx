@@ -6,7 +6,8 @@
  * The community page at `/community` (CONTEXT.md): the public page headed
  * "User Submitted Content" that the menu calls Community. In order: its
  * search, the heading with a short description and a link to the form, the
- * Most Recent submission row, and the full list of listed submissions.
+ * two submission rows (Most Recent, then Trending when anything has the
+ * views for it), and the full list of listed submissions.
  * `/community?user=<username>` narrows it to one user's listed submissions:
  * a filter on this page, not a page of its own.
  *
@@ -46,7 +47,7 @@ import {
 } from '@/lib/constants/submissions';
 import { queryKeys } from '@/lib/query-keys';
 import { SubmissionService } from '@/lib/services/submission-service';
-import type { SubmissionOwnerName } from '@/lib/types/domain/submission';
+import type { SubmissionCard, SubmissionOwnerName } from '@/lib/types/domain/submission';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { loggers } from '@/lib/utils/logger';
@@ -121,28 +122,51 @@ export async function generateMetadata({ searchParams }: CommunityPageProps): Pr
   };
 }
 
+/**
+ * The Trending row's cards: the most viewed listed submissions of the last
+ * thirty days. None when the read failed, so the page renders without the
+ * row rather than not at all.
+ */
+const loadTrending = async (): Promise<SubmissionCard[]> => {
+  try {
+    return await SubmissionService.listTrendingCards();
+  } catch (error) {
+    loggers.media.error('Community page Trending read failed', error);
+
+    return [];
+  }
+};
+
 interface ListSectionProps {
   /** The first page the server read, or `null` when that read failed. */
   firstPage: SubmissionCardPage | null;
+  /** The Trending row's cards; empty when nothing has the views for it. */
+  trending: SubmissionCard[];
 }
 
-/** Everyone's submissions: the Most Recent row, the link down, and the full list. */
-const EveryonesSubmissions = ({ firstPage }: ListSectionProps) => {
+/** Everyone's submissions: both submission rows, the link down, and the full list. */
+const EveryonesSubmissions = ({ firstPage, trending }: ListSectionProps) => {
   const recent = firstPage?.rows.slice(0, SUBMISSION_ROW_SIZE) ?? [];
   // Known to be empty: no row, no link, and no heading over an empty list.
   const isEmpty = firstPage !== null && firstPage.rows.length === 0;
 
   return (
     <>
+      {/* An empty row renders nothing; the checks keep its margin out too. */}
       {recent.length > 0 && (
-        <>
-          <div className="mt-10">
-            <SubmissionRow heading="Most Recent" cards={recent} />
-          </div>
-          <p className="mt-2">
-            <ViewAllLink />
-          </p>
-        </>
+        <div className="mt-10">
+          <SubmissionRow heading="Most Recent" cards={recent} />
+        </div>
+      )}
+      {trending.length > 0 && (
+        <div className="mt-8">
+          <SubmissionRow heading="Trending" cards={trending} />
+        </div>
+      )}
+      {(recent.length > 0 || trending.length > 0) && (
+        <p className="mt-2">
+          <ViewAllLink />
+        </p>
       )}
       <section className="mt-10">
         {!isEmpty && (
@@ -236,7 +260,11 @@ export default async function CommunityPage({ searchParams }: CommunityPageProps
   // every community page. The viewer only decides whether "Your
   // submissions" is offered.
   const viewer = await communityViewer();
-  const firstPage = await loadFirstPage(owner?.id);
+  // One user's list shows no rows, so Trending is not read for it.
+  const [firstPage, trending] = await Promise.all([
+    loadFirstPage(owner?.id),
+    owner ? [] : loadTrending(),
+  ]);
 
   // Seed the list's first page under the key `useInfiniteListedSubmissionsQuery`
   // reads, so it hydrates without a request. The service is read directly:
@@ -259,7 +287,7 @@ export default async function CommunityPage({ searchParams }: CommunityPageProps
             {owner ? (
               <UsersSubmissions username={owner.username} />
             ) : (
-              <EveryonesSubmissions firstPage={firstPage} />
+              <EveryonesSubmissions firstPage={firstPage} trending={trending} />
             )}
           </ZinePanel>
         </ContentContainer>

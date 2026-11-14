@@ -690,14 +690,21 @@ submissions** each, looping rather than fetching more. A row takes nothing
 out of the full list beneath it, which holds every listed submission, newest
 first; a row with nothing in it is not shown. Most Recent orders by first
 approval, so neither an old upload date nor a re-approval moves a submission;
-Trending orders by **views** over the last thirty days, newer first on a tie.
+Trending orders by **views** over the last thirty days, newer first on a tie,
+and holds only submissions with at least five views in that time.
 _Avoid_: feed, carousel (the banner's), featured (a release credit).
 
 **view** — one viewer opening a **submission**'s own page, counted at most
-once per viewer, per submission, per day. The viewer is a signed-in user or a
-guest, identified as a guest **download subject** is. The owner's and approvers'
-openings are never counted, and a card shown in a row, a list or a search is
-not a view.
+once per viewer, per submission, per day (the UTC day). The viewer is a
+signed-in user or a guest, identified as a guest **download subject** is. The
+owner's and approvers' openings are never counted, and a card shown in a row,
+a list or a search is not a view. A view is counted by the page in the
+browser, so a link preview or a crawler is never one; it is kept for thirty
+days without a record of who the viewer was, and then deleted. One address
+adds at most five guest views to one submission in a day. In code a stored
+view is a **view event**, because `SubmissionView` already names what a
+reader is shown of a submission. See
+[ADR-0029](docs/adr/0029-a-view-is-a-row-that-lives-as-long-as-it-counts.md).
 _Avoid_: play, hit, impression.
 
 **unlisted submission** — an approved **submission** its owner chose not to

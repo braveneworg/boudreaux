@@ -52,6 +52,16 @@ export interface SubmissionWithOwnerRecord extends SubmissionRecord {
 }
 
 /**
+ * Whose a submission is and whether the public may open it, and nothing of
+ * its content: what counting a view reads (ADR-0029).
+ */
+export interface SubmissionStandingRecord {
+  ownerId: string;
+  status: SubmissionStatus;
+  owner: { banned: boolean | null };
+}
+
+/**
  * A listed submission as the community page reads it, before it is made into
  * a card. The owner's email is for the avatar hash and never reaches a client.
  */
