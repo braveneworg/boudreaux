@@ -59,17 +59,25 @@ describe('SubmissionViewBeacon', () => {
   });
 
   it('leaves a failed request alone: nothing on the page depends on it', async () => {
-    const failure = Promise.reject(new Error('offline'));
-    fetchMock.mockReturnValueOnce(failure);
+    // Only the hook may handle this rejection, or the case could never
+    // fail. So `fetch` is a plain function here: a mock records how its
+    // promise settles, which handles the rejection, and so would a catch
+    // in the test.
+    let asked = 0;
+    vi.stubGlobal('fetch', () => {
+      asked += 1;
+
+      return Promise.reject(new Error('offline'));
+    });
     const unhandled = vi.fn();
-    process.once('unhandledRejection', unhandled);
+    process.on('unhandledRejection', unhandled);
 
     render(<SubmissionViewBeacon submissionId={SUBMISSION_ID} />);
-    await failure.catch(() => undefined);
     // A rejection nobody handled is reported a macrotask later.
     await new Promise((resolve) => setTimeout(resolve, 0));
     process.removeListener('unhandledRejection', unhandled);
 
+    expect(asked).toBe(1);
     expect(unhandled.mock.calls).toEqual([]);
   });
 
