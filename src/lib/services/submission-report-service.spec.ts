@@ -74,6 +74,7 @@ const submission = (
   title: 'Bus poem',
   category: 'WRITING',
   aboutHtml: '',
+  aboutText: '',
   writingHtml: '<p>A poem.</p>',
   links: [],
   listed: true,

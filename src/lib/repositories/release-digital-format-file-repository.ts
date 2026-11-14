@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { orderedCredits } from './_internal/credit-order';
 import { digitalFormatWhere } from './_internal/digital-format-where';
 import { listedRelease } from './_internal/visibility';
+import { containsText } from './_internal/where-kit';
 
 import type { Prisma, ReleaseDigitalFormatFile } from '@prisma/client';
 
@@ -194,7 +195,7 @@ export class ReleaseDigitalFormatFileRepository {
   async searchTracksByTitle(q: string, take: number): Promise<TrackFileWithRelease[]> {
     return prisma.releaseDigitalFormatFile.findMany({
       where: {
-        title: { contains: q, mode: 'insensitive' },
+        title: containsText(q),
         format: {
           is: {
             formatType: 'MP3_320KBPS',

@@ -10,8 +10,6 @@ import { refusalFor } from '@/lib/auth/action-gate';
 import type { SubmissionActor } from '@/lib/types/domain/submission';
 import type { User } from '@/lib/types/domain/user';
 
-import { mayUseCommunity } from './community-access';
-
 /**
  * Who a community page is being rendered for (ADR-0025). Every page asks
  * here in its own body, never only in a layout: a layout does not render
@@ -25,7 +23,7 @@ import { mayUseCommunity } from './community-access';
 /**
  * The signed-in user of a page that needs one: the form and the owner's list.
  * A signed-out visitor is sent to sign in and brought back to `returnTo`. A
- * banned account, or a role the feature is not open to yet, gets not found.
+ * banned account gets not found.
  */
 export const requireCommunityUser = async (returnTo: string): Promise<User> => {
   const session = await auth();
@@ -33,7 +31,7 @@ export const requireCommunityUser = async (returnTo: string): Promise<User> => {
     redirect(`/signin?callbackUrl=${encodeURIComponent(returnTo)}`);
   }
 
-  if (session.user.banned === true || !mayUseCommunity(session.user.role)) {
+  if (session.user.banned === true) {
     notFound();
   }
 
@@ -41,16 +39,15 @@ export const requireCommunityUser = async (returnTo: string): Promise<User> => {
 };
 
 /**
- * Who is reading a submission's page: the session's user, or `null` for a
- * signed-out visitor. Until the community page launches, anyone the feature
- * is not open to gets not found here, signed out or not. A banned account is
+ * Who is reading a public community page: the session's user, or `null` for
+ * a signed-out visitor, who is a reader like any other. A banned account is
  * refused outright rather than treated as a visitor.
  */
 export const communityViewer = async (): Promise<SubmissionActor | null> => {
   const session = await auth();
   const user = session?.user?.id ? session.user : null;
 
-  if (user?.banned === true || !mayUseCommunity(user?.role)) {
+  if (user?.banned === true) {
     notFound();
   }
 

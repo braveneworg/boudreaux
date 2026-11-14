@@ -19,3 +19,9 @@ Counting is only half of it: on 2026-09-26 the counter printed `51` for
 out anyway, and commitlint rejected it. Treat any count over 50 as a stop.
 Shorten the header (a shorter scope, e.g. `contract`, usually fixes it)
 and count again before running `git commit`.
+
+It happened again on 2026-11-13: after seven commits whose headers had been
+counted by eye and happened to fit, `test(community): ✅ mark the search and
+row hydrated` went out at 51. A run of headers that fit is not evidence the
+next one will. Run the counter before every commit, including the ones that
+look short, and stay a few characters under the cap rather than on it.

@@ -67,6 +67,23 @@ describe('SubmissionViewContent', () => {
     expect(screen.getByText('Writings (lyrics, poetry, prose, and blurbs)')).toBeInTheDocument();
   });
 
+  it('links the username to that user’s listed submissions', () => {
+    render(<SubmissionViewContent view={view()} />);
+
+    expect(screen.getByRole('link', { name: 'fan' })).toHaveAttribute(
+      'href',
+      '/community?user=fan'
+    );
+  });
+
+  it('credits an owner with no username as a community member, linked nowhere', () => {
+    render(
+      <SubmissionViewContent view={view({ owner: { username: null, gravatarHash: 'abc123' } })} />
+    );
+
+    expect(screen.getByText('A community member').closest('a')).toBeNull();
+  });
+
   it('renders the about and the writing with their formatting', () => {
     render(<SubmissionViewContent view={view()} />);
 

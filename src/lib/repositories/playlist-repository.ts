@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types/domain/playlist';
 
 import { runQuery } from './_internal/map-prisma-error';
+import { containsText } from './_internal/where-kit';
 
 import type { AssertExact, AssertExtends } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -151,7 +152,7 @@ export class PlaylistRepository {
   ): Promise<PlaylistRecord[]> {
     const where: Prisma.PlaylistWhereInput = {
       ownerId,
-      ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
+      ...(search ? { title: containsText(search) } : {}),
     };
     return prisma.playlist.findMany({ where, orderBy: { updatedAt: 'desc' }, skip, take });
   }
@@ -279,7 +280,7 @@ export class PlaylistRepository {
     const rows = await prisma.playlistItem.findMany({
       where: {
         itemType: 'track',
-        title: { contains: q, mode: 'insensitive' },
+        title: containsText(q),
         playlist: { is: { isPublic: true, ownerId: { not: excludeOwnerId } } },
       },
       include: { playlist: { select: { id: true, title: true } } },

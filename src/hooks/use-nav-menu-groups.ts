@@ -42,7 +42,7 @@ const pickLink = (href: string, byHref: Map<string, NavMenuItem>): NavMenuEntry[
 
 /**
  * Grouped projection of the primary nav: Home · Music ▾ · Label ▾ ·
- * [My Collection] · Contact Us. Built on top of `useNavMenuItems` so the flat
+ * Community · [My Collection] · Contact Us. Built on top of `useNavMenuItems` so the flat
  * list stays the single source of truth; the desktop menu renders the groups
  * as drawers and the mobile sheet as accordion categories. Conditional items
  * (My Collection) appear in both exactly when they appear in the flat list.
@@ -56,6 +56,7 @@ export const useNavMenuGroups = (): NavMenuEntry[] => {
       ...pickLink('/', byHref),
       ...pickGroup('Music', MUSIC_HREFS, byHref),
       ...pickGroup('Label', LABEL_HREFS, byHref),
+      ...pickLink('/community', byHref),
       ...pickLink('/collection', byHref),
       ...pickLink('/contact', byHref),
     ];

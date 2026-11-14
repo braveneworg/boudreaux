@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 
 import { gateAction } from '@/lib/auth/action-gate';
 import type { ServerSession } from '@/lib/auth/get-server-session';
+import { COMMUNITY_PATH } from '@/lib/community/community-paths';
 import { ManagerService } from '@/lib/services/manager-service';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type {
@@ -26,7 +27,6 @@ import {
 } from '@/lib/validation/submission-schema';
 
 import {
-  communityClosedRefusal,
   COMMUNITY_MANAGERS_PATH,
   COMMUNITY_MINE_PATH,
   COMMUNITY_QUEUE_PATH,
@@ -41,8 +41,8 @@ import {
  * action gate in its own body, validates its input, and maps a failure onto
  * the form; every rule lives in the services.
  *
- * - An owner's actions cross as `'signed-in'` and, until the community page
- *   launches, are refused to anyone who is not an approver.
+ * - An owner's actions cross as `'signed-in'`: any signed-in user who is not
+ *   banned may submit.
  * - A decision crosses as `'approver'`: an admin or a manager.
  * - Granting or removing the manager role crosses as `'admin'`.
  */
@@ -53,11 +53,16 @@ const DELETE_FAILED = 'We could not delete your submission. Please try again.';
 const DECISION_FAILED = 'We could not record that decision. Please try again.';
 const MANAGER_FAILED = 'We could not change that role. Please try again.';
 
-/** Every page a change to one submission may have changed. */
+/**
+ * Every page a change to one submission may have changed. The community page
+ * is among them: an approval, a rejection, an edit, a delete and the listed
+ * switch each decide whether it lists the submission.
+ */
 const revalidateSubmission = (id: string): void => {
   revalidatePath(COMMUNITY_MINE_PATH);
   revalidatePath(submissionPath(id));
   revalidatePath(COMMUNITY_QUEUE_PATH);
+  revalidatePath(COMMUNITY_PATH);
 };
 
 const savedFrom = (
@@ -72,17 +77,14 @@ const onUsername = <T>(result: SubmissionActionResult<T>): SubmissionActionResul
     : { ...result, fieldErrors: { username: [result.error] } };
 
 /**
- * What Save draft and Publish share once the gate is crossed: the pre-launch
- * check, the wire validation, the Turnstile token, then the service.
+ * What Save draft and Publish share once the gate is crossed: the wire
+ * validation, the Turnstile token, then the service.
  */
 const saveAs = async (
   { user }: ServerSession,
   input: unknown,
   publish: boolean
 ): Promise<SubmissionActionResult<SavedSubmission>> => {
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
-
   const parsed = saveSubmissionInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
 
@@ -146,9 +148,6 @@ export const setSubmissionListedAction = async (
   if (!gate.success) return gate;
   const { user } = gate.session;
 
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
-
   const parsed = setSubmissionListedInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);
 
@@ -170,9 +169,6 @@ export const deleteSubmissionAction = async (
   const gate = await gateAction('signed-in');
   if (!gate.success) return gate;
   const { user } = gate.session;
-
-  const closed = communityClosedRefusal(user.role);
-  if (closed) return closed;
 
   const parsed = submissionIdInputSchema.safeParse(input);
   if (!parsed.success) return invalidInputFailure(parsed.error.issues);

@@ -5,7 +5,6 @@ import 'server-only';
 
 import { headers } from 'next/headers';
 
-import { mayUseCommunity } from '@/lib/community/community-access';
 import { SubmissionRuleError } from '@/lib/services/submission-service';
 import { DataError } from '@/lib/types/domain/errors';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
@@ -26,7 +25,7 @@ const logger = loggers.media;
 export const COMMUNITY_MINE_PATH = '/community/mine';
 export const COMMUNITY_QUEUE_PATH = '/admin/community';
 export const COMMUNITY_MANAGERS_PATH = '/admin/community/managers';
-export const submissionPath = (id: string): string => `/community/${id}`;
+export { submissionPath } from '@/lib/community/community-paths';
 
 type ZodIssues = Parameters<typeof fieldErrorsFromZodIssues>[0];
 
@@ -87,16 +86,6 @@ export const failureFromError = (
     code: error instanceof DataError ? error.code : 'UNKNOWN',
   };
 };
-
-/**
- * The refusal for a role the community feature is not open to yet, or `null`
- * when it is. The same `FORBIDDEN` the action gate answers, so a client cannot
- * tell the feature exists.
- */
-export const communityClosedRefusal = (
-  role: string | null | undefined
-): SubmissionActionResult<never> | null =>
-  mayUseCommunity(role) ? null : { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
 
 /**
  * Verify the form's Turnstile token against the caller's IP. Returns the

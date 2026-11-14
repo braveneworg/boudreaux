@@ -9,6 +9,7 @@ import { attachmentUploadLimiter } from '@/lib/config/rate-limit-tiers';
 import { SubmissionAttachmentService } from '@/lib/services/submission-attachment-service';
 import { SubmissionRuleError } from '@/lib/services/submission-service';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
+import { allowAttachmentUpload } from '@/lib/utils/submission-allowances';
 
 import {
   confirmAttachmentUploadAction,
@@ -28,6 +29,10 @@ vi.mock('@/lib/utils/logger', () => ({
 vi.mock('@/lib/config/rate-limit-tiers', () => ({
   attachmentUploadLimiter: { check: vi.fn(async () => undefined) },
   ATTACHMENT_UPLOAD_LIMIT: 60,
+}));
+// An owner has uploads left for the day unless a test says otherwise.
+vi.mock('@/lib/utils/submission-allowances', () => ({
+  allowAttachmentUpload: vi.fn(async () => true),
 }));
 vi.mock('@/lib/services/submission-attachment-service', () => ({
   SubmissionAttachmentService: {
@@ -65,7 +70,6 @@ const REFUSAL = {
   error: 'Unauthorized',
   code: 'UNAUTHENTICATED' as const,
 };
-const FORBIDDEN = { success: false, error: 'Unauthorized', code: 'FORBIDDEN' };
 
 const signIn = (role: string, uploadAgreementVersion: number | null = 1): void => {
   vi.mocked(gateAction).mockResolvedValue({
@@ -115,10 +119,12 @@ describe('requestAttachmentUploadAction', () => {
     await expect(requestAttachmentUploadAction(request)).resolves.toEqual(REFUSAL);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
 
-    await expect(requestAttachmentUploadAction(request)).resolves.toEqual(FORBIDDEN);
+    await requestAttachmentUploadAction(request);
+
+    expect(SubmissionAttachmentService.requestUpload).toHaveBeenCalledTimes(1);
   });
 
   it('refuses input that is not an upload request', async () => {
@@ -151,6 +157,37 @@ describe('requestAttachmentUploadAction', () => {
     await requestAttachmentUploadAction(request);
 
     expect(vi.mocked(attachmentUploadLimiter.check).mock.calls).toEqual([[60, USER_ID]]);
+  });
+
+  it('counts the request against the user’s uploads for the day', async () => {
+    await requestAttachmentUploadAction(request);
+
+    expect(vi.mocked(allowAttachmentUpload).mock.calls).toEqual([[USER_ID]]);
+  });
+
+  it('refuses a user who has spent their uploads for the day, and signs nothing', async () => {
+    vi.mocked(allowAttachmentUpload).mockResolvedValueOnce(false);
+
+    await expect(requestAttachmentUploadAction(request)).resolves.toEqual({
+      success: false,
+      error: 'You have added a lot of files today. Try again tomorrow.',
+      code: 'LIMIT_EXCEEDED',
+    });
+    expect(SubmissionAttachmentService.requestUpload).not.toHaveBeenCalled();
+  });
+
+  it('spends none of the day’s uploads on a request the minute’s rate refuses', async () => {
+    vi.mocked(attachmentUploadLimiter.check).mockRejectedValueOnce(new Error('rate limited'));
+
+    await requestAttachmentUploadAction(request);
+
+    expect(allowAttachmentUpload).not.toHaveBeenCalled();
+  });
+
+  it('spends none of the day’s uploads on a request that is not one', async () => {
+    await requestAttachmentUploadAction({ ...request, fileSize: -1 });
+
+    expect(allowAttachmentUpload).not.toHaveBeenCalled();
   });
 
   it('refuses a user past their upload rate, and signs nothing', async () => {
@@ -216,10 +253,11 @@ describe('confirmAttachmentUploadAction', () => {
     expect(vi.mocked(gateAction).mock.calls).toEqual([['signed-in']]);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    confirmed();
 
-    await expect(confirmAttachmentUploadAction(confirm)).resolves.toEqual(FORBIDDEN);
+    await expect(confirmAttachmentUploadAction(confirm)).resolves.toMatchObject({ success: true });
   });
 
   it('answers the gate’s refusal', async () => {
@@ -273,6 +311,7 @@ describe('confirmAttachmentUploadAction', () => {
       '/community/mine',
       `/community/${SUBMISSION_ID}`,
       '/admin/community',
+      '/community',
     ]);
   });
 
@@ -298,10 +337,11 @@ describe('removeAttachmentAction', () => {
     expect(vi.mocked(gateAction).mock.calls).toEqual([['signed-in']]);
   });
 
-  it('is closed to anyone but an approver before launch', async () => {
+  it('is open to a signed-in user who is not an approver', async () => {
     signIn('user');
+    vi.mocked(SubmissionAttachmentService.remove).mockResolvedValueOnce(submission);
 
-    await expect(removeAttachmentAction(remove)).resolves.toEqual(FORBIDDEN);
+    await expect(removeAttachmentAction(remove)).resolves.toMatchObject({ success: true });
   });
 
   it('answers the gate’s refusal', async () => {
@@ -338,6 +378,7 @@ describe('removeAttachmentAction', () => {
       '/community/mine',
       `/community/${SUBMISSION_ID}`,
       '/admin/community',
+      '/community',
     ]);
   });
 

@@ -36,7 +36,8 @@ leave.**
 - **Abuse of the report control is bounded, not traced.** One report per
   reporter per submission and five per reporter per day; three notices per
   submission per day; fifty open reports per submission; Turnstile on every
-  one.
+  one; and, since the launch, ten attempts a minute per address before
+  anything is verified.
 
 ## Alternatives rejected
 

@@ -20,6 +20,7 @@ import type {
 } from '@/lib/types/domain/user';
 
 import { userWhere } from './_internal/user-where';
+import { inTexts, startsWithText } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -149,7 +150,7 @@ export class UserRepository {
   ): Promise<UserUsernameRecord[]> {
     return prisma.user.findMany({
       where: {
-        username: { startsWith: prefix, mode: 'insensitive' },
+        username: startsWithText(prefix),
         NOT: { id: excludeUserId },
       },
       select: { id: true, username: true },
@@ -168,7 +169,7 @@ export class UserRepository {
   ): Promise<UserContactRecord[]> {
     return prisma.user.findMany({
       where: {
-        username: { in: usernames, mode: 'insensitive' },
+        username: inTexts(usernames),
         NOT: { id: excludeUserId },
       },
       select: { id: true, username: true, email: true },

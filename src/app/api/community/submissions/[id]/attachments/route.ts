@@ -4,7 +4,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { mayUseCommunity } from '@/lib/community/community-access';
 import { withAuth } from '@/lib/decorators/with-auth';
 import { SubmissionService } from '@/lib/services/submission-service';
 import { loggers } from '@/lib/utils/logger';
@@ -28,7 +27,7 @@ const notFound = (): NextResponse =>
 export const GET = withAuth<{ id: string }>(async (_request: NextRequest, { params }, { user }) => {
   try {
     const { id } = await params;
-    if (!mayUseCommunity(user.role) || !objectId.safeParse(id).success) {
+    if (!objectId.safeParse(id).success) {
       return notFound();
     }
 

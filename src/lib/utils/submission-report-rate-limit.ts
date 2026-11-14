@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
-import { Ratelimit } from '@upstash/ratelimit';
-
-import { limitWithFallback } from './redis-fallback';
-import { getRedisClient } from './upstash-redis';
+import {
+  DAILY_ALLOWANCE_WINDOW_MS,
+  resetDailyAllowancesForTesting,
+  spendDailyAllowance,
+  type DailyAllowanceTier,
+} from './daily-allowance';
 
 /**
  * The limits on submission reports (ADR-0028). A report needs no account, so
@@ -31,58 +33,24 @@ export const REPORTS_PER_REPORTER = 5;
  */
 export const REPORT_NOTICES_PER_SUBMISSION = 3;
 
-const WINDOW = '24 h' as const;
+/** The window in milliseconds: each limit is a rolling 24 hours. */
+export const SUBMISSION_REPORT_WINDOW_MS = DAILY_ALLOWANCE_WINDOW_MS;
 
-/** The window in milliseconds, for the in-memory fallback limiter. */
-export const SUBMISSION_REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-interface Tier {
-  /** Names the limiter in Redis, in the fallback cache and in its warning. */
-  name: string;
-  limit: number;
-}
-
-const PAIR: Tier = { name: 'submission-report:pair', limit: REPORTS_PER_REPORTER_PER_SUBMISSION };
-const REPORTER: Tier = { name: 'submission-report:reporter', limit: REPORTS_PER_REPORTER };
-const NOTICE: Tier = { name: 'submission-report:notice', limit: REPORT_NOTICES_PER_SUBMISSION };
-
-const limiters = new Map<string, Ratelimit>();
-
-/** The Upstash limiter for a tier, built on first use. Throws when Upstash is not configured. */
-const limiterFor = ({ name, limit }: Tier): Ratelimit => {
-  const cached = limiters.get(name);
-  if (cached) {
-    return cached;
-  }
-
-  const limiter = new Ratelimit({
-    redis: getRedisClient(),
-    limiter: Ratelimit.slidingWindow(limit, WINDOW),
-    analytics: false,
-    prefix: name,
-  });
-  limiters.set(name, limiter);
-
-  return limiter;
+const PAIR: DailyAllowanceTier = {
+  name: 'submission-report:pair',
+  limit: REPORTS_PER_REPORTER_PER_SUBMISSION,
+};
+const REPORTER: DailyAllowanceTier = {
+  name: 'submission-report:reporter',
+  limit: REPORTS_PER_REPORTER,
+};
+const NOTICE: DailyAllowanceTier = {
+  name: 'submission-report:notice',
+  limit: REPORT_NOTICES_PER_SUBMISSION,
 };
 
-/**
- * Spend one of a tier's allowance for `key` and say whether there was one to
- * spend. Fails open on an Upstash outage: the tier is then held by a
- * per-process window ({@link limitWithFallback}), so reporting is never
- * blocked by a dependency being down.
- */
-const spend = async (tier: Tier, key: string): Promise<boolean> => {
-  const { success } = await limitWithFallback({
-    name: tier.name,
-    getLimiter: () => limiterFor(tier),
-    key,
-    limit: tier.limit,
-    windowMs: SUBMISSION_REPORT_WINDOW_MS,
-  });
-
-  return success;
-};
+/** Spend one of a tier's allowance for `key`; fails open to a per-process window. */
+const spend = spendDailyAllowance;
 
 /** Deterministic Playwright runs must not trip production-grade limits. */
 const isE2E = (): boolean => process.env.E2E_MODE === 'true';
@@ -137,5 +105,5 @@ export const allowSubmissionReportNotice = async (submissionId: string): Promise
 
 /** Drop the limiter singletons. Testing aid only. */
 export const resetSubmissionReportRateLimitForTesting = (): void => {
-  limiters.clear();
+  resetDailyAllowancesForTesting();
 };

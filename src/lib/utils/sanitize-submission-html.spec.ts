@@ -4,6 +4,7 @@
 import {
   sanitizeSubmissionAbout,
   sanitizeSubmissionWriting,
+  submissionText,
   submissionTextLength,
   submissionWritingLinks,
 } from './sanitize-submission-html';
@@ -124,6 +125,28 @@ describe('submissionTextLength', () => {
 
   it('ignores surrounding whitespace', () => {
     expect(submissionTextLength('<p>  hi  </p>')).toBe(2);
+  });
+});
+
+describe('submissionText', () => {
+  it('reads the text a reader sees, without the markup', () => {
+    expect(submissionText('<p><strong>abc</strong> de</p>')).toBe('abc de');
+  });
+
+  it('keeps a word whole across a bold or italic boundary', () => {
+    expect(submissionText('<p>re<strong>cord</strong>ed <em>li</em>ve</p>')).toBe('recorded live');
+  });
+
+  it('puts a space where a paragraph or a line ends', () => {
+    expect(submissionText('<p>one</p><p>two<br />three</p>')).toBe('one two three');
+  });
+
+  it('reads an encoded character as the character it stands for', () => {
+    expect(submissionText('<p>a &amp; b &lt; c</p>')).toBe('a & b < c');
+  });
+
+  it('is empty for markup with no text', () => {
+    expect(submissionText('<p></p><p><br /></p>')).toBe('');
   });
 });
 

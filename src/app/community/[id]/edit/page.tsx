@@ -15,6 +15,7 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
+import { COMMUNITY_CRUMB } from '@/lib/community/community-paths';
 import { requireCommunityUser } from '@/lib/community/community-session';
 import { UPLOAD_AGREEMENT_VERSION } from '@/lib/constants/submissions';
 import { SubmissionService } from '@/lib/services/submission-service';
@@ -44,6 +45,7 @@ export default async function EditSubmissionPage({ params }: EditSubmissionPageP
   }
 
   const breadcrumbs = [
+    COMMUNITY_CRUMB,
     { anchorText: 'Your submissions', url: '/community/mine', isActive: false },
     { anchorText: 'Edit', url: `/community/${id}/edit`, isActive: true },
   ];

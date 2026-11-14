@@ -58,3 +58,46 @@ export const isPresent = <F extends string>(field: F): PresentClause<F> =>
  * sit inside their own `AND` member.
  */
 export const allOf = <C extends object[]>(...clauses: C): { AND: C } => ({ AND: clauses });
+
+/** Every character a regular expression reads as syntax. */
+const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g;
+
+/** A value with its regular-expression syntax escaped, so it is read as text. */
+const asText = (value: string): string => value.replace(REGEX_SYNTAX, '\\$&');
+
+/**
+ * The text filters. On this stack Prisma sends `contains`, `startsWith` and
+ * `endsWith`, and any filter with `mode: 'insensitive'`, to MongoDB as a
+ * regular expression, and it does not escape the value: `.*` matches every
+ * row, `equals: 'a.c'` also matches "abc", `(` fails the query with "Invalid
+ * Regex", and a crafted pattern can make the database backtrack. Only a
+ * case-sensitive `equals` or `in` is compared as text.
+ *
+ * So every text filter is built here, where the value is escaped first, and
+ * `text-filter-seam.spec.ts` fails if one is written by hand anywhere else.
+ * Each helper is case-insensitive. Proved by `where-kit.contract.spec.ts`.
+ */
+
+/** "Contains this text", for a term someone typed. */
+export const containsText = (term: string): { contains: string; mode: 'insensitive' } => ({
+  contains: asText(term),
+  mode: 'insensitive',
+});
+
+/** "Starts with this text": a prefix someone is typing. */
+export const startsWithText = (prefix: string): { startsWith: string; mode: 'insensitive' } => ({
+  startsWith: asText(prefix),
+  mode: 'insensitive',
+});
+
+/** "Is this text, whatever the case": a name looked up or checked for a duplicate. */
+export const equalsText = (value: string): { equals: string; mode: 'insensitive' } => ({
+  equals: asText(value),
+  mode: 'insensitive',
+});
+
+/** "Is one of these texts, whatever the case". */
+export const inTexts = (values: string[]): { in: string[]; mode: 'insensitive' } => ({
+  in: values.map(asText),
+  mode: 'insensitive',
+});

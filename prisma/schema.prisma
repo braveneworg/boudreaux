@@ -1256,6 +1256,7 @@ model Submission {
   title           String
   category        SubmissionCategory @default(VIDEO)
   aboutHtml       String             @default("") // sanitized: bold and italic only
+  aboutText       String? // the about as plain text; what the community page's search reads
   writingHtml     String             @default("") // sanitized: headings, bold, italic, links
   links           String[] // http(s) URLs; at most ten with the writing's links
   listed          Boolean            @default(false) // where an approved one appears, never whether

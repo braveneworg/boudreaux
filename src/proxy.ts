@@ -6,6 +6,10 @@ import type { NextRequest } from 'next/server';
 
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
+import {
+  communityPageSegment,
+  submissionPageResponse,
+} from '@/lib/community/submission-page-status';
 import { legacyReleaseId, legacyReleaseResponse } from '@/lib/legacy-release-url';
 import { isApproverRole } from '@/lib/utils/roles';
 
@@ -149,6 +153,14 @@ export default async function middleware(request: NextRequest) {
   // Presence-only check at the edge — cheap, no DB hit.
   const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX }));
 
+  // A submission's page is public: a signed-out request for one that is not
+  // a public submission gets a real 404, and nothing here sends anyone to
+  // sign in.
+  const communitySegment = communityPageSegment(pathname);
+  if (communitySegment !== null) {
+    return submissionPageResponse(request, communitySegment, hasSession);
+  }
+
   const isPublic = isPublicRoute(pathname);
 
   // Redirect unauthenticated users trying to access private routes
@@ -190,11 +202,14 @@ export const config = {
      * Match authentication-protected routes explicitly. /videos is public
      * (like /releases) and deliberately unmatched.
      * - /releases/:releaseId, the public legacy release URL (not a gate)
+     * - /community/:id, a submission's public page (not a gate): only its
+     *   status is decided here. /community itself is deliberately unmatched.
      * - /profile and all sub-routes
      * - /admin and all sub-routes
      * - /api/admin and all sub-routes
      */
     '/releases/:releaseId',
+    '/community/:id',
     '/profile',
     '/profile/:path*',
     '/admin',

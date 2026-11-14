@@ -19,6 +19,7 @@ import { mayBeginRunWhere } from './_internal/async-job-where';
 import { runQuery } from './_internal/map-prisma-error';
 import { videoLiveAt, videoWhere } from './_internal/video-where';
 import { publicArtist } from './_internal/visibility';
+import { containsText } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -61,8 +62,6 @@ const toPrismaJson = (value: unknown): Prisma.InputJsonValue | null =>
 // Where builder (domain filters -> Prisma where; owned by the repository)
 // =============================================================================
 
-const containsInsensitive = (value: string) => ({ contains: value, mode: 'insensitive' as const });
-
 /**
  * Match the videos the public artist with this slug holds a video credit on
  * (a `VideoArtist` row, primary or featured). A hidden artist's slug matches
@@ -97,9 +96,9 @@ const buildListWhere = (filters: VideoListFilters): Prisma.VideoWhereInput => {
   if (search) {
     and.push({
       OR: [
-        { title: containsInsensitive(search) },
-        { artist: containsInsensitive(search) },
-        { description: containsInsensitive(search) },
+        { title: containsText(search) },
+        { artist: containsText(search) },
+        { description: containsText(search) },
       ],
     });
   }
@@ -123,7 +122,7 @@ const buildPublishedWhere = ({
 }: Pick<VideoListFilters, 'search' | 'artist'>): Prisma.VideoWhereInput => ({
   ...buildListWhere({ visibleAt: new Date(), artist }),
   ...(search && {
-    OR: [{ title: containsInsensitive(search) }, { artist: containsInsensitive(search) }],
+    OR: [{ title: containsText(search) }, { artist: containsText(search) }],
   }),
 });
 
@@ -254,7 +253,7 @@ export class VideoRepository {
     return prisma.video.findMany({
       where: {
         ...buildListWhere({ visibleAt: new Date() }),
-        OR: [{ title: containsInsensitive(q) }, { artist: containsInsensitive(q) }],
+        OR: [{ title: containsText(q) }, { artist: containsText(q) }],
       },
       orderBy: { title: 'asc' },
       take,

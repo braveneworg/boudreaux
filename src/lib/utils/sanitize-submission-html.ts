@@ -59,6 +59,9 @@ const TEXT_OPTIONS: sanitizeHtml.IOptions = {
   disallowedTagsMode: 'discard',
 };
 
+/** Where a line of text ends: a closed paragraph or heading, or a line break. */
+const LINE_END = /<\/(?:p|h2|h3)>|<br\s*\/?>/gi;
+
 /** Decode the entities sanitize-html writes into text and attribute values. */
 const decodeEntities = (value: string): string =>
   value
@@ -97,6 +100,16 @@ export const sanitizeSubmissionWriting = (html: string): string =>
  */
 export const submissionTextLength = (html: string): number =>
   decodeEntities(sanitizeHtml(html, TEXT_OPTIONS)).trim().length;
+
+/**
+ * Submission HTML as the text a reader sees, on one line: markup removed and
+ * entities decoded. It is what the search reads of an about, so a tag name
+ * never matches and a word split by bold or italic stays whole.
+ */
+export const submissionText = (html: string): string =>
+  decodeEntities(sanitizeHtml(html.replace(LINE_END, ' '), TEXT_OPTIONS))
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * The href of every link in a writing, in document order and with repeats.

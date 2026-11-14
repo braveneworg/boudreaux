@@ -20,6 +20,7 @@ import {
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
 import type { SubmissionAttachmentRecord } from '@/lib/types/domain/submission-attachment';
 import { gravatarHash } from '@/lib/utils/gravatar-hash';
+import { allowApproverNotice } from '@/lib/utils/submission-allowances';
 
 import { SubmissionService, type SaveSubmissionData } from './submission-service';
 
@@ -35,6 +36,8 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     decide: vi.fn(),
     deleteOwned: vi.fn(),
     listByStatus: vi.fn(),
+    listListed: vi.fn(),
+    isPublic: vi.fn(),
     countAwaitingBefore: vi.fn(),
     countAwaiting: vi.fn(),
   },
@@ -42,7 +45,7 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     status === 'APPROVED' && owner.banned !== true,
 }));
 vi.mock('@/lib/repositories/user-repository', () => ({
-  UserRepository: { acceptUploadAgreement: vi.fn() },
+  UserRepository: { acceptUploadAgreement: vi.fn(), findByUsername: vi.fn() },
 }));
 // A submission has no open reports unless a test says so.
 vi.mock('@/lib/repositories/submission-report-repository', () => ({
@@ -63,6 +66,10 @@ vi.mock('@/lib/services/submission-attachment-store', () => ({
     previewUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
     publicUrl: vi.fn((key: string) => `https://cdn.example/${key}`),
   },
+}));
+// An owner has notices left for the day unless a test says otherwise.
+vi.mock('@/lib/utils/submission-allowances', () => ({
+  allowApproverNotice: vi.fn(async () => true),
 }));
 vi.mock('@/lib/services/submission-notices', () => ({
   notifyApproversOfSubmission: vi.fn(),
@@ -100,6 +107,7 @@ const record = (overrides: Partial<SubmissionRecord> = {}): SubmissionRecord => 
   title: 'Bus poem',
   category: 'WRITING',
   aboutHtml: '<p>Written on the bus.</p>',
+  aboutText: 'Written on the bus.',
   writingHtml: '<p>A poem.</p>',
   links: ['https://example.com/zine'],
   listed: false,
@@ -276,6 +284,20 @@ describe('SubmissionService.save', () => {
       });
     });
 
+    it('stores the about as plain text too, for the search to read', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(
+        agreed,
+        form({ aboutHtml: '<p>Recorded <strong>live</strong> &amp; loud</p><p>in a basement</p>' }),
+        { publish: false }
+      );
+
+      expect(vi.mocked(SubmissionRepository.createWithinCap).mock.calls[0]?.[0]).toMatchObject({
+        aboutText: 'Recorded live & loud in a basement',
+      });
+    });
+
     it('refuses an about whose text is past the limit', async () => {
       const aboutHtml = `<p>${'a'.repeat(SUBMISSION_ABOUT_MAX + 1)}</p>`;
 
@@ -362,6 +384,7 @@ describe('SubmissionService.save', () => {
             title: 'Bus poem',
             category: 'WRITING',
             aboutHtml: '<p>Written on the bus.</p>',
+            aboutText: 'Written on the bus.',
             writingHtml: '<p>A poem.</p>',
             links: ['https://example.com/zine'],
             listed: true,
@@ -396,6 +419,36 @@ describe('SubmissionService.save', () => {
       await SubmissionService.save(agreed, form(), { publish: true });
 
       expect(vi.mocked(notifyApproversOfSubmission).mock.calls).toEqual([[saved]]);
+    });
+
+    it('spends one of the owner’s notices for the day when it tells them', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(
+        written({ status: 'AWAITING_APPROVAL' })
+      );
+
+      await SubmissionService.save(agreed, form(), { publish: true });
+
+      expect(vi.mocked(allowApproverNotice).mock.calls).toEqual([[OWNER_ID]]);
+    });
+
+    it('publishes, but tells nobody, once the owner’s notices for the day are spent', async () => {
+      const saved = record({ status: 'AWAITING_APPROVAL' });
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce({
+        status: 'written',
+        submission: saved,
+      });
+      vi.mocked(allowApproverNotice).mockResolvedValueOnce(false);
+
+      await expect(SubmissionService.save(agreed, form(), { publish: true })).resolves.toBe(saved);
+      expect(notifyApproversOfSubmission).not.toHaveBeenCalled();
+    });
+
+    it('spends no notice on a draft', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(agreed, form(), { publish: false });
+
+      expect(allowApproverNotice).not.toHaveBeenCalled();
     });
 
     it('tells nobody when it is saved as a draft', async () => {
@@ -487,6 +540,20 @@ describe('SubmissionService.save', () => {
       expect(vi.mocked(SubmissionRepository.updateOwned).mock.calls[0]?.[1].publishedAt).toEqual(
         NOW
       );
+    });
+
+    it('stores the edited about as plain text too', async () => {
+      vi.mocked(SubmissionRepository.findById).mockResolvedValueOnce(record());
+      vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(agreed, edit({ aboutHtml: '<p>Taped <em>at home</em></p>' }), {
+        publish: false,
+      });
+
+      expect(vi.mocked(SubmissionRepository.updateOwned).mock.calls[0]?.[1]).toMatchObject({
+        aboutHtml: '<p>Taped <em>at home</em></p>',
+        aboutText: 'Taped at home',
+      });
     });
 
     it('keeps its place in the queue when edited while awaiting approval', async () => {
@@ -866,6 +933,17 @@ describe('SubmissionService.takeOfflineForAttachmentChange', () => {
     }
   );
 
+  it('tells nobody once the owner’s notices for the day are spent', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    vi.mocked(allowApproverNotice).mockResolvedValueOnce(false);
+
+    await SubmissionService.takeOfflineForAttachmentChange(approved);
+
+    expect(notifyApproversOfSubmission).not.toHaveBeenCalled();
+  });
+
   it('returns an approved submission to awaiting approval, within the cap', async () => {
     vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
       written({ status: 'AWAITING_APPROVAL' })
@@ -880,6 +958,7 @@ describe('SubmissionService.takeOfflineForAttachmentChange', () => {
           title: approved.title,
           category: approved.category,
           aboutHtml: approved.aboutHtml,
+          aboutText: 'Written on the bus.',
           writingHtml: approved.writingHtml,
           links: approved.links,
           listed: approved.listed,
@@ -1124,6 +1203,98 @@ describe('SubmissionService.cardPictures', () => {
     expect(vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mock.calls).toEqual([
       [[SUBMISSION_ID, other]],
     ]);
+  });
+});
+
+describe('SubmissionService.listCards', () => {
+  const other = 'f'.repeat(24);
+  const listed = (id: string, username: string | null) => ({
+    id,
+    title: 'Bus poem',
+    category: 'WRITING' as const,
+    owner: { username, email: 'Ada@Example.com ' },
+  });
+
+  it('reads the page it was asked for and nothing wider', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([]);
+    const query = { skip: 12, take: 12, search: 'bus', ownerId: OWNER_ID };
+
+    await expect(SubmissionService.listCards(query)).resolves.toEqual([]);
+    expect(vi.mocked(SubmissionRepository.listListed).mock.calls).toEqual([[query]]);
+  });
+
+  it('makes each listed submission a card, in the order it was read', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([
+      listed(SUBMISSION_ID, 'ada'),
+      listed(other, null),
+    ]);
+    vi.mocked(SubmissionAttachmentRepository.listBySubmissions).mockResolvedValueOnce([
+      attachment(),
+    ]);
+
+    await expect(SubmissionService.listCards({ skip: 0, take: 12 })).resolves.toEqual([
+      {
+        id: SUBMISSION_ID,
+        title: 'Bus poem',
+        category: 'WRITING',
+        // A listed submission is public, so its picture is the CDN's.
+        cardPictureUrl: `https://cdn.example/${COPY_PREFIX}card.webp`,
+        owner: { username: 'ada', gravatarHash: gravatarHash('ada@example.com') },
+      },
+      {
+        id: other,
+        title: 'Bus poem',
+        category: 'WRITING',
+        cardPictureUrl: null,
+        owner: { username: null, gravatarHash: gravatarHash('ada@example.com') },
+      },
+    ]);
+  });
+
+  it('never carries the owner’s email', async () => {
+    vi.mocked(SubmissionRepository.listListed).mockResolvedValueOnce([
+      listed(SUBMISSION_ID, 'ada'),
+    ]);
+
+    const cards = await SubmissionService.listCards({ skip: 0, take: 12 });
+
+    expect(JSON.stringify(cards)).not.toMatch(/example\.com/i);
+  });
+});
+
+describe('SubmissionService.isPublic', () => {
+  it.each([true, false])('answers %s as the repository does', async (answer) => {
+    vi.mocked(SubmissionRepository.isPublic).mockResolvedValueOnce(answer);
+
+    await expect(SubmissionService.isPublic(SUBMISSION_ID)).resolves.toBe(answer);
+    expect(vi.mocked(SubmissionRepository.isPublic).mock.calls).toEqual([[SUBMISSION_ID]]);
+  });
+});
+
+describe('SubmissionService.ownerNamed', () => {
+  it('names the account that holds a username, without its email', async () => {
+    vi.mocked(UserRepository.findByUsername).mockResolvedValueOnce({
+      id: OWNER_ID,
+      username: 'ada',
+      email: 'ada@example.com',
+    });
+
+    await expect(SubmissionService.ownerNamed('ada')).resolves.toEqual({
+      id: OWNER_ID,
+      username: 'ada',
+    });
+    expect(vi.mocked(UserRepository.findByUsername).mock.calls).toEqual([['ada']]);
+  });
+
+  it('is null when no account holds it', async () => {
+    vi.mocked(UserRepository.findByUsername).mockResolvedValueOnce(null);
+
+    await expect(SubmissionService.ownerNamed('nobody')).resolves.toBeNull();
+  });
+
+  it('asks nothing for an empty username', async () => {
+    await expect(SubmissionService.ownerNamed('')).resolves.toBeNull();
+    expect(UserRepository.findByUsername).not.toHaveBeenCalled();
   });
 });
 

@@ -7,6 +7,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import type { VenueScalars } from '@/lib/types/tours';
 
+import { containsText, equalsText } from '../_internal/where-kit';
+
 import type { AssertExact } from '../_internal/drift';
 import type { Prisma } from '@prisma/client';
 
@@ -56,15 +58,15 @@ const buildWhere = (search?: string, city?: string): Prisma.VenueWhereInput | un
 
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { address: { contains: search, mode: 'insensitive' } },
-      { city: { contains: search, mode: 'insensitive' } },
+      { name: containsText(search) },
+      { address: containsText(search) },
+      { city: containsText(search) },
     ];
     hasWhere = true;
   }
 
   if (city) {
-    where.city = { equals: city, mode: 'insensitive' };
+    where.city = equalsText(city);
     hasWhere = true;
   }
 
@@ -127,7 +129,7 @@ export class VenueRepository {
   static async findByName(name: string): Promise<VenueScalars[]> {
     return prisma.venue.findMany({
       where: {
-        name: { equals: name, mode: 'insensitive' },
+        name: equalsText(name),
       },
       take: 1,
     });

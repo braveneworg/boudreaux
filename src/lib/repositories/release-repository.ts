@@ -33,6 +33,7 @@ import {
 } from './_internal/release-credits';
 import { releasePublishedFilter, releaseWhere } from './_internal/release-where';
 import { listedRelease, publicArtist } from './_internal/visibility';
+import { containsText, equalsText } from './_internal/where-kit';
 
 import type { AssertExact } from './_internal/drift';
 import type { Prisma } from '@prisma/client';
@@ -279,8 +280,6 @@ const toPrismaUpdate = (data: UpdateReleaseData): Prisma.ReleaseUpdateInput => (
 // Where builders (domain filters -> Prisma where; owned by the repository)
 // =============================================================================
 
-const containsInsensitive = (value: string) => ({ contains: value, mode: 'insensitive' as const });
-
 /**
  * Build the admin-listing `where` from domain filters. The search OR and the
  * deletedOn OR are combined under `AND` so the two `OR` keys never collide
@@ -302,9 +301,9 @@ const buildListWhere = (filters: ReleaseListFilters): Prisma.ReleaseWhereInput =
   if (search) {
     and.push({
       OR: [
-        { title: containsInsensitive(search) },
-        { catalogNumber: containsInsensitive(search) },
-        { description: containsInsensitive(search) },
+        { title: containsText(search) },
+        { catalogNumber: containsText(search) },
+        { description: containsText(search) },
       ],
     });
   }
@@ -356,7 +355,7 @@ const buildPublishedWhere = ({
   search,
   artist,
 }: Pick<PublishedReleaseFilters, 'search' | 'artist'>): Prisma.ReleaseWhereInput => {
-  const contains = containsInsensitive(search ?? '');
+  const contains = containsText(search ?? '');
   return {
     AND: [
       listedRelease.where,
@@ -673,10 +672,7 @@ export class ReleaseRepository {
   } | null> {
     return prisma.release.findFirst({
       where: {
-        title: {
-          equals: title,
-          mode: 'insensitive',
-        },
+        title: equalsText(title),
       },
       select: {
         id: true,

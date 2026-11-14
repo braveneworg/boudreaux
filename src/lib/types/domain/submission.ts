@@ -18,6 +18,8 @@ export interface SubmissionRecord {
   title: string;
   category: SubmissionCategory;
   aboutHtml: string;
+  /** The about as plain text, for the search; `null` on a row saved before it was kept. */
+  aboutText: string | null;
   writingHtml: string;
   links: string[];
   listed: boolean;
@@ -49,6 +51,47 @@ export interface SubmissionWithOwnerRecord extends SubmissionRecord {
   owner: SubmissionOwnerRecord;
 }
 
+/**
+ * A listed submission as the community page reads it, before it is made into
+ * a card. The owner's email is for the avatar hash and never reaches a client.
+ */
+export interface ListedSubmissionRecord {
+  id: string;
+  title: string;
+  category: SubmissionCategory;
+  owner: { username: string | null; email: string };
+}
+
+/**
+ * A listed submission as a card shows it, on the community page, in its
+ * search and in one user's list. Safe for any reader: it holds the owner's
+ * avatar hash, never their email, and a picture only the CDN serves.
+ */
+export interface SubmissionCard {
+  id: string;
+  title: string;
+  category: SubmissionCategory;
+  /** Its card picture's CDN address, or `null` when it has none. */
+  cardPictureUrl: string | null;
+  owner: { username: string | null; gravatarHash: string };
+}
+
+/** The account a per-user list is for. */
+export interface SubmissionOwnerName {
+  id: string;
+  username: string;
+}
+
+/** Which listed submissions a read wants: one page, optionally narrowed. */
+export interface ListedSubmissionsQuery {
+  skip: number;
+  take: number;
+  /** A search term; the title, the about text and the username are read. */
+  search?: string;
+  /** Only this owner's. */
+  ownerId?: string;
+}
+
 /** The content of a submission: what an approver approves. `listed` is not content. */
 export interface SubmissionContent {
   title: string;
@@ -58,8 +101,16 @@ export interface SubmissionContent {
   links: string[];
 }
 
+/**
+ * The content as a write stores it: with the about's plain text beside its
+ * HTML, derived by the service and never sent by a client.
+ */
+export interface StoredSubmissionContent extends SubmissionContent {
+  aboutText: string;
+}
+
 /** What the repository needs to create a submission. */
-export interface CreateSubmissionData extends SubmissionContent {
+export interface CreateSubmissionData extends StoredSubmissionContent {
   ownerId: string;
   listed: boolean;
   status: Extract<SubmissionStatus, 'DRAFT' | 'AWAITING_APPROVAL'>;
@@ -67,7 +118,7 @@ export interface CreateSubmissionData extends SubmissionContent {
 }
 
 /** What an owner's save may write on an existing submission. */
-export interface UpdateSubmissionData extends SubmissionContent {
+export interface UpdateSubmissionData extends StoredSubmissionContent {
   listed: boolean;
   status: Extract<SubmissionStatus, 'DRAFT' | 'AWAITING_APPROVAL' | 'REJECTED'>;
   /** Set when the save publishes; left alone otherwise. */

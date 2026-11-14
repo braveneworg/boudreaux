@@ -30,7 +30,11 @@ import {
 import { DataError } from '@/lib/types/domain/errors';
 import type {
   SubmissionActor,
+  ListedSubmissionsQuery,
+  SubmissionCard,
   SubmissionContent,
+  SubmissionOwnerName,
+  StoredSubmissionContent,
   SubmissionDecisionData,
   SubmissionOwnerActor,
   SubmissionQueueRow,
@@ -47,9 +51,11 @@ import { isAdminRole, isApproverRole } from '@/lib/utils/roles';
 import {
   sanitizeSubmissionAbout,
   sanitizeSubmissionWriting,
+  submissionText,
   submissionTextLength,
   submissionWritingLinks,
 } from '@/lib/utils/sanitize-submission-html';
+import { allowApproverNotice } from '@/lib/utils/submission-allowances';
 import type { SaveSubmissionInput } from '@/lib/validation/submission-schema';
 
 const logger = loggers.media;
@@ -165,6 +171,15 @@ const contentFrom = ({
 };
 
 /**
+ * The content as a write stores it: every write of the about also writes its
+ * plain text, which is all the community page's search reads of it.
+ */
+const storedContent = (content: SubmissionContent): StoredSubmissionContent => ({
+  ...content,
+  aboutText: submissionText(content.aboutHtml),
+});
+
+/**
  * What a submission needs before an approver sees it: a title, something to
  * show (a writing or an attachment for writings, an attachment for anything
  * else), and every attachment with its re-encoded copy. Throws the rule it
@@ -240,6 +255,18 @@ const afterWrite = async (notice: () => Promise<void>, what: string): Promise<vo
   }
 };
 
+/**
+ * Tell approvers a submission entered the queue, while its owner has notices
+ * left for the day. Past that it is in the queue like any other and only the
+ * email and the text are skipped: anyone signed in may publish, and one
+ * account must not be able to notify every approver without end.
+ */
+const tellApproversOf = async (submission: SubmissionRecord): Promise<void> => {
+  if (await allowApproverNotice(submission.ownerId)) {
+    await notifyApproversOfSubmission(submission);
+  }
+};
+
 /** How a reader stands to a submission, or `null` when they may not open it. */
 const viewerKindFor = (
   submission: SubmissionWithOwnerRecord,
@@ -304,7 +331,7 @@ export class SubmissionService {
         : await SubmissionService.update(stored, { content, listed: data.listed }, publish);
 
     if (enteredQueue) {
-      await afterWrite(() => notifyApproversOfSubmission(submission), 'approver notice');
+      await afterWrite(() => tellApproversOf(submission), 'approver notice');
     }
 
     return submission;
@@ -361,7 +388,7 @@ export class SubmissionService {
     const write = await SubmissionRepository.createWithinCap(
       {
         ownerId,
-        ...content,
+        ...storedContent(content),
         listed,
         status: publish ? 'AWAITING_APPROVAL' : 'DRAFT',
         publishedAt: publish ? new Date() : null,
@@ -389,7 +416,12 @@ export class SubmissionService {
       { id, ownerId, expected: stored.status },
       // An edit while awaiting approval keeps its publish moment, and so its
       // place in the queue.
-      { ...content, listed, status, ...(entersQueue && { publishedAt: new Date() }) }
+      {
+        ...storedContent(content),
+        listed,
+        status,
+        ...(entersQueue && { publishedAt: new Date() }),
+      }
     );
 
     return { submission: recordFrom(write), enteredQueue: entersQueue };
@@ -430,7 +462,12 @@ export class SubmissionService {
   ): Promise<SubmissionRecord> {
     const write = await SubmissionRepository.updateOwned(
       { id, ownerId, expected: 'APPROVED' },
-      { ...content, listed, status: 'AWAITING_APPROVAL', publishedAt: new Date() },
+      {
+        ...storedContent(content),
+        listed,
+        status: 'AWAITING_APPROVAL',
+        publishedAt: new Date(),
+      },
       MAX_UNAPPROVED_SUBMISSIONS
     );
     const submission = recordFrom(write);
@@ -459,7 +496,7 @@ export class SubmissionService {
       { title, category, aboutHtml, writingHtml, links },
       listed
     );
-    await afterWrite(() => notifyApproversOfSubmission(submission), 'approver notice');
+    await afterWrite(() => tellApproversOf(submission), 'approver notice');
 
     return submission;
   }
@@ -753,6 +790,45 @@ export class SubmissionService {
     return new Map(
       pictures.flatMap(({ id, url }): Array<[string, string]> => (url === null ? [] : [[id, url]]))
     );
+  }
+
+  /**
+   * One page of listed submissions as cards, newest first: what the community
+   * page, its search and a user's public list show. Every one is public, so
+   * each picture is the CDN's and the answer is the same for any reader.
+   */
+  static async listCards(query: ListedSubmissionsQuery): Promise<SubmissionCard[]> {
+    const listed = await SubmissionRepository.listListed(query);
+    const pictures = await SubmissionService.cardPictures(
+      listed.map(({ id }) => ({ id, status: 'APPROVED' }))
+    );
+
+    return listed.map(({ id, title, category, owner }) => ({
+      id,
+      title,
+      category,
+      cardPictureUrl: pictures.get(id) ?? null,
+      owner: { username: owner.username, gravatarHash: gravatarHash(owner.email) },
+    }));
+  }
+
+  /** Whether an id names a public submission: one anybody may open. */
+  static async isPublic(submissionId: string): Promise<boolean> {
+    return SubmissionRepository.isPublic(submissionId);
+  }
+
+  /**
+   * The account that holds a username, for a per-user list, or `null` when
+   * none does. The match is exact: a card links to the username as stored.
+   */
+  static async ownerNamed(username: string): Promise<SubmissionOwnerName | null> {
+    if (username === '') {
+      return null;
+    }
+
+    const owner = await UserRepository.findByUsername(username);
+
+    return owner ? { id: owner.id, username: owner.username ?? username } : null;
   }
 
   /** Every submission an owner holds, in any state. */
