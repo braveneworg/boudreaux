@@ -23,7 +23,8 @@ export interface NavMenuItem {
 }
 
 // The static signed-out list, in render order:
-// Home, Artists, Releases, Videos, Tours, Merch, Playlists, About, Contact Us.
+// Home, Artists, Releases, Videos, Tours, Merch, Playlists, About, Community,
+// Contact Us.
 // Defined at module scope so the hook body stays under the max-lines limit.
 const BASE_NAV_ITEMS: NavMenuItem[] = [
   {
@@ -74,6 +75,12 @@ const BASE_NAV_ITEMS: NavMenuItem[] = [
     href: '/about',
     color:
       'aria-[current=page]:text-menu-item-pink-400 aria-[current=page]:decoration-menu-item-pink-400 hover:text-menu-item-pink-400 hover:decoration-menu-item-pink-400',
+  },
+  {
+    name: 'Community',
+    href: '/community',
+    color:
+      'aria-[current=page]:text-menu-item-pink-200 aria-[current=page]:decoration-menu-item-pink-200 hover:text-menu-item-pink-200 hover:decoration-menu-item-pink-200',
   },
   {
     name: 'Contact Us',

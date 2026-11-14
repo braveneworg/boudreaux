@@ -28,7 +28,7 @@ const Bullet = () => (
 
 /**
  * Desktop primary nav (deck two of the masthead): Home · Music ▾ · Label ▾ ·
- * [My Collection] · Contact Us at full cutout scale. Symmetric `px-38` (152px)
+ * Community · [My Collection] · Contact Us at full cutout scale. Symmetric `px-38` (152px)
  * insets keep true centering while making logo/"Home" overlap geometrically
  * impossible at every xl viewport — the row wraps instead of colliding.
  */

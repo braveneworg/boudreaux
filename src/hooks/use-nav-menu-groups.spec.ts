@@ -88,6 +88,27 @@ describe('useNavMenuGroups', () => {
     ]);
   });
 
+  it('places Community top-level, after the Label group and before My Collection', () => {
+    mockUseNavMenuItems.mockReturnValue([
+      ...FLAT_SIGNED_OUT.slice(0, 3),
+      item('My Collection', '/collection'),
+      ...FLAT_SIGNED_OUT.slice(3, -1),
+      item('Community', '/community'),
+      ...FLAT_SIGNED_OUT.slice(-1),
+    ]);
+
+    const { result } = renderHook(() => useNavMenuGroups());
+
+    expect(result.current.map((e) => (e.kind === 'link' ? e.item.name : e.group.label))).toEqual([
+      'Home',
+      'Music',
+      'Label',
+      'Community',
+      'My Collection',
+      'Contact Us',
+    ]);
+  });
+
   it('skips a group member absent from the flat list without crashing', () => {
     mockUseNavMenuItems.mockReturnValue(FLAT_SIGNED_OUT.filter((i) => i.href !== '/videos'));
 

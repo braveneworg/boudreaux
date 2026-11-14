@@ -33,7 +33,7 @@ describe('useNavMenuItems', () => {
       mockUseSession.mockReturnValue({ status: 'unauthenticated' });
     });
 
-    it('returns the nine public items in order', () => {
+    it('returns the ten public items in order', () => {
       const { result } = renderHook(() => useNavMenuItems());
 
       expect(result.current.map((item) => item.name)).toEqual([
@@ -45,8 +45,17 @@ describe('useNavMenuItems', () => {
         'Merch',
         'Playlists',
         'About',
+        'Community',
         'Contact Us',
       ]);
+    });
+
+    it('points Community at the community page, for a visitor who is not signed in too', () => {
+      const { result } = renderHook(() => useNavMenuItems());
+
+      expect(result.current.find((item) => item.name === 'Community')).toMatchObject({
+        href: '/community',
+      });
     });
 
     it('points Merch at the external shirt store', () => {

@@ -62,6 +62,12 @@ describe('DesktopMenu', () => {
       expect(screen.getByRole('link', { name: 'Contact Us' })).toHaveAttribute('href', '/contact');
     });
 
+    it('renders Community as an always-visible link, signed in or not', () => {
+      render(<DesktopMenu />);
+
+      expect(screen.getByRole('link', { name: 'Community' })).toHaveAttribute('href', '/community');
+    });
+
     it('renders Music and Label as drawer triggers, not links', () => {
       render(<DesktopMenu />);
 
@@ -157,6 +163,20 @@ describe('DesktopMenu', () => {
 
       expect(collectionIndex).toBeGreaterThan(labelIndex);
       expect(collectionIndex).toBeLessThan(contactIndex);
+    });
+
+    it('renders Community between Label and My Collection', async () => {
+      render(<DesktopMenu />);
+      await screen.findByRole('link', { name: 'My Collection' });
+
+      const topLevel = screen
+        .getAllByRole('listitem')
+        .map((li) => li.textContent ?? '')
+        .filter((text) => text.length > 0);
+      const communityIndex = topLevel.findIndex((t) => t.includes('Community'));
+
+      expect(communityIndex).toBeGreaterThan(topLevel.findIndex((t) => t.includes('Label')));
+      expect(communityIndex).toBeLessThan(topLevel.findIndex((t) => t.includes('My Collection')));
     });
   });
 });
