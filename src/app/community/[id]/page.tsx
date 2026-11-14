@@ -16,6 +16,7 @@ import { SubmissionViewContent } from '@/app/components/community/submission-vie
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
+import { COMMUNITY_CRUMB, submissionPath } from '@/lib/community/community-paths';
 import { communityViewer } from '@/lib/community/community-session';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type { SubmissionView } from '@/lib/types/domain/submission';
@@ -81,10 +82,19 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
     notFound();
   }
 
+  const breadcrumbs = [
+    COMMUNITY_CRUMB,
+    {
+      anchorText: view.title === '' ? 'Untitled' : view.title,
+      url: submissionPath(view.id),
+      isActive: true,
+    },
+  ];
+
   return (
     <PageContainer>
       <ContentContainer>
-        <ZinePanel accent="kraft">
+        <ZinePanel accent="kraft" breadcrumbs={breadcrumbs}>
           <SubmissionViewContent view={view} reportable />
         </ZinePanel>
       </ContentContainer>

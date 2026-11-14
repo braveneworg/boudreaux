@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { ArtistLinkIcon } from '@/app/components/artist-link-icon';
 import { GravatarAvatar } from '@/app/components/gravatar-avatar';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
-import { submissionCategoryLabel } from '@/lib/constants/submissions';
+import { userSubmissionsPath } from '@/lib/community/community-paths';
+import { NAMELESS_OWNER, submissionCategoryLabel } from '@/lib/constants/submissions';
 import type { SubmissionView } from '@/lib/types/domain/submission';
 
 import { SubmissionAttachmentGallery } from './submission-attachment-gallery';
@@ -74,7 +75,18 @@ export const SubmissionViewContent = ({ view, reportable = false }: SubmissionVi
       <div className="flex items-center gap-3">
         <GravatarAvatar hash={view.owner.gravatarHash} size={48} defaultStyle="identicon" />
         <div className="min-w-0">
-          <p className="truncate font-semibold">{view.owner.username ?? 'A community member'}</p>
+          <p className="truncate font-semibold">
+            {view.owner.username === null ? (
+              NAMELESS_OWNER
+            ) : (
+              <Link
+                href={userSubmissionsPath(view.owner.username)}
+                className="underline underline-offset-4 hover:no-underline"
+              >
+                {view.owner.username}
+              </Link>
+            )}
+          </p>
           <p className="text-muted-foreground text-sm">{submissionCategoryLabel(view.category)}</p>
         </div>
       </div>

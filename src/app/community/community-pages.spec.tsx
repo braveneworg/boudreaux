@@ -32,7 +32,11 @@ vi.mock('@/lib/services/submission-service', () => ({
   },
 }));
 vi.mock('@/app/components/ui/breadcrumb-menu', () => ({
-  BreadcrumbMenu: () => <nav data-testid="breadcrumb" />,
+  BreadcrumbMenu: ({ items }: { items: Array<{ anchorText: string; url: string }> }) => (
+    <nav data-testid="breadcrumb">
+      {items.map(({ anchorText, url }) => `${anchorText}=${url}`).join('|')}
+    </nav>
+  ),
 }));
 vi.mock('@/app/components/community/submission-form', () => ({
   SubmissionForm: ({
@@ -122,6 +126,16 @@ describe('SubmitPage', () => {
     expect(vi.mocked(requireCommunityUser).mock.calls).toEqual([['/community/submit']]);
   });
 
+  it('leads its breadcrumbs back to the community page', async () => {
+    vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
+
+    render(await SubmitPage());
+
+    expect(screen.getByTestId('breadcrumb')).toHaveTextContent(
+      'Community=/community|Your submissions=/community/mine|Submit something=/community/submit'
+    );
+  });
+
   it('shows an empty form that asks for no agreement from an account that holds it', async () => {
     vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
 
@@ -156,6 +170,17 @@ describe('EditSubmissionPage', () => {
       [ID, { id: USER_ID, role: 'admin' }],
     ]);
     expect(vi.mocked(requireCommunityUser).mock.calls).toEqual([[`/community/${ID}/edit`]]);
+  });
+
+  it('leads its breadcrumbs back to the community page', async () => {
+    vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'owner' }));
+
+    render(await EditSubmissionPage({ params: Promise.resolve({ id: ID }) }));
+
+    expect(screen.getByTestId('breadcrumb')).toHaveTextContent(
+      `Community=/community|Your submissions=/community/mine|Edit=/community/${ID}/edit`
+    );
   });
 
   it('shows the owner where it stands above the form', async () => {
@@ -198,6 +223,17 @@ describe('SubmissionPage', () => {
     expect(vi.mocked(SubmissionService.getForViewer).mock.calls).toEqual([
       [ID, { id: USER_ID, role: 'manager' }],
     ]);
+  });
+
+  it('leads its breadcrumbs back to the community page', async () => {
+    vi.mocked(communityViewer).mockResolvedValueOnce(null);
+    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ title: 'Bus poem' }));
+
+    render(await SubmissionPage({ params: Promise.resolve({ id: ID }) }));
+
+    expect(screen.getByTestId('breadcrumb')).toHaveTextContent(
+      `Community=/community|Bus poem=/community/${ID}`
+    );
   });
 
   it('is the page a submission can be reported from', async () => {
@@ -332,6 +368,17 @@ describe('MySubmissionsPage', () => {
       `/community/${ID}`
     );
     expect(vi.mocked(SubmissionService.listMine).mock.calls).toEqual([[USER_ID]]);
+  });
+
+  it('leads its breadcrumbs back to the community page', async () => {
+    vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
+    vi.mocked(SubmissionService.listMine).mockResolvedValueOnce([]);
+
+    render(await MySubmissionsPage());
+
+    expect(screen.getByTestId('breadcrumb')).toHaveTextContent(
+      'Community=/community|Your submissions=/community/mine'
+    );
   });
 
   it('shows each submission’s card picture, or a tile naming its category', async () => {

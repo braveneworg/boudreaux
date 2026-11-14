@@ -15,6 +15,7 @@ import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { ZinePanel } from '@/app/components/ui/zine-panel';
+import { COMMUNITY_CRUMB } from '@/lib/community/community-paths';
 import { requireCommunityUser } from '@/lib/community/community-session';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type { SubmissionRecord } from '@/lib/types/domain/submission';
@@ -26,7 +27,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const BREADCRUMBS = [{ anchorText: 'Your submissions', url: '/community/mine', isActive: true }];
+const BREADCRUMBS = [
+  COMMUNITY_CRUMB,
+  { anchorText: 'Your submissions', url: '/community/mine', isActive: true },
+];
 
 /** Where a submission stands, in a few words. */
 const stateLabel = ({ status, listed }: SubmissionRecord): string => {
