@@ -20,6 +20,7 @@ import {
 import type { SubmissionRecord, SubmissionWithOwnerRecord } from '@/lib/types/domain/submission';
 import type { SubmissionAttachmentRecord } from '@/lib/types/domain/submission-attachment';
 import { gravatarHash } from '@/lib/utils/gravatar-hash';
+import { allowApproverNotice } from '@/lib/utils/submission-allowances';
 
 import { SubmissionService, type SaveSubmissionData } from './submission-service';
 
@@ -65,6 +66,10 @@ vi.mock('@/lib/services/submission-attachment-store', () => ({
     previewUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
     publicUrl: vi.fn((key: string) => `https://cdn.example/${key}`),
   },
+}));
+// An owner has notices left for the day unless a test says otherwise.
+vi.mock('@/lib/utils/submission-allowances', () => ({
+  allowApproverNotice: vi.fn(async () => true),
 }));
 vi.mock('@/lib/services/submission-notices', () => ({
   notifyApproversOfSubmission: vi.fn(),
@@ -414,6 +419,36 @@ describe('SubmissionService.save', () => {
       await SubmissionService.save(agreed, form(), { publish: true });
 
       expect(vi.mocked(notifyApproversOfSubmission).mock.calls).toEqual([[saved]]);
+    });
+
+    it('spends one of the owner’s notices for the day when it tells them', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(
+        written({ status: 'AWAITING_APPROVAL' })
+      );
+
+      await SubmissionService.save(agreed, form(), { publish: true });
+
+      expect(vi.mocked(allowApproverNotice).mock.calls).toEqual([[OWNER_ID]]);
+    });
+
+    it('publishes, but tells nobody, once the owner’s notices for the day are spent', async () => {
+      const saved = record({ status: 'AWAITING_APPROVAL' });
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce({
+        status: 'written',
+        submission: saved,
+      });
+      vi.mocked(allowApproverNotice).mockResolvedValueOnce(false);
+
+      await expect(SubmissionService.save(agreed, form(), { publish: true })).resolves.toBe(saved);
+      expect(notifyApproversOfSubmission).not.toHaveBeenCalled();
+    });
+
+    it('spends no notice on a draft', async () => {
+      vi.mocked(SubmissionRepository.createWithinCap).mockResolvedValueOnce(written());
+
+      await SubmissionService.save(agreed, form(), { publish: false });
+
+      expect(allowApproverNotice).not.toHaveBeenCalled();
     });
 
     it('tells nobody when it is saved as a draft', async () => {
@@ -897,6 +932,17 @@ describe('SubmissionService.takeOfflineForAttachmentChange', () => {
       expect(SubmissionRepository.updateOwned).not.toHaveBeenCalled();
     }
   );
+
+  it('tells nobody once the owner’s notices for the day are spent', async () => {
+    vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(
+      written({ status: 'AWAITING_APPROVAL' })
+    );
+    vi.mocked(allowApproverNotice).mockResolvedValueOnce(false);
+
+    await SubmissionService.takeOfflineForAttachmentChange(approved);
+
+    expect(notifyApproversOfSubmission).not.toHaveBeenCalled();
+  });
 
   it('returns an approved submission to awaiting approval, within the cap', async () => {
     vi.mocked(SubmissionRepository.updateOwned).mockResolvedValueOnce(

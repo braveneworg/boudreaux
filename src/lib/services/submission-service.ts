@@ -55,6 +55,7 @@ import {
   submissionTextLength,
   submissionWritingLinks,
 } from '@/lib/utils/sanitize-submission-html';
+import { allowApproverNotice } from '@/lib/utils/submission-allowances';
 import type { SaveSubmissionInput } from '@/lib/validation/submission-schema';
 
 const logger = loggers.media;
@@ -254,6 +255,18 @@ const afterWrite = async (notice: () => Promise<void>, what: string): Promise<vo
   }
 };
 
+/**
+ * Tell approvers a submission entered the queue, while its owner has notices
+ * left for the day. Past that it is in the queue like any other and only the
+ * email and the text are skipped: anyone signed in may publish, and one
+ * account must not be able to notify every approver without end.
+ */
+const tellApproversOf = async (submission: SubmissionRecord): Promise<void> => {
+  if (await allowApproverNotice(submission.ownerId)) {
+    await notifyApproversOfSubmission(submission);
+  }
+};
+
 /** How a reader stands to a submission, or `null` when they may not open it. */
 const viewerKindFor = (
   submission: SubmissionWithOwnerRecord,
@@ -318,7 +331,7 @@ export class SubmissionService {
         : await SubmissionService.update(stored, { content, listed: data.listed }, publish);
 
     if (enteredQueue) {
-      await afterWrite(() => notifyApproversOfSubmission(submission), 'approver notice');
+      await afterWrite(() => tellApproversOf(submission), 'approver notice');
     }
 
     return submission;
@@ -483,7 +496,7 @@ export class SubmissionService {
       { title, category, aboutHtml, writingHtml, links },
       listed
     );
-    await afterWrite(() => notifyApproversOfSubmission(submission), 'approver notice');
+    await afterWrite(() => tellApproversOf(submission), 'approver notice');
 
     return submission;
   }

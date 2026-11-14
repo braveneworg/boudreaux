@@ -18,6 +18,7 @@ import type {
   AttachmentUploadTarget,
   ConfirmedAttachment,
 } from '@/lib/types/domain/submission-attachment';
+import { allowAttachmentUpload } from '@/lib/utils/submission-allowances';
 import {
   confirmAttachmentUploadSchema,
   removeAttachmentSchema,
@@ -45,6 +46,7 @@ const REQUEST_FAILED = 'We could not start that upload. Please try again.';
 const CONFIRM_FAILED = 'We could not add that file. Please try again.';
 const REMOVE_FAILED = 'We could not remove that attachment. Please try again.';
 const RATE_LIMITED_MESSAGE = 'That is a lot of uploads at once. Wait a minute and try again.';
+const DAILY_LIMIT_MESSAGE = 'You have added a lot of files today. Try again tomorrow.';
 
 /**
  * Every page a change to one submission's attachments may have changed. The
@@ -61,7 +63,7 @@ const revalidateSubmission = (id: string): void => {
 /**
  * Ask for somewhere to upload one file to a submission the caller owns. The
  * answer is a presigned URL that accepts exactly the declared size and type.
- * Rate-limited per user.
+ * Rate-limited per user, by the minute and by the day.
  */
 export const requestAttachmentUploadAction = async (
   input: unknown
@@ -78,6 +80,12 @@ export const requestAttachmentUploadAction = async (
     await attachmentUploadLimiter.check(ATTACHMENT_UPLOAD_LIMIT, user.id);
   } catch {
     return { success: false, error: RATE_LIMITED_MESSAGE, code: 'LIMIT_EXCEEDED' };
+  }
+
+  // Every upload runs a re-encode, so the day's allowance is what bounds
+  // what one account can cost there.
+  if (!(await allowAttachmentUpload(user.id))) {
+    return { success: false, error: DAILY_LIMIT_MESSAGE, code: 'LIMIT_EXCEEDED' };
   }
 
   try {

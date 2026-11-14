@@ -9,6 +9,7 @@ import { attachmentUploadLimiter } from '@/lib/config/rate-limit-tiers';
 import { SubmissionAttachmentService } from '@/lib/services/submission-attachment-service';
 import { SubmissionRuleError } from '@/lib/services/submission-service';
 import type { DataErrorCode } from '@/lib/types/domain/errors';
+import { allowAttachmentUpload } from '@/lib/utils/submission-allowances';
 
 import {
   confirmAttachmentUploadAction,
@@ -28,6 +29,10 @@ vi.mock('@/lib/utils/logger', () => ({
 vi.mock('@/lib/config/rate-limit-tiers', () => ({
   attachmentUploadLimiter: { check: vi.fn(async () => undefined) },
   ATTACHMENT_UPLOAD_LIMIT: 60,
+}));
+// An owner has uploads left for the day unless a test says otherwise.
+vi.mock('@/lib/utils/submission-allowances', () => ({
+  allowAttachmentUpload: vi.fn(async () => true),
 }));
 vi.mock('@/lib/services/submission-attachment-service', () => ({
   SubmissionAttachmentService: {
@@ -152,6 +157,37 @@ describe('requestAttachmentUploadAction', () => {
     await requestAttachmentUploadAction(request);
 
     expect(vi.mocked(attachmentUploadLimiter.check).mock.calls).toEqual([[60, USER_ID]]);
+  });
+
+  it('counts the request against the user’s uploads for the day', async () => {
+    await requestAttachmentUploadAction(request);
+
+    expect(vi.mocked(allowAttachmentUpload).mock.calls).toEqual([[USER_ID]]);
+  });
+
+  it('refuses a user who has spent their uploads for the day, and signs nothing', async () => {
+    vi.mocked(allowAttachmentUpload).mockResolvedValueOnce(false);
+
+    await expect(requestAttachmentUploadAction(request)).resolves.toEqual({
+      success: false,
+      error: 'You have added a lot of files today. Try again tomorrow.',
+      code: 'LIMIT_EXCEEDED',
+    });
+    expect(SubmissionAttachmentService.requestUpload).not.toHaveBeenCalled();
+  });
+
+  it('spends none of the day’s uploads on a request the minute’s rate refuses', async () => {
+    vi.mocked(attachmentUploadLimiter.check).mockRejectedValueOnce(new Error('rate limited'));
+
+    await requestAttachmentUploadAction(request);
+
+    expect(allowAttachmentUpload).not.toHaveBeenCalled();
+  });
+
+  it('spends none of the day’s uploads on a request that is not one', async () => {
+    await requestAttachmentUploadAction({ ...request, fileSize: -1 });
+
+    expect(allowAttachmentUpload).not.toHaveBeenCalled();
   });
 
   it('refuses a user past their upload rate, and signs nothing', async () => {
