@@ -73,16 +73,23 @@ describe('SubmissionViewBeacon', () => {
     expect(unhandled.mock.calls).toEqual([]);
   });
 
-  it('asks twice under a development double-mount, which the server counts once', () => {
+  it('asks once under a development double-mount, as a production page does', () => {
+    // Two requests at once from a guest with no cookie yet are identified as
+    // two visitors, and one opening would be counted under both.
     render(
       <StrictMode>
         <SubmissionViewBeacon submissionId={SUBMISSION_ID} />
       </StrictMode>
     );
 
-    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
-      viewPath(SUBMISSION_ID),
-      viewPath(SUBMISSION_ID),
-    ]);
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([viewPath(SUBMISSION_ID)]);
+  });
+
+  it('asks again when the page is opened again', () => {
+    render(<SubmissionViewBeacon submissionId={SUBMISSION_ID} />).unmount();
+
+    render(<SubmissionViewBeacon submissionId={SUBMISSION_ID} />);
+
+    expect(fetchMock.mock.calls).toHaveLength(2);
   });
 });
