@@ -57,6 +57,18 @@ describe('GravatarAvatar', () => {
     expect(useGravatarHashMock).toHaveBeenCalledWith(undefined);
   });
 
+  it('names the image “User Avatar” unless told otherwise', () => {
+    render(<GravatarAvatar hash="server-hash" />);
+
+    expect(screen.getByTestId('avatar-image')).toHaveAttribute('data-alt', 'User Avatar');
+  });
+
+  it('takes an empty alt where a name beside it already says whose it is', () => {
+    render(<GravatarAvatar hash="server-hash" alt="" />);
+
+    expect(screen.getByTestId('avatar-image')).toHaveAttribute('data-alt', '');
+  });
+
   it('renders an empty-hash URL while the client hash is still resolving', () => {
     useGravatarHashMock.mockReturnValue('');
 

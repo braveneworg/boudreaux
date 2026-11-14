@@ -21,6 +21,11 @@ interface GravatarAvatarProps {
   size?: number;
   /** Gravatar fallback style. Defaults to 'retro' for back-compat. */
   defaultStyle?: GravatarDefaultStyle;
+  /**
+   * The image's text alternative. Pass `''` where a name beside the avatar
+   * already says whose it is. Defaults to "User Avatar".
+   */
+  alt?: string;
   className?: string;
 }
 
@@ -31,6 +36,7 @@ export const GravatarAvatar = ({
   surname,
   size = 48,
   defaultStyle = 'retro',
+  alt = 'User Avatar',
   className,
 }: GravatarAvatarProps) => {
   const computedHash = useGravatarHash(hash ? undefined : email);
@@ -51,7 +57,7 @@ export const GravatarAvatar = ({
 
   return (
     <Avatar className={cn('size-13 border border-zinc-50', className)}>
-      <AvatarImage src={gravatarUrl} alt="User Avatar" />
+      <AvatarImage src={gravatarUrl} alt={alt} />
       <AvatarFallback>{fallbackInitials}</AvatarFallback>
     </Avatar>
   );

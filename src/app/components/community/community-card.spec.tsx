@@ -1,0 +1,92 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { render, screen } from '@testing-library/react';
+
+import type { SubmissionCard } from '@/lib/types/domain/submission';
+
+import { CommunityCard } from './community-card';
+
+// Radix's avatar shows its image only once it has loaded, which jsdom never
+// does; the stand-in shows what the card handed it.
+vi.mock('@/app/components/gravatar-avatar', () => ({
+  GravatarAvatar: ({ hash, alt }: { hash: string; alt: string }) => (
+    <span data-testid="avatar" data-hash={hash} data-alt={alt} />
+  ),
+}));
+
+const ID = 'c'.repeat(24);
+const PICTURE = 'https://cdn.example/media/submissions/s/a/card.webp';
+
+const card = (overrides: Partial<SubmissionCard> = {}): SubmissionCard => ({
+  id: ID,
+  title: 'Bus poem',
+  category: 'WRITING',
+  cardPictureUrl: PICTURE,
+  owner: { username: 'ada', gravatarHash: 'abc123' },
+  ...overrides,
+});
+
+describe('CommunityCard', () => {
+  it('links its title to the submission’s page', () => {
+    render(<CommunityCard card={card()} />);
+
+    expect(screen.getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
+      'href',
+      `/community/${ID}`
+    );
+  });
+
+  it('reads “Untitled” for a submission with no title', () => {
+    render(<CommunityCard card={card({ title: '' })} />);
+
+    expect(screen.getByRole('link', { name: 'Untitled' })).toBeInTheDocument();
+  });
+
+  it('links the username to that user’s listed submissions', () => {
+    render(<CommunityCard card={card({ owner: { username: 'a&b', gravatarHash: 'abc123' } })} />);
+
+    expect(screen.getByRole('link', { name: 'a&b' })).toHaveAttribute(
+      'href',
+      '/community?user=a%26b'
+    );
+  });
+
+  it('reads “A community member”, not linked, for an owner with no username', () => {
+    render(<CommunityCard card={card({ owner: { username: null, gravatarHash: 'abc123' } })} />);
+
+    expect(screen.getByText('A community member')).toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('shows the card picture as decoration: the title already names it', () => {
+    render(<CommunityCard card={card()} />);
+
+    const picture = screen.getByRole('presentation');
+    expect(picture).toHaveAttribute('src', PICTURE);
+    expect(picture).toHaveAttribute('alt', '');
+  });
+
+  it('shows a tile naming the category when there is no picture', () => {
+    render(<CommunityCard card={card({ cardPictureUrl: null, category: 'ORIGINAL_SONG' })} />);
+
+    expect(screen.getByText('Original song')).toBeInTheDocument();
+    expect(screen.queryByRole('presentation')).not.toBeInTheDocument();
+  });
+
+  it('shows the owner’s avatar by its hash, as decoration', () => {
+    render(<CommunityCard card={card()} />);
+
+    const avatar = screen.getByTestId('avatar');
+    expect(avatar).toHaveAttribute('data-hash', 'abc123');
+    expect(avatar).toHaveAttribute('data-alt', '');
+  });
+
+  it('is one stop for the submission, not two: only the title is its link', () => {
+    render(<CommunityCard card={card()} />);
+
+    expect(
+      screen.getAllByRole('link').filter((link) => link.getAttribute('href') === `/community/${ID}`)
+    ).toHaveLength(1);
+  });
+});
