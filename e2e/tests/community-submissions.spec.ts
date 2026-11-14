@@ -51,6 +51,8 @@ const STALE_TITLE = `E2E stale zine ${STAMP}`;
 // Viewed more than either, and unlisted: views never list a submission.
 const UNLISTED_VIEWED_TITLE = `E2E unlisted viewed zine ${STAMP}`;
 const DAY_MS = 86_400_000;
+// Longer than the views test takes: it never straddles 00:00 UTC.
+const UTC_MIDNIGHT_MARGIN_MS = 120_000;
 // What a browser sends with a request a page of this site made.
 const FROM_THIS_SITE = { 'sec-fetch-site': 'same-origin' };
 
@@ -687,14 +689,23 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
  * a view, once per viewer per day; its owner's and an approver's openings
  * never are. A listed submission with five views in the last thirty days is
  * in the Trending row. Every submission here is approved long ago, so none
- * leads Most Recent, and every view belongs to one of them: no other spec
- * stores a view.
+ * leads Most Recent. Other tests open a public submission in a browser and
+ * so store a view each; none stores the five that would put another row in
+ * Trending.
+ *
+ * A view is keyed on the UTC day, read from the server's clock. A run that
+ * crossed 00:00 UTC between two openings would count the second, so the
+ * test does not start in the two minutes before it.
  */
 test('an opening is a view once a day, and five views make a listed submission trend', async ({
   page,
   browser,
 }) => {
   test.setTimeout(120_000);
+  test.skip(
+    DAY_MS - (Date.now() % DAY_MS) < UTC_MIDNIGHT_MARGIN_MS,
+    'a view is keyed on the UTC day, which is about to change'
+  );
   if (!owner) {
     throw new Error('The stamped users were not created');
   }
