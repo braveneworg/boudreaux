@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
+import type * as SubmissionPageStatus from '@/lib/community/submission-page-status';
 import type * as LegacyReleaseUrl from '@/lib/legacy-release-url';
 
 import middleware, { config } from './proxy';
@@ -34,8 +35,16 @@ vi.mock('@/lib/legacy-release-url', async (importOriginal) => ({
     legacyReleaseResponse(request, releaseId),
 }));
 
+const submissionPageResponse = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/community/submission-page-status', async (importOriginal) => ({
+  ...(await importOriginal<typeof SubmissionPageStatus>()),
+  submissionPageResponse: (request: NextRequest, segment: string, hasSession: boolean) =>
+    submissionPageResponse(request, segment, hasSession),
+}));
+
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/services/release-service', () => ({ ReleaseService: {} }));
+vi.mock('@/lib/services/submission-service', () => ({ SubmissionService: {} }));
 
 interface MockNextUrl {
   pathname: string;
@@ -525,6 +534,57 @@ describe('proxy middleware', () => {
     });
   });
 
+  describe('a submission’s page', () => {
+    const SUBMISSION_PATH = '/community/0123456789abcdef01234567';
+
+    it('answers /community/<id> for a signed-out visitor before any auth gate', async () => {
+      signedOut();
+      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      const request = createMockRequest(SUBMISSION_PATH);
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(submissionPageResponse.mock.calls).toEqual([
+        [request, '0123456789abcdef01234567', false],
+      ]);
+      expect(result).toEqual({ type: 'submission-page' });
+      expect(NextResponse.redirect).not.toHaveBeenCalled();
+    });
+
+    it('says so when the request carries a session cookie', async () => {
+      signedIn();
+      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      const request = createMockRequest(SUBMISSION_PATH);
+
+      await middleware(request as unknown as NextRequest);
+
+      expect(submissionPageResponse.mock.calls[0]?.[2]).toBe(true);
+    });
+
+    it('hands the form’s and the owner’s list’s addresses to the same answer', async () => {
+      signedOut();
+      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      const request = createMockRequest('/community/submit');
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(submissionPageResponse.mock.calls).toEqual([[request, 'submit', false]]);
+      expect(result).toEqual({ type: 'submission-page' });
+    });
+
+    it.each(['/community-archive/0123456789abcdef01234567', '/admin/community'])(
+      'leaves a path that only shares the prefix alone (%s)',
+      async (pathname) => {
+        signedOut();
+        const request = createMockRequest(pathname);
+
+        await middleware(request as unknown as NextRequest);
+
+        expect(submissionPageResponse).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   describe('session cookie presence', () => {
     it('reads the better-auth session cookie with the boudreaux prefix', async () => {
       signedOut();
@@ -567,6 +627,12 @@ describe('proxy config', () => {
   it('matches the legacy release URL, but not the public /releases listing', () => {
     expect(config.matcher).toContain('/releases/:releaseId');
     expect(config.matcher).not.toContain('/releases');
+  });
+
+  it('matches a submission’s page, but not the community page or a submission’s edit page', () => {
+    expect(config.matcher).toContain('/community/:id');
+    expect(config.matcher).not.toContain('/community');
+    expect(config.matcher).not.toContain('/community/:path*');
   });
 
   it('excludes the public videos routes so the proxy never gates them', () => {
