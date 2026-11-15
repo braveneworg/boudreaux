@@ -1,15 +1,20 @@
 name: Redis Keepalive
 
-# One PING a day so the free-tier Upstash Redis never goes idle — it was
+# One write a day so the free-tier Upstash Redis sees real usage. It was
 # deleted for inactivity once (2026-09), which took chat sends and abuse
-# reports down with it until the limiters learned to fail open. The job goes
-# red when the reply is not PONG, so a re-deletion surfaces here first;
-# GitHub emails the workflow author on a failed scheduled run.
+# reports down with it until the limiters learned to fail open, and lost
+# again on 2026-11-10 after two months of successful daily PINGs, so the
+# keepalive now writes a record instead. The job goes red when the write is
+# not accepted, so a re-deletion surfaces here first, and a red run mails the
+# reason to the alert address through SES. GitHub's own notice reaches only
+# whoever last edited the schedule, and only if that account has Actions
+# notifications on: six red days passed unnoticed (2026-11-10 on) while this
+# workflow relied on it.
 #
 # Caveats: GitHub may delay scheduled runs by minutes and disables schedules
 # after 60 days without repo activity (release-bot commits count; use
 # `workflow_dispatch` to run it by hand). The memoized PING behind
-# /api/health, polled by the uptime check, is a second, incidental keepalive.
+# /api/health, polled by the uptime check, reads but never writes.
 on:
   schedule:
     - cron: '17 6 * * *'
@@ -23,19 +28,49 @@ permissions:
   contents: read
 
 jobs:
-  ping:
-    name: PING production Upstash Redis
+  keepalive:
+    name: Write to production Upstash Redis
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout keepalive script
+      - name: Checkout keepalive scripts
         uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/ci/redis-keepalive.sh
+          sparse-checkout: |
+            scripts/ci/redis-keepalive.sh
+            scripts/ci/send-alert-email.sh
           sparse-checkout-cone-mode: false
 
-      - name: PING
+      - name: Write the keepalive record
+        id: keepalive
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
         run: bash scripts/ci/redis-keepalive.sh
+
+      - name: Email the alert address
+        if: failure()
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          REASON: ${{ steps.keepalive.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="The daily keepalive write to the production Upstash Redis failed.
+
+          Reason: ${REASON:-the job failed before the write reported a reason; read the run log.}
+
+          While Redis is down, the chat and abuse-report rate limits run on
+          their in-memory fallback and @mention emails are skipped.
+          /api/health reports redis: unavailable.
+
+          What to do: open the Upstash console and restore or recreate the
+          database. If its endpoint or token changed, update the
+          UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN repository
+          secrets; the host picks them up on the next merge to main.
+
+          Run: ${RUN_URL}"
+          bash scripts/ci/send-alert-email.sh "[boudreaux] Redis keepalive failed" "$body"
