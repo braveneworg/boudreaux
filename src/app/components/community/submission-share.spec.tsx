@@ -20,7 +20,7 @@ vi.mock('next/dynamic', () => ({
 
 const ID = 'c'.repeat(24);
 const HOST = 'https://fakefour.example';
-const URL_TO_SHARE = `${HOST}/community/${ID}`;
+const URL_TO_SHARE = `${HOST}/community?submission=${ID}`;
 
 const writeText = vi.fn();
 

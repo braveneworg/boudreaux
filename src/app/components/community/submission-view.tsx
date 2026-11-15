@@ -8,7 +8,7 @@ import { GravatarAvatar } from '@/app/components/gravatar-avatar';
 import { ZineHeading } from '@/app/components/ui/zine-heading';
 import { userSubmissionsPath } from '@/lib/community/community-paths';
 import { NAMELESS_OWNER, submissionCategoryLabel } from '@/lib/constants/submissions';
-import type { SubmissionView } from '@/lib/types/domain/submission';
+import type { SubmissionViewPayload } from '@/lib/types/domain/submission';
 
 import { SubmissionAttachmentGallery } from './submission-attachment-gallery';
 import { SubmissionHtml } from './submission-html';
@@ -40,24 +40,63 @@ const SubmissionLinks = ({ links }: { links: string[] }) =>
     </ul>
   );
 
+/**
+ * Who shared it and as what: the owner's avatar, their username as a link to
+ * their listed submissions, and the category. An owner with no username
+ * reads "A community member" and links nowhere.
+ */
+const SubmissionByline = ({
+  owner,
+  category,
+}: Pick<SubmissionViewPayload, 'owner' | 'category'>) => (
+  <div className="flex items-center gap-3">
+    <GravatarAvatar hash={owner.gravatarHash} size={48} defaultStyle="identicon" />
+    <div className="min-w-0">
+      <p className="truncate font-semibold">
+        {owner.username === null ? (
+          NAMELESS_OWNER
+        ) : (
+          <Link
+            href={userSubmissionsPath(owner.username)}
+            className="underline underline-offset-4 hover:no-underline"
+          >
+            {owner.username}
+          </Link>
+        )}
+      </p>
+      <p className="text-muted-foreground text-sm">{submissionCategoryLabel(category)}</p>
+    </div>
+  </div>
+);
+
 interface SubmissionViewContentProps {
   /** What this reader sees; it exists only because they may open the submission. */
-  view: SubmissionView;
+  view: SubmissionViewPayload;
   /**
-   * Whether this page offers the Report control: the submission's own page
+   * Whether this surface offers the Report control: the submission modal
    * does, and the approver's review page, where the decision is, does not.
    */
   reportable?: boolean;
+  /**
+   * Whether the title is set here as the page's heading. The submission
+   * modal names itself with the title, so it asks for none.
+   */
+  titled?: boolean;
 }
 
 /**
- * The body of a submission's page: its title, who posted it, its category,
- * its attachments, the about, the writing and the outbound links. Its owner and approvers also
- * get the status strip and their controls. Sharing is offered only on a public
- * submission, since nobody else could open the link, and so is reporting: to
- * every reader but the owner, an approver included.
+ * A submission as a reader is shown it, in the submission modal and on the
+ * approver's review page: its title, who posted it, its category, its
+ * attachments, the about, the writing and the outbound links. Its owner and
+ * approvers also get the status strip and their controls. Sharing is offered
+ * only on a public submission, since nobody else could open the link, and so
+ * is reporting: to every reader but the owner, an approver included.
  */
-export const SubmissionViewContent = ({ view, reportable = false }: SubmissionViewContentProps) => {
+export const SubmissionViewContent = ({
+  view,
+  reportable = false,
+  titled = true,
+}: SubmissionViewContentProps) => {
   const title = view.title === '' ? 'Untitled' : view.title;
   const canReport = reportable && view.viewer !== 'owner';
 
@@ -71,25 +110,8 @@ export const SubmissionViewContent = ({ view, reportable = false }: SubmissionVi
         rejectionReason={view.rejectionReason}
         queuePosition={view.queuePosition}
       />
-      <ZineHeading level={1}>{title}</ZineHeading>
-      <div className="flex items-center gap-3">
-        <GravatarAvatar hash={view.owner.gravatarHash} size={48} defaultStyle="identicon" />
-        <div className="min-w-0">
-          <p className="truncate font-semibold">
-            {view.owner.username === null ? (
-              NAMELESS_OWNER
-            ) : (
-              <Link
-                href={userSubmissionsPath(view.owner.username)}
-                className="underline underline-offset-4 hover:no-underline"
-              >
-                {view.owner.username}
-              </Link>
-            )}
-          </p>
-          <p className="text-muted-foreground text-sm">{submissionCategoryLabel(view.category)}</p>
-        </div>
-      </div>
+      {titled && <ZineHeading level={1}>{title}</ZineHeading>}
+      <SubmissionByline owner={view.owner} category={view.category} />
       <SubmissionAttachmentGallery attachments={view.attachments} title={title} />
       <SubmissionHtml html={view.aboutHtml} className="mt-6" />
       <SubmissionHtml html={view.writingHtml} className="mt-6" />

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import 'server-only';
 
+import { submissionDeepLink } from '@/lib/community/community-paths';
 import { OVERDUE_BUSINESS_DAYS, submissionReportReasonPhrase } from '@/lib/constants/submissions';
 import type { SubmissionReportReason } from '@/lib/constants/submissions';
 import { sendSubmissionEmail } from '@/lib/email/send-submission-email';
@@ -199,7 +200,8 @@ const decisionMessageFor = (
           ? 'It is listed, so it is shown with the other user submitted content.'
           : 'It is unlisted, so only people with the link can open it.',
       ],
-      action: { label: 'Open it', url: `${baseUrl()}/community/${submission.id}` },
+      // The submission deep link (ADR-0030): it is public, so no sign-in is asked.
+      action: { label: 'Open it', url: `${baseUrl()}${submissionDeepLink(submission.id)}` },
     };
   }
 

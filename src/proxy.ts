@@ -8,8 +8,8 @@ import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
 import {
   communityPageSegment,
-  submissionPageResponse,
-} from '@/lib/community/submission-page-status';
+  legacySubmissionResponse,
+} from '@/lib/community/legacy-submission-url';
 import { legacyReleaseId, legacyReleaseResponse } from '@/lib/legacy-release-url';
 import { isApproverRole } from '@/lib/utils/roles';
 
@@ -159,18 +159,18 @@ export default async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users trying to access private routes. Asked
   // before the community branch below: the form and the owner's list are
-  // one segment under /community, as a submission's page is, and a signed-out
-  // visitor to them is sent to sign in, not looked up as a submission.
+  // one segment under /community, as a submission's old page was, and a
+  // signed-out visitor to them is sent to sign in.
   if (isPrivateRoute(pathname) && !hasSession) {
     return buildSigninRedirect(request, pathname);
   }
 
-  // A submission's page is public: a signed-out request for one that is not
-  // a public submission gets a real 404, and this branch sends nobody to
-  // sign in.
+  // The public legacy submission URL: a 308 to its deep link. Any other
+  // one-segment community path goes on to the router, and this branch sends
+  // nobody to sign in.
   const communitySegment = communityPageSegment(pathname);
   if (communitySegment !== null) {
-    return submissionPageResponse(request, communitySegment, hasSession);
+    return legacySubmissionResponse(request, communitySegment);
   }
 
   const isPublic = isPublicRoute(pathname);
@@ -209,10 +209,10 @@ export const config = {
      * Match authentication-protected routes explicitly. /videos is public
      * (like /releases) and deliberately unmatched.
      * - /releases/:releaseId, the public legacy release URL (not a gate)
-     * - /community/:id, a submission's public page (not a gate): only its
-     *   status is decided here. The same pattern matches the form and the
-     *   owner's list, which do need an account. /community itself is
-     *   deliberately unmatched.
+     * - /community/:id, the public legacy submission URL (not a gate): it is
+     *   redirected to its deep link here. The same pattern matches the form
+     *   and the owner's list, which do need an account. /community itself,
+     *   where the deep link lands, is deliberately unmatched.
      * - /community/:id/edit, a submission's edit page, which needs an account
      * - /profile and all sub-routes
      * - /admin and all sub-routes

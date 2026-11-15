@@ -302,17 +302,12 @@ describe('confirmAttachmentUploadAction', () => {
     ]);
   });
 
-  it('revalidates the submission’s pages', async () => {
+  it('revalidates the pages that list the submission', async () => {
     confirmed();
 
     await confirmAttachmentUploadAction(confirm);
 
-    expect(revalidated()).toEqual([
-      '/community/mine',
-      `/community/${SUBMISSION_ID}`,
-      '/admin/community',
-      '/community',
-    ]);
+    expect(revalidated()).toEqual(['/community/mine', '/admin/community', '/community']);
   });
 
   it('runs nothing for a refused confirm', async () => {
@@ -369,17 +364,12 @@ describe('removeAttachmentAction', () => {
     ]);
   });
 
-  it('revalidates the submission’s pages', async () => {
+  it('revalidates the pages that list the submission', async () => {
     vi.mocked(SubmissionAttachmentService.remove).mockResolvedValueOnce(submission);
 
     await removeAttachmentAction(remove);
 
-    expect(revalidated()).toEqual([
-      '/community/mine',
-      `/community/${SUBMISSION_ID}`,
-      '/admin/community',
-      '/community',
-    ]);
+    expect(revalidated()).toEqual(['/community/mine', '/admin/community', '/community']);
   });
 
   it('shows the rule a refusal names', async () => {

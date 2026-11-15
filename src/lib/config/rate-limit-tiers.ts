@@ -108,7 +108,7 @@ export const submissionReportAttemptLimiter = rateLimit({
 export const SUBMISSION_REPORT_ATTEMPT_LIMIT = 10;
 
 /**
- * Address-keyed view beacons of a submission's page — 10 requests per
+ * Address-keyed view beacons of an opened submission — 10 requests per
  * minute, the download routes' number. The route takes no account, and each
  * call can resolve a guest identity as a download does; this stands in front
  * of that. A reader opens far fewer submissions a minute than this, and one

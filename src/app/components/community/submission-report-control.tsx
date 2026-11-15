@@ -25,14 +25,14 @@ const SubmissionReportDialog = nextDynamic(
 
 export interface SubmissionReportControlProps {
   submissionId: string;
-  /** The submission's title as its page shows it. */
+  /** The submission's title as the submission modal shows it. */
   title: string;
 }
 
 /**
- * The Report button on a public submission's page, and the dialog it opens
- * (ADR-0025, ADR-0028). Anyone who can open the page may press it; no account
- * is needed.
+ * The Report button on an opened public submission, and the dialog it opens
+ * (ADR-0025, ADR-0028). Anyone who can open the submission may press it; no
+ * account is needed.
  *
  * Each press opens a new dialog, so a reporter who comes back to it after
  * sending or cancelling starts from an empty form. The button cannot be

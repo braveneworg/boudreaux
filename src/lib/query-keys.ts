@@ -208,6 +208,8 @@ export const queryKeys = {
     all: ['submissions'] as const,
     /** A submission's attachments, polled while any is still processing. */
     attachments: (id: string) => [...queryKeys.submissions.all, 'attachments', id] as const,
+    /** One submission as its reader may see it: what the submission modal shows. */
+    detail: (id: string) => [...queryKeys.submissions.all, 'detail', id] as const,
     /** The community page's full list, by the `?user=` username it is narrowed to. */
     listedInfinite: (user = '') =>
       [...queryKeys.submissions.all, 'listedInfinite', user.trim()] as const,

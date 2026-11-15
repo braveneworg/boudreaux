@@ -7,6 +7,7 @@ import { useId, useState, useTransition } from 'react';
 
 import Link from 'next/link';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { EntityDeleteButton } from '@/app/components/forms/entity-delete-button';
@@ -18,6 +19,9 @@ import {
   setSubmissionListedAction,
 } from '@/lib/actions/submission-actions';
 import type { SubmissionStatus } from '@/lib/constants/submissions';
+import { queryKeys } from '@/lib/query-keys';
+
+import { useSubmissionModal } from './use-submission-modal';
 
 export interface SubmissionOwnerControlsProps {
   submissionId: string;
@@ -29,7 +33,7 @@ export const LISTED_LABEL = 'Show on the User Submitted Content page';
 export const LISTED_HELP = 'Off: only people with the link can open it.';
 
 /**
- * What a submission's owner can do from its page: edit it, switch an approved
+ * What a submission's owner can do where it is shown: edit it, switch an approved
  * one between listed and unlisted, and delete it. The switch is offered only
  * on an approved submission, where it changes where the submission appears and
  * never whether it is reachable, so it needs no second approval.
@@ -40,6 +44,8 @@ export const SubmissionOwnerControls = ({
   listed,
 }: SubmissionOwnerControlsProps) => {
   const switchId = useId();
+  const modal = useSubmissionModal();
+  const queryClient = useQueryClient();
   const [isListed, setIsListed] = useState(listed);
   const [isPending, startTransition] = useTransition();
 
@@ -49,12 +55,27 @@ export const SubmissionOwnerControls = ({
       const result = await setSubmissionListedAction({ submissionId, listed: next });
       if (result.success) {
         toast.success(next ? 'Listed.' : 'Unlisted. Only people with the link can open it.');
+        // The modal's status line reads the submission it fetched: read it again.
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.submissions.detail(submissionId),
+        });
         return;
       }
 
       setIsListed(!next);
       toast.error(result.error);
     });
+  };
+
+  const handleDelete = async (): ReturnType<typeof deleteSubmissionAction> => {
+    const result = await deleteSubmissionAction({ submissionId });
+    // Nothing is left to show. The owner's list may be the page beneath, and
+    // going to the page one is already on closes nothing.
+    if (result.success) {
+      modal?.close();
+    }
+
+    return result;
   };
 
   return (
@@ -83,7 +104,7 @@ export const SubmissionOwnerControls = ({
           <Link href="/community/mine">Your submissions</Link>
         </Button>
         <EntityDeleteButton
-          onDelete={() => deleteSubmissionAction({ submissionId })}
+          onDelete={handleDelete}
           label="Delete"
           title="Delete this submission?"
           description="It is removed for good, along with its link. This cannot be undone."

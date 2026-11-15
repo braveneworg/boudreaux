@@ -91,6 +91,25 @@ const openPageAs = async (browser: Browser, user: StampedUser | undefined): Prom
   return context.newPage();
 };
 
+/** A submission's permalink, the submission deep link (ADR-0030). */
+const deepLinkOf = (submissionId: string): string => `/community?submission=${submissionId}`;
+
+/** The submission modal, open on the submission with this title. */
+const modalOf = (target: Page, title: string) =>
+  target.getByRole('dialog', { name: title, exact: true });
+
+/** What the modal says of a submission this reader may not open, whatever the reason. */
+const notAvailableIn = (target: Page) => target.getByRole('dialog', { name: 'Not available' });
+
+/**
+ * Click a link that opens a submission over the page. Until it has hydrated
+ * the link is a plain link to the deep link, and a click would navigate.
+ */
+const openInPlace = async (target: Page, link: ReturnType<Page['getByRole']>): Promise<void> => {
+  await expect(link).toHaveAttribute('aria-haspopup', 'dialog');
+  await link.click();
+};
+
 /** Pick a category from the form's dropdown. */
 const chooseCategory = async (page: Page, name: RegExp): Promise<void> => {
   await page.getByRole('combobox', { name: 'Category' }).click();
@@ -138,7 +157,7 @@ test('a writing is published, approved by another approver, and goes back out wh
   test.setTimeout(120_000);
   const ownerPage = await openPageAs(browser, owner);
   const approverPage = await openPageAs(browser, approver);
-  let submissionPath = '';
+  let submissionId = '';
 
   await test.step('the owner accepts the agreement and publishes', async () => {
     await ownerPage.goto('/community/submit');
@@ -159,23 +178,34 @@ test('a writing is published, approved by another approver, and goes back out wh
     await expect(
       ownerPage.getByText('We usually reply within 2 to 5 business days.')
     ).toBeVisible();
-    const href = await ownerPage
-      .getByRole('link', { name: 'View your submission' })
-      .getAttribute('href');
-    expect(href).toMatch(/^\/community\/[a-f0-9]{24}$/);
-    submissionPath = href ?? '';
+    const view = ownerPage.getByRole('link', { name: 'View your submission' });
+    const href = await view.getAttribute('href');
+    expect(href).toMatch(/^\/community\?submission=[a-f0-9]{24}$/);
+    submissionId = href?.split('=').at(1) ?? '';
+
+    // It opens over the form's page, for its owner, and goes nowhere.
+    await openInPlace(ownerPage, view);
+    const modal = modalOf(ownerPage, TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    await expect(modal.getByRole('status')).toContainText('Awaiting approval');
+    expect(new URL(ownerPage.url()).pathname).toBe('/community/submit');
   });
 
   await test.step('nobody but its owner and approvers can open it before approval', async () => {
-    // A signed-out visitor is answered a real 404, by the proxy.
-    const refused = await page.goto(submissionPath);
-    expect(refused?.status()).toBe(404);
-    await expect(page.getByRole('img', { name: 'page not found' })).toBeVisible();
+    // A signed-out visitor's link lands on the community page, where the
+    // modal has one answer for every submission they may not open.
+    await page.goto(deepLinkOf(submissionId));
+    await expect(notAvailableIn(page)).toBeVisible();
     await expect(page.getByText(TITLE)).toHaveCount(0);
+    // The route the modal reads answers the same for it as for no submission.
+    const refused = await page.request.get(`/api/community/submissions/${submissionId}`);
+    expect(refused.status()).toBe(404);
+    const unknown = await page.request.get(`/api/community/submissions/${'0'.repeat(24)}`);
+    expect(await refused.json()).toEqual(await unknown.json());
 
-    // Another signed-in user gets the same page.
-    await userPage.goto(submissionPath);
-    await expect(userPage.getByRole('img', { name: 'page not found' })).toBeVisible();
+    // Another signed-in user gets the same answer.
+    await userPage.goto(deepLinkOf(submissionId));
+    await expect(notAvailableIn(userPage)).toBeVisible();
     await expect(userPage.getByText(TITLE)).toHaveCount(0);
   });
 
@@ -216,26 +246,26 @@ test('a writing is published, approved by another approver, and goes back out wh
   });
 
   await test.step('once approved it opens for a signed-out visitor, with sharing', async () => {
-    const opened = await page.goto(submissionPath);
-    expect(opened?.status()).toBe(200);
+    await page.goto(deepLinkOf(submissionId));
 
-    await expect(page.getByRole('heading', { level: 1, name: TITLE })).toBeVisible();
-    await expect(page.getByText(POEM)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Report' })).toBeVisible();
+    const modal = modalOf(page, TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Report' })).toBeVisible();
     // Where it stands is for its owner and approvers, not for a visitor.
     await expect(page.getByText('Approved and unlisted')).toHaveCount(0);
   });
 
   await test.step('an approver is shown where it stands', async () => {
-    await adminPage.goto(submissionPath);
+    await adminPage.goto(deepLinkOf(submissionId));
 
-    await expect(adminPage.getByRole('heading', { level: 1, name: TITLE })).toBeVisible();
-    await expect(adminPage.getByRole('status')).toContainText('Approved and unlisted');
+    await expect(modalOf(adminPage, TITLE).getByRole('status')).toContainText(
+      'Approved and unlisted'
+    );
   });
 
   await test.step('the owner’s edit is warned about, then takes it offline', async () => {
-    await ownerPage.goto(`${submissionPath}/edit`);
+    await ownerPage.goto(`/community/${submissionId}/edit`);
     await expect(ownerPage.getByRole('button', { name: 'Save changes' })).toBeEnabled();
     await ownerPage.getByLabel('Title').fill(EDITED_TITLE);
 
@@ -248,15 +278,16 @@ test('a writing is published, approved by another approver, and goes back out wh
   });
 
   await test.step('it is awaiting approval again, and no longer shareable', async () => {
-    await adminPage.goto(submissionPath);
+    await adminPage.goto(deepLinkOf(submissionId));
 
-    await expect(adminPage.getByRole('heading', { level: 1, name: EDITED_TITLE })).toBeVisible();
-    await expect(adminPage.getByRole('status')).toContainText('Awaiting approval.');
+    await expect(modalOf(adminPage, EDITED_TITLE).getByRole('status')).toContainText(
+      'Awaiting approval.'
+    );
     await expect(adminPage.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
 
-    // And the visitor who could open it a moment ago gets the 404 again.
-    const refused = await page.goto(submissionPath);
-    expect(refused?.status()).toBe(404);
+    // And the visitor who could open it a moment ago cannot any more.
+    await page.goto(deepLinkOf(submissionId));
+    await expect(notAvailableIn(page)).toBeVisible();
     await expect(page.getByText(EDITED_TITLE)).toHaveCount(0);
 
     // The stored row, not only what a page rendered.
@@ -278,7 +309,7 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
   test.setTimeout(120_000);
   const ownerPage = await openPageAs(browser, photographer);
   const approverPage = await openPageAs(browser, approver);
-  let submissionPath = '';
+  let submissionId = '';
 
   await test.step('a photo submission cannot be published without a photo', async () => {
     await ownerPage.goto('/community/submit');
@@ -301,7 +332,7 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
     await ownerPage.getByRole('button', { name: 'Save draft' }).click();
 
     await ownerPage.waitForURL(/\/community\/[a-f0-9]{24}\/edit$/);
-    submissionPath = new URL(ownerPage.url()).pathname.replace(/\/edit$/, '');
+    submissionId = new URL(ownerPage.url()).pathname.split('/').at(2) ?? '';
   });
 
   await test.step('the owner attaches a photo and sees it re-encoded', async () => {
@@ -348,11 +379,12 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
   });
 
   await test.step('once approved, the photo is served from its CDN address', async () => {
-    await ownerPage.goto(submissionPath);
+    await ownerPage.goto(deepLinkOf(submissionId));
 
-    await expect(ownerPage.getByRole('status')).toContainText('Approved and unlisted');
+    const modal = modalOf(ownerPage, PHOTO_TITLE);
+    await expect(modal.getByRole('status')).toContainText('Approved and unlisted');
     await expect(
-      ownerPage.getByRole('img', { name: `${PHOTO_TITLE}, attachment 1 of 1` })
+      modal.getByRole('img', { name: `${PHOTO_TITLE}, attachment 1 of 1` })
     ).toHaveAttribute('src', PUBLISHED_COPY);
   });
 
@@ -361,6 +393,23 @@ test('a photo is attached, re-encoded, published and approved', async ({ browser
 
     const row = ownerPage.getByRole('listitem').filter({ hasText: PHOTO_TITLE });
     await expect(row.getByRole('presentation')).toHaveAttribute('src', PUBLISHED_CARD);
+  });
+
+  await test.step('its title opens it over the owner’s list, with the owner’s controls', async () => {
+    const row = ownerPage.getByRole('listitem').filter({ hasText: PHOTO_TITLE });
+    await openInPlace(ownerPage, row.getByRole('link', { name: PHOTO_TITLE, exact: true }));
+
+    const modal = modalOf(ownerPage, PHOTO_TITLE);
+    await expect(modal.getByRole('link', { name: 'Edit' })).toHaveAttribute(
+      'href',
+      `/community/${submissionId}/edit`
+    );
+    await expect(
+      modal.getByRole('img', { name: `${PHOTO_TITLE}, attachment 1 of 1` })
+    ).toBeVisible();
+    // Over the list: the address is still the list's.
+    expect(new URL(ownerPage.url()).pathname).toBe('/community/mine');
+    expect(new URL(ownerPage.url()).search).toBe('');
   });
 });
 
@@ -396,15 +445,14 @@ test('a signed-out visitor’s report reaches the approvers, is marked handled, 
     },
     select: { id: true, updatedAt: true },
   });
-  const submissionPath = `/community/${reported.id}`;
+  const deepLink = deepLinkOf(reported.id);
   const reviewPath = `/admin/community/${reported.id}`;
   const approverPage = await openPageAs(browser, approver);
   const ownerPage = await openPageAs(browser, managerOwner);
 
-  await test.step('a signed-out visitor reports it from its page', async () => {
-    await reporterPage.goto(submissionPath);
-    // The button is disabled until the page has hydrated, so this click waits.
-    await reporterPage.getByRole('button', { name: 'Report' }).click();
+  await test.step('a signed-out visitor reports it from where it opens', async () => {
+    await reporterPage.goto(deepLink);
+    await modalOf(reporterPage, REPORTED_TITLE).getByRole('button', { name: 'Report' }).click();
 
     const dialog = reporterPage.getByRole('dialog', { name: `Report “${REPORTED_TITLE}”` });
     // Enabled means the dialog has loaded and verification has passed.
@@ -454,11 +502,15 @@ test('a signed-out visitor’s report reaches the approvers, is marked handled, 
     });
     expect(after).toEqual({ status: 'APPROVED', updatedAt: reported.updatedAt });
 
-    await reporterPage.goto(submissionPath);
+    // The report dialog closed onto the submission it was opened from.
     await expect(
-      reporterPage.getByRole('heading', { level: 1, name: REPORTED_TITLE })
+      modalOf(reporterPage, REPORTED_TITLE).getByRole('button', { name: 'Copy link' })
     ).toBeVisible();
-    await expect(reporterPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
+
+    await reporterPage.goto(deepLink);
+    await expect(
+      modalOf(reporterPage, REPORTED_TITLE).getByRole('button', { name: 'Copy link' })
+    ).toBeVisible();
   });
 
   await test.step('its owner, a manager, is kept from the reports against it', async () => {
@@ -470,9 +522,11 @@ test('a signed-out visitor’s report reaches the approvers, is marked handled, 
     await expect(ownerPage.getByRole('heading', { level: 1, name: REPORTED_TITLE })).toBeVisible();
     await expect(ownerPage.getByRole('heading', { name: 'Reports' })).toHaveCount(0);
 
-    // And their own page offers them no way to report it.
-    await ownerPage.goto(submissionPath);
-    await expect(ownerPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    // And opening their own offers them no way to report it.
+    await ownerPage.goto(deepLink);
+    await expect(
+      modalOf(ownerPage, REPORTED_TITLE).getByRole('button', { name: 'Copy link' })
+    ).toBeVisible();
     await expect(ownerPage.getByRole('button', { name: 'Report' })).toHaveCount(0);
   });
 
@@ -535,6 +589,8 @@ test('a signed-out visitor’s report reaches the approvers, is marked handled, 
  * The community page, end to end: a signed-out visitor finds a listed
  * submission in Most Recent, in the full list, by a word of its about in the
  * search, and under its owner's username; an unlisted one is in none of them.
+ * Wherever they click it, it opens over the page (ADR-0030): a dialog on a
+ * wide screen and a drawer on a phone, never a page of its own.
  * Both are seeded approved, and long ago, so a later page of the list is the
  * only place a growing run could push them.
  */
@@ -595,9 +651,10 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
 
   await test.step('Most Recent and the full list hold the listed one, never the unlisted', async () => {
     const recent = page.getByRole('region', { name: 'Most Recent' });
+    // Its href is the deep link, for a click the browser keeps (a new tab).
     await expect(recent.getByRole('link', { name: LISTED_TITLE, exact: true })).toHaveAttribute(
       'href',
-      `/community/${listed.id}`
+      deepLinkOf(listed.id)
     );
 
     const all = page.getByRole('list').filter({ has: page.getByRole('article') });
@@ -605,6 +662,52 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     await expect(page.getByText(UNLISTED_TITLE)).toHaveCount(0);
     // The first page came with the page: the list asked the route for nothing.
     expect(listingRequests).toEqual([]);
+  });
+
+  await test.step('a card opens its submission over the page, in a dialog, and counts the view', async () => {
+    const card = page
+      .getByRole('region', { name: 'Most Recent' })
+      .getByRole('link', { name: LISTED_TITLE, exact: true });
+    const counted = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === `/api/community/submissions/${listed.id}/view`
+    );
+    await openInPlace(page, card);
+
+    const modal = modalOf(page, LISTED_TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    await expect(modal).toHaveAttribute('data-slot', 'dialog-content');
+    await expect(modal.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    expect((await counted).status()).toBe(204);
+    // Over the page: the address did not change, and the page is still there.
+    expect(new URL(page.url()).pathname).toBe('/community');
+    expect(new URL(page.url()).search).toBe('');
+
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'User Submitted Content' })
+    ).toBeVisible();
+    // Focus is on the card that opened it, though a click in the row never
+    // focused it: the row takes the mouse-down for its own dragging.
+    await expect(card).toBeFocused();
+  });
+
+  await test.step('the keyboard opens a card too, and closing returns to it', async () => {
+    const card = page
+      .getByRole('region', { name: 'Most Recent' })
+      .getByRole('link', { name: LISTED_TITLE, exact: true });
+    await card.focus();
+    await page.keyboard.press('Enter');
+
+    const modal = modalOf(page, LISTED_TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    expect(new URL(page.url()).search).toBe('');
+
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+    await expect(card).toBeFocused();
   });
 
   await test.step('the row moves with its buttons and the arrow keys, and loops', async () => {
@@ -648,17 +751,20 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     expect(listingRequests.some((url) => url.includes(`search=${ABOUT_WORD}`))).toBe(true);
     await match.click();
 
-    await page.waitForURL(({ pathname }) => pathname === `/community/${listed.id}`);
-    await expect(page.getByRole('heading', { level: 1, name: LISTED_TITLE })).toBeVisible();
+    await expect(modalOf(page, LISTED_TITLE).getByText(POEM)).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/community');
   });
 
   await test.step('its owner’s username leads to their listed submissions alone', async () => {
-    await page.getByRole('link', { name: username, exact: true }).click();
+    const modal = modalOf(page, LISTED_TITLE);
+    await modal.getByRole('link', { name: username, exact: true }).click();
 
     await page.waitForURL(
       ({ pathname, searchParams }) =>
         pathname === '/community' && searchParams.get('user') === username
     );
+    // The link led away, so the submission closed behind it.
+    await expect(modal).toBeHidden();
     await expect(
       page.getByRole('heading', { level: 2, name: `Submissions by ${username}` })
     ).toBeVisible();
@@ -675,6 +781,81 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
     await page.goto(`/community?user=nobody-${STAMP}`);
 
     await expect(page.getByRole('img', { name: 'page not found' })).toBeVisible();
+  });
+
+  await test.step('a deep link opens the submission on arrival, and closes onto the page', async () => {
+    // Earlier steps opened it in place, and each of those read the route.
+    const requestsBefore = listingRequests.length;
+    await page.goto(deepLinkOf(listed.id));
+
+    const modal = modalOf(page, LISTED_TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    // It came with the page: this time the modal asked the route for nothing.
+    expect(
+      listingRequests
+        .slice(requestsBefore)
+        .filter((url) => new URL(url).pathname.endsWith(`/submissions/${listed.id}`))
+    ).toEqual([]);
+    // A shared link previews as the submission, not as the page beneath it.
+    await expect.poll(() => page.title()).toContain(LISTED_TITLE);
+
+    await modal.getByRole('button', { name: 'Close' }).click();
+    await expect(modal).toBeHidden();
+    // The address lost the link, so a refresh does not reopen it.
+    await page.waitForURL(
+      ({ pathname, searchParams }) => pathname === '/community' && !searchParams.has('submission')
+    );
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'User Submitted Content' })
+    ).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  await test.step('a submission’s old address redirects to its deep link, whatever the id', async () => {
+    // Read from the response itself: the proxy answers, before any page.
+    for (const id of [listed.id, '0'.repeat(24)]) {
+      const response = await page.request.get(`/community/${id}`, { maxRedirects: 0 });
+
+      expect(`${id} ${response.status()}`).toBe(`${id} 308`);
+      expect(response.headers().location).toContain(deepLinkOf(id));
+    }
+
+    // Followed, it lands on the community page with the submission open.
+    await page.goto(`/community/${listed.id}`);
+    await expect(modalOf(page, LISTED_TITLE).getByText(POEM)).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/community');
+  });
+
+  await test.step('a path under the community that is neither is not found', async () => {
+    const response = await page.request.get(`/community/nothing-${STAMP}`, { maxRedirects: 0 });
+
+    expect(response.status()).toBe(404);
+  });
+
+  await test.step('on a phone it opens in a drawer, from a card and from a deep link', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/community');
+    const all = page.getByRole('list').filter({ has: page.getByRole('article') });
+    await openInPlace(page, all.getByRole('link', { name: LISTED_TITLE, exact: true }));
+
+    const modal = modalOf(page, LISTED_TITLE);
+    await expect(modal.getByText(POEM)).toBeVisible();
+    await expect(modal).toHaveAttribute('data-slot', 'drawer-content');
+    // Nothing in it is wider than the phone.
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
+    await modal.getByRole('button', { name: 'Close' }).click();
+    await expect(modal).toBeHidden();
+
+    await page.goto(deepLinkOf(listed.id));
+    await expect(modal.getByText(POEM)).toBeVisible();
+    await expect(modal).toHaveAttribute('data-slot', 'drawer-content');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
   });
 
   await test.step('a signed-out visitor who wants to submit is sent to sign in', async () => {
@@ -702,8 +883,8 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
 });
 
 /**
- * Views and Trending (ADR-0029). Opening a submission's page in a browser is
- * a view, once per viewer per day; its owner's and an approver's openings
+ * Views and Trending (ADR-0029). Opening a submission in a browser is a
+ * view, once per viewer per day; its owner's and an approver's openings
  * never are. A listed submission with five views in the last thirty days is
  * in the Trending row. Every submission here is approved long ago, so none
  * leads Most Recent. Other tests open a public submission in a browser and
@@ -763,7 +944,7 @@ test('an opening is a view once a day, and five views make a listed submission t
       })),
     });
   };
-  /** The page's own request for its opening to be counted. */
+  /** The submission modal's own request for its opening to be counted. */
   const beaconOf = (target: Page, submissionId: string) =>
     target.waitForResponse(
       (response) =>
@@ -773,7 +954,7 @@ test('an opening is a view once a day, and five views make a listed submission t
 
   await test.step('a signed-out visitor’s opening is counted', async () => {
     const counted = beaconOf(page, trending.id);
-    await page.goto(`/community/${trending.id}`);
+    await page.goto(deepLinkOf(trending.id));
 
     expect((await counted).status()).toBe(204);
     await expect.poll(() => viewsOf(trending.id)).toBe(1);
@@ -801,7 +982,7 @@ test('an opening is a view once a day, and five views make a listed submission t
     expect(view?.viewKey).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  await test.step('the owner’s page does not ask, and neither they nor an approver are counted', async () => {
+  await test.step('the owner’s opening does not ask, and neither they nor an approver are counted', async () => {
     const ownerPage = await openPageAs(browser, owner);
     const asked: string[] = [];
     ownerPage.on('request', (request) => {
@@ -809,8 +990,8 @@ test('an opening is a view once a day, and five views make a listed submission t
         asked.push(request.url());
       }
     });
-    await ownerPage.goto(`/community/${trending.id}`);
-    await expect(ownerPage.getByRole('heading', { level: 1, name: TRENDING_TITLE })).toBeVisible();
+    await ownerPage.goto(deepLinkOf(trending.id));
+    await expect(modalOf(ownerPage, TRENDING_TITLE).getByText(POEM)).toBeVisible();
     await ownerPage.waitForLoadState('networkidle');
 
     // Asked directly, with each one's session, the route counts neither.
@@ -864,7 +1045,7 @@ test('an opening is a view once a day, and five views make a listed submission t
     const row = page.getByRole('region', { name: 'Trending' });
     await expect(row.getByRole('link', { name: TRENDING_TITLE, exact: true })).toHaveAttribute(
       'href',
-      `/community/${trending.id}`
+      deepLinkOf(trending.id)
     );
     await expect(row.getByText(STALE_TITLE)).toHaveCount(0);
     await expect(row.getByText(UNLISTED_VIEWED_TITLE)).toHaveCount(0);

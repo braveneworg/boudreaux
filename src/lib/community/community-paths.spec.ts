@@ -4,7 +4,9 @@
 import {
   ALL_SUBMISSIONS_ID,
   COMMUNITY_PATH,
-  submissionPath,
+  SUBMISSION_PARAM,
+  submissionDeepLink,
+  submissionReadPath,
   submissionViewPath,
   userSubmissionsPath,
 } from './community-paths';
@@ -14,8 +16,16 @@ describe('community paths', () => {
     expect(COMMUNITY_PATH).toBe('/community');
   });
 
-  it('addresses a submission by its id alone', () => {
-    expect(submissionPath('c'.repeat(24))).toBe(`/community/${'c'.repeat(24)}`);
+  it('addresses a submission as the community page with it open, by its id alone', () => {
+    expect(submissionDeepLink('c'.repeat(24))).toBe(`/community?submission=${'c'.repeat(24)}`);
+  });
+
+  it('names the deep link’s parameter', () => {
+    expect(SUBMISSION_PARAM).toBe('submission');
+  });
+
+  it('addresses the route that answers one submission to its reader', () => {
+    expect(submissionReadPath('c'.repeat(24))).toBe(`/api/community/submissions/${'c'.repeat(24)}`);
   });
 
   it('addresses one user’s list as a filter on the community page', () => {

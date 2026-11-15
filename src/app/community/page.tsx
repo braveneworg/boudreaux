@@ -11,6 +11,11 @@
  * `/community?user=<username>` narrows it to one user's listed submissions:
  * a filter on this page, not a page of its own.
  *
+ * `/community?submission=<id>` is the submission deep link (ADR-0030): this
+ * page with that submission open over it, in the modal the layout hosts. The
+ * page reads the submission for this reader, hands it to the modal, and
+ * titles itself with it, so a shared link previews as the submission.
+ *
  * Server Component, open to anyone. It reads the newest listed submissions
  * once: they are the row's cards and the first page the list is hydrated
  * with. Only a listed submission is ever read here, whoever is asking.
@@ -47,14 +52,21 @@ import {
 } from '@/lib/constants/submissions';
 import { queryKeys } from '@/lib/query-keys';
 import { SubmissionService } from '@/lib/services/submission-service';
-import type { SubmissionCard, SubmissionOwnerName } from '@/lib/types/domain/submission';
+import type {
+  SubmissionCard,
+  SubmissionOwnerName,
+  SubmissionView,
+} from '@/lib/types/domain/submission';
+import type { AttachmentView } from '@/lib/types/domain/submission-attachment';
 import { computeNextSkip } from '@/lib/types/pagination';
 import { getQueryClient } from '@/lib/utils/get-query-client';
 import { loggers } from '@/lib/utils/logger';
+import { isValidObjectId } from '@/lib/utils/validation/object-id';
 import {
   submissionListingQuerySchema,
   type SubmissionCardPage,
 } from '@/lib/validation/submission-listing-schema';
+import { toSubmissionViewPayload } from '@/lib/validation/submission-view-schema';
 
 import type { Metadata } from 'next';
 
@@ -65,9 +77,65 @@ interface CommunityPageProps {
 const PAGE_TITLE = 'User Submitted Content';
 const NOT_INDEXED = { index: false, follow: false };
 
-/** The `?user=` value as it arrived: the first when repeated, `''` when missing. */
-const readUsername = (value: string | string[] | undefined): string =>
+/** A query value as it arrived: the first when repeated, `''` when missing. */
+const readParam = (value: string | string[] | undefined): string =>
   (Array.isArray(value) ? value[0] : value) ?? '';
+
+/**
+ * Who is reading, once per request: the page and a deep link's read share
+ * the answer. A banned account is refused here like on every community page.
+ */
+const loadViewer = cache(communityViewer);
+
+/**
+ * The submission a deep link names, as this request's reader may see it, or
+ * `null`: no link, a value no id can be, a submission they may not open, or
+ * a read that failed. The page renders either way, and the modal then reads
+ * for itself in the browser. Cached for the request, so the metadata and the
+ * page share one read.
+ */
+const loadLinkedSubmission = cache(async (raw: string): Promise<SubmissionView | null> => {
+  if (!isValidObjectId(raw)) {
+    return null;
+  }
+
+  const viewer = await loadViewer();
+  try {
+    return await SubmissionService.getForViewer(raw, viewer);
+  } catch (error) {
+    loggers.media.error('Community page deep link read failed', error);
+
+    return null;
+  }
+});
+
+/**
+ * The picture a shared link previews with: the first photo, else a frame of
+ * the first video (the card picture's rule, at full size).
+ */
+const previewImageOf = (attachments: AttachmentView[]): string | null => {
+  const photo = attachments.find(({ kind }) => kind === 'IMAGE');
+  const video = attachments.find(({ kind }) => kind === 'VIDEO');
+
+  return photo?.url ?? video?.posterUrl ?? null;
+};
+
+/**
+ * What a submission deep link says of itself: the submission's title, and
+ * its picture for a link preview. Only a listed, public submission may be
+ * indexed. An unlisted one is open to anyone who holds its link, and a
+ * search engine is not someone who holds it.
+ */
+const linkedMetadata = (view: SubmissionView): Metadata => {
+  const title = view.title === '' ? 'Untitled' : view.title;
+  // Only a public submission's files are on the CDN; anything else would put
+  // a signed link to a private copy into the page's head.
+  const image = view.isPublic ? previewImageOf(view.attachments) : null;
+  const metadata: Metadata =
+    image === null ? { title } : { title, openGraph: { title, images: [image] } };
+
+  return view.isPublic && view.listed ? metadata : { ...metadata, robots: NOT_INDEXED };
+};
 
 /** The listing route's own rule for a username: trimmed, and no longer than one can be. */
 const usernameSchema = submissionListingQuerySchema.shape.user;
@@ -105,21 +173,33 @@ const loadFirstPage = async (ownerId: string | undefined): Promise<SubmissionCar
   }
 };
 
-export async function generateMetadata({ searchParams }: CommunityPageProps): Promise<Metadata> {
-  const username = readUsername((await searchParams).user);
+/** The page's own metadata: everyone's submissions, or one user's; `null` for a user who is not found. */
+const listingMetadata = async (username: string): Promise<Metadata | null> => {
   if (username.trim() === '') {
     return { title: PAGE_TITLE, description: COMMUNITY_DESCRIPTION };
   }
 
   const owner = await loadOwner(username);
-  if (!owner) {
+
+  return (
+    owner && {
+      title: `Submissions by ${owner.username}`,
+      description: `What ${owner.username} has shared with the Fake Four Inc. community.`,
+    }
+  );
+};
+
+export async function generateMetadata({ searchParams }: CommunityPageProps): Promise<Metadata> {
+  const { user, submission } = await searchParams;
+  const listing = await listingMetadata(readParam(user));
+  if (!listing) {
     return { title: 'Not found', robots: NOT_INDEXED };
   }
 
-  return {
-    title: `Submissions by ${owner.username}`,
-    description: `What ${owner.username} has shared with the Fake Four Inc. community.`,
-  };
+  // A deep link is shared as its submission, not as the page beneath it.
+  const linked = await loadLinkedSubmission(readParam(submission));
+
+  return linked ? linkedMetadata(linked) : listing;
 }
 
 /**
@@ -254,16 +334,18 @@ const PageIntro = ({ signedIn }: { signedIn: boolean }) => (
 );
 
 export default async function CommunityPage({ searchParams }: CommunityPageProps) {
-  const owner = await readOwner(readUsername((await searchParams).user));
+  const { user, submission } = await searchParams;
+  const owner = await readOwner(readParam(user));
 
   // Anyone may read this page; a banned account is refused here like on
-  // every community page. The viewer only decides whether "Your
+  // every community page. Here the viewer only decides whether "Your
   // submissions" is offered.
-  const viewer = await communityViewer();
+  const viewer = await loadViewer();
   // One user's list shows no rows, so Trending is not read for it.
-  const [firstPage, trending] = await Promise.all([
+  const [firstPage, trending, linked] = await Promise.all([
     loadFirstPage(owner?.id),
     owner ? [] : loadTrending(),
+    loadLinkedSubmission(readParam(submission)),
   ]);
 
   // Seed the list's first page under the key `useInfiniteListedSubmissionsQuery`
@@ -275,6 +357,14 @@ export default async function CommunityPage({ searchParams }: CommunityPageProps
       pages: [firstPage],
       pageParams: [0],
     });
+  }
+  // A submission deep link: the layout's modal opens it on arrival, and
+  // finds it here, under the key `useSubmissionQuery` reads.
+  if (linked) {
+    queryClient.setQueryData(
+      queryKeys.submissions.detail(linked.id),
+      toSubmissionViewPayload(linked)
+    );
   }
 
   return (

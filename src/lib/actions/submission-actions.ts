@@ -32,7 +32,6 @@ import {
   COMMUNITY_QUEUE_PATH,
   failureFromError,
   invalidInputFailure,
-  submissionPath,
   turnstileRefusal,
 } from './submission-action-helpers';
 
@@ -56,11 +55,11 @@ const MANAGER_FAILED = 'We could not change that role. Please try again.';
 /**
  * Every page a change to one submission may have changed. The community page
  * is among them: an approval, a rejection, an edit, a delete and the listed
- * switch each decide whether it lists the submission.
+ * switch each decide whether it lists the submission. A submission has no
+ * page of its own to revalidate (ADR-0030): the modal reads it on opening.
  */
-const revalidateSubmission = (id: string): void => {
+const revalidateSubmission = (): void => {
   revalidatePath(COMMUNITY_MINE_PATH);
-  revalidatePath(submissionPath(id));
   revalidatePath(COMMUNITY_QUEUE_PATH);
   revalidatePath(COMMUNITY_PATH);
 };
@@ -98,7 +97,7 @@ const saveAs = async (
       data,
       { publish }
     );
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return {
       success: true,
@@ -154,7 +153,7 @@ export const setSubmissionListedAction = async (
   try {
     const { submissionId, listed } = parsed.data;
     const submission = await SubmissionService.setListed(user.id, submissionId, listed);
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return { success: true, data: savedFrom(submission) };
   } catch (error) {
@@ -176,7 +175,7 @@ export const deleteSubmissionAction = async (
   try {
     const { submissionId } = parsed.data;
     await SubmissionService.delete(user.id, submissionId);
-    revalidateSubmission(submissionId);
+    revalidateSubmission();
 
     return { success: true, data: { id: submissionId } };
   } catch (error) {
@@ -200,7 +199,7 @@ export const approveSubmissionAction = async (
 
   try {
     const submission = await SubmissionService.approve({ id, role }, parsed.data);
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return { success: true, data: savedFrom(submission) };
   } catch (error) {
@@ -225,7 +224,7 @@ export const rejectSubmissionAction = async (
 
   try {
     const submission = await SubmissionService.reject({ id, role }, parsed.data);
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return { success: true, data: savedFrom(submission) };
   } catch (error) {
