@@ -10,8 +10,12 @@ import { join } from 'path';
  * The keepalive went red for six days (2026-11-10 on) saying only "PING
  * request failed (HTTP error or timeout)": the script threw away curl's exit
  * code and the HTTP status, so a deleted database, a rotated token and a
- * spent quota all read the same. These specs pin that each cause is named,
- * that the reason reaches the alert step through `GITHUB_OUTPUT`, and that
+ * spent quota all read the same. It had also PINGed successfully every day
+ * until then, so a bare PING did not keep the database: the keepalive now
+ * writes a record, which is real usage.
+ *
+ * These specs pin the write it sends, that each failure cause is named, that
+ * the reason reaches the alert step through `GITHUB_OUTPUT`, and that
  * neither the endpoint nor the token is ever printed. `curl` is a stub; all
  * values are fakes.
  */
@@ -20,11 +24,13 @@ const SCRIPT = join(__dirname, 'redis-keepalive.sh');
 const FAKE_HOST = 'fake-db-12345.upstash.example';
 const FAKE_URL = `https://${FAKE_HOST}`;
 const FAKE_TOKEN = 'fake-token-abcdef';
+const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
 
 /**
- * Stands in for curl: writes FAKE_BODY to the `-o` file, prints
- * FAKE_HTTP_CODE the way `-w '%{http_code}'` does, names the host on stderr
- * as real curl does on a DNS failure, and exits with FAKE_CURL_EXIT.
+ * Stands in for curl: records the method, URL and `-d` body it was given,
+ * writes FAKE_BODY to the `-o` file, prints FAKE_HTTP_CODE the way
+ * `-w '%{http_code}'` does, names the host on stderr as real curl does on a
+ * DNS failure, and exits with FAKE_CURL_EXIT.
  */
 const CURL_STUB = `#!/usr/bin/env bash
 out=""
@@ -32,15 +38,20 @@ url=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out="$2"; shift 2 ;;
+    -X) printf '%s' "$2" > "$STUB_DIR/curl-method"; shift 2 ;;
+    -d) printf '%s' "$2" > "$STUB_DIR/curl-data"; shift 2 ;;
     http*) url="$1"; shift ;;
     *) shift ;;
   esac
 done
+printf '%s' "$url" > "$STUB_DIR/curl-url"
 if [ -n "$out" ]; then printf '%s' "\${FAKE_BODY:-}" > "$out"; fi
 echo "curl: (\${FAKE_CURL_EXIT:-0}) problem talking to $url" >&2
 printf '%s' "\${FAKE_HTTP_CODE:-000}"
 exit "\${FAKE_CURL_EXIT:-0}"
 `;
+
+const WRITE_ACCEPTED = { FAKE_HTTP_CODE: '200', FAKE_BODY: '{"result":"OK"}' };
 
 interface RunResult {
   status: number | null;
@@ -58,6 +69,7 @@ const run = (env: Record<string, string>): RunResult => {
     env: {
       PATH: `${workDir}:${process.env.PATH ?? ''}`,
       NODE_ENV: 'test',
+      STUB_DIR: workDir,
       UPSTASH_REDIS_REST_URL: FAKE_URL,
       UPSTASH_REDIS_REST_TOKEN: FAKE_TOKEN,
       GITHUB_OUTPUT: githubOutputFile,
@@ -69,6 +81,14 @@ const run = (env: Record<string, string>): RunResult => {
     output: `${result.stdout}${result.stderr}`,
     githubOutput: readFileSync(githubOutputFile, 'utf8'),
   };
+};
+
+const recorded = (name: string): string => readFileSync(join(workDir, name), 'utf8');
+
+/** The Redis command the stubbed curl was asked to send. */
+const sentCommand = (): unknown[] => {
+  const parsed: unknown = JSON.parse(recorded('curl-data'));
+  return Array.isArray(parsed) ? parsed : [];
 };
 
 describe('redis-keepalive.sh', () => {
@@ -83,15 +103,39 @@ describe('redis-keepalive.sh', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it('passes on PONG and records no failure reason', () => {
-    const { status, output, githubOutput } = run({
-      FAKE_HTTP_CODE: '200',
-      FAKE_BODY: '{"result":"PONG"}',
-    });
+  it('passes when the write is accepted and records no failure reason', () => {
+    const { status, output, githubOutput } = run(WRITE_ACCEPTED);
 
     expect(status).toBe(0);
-    expect(output).toContain('PONG');
+    expect(output).toContain('✓');
     expect(githubOutput).toBe('');
+  });
+
+  it('writes a record with SET, not a bare PING', () => {
+    run(WRITE_ACCEPTED);
+
+    const [verb, key] = sentCommand();
+    expect(verb).toBe('SET');
+    expect(key).toBe('keepalive:last-run');
+    expect(recorded('curl-method')).toBe('POST');
+    expect(recorded('curl-url')).toBe(FAKE_URL);
+  });
+
+  it('stores the UTC time of the run as the value', () => {
+    const before = Date.now();
+    run(WRITE_ACCEPTED);
+
+    const value = String(sentCommand()[2]);
+    expect(value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // Second precision: allow the truncated second before `before`.
+    expect(Date.parse(value)).toBeGreaterThanOrEqual(before - 1000);
+    expect(Date.parse(value)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('expires the record after seven days, so a retired keepalive leaves nothing behind', () => {
+    run(WRITE_ACCEPTED);
+
+    expect(sentCommand().slice(3)).toEqual(['EX', String(SEVEN_DAYS_IN_SECONDS)]);
   });
 
   it('fails when either credential is missing', () => {
@@ -139,12 +183,12 @@ describe('redis-keepalive.sh', () => {
   it('reports the status and the error Upstash returned on any other HTTP failure', () => {
     const { status, output } = run({
       FAKE_HTTP_CODE: '400',
-      FAKE_BODY: '{"error":"ERR max requests limit exceeded. Limit: 500000"}',
+      FAKE_BODY: '{"error":"NOPERM this user has no permissions to run the set command"}',
     });
 
     expect(status).toBe(1);
     expect(output).toContain('HTTP 400');
-    expect(output).toContain('ERR max requests limit exceeded. Limit: 500000');
+    expect(output).toContain('NOPERM this user has no permissions to run the set command');
   });
 
   it('reports the status when the error body is not JSON', () => {
@@ -154,8 +198,8 @@ describe('redis-keepalive.sh', () => {
     expect(output).toContain('HTTP 503');
   });
 
-  it('fails on a 200 whose result is not PONG', () => {
-    const { status, output } = run({ FAKE_HTTP_CODE: '200', FAKE_BODY: '{"result":"nope"}' });
+  it('fails on a 200 whose result is not OK', () => {
+    const { status, output } = run({ FAKE_HTTP_CODE: '200', FAKE_BODY: '{"result":"PONG"}' });
 
     expect(status).toBe(1);
     expect(output).toContain('Unexpected reply');

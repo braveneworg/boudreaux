@@ -6,8 +6,8 @@ import { join } from 'path';
 
 /**
  * Workflow wiring for the Redis keepalive's alert. The two scripts have their
- * own specs; these assertions pin that a failed PING still reaches the alert
- * step, with the reason the PING step recorded and the secrets the send
+ * own specs; these assertions pin that a failed write still reaches the alert
+ * step, with the reason the write step recorded and the secrets the send
  * needs, so a refactor cannot leave the run red and silent again.
  */
 
@@ -28,11 +28,12 @@ const stepBlock = (name: string): string => {
 };
 
 describe('redis-keepalive.yml', () => {
-  const ping = stepBlock('PING');
+  const write = stepBlock('Write the keepalive record');
   const alert = stepBlock('Email the alert address');
 
-  it('gives the PING step an id so the alert can read its failure reason', () => {
-    expect(ping).toContain('id: ping');
+  it('gives the write step an id so the alert can read its failure reason', () => {
+    expect(write).toContain('id: keepalive');
+    expect(write).toContain('bash scripts/ci/redis-keepalive.sh');
   });
 
   it('runs the alert step only when the job has failed', () => {
@@ -57,7 +58,7 @@ describe('redis-keepalive.yml', () => {
   });
 
   it('passes the failure reason through env, never interpolated into the script', () => {
-    expect(alert).toContain('REASON: ${{ steps.ping.outputs.reason }}');
+    expect(alert).toContain('REASON: ${{ steps.keepalive.outputs.reason }}');
     expect(alert.slice(alert.indexOf('run:'))).not.toContain('${{');
   });
 });
