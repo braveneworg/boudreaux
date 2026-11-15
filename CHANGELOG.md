@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.489.0] - 2026-11-15
+
+### Fixed
+
+- fix(community): 🐛 redirect signed-out visitors to sign in at the proxy (#952)
+
 ## [4.488.0] - 2026-11-14
 
 ### Added
