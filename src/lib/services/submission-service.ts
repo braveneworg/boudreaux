@@ -854,11 +854,6 @@ export class SubmissionService {
     return SubmissionService.cardsFor(mostViewed);
   }
 
-  /** Whether an id names a public submission: one anybody may open. */
-  static async isPublic(submissionId: string): Promise<boolean> {
-    return SubmissionRepository.isPublic(submissionId);
-  }
-
   /**
    * The account that holds a username, for a per-user list, or `null` when
    * none does. The match is exact: a card links to the username as stored.

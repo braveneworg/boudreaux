@@ -42,7 +42,6 @@ vi.mock('@/lib/repositories/submission-repository', () => ({
     listByStatus: vi.fn(),
     listListed: vi.fn(),
     listListedAmong: vi.fn(),
-    isPublic: vi.fn(),
     countAwaitingBefore: vi.fn(),
     countAwaiting: vi.fn(),
   },
@@ -1395,15 +1394,6 @@ describe('SubmissionService.listTrendingCards', () => {
       'owner',
       'title',
     ]);
-  });
-});
-
-describe('SubmissionService.isPublic', () => {
-  it.each([true, false])('answers %s as the repository does', async (answer) => {
-    vi.mocked(SubmissionRepository.isPublic).mockResolvedValueOnce(answer);
-
-    await expect(SubmissionService.isPublic(SUBMISSION_ID)).resolves.toBe(answer);
-    expect(vi.mocked(SubmissionRepository.isPublic).mock.calls).toEqual([[SUBMISSION_ID]]);
   });
 });
 
