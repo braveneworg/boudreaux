@@ -396,7 +396,7 @@ describe('SubmissionForm', () => {
       expect(sent).toHaveTextContent("We'll email you when it's live or if we need changes.");
       expect(within(sent).getByRole('link', { name: 'View your submission' })).toHaveAttribute(
         'href',
-        `/community/${ID}`
+        `/community?submission=${ID}`
       );
       expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
     });

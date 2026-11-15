@@ -3,7 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { auth } from '@/auth';
 
-import { communityViewer, requireApprover, requireCommunityUser } from './community-session';
+import {
+  communityCaller,
+  communityViewer,
+  requireApprover,
+  requireCommunityUser,
+} from './community-session';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
@@ -51,6 +56,41 @@ describe('requireCommunityUser', () => {
     signedInAs('admin', true);
 
     await expect(requireCommunityUser('/community/mine')).rejects.toThrow('NOT_FOUND');
+  });
+});
+
+describe('communityCaller', () => {
+  it('names a signed-out caller as a guest', async () => {
+    signedOut();
+
+    await expect(communityCaller()).resolves.toEqual({ banned: false, viewer: null });
+  });
+
+  it.each(['admin', 'manager', 'user', null])(
+    'names a signed-in caller as the viewer, whatever their role (%s)',
+    async (role) => {
+      signedInAs(role);
+
+      await expect(communityCaller()).resolves.toEqual({
+        banned: false,
+        viewer: { id: USER_ID, role },
+      });
+    }
+  );
+
+  it('reads a role the session lacks as none', async () => {
+    vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as never);
+
+    await expect(communityCaller()).resolves.toEqual({
+      banned: false,
+      viewer: { id: USER_ID, role: null },
+    });
+  });
+
+  it('says a banned account is banned, and never throws', async () => {
+    signedInAs('admin', true);
+
+    await expect(communityCaller()).resolves.toEqual({ banned: true });
   });
 });
 

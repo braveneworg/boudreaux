@@ -5,10 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { GravatarAvatar } from '@/app/components/gravatar-avatar';
-import { submissionPath, userSubmissionsPath } from '@/lib/community/community-paths';
+import { userSubmissionsPath } from '@/lib/community/community-paths';
 import { NAMELESS_OWNER, submissionCategoryShortLabel } from '@/lib/constants/submissions';
 import type { SubmissionCard } from '@/lib/types/domain/submission';
 import { resolveCdnImageSource } from '@/lib/utils/build-cdn-image-variant-url';
+
+import { SubmissionLink } from './submission-link';
 
 /**
  * How wide a card's picture is drawn: two cards across on a phone, three from
@@ -30,7 +32,8 @@ export interface CommunityCardProps {
  * username.
  *
  * The title is the card's one link to the submission, stretched over the
- * picture, so a keyboard or screen reader meets it once. The username is a
+ * picture, so a keyboard or screen reader meets it once. A click on it opens
+ * the submission modal over the page (ADR-0030). The username is a
  * second link, to that user's listed submissions; an owner with no username
  * reads "A community member" and links nowhere. The picture and the avatar
  * are decoration beside those two names.
@@ -67,16 +70,13 @@ export const CommunityCard = ({ card }: CommunityCardProps) => {
       </div>
       <div className="min-w-0 text-sm leading-snug text-zinc-950">
         <p className="line-clamp-2 font-semibold">
-          <Link
-            href={submissionPath(id)}
-            // Not prefetched: every prefetch of a submission's page is a
-            // lookup in the proxy, and a page shows a dozen cards at a time.
-            prefetch={false}
+          <SubmissionLink
+            submissionId={id}
             // Stretched over the whole card: the picture is part of this link.
             className="underline underline-offset-4 after:absolute after:inset-0 hover:no-underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-black focus-visible:after:ring-offset-2"
           >
             {title}
-          </Link>
+          </SubmissionLink>
         </p>
         <p className="truncate text-zinc-700">
           {owner.username === null ? (

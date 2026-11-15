@@ -210,14 +210,13 @@ describe.each([
     expect(vi.mocked(SubmissionService.queuePositionOf).mock.calls).toEqual([[saved]]);
   });
 
-  it('revalidates the owner’s list, the submission’s page and the queue', async () => {
+  it('revalidates the owner’s list, the queue and the community page', async () => {
     vi.mocked(SubmissionService.save).mockResolvedValueOnce(record());
 
     await action(form);
 
     expect(vi.mocked(revalidatePath).mock.calls).toEqual([
       ['/community/mine'],
-      [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
       ['/community'],
     ]);
@@ -336,7 +335,6 @@ describe('deleteSubmissionAction', () => {
     expect(vi.mocked(SubmissionService.delete).mock.calls).toEqual([[USER_ID, SUBMISSION_ID]]);
     expect(vi.mocked(revalidatePath).mock.calls).toEqual([
       ['/community/mine'],
-      [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
       ['/community'],
     ]);
@@ -417,7 +415,6 @@ describe('approveSubmissionAction', () => {
 
     expect(vi.mocked(revalidatePath).mock.calls).toEqual([
       ['/community/mine'],
-      [`/community/${SUBMISSION_ID}`],
       ['/admin/community'],
       ['/community'],
     ]);

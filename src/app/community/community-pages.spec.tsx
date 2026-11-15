@@ -3,13 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { render, screen, within } from '@testing-library/react';
 
-import { communityViewer, requireCommunityUser } from '@/lib/community/community-session';
+import { requireCommunityUser } from '@/lib/community/community-session';
 import { UPLOAD_AGREEMENT_VERSION } from '@/lib/constants/submissions';
 import { SubmissionService } from '@/lib/services/submission-service';
 import type { SubmissionRecord, SubmissionView } from '@/lib/types/domain/submission';
 
 import EditSubmissionPage from './[id]/edit/page';
-import SubmissionPage, { generateMetadata } from './[id]/page';
 import MySubmissionsPage from './mine/page';
 import SubmitPage from './submit/page';
 
@@ -20,7 +19,6 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 vi.mock('@/lib/community/community-session', () => ({
-  communityViewer: vi.fn(),
   requireCommunityUser: vi.fn(),
 }));
 vi.mock('@/lib/services/submission-service', () => ({
@@ -50,21 +48,6 @@ vi.mock('@/app/components/community/submission-form', () => ({
       data-testid="form"
       data-needs-agreement={String(needsAgreement)}
       data-submission={submission ? `${submission.id}:${submission.title}` : ''}
-    />
-  ),
-}));
-vi.mock('@/app/components/community/submission-view-beacon', () => ({
-  SubmissionViewBeacon: ({ submissionId }: { submissionId: string }) => (
-    <div data-testid="view-beacon" data-submission={submissionId} />
-  ),
-}));
-vi.mock('@/app/components/community/submission-view', () => ({
-  SubmissionViewContent: ({ view, reportable }: { view: SubmissionView; reportable?: boolean }) => (
-    <div
-      data-testid="view"
-      data-viewer={view.viewer}
-      data-title={view.title}
-      data-reportable={String(reportable === true)}
     />
   ),
 }));
@@ -217,170 +200,6 @@ describe('EditSubmissionPage', () => {
   });
 });
 
-describe('SubmissionPage', () => {
-  it('shows the submission as this reader may see it', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'manager' });
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'approver' }));
-
-    render(await SubmissionPage(params()));
-
-    expect(screen.getByTestId('view')).toHaveAttribute('data-viewer', 'approver');
-    expect(vi.mocked(SubmissionService.getForViewer).mock.calls).toEqual([
-      [ID, { id: USER_ID, role: 'manager' }],
-    ]);
-  });
-
-  it('leads its breadcrumbs back to the community page', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce(null);
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ title: 'Bus poem' }));
-
-    render(await SubmissionPage({ params: Promise.resolve({ id: ID }) }));
-
-    expect(screen.getByTestId('breadcrumb')).toHaveTextContent(
-      `Community=/community|Bus poem=/community/${ID}`
-    );
-  });
-
-  it('is the page a submission can be reported from', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce(null);
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'public' }));
-
-    render(await SubmissionPage(params()));
-
-    expect(screen.getByTestId('view')).toHaveAttribute('data-reportable', 'true');
-  });
-
-  it('asks for a public reader’s opening to be counted as a view', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce(null);
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer: 'public' }));
-
-    render(await SubmissionPage(params()));
-
-    expect(screen.getByTestId('view-beacon')).toHaveAttribute('data-submission', ID);
-  });
-
-  it.each(['owner', 'approver'] as const)(
-    'does not ask for the %s’s opening to be counted',
-    async (viewer) => {
-      vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'admin' });
-      vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(view({ viewer }));
-
-      render(await SubmissionPage(params()));
-
-      expect(screen.queryByTestId('view-beacon')).not.toBeInTheDocument();
-    }
-  );
-
-  it('does not ask for an opening of a submission that is not public to be counted', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce(null);
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(
-      view({ viewer: 'public', isPublic: false })
-    );
-
-    render(await SubmissionPage(params()));
-
-    expect(screen.queryByTestId('view-beacon')).not.toBeInTheDocument();
-  });
-
-  it('answers not found when this reader may not open it', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'admin' });
-    vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(null);
-
-    await expect(SubmissionPage(params())).rejects.toThrow('NOT_FOUND');
-  });
-
-  it('answers not found for an id that cannot be one, without asking the service', async () => {
-    vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'admin' });
-
-    await expect(SubmissionPage(params('nope'))).rejects.toThrow('NOT_FOUND');
-    expect(SubmissionService.getForViewer).not.toHaveBeenCalled();
-  });
-
-  describe('metadata', () => {
-    const metadataFor = async (found: SubmissionView | null) => {
-      vi.mocked(communityViewer).mockResolvedValueOnce({ id: USER_ID, role: 'admin' });
-      vi.mocked(SubmissionService.getForViewer).mockResolvedValueOnce(found);
-      return generateMetadata(params());
-    };
-
-    it('titles the page with the submission and lets a listed public one be indexed', async () => {
-      await expect(metadataFor(view())).resolves.toEqual({ title: 'Bus poem' });
-    });
-
-    it('titles a submission that has no title yet as untitled', async () => {
-      await expect(metadataFor(view({ title: '' }))).resolves.toEqual({ title: 'Untitled' });
-    });
-
-    it.each([
-      ['an unlisted submission', view({ listed: false })],
-      ['a submission that is not public', view({ status: 'DRAFT', isPublic: false })],
-    ])('keeps %s out of search engines', async (_name, found) => {
-      await expect(metadataFor(found)).resolves.toEqual({
-        title: 'Bus poem',
-        robots: { index: false, follow: false },
-      });
-    });
-
-    const photo = {
-      id: 'e'.repeat(24),
-      kind: 'IMAGE' as const,
-      fileName: '',
-      state: 'ready' as const,
-      error: null,
-      progress: null,
-      url: 'https://cdn.example/media/submissions/s/a/copy.jpg',
-      cardUrl: 'https://cdn.example/media/submissions/s/a/card.webp',
-      posterUrl: null,
-      width: 1200,
-      height: 800,
-      durationSeconds: null,
-    };
-    const clip = {
-      ...photo,
-      id: '1'.repeat(24),
-      kind: 'VIDEO' as const,
-      url: 'https://cdn.example/media/submissions/s/v/copy.mp4',
-      posterUrl: 'https://cdn.example/media/submissions/s/v/poster.jpg',
-    };
-
-    it('previews a shared link with the first photo of a public submission', async () => {
-      await expect(metadataFor(view({ attachments: [clip, photo] }))).resolves.toMatchObject({
-        openGraph: { title: 'Bus poem', images: [photo.url] },
-      });
-    });
-
-    it('previews with a frame of the first video when there is no photo', async () => {
-      await expect(metadataFor(view({ attachments: [clip] }))).resolves.toMatchObject({
-        openGraph: { images: [clip.posterUrl] },
-      });
-    });
-
-    it('previews an unlisted public submission too, and still keeps it out of search', async () => {
-      await expect(
-        metadataFor(view({ listed: false, attachments: [photo] }))
-      ).resolves.toMatchObject({
-        openGraph: { images: [photo.url] },
-        robots: { index: false, follow: false },
-      });
-    });
-
-    it('puts no picture in the head of a submission that is not public', async () => {
-      const metadata = await metadataFor(
-        view({ status: 'DRAFT', isPublic: false, attachments: [photo] })
-      );
-
-      expect(metadata.openGraph).toBeUndefined();
-    });
-
-    it('says nothing about a submission this reader may not open', async () => {
-      await expect(metadataFor(null)).resolves.toEqual({
-        title: 'Not found',
-        robots: { index: false, follow: false },
-      });
-    });
-  });
-});
-
 describe('MySubmissionsPage', () => {
   it('lists the owner’s submissions, each with its state and a link to it', async () => {
     vi.mocked(requireCommunityUser).mockResolvedValueOnce(user());
@@ -400,9 +219,10 @@ describe('MySubmissionsPage', () => {
     ]);
     expect(rows[0]).toHaveTextContent('Approved, listed');
     expect(rows[1]).toHaveTextContent('Draft');
+    // The submission deep link: a click opens the submission over this list.
     expect(within(rows[0] as HTMLElement).getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
       'href',
-      `/community/${ID}`
+      `/community?submission=${ID}`
     );
     expect(vi.mocked(SubmissionService.listMine).mock.calls).toEqual([[USER_ID]]);
   });

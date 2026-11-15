@@ -10,14 +10,17 @@ import {
 } from '@/lib/actions/submission-actions';
 
 import { SubmissionOwnerControls } from './submission-owner-controls';
+import { SubmissionModalContext } from './use-submission-modal';
 
-const { mockToast, mockRouter } = vi.hoisted(() => ({
+const { mockToast, mockRouter, mockQueryClient } = vi.hoisted(() => ({
   mockToast: { success: vi.fn(), error: vi.fn() },
   mockRouter: { push: vi.fn(), refresh: vi.fn() },
+  mockQueryClient: { invalidateQueries: vi.fn() },
 }));
 
 vi.mock('sonner', () => ({ toast: mockToast }));
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => mockQueryClient }));
 vi.mock('@/lib/actions/submission-actions', () => ({
   deleteSubmissionAction: vi.fn(),
   setSubmissionListedAction: vi.fn(),
@@ -102,6 +105,68 @@ describe('SubmissionOwnerControls', () => {
       ])
     );
     expect(screen.getByRole('switch', { name: LISTED_LABEL })).not.toBeChecked();
+  });
+
+  it('has the submission read again once the switch is stored, so its status line follows', async () => {
+    vi.mocked(setSubmissionListedAction).mockResolvedValueOnce(saved(true));
+    render(<SubmissionOwnerControls submissionId={ID} status="APPROVED" listed={false} />);
+
+    await userEvent.click(screen.getByRole('switch', { name: LISTED_LABEL }));
+
+    await waitFor(() =>
+      expect(mockQueryClient.invalidateQueries.mock.calls).toEqual([
+        [{ queryKey: ['submissions', 'detail', ID] }],
+      ])
+    );
+  });
+
+  it('reads nothing again when the switch is refused', async () => {
+    vi.mocked(setSubmissionListedAction).mockResolvedValueOnce({
+      success: false,
+      error: 'Only an approved submission can be listed or unlisted.',
+      code: 'NOT_FOUND',
+    });
+    render(<SubmissionOwnerControls submissionId={ID} status="APPROVED" listed={false} />);
+
+    await userEvent.click(screen.getByRole('switch', { name: LISTED_LABEL }));
+
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledTimes(1));
+    expect(mockQueryClient.invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('closes the submission modal once the submission is deleted: there is nothing left to show', async () => {
+    const modal = { open: vi.fn(), close: vi.fn() };
+    vi.mocked(deleteSubmissionAction).mockResolvedValueOnce({ success: true, data: { id: ID } });
+    render(
+      <SubmissionModalContext value={modal}>
+        <SubmissionOwnerControls submissionId={ID} status="DRAFT" listed={false} />
+      </SubmissionModalContext>
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(modal.close).toHaveBeenCalledTimes(1));
+  });
+
+  it('leaves the submission modal open when the delete is refused', async () => {
+    const modal = { open: vi.fn(), close: vi.fn() };
+    vi.mocked(deleteSubmissionAction).mockResolvedValueOnce({
+      success: false,
+      error: 'We could not delete your submission. Please try again.',
+      code: 'NOT_FOUND',
+    });
+    render(
+      <SubmissionModalContext value={modal}>
+        <SubmissionOwnerControls submissionId={ID} status="DRAFT" listed={false} />
+      </SubmissionModalContext>
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledTimes(1));
+    expect(modal.close).not.toHaveBeenCalled();
   });
 
   it('deletes only after the owner confirms, then returns to their list', async () => {

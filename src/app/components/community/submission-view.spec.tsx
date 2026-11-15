@@ -54,6 +54,13 @@ describe('SubmissionViewContent', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Bus poem');
   });
 
+  it('leaves the heading to the surface that names it, when asked', () => {
+    render(<SubmissionViewContent view={view()} titled={false} />);
+
+    expect(screen.queryByRole('heading', { name: 'Bus poem' })).not.toBeInTheDocument();
+    expect(screen.getByText('A poem.')).toBeInTheDocument();
+  });
+
   it('names an untitled draft as untitled', () => {
     render(<SubmissionViewContent view={view({ title: '', status: 'DRAFT', viewer: 'owner' })} />);
 

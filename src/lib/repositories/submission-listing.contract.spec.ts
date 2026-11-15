@@ -10,8 +10,7 @@ import { SubmissionRepository } from './submission-repository';
 // Contract: on a real MongoDB, the community page's read lists only listed
 // submissions, newest first by first approval with the id breaking a tie,
 // page by page with no row repeated or dropped, narrowed by a search term and
-// by an owner together; and `isPublic` answers for each state an id can be
-// in. Runs only under `pnpm run test:db`.
+// by an owner together. Runs only under `pnpm run test:db`.
 //
 // The read is not scoped to these rows, and other contract files approve
 // submissions too. Every list here carries this run's search term, which no
@@ -219,27 +218,5 @@ describe('SubmissionRepository.listListedAmong (Docker Mongo contract)', () => {
       category: 'WRITING',
       owner: { username: `${prefix}owner-b`, email: `${prefix}owner-b@example.com` },
     });
-  });
-});
-
-describe('SubmissionRepository.isPublic (Docker Mongo contract)', () => {
-  it('is true for an approved submission that is listed', async () => {
-    expect(await SubmissionRepository.isPublic(ids().newest)).toBe(true);
-  });
-
-  it('is true for an approved submission that is unlisted', async () => {
-    expect(await SubmissionRepository.isPublic(ids().unlisted)).toBe(true);
-  });
-
-  it('is false for a draft', async () => {
-    expect(await SubmissionRepository.isPublic(ids().draft)).toBe(false);
-  });
-
-  it('is false for a banned owner’s approved submission', async () => {
-    expect(await SubmissionRepository.isPublic(ids().bannedOwners)).toBe(false);
-  });
-
-  it('is false for an id that names nothing', async () => {
-    expect(await SubmissionRepository.isPublic('0'.repeat(24))).toBe(false);
   });
 });

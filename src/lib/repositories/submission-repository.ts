@@ -342,15 +342,6 @@ export class SubmissionRepository {
     });
   }
 
-  /** Whether an id names a public submission: one anybody may open. */
-  static async isPublic(id: string): Promise<boolean> {
-    const matched = await prisma.submission.count({
-      where: { id, AND: [submissionWhere.public] },
-    });
-
-    return matched > 0;
-  }
-
   /**
    * How many submissions awaiting approval were published before `moment`:
    * a submission's queue position, and with a cutoff, how many are overdue.

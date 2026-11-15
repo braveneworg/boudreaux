@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
@@ -22,9 +22,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/pop
 import { useSubmissionSearchQuery } from '@/hooks/queries/use-submission-search-query';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useHydrated } from '@/hooks/use-hydrated';
-import { submissionPath } from '@/lib/community/community-paths';
+import { submissionDeepLink } from '@/lib/community/community-paths';
 import { NAMELESS_OWNER } from '@/lib/constants/submissions';
 import { cn } from '@/lib/utils';
+
+import { useSubmissionModal } from './use-submission-modal';
 
 const SEARCH_LABEL = 'Search submissions';
 const SEARCH_PLACEHOLDER = 'Search by title, about or username';
@@ -53,9 +55,10 @@ export interface CommunitySearchProps {
  * keyboard-navigable dropdown of the listed submissions whose title, about
  * or owner's username holds what was typed, newest first. Before anything is
  * typed it suggests the newest. Each match shows the owner's avatar, the
- * title and the username; choosing one opens that submission's page.
+ * title and the username; choosing one opens that submission in the
+ * submission modal, over the page (ADR-0030).
  *
- * It is a jump to one submission and does not filter the page beneath it.
+ * It opens one submission and does not filter the page beneath it.
  * While a term is being typed or fetched it offers no rows and says it is
  * searching, so a choice is always a match for what is typed. Nothing is
  * fetched until it is first opened. The server provides the
@@ -63,7 +66,9 @@ export interface CommunitySearchProps {
  */
 export const CommunitySearch = ({ className }: CommunitySearchProps) => {
   const router = useRouter();
+  const modal = useSubmissionModal();
   const hydrated = useHydrated();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounce(searchInput, DEBOUNCE_MS).trim();
@@ -77,13 +82,21 @@ export const CommunitySearch = ({ className }: CommunitySearchProps) => {
 
   const handleSelect = (id: string): void => {
     setOpen(false);
-    router.push(submissionPath(id));
+    if (modal) {
+      // The chosen row leaves with the dropdown; focus comes back to the search.
+      modal.open(id, triggerRef.current);
+      return;
+    }
+
+    // No page here hosts the modal: the deep link opens it on the community page.
+    router.push(submissionDeepLink(id));
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <SearchComboboxTrigger
+          ref={triggerRef}
           aria-expanded={open}
           aria-label={SEARCH_LABEL}
           // "false" in the server markup, "true" once the click handler is

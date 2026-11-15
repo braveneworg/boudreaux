@@ -176,8 +176,9 @@ export interface SubmissionOwnerActor {
 export type SubmissionViewerKind = 'owner' | 'approver' | 'public';
 
 /**
- * What a submission's page shows. Built for one reader: it exists only when
- * that reader may open the submission, and it never carries the owner's email.
+ * What a reader is shown of a submission they opened. Built for one reader:
+ * it exists only when that reader may open the submission, and it never
+ * carries the owner's email.
  */
 export interface SubmissionView extends SubmissionContent {
   id: string;
@@ -196,6 +197,13 @@ export interface SubmissionView extends SubmissionContent {
   /** Its attachments, in upload order, with the addresses this reader may use. */
   attachments: AttachmentView[];
 }
+
+/**
+ * A reader's view as it leaves the server for the submission modal
+ * (ADR-0030): what a screen shows, without the owner's id and the dates,
+ * which no screen reads.
+ */
+export type SubmissionViewPayload = Omit<SubmissionView, 'ownerId' | 'publishedAt' | 'updatedAt'>;
 
 /** One row of an approver's queue. */
 export interface SubmissionQueueRow {

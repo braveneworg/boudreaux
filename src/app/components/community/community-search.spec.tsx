@@ -10,6 +10,7 @@ import { useSubmissionSearchQuery } from '@/hooks/queries/use-submission-search-
 import type { SubmissionCard } from '@/lib/types/domain/submission';
 
 import { CommunitySearch } from './community-search';
+import { SubmissionModalContext, type SubmissionModalControls } from './use-submission-modal';
 
 vi.mock('@/hooks/queries/use-submission-search-query', () => ({
   useSubmissionSearchQuery: vi.fn(),
@@ -48,9 +49,16 @@ const searchReturns = (
   } as QueryResult);
 };
 
-const open = async (): Promise<ReturnType<typeof userEvent.setup>> => {
+/** Open the search, on a page that hosts the submission modal when given one. */
+const open = async (
+  modal: SubmissionModalControls | null = null
+): Promise<ReturnType<typeof userEvent.setup>> => {
   const user = userEvent.setup({ delay: null });
-  render(<CommunitySearch />);
+  render(
+    <SubmissionModalContext value={modal}>
+      <CommunitySearch />
+    </SubmissionModalContext>
+  );
   await user.click(screen.getByRole('button', { name: 'Search submissions' }));
   return user;
 };
@@ -119,7 +127,23 @@ describe('CommunitySearch', () => {
     ]);
   });
 
-  it('opens the chosen submission’s page', async () => {
+  it('opens the chosen submission over the page', async () => {
+    const push = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ push } as unknown as ReturnType<typeof useRouter>);
+    const modal = { open: vi.fn(), close: vi.fn() };
+    searchReturns([card()]);
+
+    const user = await open(modal);
+    await user.click(screen.getByRole('option', { name: /Bus poem/ }));
+
+    // With the search's own button: the row that was chosen is gone by then.
+    expect(modal.open.mock.calls).toEqual([
+      [ID, screen.getByRole('button', { name: 'Search submissions' })],
+    ]);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('goes to the chosen submission’s deep link where no modal is hosted', async () => {
     const push = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push } as unknown as ReturnType<typeof useRouter>);
     searchReturns([card()]);
@@ -127,7 +151,7 @@ describe('CommunitySearch', () => {
     const user = await open();
     await user.click(screen.getByRole('option', { name: /Bus poem/ }));
 
-    expect(push.mock.calls).toEqual([[`/community/${ID}`]]);
+    expect(push.mock.calls).toEqual([[`/community?submission=${ID}`]]);
   });
 
   it('reads “No results yet.” when nothing matches', async () => {

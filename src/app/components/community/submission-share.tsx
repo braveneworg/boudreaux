@@ -9,6 +9,7 @@ import { Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/app/components/ui/button';
+import { submissionDeepLink } from '@/lib/community/community-paths';
 
 // Interaction-only, so it is never server-rendered; the fallback reserves its
 // footprint so the row does not jump when the chunk lands.
@@ -30,12 +31,13 @@ interface SubmissionShareProps {
 
 /**
  * The share row on a public submission: a button that copies its link, then
- * the social networks. Every share points at the submission's own page, whose
- * address holds only its id, so no edit or rename breaks a shared link.
+ * the social networks. Every share points at the submission deep link
+ * (ADR-0030), whose address holds only the submission's id, so no edit or
+ * rename breaks a shared link.
  */
 export const SubmissionShare = ({ submissionId, title }: SubmissionShareProps) => {
   const host = process.env.NEXT_PUBLIC_HOST_NAME ?? 'https://fakefourrecords.com';
-  const url = `${host}/community/${submissionId}`;
+  const url = `${host}${submissionDeepLink(submissionId)}`;
 
   const copyLink = async (): Promise<void> => {
     try {

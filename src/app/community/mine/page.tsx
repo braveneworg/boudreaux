@@ -5,11 +5,13 @@
 /**
  * The owner's own list at `/community/mine` (sign-in required): every
  * submission they hold, in any state, with a rejection's reason. It is the
- * only place a draft or a rejected submission is listed.
+ * only place a draft or a rejected submission is listed. A title opens its
+ * submission in the submission modal, over this list (ADR-0030).
  */
 import Link from 'next/link';
 
 import { SubmissionCardPicture } from '@/app/components/community/submission-card-picture';
+import { SubmissionLink } from '@/app/components/community/submission-link';
 import { Button } from '@/app/components/ui/button';
 import { ContentContainer } from '@/app/components/ui/content-container';
 import { PageContainer } from '@/app/components/ui/page-container';
@@ -62,12 +64,12 @@ const SubmissionRow = ({ submission, cardPictureUrl }: SubmissionRowProps) => {
     <li className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3">
       <SubmissionCardPicture url={cardPictureUrl} category={submission.category} />
       <div className="min-w-0 flex-1">
-        <Link
-          href={`/community/${submission.id}`}
+        <SubmissionLink
+          submissionId={submission.id}
           className="font-semibold underline underline-offset-4"
         >
           {title}
-        </Link>
+        </SubmissionLink>
         {submission.status === 'REJECTED' && submission.rejectionReason !== null && (
           <p className="text-sm">Reason: {submission.rejectionReason}</p>
         )}

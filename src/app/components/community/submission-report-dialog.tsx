@@ -51,7 +51,7 @@ import type { Control, UseFormReturn } from 'react-hook-form';
 
 export interface SubmissionReportDialogProps {
   submissionId: string;
-  /** The submission's title as its page shows it. */
+  /** The submission's title as the submission modal shows it. */
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -186,7 +186,7 @@ const Sent = ({ onDone }: { onDone: () => void }) => (
 );
 
 /**
- * The report dialog on a public submission's page (ADR-0025, ADR-0028): a
+ * The report dialog on an opened public submission (ADR-0025, ADR-0028): a
  * reason, an optional note and an optional contact email, behind a Turnstile
  * check. Anyone may send one, signed in or not. A report tells approvers and
  * changes nothing by itself, and the dialog says so.

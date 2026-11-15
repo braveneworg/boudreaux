@@ -379,7 +379,7 @@ describe('notifyOwnerOfDecision', () => {
     await notifyOwnerOfDecision(withOwner({ status: 'APPROVED', listed: true }));
 
     expect(sentTo()).toEqual([['fan@example.com', 'Approved: Bus poem']]);
-    expect(firstBody()).toContain(`${BASE}/community/${SUBMISSION_ID}`);
+    expect(firstBody()).toContain(`${BASE}/community?submission=${SUBMISSION_ID}`);
   });
 
   it('says an unlisted approved submission is reachable by its link only', async () => {

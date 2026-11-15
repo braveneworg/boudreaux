@@ -59,6 +59,24 @@ export const communityViewer = async (): Promise<SubmissionActor | null> => {
   return user ? { id: user.id, role: user.role } : null;
 };
 
+/** Who is calling a public community route: a banned account, or the viewer (`null` is a guest). */
+export type CommunityCaller = { banned: true } | { banned: false; viewer: SubmissionActor | null };
+
+/**
+ * The caller of a public community route, which takes no session: the
+ * session's user, or a guest. A route answers a banned account itself, in
+ * the one way it answers every refusal, so this says so and never throws.
+ */
+export const communityCaller = async (): Promise<CommunityCaller> => {
+  const session = await auth();
+  const user = session?.user?.id ? session.user : null;
+  if (user?.banned === true) {
+    return { banned: true };
+  }
+
+  return { banned: false, viewer: user ? { id: user.id, role: user.role ?? null } : null };
+};
+
 /**
  * The signed-in approver of an approver page, by the action gate's own rule:
  * `'approver'` admits an admin or a manager, `'admin'` an admin alone. Anyone

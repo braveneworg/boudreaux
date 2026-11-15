@@ -421,23 +421,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('isPublic', () => {
-    it('counts the public submissions with that id', async () => {
-      vi.mocked(prisma.submission.count).mockResolvedValueOnce(1);
-
-      await expect(SubmissionRepository.isPublic(SUBMISSION_ID)).resolves.toBe(true);
-      expect(vi.mocked(prisma.submission.count).mock.calls).toEqual([
-        [{ where: { id: SUBMISSION_ID, AND: [submissionWhere.public] } }],
-      ]);
-    });
-
-    it('is false when none matched', async () => {
-      vi.mocked(prisma.submission.count).mockResolvedValueOnce(0);
-
-      await expect(SubmissionRepository.isPublic(SUBMISSION_ID)).resolves.toBe(false);
-    });
-  });
-
   describe('findManyWithOwnerByIds', () => {
     it('reads the named submissions with their owners', async () => {
       const rows = [{ ...stored, owner: { id: OWNER_ID, username: 'ada' } }];

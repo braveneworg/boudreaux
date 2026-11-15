@@ -16,7 +16,7 @@ import type { SubmissionActor } from '@/lib/types/domain/submission';
 import { isApproverRole } from '@/lib/utils/roles';
 import { allowGuestView } from '@/lib/utils/submission-view-allowance';
 
-/** One opening of a submission's page that asks to be counted. */
+/** One opening of a submission that asks to be counted. */
 export interface ViewAttempt {
   submissionId: string;
   /** The session's user, or `null` for a guest. */
@@ -33,8 +33,8 @@ export interface ViewAttempt {
 
 /**
  * The rules of a view (CONTEXT.md, ADR-0029): one viewer opening a
- * submission's own page, counted at most once per viewer, per submission,
- * per UTC day. Every rule about what counts lives here; the route only
+ * submission in the submission modal, counted at most once per viewer, per
+ * submission, per UTC day. Every rule about what counts lives here; the route only
  * identifies the caller.
  */
 export class SubmissionViewEventService {

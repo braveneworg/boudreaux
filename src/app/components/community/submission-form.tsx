@@ -61,6 +61,7 @@ import { submissionFormSchema } from '@/lib/validation/submission-schema';
 import type { SubmissionFormValues } from '@/lib/validation/submission-schema';
 
 import { SubmissionAttachments } from './submission-attachments';
+import { SubmissionLink } from './submission-link';
 import { LISTED_HELP, LISTED_LABEL } from './submission-owner-controls';
 import { SubmissionTextEditor } from './submission-text-editor';
 import { useVerification } from './use-verification';
@@ -290,7 +291,7 @@ const SentForApproval = ({ id, queuePosition }: SavedSubmission) => (
     <p>We&apos;ll email you when it&apos;s live or if we need changes.</p>
     <div className="flex flex-wrap gap-3">
       <Button asChild variant="outline">
-        <Link href={`/community/${id}`}>View your submission</Link>
+        <SubmissionLink submissionId={id}>View your submission</SubmissionLink>
       </Button>
       <Button asChild variant="ghost">
         <Link href="/community/mine">Your submissions</Link>

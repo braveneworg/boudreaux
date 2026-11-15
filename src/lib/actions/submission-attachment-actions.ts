@@ -30,7 +30,6 @@ import {
   COMMUNITY_QUEUE_PATH,
   failureFromError,
   invalidInputFailure,
-  submissionPath,
 } from './submission-action-helpers';
 
 /**
@@ -51,11 +50,11 @@ const DAILY_LIMIT_MESSAGE = 'You have added a lot of files today. Try again tomo
 /**
  * Every page a change to one submission's attachments may have changed. The
  * community page is among them: an attachment added to or removed from an
- * approved submission takes it offline.
+ * approved submission takes it offline. A submission has no page of its own
+ * to revalidate (ADR-0030): the modal reads it on opening.
  */
-const revalidateSubmission = (id: string): void => {
+const revalidateSubmission = (): void => {
   revalidatePath(COMMUNITY_MINE_PATH);
-  revalidatePath(submissionPath(id));
   revalidatePath(COMMUNITY_QUEUE_PATH);
   revalidatePath(COMMUNITY_PATH);
 };
@@ -122,7 +121,7 @@ export const confirmAttachmentUploadAction = async (
       parsed.data
     );
     after(() => SubmissionAttachmentService.runReencode(attachmentId));
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return { success: true, data: { attachmentId, status: submission.status } };
   } catch (error) {
@@ -148,7 +147,7 @@ export const removeAttachmentAction = async (
 
   try {
     const submission = await SubmissionAttachmentService.remove(user.id, parsed.data.attachmentId);
-    revalidateSubmission(submission.id);
+    revalidateSubmission();
 
     return { success: true, data: { status: submission.status } };
   } catch (error) {

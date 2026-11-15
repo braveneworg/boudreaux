@@ -25,7 +25,6 @@ const logger = loggers.media;
 export const COMMUNITY_MINE_PATH = '/community/mine';
 export const COMMUNITY_QUEUE_PATH = '/admin/community';
 export const COMMUNITY_MANAGERS_PATH = '/admin/community/managers';
-export { submissionPath } from '@/lib/community/community-paths';
 
 type ZodIssues = Parameters<typeof fieldErrorsFromZodIssues>[0];
 

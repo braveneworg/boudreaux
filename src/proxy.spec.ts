@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 
 import { getCookieCache, getSessionCookie } from 'better-auth/cookies';
 
-import type * as SubmissionPageStatus from '@/lib/community/submission-page-status';
+import type * as LegacySubmissionUrl from '@/lib/community/legacy-submission-url';
 import type * as LegacyReleaseUrl from '@/lib/legacy-release-url';
 
 import middleware, { config } from './proxy';
@@ -35,16 +35,15 @@ vi.mock('@/lib/legacy-release-url', async (importOriginal) => ({
     legacyReleaseResponse(request, releaseId),
 }));
 
-const submissionPageResponse = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/community/submission-page-status', async (importOriginal) => ({
-  ...(await importOriginal<typeof SubmissionPageStatus>()),
-  submissionPageResponse: (request: NextRequest, segment: string, hasSession: boolean) =>
-    submissionPageResponse(request, segment, hasSession),
+const legacySubmissionResponse = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/community/legacy-submission-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof LegacySubmissionUrl>()),
+  legacySubmissionResponse: (request: NextRequest, segment: string) =>
+    legacySubmissionResponse(request, segment),
 }));
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/services/release-service', () => ({ ReleaseService: {} }));
-vi.mock('@/lib/services/submission-service', () => ({ SubmissionService: {} }));
 
 interface MockNextUrl {
   pathname: string;
@@ -534,42 +533,42 @@ describe('proxy middleware', () => {
     });
   });
 
-  describe('a submission’s page', () => {
+  describe('the legacy submission URL', () => {
     const SUBMISSION_PATH = '/community/0123456789abcdef01234567';
 
     it('answers /community/<id> for a signed-out visitor before any auth gate', async () => {
       signedOut();
-      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      legacySubmissionResponse.mockReturnValueOnce({ type: 'legacy-submission' });
       const request = createMockRequest(SUBMISSION_PATH);
 
       const result = await middleware(request as unknown as NextRequest);
 
-      expect(submissionPageResponse.mock.calls).toEqual([
-        [request, '0123456789abcdef01234567', false],
-      ]);
-      expect(result).toEqual({ type: 'submission-page' });
+      expect(legacySubmissionResponse.mock.calls).toEqual([[request, '0123456789abcdef01234567']]);
+      expect(result).toEqual({ type: 'legacy-submission' });
+      // The redirect is the legacy module's own; no auth gate made one.
       expect(NextResponse.redirect).not.toHaveBeenCalled();
     });
 
-    it('says so when the request carries a session cookie', async () => {
+    it('answers a signed-in visitor the same way', async () => {
       signedIn();
-      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      legacySubmissionResponse.mockReturnValueOnce({ type: 'legacy-submission' });
       const request = createMockRequest(SUBMISSION_PATH);
 
-      await middleware(request as unknown as NextRequest);
+      const result = await middleware(request as unknown as NextRequest);
 
-      expect(submissionPageResponse.mock.calls[0]?.[2]).toBe(true);
+      expect(legacySubmissionResponse.mock.calls).toEqual([[request, '0123456789abcdef01234567']]);
+      expect(result).toEqual({ type: 'legacy-submission' });
     });
 
     it('hands a signed-in visitor’s request for the form to the same answer', async () => {
       signedIn();
-      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      legacySubmissionResponse.mockReturnValueOnce({ type: 'legacy-submission' });
       const request = createMockRequest('/community/submit');
 
       const result = await middleware(request as unknown as NextRequest);
 
-      expect(submissionPageResponse.mock.calls).toEqual([[request, 'submit', true]]);
-      expect(result).toEqual({ type: 'submission-page' });
+      expect(legacySubmissionResponse.mock.calls).toEqual([[request, 'submit']]);
+      expect(result).toEqual({ type: 'legacy-submission' });
     });
 
     it.each(['/community-archive/0123456789abcdef01234567', '/admin/community'])(
@@ -580,7 +579,7 @@ describe('proxy middleware', () => {
 
         await middleware(request as unknown as NextRequest);
 
-        expect(submissionPageResponse).not.toHaveBeenCalled();
+        expect(legacySubmissionResponse).not.toHaveBeenCalled();
       }
     );
   });
@@ -604,14 +603,14 @@ describe('proxy middleware', () => {
     );
 
     it.each(['/community/submit', '/community/mine'])(
-      'never asks whether %s is a public submission for a signed-out visitor',
+      'never takes %s for a legacy submission URL when the visitor is signed out',
       async (pathname) => {
         signedOut();
         const request = createMockRequest(pathname);
 
         await middleware(request as unknown as NextRequest);
 
-        expect(submissionPageResponse).not.toHaveBeenCalled();
+        expect(legacySubmissionResponse).not.toHaveBeenCalled();
       }
     );
 
@@ -625,9 +624,9 @@ describe('proxy middleware', () => {
       expect(result).toEqual({ type: 'next' });
     });
 
-    it('still answers a submission’s own page for a signed-out visitor without sending them to sign in', async () => {
+    it('still answers a legacy submission URL for a signed-out visitor without sending them to sign in', async () => {
       signedOut();
-      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      legacySubmissionResponse.mockReturnValueOnce({ type: 'legacy-submission' });
       const request = createMockRequest('/community/0123456789abcdef01234567');
 
       await middleware(request as unknown as NextRequest);
@@ -639,13 +638,13 @@ describe('proxy middleware', () => {
       'does not take %s for one of them',
       async (pathname) => {
         signedOut();
-        submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+        legacySubmissionResponse.mockReturnValueOnce({ type: 'legacy-submission' });
         const request = createMockRequest(pathname);
 
         await middleware(request as unknown as NextRequest);
 
         expect(NextResponse.redirect).not.toHaveBeenCalled();
-        expect(submissionPageResponse).toHaveBeenCalledTimes(1);
+        expect(legacySubmissionResponse).toHaveBeenCalledTimes(1);
       }
     );
   });
@@ -694,7 +693,7 @@ describe('proxy config', () => {
     expect(config.matcher).not.toContain('/releases');
   });
 
-  it('matches a submission’s page and its edit page, but not the community page', () => {
+  it('matches the legacy submission URL and an edit page, but not the community page', () => {
     expect(config.matcher).toContain('/community/:id');
     expect(config.matcher).toContain('/community/:id/edit');
     expect(config.matcher).not.toContain('/community');

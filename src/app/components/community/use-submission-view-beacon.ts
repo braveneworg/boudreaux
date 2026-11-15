@@ -6,14 +6,16 @@ import { useEffect, useRef } from 'react';
 import { submissionViewPath } from '@/lib/community/community-paths';
 
 /**
- * Ask, once a submission's page has opened in a browser, for the opening to
- * be counted as a view (CONTEXT.md, ADR-0029). It posts when the component
- * mounts and again only if the page comes to show another submission.
+ * Ask, once a submission has opened in a browser, for the opening to be
+ * counted as a view (CONTEXT.md, ADR-0029). It posts when the component
+ * mounts, which is when the submission modal shows the submission, and
+ * again only if the same mount comes to show another submission.
  *
  * The request is `keepalive`, so it is not cancelled when the reader leaves
- * at once: they opened the page, and that is a view. It is never aborted on
- * unmount for the same reason. A failed request is left alone; nothing on
- * the page depends on the answer, and the answer says nothing either way.
+ * at once: they opened the submission, and that is a view. It is never
+ * aborted on unmount for the same reason. A failed request is left alone;
+ * nothing on screen depends on the answer, and the answer says nothing
+ * either way.
  *
  * One mount posts once, also in development, where React runs a mounted
  * component's effects twice. The ref outlives that replay, so the second run
@@ -21,7 +23,7 @@ import { submissionViewPath } from '@/lib/community/community-paths';
  * at once from a guest with no visitor cookie yet are identified as two
  * visitors, and one opening would be counted under both.
  *
- * @param submissionId - The submission whose page this is.
+ * @param submissionId - The submission that was opened.
  */
 export const useSubmissionViewBeacon = (submissionId: string): void => {
   const askedFor = useRef<string | null>(null);

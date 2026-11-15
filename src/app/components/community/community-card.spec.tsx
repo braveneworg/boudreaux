@@ -1,11 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import type { SubmissionCard } from '@/lib/types/domain/submission';
 
 import { CommunityCard } from './community-card';
+import { SubmissionModalContext } from './use-submission-modal';
 
 // Radix's avatar shows its image only once it has loaded, which jsdom never
 // does; the stand-in shows what the card handed it.
@@ -48,16 +49,30 @@ const card = (overrides: Partial<SubmissionCard> = {}): SubmissionCard => ({
 });
 
 describe('CommunityCard', () => {
-  it('links its title to the submission’s page', () => {
+  it('carries the submission deep link on its title, for a click the browser keeps', () => {
     render(<CommunityCard card={card()} />);
 
     expect(screen.getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
       'href',
-      `/community/${ID}`
+      `/community?submission=${ID}`
     );
   });
 
-  it('does not prefetch the submission: a page of cards would cost a lookup each', () => {
+  it('opens the submission over the page on a click of its title', () => {
+    const modal = { open: vi.fn(), close: vi.fn() };
+    render(
+      <SubmissionModalContext value={modal}>
+        <CommunityCard card={card()} />
+      </SubmissionModalContext>
+    );
+
+    const followed = fireEvent.click(screen.getByRole('link', { name: 'Bus poem' }));
+
+    expect(modal.open.mock.calls).toEqual([[ID, screen.getByRole('link', { name: 'Bus poem' })]]);
+    expect(followed).toBe(false);
+  });
+
+  it('does not prefetch the submission: a page of cards would cost a page each', () => {
     render(<CommunityCard card={card()} />);
 
     expect(screen.getByRole('link', { name: 'Bus poem' })).toHaveAttribute(
@@ -115,7 +130,9 @@ describe('CommunityCard', () => {
     render(<CommunityCard card={card()} />);
 
     expect(
-      screen.getAllByRole('link').filter((link) => link.getAttribute('href') === `/community/${ID}`)
+      screen
+        .getAllByRole('link')
+        .filter((link) => link.getAttribute('href') === `/community?submission=${ID}`)
     ).toHaveLength(1);
   });
 });
