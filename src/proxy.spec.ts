@@ -561,14 +561,14 @@ describe('proxy middleware', () => {
       expect(submissionPageResponse.mock.calls[0]?.[2]).toBe(true);
     });
 
-    it('hands the form’s and the owner’s list’s addresses to the same answer', async () => {
-      signedOut();
+    it('hands a signed-in visitor’s request for the form to the same answer', async () => {
+      signedIn();
       submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
       const request = createMockRequest('/community/submit');
 
       const result = await middleware(request as unknown as NextRequest);
 
-      expect(submissionPageResponse.mock.calls).toEqual([[request, 'submit', false]]);
+      expect(submissionPageResponse.mock.calls).toEqual([[request, 'submit', true]]);
       expect(result).toEqual({ type: 'submission-page' });
     });
 
@@ -581,6 +581,71 @@ describe('proxy middleware', () => {
         await middleware(request as unknown as NextRequest);
 
         expect(submissionPageResponse).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  describe('the community pages that need an account', () => {
+    const EDIT_PATH = '/community/0123456789abcdef01234567/edit';
+
+    it.each(['/community/submit', '/community/mine', EDIT_PATH])(
+      'sends a signed-out visitor from %s to sign in, and back afterwards',
+      async (pathname) => {
+        signedOut();
+        const request = createMockRequest(pathname);
+
+        const result = await middleware(request as unknown as NextRequest);
+
+        const redirectCall = vi.mocked(NextResponse.redirect).mock.calls[0]?.[0] as URL;
+        expect(redirectCall.pathname).toBe('/signin');
+        expect(redirectCall.searchParams.get('callbackUrl')).toBe(pathname);
+        expect(result).toMatchObject({ type: 'redirect' });
+      }
+    );
+
+    it.each(['/community/submit', '/community/mine'])(
+      'never asks whether %s is a public submission for a signed-out visitor',
+      async (pathname) => {
+        signedOut();
+        const request = createMockRequest(pathname);
+
+        await middleware(request as unknown as NextRequest);
+
+        expect(submissionPageResponse).not.toHaveBeenCalled();
+      }
+    );
+
+    it('lets a signed-in visitor through to a submission’s edit page', async () => {
+      signedIn();
+      const request = createMockRequest(EDIT_PATH);
+
+      const result = await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.redirect).not.toHaveBeenCalled();
+      expect(result).toEqual({ type: 'next' });
+    });
+
+    it('still answers a submission’s own page for a signed-out visitor without sending them to sign in', async () => {
+      signedOut();
+      submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+      const request = createMockRequest('/community/0123456789abcdef01234567');
+
+      await middleware(request as unknown as NextRequest);
+
+      expect(NextResponse.redirect).not.toHaveBeenCalled();
+    });
+
+    it.each(['/community/submitted', '/community/mines'])(
+      'does not take %s for one of them',
+      async (pathname) => {
+        signedOut();
+        submissionPageResponse.mockResolvedValueOnce({ type: 'submission-page' });
+        const request = createMockRequest(pathname);
+
+        await middleware(request as unknown as NextRequest);
+
+        expect(NextResponse.redirect).not.toHaveBeenCalled();
+        expect(submissionPageResponse).toHaveBeenCalledTimes(1);
       }
     );
   });
@@ -629,8 +694,9 @@ describe('proxy config', () => {
     expect(config.matcher).not.toContain('/releases');
   });
 
-  it('matches a submission’s page, but not the community page or a submission’s edit page', () => {
+  it('matches a submission’s page and its edit page, but not the community page', () => {
     expect(config.matcher).toContain('/community/:id');
+    expect(config.matcher).toContain('/community/:id/edit');
     expect(config.matcher).not.toContain('/community');
     expect(config.matcher).not.toContain('/community/:path*');
   });
