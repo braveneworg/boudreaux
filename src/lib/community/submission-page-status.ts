@@ -59,8 +59,10 @@ const namesPublicSubmission = async (segment: string): Promise<boolean> => {
 /**
  * The proxy's answer for `/community/<segment>`: on to the page, or a
  * rewrite in place under a `404` for a signed-out request whose segment is
- * not a public submission. The form and the owner's list go on to their
- * pages, which send a signed-out visitor to sign in.
+ * not a public submission. The form and the owner's list are never a `404`
+ * here. The proxy sends a signed-out visitor to them to sign in before it
+ * asks this, and their pages check again; this only makes sure the two can
+ * never be taken for a submission's id.
  *
  * @param hasSession - Whether the request carries a session cookie. Presence
  * only: the page makes the authoritative check.

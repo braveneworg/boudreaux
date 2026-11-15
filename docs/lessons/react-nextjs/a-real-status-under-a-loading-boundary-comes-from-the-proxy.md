@@ -33,3 +33,32 @@ Rules:
 - A local `pnpm run build` points `assetPrefix` at the real CDN, so its
   pages never hydrate in a browser. Build with `SKIP_CDN_ASSET_PREFIX=1`
   (and the Docker `DATABASE_URL`) for a local visual check.
+
+## A redirect to sign in is a status too
+
+Stage 4 of community submissions (2026-11-14) gave `/community/<id>` its
+real `404` from the proxy and left the form, the owner's list and the edit
+page to `requireCommunityUser`, which calls `redirect()` in the page. A
+signed-out visitor could make nothing: every action refuses, and the form
+never rendered. But the address answered `200` with the loading page, and
+the redirect to sign in happened in the browser. On production:
+
+```
+$ curl -s -o /dev/null -w '%{http_code}' https://…/community/submit
+200
+```
+
+The owner raised it the next day as "users shouldn't be able to make
+submissions if they aren't signed in". The E2E step that covered it used
+`page.goto` and `waitForURL`, which passes either way.
+
+- A page that needs an account goes in the proxy's `PRIVATE_ROUTES` and its
+  `matcher`, as `/profile` is, so a request with no session cookie gets a
+  real redirect. The page keeps its own check, which is the one that reads
+  the session.
+- Prove it from the response, not the address bar:
+  `page.request.get(path, { maxRedirects: 0 })` and assert `307` and the
+  `location` header. `community-submissions.spec.ts` does.
+- When a path shares a matcher pattern with a public page (the form and a
+  submission's page are both one segment under `/community`), ask the
+  private rule first.
