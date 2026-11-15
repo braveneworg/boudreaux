@@ -332,7 +332,7 @@ Free-tier limits and the traffic they imply:
 | MongoDB Atlas | (existing tier — chat collections are tiny) | n/a                                                      |
 
 Fixed Upstash overhead on top of chat traffic: the `Redis Keepalive`
-workflow (1 PING/day) and the memoized PING behind `/api/health`
+workflow (1 `SET`/day) and the memoized PING behind `/api/health`
 (≤288/day regardless of traffic — the result is cached for 5 minutes).
 
 Both Pusher and Upstash have one-click upgrade paths if usage grows.

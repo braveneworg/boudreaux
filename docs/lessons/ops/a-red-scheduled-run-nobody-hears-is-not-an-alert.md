@@ -35,3 +35,8 @@ delivery path.
   step reads it through `env`, never through `${{ }}` inside `run`.
 - `gh run list --workflow <file> --limit 30` shows when a schedule turned
   red. Read it before the newest log.
+- A keepalive writes, it does not only PING. The database was lost after
+  two months of green daily PINGs, so a PING did not keep it. The script now
+  runs `SET keepalive:last-run <time> EX 604800`. Why Upstash dropped the
+  database was never established from the repository's side; the write is
+  the user's call on what counts as usage, not a confirmed cause.
