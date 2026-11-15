@@ -34,6 +34,10 @@ const PUBLIC_ROUTES = [
 
 const PRIVATE_ROUTES = [
   /^\/profile/, // /profile and sub-routes
+  // The community pages that need an account: the form, the owner's list
+  // and a submission's edit page. Only a signed-in user makes a submission.
+  /^\/community\/(submit|mine)$/,
+  /^\/community\/[^/]+\/edit$/,
 ];
 
 const isPublicRoute = (pathname: string): boolean =>
@@ -153,8 +157,16 @@ export default async function middleware(request: NextRequest) {
   // Presence-only check at the edge — cheap, no DB hit.
   const hasSession = Boolean(getSessionCookie(request, { cookiePrefix: COOKIE_PREFIX }));
 
+  // Redirect unauthenticated users trying to access private routes. Asked
+  // before the community branch below: the form and the owner's list are
+  // one segment under /community, as a submission's page is, and a signed-out
+  // visitor to them is sent to sign in, not looked up as a submission.
+  if (isPrivateRoute(pathname) && !hasSession) {
+    return buildSigninRedirect(request, pathname);
+  }
+
   // A submission's page is public: a signed-out request for one that is not
-  // a public submission gets a real 404, and nothing here sends anyone to
+  // a public submission gets a real 404, and this branch sends nobody to
   // sign in.
   const communitySegment = communityPageSegment(pathname);
   if (communitySegment !== null) {
@@ -162,11 +174,6 @@ export default async function middleware(request: NextRequest) {
   }
 
   const isPublic = isPublicRoute(pathname);
-
-  // Redirect unauthenticated users trying to access private routes
-  if (isPrivateRoute(pathname) && !hasSession) {
-    return buildSigninRedirect(request, pathname);
-  }
 
   // Return early for public routes
   if (isPublic) {
@@ -203,13 +210,17 @@ export const config = {
      * (like /releases) and deliberately unmatched.
      * - /releases/:releaseId, the public legacy release URL (not a gate)
      * - /community/:id, a submission's public page (not a gate): only its
-     *   status is decided here. /community itself is deliberately unmatched.
+     *   status is decided here. The same pattern matches the form and the
+     *   owner's list, which do need an account. /community itself is
+     *   deliberately unmatched.
+     * - /community/:id/edit, a submission's edit page, which needs an account
      * - /profile and all sub-routes
      * - /admin and all sub-routes
      * - /api/admin and all sub-routes
      */
     '/releases/:releaseId',
     '/community/:id',
+    '/community/:id/edit',
     '/profile',
     '/profile/:path*',
     '/admin',

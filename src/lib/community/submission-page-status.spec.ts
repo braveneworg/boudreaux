@@ -66,7 +66,7 @@ describe('the one-segment community pages that are not a submission’s', () => 
     expect(staticPages).toEqual(expect.arrayContaining(['mine', 'submit']));
   });
 
-  it.each(staticPages)('lets a signed-out visitor through to /community/%s', async (segment) => {
+  it.each(staticPages)('never answers a 404 for /community/%s', async (segment) => {
     const response = await visit(segment, false);
 
     expect(response.status).toBe(200);
@@ -106,7 +106,7 @@ describe('submissionPageResponse', () => {
     );
 
     it.each(['submit', 'mine'])(
-      'leaves /community/%s to its page, which sends the visitor to sign in',
+      'never takes /community/%s for a submission: the proxy sent the visitor to sign in already',
       async (segment) => {
         const response = await visit(segment, false);
 

@@ -682,6 +682,23 @@ test('the community page lists what is listed, to anyone', async ({ page }) => {
 
     await page.waitForURL(/\/signin\?callbackUrl=%2Fcommunity%2Fsubmit/);
   });
+
+  await test.step('the form, the owner’s list and an edit page answer a signed-out request with a redirect, never a page', async () => {
+    // Read from the response itself: under the loading boundary a page can
+    // only redirect in the browser, after it has answered 200.
+    for (const pathname of [
+      '/community/submit',
+      '/community/mine',
+      `/community/${listed.id}/edit`,
+    ]) {
+      const response = await page.request.get(pathname, { maxRedirects: 0 });
+
+      expect(`${pathname} ${response.status()}`).toBe(`${pathname} 307`);
+      expect(response.headers().location).toContain(
+        `/signin?callbackUrl=${encodeURIComponent(pathname)}`
+      );
+    }
+  });
 });
 
 /**

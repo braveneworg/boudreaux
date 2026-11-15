@@ -21,9 +21,14 @@ import type { User } from '@/lib/types/domain/user';
  */
 
 /**
- * The signed-in user of a page that needs one: the form and the owner's list.
- * A signed-out visitor is sent to sign in and brought back to `returnTo`. A
- * banned account gets not found.
+ * The signed-in user of a page that needs one: the form, the owner's list
+ * and a submission's edit page. A signed-out visitor is sent to sign in and
+ * brought back to `returnTo`. A banned account gets not found.
+ *
+ * The proxy already answers a request with no session cookie with a real
+ * redirect, before the page starts. This is the check that counts: it reads
+ * the session itself, so a cookie that no longer names one is caught here.
+ * Under the root loading boundary its redirect happens in the browser.
  */
 export const requireCommunityUser = async (returnTo: string): Promise<User> => {
   const session = await auth();
