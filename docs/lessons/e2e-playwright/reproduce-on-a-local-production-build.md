@@ -42,6 +42,18 @@ NEXT_PUBLIC_HOST_NAME=http://127.0.0.1:3000`). Next.js inlines
   `connect-src` refused it, and the spec failed with "The upload did not
   finish" on the production build only. The trace's `*.network` log showed
   the host. CI's build has no env files, so CI never sees this.
+- A session isolated in a worktree refuses a command that sets `HOME`
+  ("injecting git configuration"). Leave `HOME="$HOME"` out of the `env -i`
+  line there: `next build` ran without it on 2026-11-15.
+- With `CI=true` the config starts the server on port 3000 and will not
+  reuse one. When another process holds the port (`lsof -nP -iTCP:3000
+-sTCP:LISTEN`), do not stop it: it is not yours. Build with
+  `NEXT_PUBLIC_BASE_URL` and `NEXT_PUBLIC_HOST_NAME` on a free port, and run
+  through a throwaway config that spreads `playwright.config.ts` and
+  overrides `use.baseURL`, `webServer.url` and the `PORT`, `AUTH_URL` and
+  `NEXT_PUBLIC_BASE_URL` of `webServer.env`
+  (`playwright test --config <file>`). Delete the file afterwards. The
+  database variables come from the spread config and stay as they are.
 - `--repeat-each` with several workers runs copies of one test at once.
   A spec that edits one seeded row (`admin-video-artist-review.spec.ts`)
   then collides with itself; that failure is the stress, not the bug (see
