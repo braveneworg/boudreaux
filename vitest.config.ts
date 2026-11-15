@@ -47,6 +47,7 @@ export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/rollback-resolve.spec.ts',
   'scripts/ci/schema-push-gate.spec.ts',
   'scripts/ci/schema-rollback-tripwire.spec.ts',
+  'scripts/ci/send-alert-email.spec.ts',
   'scripts/ci/start-mongo.spec.ts',
   'scripts/assert-toolchain.spec.ts',
   'scripts/check-toolchain-pins.spec.ts',
