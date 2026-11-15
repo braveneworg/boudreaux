@@ -586,7 +586,7 @@ side at quality 70, a video at 720p.
 _Avoid_: transcode, sanitized file, scan (nothing is scanned).
 
 **about** — the owner's note on a **submission**, in bold and italic only:
-what its page shows beside the work, and the only body text a search reads.
+what is shown beside the work, and the only body text a search reads.
 _Avoid_: description (a Video's prose), blurb (a Release's listing copy),
 caption.
 
@@ -679,10 +679,30 @@ submission appears, never whether it is reachable.
 
 **community page** — `/community`, the public page headed "User Submitted
 Content" that the menu calls Community: its search, both **submission rows**
-and the full list of **listed submissions**. A submission's own page is
-`/community/<id>`: an id, never its title or its owner's username, so no
-edit or rename breaks a shared link.
+and the full list of **listed submissions**. A submission opens over it, in
+the **submission modal**, and is never a page of its own.
 _Avoid_: USC page, feed, gallery.
+
+**submission modal** — how a **submission** is opened, wherever it is
+clicked: over the page the visitor is on, as a centred dialog on a wide
+screen and a drawer rising from the bottom on a phone. A card, a search
+result, a row of the owner's list and the form's "View your submission" all
+open it in place, and the address does not change. It shows what that reader
+may see: the public a **public submission**, its owner and approvers any,
+with their status line and controls. A submission the reader may not open
+gets one answer whatever the reason. The approver's review page, where the
+decision is made, stays a page. See
+[ADR-0030](docs/adr/0030-a-submission-opens-in-a-modal-not-a-page.md).
+_Avoid_: submission page, detail page, lightbox (an enlarged image).
+
+**submission deep link** — `/community?submission=<id>`: a submission's
+permalink, the **community page** with the **submission modal** open on
+it. It holds the id and nothing else, never the title or the owner's
+username, so no edit or rename breaks a shared link. It is what the share
+row copies, what the approval email links, the href of every opener for a
+click the browser keeps, and where the old `/community/<id>` address
+redirects. Closing the modal it opened removes the parameter from the
+address, so back and refresh do not reopen it.
 
 **submission row** — one of the two fixed sets the **community page**
 leads with, **Most Recent** and **Trending**: at most twelve **listed
@@ -694,12 +714,13 @@ Trending orders by **views** over the last thirty days, newer first on a tie,
 and holds only submissions with at least five views in that time.
 _Avoid_: feed, carousel (the banner's), featured (a release credit).
 
-**view** — one viewer opening a **submission**'s own page, counted at most
-once per viewer, per submission, per day (the UTC day). The viewer is a
-signed-in user or a guest, identified as a guest **download subject** is. The
-owner's and approvers' openings are never counted, and a card shown in a row,
-a list or a search is not a view. A view is counted by the page in the
-browser, so a link preview or a crawler is never one; it is kept for thirty
+**view** — one viewer opening a **submission** in the **submission modal**,
+counted at most once per viewer, per submission, per day (the UTC day). The
+viewer is a signed-in user or a guest, identified as a guest **download
+subject** is. The owner's and approvers' openings are never counted, and a
+card shown in a row, a list or a search is not a view. A view is counted by
+the modal in the browser, so a link preview or a crawler, which only renders
+the page beneath, is never one; it is kept for thirty
 days without a record of who the viewer was, and then deleted. One address
 adds at most five guest views to one submission in a day. In code a stored
 view is a **view event**, because `SubmissionView` already names what a
