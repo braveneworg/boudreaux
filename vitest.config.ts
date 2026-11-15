@@ -42,6 +42,7 @@ export const SHELL_SCRIPT_SPECS = [
   'scripts/ci/check-social-provider-intent.spec.ts',
   'scripts/ci/deploy-remote.spec.ts',
   'scripts/ci/nginx-config-test.spec.ts',
+  'scripts/ci/redis-keepalive.spec.ts',
   'scripts/ci/release-deployed-sha.spec.ts',
   'scripts/ci/rollback-resolve.spec.ts',
   'scripts/ci/schema-push-gate.spec.ts',
